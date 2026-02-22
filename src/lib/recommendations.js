@@ -1,0 +1,38 @@
+// Recommendation engine — ported from prototype lines 109-142
+// Uses PROTOTYPE scoring (not PRD scoring which is wrong)
+import { getPeakStatus } from './peakStatus';
+
+export const getRecommendations = (beans, count = 3) => {
+  const sealed = beans.filter(b => b.status === "SEALED");
+  if (sealed.length === 0) return [];
+  const active = beans.filter(b => b.status === "ACTIVE");
+  const activeOrigins = active.map(b => b.origin);
+  const activeProcesses = active.map(b => b.process);
+
+  const scored = sealed.map(b => {
+    let score = 0;
+    const ps = getPeakStatus(b);
+    // Strongly prefer beans in peak window
+    if (ps.label.startsWith("In Peak")) score += 50;
+    // Fading beans need to be opened ASAP
+    if (ps.label.startsWith("Fading")) score += 60;
+    // Past peak / stale — still better to open than let sit more
+    if (ps.label.startsWith("Past Peak") || ps.label.startsWith("Stale")) score += 30;
+    // Prefer beans approaching end of peak
+    if (ps.days && ps.days > b.peakStart + (b.peakEnd - b.peakStart) * 0.5) score += 20;
+    // Prefer beans past degassing
+    if (ps.days >= b.degasMin) score += 10;
+    // Prefer smaller bags
+    if (b.bagSize <= 100) score += 10;
+    if (b.bagSize <= 150) score += 5;
+    // Variety bonus (different origin/process than active)
+    if (!activeOrigins.includes(b.origin)) score += 15;
+    if (!activeProcesses.includes(b.process)) score += 10;
+    // Penalize if still degassing
+    if (ps.days < b.degasMin) score -= 30;
+    return { bean: b, score, peakStatus: ps };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, Math.min(count, scored.length));
+};

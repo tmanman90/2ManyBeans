@@ -1,0 +1,40 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #FAF6F1;
+  -webkit-font-smoothing: antialiased;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #C49A6C !important;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E8DDD3;
+  border-radius: 4px;
+}
+
+/* Safe area padding for standalone PWA */
+.app-header {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.app-tab-bar {
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
