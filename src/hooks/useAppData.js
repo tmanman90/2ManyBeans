@@ -118,18 +118,16 @@ export const useAppData = (uid) => {
     if (!uid) return;
     const batch = writeBatch(db);
 
-    // We need to create doc refs with auto IDs and track old->new ID mapping for tastings
-    const idMap = {};
+    // Map seedId → new Firestore doc ID so tastings can reference the right bean
+    const seedIdMap = {};
 
     for (const bean of INITIAL_BEANS) {
       const beanRef = doc(collection(db, 'users', uid, 'beans'));
-      // Store mapping from old seed ID pattern to new Firestore ID
-      // Use roaster+name as a stable key for tasting beanId lookup
-      const key = `${bean.roaster}::${bean.name}`;
-      idMap[key] = beanRef.id;
+      if (bean.seedId) seedIdMap[bean.seedId] = beanRef.id;
 
+      const { seedId, ...beanData } = bean;
       batch.set(beanRef, {
-        ...bean,
+        ...beanData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -137,25 +135,11 @@ export const useAppData = (uid) => {
 
     for (const tasting of INITIAL_TASTINGS) {
       const tastingRef = doc(collection(db, 'users', uid, 'tastings'));
-      // Map old beanId to the new Firestore doc ID
-      // Find the bean in INITIAL_BEANS by old id to get roaster+name
-      const oldBean = INITIAL_BEANS.find(b => {
-        // Match by the old id pattern (e.g. "ag-chelchele")
-        const oldId = tasting.beanId;
-        // The seed data uses short ids like "ag-chelchele" which correspond to bean names
-        const nameSlug = b.name.toLowerCase().replace(/\s+/g, '');
-        return oldId.includes(nameSlug) || nameSlug.includes(oldId.replace(/^[a-z]+-/, ''));
-      });
-
-      let beanId = tasting.beanId; // fallback
-      if (oldBean) {
-        const key = `${oldBean.roaster}::${oldBean.name}`;
-        if (idMap[key]) beanId = idMap[key];
-      }
+      const { seedBeanId, ...tastingData } = tasting;
 
       batch.set(tastingRef, {
-        ...tasting,
-        beanId,
+        ...tastingData,
+        beanId: seedIdMap[seedBeanId] || seedBeanId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

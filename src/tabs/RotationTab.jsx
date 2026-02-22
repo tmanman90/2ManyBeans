@@ -1,19 +1,29 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useState } from 'react';
-import { Check, Plus, Star, X } from 'lucide-react';
+import { Check, Plus, Star, X, Coffee } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
 import { getRecBlurb } from '../lib/claude';
 import { BeanCard } from '../components/BeanCard';
+import { AidenModal } from '../components/AidenModal';
 import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
+import { generateAidenRecipe, researchBean, pushToAiden } from '../lib/aiden';
 
 export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, onSeed }) => {
   const [showRec, setShowRec] = useState(false);
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
   const [slotPicker, setSlotPicker] = useState(null);
+  const [aidenModal, setAidenModal] = useState(false);
+  const [aidenRecipe, setAidenRecipe] = useState(null);
+  const [aidenResult, setAidenResult] = useState(null);
+  const [aidenLoading, setAidenLoading] = useState(false);
+  const [aidenError, setAidenError] = useState(null);
+  const [aidenBean, setAidenBean] = useState(null);
+  const [aidenResearch, setAidenResearch] = useState(null);
+  const [aidenPhase, setAidenPhase] = useState(null); // 'research' | 'recipe' | 'push'
 
   const slots = [1, 2, 3].map(n => beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n) || null);
   const recs = getRecommendations(beans);
@@ -26,6 +36,59 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
       return;
     }
     setSlotPicker({ beanId });
+  };
+
+  const handlePushToAiden = async (recipe) => {
+    setAidenError(null);
+    setAidenResult(null);
+    setAidenLoading(true);
+    try {
+      const result = await pushToAiden(recipe);
+      setAidenResult(result);
+      if (result.grindRecommendation) {
+        setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));
+      }
+    } catch (fellowErr) {
+      setAidenError(fellowErr.message || "Couldn't push to Aiden");
+    }
+    setAidenLoading(false);
+  };
+
+  const handleBrewWithAiden = async (bean, cachedResearch = null) => {
+    setAidenBean(bean);
+    setAidenRecipe(null);
+    setAidenResult(null);
+    setAidenError(null);
+    setAidenLoading(true);
+    setAidenModal(true);
+
+    // Step 1: Research (skip if cached)
+    let research = cachedResearch;
+    if (!research) {
+      setAidenPhase('research');
+      try {
+        research = await researchBean(bean);
+        setAidenResearch(research);
+      } catch (err) {
+        console.warn('Bean research failed, continuing without enrichment:', err.message);
+        research = null;
+      }
+    }
+
+    // Step 2: Recipe
+    setAidenPhase('recipe');
+    try {
+      const recipe = await generateAidenRecipe(bean, research);
+      setAidenRecipe(recipe);
+      setAidenError(null);
+      // Step 3: Push to Fellow
+      setAidenPhase('push');
+      await handlePushToAiden(recipe);
+    } catch (err) {
+      setAidenError(err.message || "Couldn't generate a recipe");
+      setAidenLoading(false);
+    }
+    setAidenPhase(null);
   };
 
   const fetchRecBlurb = async () => {
@@ -83,11 +146,14 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
             Atmos #{i + 1}
           </div>
           {bean ? (
-            <BeanCard bean={bean} actions={
+            <BeanCard bean={bean} actions={<>
+              <Btn variant="small" onClick={() => handleBrewWithAiden(bean)}>
+                <Coffee size={12} /> Brew with Aiden
+              </Btn>
               <Btn variant="danger" onClick={() => onFinishBean(bean.id)}>
                 <Check size={14} /> Finish Bag
               </Btn>
-            } />
+            </>} />
           ) : (
             <div style={{
               background: C.card,
@@ -192,6 +258,17 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
           )}
         </div>
       )}
+      <AidenModal
+        open={aidenModal}
+        onClose={() => setAidenModal(false)}
+        recipe={aidenRecipe}
+        result={aidenResult}
+        loading={aidenLoading}
+        error={aidenError}
+        phase={aidenPhase}
+        onRetry={aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined}
+        onRetryPush={aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined}
+      />
     </div>
   );
 };

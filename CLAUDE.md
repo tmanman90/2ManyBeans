@@ -47,11 +47,12 @@ src/
   hooks/useAuth.js      # Auth state
   hooks/useAppData.js   # Firestore CRUD (beans + tastings)
   tabs/                 # RotationTab, InventoryTab, TastingTab, ChatTab, ArchiveTab
-  components/           # StarRating, AddBeanForm, Badge, SlotPicker
+  components/           # StarRating, AddBeanForm, Badge, SlotPicker, AidenModal
   lib/peakStatus.js     # Peak window calculations
   lib/roasterProfiles.js
   lib/recommendations.js
   lib/claude.js         # Claude API helpers
+  lib/aiden.js          # Aiden brew profile: researchBean() + generateAidenRecipe() + pushToAiden()
   styles/theme.js       # Color palette
 ```
 
@@ -60,7 +61,8 @@ src/
 - Bean statuses: `ACTIVE` | `SEALED` | `FINISHED`
 - Atmos slots are 1, 2, or 3 (Fellow Atmos vacuum canisters)
 - Roaster profiles auto-detected by fuzzy name match, fallback to default specialty light profile
-- AI features: photo bean scanning, guided tasting (coach mode), recommendations, general chat
+- AI features: photo bean scanning, guided tasting (coach mode), recommendations, general chat, Aiden brew profiles
+- Aiden brew flow uses two-step Claude calls: (1) researchBean() enriches with altitude/roast level/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using research context. Research failure falls back gracefully to recipe-only.
 - Tasting chat uses `---EXTRACT---` / `---END---` markers for structured data extraction from conversation
 - The user (Tal) is a novice taster — all AI tasting interactions must use step-by-step coaching with scaffolded options, never vague open-ended questions
 
