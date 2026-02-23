@@ -12,12 +12,12 @@ export const getRecommendations = (beans, count = 3) => {
   const scored = sealed.map(b => {
     let score = 0;
     const ps = getPeakStatus(b);
-    // Strongly prefer beans in peak window
-    if (ps.label.startsWith("In Peak")) score += 50;
+    // Past peak / stale — most urgent, losing quality every day
+    if (ps.label.startsWith("Past Peak") || ps.label.startsWith("Stale")) score += 80;
     // Fading beans need to be opened ASAP
-    if (ps.label.startsWith("Fading")) score += 60;
-    // Past peak / stale — still better to open than let sit more
-    if (ps.label.startsWith("Past Peak") || ps.label.startsWith("Stale")) score += 30;
+    if (ps.label.startsWith("Fading")) score += 70;
+    // In peak — good to open but less urgent than fading/past peak
+    if (ps.label.startsWith("In Peak")) score += 50;
     // Prefer beans approaching end of peak
     if (ps.days && ps.days > b.peakStart + (b.peakEnd - b.peakStart) * 0.5) score += 20;
     // Prefer beans past degassing

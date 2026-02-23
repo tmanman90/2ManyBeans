@@ -23,9 +23,15 @@ Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with
 - If a fix feels hacky, step back and implement the cleaner solution
 
 ### Self-Improvement
+- Review `session-start.md` and `lessons.md` at the start of each session
 - After ANY correction: update `lessons.md` in this project folder
 - Format: `- **[Topic]**: [What went wrong] → [What to do instead]`
-- Review `session-start.md` and `lessons.md` at the start of each session
+
+### Markdown Maintenance
+- **CLAUDE.md**: Update when project structure, conventions, or tech stack change
+- **lessons.md**: Add a bullet after any painful debugging session or gotcha
+- **PRD.md**: Update only when feature specs actually change
+- Don't update MDs for routine changes. Keep files concise.
 
 ### Principles
 - **Simplicity First**: Make every change as simple as possible

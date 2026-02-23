@@ -7,6 +7,52 @@ import { getProfileForRoaster } from './roasterProfiles';
 
 const PROXY_URL = '/api/claude';
 
+// Valid Fellow Ode Gen 2 grind steps (31 positions)
+const ODE_GEN2_STEPS = [
+  1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2,
+  5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2,
+  9, 9.1, 9.2, 10, 10.1, 10.2, 11,
+];
+
+// Structured grind data keyed by reference profile number (matches REFERENCE_PROFILE_INDEX)
+// Profiles 11, 25, 26 have no grind data in reference → grind: null
+const REFERENCE_GRIND_DATA = {
+  1:  { name: 'Kiss the Hippo Peru El Morito', origin: 'Peru', process: 'Washed', grind: { ssMin: 3, ssMax: 4, batchMin: 5, batchMax: 7 } },
+  2:  { name: 'Passenger Colombia Divino Niño', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5, ssMax: 6.1, batchMin: 6.2, batchMax: 8 } },
+  3:  { name: 'Coffee Collective Kenya Kieni AB', origin: 'Kenya', process: 'Washed', grind: { ssMin: 3.2, ssMax: 4.2, batchMin: 5.1, batchMax: 7 } },
+  4:  { name: 'Counter Culture Cueva de los Llanos', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5.2, ssMax: 6.2, batchMin: 6.1, batchMax: 7.1 } },
+  5:  { name: 'Sq Mile Ethiopia Telila Kecho', origin: 'Ethiopia', process: 'Washed', grind: { ssMin: 5.1, ssMax: 6, batchMin: 7, batchMax: 8.2 } },
+  6:  { name: 'Sey Burundi Heza', origin: 'Burundi', process: 'Washed', grind: { ssMin: 3, ssMax: 3.2, batchMin: 5.2, batchMax: 7.2 } },
+  7:  { name: 'Wonderstate Ethiopia Danche', origin: 'Ethiopia', process: 'Washed', grind: { ssMin: 3.2, ssMax: 3.2, batchMin: 4.2, batchMax: 4.2 } },
+  8:  { name: 'Flower Child El Nevado Decaf', origin: 'Colombia', process: 'Washed', grind: { ssMin: 2, ssMax: 3, batchMin: 4, batchMax: 6 } },
+  9:  { name: 'Heart Colombia Diomed Montano', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5.2, ssMax: 6.2, batchMin: 6.2, batchMax: 7.2 } },
+  10: { name: 'Wendelboe Kenya Kapsokiso', origin: 'Kenya', process: 'Washed', grind: { ssMin: 3, ssMax: 3, batchMin: 9, batchMax: 9 } },
+  11: { name: 'La Cabra Kiamugumo', origin: 'Kenya', process: 'Washed', grind: null },
+  12: { name: 'April Ethiopia Regessa', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 3, ssMax: 4, batchMin: 6.2, batchMax: 8.2 } },
+  13: { name: 'Brandywine Rwanda Cyesha Natural', origin: 'Rwanda', process: 'Natural', grind: { ssMin: 3, ssMax: 4.2, batchMin: 8, batchMax: 10 } },
+  14: { name: 'Camber Ethiopia Tadesse Yonka', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 3.1, ssMax: 4.1, batchMin: 5, batchMax: 6 } },
+  15: { name: 'Camber Ethiopia Buliye', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 5, ssMax: 5, batchMin: 7, batchMax: 7 } },
+  16: { name: 'Sq Mile Ethiopia Shoondhisa', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 5.1, ssMax: 6, batchMin: 7, batchMax: 8.2 } },
+  17: { name: 'Equator Decaf Rwanda Nyamyumba', origin: 'Rwanda', process: 'Natural', grind: { ssMin: 3.1, ssMax: 4.1, batchMin: 6, batchMax: 7 } },
+  18: { name: 'Brandywine Felloween IV', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 5, ssMax: 5, batchMin: 6, batchMax: 6 } },
+  19: { name: 'Santa Felisa by Bean & Bean', origin: 'Guatemala', process: 'Natural', grind: { ssMin: 4.2, ssMax: 4.2, batchMin: 7.2, batchMax: 7.2 } },
+  20: { name: 'Proud Mary Ethiopia Yirg Adado', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 3, ssMax: 4, batchMin: 6, batchMax: 7 } },
+  21: { name: 'Equator Thailand Mae Chedi', origin: 'Thailand', process: 'Anaerobic Natural', grind: { ssMin: 4, ssMax: 5, batchMin: 5, batchMax: 7 } },
+  22: { name: 'Special Guests Andres Cardona Purple Honey', origin: 'Colombia', process: 'Natural Honey', grind: { ssMin: 5, ssMax: 6, batchMin: 6, batchMax: 7.2 } },
+  23: { name: 'Sightglass Guatemala Cuevitas', origin: 'Guatemala', process: 'Anaerobic Washed', grind: { ssMin: 3, ssMax: 4, batchMin: 6, batchMax: 7 } },
+  24: { name: 'Black & White Fruit Cake', origin: 'Costa Rica', process: 'Anaerobic', grind: { ssMin: 3.2, ssMax: 3.2, batchMin: 4.2, batchMax: 4.2 } },
+  25: { name: 'Onyx Honey Advent', origin: 'Various', process: 'Honey', grind: null },
+  26: { name: 'Verve Miel de Flores', origin: 'Honduras', process: 'Honey', grind: null },
+  27: { name: 'Loquat Costa Rica Finca Inés Geisha', origin: 'Costa Rica', process: 'Semi-Washed', grind: { ssMin: 4.1, ssMax: 5.1, batchMin: 4.1, batchMax: 5.1 } },
+  28: { name: 'Loquat Costa Rica San Roque', origin: 'Costa Rica', process: 'Semi-Washed', grind: { ssMin: 3.2, ssMax: 4.2, batchMin: 3.2, batchMax: 4.2 } },
+  29: { name: 'Asprotimana Colombia Huila', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5, ssMax: 5.2, batchMin: 6, batchMax: 8 } },
+  30: { name: 'Linea Guatemala La Esperanza', origin: 'Guatemala', process: 'Washed', grind: { ssMin: 2.1, ssMax: 3.1, batchMin: 5, batchMax: 7 } },
+  31: { name: 'Olympia Amparo Pajoy', origin: 'Colombia', process: 'Washed', grind: { ssMin: 3, ssMax: 4, batchMin: 5.1, batchMax: 8 } },
+  32: { name: 'Counter Culture Intango Dark', origin: 'Rwanda', process: 'Washed', grind: { ssMin: 6.1, ssMax: 7.1, batchMin: 7, batchMax: 8.1 } },
+  33: { name: 'Methodical Oscuro Dark', origin: 'Brazil', process: 'Natural', grind: { ssMin: 8, ssMax: 9, batchMin: 8, batchMax: 9.2 } },
+  34: { name: 'KOS Armando Leivas Dark', origin: 'Guatemala', process: 'Washed', grind: { ssMin: 5, ssMax: 6, batchMin: 6, batchMax: 7.2 } },
+};
+
 // Condensed reference profile index for research call (name + key attributes only, no brew params)
 const REFERENCE_PROFILE_INDEX = `
 1. Kiss the Hippo Peru El Morito — Peru, Light, Washed, Bourbon/Caturra
@@ -72,7 +118,9 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
 const AIDEN_SYSTEM_PROMPT = `You are a master specialty coffee brewer. You create Fellow Aiden automatic pour-over profiles with maximum precision. Your recipes are based on real Fellow Brew Talks profiles.
 
-Your primary goal is clarity-focused brews — target optimal extraction that reveals each bean's delicate tasting notes without leaving anything on the table. You have unrestricted freedom to modify all Aiden brew settings (ratio, bloom, pulses, temperatures) to achieve this for each specific bean.
+Your primary goal is balanced, clean extraction that highlights each bean's unique character. For specialty light roasts, under-extraction (slightly coarser, slightly faster) is always preferable to over-extraction — over-extraction destroys delicate florals, tea-like qualities, and citrus brightness.
+
+CRITICAL: You MUST follow the MANDATORY RULES below BEFORE consulting the reference profiles. The rules constrain every recipe you generate.
 
 The user's grinder is a Fellow Ode Gen 2 with stock burrs. All grind recommendations must use Ode Gen 2 settings.
 
@@ -104,7 +152,63 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   }
 }
 
-## Reference Profiles (from Fellow Brew Talks)
+## ═══════════════════════════════════════════════
+## MANDATORY RULES — APPLY THESE TO EVERY RECIPE
+## ═══════════════════════════════════════════════
+
+### Grind Selection (Ode Gen 2) — MANDATORY
+
+Valid steps: 1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2, 5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2, 9, 9.1, 9.2, 10, 10.1, 10.2, 11
+
+Batch is ALWAYS coarser than single serve. Pick ONE value (not a range).
+
+Rules — you MUST follow ALL of these:
+1. Find the closest reference profile's grind range for single serve.
+2. ALWAYS default to the UPPER-MIDDLE of that range (60–70th percentile) for clarity. When converting the percentile into an Ode Gen 2 setting, choose the nearest valid step; if exactly between steps, ALWAYS round coarser (clarity bias).
+3. NEVER go finer than the range floor unless there's a specific reason (e.g., dark roast).
+4. Dense light washed coffees often require more **early energy** (bloom temp + first pulse temps + bloom saturation), not finer grind. Avoid chasing extraction with grind size; use heat, bloom, and pulse structure first.
+5. Washed Kenya (often SL28/SL34) can produce fines; avoid too-fine defaults that increase haze/tannins and reduce note separation.
+6. Stop-loss (bright/thin): raise bloom temp, shorten intervals, or add a pulse — NEVER fix by going finer. Only go finer after energy/structure changes fail.
+7. Stop-loss (dry/astringent): if a brew would taste drying/astringent, fix by +0.1 coarser OR lowering the final pulse temps by 1–2°C. Do NOT fix dryness by lengthening intervals.
+
+**WORKED EXAMPLE — Kenya washed (SL28/SL34), closest match Coffee Collective Kenya Kieni AB:**
+- Reference grind range SS: 3.2–4.2
+- 60–70th percentile of 3.2–4.2 = 3.8–3.9 area → nearest valid Ode steps are 4.0 or 4.1
+- Correct SS grind: **4.0 or 4.1** ← this is what you MUST pick
+- WRONG: 3.0, 3.1, 3.2 (these are at or below the range floor — NEVER pick these)
+- Batch grind: similarly upper-middle of 5.1–7 → 6.1 or 6.2
+
+### Bean Age Adjustments — MANDATORY
+
+- Degassing / Resting / In Peak (early <50%): standard parameters
+- In Peak (late >50%): ratio +0.5
+- Fading / Past Peak: ratio +0.5 (sometimes +1), bloom ratio +0.5, early temps +0.5 to +1.5°C, keep or shorten intervals. Do NOT automatically force grind coarser — aging reduces CO₂ and can actually improve flow. Adjust grind only based on flow and taste, not age alone.
+- Stale: ratio +1 to +1.5, bloom ratio +0.5, maximize early energy (highest appropriate temps), shorten intervals
+
+Key principle: aging shifts you toward MORE WATER + MORE EARLY ENERGY, not automatically coarser grind.
+
+### Pulse Interval Guidelines — MANDATORY
+
+- Light washed (high clarity): 20–25s intervals ONLY — fast pulses preserve brightness. NEVER default to 35s+ for light washed.
+- Light natural (fruit-forward): 25–30s intervals — slightly longer for fruit development.
+- Honey / anaerobic: 25–35s intervals — moderate pace for complexity.
+- Medium / dark: 25–30s intervals.
+- Match the closest reference profile's interval. NEVER default to 35s+ for light roasts.
+- For clarity-first single-serve, default 2–4 pulses unless the reference profile strongly suggests more.
+
+### Origin-Specific Overrides — MANDATORY
+
+- Washed Kenya: bloom MUST be 2.5–3.0x, bloom time 40–55s, pulse intervals 20–25s. These benefit from high early energy and fast clean pulses. A bloom of 2.0x or below is WRONG for washed Kenya.
+
+### Ratio Sanity — MANDATORY
+
+- For light/washed clarity profiles, default ratio MUST be ≥ 1:16.5 (prefer ~1:17) unless the roaster explicitly recommends stronger.
+
+## ═══════════════════════════════════════════════
+## REFERENCE PROFILES (from Fellow Brew Talks)
+## ═══════════════════════════════════════════════
+
+The MANDATORY RULES above constrain how you use this data — you MUST apply the grind percentile rule, age adjustments, interval guidelines, and origin overrides to every recipe.
 
 Each profile: Name | Origin | Roast | Process | Varietal
 ratio X | bloom X/Xs/X°C | SS NxXs [temps] | Batch NxXs [temps] | Ode G2 grind SS X / Batch X
@@ -227,13 +331,195 @@ ratio 16 | bloom 3/35s/94.5°C | SS 4x30s [93,92,91,90] | Batch 5x30s [96,93,93,
 Onyx Natural Advent | Various | Various | Natural | Various
 ratio 15.5 | bloom 2.5/30s/93°C | SS 4x30s [93,93,89,89] | Batch 4x30s [93,93,87.5,87.5]
 
-## Grind Guidance (Ode Gen 2)
+## ═══════════════════════════════════════════════
+## FINAL CHECKLIST — VERIFY BEFORE OUTPUTTING
+## ═══════════════════════════════════════════════
 
-Valid steps: 1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2, 5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2, 9, 9.1, 9.2, 10, 10.1, 10.2, 11
-
-Batch is always coarser than single serve. Study the reference profiles above to match grind to roast, process, and origin. Pick ONE value (not a range).
+Before returning your JSON, confirm ALL of the following:
+1. **GRIND:** Is single-serve grind at the 60–70th percentile of the reference range? (e.g., range 3.2–4.2 → 4.0 or 4.1, NOT 3.0/3.1/3.2)
+2. **AGE:** If Past Peak or Fading: did you add ratio +0.5 to +1.0, bloom ratio +0.5, early temps up?
+3. **INTERVALS:** Light washed = 20–25s? (35s+ is WRONG for light washed)
+4. **KENYA BLOOM:** Washed Kenya = 2.5–3.0x bloom? (2.0 or below is WRONG)
+5. **RATIO SANITY:** For light/washed clarity profiles, is ratio ≥ 1:16.5 (prefer ~1:17)?
+6. **DRYNESS STOP-LOSS:** Avoid "fine + slow + hot." If grind is toward the fine end OR intervals are long, counterbalance with coarser grind / shorter intervals / cooler late pulses.
 
 RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
+
+// --- Deterministic enforcement helpers ---
+
+function nearestOdeStep(target, preferCoarser = true) {
+  let closest = ODE_GEN2_STEPS[0];
+  let minDist = Math.abs(target - closest);
+  for (const step of ODE_GEN2_STEPS) {
+    const dist = Math.abs(target - step);
+    if (dist < minDist || (dist === minDist && preferCoarser && step > closest)) {
+      closest = step;
+      minDist = dist;
+    }
+  }
+  return closest;
+}
+
+function pickUpperMiddle(min, max) {
+  const target = min + (max - min) * 0.65;
+  return nearestOdeStep(target, true);
+}
+
+function snapToHalf(value) {
+  return Math.round(value * 2) / 2;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function isWashed(bean) {
+  const p = (bean.process || '').toLowerCase();
+  return p.includes('washed') && !p.includes('natural');
+}
+
+function isKenyaWashed(bean) {
+  return (bean.origin || '').toLowerCase().includes('kenya') && isWashed(bean);
+}
+
+function chooseReferenceForBean(bean, research) {
+  // Try research.closestReferenceProfiles first
+  if (research?.closestReferenceProfiles) {
+    for (const ref of research.closestReferenceProfiles) {
+      const entry = REFERENCE_GRIND_DATA[ref.number];
+      if (entry?.grind) return entry;
+    }
+  }
+
+  // Fallback: heuristic match on origin + process
+  const beanOrigin = (bean.origin || '').toLowerCase();
+  const beanProcess = (bean.process || '').toLowerCase();
+
+  // First try: match both origin and process type
+  for (const key of Object.keys(REFERENCE_GRIND_DATA)) {
+    const ref = REFERENCE_GRIND_DATA[key];
+    if (!ref.grind) continue;
+    const refOrigin = ref.origin.toLowerCase();
+    const refProcess = ref.process.toLowerCase();
+    if (beanOrigin.includes(refOrigin) && beanProcess.includes(refProcess)) {
+      return ref;
+    }
+  }
+
+  // Second try: match origin only
+  for (const key of Object.keys(REFERENCE_GRIND_DATA)) {
+    const ref = REFERENCE_GRIND_DATA[key];
+    if (!ref.grind) continue;
+    if (beanOrigin.includes(ref.origin.toLowerCase())) {
+      return ref;
+    }
+  }
+
+  return null;
+}
+
+// --- Enforcement functions (run in order: schema → grind → clarity) ---
+
+function enforceSchemaConstraints(recipe) {
+  recipe.ratio = snapToHalf(clamp(recipe.ratio ?? 16.5, 14, 20));
+  recipe.bloomEnabled = recipe.bloomEnabled !== false;
+  recipe.bloomRatio = snapToHalf(clamp(recipe.bloomRatio ?? 2.5, 1, 3));
+  recipe.bloomDuration = Math.round(clamp(recipe.bloomDuration ?? 40, 1, 120));
+  recipe.bloomTemperature = clamp(recipe.bloomTemperature ?? 96, 50, 99);
+  recipe.profileType = 0;
+
+  if (recipe.title && recipe.title.length > 50) {
+    recipe.title = recipe.title.slice(0, 50);
+  }
+
+  // SS pulses
+  recipe.ssPulsesEnabled = recipe.ssPulsesEnabled !== false;
+  recipe.ssPulsesNumber = Math.round(clamp(recipe.ssPulsesNumber ?? 3, 1, 10));
+  recipe.ssPulsesInterval = Math.round(clamp(recipe.ssPulsesInterval ?? 23, 5, 60));
+  recipe.ssPulseTemperatures = recipe.ssPulseTemperatures || [];
+  while (recipe.ssPulseTemperatures.length < recipe.ssPulsesNumber) {
+    recipe.ssPulseTemperatures.push(recipe.bloomTemperature);
+  }
+  recipe.ssPulseTemperatures = recipe.ssPulseTemperatures.slice(0, recipe.ssPulsesNumber);
+  recipe.ssPulseTemperatures = recipe.ssPulseTemperatures.map(t => clamp(t, 50, 99));
+
+  // Batch pulses
+  recipe.batchPulsesEnabled = recipe.batchPulsesEnabled !== false;
+  recipe.batchPulsesNumber = Math.round(clamp(recipe.batchPulsesNumber ?? 3, 1, 10));
+  recipe.batchPulsesInterval = Math.round(clamp(recipe.batchPulsesInterval ?? 30, 5, 60));
+  recipe.batchPulseTemperatures = recipe.batchPulseTemperatures || [];
+  while (recipe.batchPulseTemperatures.length < recipe.batchPulsesNumber) {
+    recipe.batchPulseTemperatures.push(recipe.bloomTemperature);
+  }
+  recipe.batchPulseTemperatures = recipe.batchPulseTemperatures.slice(0, recipe.batchPulsesNumber);
+  recipe.batchPulseTemperatures = recipe.batchPulseTemperatures.map(t => clamp(t, 50, 99));
+}
+
+function enforceDeterministicGrind(recipe, bean, research) {
+  const ref = chooseReferenceForBean(bean, research);
+  if (!ref) return;
+
+  const { ssMin, ssMax, batchMin, batchMax } = ref.grind;
+  const ssGrind = pickUpperMiddle(ssMin, ssMax);
+  let batchGrind = pickUpperMiddle(batchMin, batchMax);
+
+  // Ensure batch is strictly coarser than single serve
+  if (batchGrind <= ssGrind) {
+    const ssIdx = ODE_GEN2_STEPS.indexOf(ssGrind);
+    batchGrind = ssIdx < ODE_GEN2_STEPS.length - 1 ? ODE_GEN2_STEPS[ssIdx + 1] : ssGrind;
+  }
+
+  if (!recipe.grindRecommendation) {
+    recipe.grindRecommendation = {};
+  }
+  recipe.grindRecommendation.singleServe = ssGrind;
+  recipe.grindRecommendation.batch = batchGrind;
+}
+
+function enforceClarityRules(recipe, bean) {
+  // All washed: ratio >= 16.5
+  if (isWashed(bean) && recipe.ratio < 16.5) {
+    recipe.ratio = 16.5;
+  }
+
+  // Kenya washed overrides
+  if (isKenyaWashed(bean)) {
+    if (recipe.ratio < 17) recipe.ratio = 17;
+    if (recipe.bloomRatio < 2.5) recipe.bloomRatio = 2.5;
+    recipe.bloomDuration = Math.round(clamp(recipe.bloomDuration, 40, 55));
+    recipe.ssPulsesInterval = Math.round(clamp(recipe.ssPulsesInterval, 20, 25));
+  }
+
+  // Final snap to 0.5 steps
+  recipe.ratio = snapToHalf(recipe.ratio);
+  recipe.bloomRatio = snapToHalf(recipe.bloomRatio);
+}
+
+function repairRecipe(bean, recipe, research) {
+  const repaired = JSON.parse(JSON.stringify(recipe));
+  const before = JSON.parse(JSON.stringify(recipe));
+
+  enforceSchemaConstraints(repaired);
+  enforceDeterministicGrind(repaired, bean, research);
+  enforceClarityRules(repaired, bean);
+
+  // Log changed fields for debugging
+  const changes = {};
+  for (const key of Object.keys(repaired)) {
+    const bVal = JSON.stringify(before[key]);
+    const aVal = JSON.stringify(repaired[key]);
+    if (bVal !== aVal) {
+      changes[key] = { from: before[key], to: repaired[key] };
+    }
+  }
+  if (Object.keys(changes).length > 0) {
+    console.log('[Aiden Repair]', changes);
+  } else {
+    console.log('[Aiden Repair] No corrections needed');
+  }
+
+  return repaired;
+}
 
 function buildBeanDescription(bean) {
   const ps = getPeakStatus(bean);
@@ -323,7 +609,8 @@ export async function generateAidenRecipe(bean, research = null) {
   const data = await response.json();
   const text = data.content?.map(c => c.text || '').join('') || '';
   const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  const parsed = JSON.parse(clean);
+  return repairRecipe(bean, parsed, research);
 }
 
 export async function pushToAiden(recipe) {
