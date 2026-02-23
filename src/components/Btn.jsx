@@ -1,5 +1,5 @@
-// Button variants — ported from prototype lines 223-233
-import { C, fonts } from '../styles/theme';
+// Button variants — tactile depth with warm shadows
+import { C, fonts, shadows } from '../styles/theme';
 
 export const Btn = ({ children, onClick, variant = 'primary', style = {}, disabled = false }) => {
   const base = {
@@ -16,9 +16,9 @@ export const Btn = ({ children, onClick, variant = 'primary', style = {}, disabl
     gap: 6,
   };
   const variants = {
-    primary: { ...base, background: C.accent, color: '#fff', padding: '10px 18px' },
+    primary: { ...base, background: C.accent, color: '#fff', padding: '10px 18px', boxShadow: shadows.button },
     secondary: { ...base, background: C.borderLight, color: C.text, padding: '10px 18px' },
-    ghost: { ...base, background: 'transparent', color: C.accent, padding: '8px 12px' },
+    ghost: { ...base, background: 'rgba(160,113,75,0.06)', color: C.accent, padding: '8px 12px' },
     danger: { ...base, background: C.redBg, color: C.red, padding: '10px 18px' },
     small: { ...base, background: C.borderLight, color: C.text, padding: '6px 12px', fontSize: 12 },
   };

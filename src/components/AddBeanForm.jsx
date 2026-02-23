@@ -125,7 +125,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
             }}
           >
             <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
-            <div style={{ fontFamily: fonts.title, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
+            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
             <div style={{ fontSize: 13, color: C.textMuted }}>Take a photo or upload an image</div>
           </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>— or —</div>

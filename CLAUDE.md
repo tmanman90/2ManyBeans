@@ -56,6 +56,11 @@ src/
   styles/theme.js       # Color palette
 ```
 
+## Assets
+- All images go in `public/images/` — nav icons, illustrations, canister art, etc.
+- App icons (favicon, PWA) go in `public/` — `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon.ico`
+- Never save generated images to other directories. Move them to the correct location immediately.
+
 ## Key Conventions
 - All dates are ISO strings (`"2026-02-21"`)
 - Bean statuses: `ACTIVE` | `SEALED` | `FINISHED`

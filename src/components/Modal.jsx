@@ -1,5 +1,5 @@
-// Bottom-sheet overlay — ported from prototype lines 263-276
-import { C, fonts } from '../styles/theme';
+// Bottom-sheet overlay — warm shadow + larger radius
+import { C, fonts, shadows } from '../styles/theme';
 import { X } from 'lucide-react';
 
 export const Modal = ({ open, onClose, title, children }) => {
@@ -18,10 +18,11 @@ export const Modal = ({ open, onClose, title, children }) => {
       <div
         style={{
           background: C.bg,
-          borderRadius: '20px 20px 0 0',
+          borderRadius: '24px 24px 0 0',
           padding: '20px 20px 32px',
           width: '100%', maxWidth: 480,
           maxHeight: '80vh', overflow: 'auto',
+          boxShadow: shadows.modal,
         }}
         onClick={e => e.stopPropagation()}
       >

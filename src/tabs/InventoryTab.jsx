@@ -1,7 +1,7 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { BeanCard } from '../components/BeanCard';
 import { Btn } from '../components/Btn';
@@ -30,21 +30,26 @@ export const InventoryTab = ({ beans, onOpenBean, onAddBean }) => {
     });
   });
 
+  const accentBar = {
+    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <div style={{ fontFamily: fonts.title, fontSize: 26, color: C.text }}>Sealed Inventory</div>
+        <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Sealed Inventory</div>
         <Btn variant="primary" onClick={() => setShowAdd(true)} style={{ padding: '8px 14px' }}>
           <Plus size={14} /> Add Bean
         </Btn>
       </div>
+      <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
         {sealed.length} bags waiting · {emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}
       </div>
 
       {Object.entries(grouped).map(([roaster, rBeans]) => (
         <div key={roaster} style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.accentLight, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
             {roaster}
           </div>
           {rBeans.map(bean => (

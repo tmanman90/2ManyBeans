@@ -1,7 +1,7 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useState } from 'react';
 import { Check, Plus, Star, X, Coffee } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
 import { getRecBlurb } from '../lib/claude';
@@ -119,10 +119,18 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
     if (next && !recBlurb && !recLoading) fetchRecBlurb();
   };
 
+  const sectionTitle = {
+    fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4,
+  };
+  const accentBar = {
+    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
+  };
+
   return (
     <div>
-      <div style={{ fontFamily: fonts.title, fontSize: 26, color: C.text, marginBottom: 4 }}>Active Rotation</div>
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>Your 3 Atmos canisters</div>
+      <div style={sectionTitle}>Active Rotation</div>
+      <div style={accentBar} />
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your 3 Atmos canisters</div>
 
       {showSeedButton && (
         <div style={{
@@ -142,9 +150,17 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
 
       {slots.map((bean, i) => (
         <div key={i}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.accentLight, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
-            Atmos #{i + 1}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <img
+              src={bean ? '/images/atmos-full.png' : '/images/atmos-empty.png'}
+              alt={bean ? 'Full canister' : 'Empty canister'}
+              style={{ width: 24, height: 24, objectFit: 'contain' }}
+            />
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase' }}>
+              Atmos #{i + 1}
+            </span>
           </div>
+          <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
             <BeanCard bean={bean} actions={<>
               <Btn variant="small" onClick={() => handleBrewWithAiden(bean)}>
@@ -156,11 +172,10 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
             </>} />
           ) : (
             <div style={{
-              background: C.card,
-              borderRadius: 14,
+              ...journalCard,
               padding: 24,
               border: `2px dashed ${C.border}`,
-              marginBottom: 10,
+              borderLeft: `2px dashed ${C.border}`,
               textAlign: 'center',
             }}>
               <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 10 }}>Empty slot</div>
@@ -200,20 +215,14 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
 
               {/* Recommendation Cards */}
               {recs.map((r, idx) => (
-                <div key={r.bean.id} style={{
-                  background: C.card,
-                  borderRadius: 14,
-                  padding: 16,
-                  border: `1px solid ${C.border}`,
-                  marginBottom: 10,
-                }}>
+                <div key={r.bean.id} style={journalCard}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: C.amber, background: C.amberBg, padding: '2px 7px', borderRadius: 6 }}>
                           #{idx + 1}
                         </span>
-                        <div style={{ fontFamily: fonts.title, fontSize: 17, color: C.text }}>{r.bean.name}</div>
+                        <div style={{ fontFamily: fonts.heading, fontSize: 17, color: C.text }}>{r.bean.name}</div>
                       </div>
                       <div style={{ fontSize: 13, color: C.textMuted }}>
                         {r.bean.roaster} · {r.bean.origin} · {r.bean.variety} {r.bean.process}

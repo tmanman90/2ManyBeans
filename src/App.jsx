@@ -1,7 +1,6 @@
-// App shell — ported from prototype lines 1193-1272
+// App shell — warm Ghibli-inspired coffee journal
 import { useState } from 'react';
-import { Coffee, Package, Droplets, MessageCircle, Archive } from 'lucide-react';
-import { C, fonts } from './styles/theme';
+import { C, fonts, shadows } from './styles/theme';
 import { today } from './lib/peakStatus';
 import { RotationTab } from './tabs/RotationTab';
 import { InventoryTab } from './tabs/InventoryTab';
@@ -11,11 +10,11 @@ import { ArchiveTab } from './tabs/ArchiveTab';
 import { OpenBeanFlow } from './components/OpenBeanFlow';
 
 const tabs = [
-  { key: 'rotation', label: 'Rotation', icon: Coffee },
-  { key: 'inventory', label: 'Inventory', icon: Package },
-  { key: 'tasting', label: 'Tasting', icon: Droplets },
-  { key: 'chat', label: 'Chat', icon: MessageCircle },
-  { key: 'archive', label: 'Archive', icon: Archive },
+  { key: 'rotation', label: 'Rotation', img: '/images/nav-rotation.png' },
+  { key: 'inventory', label: 'Inventory', img: '/images/nav-inventory.png' },
+  { key: 'tasting', label: 'Tasting', img: '/images/nav-tasting.png' },
+  { key: 'chat', label: 'Chat', img: '/images/nav-chat.png' },
+  { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
 ];
 
 export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, seedTalData }) => {
@@ -25,9 +24,6 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
 
   const showSeedButton = beans.length === 0;
 
-  // handleOpenBean has two paths:
-  // 1. If preselectedBeanId is provided (from InventoryTab "Open" button), open directly
-  // 2. Otherwise open the selection modal
   const handleOpenBean = (preselectedBeanId, slot) => {
     if (preselectedBeanId) {
       openBean(preselectedBeanId, slot);
@@ -43,21 +39,53 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
     setTargetSlot(null);
   };
 
+  const isRotation = tab === 'rotation';
+
   return (
     <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="app-header" style={{ padding: '16px 20px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10, background: C.accent,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+      {isRotation ? (
+        <div className="app-header" style={{
+          position: 'relative',
+          height: 160,
+          overflow: 'hidden',
         }}>
-          <Coffee size={20} color="#fff" />
+          <img
+            src="/images/rotation-header.png"
+            alt=""
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              objectFit: 'cover', objectPosition: 'center 30%',
+            }}
+          />
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to bottom, rgba(250,246,241,0.15) 0%, rgba(250,246,241,0.85) 80%, rgba(250,246,241,1) 100%)',
+          }} />
+          <div style={{
+            position: 'relative', zIndex: 1,
+            padding: '0 20px',
+            display: 'flex', alignItems: 'flex-end',
+            height: '100%', paddingBottom: 12,
+          }}>
+            <div>
+              <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>Coffee Hub</div>
+              <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{today()}</div>
+            </div>
+          </div>
         </div>
-        <div>
-          <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text, lineHeight: 1.1 }}>Coffee Hub</div>
-          <div style={{ fontSize: 11, color: C.textMuted }}>{today()}</div>
+      ) : (
+        <div className="app-header" style={{
+          padding: '16px 20px 12px',
+          borderBottom: `1px solid ${C.borderLight}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>Coffee Hub</div>
+            <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body }}>{today()}</div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 100px' }}>
@@ -94,14 +122,14 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
         className="app-tab-bar"
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: C.cream, borderTop: `1px solid ${C.border}`,
+          background: C.navBg,
+          borderTop: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-around',
-          padding: '8px 0',
+          padding: '6px 0',
           zIndex: 100,
         }}
       >
         {tabs.map(t => {
-          const Icon = t.icon;
           const active = tab === t.key;
           return (
             <button
@@ -110,12 +138,36 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 2, padding: '4px 12px',
-                opacity: active ? 1 : 0.5, transition: 'opacity 0.15s',
+                gap: 3, padding: '4px 8px',
+                transition: 'all 0.15s',
               }}
             >
-              <Icon size={20} color={active ? C.accent : C.textMuted} strokeWidth={active ? 2.5 : 2} />
-              <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? C.accent : C.textMuted }}>
+              <div style={{
+                width: 56, height: 56,
+                borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: active ? C.amberBg : 'transparent',
+                border: active ? `2px solid ${C.accentLight}` : '2px solid transparent',
+                boxShadow: active ? shadows.navActive : 'none',
+                transition: 'all 0.15s',
+              }}>
+                <img
+                  src={t.img}
+                  alt={t.label}
+                  style={{
+                    width: 44, height: 44,
+                    objectFit: 'contain',
+                    opacity: active ? 1 : 0.55,
+                    transition: 'opacity 0.15s',
+                  }}
+                />
+              </div>
+              <span style={{
+                fontSize: 10,
+                fontWeight: active ? 700 : 500,
+                fontFamily: fonts.body,
+                color: active ? C.navActive : C.navText,
+              }}>
                 {t.label}
               </span>
             </button>

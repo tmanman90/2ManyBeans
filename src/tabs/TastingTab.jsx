@@ -2,7 +2,7 @@
 // 3 modes: list, form, chat
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Plus, Check, Send, Pencil } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, journalCard, shadows } from '../styles/theme';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { StarRating } from '../components/StarRating';
@@ -121,13 +121,16 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
     setMode('list');
   };
 
+  const accentBar = {
+    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
+  };
+
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div>
-          <div style={{ fontFamily: fonts.title, fontSize: 26, color: C.text }}>Tasting Log</div>
-          <div style={{ fontSize: 13, color: C.textMuted }}>{tastings.length} tastings logged</div>
+          <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Tasting Log</div>
         </div>
         {mode === 'list' ? (
           <div style={{ display: 'flex', gap: 6 }}>
@@ -142,6 +145,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
           <Btn variant="ghost" onClick={() => { setMode('list'); setChatMessages([]); setChatExtracted(null); }}>Cancel</Btn>
         )}
       </div>
+      <div style={accentBar} />
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>{tastings.length} tastings logged</div>
 
       {/* Bean selector for form/chat */}
       {(mode === 'form' || mode === 'chat') && (
@@ -155,7 +160,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
 
       {/* Form Mode */}
       {mode === 'form' && (
-        <div style={{ background: C.card, borderRadius: 14, padding: 18, border: `1px solid ${C.border}`, marginBottom: 20 }}>
+        <div style={{ ...journalCard, padding: 18 }}>
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 6 }}>Rating</label>
             <StarRating value={form.rating} onChange={r => setForm(p => ({ ...p, rating: r }))} size={28} />
@@ -178,13 +183,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
 
       {/* Chat Mode */}
       {mode === 'chat' && (
-        <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, marginBottom: 20, overflow: 'hidden' }}>
+        <div style={{ ...journalCard, padding: 0, overflow: 'hidden' }}>
           <div ref={chatScrollRef} style={{ maxHeight: 320, overflowY: 'auto', padding: 16 }}>
             {chatMessages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                 <div style={{
                   maxWidth: '80%', padding: '10px 14px', borderRadius: 14, fontSize: 14, lineHeight: 1.5,
-                  background: m.role === 'user' ? C.accent : C.bg,
+                  background: m.role === 'user' ? C.accent : C.cream,
                   color: m.role === 'user' ? '#fff' : C.text,
                   borderBottomRightRadius: m.role === 'user' ? 4 : 14,
                   borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
@@ -250,9 +255,9 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
         const isEditing = editingId === t.id;
 
         if (isEditing && editForm) return (
-          <div key={t.id} style={{ background: C.card, borderRadius: 14, padding: 16, border: `1px solid ${C.accent}`, marginBottom: 10 }}>
+          <div key={t.id} style={{ ...journalCard, border: `1px solid ${C.accent}`, borderLeft: `3px solid ${C.accent}`, padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
+              <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <Btn variant="primary" onClick={saveEdit} style={{ fontSize: 11, padding: '4px 10px' }}><Check size={12} /> Save</Btn>
                 <Btn variant="ghost" onClick={cancelEdit} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</Btn>
@@ -276,9 +281,9 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
         );
 
         return (
-          <div key={t.id} style={{ background: C.card, borderRadius: 14, padding: 16, border: `1px solid ${C.border}`, marginBottom: 10 }}>
+          <div key={t.id} style={journalCard}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-              <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
+              <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 12, color: C.textMuted }}>{t.date}</span>
                 <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 2 }}>

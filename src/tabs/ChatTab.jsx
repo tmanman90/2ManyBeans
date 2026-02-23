@@ -34,9 +34,14 @@ export const ChatTab = ({ beans, tastings }) => {
     setLoading(false);
   };
 
+  const accentBar = {
+    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', minHeight: 400 }}>
-      <div style={{ fontFamily: fonts.title, fontSize: 26, color: C.text, marginBottom: 4 }}>Coffee Chat</div>
+      <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4 }}>Coffee Chat</div>
+      <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>AI with your real inventory data</div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -46,13 +51,13 @@ export const ChatTab = ({ beans, tastings }) => {
             style={{
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
-              background: m.role === 'user' ? C.accent : C.card,
+              background: m.role === 'user' ? C.accent : C.cream,
               color: m.role === 'user' ? '#fff' : C.text,
               borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
               padding: '10px 14px',
               fontSize: 14,
               lineHeight: 1.5,
-              border: m.role === 'user' ? 'none' : `1px solid ${C.border}`,
+              border: m.role === 'user' ? 'none' : `1px solid ${C.borderLight}`,
               whiteSpace: 'pre-wrap',
             }}
           >
@@ -62,8 +67,8 @@ export const ChatTab = ({ beans, tastings }) => {
         {loading && (
           <div style={{
             alignSelf: 'flex-start',
-            background: C.card,
-            border: `1px solid ${C.border}`,
+            background: C.cream,
+            border: `1px solid ${C.borderLight}`,
             borderRadius: '16px 16px 16px 4px',
             padding: '10px 14px',
             fontSize: 14,

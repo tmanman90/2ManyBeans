@@ -1,5 +1,5 @@
-// Bean display card — ported from prototype lines 235-260
-import { C, fonts } from '../styles/theme';
+// Bean display card — journal-page treatment
+import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { Badge } from './Badge';
 
@@ -8,15 +8,12 @@ export const BeanCard = ({ bean, actions, compact = false }) => {
   const dOpen = daysOpen(bean.openDate);
   return (
     <div style={{
-      background: C.card,
-      borderRadius: 14,
-      padding: compact ? 14 : 18,
-      border: `1px solid ${C.border}`,
-      marginBottom: 10,
+      ...journalCard,
+      padding: compact ? 16 : 20,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
-          <div style={{ fontFamily: fonts.title, fontSize: compact ? 16 : 18, color: C.text, lineHeight: 1.2 }}>
+          <div style={{ fontFamily: fonts.heading, fontSize: compact ? 16 : 18, color: C.text, lineHeight: 1.2 }}>
             {bean.name}
           </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>

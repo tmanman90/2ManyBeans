@@ -1,5 +1,4 @@
-// Loading spinner — ported from prototype lines 1217-1221
-import { Coffee } from 'lucide-react';
+// Loading spinner
 import { C, fonts } from '../styles/theme';
 
 export const LoadingScreen = () => (
@@ -8,10 +7,13 @@ export const LoadingScreen = () => (
     background: C.bg,
     minHeight: '100vh',
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     color: C.textMuted,
+    gap: 12,
   }}>
-    <Coffee size={32} style={{ marginRight: 12, opacity: 0.5 }} /> Loading your beans...
+    <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent }}>Coffee Hub</div>
+    <div style={{ fontSize: 14 }}>Loading your beans...</div>
   </div>
 );

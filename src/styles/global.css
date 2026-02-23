@@ -5,8 +5,11 @@
 }
 
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Nunito', sans-serif;
   background: #FAF6F1;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(201,168,124,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 30%, rgba(92,61,46,0.04) 0%, transparent 50%);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -14,7 +17,7 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: #C49A6C !important;
+  border-color: #C9A87C !important;
 }
 
 ::-webkit-scrollbar {
