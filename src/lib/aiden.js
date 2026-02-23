@@ -477,12 +477,13 @@ function enforceDeterministicGrind(recipe, bean, research) {
 }
 
 function enforceClarityRules(recipe, bean) {
-  // All washed: ratio >= 16.5
-  if (isWashed(bean) && recipe.ratio < 16.5) {
-    recipe.ratio = 16.5;
+  // All light washed: ratio >= 16.5, intervals 20–25s
+  if (isWashed(bean)) {
+    if (recipe.ratio < 16.5) recipe.ratio = 16.5;
+    recipe.ssPulsesInterval = Math.round(clamp(recipe.ssPulsesInterval, 20, 25));
   }
 
-  // Kenya washed overrides
+  // Kenya washed overrides (on top of general washed rules)
   if (isKenyaWashed(bean)) {
     if (recipe.ratio < 17) recipe.ratio = 17;
     if (recipe.bloomRatio < 2.5) recipe.bloomRatio = 2.5;
