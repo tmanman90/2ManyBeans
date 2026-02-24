@@ -48,20 +48,22 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
         <div className="app-header" style={{
           position: 'relative',
           height: 160,
-          overflow: 'hidden',
+          zIndex: 0,
         }}>
           <img
             src="/images/rotation-header.png"
             alt=""
             style={{
-              position: 'absolute', inset: 0,
-              width: '100%', height: '100%',
+              position: 'absolute', top: 0, left: 0, right: 0,
+              width: '100%', height: 450,
               objectFit: 'cover', objectPosition: 'center 30%',
+              pointerEvents: 'none',
             }}
           />
           <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(to bottom, rgba(250,246,241,0.15) 0%, rgba(250,246,241,0.85) 80%, rgba(250,246,241,1) 100%)',
+            position: 'absolute', top: 0, left: 0, right: 0,
+            height: 450, pointerEvents: 'none',
+            background: 'linear-gradient(to bottom, rgba(250,246,241,0.15) 0%, rgba(250,246,241,0.7) 25%, rgba(250,246,241,0.88) 40%, rgba(250,246,241,0.95) 60%, rgba(250,246,241,1) 85%)',
           }} />
           <div style={{
             position: 'relative', zIndex: 1,
@@ -88,7 +90,7 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 100px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 100px', position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             beans={beans}
