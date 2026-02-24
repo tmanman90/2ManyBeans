@@ -79,7 +79,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
         name: parsed.name || '',
         origin: parsed.origin || '',
         variety: parsed.variety || '',
-        process: parsed.process || 'Washed',
+        process: parsed.process || '',
         roastDate: parsed.roastDate || today(),
         bagSize: parsed.bagSize || 100,
         bagNotes: parsed.bagNotes || '',
@@ -407,7 +407,8 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
             <div>
               <label style={labelStyle}>Process</label>
               <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle}>
-                {['Washed', 'Natural', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Advanced Natural', 'Honey', 'Other'].map(p => (
+                <option value="" disabled>Select...</option>
+                {['Washed', 'Natural', 'Honey', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Anaerobic White Honey', 'Advanced Natural', 'Other'].map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>

@@ -129,7 +129,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
         <div>
           <label style={labelStyle}>Process</label>
           <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle}>
-            {['Washed', 'Natural', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Advanced Natural', 'Honey', 'Other'].map(p => (
+            {['Washed', 'Natural', 'Honey', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Anaerobic White Honey', 'Advanced Natural', 'Other'].map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>

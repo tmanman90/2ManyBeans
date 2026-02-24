@@ -90,40 +90,56 @@ If ALL images are too blurry, dark, or unreadable to extract meaningful informat
 {"error": "Photo too blurry or unreadable. Please take a clearer photo."}
 
 STEP 2 — EXHAUSTIVE TEXT EXTRACTION:
-Read EVERY piece of text visible across ALL images — front label, back label, side panels, small print, stamps, stickers, handwritten notes, QR code labels, everything. Pay special attention to:
-- Varietal names in different fonts/sizes (e.g., GEISHA, BOURBON, SL28, CATURRA, TYPICA)
-- Producer/farm names that may be in smaller text
+Read EVERY piece of text visible across ALL images — front label, back label, side panels, small print, stamps, stickers, handwritten notes, QR code labels, everything.
+
+CRITICAL: Text on coffee packaging is often ROTATED, VERTICAL, SIDEWAYS, or in unusual orientations. Scan the entire image in all directions. Do NOT skip text just because it's rotated 90°, upside-down, or along an edge. Read every word on every surface.
+
+Pay special attention to:
+- Varietal names in different fonts/sizes/orientations (e.g., GEISHA, BOURBON, SL28, CATURRA, TYPICA)
+- Processing methods (often printed vertically or on side panels) — read the EXACT text, don't simplify
+- Producer/farm names that may be in smaller text or rotated
 - Altitude/elevation (e.g., "1800-2100 masl")
 - Region names (e.g., Huila, Yirgacheffe, Nyeri)
 - Roast level indicators
 - Tasting/flavor notes
 - Roast dates, best-by dates
 - Weight/bag size
-- If you see a retailer/selector brand (e.g., "Dayglow", "Manhattan Coffee Roasters", "Cat & Cloud"), note it as sourcedBy
 
-STEP 3 — CROSS-REFERENCE:
+STEP 3 — CURATOR vs ROASTER:
+IMPORTANT: Some images may show a SUBSCRIPTION SERVICE or CURATOR brand (e.g., Dayglow, Trade, Angels' Cup, Yes Plz, Cat & Cloud marketplace) — this is NOT the roaster. The actual roaster is the company that ROASTED the coffee (usually on the label/box itself).
+- If a curator/subscription service is present: set "roaster" to "Curator (Actual Roaster)" format, e.g., "Dayglow (Promethium Coffee)"
+- Set "sourcedBy" to the curator name alone, e.g., "Dayglow"
+- NEVER use the curator name as the coffee name
+
+STEP 4 — CROSS-REFERENCE:
 Cross-reference information across all provided images. Back labels often have details missing from the front.
 
-STEP 4 — STRUCTURED OUTPUT:
+STEP 5 — COFFEE NAME:
+- If the bag has an explicit coffee name or lot name, use it
+- If there is NO explicit name, construct one from farm/estate + variety, e.g., "El Placer Geisha", "La Palma Caturra"
+- If only variety is known, use origin + variety, e.g., "Colombia Geisha"
+- NEVER use the roaster name or curator name as the coffee name
+
+STEP 6 — STRUCTURED OUTPUT:
 Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation):
 
 {
-  "roaster": "roaster/brand name",
-  "name": "coffee name or lot name",
+  "roaster": "roaster/brand name (or 'Curator (Roaster)' format if subscription)",
+  "name": "coffee name, lot name, or constructed Farm+Variety name",
   "origin": "country",
   "variety": "coffee variety/cultivar if shown",
-  "process": "processing method (Washed, Natural, Honey, Anaerobic Honey, Anaerobic Natural, White Honey, Advanced Natural, or Other)",
+  "process": "EXACT processing method as printed on bag (e.g. Washed, Natural, Honey, Anaerobic Honey, Anaerobic Natural, White Honey, Anaerobic White Honey, Advanced Natural, or Other)",
   "roastDate": "YYYY-MM-DD if shown, otherwise empty string",
   "bagSize": number in grams (default 100 if not shown),
   "bagNotes": "tasting notes from the bag, separated by ' / '",
   "producer": "farm or producer name if shown",
   "region": "specific region/area within the country if shown",
   "altitude": "altitude if shown (e.g. '1800-2100 masl')",
-  "farm": "specific farm/estate name if shown and different from producer",
+  "farm": "specific farm/estate name if shown",
   "roastLevel": "light, medium-light, medium, medium-dark, or dark — if indicated",
   "cupScore": "SCA cup score if shown (e.g. '87.5')",
   "brewingRec": "any brewing recommendations on the bag",
-  "sourcedBy": "retailer or selector if different from roaster"
+  "sourcedBy": "subscription service or curator if different from roaster"
 }
 
 If a field is not visible, use an empty string (or 100 for bagSize). For roastDate, look for "roasted on", "roast date", or any date that appears to be a roast date — convert to YYYY-MM-DD. Do NOT use best-before dates as roast date.`,
