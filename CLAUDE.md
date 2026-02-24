@@ -72,8 +72,11 @@ src/
 - Bean statuses: `ACTIVE` | `SEALED` | `FINISHED`
 - Atmos slots are 1, 2, or 3 (Fellow Atmos vacuum canisters)
 - Roaster profiles auto-detected by fuzzy name match, fallback to default specialty light profile
-- AI features: photo bean scanning, guided tasting (coach mode), recommendations, general chat, Aiden brew profiles
-- Aiden brew flow uses two-step Claude calls: (1) researchBean() enriches with altitude/roast level/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using research context. Research failure falls back gracefully to recipe-only.
+- AI features: photo bean scanning (multi-photo + web research), guided tasting (coach mode), recommendations, general chat, Aiden brew profiles
+- Add Bean flow: multi-photo gallery (1-3) → deep Claude vision scan → web research via `web_search_20250305` tool → review. Alt path: manual entry → AI Fill button triggers same research.
+- Bean data model includes enriched fields: altitude, region, farm, roastLevel, cupScore, brewingRec, sourcedBy (all optional, filled by scan + research)
+- `/api/claude` proxy accepts optional `tools` array for web search passthrough (60s timeout)
+- Aiden brew flow uses two-step Claude calls: (1) researchBean() enriches with altitude/roast level/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using research context. Research failure falls back gracefully to recipe-only. brewingRec/altitude/roastLevel passed as advisory context.
 - Tasting chat uses `---EXTRACT---` / `---END---` markers for structured data extraction from conversation
 - The user (Tal) is a novice taster — all AI tasting interactions must use step-by-step coaching with scaffolded options, never vague open-ended questions
 

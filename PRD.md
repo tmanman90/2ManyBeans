@@ -33,6 +33,15 @@ interface Bean {
   finishDate: string | null;
   bagNotes: string;         // flavor descriptors from bag label
   producer: string;         // farm/producer name
+  // Enriched fields (from deep scan + web research)
+  altitude: string;         // e.g. "1800-2100 masl"
+  region: string;           // specific growing region, e.g. "Huila, Colombia"
+  farm: string;             // farm/estate name (may differ from producer)
+  roastLevel: string;       // ultra-light | light | medium-light | medium | medium-dark | dark
+  cupScore: string;         // SCA score if available, e.g. "88.5"
+  brewingRec: string;       // brewing recommendations from bag or roaster website
+  sourcedBy: string;        // subscription service, e.g. "Dayglow"
+  // Timing (from roaster profile)
   degasMin: number;         // days (from roaster profile)
   degasMax: number;
   peakStart: number;        // days post-roast when peak begins
@@ -167,11 +176,67 @@ Three modes: **list** | **form** | **chat**
 
 All use `claude-sonnet-4-20250514` via Anthropic API.
 
-### 1. Photo-Based Bean Entry
-- Camera/photo picker → base64 image to Claude API
-- Extracts: roaster, name, origin, variety, process, roast date, bag size, tasting notes, producer
-- Returns JSON, populates review form before saving
-- Handles partial extractions gracefully
+### 1. Smart Bean Entry (Photo Scan + Web Research + AI Fill)
+
+#### Multi-Photo Capture
+- Camera OR photo library picker (no forced camera-only on mobile)
+- Support 1-3 photos per bean (front/back/side of bag)
+- Gallery UI: horizontal thumbnail row with X to remove, "Add another" button (if < 3)
+- "Scan" button triggers analysis once user is ready
+- All photos sent to Claude in a single API call for cross-referencing
+
+#### Deep Image Analysis (Phase 1: Scan)
+- Exhaustive text extraction: reads EVERY piece of text across all images — front, back, sides, small print, stamps, stickers, handwriting
+- Image quality gate: rejects blurry/unreadable photos with clear error message
+- Extracts expanded field set:
+  - Core: roaster, name, origin, variety, process, roastDate, bagSize, bagNotes, producer
+  - Enriched: region, altitude, farm, roastLevel, cupScore, brewingRec, sourcedBy
+- Explicit varietal detection: looks for GEISHA, BOURBON, SL28, TYPICA, CATURRA etc. even in different fonts/sizes
+- Subscription detection: recognizes Dayglow-style boxes and sets `sourcedBy` accordingly
+- Returns structured JSON; handles partial extractions gracefully
+
+#### Web Research Mode (Phase 2: Research)
+- Auto-triggers after photo scan completes (skippable via "Skip research" button)
+- Uses Claude with `web_search_20250305` tool (built-in Anthropic web search, no additional API keys)
+- Builds smart search queries from extracted fields (roaster + name + origin + variety + sourcedBy)
+- If `sourcedBy` detected (e.g., "Dayglow"), includes it in search for better results
+- Fills ONLY empty fields — bag label data always takes absolute precedence
+- Confidence-gated: only fills fields where research is confident about this EXACT coffee
+- Guards against wrong-coffee attribution (partial name matches, different lots from same roaster)
+- Max 3 web searches per bean (cost control: ~$0.03/bean)
+- Target enrichment: altitude, region, farm, roastLevel, cupScore, brewingRec
+
+#### AI Fill (Manual Entry Path)
+- Single "AI Fill — Search Online" button in the review form
+- Triggers when user has entered at least roaster or name + there are empty enrichable fields
+- Uses same web research function as post-scan research
+- Fills all empty fields in one pass (not field-by-field)
+- Works for both: manual entry (skipped photo) and post-scan (when fields are still empty)
+- Loading state with spinner; silent failure (user can always fill manually)
+
+#### Form Flow
+```
+photo(s) → scanning → researching → review → save
+                                  ↗
+           manual entry ("Type it manually") → review → [AI Fill] → save
+```
+
+#### Review Step
+- All extracted + researched fields editable before saving
+- Core fields: roaster*, name*, origin, variety, process, roastDate, bagSize, producer, bagNotes
+- Enriched details section (collapsible): region, farm, altitude, roastLevel, cupScore, sourcedBy, brewingRec
+- Roaster profile badge (auto-detected timing)
+- AI Fill button (when applicable)
+- Rescan button resets to photo step
+
+#### Bean Card Display
+- Compact view: name, roaster, origin, variety, process, bagSize, roastDate, bagNotes, aidenGrind (unchanged)
+- Expandable "Show details" section for enriched fields: region, farm, altitude, roastLevel, cupScore, sourcedBy
+- `brewingRec` only visible in expanded detail view (saves space in inventory list)
+
+#### Aiden Integration
+- `brewingRec`, `altitude`, `roastLevel`, and `farm` passed as advisory context to Aiden recipe generation
+- Brewing recommendations treated as advisory for pour-over adaptation (Aiden is pour-over, bag recs may reference other methods)
 
 ### 2. Recommendation Engine
 - Scoring algorithm selects top 3 sealed beans:
@@ -269,9 +334,12 @@ service cloud.firestore {
 3. Signed in → subscribe to user's Firestore data
 4. First-time: offer seed data import (Tal) or start empty (friends)
 
-### Claude API Key
-- **Phase 1**: Client-side key in env vars (fine for personal/friends)
-- **Phase 2**: Vercel Edge Function proxy if user base grows
+### Claude API Proxy
+- All Claude calls route through `/api/claude` Vercel serverless function (API key server-side only)
+- Proxy accepts: `{ system, messages, maxTokens, model, tools }` and passes through to Anthropic SDK
+- `tools` param enables Claude's built-in `web_search_20250305` for bean research (no additional API keys needed)
+- Timeout: 60s (accommodates web search latency)
+- Model: `claude-sonnet-4-20250514`
 
 ### PWA Config
 ```json
@@ -296,10 +364,14 @@ service cloud.firestore {
 ## Bean Lifecycle Flows
 
 ### Adding a Bean
-1. Tap "+" FAB → photo step (camera/gallery)
-2. Claude API scans label → pre-fills form
-3. User reviews/edits → roaster profile auto-detected
-4. Save → bean added as SEALED
+1. Tap "Add Bean" → photo step (camera or photo library, no forced camera)
+2. Add 1-3 photos of bag label (gallery with thumbnails, add/remove)
+3. Tap "Scan" → Claude vision deep-analyzes all photos, extracts every field it can
+4. If scan succeeds → auto-enters Research Mode: web search enriches empty fields (altitude, region, cup score, etc.)
+5. User reviews/edits all fields (core + enriched) → roaster profile auto-detected
+6. Save → bean added as SEALED with all enriched metadata
+- **Alternative flow**: Skip photo → type manually → hit "AI Fill" button → web research fills empty fields → review → save
+- **Edge cases**: blurry photo rejected with message; research failure silently skipped; bag data always overrides online data
 
 ### Opening a Bean
 1. Tap "Open" on sealed bean

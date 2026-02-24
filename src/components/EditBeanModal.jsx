@@ -1,4 +1,4 @@
-// Edit Bean Modal — edit any bean field + grind settings
+// Edit Bean Modal — edit any bean field + grind settings + enriched details
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
@@ -23,6 +23,13 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
         bagNotes: bean.bagNotes || '',
         ssGrind: bean.aidenGrind?.singleServe ?? '',
         batchGrind: bean.aidenGrind?.batch ?? '',
+        region: bean.region || '',
+        altitude: bean.altitude || '',
+        farm: bean.farm || '',
+        roastLevel: bean.roastLevel || '',
+        cupScore: bean.cupScore || '',
+        brewingRec: bean.brewingRec || '',
+        sourcedBy: bean.sourcedBy || '',
       });
     }
   }, [bean, open]);
@@ -43,6 +50,15 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
     if (f.roastDate !== (bean.roastDate || '')) changes.roastDate = f.roastDate;
     if (f.producer.trim() !== (bean.producer || '')) changes.producer = f.producer.trim();
     if (f.bagNotes.trim() !== (bean.bagNotes || '')) changes.bagNotes = f.bagNotes.trim();
+
+    // Enriched fields
+    if (f.region.trim() !== (bean.region || '')) changes.region = f.region.trim();
+    if (f.altitude.trim() !== (bean.altitude || '')) changes.altitude = f.altitude.trim();
+    if (f.farm.trim() !== (bean.farm || '')) changes.farm = f.farm.trim();
+    if (f.roastLevel !== (bean.roastLevel || '')) changes.roastLevel = f.roastLevel;
+    if (f.cupScore.trim() !== (bean.cupScore || '')) changes.cupScore = f.cupScore.trim();
+    if (f.brewingRec.trim() !== (bean.brewingRec || '')) changes.brewingRec = f.brewingRec.trim();
+    if (f.sourcedBy.trim() !== (bean.sourcedBy || '')) changes.sourcedBy = f.sourcedBy.trim();
 
     // Grind handling
     const ss = f.ssGrind !== '' ? Number(f.ssGrind) : null;
@@ -128,6 +144,55 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
         <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} />
       </div>
 
+      {/* Enriched Details */}
+      <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 12, ...rowStyle }}>
+        <label style={{ ...labelStyle, fontSize: 13, color: C.accent }}>Enriched Details</label>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={labelStyle}>Region</label>
+            <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Farm</label>
+            <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={labelStyle}>Altitude</label>
+            <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800 masl" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Roast Level</label>
+            <select value={f.roastLevel} onChange={e => setF(p => ({ ...p, roastLevel: e.target.value }))} style={inputStyle}>
+              <option value="">—</option>
+              {['light', 'medium-light', 'medium', 'medium-dark', 'dark'].map(l => (
+                <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={labelStyle}>Cup Score</label>
+            <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Sourced By</label>
+            <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <label style={labelStyle}>Brewing Recommendations</label>
+          <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} />
+        </div>
+      </div>
+
+      {/* Grind Settings */}
       <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 12, ...rowStyle }}>
         <label style={{ ...labelStyle, fontSize: 13, color: C.accent }}>Grind Settings (Ode Gen 2)</label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

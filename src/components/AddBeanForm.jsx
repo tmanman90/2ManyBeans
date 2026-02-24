@@ -1,20 +1,28 @@
-// Add Bean Form (Photo-First) — ported from prototype lines 920-1150
+// Add Bean Form — Multi-photo scan + web research + AI Fill
 import { useState, useEffect, useRef } from 'react';
-import { Plus, RotateCcw } from 'lucide-react';
+import { Plus, RotateCcw, X, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
-import { scanBeanLabel } from '../lib/claude';
+import { scanBeanLabel, compressImage, researchBeanOnline } from '../lib/claude';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
+const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
+
 export const AddBeanForm = ({ open, onClose, onAdd }) => {
-  const empty = { roaster: '', name: '', origin: '', variety: '', process: 'Washed', roastDate: today(), bagSize: 100, bagNotes: '', producer: '' };
+  const empty = {
+    roaster: '', name: '', origin: '', variety: '', process: 'Washed',
+    roastDate: today(), bagSize: 100, bagNotes: '', producer: '',
+    altitude: '', region: '', farm: '', roastLevel: '', cupScore: '',
+    brewingRec: '', sourcedBy: '',
+  };
   const [f, setF] = useState(empty);
   const [profileInfo, setProfileInfo] = useState(null);
-  const [step, setStep] = useState('photo'); // "photo" | "scanning" | "review"
+  const [step, setStep] = useState('photo'); // photo | scanning | researching | review
   const [scanError, setScanError] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [photos, setPhotos] = useState([]); // [{ base64, mediaType, previewUrl }]
+  const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -30,31 +38,43 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     setF(empty);
     setStep('photo');
     setScanError(null);
-    setPreviewUrl(null);
+    setPhotos([]);
     setProfileInfo(null);
+    setAiFilling(false);
   };
 
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      setPhotos(prev => [...prev, compressed].slice(0, 3));
+    } catch (err) {
+      console.error('Compression error:', err);
+      setScanError('Failed to process photo. Try another.');
+    }
+    // Reset input so same file can be re-selected
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const removePhoto = (idx) => {
+    setPhotos(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      // Revoke the removed preview URL
+      if (prev[idx]?.previewUrl) URL.revokeObjectURL(prev[idx].previewUrl);
+      return updated;
+    });
+  };
+
+  const handleScan = async () => {
+    if (photos.length === 0) return;
     setScanError(null);
     setStep('scanning');
 
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-
-    const base64 = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result.split(',')[1]);
-      r.onerror = () => rej(new Error('Failed to read file'));
-      r.readAsDataURL(file);
-    });
-
-    const mediaType = file.type || 'image/jpeg';
-
     try {
-      const parsed = await scanBeanLabel(base64, mediaType);
-      setF({
+      const parsed = await scanBeanLabel(photos);
+      // Save scan results immediately — safe even if research fails
+      const scanData = {
         roaster: parsed.roaster || '',
         name: parsed.name || '',
         origin: parsed.origin || '',
@@ -64,20 +84,67 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
         bagSize: parsed.bagSize || 100,
         bagNotes: parsed.bagNotes || '',
         producer: parsed.producer || '',
-      });
+        region: parsed.region || '',
+        altitude: parsed.altitude || '',
+        farm: parsed.farm || '',
+        roastLevel: parsed.roastLevel || '',
+        cupScore: parsed.cupScore || '',
+        brewingRec: parsed.brewingRec || '',
+        sourcedBy: parsed.sourcedBy || '',
+      };
+      setF(scanData);
+
+      // Auto-trigger research
+      setStep('researching');
+      try {
+        const research = await researchBeanOnline(scanData);
+        // Merge: only fill empty fields
+        setF(prev => {
+          const merged = { ...prev };
+          for (const field of ENRICHABLE_FIELDS) {
+            if (!merged[field] && research[field]) {
+              merged[field] = research[field];
+            }
+          }
+          return merged;
+        });
+      } catch (researchErr) {
+        console.log('Research skipped/failed:', researchErr.message);
+        // Silent — scan data is already saved
+      }
       setStep('review');
     } catch (err) {
       console.error('Scan error:', err);
-      setScanError("Couldn't read the label. You can fill in details manually.");
+      setScanError(err.message || "Couldn't read the label. You can fill in details manually.");
       setStep('review');
     }
+  };
+
+  const handleAiFill = async () => {
+    if (aiFilling) return;
+    setAiFilling(true);
+    try {
+      const research = await researchBeanOnline(f);
+      setF(prev => {
+        const merged = { ...prev };
+        for (const field of ENRICHABLE_FIELDS) {
+          if (!merged[field] && research[field]) {
+            merged[field] = research[field];
+          }
+        }
+        return merged;
+      });
+    } catch (err) {
+      console.log('AI Fill failed:', err.message);
+    }
+    setAiFilling(false);
   };
 
   const handleSave = () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
     const p = getProfileForRoaster(f.roaster);
 
-    onAdd({
+    const beanData = {
       roaster: f.roaster.trim(),
       name: f.name.trim(),
       origin: f.origin.trim(),
@@ -96,10 +163,24 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
       peakStart: p.peakStart,
       peakEnd: p.peakEnd,
       guidance: p.guidance,
-    });
+    };
+
+    // Include enriched fields only if non-empty
+    if (f.altitude.trim()) beanData.altitude = f.altitude.trim();
+    if (f.region.trim()) beanData.region = f.region.trim();
+    if (f.farm.trim()) beanData.farm = f.farm.trim();
+    if (f.roastLevel.trim()) beanData.roastLevel = f.roastLevel.trim();
+    if (f.cupScore.trim()) beanData.cupScore = f.cupScore.trim();
+    if (f.brewingRec.trim()) beanData.brewingRec = f.brewingRec.trim();
+    if (f.sourcedBy.trim()) beanData.sourcedBy = f.sourcedBy.trim();
+
+    onAdd(beanData);
     reset();
     onClose();
   };
+
+  const hasSearchableData = f.roaster.trim() || f.name.trim();
+  const hasEmptyEnrichable = ENRICHABLE_FIELDS.some(field => !f[field]);
 
   const inputStyle = {
     width: '100%', padding: '8px 10px', borderRadius: 8,
@@ -109,58 +190,157 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
   const rowStyle = { marginBottom: 12 };
 
+  const spinner = (
+    <div style={{
+      width: 16, height: 16,
+      border: `2px solid ${C.accent}`,
+      borderTopColor: 'transparent',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite',
+      display: 'inline-block',
+    }} />
+  );
+
   return (
     <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean">
-      {/* STEP 1: Photo upload */}
+      {/* STEP: Photo upload + gallery */}
       {step === 'photo' && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
-          <div
-            onClick={() => fileRef.current?.click()}
-            style={{
-              cursor: 'pointer', background: C.card,
-              border: `2px dashed ${C.border}`,
-              borderRadius: 16, padding: '40px 20px',
-              marginBottom: 16, transition: 'border-color 0.15s',
-            }}
-          >
-            <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
-            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
-            <div style={{ fontSize: 13, color: C.textMuted }}>Take a photo or upload an image</div>
-          </div>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
+
+          {photos.length === 0 ? (
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{
+                cursor: 'pointer', background: C.card,
+                border: `2px dashed ${C.border}`,
+                borderRadius: 16, padding: '40px 20px',
+                marginBottom: 16, transition: 'border-color 0.15s',
+              }}
+            >
+              <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
+              <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
+              <div style={{ fontSize: 13, color: C.textMuted }}>Take a photo or choose from library</div>
+            </div>
+          ) : (
+            <>
+              {/* Thumbnail gallery */}
+              <div style={{
+                display: 'flex', gap: 10, justifyContent: 'center',
+                marginBottom: 16, flexWrap: 'wrap',
+              }}>
+                {photos.map((photo, idx) => (
+                  <div key={idx} style={{ position: 'relative' }}>
+                    <img
+                      src={photo.previewUrl}
+                      alt={`Photo ${idx + 1}`}
+                      style={{
+                        width: 90, height: 90, objectFit: 'cover',
+                        borderRadius: 10, border: `1px solid ${C.border}`,
+                      }}
+                    />
+                    <button
+                      onClick={() => removePhoto(idx)}
+                      style={{
+                        position: 'absolute', top: -6, right: -6,
+                        width: 22, height: 22, borderRadius: '50%',
+                        background: C.red, border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 0,
+                      }}
+                    >
+                      <X size={12} color="#fff" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+                {photos.length < 3 && (
+                  <Btn variant="secondary" onClick={() => fileRef.current?.click()}>
+                    + Add photo
+                  </Btn>
+                )}
+                <Btn variant="primary" onClick={handleScan}>
+                  <Search size={14} /> Scan {photos.length > 1 ? `${photos.length} photos` : 'photo'}
+                </Btn>
+              </div>
+            </>
+          )}
+
+          {scanError && (
+            <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, background: C.amberBg, color: C.amber, marginBottom: 12 }}>
+              {scanError}
+            </div>
+          )}
+
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>— or —</div>
           <Btn variant="ghost" onClick={() => setStep('review')} style={{ margin: '0 auto' }}>Type it manually</Btn>
         </div>
       )}
 
-      {/* STEP 2: Scanning */}
+      {/* STEP: Scanning */}
       {step === 'scanning' && (
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
-          {previewUrl && <img src={previewUrl} alt="bag" style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 12, marginBottom: 16, opacity: 0.7 }} />}
+          {photos.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+              {photos.map((photo, idx) => (
+                <img key={idx} src={photo.previewUrl} alt={`Photo ${idx + 1}`}
+                  style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, opacity: 0.7 }} />
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <div style={{
-              width: 16, height: 16,
-              border: `2px solid ${C.accent}`,
-              borderTopColor: 'transparent',
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-            }} />
-            <span style={{ fontSize: 14, color: C.textMuted }}>Reading label...</span>
+            {spinner}
+            <span style={{ fontSize: 14, color: C.textMuted }}>Reading {photos.length > 1 ? 'labels' : 'label'}...</span>
           </div>
         </div>
       )}
 
-      {/* STEP 3: Review / Edit */}
+      {/* STEP: Researching online */}
+      {step === 'researching' && (
+        <div style={{ textAlign: 'center', padding: '30px 0' }}>
+          {(f.roaster || f.name) && (
+            <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text, marginBottom: 4 }}>
+              {f.name}
+            </div>
+          )}
+          {f.roaster && (
+            <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>
+              by {f.roaster}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+            {spinner}
+            <span style={{ fontSize: 14, color: C.textMuted }}>Researching online...</span>
+          </div>
+          <Btn
+            variant="ghost"
+            onClick={() => setStep('review')}
+            style={{ margin: '0 auto', fontSize: 12 }}
+          >
+            Skip research
+          </Btn>
+        </div>
+      )}
+
+      {/* STEP: Review / Edit */}
       {step === 'review' && (
         <>
-          {previewUrl && (
-            <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}` }}>
-              <img src={previewUrl} alt="bag" style={{ width: '100%', maxHeight: 140, objectFit: 'cover' }} />
+          {photos.length > 0 && (
+            <div style={{
+              display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto',
+              borderRadius: 12, border: `1px solid ${C.border}`, padding: 6,
+            }}>
+              {photos.map((photo, idx) => (
+                <img key={idx} src={photo.previewUrl} alt={`Photo ${idx + 1}`}
+                  style={{ height: 80, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+              ))}
             </div>
           )}
           {scanError && (
             <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, background: C.amberBg, color: C.amber, marginBottom: 12 }}>
-              ⚠ {scanError}
+              {scanError}
             </div>
           )}
 
@@ -173,7 +353,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
                 background: profileInfo.known ? C.greenBg : C.amberBg,
                 color: profileInfo.known ? C.green : C.amber,
               }}>
-                {profileInfo.known ? '✓ ' : '⚠ Unknown roaster — '}
+                {profileInfo.known ? '✓ ' : 'Unknown roaster — '}
                 Degas {profileInfo.degasMin}–{profileInfo.degasMax}d · Peak {profileInfo.peakStart}–{profileInfo.peakEnd}d
                 {!profileInfo.known && ' (est.)'}
               </div>
@@ -227,10 +407,72 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
             <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} />
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* Enriched Details Section */}
+          <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 12, marginBottom: 12 }}>
+            <label style={{ ...labelStyle, fontSize: 13, color: C.accent, marginBottom: 10 }}>Enriched Details</label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+              <div>
+                <label style={labelStyle}>Region</label>
+                <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Farm</label>
+                <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+              <div>
+                <label style={labelStyle}>Altitude</label>
+                <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800-2100 masl" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Roast Level</label>
+                <select value={f.roastLevel} onChange={e => setF(p => ({ ...p, roastLevel: e.target.value }))} style={inputStyle}>
+                  <option value="">—</option>
+                  {['light', 'medium-light', 'medium', 'medium-dark', 'dark'].map(l => (
+                    <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+              <div>
+                <label style={labelStyle}>Cup Score</label>
+                <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Sourced By</label>
+                <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} />
+              </div>
+            </div>
+
+            <div style={rowStyle}>
+              <label style={labelStyle}>Brewing Recommendations</label>
+              <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster, if any" style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
               <RotateCcw size={14} /> Rescan
             </Btn>
+            {hasSearchableData && hasEmptyEnrichable && (
+              <Btn
+                variant="ghost"
+                onClick={handleAiFill}
+                disabled={aiFilling}
+                style={{ flex: 0, fontSize: 12 }}
+              >
+                {aiFilling ? (
+                  <>{spinner} Researching...</>
+                ) : (
+                  <><Search size={12} /> AI Fill</>
+                )}
+              </Btn>
+            )}
             <Btn
               variant="primary"
               onClick={handleSave}

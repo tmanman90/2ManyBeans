@@ -120,6 +120,8 @@ const AIDEN_SYSTEM_PROMPT = `You are a master specialty coffee brewer. You creat
 
 Your primary goal is balanced, clean extraction that highlights each bean's unique character. For specialty light roasts, under-extraction (slightly coarser, slightly faster) is always preferable to over-extraction — over-extraction destroys delicate florals, tea-like qualities, and citrus brightness.
 
+If brewing recommendations from the bag/roaster are provided, treat them as advisory context for pour-over adaptation — they may suggest ratio, temperature, or grind direction but always adapt to Aiden's pulse-pour format.
+
 CRITICAL: You MUST follow the MANDATORY RULES below BEFORE consulting the reference profiles. The rules constrain every recipe you generate.
 
 The user's grinder is a Fellow Ode Gen 2 with stock burrs. All grind recommendations must use Ode Gen 2 settings.
@@ -544,6 +546,10 @@ function buildBeanDescription(bean) {
       `Roaster category: ${profile.category}`,
       bean.bagNotes ? `Bag tasting notes: ${bean.bagNotes}` : null,
       bean.producer ? `Producer: ${bean.producer}` : null,
+      bean.altitude ? `Altitude: ${bean.altitude}` : null,
+      bean.roastLevel ? `Roast level: ${bean.roastLevel}` : null,
+      bean.farm ? `Farm: ${bean.farm}` : null,
+      bean.brewingRec ? `Roaster brewing recommendation: ${bean.brewingRec}` : null,
     ].filter(Boolean).join('\n'),
     profile,
   };

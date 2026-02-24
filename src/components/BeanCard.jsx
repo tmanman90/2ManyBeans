@@ -8,8 +8,12 @@ import { EditBeanModal } from './EditBeanModal';
 
 export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
   const [editOpen, setEditOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const ps = getPeakStatus(bean);
   const dOpen = daysOpen(bean.openDate);
+
+  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy;
+
   return (
     <div style={{
       ...journalCard,
@@ -47,15 +51,52 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
         {dOpen !== null && <span style={{ color: C.accent }}>{dOpen}d open</span>}
       </div>
       {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
-        <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: (bean.aidenGrind || actions) ? 6 : 0 }}>
+        <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: (bean.aidenGrind || hasDetails || actions) ? 6 : 0 }}>
           ☕ {bean.bagNotes}
         </div>
       )}
       {bean.aidenGrind && (
-        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: actions ? 10 : 0 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
           ⚙ Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
         </div>
       )}
+
+      {/* Expandable details */}
+      {hasDetails && (
+        <>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: 0, fontSize: 11, color: C.accent,
+              fontFamily: fonts.body, marginBottom: expanded ? 8 : (actions ? 10 : 0),
+            }}
+          >
+            {expanded ? 'Hide details' : 'Show details'}
+          </button>
+
+          {expanded && (
+            <div style={{
+              fontSize: 12, color: C.textMuted,
+              padding: '8px 10px', borderRadius: 8,
+              background: C.bg, border: `1px solid ${C.borderLight}`,
+              marginBottom: actions ? 10 : 0,
+              display: 'flex', flexDirection: 'column', gap: 3,
+            }}>
+              {bean.region && <span><strong>Region:</strong> {bean.region}</span>}
+              {bean.farm && <span><strong>Farm:</strong> {bean.farm}</span>}
+              {bean.altitude && <span><strong>Altitude:</strong> {bean.altitude}</span>}
+              {bean.roastLevel && <span><strong>Roast Level:</strong> {bean.roastLevel}</span>}
+              {bean.cupScore && <span><strong>Cup Score:</strong> {bean.cupScore}</span>}
+              {bean.sourcedBy && <span><strong>Sourced By:</strong> {bean.sourcedBy}</span>}
+              {bean.brewingRec && (
+                <span style={{ marginTop: 2 }}><strong>Brewing Rec:</strong> {bean.brewingRec}</span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
       {actions && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
 
       {updateBean && (

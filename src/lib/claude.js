@@ -4,17 +4,213 @@ import { today, getPeakStatus, daysOpen } from './peakStatus';
 
 const PROXY_URL = '/api/claude';
 
-async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-sonnet-4-20250514' }) {
+async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-sonnet-4-20250514', tools }) {
+  const body = { system, messages, maxTokens, model };
+  if (tools) body.tools = tools;
+
   const response = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, messages, maxTokens, model }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error(`Claude API error: ${response.status}`);
   }
   return response.json();
 }
+
+// --- Image compression utility ---
+
+export function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX_DIM = 1500;
+      let { width, height } = img;
+
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const scale = MAX_DIM / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error('Compression failed'));
+          const reader = new FileReader();
+          reader.onload = () => resolve({
+            base64: reader.result.split(',')[1],
+            mediaType: 'image/jpeg',
+            previewUrl: URL.createObjectURL(blob),
+          });
+          reader.onerror = () => reject(new Error('Failed to read compressed image'));
+          reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        0.8,
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = url;
+  });
+}
+
+// --- Bean label scanning (multi-photo, deep analysis) ---
+
+export async function scanBeanLabel(photos) {
+  const imageBlocks = photos.map(p => ({
+    type: 'image',
+    source: { type: 'base64', media_type: p.mediaType, data: p.base64 },
+  }));
+
+  const data = await callClaude({
+    messages: [{
+      role: 'user',
+      content: [
+        ...imageBlocks,
+        {
+          type: 'text',
+          text: `You are an expert specialty coffee label reader. You have been given ${photos.length} photo(s) of a coffee bag.
+
+STEP 1 — QUALITY CHECK:
+If ALL images are too blurry, dark, or unreadable to extract meaningful information, respond with ONLY:
+{"error": "Photo too blurry or unreadable. Please take a clearer photo."}
+
+STEP 2 — EXHAUSTIVE TEXT EXTRACTION:
+Read EVERY piece of text visible across ALL images — front label, back label, side panels, small print, stamps, stickers, handwritten notes, QR code labels, everything. Pay special attention to:
+- Varietal names in different fonts/sizes (e.g., GEISHA, BOURBON, SL28, CATURRA, TYPICA)
+- Producer/farm names that may be in smaller text
+- Altitude/elevation (e.g., "1800-2100 masl")
+- Region names (e.g., Huila, Yirgacheffe, Nyeri)
+- Roast level indicators
+- Tasting/flavor notes
+- Roast dates, best-by dates
+- Weight/bag size
+- If you see a retailer/selector brand (e.g., "Dayglow", "Manhattan Coffee Roasters", "Cat & Cloud"), note it as sourcedBy
+
+STEP 3 — CROSS-REFERENCE:
+Cross-reference information across all provided images. Back labels often have details missing from the front.
+
+STEP 4 — STRUCTURED OUTPUT:
+Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation):
+
+{
+  "roaster": "roaster/brand name",
+  "name": "coffee name or lot name",
+  "origin": "country",
+  "variety": "coffee variety/cultivar if shown",
+  "process": "processing method (Washed, Natural, Honey, Anaerobic Honey, Anaerobic Natural, White Honey, Advanced Natural, or Other)",
+  "roastDate": "YYYY-MM-DD if shown, otherwise empty string",
+  "bagSize": number in grams (default 100 if not shown),
+  "bagNotes": "tasting notes from the bag, separated by ' / '",
+  "producer": "farm or producer name if shown",
+  "region": "specific region/area within the country if shown",
+  "altitude": "altitude if shown (e.g. '1800-2100 masl')",
+  "farm": "specific farm/estate name if shown and different from producer",
+  "roastLevel": "light, medium-light, medium, medium-dark, or dark — if indicated",
+  "cupScore": "SCA cup score if shown (e.g. '87.5')",
+  "brewingRec": "any brewing recommendations on the bag",
+  "sourcedBy": "retailer or selector if different from roaster"
+}
+
+If a field is not visible, use an empty string (or 100 for bagSize). For roastDate, look for "roasted on", "roast date", or any date that appears to be a roast date — convert to YYYY-MM-DD. Do NOT use best-before dates as roast date.`,
+        },
+      ],
+    }],
+    maxTokens: 1200,
+  });
+
+  const text = data.content?.map(c => c.text || '').join('') || '';
+  const clean = text.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+
+  if (parsed.error) {
+    throw new Error(parsed.error);
+  }
+
+  return parsed;
+}
+
+// --- Web search research for bean enrichment ---
+
+export async function researchBeanOnline(extractedData) {
+  const { roaster, name, origin, variety, sourcedBy } = extractedData;
+  const searchParts = [roaster, name, origin, variety, sourcedBy].filter(Boolean);
+  if (searchParts.length < 2) {
+    throw new Error('Not enough data to search');
+  }
+
+  const searchContext = searchParts.join(' ');
+
+  const data = await callClaude({
+    system: `You are a specialty coffee researcher. Search for this EXACT coffee online and fill in missing details.
+
+CRITICAL RULES:
+- Only fill fields where you are CONFIDENT in the data — no guessing
+- Bag data takes precedence — you are only filling EMPTY fields
+- Be careful not to attribute information from a different coffee by the same roaster
+- If you find conflicting information, prefer the roaster's own website
+- Return ONLY a valid JSON object (no markdown, no backticks)`,
+    messages: [{
+      role: 'user',
+      content: `Search online for this specialty coffee and find additional details:
+
+Coffee: ${searchContext}
+${roaster ? `Roaster: ${roaster}` : ''}
+${name ? `Name: ${name}` : ''}
+${origin ? `Origin: ${origin}` : ''}
+${variety ? `Variety: ${variety}` : ''}
+${sourcedBy ? `Sourced by: ${sourcedBy}` : ''}
+
+Return a JSON object with ONLY fields you found reliable data for. Empty string for anything uncertain:
+
+{
+  "altitude": "e.g. '1800-2100 masl'",
+  "region": "specific region within the country",
+  "farm": "farm or estate name",
+  "roastLevel": "light, medium-light, medium, medium-dark, or dark",
+  "cupScore": "SCA score if available",
+  "brewingRec": "any brewing recommendations from the roaster",
+  "variety": "variety if found and not already known",
+  "process": "process if found and not already known",
+  "sourcedBy": "retailer/selector if applicable",
+  "producer": "producer name if found"
+}`,
+    }],
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+    maxTokens: 1500,
+  });
+
+  // Extract text blocks from response (skip tool_use/tool_result blocks)
+  const textParts = (data.content || [])
+    .filter(block => block.type === 'text')
+    .map(block => block.text || '')
+    .join('');
+
+  const clean = textParts.replace(/```json|```/g, '').trim();
+  // Find JSON in the response
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No JSON found in research response');
+  }
+
+  return JSON.parse(jsonMatch[0]);
+}
+
+// --- Existing functions (unchanged) ---
 
 export async function getRecBlurb(activeDesc, recDesc) {
   const data = await callClaude({
@@ -123,34 +319,4 @@ export async function sendChatMessage(systemPrompt, history) {
     maxTokens: 1000,
   });
   return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
-}
-
-export async function scanBeanLabel(base64, mediaType) {
-  const data = await callClaude({
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-        { type: 'text', text: `You are reading a specialty coffee bag label. Extract all info you can find and respond ONLY with a JSON object (no markdown, no backticks, no explanation). Use these exact keys:
-
-{
-  "roaster": "roaster/brand name",
-  "name": "coffee name or lot name",
-  "origin": "country and region if shown",
-  "variety": "coffee variety/cultivar if shown",
-  "process": "processing method (Washed, Natural, Honey, Anaerobic Honey, Anaerobic Natural, White Honey, Advanced Natural, or Other)",
-  "roastDate": "YYYY-MM-DD if shown, otherwise empty string",
-  "bagSize": number in grams (default 100 if not shown),
-  "bagNotes": "tasting notes from the bag, separated by ' / '",
-  "producer": "farm or producer name if shown"
-}
-
-If a field is not visible on the label, use an empty string (or 100 for bagSize). For roastDate, look for "roasted on", "roast date", or any date that appears to be a roast date — convert to YYYY-MM-DD format. For best-before dates, do NOT use those as roast date.` }
-      ]
-    }],
-    maxTokens: 1000,
-  });
-  const text = data.content?.map(c => c.text || '').join('') || '';
-  const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
 }
