@@ -1,10 +1,19 @@
 // Archive tab — ported from prototype lines 897-917
 import { C, fonts, journalCard } from '../styles/theme';
+import { StarRating } from '../components/StarRating';
 
-export const ArchiveTab = ({ beans }) => {
+export const ArchiveTab = ({ beans, tastings = [] }) => {
   const finished = beans
     .filter(b => b.status === 'FINISHED')
     .sort((a, b) => (b.finishDate || '').localeCompare(a.finishDate || ''));
+
+  // Compute best rating per bean
+  const bestRating = {};
+  tastings.forEach(t => {
+    if (t.rating && (!bestRating[t.beanId] || t.rating > bestRating[t.beanId])) {
+      bestRating[t.beanId] = t.rating;
+    }
+  });
 
   const accentBar = {
     width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
@@ -34,6 +43,11 @@ export const ArchiveTab = ({ beans }) => {
           {bean.bagNotes && bean.bagNotes !== '' && (
             <div style={{ fontSize: 12, color: C.textLight, fontStyle: 'italic', marginTop: 4 }}>
               ☕ {bean.bagNotes}
+            </div>
+          )}
+          {bestRating[bean.id] && (
+            <div style={{ marginTop: 6 }}>
+              <StarRating value={bestRating[bean.id]} size={16} />
             </div>
           )}
         </div>

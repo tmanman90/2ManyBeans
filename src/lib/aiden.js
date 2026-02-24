@@ -504,6 +504,11 @@ function repairRecipe(bean, recipe, research) {
   enforceDeterministicGrind(repaired, bean, research);
   enforceClarityRules(repaired, bean);
 
+  // Deterministic title: #{atmosSlot} {origin} {name} - {roaster}
+  const slot = bean.atmosSlot ? `#${bean.atmosSlot} ` : '';
+  const title = `${slot}${bean.origin || ''} ${bean.name || ''} - ${bean.roaster || ''}`.trim();
+  repaired.title = title.length > 50 ? title.slice(0, 50) : title;
+
   // Log changed fields for debugging
   const changes = {};
   for (const key of Object.keys(repaired)) {

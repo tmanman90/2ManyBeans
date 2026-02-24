@@ -1,14 +1,14 @@
 // Tasting tab — ported from prototype lines 500-789
 // 3 modes: list, form, chat
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Plus, Check, Send, Pencil } from 'lucide-react';
+import { MessageCircle, Plus, Check, Send, Pencil, Trash2 } from 'lucide-react';
 import { C, fonts, journalCard, shadows } from '../styles/theme';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const [sel, setSel] = useState(active[0]?.id || '');
   const emptyForm = { aroma: '', firstSip: '', acidity: '', sweetness: '', body: '', finish: '', oneWord: '', rating: 0, notes: '', changeTomorrow: '' };
@@ -90,7 +90,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
 
     try {
       const beanName = sel ? getBeanName(sel) : 'unknown bean';
-      const systemPrompt = buildTastingSystemPrompt(beanName);
+      const systemPrompt = buildTastingSystemPrompt(beanName, beans);
       const history = [...chatMessages.filter(m => m.role !== 'system'), userMsg];
       const text = await sendTastingMessage(systemPrompt, history);
 
@@ -98,6 +98,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
       if (extractMatch) {
         try {
           const extracted = JSON.parse(extractMatch[1].trim());
+          // Auto-match bean if AI extracted a beanName
+          if (extracted.beanName) {
+            const match = beans.find(b => b.name.toLowerCase() === extracted.beanName.toLowerCase());
+            if (match) setSel(match.id);
+          }
           setChatExtracted(extracted);
           const cleanText = text.replace(/---EXTRACT---[\s\S]*?---END---/, '').trim();
           setChatMessages(prev => [...prev, { role: 'assistant', content: cleanText || 'Great session! Review below and save when ready.' }]);
@@ -256,9 +261,14 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
 
         if (isEditing && editForm) return (
           <div key={t.id} style={{ ...journalCard, border: `1px solid ${C.accent}`, borderLeft: `3px solid ${C.accent}`, padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
-              <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+              <div style={{ flex: 1, marginRight: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 3 }}>Bean</label>
+                <select value={editForm.beanId} onChange={e => setEditForm(p => ({ ...p, beanId: e.target.value }))} style={{ ...inputStyle, fontSize: 13 }}>
+                  {beans.map(b => <option key={b.id} value={b.id}>{b.name} ({b.roaster})</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 6, paddingTop: 16 }}>
                 <Btn variant="primary" onClick={saveEdit} style={{ fontSize: 11, padding: '4px 10px' }}><Check size={12} /> Save</Btn>
                 <Btn variant="ghost" onClick={cancelEdit} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</Btn>
               </div>
@@ -288,6 +298,9 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting }) =
                 <span style={{ fontSize: 12, color: C.textMuted }}>{t.date}</span>
                 <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 2 }}>
                   <Pencil size={13} />
+                </span>
+                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 2 }}>
+                  <Trash2 size={13} />
                 </span>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch,
-  serverTimestamp, query, orderBy
+  serverTimestamp, query, orderBy, getDocs, limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { today } from '../lib/peakStatus';
@@ -116,6 +116,12 @@ export const useAppData = (uid) => {
   // Seed Tal's initial data into Firestore
   const seedTalData = useCallback(async () => {
     if (!uid) return;
+
+    // Idempotency guard: don't seed if beans already exist
+    const beansRef = collection(db, 'users', uid, 'beans');
+    const existing = await getDocs(query(beansRef, limit(1)));
+    if (!existing.empty) return;
+
     const batch = writeBatch(db);
 
     // Map seedId → new Firestore doc ID so tastings can reference the right bean

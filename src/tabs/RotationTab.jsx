@@ -11,7 +11,12 @@ import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
 import { generateAidenRecipe, researchBean, pushToAiden } from '../lib/aiden';
 
-export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, onSeed }) => {
+export const RotationTab = ({ beans, onFinishBean, onOpenBean, updateBean, showSeedButton, onSeed }) => {
+  const [seeding, setSeeding] = useState(false);
+  const handleSeed = async () => {
+    setSeeding(true);
+    try { await onSeed(); } catch (e) { console.error(e); setSeeding(false); }
+  };
   const [showRec, setShowRec] = useState(false);
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
@@ -81,6 +86,10 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
       const recipe = await generateAidenRecipe(bean, research);
       setAidenRecipe(recipe);
       setAidenError(null);
+      // Persist grind recommendation to the bean
+      if (recipe.grindRecommendation) {
+        await updateBean(bean.id, { aidenGrind: recipe.grindRecommendation });
+      }
       // Step 3: Push to Fellow
       setAidenPhase('push');
       await handlePushToAiden(recipe);
@@ -142,8 +151,8 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>Welcome! Import your coffee inventory?</div>
-          <Btn variant="primary" onClick={onSeed}>
-            Import Tal's Inventory
+          <Btn variant="primary" onClick={handleSeed} disabled={seeding}>
+            {seeding ? 'Importing…' : "Import Tal's Inventory"}
           </Btn>
         </div>
       )}
@@ -162,7 +171,7 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, showSeedButton, o
           </div>
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
-            <BeanCard bean={bean} actions={<>
+            <BeanCard bean={bean} updateBean={updateBean} actions={<>
               <Btn variant="small" onClick={() => handleBrewWithAiden(bean)}>
                 <Coffee size={12} /> Brew with Aiden
               </Btn>

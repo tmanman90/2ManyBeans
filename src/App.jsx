@@ -94,6 +94,7 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
             beans={beans}
             onFinishBean={finishBean}
             onOpenBean={handleOpenBean}
+            updateBean={updateBean}
             showSeedButton={showSeedButton}
             onSeed={seedTalData}
           />
@@ -111,10 +112,11 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
             tastings={tastings}
             onAddTasting={addTasting}
             onUpdateTasting={updateTasting}
+            onDeleteTasting={deleteTasting}
           />
         )}
         {tab === 'chat' && <ChatTab beans={beans} tastings={tastings} />}
-        {tab === 'archive' && <ArchiveTab beans={beans} />}
+        {tab === 'archive' && <ArchiveTab beans={beans} tastings={tastings} />}
       </div>
 
       {/* Bottom Tab Bar */}

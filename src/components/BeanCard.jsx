@@ -1,9 +1,13 @@
 // Bean display card — journal-page treatment
+import { useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { Badge } from './Badge';
+import { EditBeanModal } from './EditBeanModal';
 
-export const BeanCard = ({ bean, actions, compact = false }) => {
+export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
+  const [editOpen, setEditOpen] = useState(false);
   const ps = getPeakStatus(bean);
   const dOpen = daysOpen(bean.openDate);
   return (
@@ -20,7 +24,20 @@ export const BeanCard = ({ bean, actions, compact = false }) => {
             {bean.roaster} · {bean.origin}
           </div>
         </div>
-        <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {updateBean && (
+            <button
+              onClick={() => setEditOpen(true)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 4, display: 'flex', alignItems: 'center',
+              }}
+            >
+              <Pencil size={14} color={C.textMuted} />
+            </button>
+          )}
+          <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>
+        </div>
       </div>
       <div style={{ fontSize: 12, color: C.textMuted, display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginBottom: bean.bagNotes ? 6 : 0 }}>
         <span>{bean.variety} · {bean.process}</span>
@@ -30,11 +47,25 @@ export const BeanCard = ({ bean, actions, compact = false }) => {
         {dOpen !== null && <span style={{ color: C.accent }}>{dOpen}d open</span>}
       </div>
       {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
-        <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: actions ? 10 : 0 }}>
+        <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: (bean.aidenGrind || actions) ? 6 : 0 }}>
           ☕ {bean.bagNotes}
         </div>
       )}
+      {bean.aidenGrind && (
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: actions ? 10 : 0 }}>
+          ⚙ Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
+        </div>
+      )}
       {actions && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
+
+      {updateBean && (
+        <EditBeanModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          bean={bean}
+          updateBean={updateBean}
+        />
+      )}
     </div>
   );
 };
