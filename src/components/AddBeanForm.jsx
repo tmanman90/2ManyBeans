@@ -202,7 +202,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
   );
 
   return (
-    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean" footer={step === 'review' ? (
+    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean" centered footer={step === 'review' ? (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
           <RotateCcw size={14} /> Rescan

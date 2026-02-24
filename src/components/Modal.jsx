@@ -1,25 +1,27 @@
 // Bottom-sheet overlay — warm shadow + larger radius
 // Supports optional `footer` prop for sticky action buttons
+// Portal to body so modal escapes any parent stacking context
+import { createPortal } from 'react-dom';
 import { C, fonts, shadows } from '../styles/theme';
 import { X } from 'lucide-react';
 
-export const Modal = ({ open, onClose, title, children, footer }) => {
+export const Modal = ({ open, onClose, title, children, footer, centered }) => {
   if (!open) return null;
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(44,24,16,0.4)',
         backdropFilter: 'blur(4px)',
         zIndex: 1000,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        display: 'flex', alignItems: centered ? 'center' : 'flex-end', justifyContent: 'center',
       }}
       onClick={onClose}
     >
       <div
         style={{
           background: C.bg,
-          borderRadius: '24px 24px 0 0',
+          borderRadius: centered ? 24 : '24px 24px 0 0',
           width: '100%', maxWidth: 480,
           maxHeight: '90vh',
           boxShadow: shadows.modal,
@@ -57,6 +59,7 @@ export const Modal = ({ open, onClose, title, children, footer }) => {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
