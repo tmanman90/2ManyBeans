@@ -19,9 +19,9 @@ export const Modal = ({ open, onClose, title, children }) => {
         style={{
           background: C.bg,
           borderRadius: '24px 24px 0 0',
-          padding: '20px 20px 32px',
+          padding: '20px 20px calc(32px + env(safe-area-inset-bottom, 0px))',
           width: '100%', maxWidth: 480,
-          maxHeight: '80vh', overflow: 'auto',
+          maxHeight: '90vh', overflow: 'auto',
           boxShadow: shadows.modal,
         }}
         onClick={e => e.stopPropagation()}
