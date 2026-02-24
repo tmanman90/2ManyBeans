@@ -91,7 +91,19 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
   const rowStyle = { marginBottom: 12 };
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit Bean">
+    <Modal open={open} onClose={onClose} title="Edit Bean" footer={
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+        <Btn
+          variant="primary"
+          onClick={handleSave}
+          disabled={saving || !f.roaster?.trim() || !f.name?.trim()}
+          style={{ flex: 1, justifyContent: 'center' }}
+        >
+          <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+        </Btn>
+      </div>
+    }>
       <div style={rowStyle}>
         <label style={labelStyle}>Roaster *</label>
         <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} style={inputStyle} />
@@ -223,17 +235,6 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
-        <Btn
-          variant="primary"
-          onClick={handleSave}
-          disabled={saving || !f.roaster?.trim() || !f.name?.trim()}
-          style={{ flex: 1, justifyContent: 'center' }}
-        >
-          <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
-        </Btn>
-      </div>
     </Modal>
   );
 };

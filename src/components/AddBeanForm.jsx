@@ -202,7 +202,34 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
   );
 
   return (
-    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean">
+    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean" footer={step === 'review' ? (
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
+          <RotateCcw size={14} /> Rescan
+        </Btn>
+        {hasSearchableData && hasEmptyEnrichable && (
+          <Btn
+            variant="ghost"
+            onClick={handleAiFill}
+            disabled={aiFilling}
+            style={{ flex: 0, fontSize: 12 }}
+          >
+            {aiFilling ? (
+              <>{spinner} Researching...</>
+            ) : (
+              <><Search size={12} /> AI Fill</>
+            )}
+          </Btn>
+        )}
+        <Btn
+          variant="primary"
+          onClick={handleSave}
+          style={{ flex: 1, justifyContent: 'center', opacity: f.roaster.trim() && f.name.trim() ? 1 : 0.4 }}
+        >
+          <Plus size={14} /> Add to Inventory
+        </Btn>
+      </div>
+    ) : null}>
       {/* STEP: Photo upload + gallery */}
       {step === 'photo' && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
@@ -455,32 +482,6 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
-              <RotateCcw size={14} /> Rescan
-            </Btn>
-            {hasSearchableData && hasEmptyEnrichable && (
-              <Btn
-                variant="ghost"
-                onClick={handleAiFill}
-                disabled={aiFilling}
-                style={{ flex: 0, fontSize: 12 }}
-              >
-                {aiFilling ? (
-                  <>{spinner} Researching...</>
-                ) : (
-                  <><Search size={12} /> AI Fill</>
-                )}
-              </Btn>
-            )}
-            <Btn
-              variant="primary"
-              onClick={handleSave}
-              style={{ flex: 1, justifyContent: 'center', opacity: f.roaster.trim() && f.name.trim() ? 1 : 0.4 }}
-            >
-              <Plus size={14} /> Add to Inventory
-            </Btn>
-          </div>
         </>
       )}
     </Modal>
