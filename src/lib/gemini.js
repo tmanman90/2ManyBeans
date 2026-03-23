@@ -1,0 +1,221 @@
+// Gemini API helpers — all calls go through /api/gemini serverless proxy
+// No Google SDK in the browser. No API key in client code.
+import { API_BASE } from './apiBase';
+
+const PROXY_URL = `${API_BASE}/api/gemini`;
+
+const FRIENDLY_ERRORS = {
+  429: 'AI is rate-limited — please wait a moment and try again',
+  529: 'AI service is temporarily busy — please try again in a moment',
+  503: 'AI service is temporarily unavailable — please try again shortly',
+};
+
+export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2 }) {
+  const body = { model, contents, systemInstruction, maxTokens };
+  if (tools) body.tools = tools;
+
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    if ([429, 529, 503].includes(response.status) && attempt < retries) {
+      lastError = response.status;
+      continue;
+    }
+
+    const friendly = FRIENDLY_ERRORS[response.status];
+    if (friendly) throw new Error(friendly);
+
+    try {
+      const data = await response.json();
+      throw new Error(data.error || `Gemini API error: ${response.status}`);
+    } catch (e) {
+      if (e.message && e.message !== 'Unexpected token') throw e;
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+  }
+
+  const friendly = FRIENDLY_ERRORS[lastError];
+  throw new Error(friendly || `Gemini API error: ${lastError}`);
+}
+
+// --- Bean label scanning (multi-photo, deep analysis) via Gemini 2.5 Flash ---
+
+export async function scanBeanLabel(photos) {
+  const imageParts = photos.map(p => ({
+    inlineData: { mimeType: p.mediaType, data: p.base64 },
+  }));
+
+  const scanPrompt = `You are an expert specialty coffee label reader. You have been given ${photos.length} photo(s) of a coffee bag.
+
+STEP 1 — QUALITY CHECK:
+If ALL images are too blurry, dark, or unreadable to extract meaningful information, respond with ONLY:
+{"error": "Photo too blurry or unreadable. Please take a clearer photo."}
+
+STEP 2 — EXHAUSTIVE TEXT EXTRACTION:
+Read EVERY piece of text visible across ALL images — front label, back label, side panels, small print, stamps, stickers, handwritten notes, QR code labels, everything.
+
+CRITICAL: Text on coffee packaging is often ROTATED, VERTICAL, SIDEWAYS, or in unusual orientations. Scan the entire image in all directions. Do NOT skip text just because it's rotated 90°, upside-down, or along an edge. Read every word on every surface.
+
+Pay special attention to:
+- Varietal names in different fonts/sizes/orientations (e.g., GEISHA, BOURBON, SL28, CATURRA, TYPICA)
+- Processing methods (often printed vertically or on side panels) — read the EXACT text, don't simplify
+- Producer/farm names that may be in smaller text or rotated
+- Altitude/elevation (e.g., "1800-2100 masl")
+- Region names (e.g., Huila, Yirgacheffe, Nyeri)
+- Roast level indicators
+- Tasting/flavor notes
+- Roast dates (look for "roasted on", "roast date", handwritten/stamped dates, stickers — common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "2026-02-17")
+- Best-by / consume-by / shelf life info (e.g. "consume within 3 months", "best within 6 weeks of roast", "90 days")
+- Weight/bag size
+
+STEP 3 — CURATOR vs ROASTER:
+IMPORTANT: Some images may show a SUBSCRIPTION SERVICE or CURATOR brand (e.g., Dayglow, Trade, Angels' Cup, Yes Plz, Cat & Cloud marketplace) — this is NOT the roaster. The actual roaster is the company that ROASTED the coffee (usually on the label/box itself).
+- If a curator/subscription service is present: set "roaster" to "Curator (Actual Roaster)" format, e.g., "Dayglow (Promethium Coffee)"
+- Set "sourcedBy" to the curator name alone, e.g., "Dayglow"
+- NEVER use the curator name as the coffee name
+
+STEP 4 — CROSS-REFERENCE:
+Cross-reference information across all provided images. Back labels often have details missing from the front.
+
+STEP 5 — COFFEE NAME:
+- If the bag has an explicit coffee name or lot name, use it
+- If there is NO explicit name, construct one from farm/estate + variety, e.g., "El Placer Geisha", "La Palma Caturra"
+- If only variety is known, use origin + variety, e.g., "Colombia Geisha"
+- NEVER use the roaster name or curator name as the coffee name
+
+STEP 6 — STRUCTURED OUTPUT:
+Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation):
+
+{
+  "roaster": "roaster/brand name (or 'Curator (Roaster)' format if subscription)",
+  "name": "coffee name, lot name, or constructed Farm+Variety name",
+  "origin": "country",
+  "variety": "coffee variety/cultivar if shown",
+  "process": "EXACT processing method as printed on bag (e.g. Washed, Natural, Honey, Anaerobic Honey, Anaerobic Natural, White Honey, Anaerobic White Honey, Advanced Natural, or Other)",
+  "roastDate": "YYYY-MM-DD if shown, otherwise empty string",
+  "bagSize": number in grams (default 100 if not shown),
+  "bagNotes": "tasting notes from the bag, separated by ' / '",
+  "producer": "farm or producer name if shown",
+  "region": "specific region/area within the country if shown",
+  "altitude": "altitude if shown (e.g. '1800-2100 masl')",
+  "farm": "specific farm/estate name if shown",
+  "roastLevel": "light, medium-light, medium, medium-dark, or dark — if indicated",
+  "cupScore": "SCA cup score, micro lot score, lot score, Q grade, or any numeric quality/cupping score on the bag (e.g. '87.5')",
+  "brewingRec": "any brewing recommendations on the bag",
+  "sourcedBy": "subscription service or curator if different from roaster",
+  "shelfLife": "shelf life or consume-by guidance from the bag (e.g. '3 months', '90 days', 'best within 6 weeks of roast')"
+}
+
+If a field is not visible, use an empty string (or 100 for bagSize). For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers — convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING — do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
+
+  const data = await callGemini({
+    contents: [{
+      parts: [...imageParts, { text: scanPrompt }],
+    }],
+    maxTokens: 1200,
+  });
+
+  const text = data.text || '';
+  const clean = text.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+
+  if (parsed.error) {
+    throw new Error(parsed.error);
+  }
+
+  return parsed;
+}
+
+// --- Web search + Reddit research for bean enrichment via Gemini search grounding ---
+
+export async function researchBeanOnline(extractedData) {
+  const { roaster, name, origin, variety, sourcedBy } = extractedData;
+  const searchParts = [roaster, name, origin, variety, sourcedBy].filter(Boolean);
+  if (searchParts.length < 2) {
+    throw new Error('Not enough data to search');
+  }
+
+  const searchContext = searchParts.join(' ');
+
+  const data = await callGemini({
+    systemInstruction: `You are a specialty coffee researcher. Search for this EXACT coffee online and fill in missing details. Also search Reddit (r/coffee, r/specialtycoffee, r/pourover) for community reviews and tasting notes.
+
+CRITICAL RULES:
+- Only fill fields where you are CONFIDENT in the data — no guessing
+- Bag data takes precedence — you are only filling EMPTY fields
+- Be careful not to attribute information from a different coffee by the same roaster
+- If you find conflicting information, prefer the roaster's own website
+- Include any Reddit community tasting notes or reviews you find in the redditNotes field
+- Return ONLY a valid JSON object (no markdown, no backticks)`,
+    contents: [{
+      parts: [{ text: `Search online for this specialty coffee and find additional details:
+
+Coffee: ${searchContext}
+${roaster ? `Roaster: ${roaster}` : ''}
+${name ? `Name: ${name}` : ''}
+${origin ? `Origin: ${origin}` : ''}
+${variety ? `Variety: ${variety}` : ''}
+${sourcedBy ? `Sourced by: ${sourcedBy}` : ''}
+
+Return a JSON object with ONLY fields you found reliable data for. Empty string for anything uncertain:
+
+{
+  "altitude": "e.g. '1800-2100 masl'",
+  "region": "specific region within the country",
+  "farm": "farm or estate name",
+  "roastLevel": "light, medium-light, medium, medium-dark, or dark",
+  "cupScore": "SCA score if available",
+  "brewingRec": "any brewing recommendations from the roaster",
+  "variety": "variety if found and not already known",
+  "process": "process if found and not already known",
+  "sourcedBy": "retailer/selector if applicable",
+  "producer": "producer name if found",
+  "redditNotes": "community tasting notes or reviews from Reddit if found"
+}` }],
+    }],
+    tools: [{ googleSearchRetrieval: {} }],
+    maxTokens: 1500,
+  });
+
+  const text = data.text || '';
+  const clean = text.replace(/```json|```/g, '').trim();
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No JSON found in research response');
+  }
+
+  return JSON.parse(jsonMatch[0]);
+}
+
+// --- Vision description for chat image routing ---
+
+export async function describeImage(photos) {
+  const imageParts = photos.map(p => ({
+    inlineData: { mimeType: p.mediaType, data: p.base64 },
+  }));
+
+  const data = await callGemini({
+    contents: [{
+      parts: [
+        ...imageParts,
+        { text: 'Describe this image in detail. If it is a coffee bag, read all visible text including roaster name, coffee name, origin, variety, process, roast date, tasting notes, and any other information. Include text from all orientations (rotated, vertical, sideways).' },
+      ],
+    }],
+    maxTokens: 800,
+  });
+
+  return data.text || '';
+}

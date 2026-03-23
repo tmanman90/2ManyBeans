@@ -2,15 +2,38 @@
 // Keeps ANTHROPIC_API_KEY server-side only
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
+
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 2,
+});
+
+const ALLOWED_ORIGINS = [
+  'https://2manybeans.vercel.app',
+  'capacitor://localhost',
+  'http://localhost',
+];
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.some(o => origin?.startsWith(o))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
 
 export default async function handler(req, res) {
+  setCorsHeaders(req, res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { system, messages, maxTokens = 1000, model = 'claude-sonnet-4-20250514', tools } = req.body;
+    const { system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array is required' });
@@ -30,7 +53,19 @@ export default async function handler(req, res) {
       params.tools = tools;
     }
 
-    let response = await client.messages.create(params);
+    let response;
+    try {
+      response = await client.messages.create(params);
+    } catch (primaryError) {
+      // On overload/rate-limit, fall back to Haiku
+      if ([429, 529].includes(primaryError.status) && model !== FALLBACK_MODEL) {
+        console.warn(`Primary model ${model} unavailable (${primaryError.status}), falling back to ${FALLBACK_MODEL}`);
+        params.model = FALLBACK_MODEL;
+        response = await client.messages.create(params);
+      } else {
+        throw primaryError;
+      }
+    }
 
     // Multi-turn handling for tool_use (web_search etc.)
     // Loop until we get end_turn or hit safety limit
@@ -38,17 +73,10 @@ export default async function handler(req, res) {
     const maxTurns = 5;
     while (response.stop_reason === 'tool_use' && turns < maxTurns) {
       turns++;
-      // Build assistant message from response content
       const assistantMsg = { role: 'assistant', content: response.content };
-      // Build tool results for each tool_use block
       const toolResults = [];
       for (const block of response.content) {
         if (block.type === 'tool_use') {
-          // For server-side tools like web_search, the results come back
-          // in the same response content array as tool_result blocks.
-          // But if stop_reason is 'tool_use', we need to send back tool results.
-          // For Anthropic's built-in web_search tool, the API handles the search
-          // server-side and returns results inline — we just need to continue.
           toolResults.push({
             type: 'tool_result',
             tool_use_id: block.id,
@@ -68,6 +96,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ content: response.content, stop_reason: response.stop_reason });
   } catch (error) {
     console.error('Claude API error:', error);
-    return res.status(500).json({ error: 'Failed to call Claude API' });
+    const status = error.status || 500;
+    const detail = error.error?.error?.message || error.message || 'Unknown error';
+    return res.status(status).json({ error: detail });
   }
 }

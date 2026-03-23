@@ -5,6 +5,21 @@
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
 
+const ALLOWED_ORIGINS = [
+  'https://2manybeans.vercel.app',
+  'capacitor://localhost',
+  'http://localhost',
+];
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.some(o => origin?.startsWith(o))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function validateProfile(profile) {
   const errors = [];
   const { ratio, bloomRatio, bloomDuration, bloomTemperature,
@@ -53,6 +68,9 @@ async function fellowFetch(path, options = {}) {
 }
 
 export default async function handler(req, res) {
+  setCorsHeaders(req, res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -98,8 +116,10 @@ export default async function handler(req, res) {
       });
     } catch (createErr) {
       if (createErr.status === 400) {
+        // Log the actual error for debugging — could be full device OR validation failure
+        console.error('Profile create 400:', createErr.message);
         return res.status(409).json({
-          error: 'Your Aiden has 14 profiles (the max). Delete one in the Fellow app to enable brew.link generation.',
+          error: `Fellow rejected the profile (400): ${createErr.message}`,
         });
       }
       throw createErr;
