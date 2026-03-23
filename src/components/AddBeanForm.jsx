@@ -1,10 +1,13 @@
 // Add Bean Form — Multi-photo scan + web research + AI Fill
 import { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Plus, RotateCcw, X, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
-import { scanBeanLabel, compressImage, researchBeanOnline } from '../lib/claude';
+import { compressImage } from '../lib/claude';
+import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
+import { generateRuphusStory } from '../lib/professorRuphus';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
@@ -15,7 +18,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
     roastDate: today(), bagSize: 100, bagNotes: '', producer: '',
     altitude: '', region: '', farm: '', roastLevel: '', cupScore: '',
-    brewingRec: '', sourcedBy: '',
+    brewingRec: '', sourcedBy: '', shelfLife: '',
   };
   const [f, setF] = useState(empty);
   const [profileInfo, setProfileInfo] = useState(null);
@@ -24,6 +27,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
   const [photos, setPhotos] = useState([]); // [{ base64, mediaType, previewUrl }]
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
+  const storyRef = useRef(null); // Background Professor Ruphus story
 
   useEffect(() => {
     if (f.roaster.trim()) {
@@ -41,6 +45,29 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     setPhotos([]);
     setProfileInfo(null);
     setAiFilling(false);
+    storyRef.current = null;
+  };
+
+  const takeNativePhoto = async () => {
+    try {
+      const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      const image = await Camera.getPhoto({
+        quality: 85,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt,
+        width: 1200,
+        height: 1200,
+      });
+      // Convert dataUrl to the same format as compressImage output
+      const mediaType = 'image/jpeg';
+      const base64 = image.dataUrl.split(',')[1];
+      setPhotos(prev => [...prev, { base64, mediaType, previewUrl: image.dataUrl }].slice(0, 3));
+    } catch (err) {
+      if (err.message !== 'User cancelled photos app') {
+        console.error('Camera error:', err);
+        setScanError('Failed to capture photo. Try again.');
+      }
+    }
   };
 
   const handlePhoto = async (e) => {
@@ -80,7 +107,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
         origin: parsed.origin || '',
         variety: parsed.variety || '',
         process: parsed.process || '',
-        roastDate: parsed.roastDate || today(),
+        roastDate: parsed.roastDate || '',
         bagSize: parsed.bagSize || 100,
         bagNotes: parsed.bagNotes || '',
         producer: parsed.producer || '',
@@ -91,27 +118,33 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
         cupScore: parsed.cupScore || '',
         brewingRec: parsed.brewingRec || '',
         sourcedBy: parsed.sourcedBy || '',
+        shelfLife: parsed.shelfLife || '',
       };
       setF(scanData);
 
       // Auto-trigger research
       setStep('researching');
+      let enrichedData = scanData;
       try {
         const research = await researchBeanOnline(scanData);
         // Merge: only fill empty fields
-        setF(prev => {
-          const merged = { ...prev };
-          for (const field of ENRICHABLE_FIELDS) {
-            if (!merged[field] && research[field]) {
-              merged[field] = research[field];
-            }
+        const merged = { ...scanData };
+        for (const field of ENRICHABLE_FIELDS) {
+          if (!merged[field] && research[field]) {
+            merged[field] = research[field];
           }
-          return merged;
-        });
+        }
+        setF(merged);
+        enrichedData = merged;
       } catch (researchErr) {
         console.log('Research skipped/failed:', researchErr.message);
         // Silent — scan data is already saved
       }
+      // Background: generate Professor Ruphus story (non-blocking)
+      storyRef.current = null;
+      generateRuphusStory(enrichedData, { useWebSearch: false })
+        .then(story => { storyRef.current = story; })
+        .catch(err => console.log('Background story gen skipped:', err.message));
       setStep('review');
     } catch (err) {
       console.error('Scan error:', err);
@@ -125,24 +158,42 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     setAiFilling(true);
     try {
       const research = await researchBeanOnline(f);
-      setF(prev => {
-        const merged = { ...prev };
-        for (const field of ENRICHABLE_FIELDS) {
-          if (!merged[field] && research[field]) {
-            merged[field] = research[field];
-          }
+      const merged = { ...f };
+      for (const field of ENRICHABLE_FIELDS) {
+        if (!merged[field] && research[field]) {
+          merged[field] = research[field];
         }
-        return merged;
-      });
+      }
+      setF(merged);
+      // Background: generate Professor Ruphus story (non-blocking)
+      storyRef.current = null;
+      generateRuphusStory(merged, { useWebSearch: false })
+        .then(story => { storyRef.current = story; })
+        .catch(err => console.log('Background story gen skipped:', err.message));
     } catch (err) {
       console.log('AI Fill failed:', err.message);
     }
     setAiFilling(false);
   };
 
+  const parseShelfLifeDays = (str) => {
+    if (!str) return null;
+    const s = str.toLowerCase();
+    const num = parseFloat(s);
+    if (isNaN(num)) return null;
+    if (/month/.test(s)) return Math.round(num * 30);
+    if (/week/.test(s)) return Math.round(num * 7);
+    if (/day/.test(s)) return Math.round(num);
+    return null;
+  };
+
   const handleSave = () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
     const p = getProfileForRoaster(f.roaster);
+
+    // Override peakEnd if bag states a shelf life
+    const shelfDays = parseShelfLifeDays(f.shelfLife);
+    const peakEnd = shelfDays && shelfDays > p.peakEnd ? shelfDays : p.peakEnd;
 
     const beanData = {
       roaster: f.roaster.trim(),
@@ -150,7 +201,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
       origin: f.origin.trim(),
       variety: f.variety.trim(),
       process: f.process,
-      roastDate: f.roastDate,
+      roastDate: f.roastDate || today(),
       bagSize: Number(f.bagSize) || 100,
       status: 'SEALED',
       atmosSlot: null,
@@ -161,7 +212,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
       degasMin: p.degasMin,
       degasMax: p.degasMax,
       peakStart: p.peakStart,
-      peakEnd: p.peakEnd,
+      peakEnd,
       guidance: p.guidance,
     };
 
@@ -173,6 +224,10 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     if (f.cupScore.trim()) beanData.cupScore = f.cupScore.trim();
     if (f.brewingRec.trim()) beanData.brewingRec = f.brewingRec.trim();
     if (f.sourcedBy.trim()) beanData.sourcedBy = f.sourcedBy.trim();
+    if (f.shelfLife.trim()) beanData.shelfLife = f.shelfLife.trim();
+
+    // Include Professor Ruphus story if background generation finished
+    if (storyRef.current) beanData.story = storyRef.current;
 
     onAdd(beanData);
     reset();
@@ -237,7 +292,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
 
           {photos.length === 0 ? (
             <div
-              onClick={() => fileRef.current?.click()}
+              onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
               style={{
                 cursor: 'pointer', background: C.card,
                 border: `2px dashed ${C.border}`,
@@ -284,7 +339,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
                 {photos.length < 3 && (
-                  <Btn variant="secondary" onClick={() => fileRef.current?.click()}>
+                  <Btn variant="secondary" onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}>
                     + Add photo
                   </Btn>
                 )}
@@ -380,9 +435,15 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
                 background: profileInfo.known ? C.greenBg : C.amberBg,
                 color: profileInfo.known ? C.green : C.amber,
               }}>
-                {profileInfo.known ? '✓ ' : 'Unknown roaster — '}
-                Degas {profileInfo.degasMin}–{profileInfo.degasMax}d · Peak {profileInfo.peakStart}–{profileInfo.peakEnd}d
-                {!profileInfo.known && ' (est.)'}
+                {f.shelfLife ? (
+                  <>Bag says: consume within {f.shelfLife} of roast</>
+                ) : (
+                  <>
+                    {profileInfo.known ? '✓ ' : 'Unknown roaster — '}
+                    Degas {profileInfo.degasMin}–{profileInfo.degasMax}d · Peak {profileInfo.peakStart}–{profileInfo.peakEnd}d
+                    {!profileInfo.known && ' (est.)'}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -477,9 +538,15 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
               </div>
             </div>
 
-            <div style={rowStyle}>
-              <label style={labelStyle}>Brewing Recommendations</label>
-              <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster, if any" style={inputStyle} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+              <div>
+                <label style={labelStyle}>Brewing Recommendations</label>
+                <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster, if any" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Shelf Life</label>
+                <input value={f.shelfLife} onChange={e => setF(p => ({ ...p, shelfLife: e.target.value }))} placeholder="e.g. 3 months" style={inputStyle} />
+              </div>
             </div>
           </div>
 

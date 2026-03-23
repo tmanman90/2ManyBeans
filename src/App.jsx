@@ -1,6 +1,7 @@
 // App shell — warm Ghibli-inspired coffee journal
 import { useState } from 'react';
 import { C, fonts, shadows } from './styles/theme';
+import { haptic } from './lib/haptics';
 import { today } from './lib/peakStatus';
 import { RotationTab } from './tabs/RotationTab';
 import { InventoryTab } from './tabs/InventoryTab';
@@ -17,7 +18,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
 ];
 
-export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, seedTalData }) => {
+export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, seedTalData }) => {
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
@@ -94,18 +95,27 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
         {tab === 'rotation' && (
           <RotationTab
             beans={beans}
+            tastings={tastings}
             onFinishBean={finishBean}
+            onReturnBean={returnBean}
             onOpenBean={handleOpenBean}
             updateBean={updateBean}
             showSeedButton={showSeedButton}
             onSeed={seedTalData}
+            addTasting={addTasting}
+            updateTasting={updateTasting}
           />
         )}
         {tab === 'inventory' && (
           <InventoryTab
             beans={beans}
+            tastings={tastings}
             onOpenBean={handleOpenBean}
             onAddBean={addBean}
+            updateBean={updateBean}
+            onFinishBean={finishBean}
+            addTasting={addTasting}
+            updateTasting={updateTasting}
           />
         )}
         {tab === 'tasting' && (
@@ -115,10 +125,20 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
             onAddTasting={addTasting}
             onUpdateTasting={updateTasting}
             onDeleteTasting={deleteTasting}
+            updateBean={updateBean}
           />
         )}
-        {tab === 'chat' && <ChatTab beans={beans} tastings={tastings} />}
-        {tab === 'archive' && <ArchiveTab beans={beans} tastings={tastings} />}
+        {tab === 'chat' && (
+          <ChatTab
+            beans={beans}
+            tastings={tastings}
+            addBean={addBean}
+            updateBean={updateBean}
+            addTasting={addTasting}
+            updateTasting={updateTasting}
+          />
+        )}
+        {tab === 'archive' && <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} />}
       </div>
 
       {/* Bottom Tab Bar */}
@@ -138,7 +158,7 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
           return (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => { haptic.selection(); setTab(t.key); }}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',

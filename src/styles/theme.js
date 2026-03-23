@@ -37,6 +37,13 @@ export const shadows = {
   navActive: '0 2px 8px rgba(160,113,75,0.20)',
 };
 
+export const radius = {
+  sm: 8,    // chips, badges, small inputs
+  md: 12,   // cards, buttons, inputs
+  lg: 16,   // modals, sheets
+  xl: 20,   // bottom sheets, large cards
+};
+
 export const cardBase = {
   background: C.card,
   borderRadius: 14,
