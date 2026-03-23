@@ -16,6 +16,7 @@
     "@capacitor/camera": "^8.0.2",
     "@capacitor/core": "^8.2.0",
     "@capacitor/haptics": "^8.0.1",
+    "@capacitor/ios": "^8.2.0",
     "@capacitor/keyboard": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.1",
@@ -39,6 +40,7 @@
     "firebase-admin": "^13.6.1",
     "globals": "^16.5.0",
     "openai": "^6.32.0",
+    "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.2.0"
   }

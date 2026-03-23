@@ -13,10 +13,21 @@ export const useAuth = () => {
       setLoading(false);
     });
 
-    // Capture any pending redirect result from a previous attempt
-    getRedirectResult(auth).catch(() => {});
+    // Safety timeout: if Firebase Auth hasn't responded in 3s, stop loading
+    // This prevents infinite loading screen on native where auth init can stall
+    const timeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) console.warn('[Auth] timeout — forcing past loading screen');
+        return false;
+      });
+    }, 3000);
 
-    return unsubscribe;
+    // Only check redirect result on web (hangs in Capacitor WKWebView)
+    if (!Capacitor.isNativePlatform()) {
+      getRedirectResult(auth).catch(() => {});
+    }
+
+    return () => { unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   const signIn = useCallback(async () => {

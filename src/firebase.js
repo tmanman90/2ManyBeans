@@ -16,10 +16,14 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-const tabManager = Capacitor.isNativePlatform()
-  ? persistentSingleTabManager({ forceOwnership: true })
-  : persistentMultipleTabManager();
 
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager }),
-});
+let db;
+if (Capacitor.isNativePlatform()) {
+  // Skip persistent cache on native — IndexedDB can hang in WKWebView
+  db = initializeFirestore(app, {});
+} else {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+}
+export { db };
