@@ -40,12 +40,25 @@ Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with
 
 ## Tech Stack
 - React 18 + Vite
+- Multi-model AI architecture:
+  - Anthropic Claude Sonnet 4.6 — tasting coach, general chat
+  - OpenAI GPT-5.4 — Professor Ruphus stories, Aiden brew recipes
+  - OpenAI GPT-5.4 Mini — tasting score extraction
+  - Google Gemini 2.5 Flash — bean photo scanning, web search enrichment (with Reddit), chat image analysis
 - Firebase Auth (Google sign-in) + Firestore (real-time sync)
-- Anthropic Claude API (claude-sonnet-4-20250514) for AI features
 - PWA with service worker for add-to-home-screen
 
 ## Project Structure
 ```
+api/
+  aiden.js              # Fellow Aiden brew profile proxy (GPT-5.4)
+  claude.js             # Anthropic proxy (Sonnet 4.6 → Haiku 4.5 fallback)
+  gemini.js             # Google proxy (Gemini 2.5 Flash + search grounding)
+  openai.js             # OpenAI proxy (GPT-5.4 → Mini fallback)
+docs/
+  prds/                 # Feature PRDs (planning docs)
+  data/                 # Data files, analysis results
+  plans/                # Implementation plans
 src/
   main.jsx              # Entry, Firebase init, auth gate
   App.jsx               # Tab shell
@@ -53,12 +66,15 @@ src/
   hooks/useAuth.js      # Auth state
   hooks/useAppData.js   # Firestore CRUD (beans + tastings)
   tabs/                 # RotationTab, InventoryTab, TastingTab, ChatTab, ArchiveTab
-  components/           # StarRating, AddBeanForm, Badge, SlotPicker, AidenModal
+  components/           # StarRating, AddBeanForm, Badge, SlotPicker, AidenModal, ProfessorRuphusSlideUp, SpiderChart
   lib/peakStatus.js     # Peak window calculations
   lib/roasterProfiles.js
   lib/recommendations.js
-  lib/claude.js         # Claude API helpers
-  lib/aiden.js          # Aiden brew profile: researchBean() + generateAidenRecipe() + pushToAiden()
+  lib/claude.js         # Claude API helpers — tasting coach + chat (client-side retry + friendly errors)
+  lib/gemini.js         # Gemini API helpers — bean scanning + web search enrichment + image description
+  lib/openai.js         # OpenAI API helpers — client-side retry + friendly errors
+  lib/professorRuphus.js # Professor Ruphus story generation (GPT-5.4) + tasting score conversion (GPT-5.4 Mini)
+  lib/aiden.js          # Aiden brew profile (GPT-5.4): researchBean() + generateAidenRecipe() + pushToAiden()
   styles/theme.js       # Color palette
 ```
 
@@ -73,22 +89,28 @@ src/
 - Atmos slots are 1, 2, or 3 (Fellow Atmos vacuum canisters)
 - Roaster profiles auto-detected by fuzzy name match, fallback to default specialty light profile
 - AI features: photo bean scanning (multi-photo + web research), guided tasting (coach mode), recommendations, general chat, Aiden brew profiles
-- Add Bean flow: multi-photo gallery (1-3) → deep Claude vision scan → web research via `web_search_20250305` tool → review. Alt path: manual entry → AI Fill button triggers same research.
+- Add Bean flow: multi-photo gallery (1-3) → Gemini 2.5 Flash vision scan → Gemini search grounding enrichment (includes Reddit) → review. Alt path: manual entry → AI Fill button triggers same research.
 - Bean data model includes enriched fields: altitude, region, farm, roastLevel, cupScore, brewingRec, sourcedBy (all optional, filled by scan + research)
-- `/api/claude` proxy accepts optional `tools` array for web search passthrough (60s timeout)
-- Aiden brew flow uses two-step Claude calls: (1) researchBean() enriches with altitude/roast level/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using research context. Research failure falls back gracefully to recipe-only. brewingRec/altitude/roastLevel passed as advisory context.
+- Four API proxies: `/api/claude` (Anthropic), `/api/openai` (OpenAI), `/api/gemini` (Google), `/api/aiden` (Fellow Aiden). Each has retry logic, error forwarding, and model fallback.
+- `/api/claude` proxy: Sonnet 4.6 primary, Haiku 4.5 fallback on 429/529. Client-side `callClaude` retries with exponential backoff.
+- `/api/openai` proxy: GPT-5.4 primary, GPT-5.4 Mini fallback. Supports `responseFormat` for structured output.
+- `/api/gemini` proxy: Gemini 2.5 Flash. Supports `tools: [{ googleSearchRetrieval: {} }]` for search grounding.
+- Aiden brew flow uses two-step GPT-5.4 calls with family-first classification: (1) researchBean() enriches with altitude/roast level/cup-structure family/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using family baseline defaults + research context. Research failure falls back gracefully.
+- Chat image routing: images in chat are sent to Gemini for vision analysis, then the text description is passed to Claude for conversational response.
 - Tasting chat uses `---EXTRACT---` / `---END---` markers for structured data extraction from conversation
 - The user (Tal) is a novice taster — all AI tasting interactions must use step-by-step coaching with scaffolded options, never vague open-ended questions
 
 ## Reference Files
 - **`PRD.md`** — Full product spec: data model, all features, Firebase schema, architecture, UI/design details
 - **`coffee-app.jsx`** — Working React prototype with all features implemented (reference implementation for all UI and logic)
+- **`docs/prds/`** — Feature PRDs (historical planning docs for individual features)
 
 ## Environment Variables
 ```
 VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
 VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID,
-VITE_ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,
+FELLOW_EMAIL, FELLOW_PASSWORD
 ```
 
 ## Deploy

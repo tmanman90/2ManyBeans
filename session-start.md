@@ -39,3 +39,4 @@ firebase deploy --only firestore:rules
 - `coffee-app.jsx` — the complete React prototype, serves as the full feature spec
 - `CLAUDE.md` — project brief with data model, business logic, design language, and seed data
 - `PRD.md` — full product spec (note: prototype takes precedence where PRD is wrong)
+- `docs/prds/` — feature PRDs for individual features (historical planning docs)
