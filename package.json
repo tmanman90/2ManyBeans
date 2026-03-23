@@ -6,10 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ios": "CAPACITOR_BUILD=true vite build",
+    "cap:sync": "npm run build:ios && npx cap sync",
+    "cap:open": "npx cap open ios",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/core": "^8.2.0",
     "firebase": "^12.9.0",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
@@ -17,7 +21,9 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@capacitor/cli": "^8.2.0",
     "@eslint/js": "^9.39.1",
+    "@google/generative-ai": "^0.24.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -26,6 +32,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "firebase-admin": "^13.6.1",
     "globals": "^16.5.0",
+    "openai": "^6.32.0",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.2.0"
   }

@@ -2,10 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const isCapacitor = process.env.CAPACITOR_BUILD === 'true'
+
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
+    // Disable PWA service worker for native builds (Capacitor serves from bundled assets)
+    ...(!isCapacitor ? [VitePWA({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
@@ -31,6 +34,6 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-    }),
+    })] : []),
   ],
 })
