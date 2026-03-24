@@ -1,13 +1,19 @@
-// Edit Bean Modal — edit any bean field + grind settings + enriched details
-import { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+// Edit Bean Modal — edit any bean field + grind settings + enriched details + photo
+import { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Save, Camera } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
+import { compressImage } from '../lib/claude';
+import { generateProductShot } from '../lib/gemini';
+import { uploadBeanPhoto } from '../lib/storage';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
-export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
+export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
+  const [photoGenerating, setPhotoGenerating] = useState(false);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     if (bean && open) {
@@ -35,6 +41,48 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
   }, [bean, open]);
 
   if (!bean) return null;
+
+  const handlePhotoCapture = async (file) => {
+    if (!uid || !bean.id) return;
+    setPhotoGenerating(true);
+    try {
+      const compressed = await compressImage(file);
+      const result = await generateProductShot(compressed);
+      const photoUrl = await uploadBeanPhoto(uid, bean.id, result.base64, result.mimeType);
+      await updateBean(bean.id, { photoUrl });
+    } catch (err) {
+      console.error('Photo generation failed:', err);
+    }
+    setPhotoGenerating(false);
+  };
+
+  const handleNativePhoto = async () => {
+    try {
+      const { Camera: CapCamera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      const image = await CapCamera.getPhoto({
+        quality: 85,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt,
+        width: 1200,
+        height: 1200,
+      });
+      const base64 = image.dataUrl.split(',')[1];
+      // Create a fake file-like for compressImage compatibility
+      setPhotoGenerating(true);
+      try {
+        const result = await generateProductShot({ base64, mediaType: 'image/jpeg' });
+        const photoUrl = await uploadBeanPhoto(uid, bean.id, result.base64, result.mimeType);
+        await updateBean(bean.id, { photoUrl });
+      } catch (err) {
+        console.error('Photo generation failed:', err);
+      }
+      setPhotoGenerating(false);
+    } catch (err) {
+      if (err.message !== 'User cancelled photos app') {
+        console.error('Camera error:', err);
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
@@ -104,6 +152,43 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean }) => {
         </Btn>
       </div>
     }>
+      {/* Photo section */}
+      <div style={{ marginBottom: 16 }}>
+        {bean.photoUrl ? (
+          <div style={{ position: 'relative' }}>
+            <img
+              src={bean.photoUrl}
+              alt={`${bean.name} bag`}
+              style={{
+                width: '100%', height: 160, objectFit: 'cover', objectPosition: 'center',
+                borderRadius: 10, border: `1px solid ${C.borderLight}`,
+              }}
+            />
+            <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
+            <Btn
+              variant="ghost"
+              onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
+              disabled={photoGenerating}
+              style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
+            >
+              {photoGenerating ? 'Generating...' : <><Camera size={12} /> Change Photo</>}
+            </Btn>
+          </div>
+        ) : (
+          <>
+            <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
+            <Btn
+              variant="ghost"
+              onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
+              disabled={photoGenerating}
+              style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10 }}
+            >
+              {photoGenerating ? 'Generating product shot...' : <><Camera size={14} /> Add Photo</>}
+            </Btn>
+          </>
+        )}
+      </div>
+
       <div style={rowStyle}>
         <label style={labelStyle}>Roaster *</label>
         <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} style={inputStyle} />

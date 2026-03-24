@@ -186,7 +186,7 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   "redditNotes": "community tasting notes or reviews from Reddit if found"
 }` }],
     }],
-    tools: [{ googleSearchRetrieval: {} }],
+    tools: [{ googleSearch: {} }],
     maxTokens: 1500,
   });
 
@@ -198,6 +198,31 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   }
 
   return JSON.parse(jsonMatch[0]);
+}
+
+// --- Product shot generation (image-to-image via Gemini) ---
+
+export async function generateProductShot(photo) {
+  const response = await fetch(PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'productShot',
+      photo: { base64: photo.base64, mimeType: photo.mediaType },
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Product shot generation failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data.image) {
+    throw new Error('No image in product shot response');
+  }
+
+  return { base64: data.image, mimeType: data.mimeType || 'image/png' };
 }
 
 // --- Vision description for chat image routing ---

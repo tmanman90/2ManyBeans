@@ -1,24 +1,64 @@
 // Bean display card — journal-page treatment
 import { useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Snowflake } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
-import { getPeakStatus, daysOpen } from '../lib/peakStatus';
+import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
 import { Badge } from './Badge';
 import { EditBeanModal } from './EditBeanModal';
 
-export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
+export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, uid }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const ps = getPeakStatus(bean);
   const dOpen = daysOpen(bean.openDate);
 
   const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy;
 
+  const photoHeight = compact ? 180 : 240;
+
   return (
     <div style={{
       ...journalCard,
-      padding: compact ? 16 : 20,
+      padding: 0,
+      overflow: 'hidden',
     }}>
+      {/* Product shot photo */}
+      {bean.photoUrl && (
+        <div style={{
+          width: '100%',
+          height: photoHeight,
+          background: '#F0EBE3',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {!imgLoaded && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: `linear-gradient(110deg, ${C.bg} 30%, ${C.borderLight} 50%, ${C.bg} 70%)`,
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          )}
+          <img
+            src={bean.photoUrl}
+            alt={`${bean.name} bag`}
+            loading="lazy"
+            onLoad={() => setImgLoaded(true)}
+            style={{
+              width: '100%',
+              height: photoHeight,
+              objectFit: 'contain',
+              objectPosition: 'center',
+              display: imgLoaded ? 'block' : 'block',
+              opacity: imgLoaded ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
+          />
+        </div>
+      )}
+
+      <div style={{ padding: compact ? 16 : 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
           <div style={{ fontFamily: fonts.heading, fontSize: compact ? 16 : 18, color: C.text, lineHeight: 1.2 }}>
@@ -28,7 +68,44 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
             {bean.roaster} · {bean.origin}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {onLearn && (
+            <button
+              onClick={() => onLearn(bean)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 2, display: 'flex', alignItems: 'center',
+              }}
+              title="Learn about this coffee"
+            >
+              <img src="/images/professor-ruphus.png" alt="Learn"
+                style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+            </button>
+          )}
+          {updateBean && bean.status !== 'FINISHED' && (
+            <button
+              onClick={() => {
+                if (bean.frozenAt) {
+                  // Unfreeze
+                  const daysFrozenThisCycle = daysBetween(bean.frozenAt, today());
+                  updateBean(bean.id, {
+                    frozenAt: null,
+                    frozenDays: (bean.frozenDays || 0) + (daysFrozenThisCycle || 0),
+                  });
+                } else {
+                  // Freeze
+                  updateBean(bean.id, { frozenAt: today() });
+                }
+              }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 4, display: 'flex', alignItems: 'center',
+              }}
+              title={bean.frozenAt ? 'Unfreeze bean' : 'Freeze bean'}
+            >
+              <Snowflake size={14} color={bean.frozenAt ? '#3B82F6' : C.textMuted} fill={bean.frozenAt ? '#3B82F6' : 'none'} />
+            </button>
+          )}
           {updateBean && (
             <button
               onClick={() => setEditOpen(true)}
@@ -48,6 +125,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
         {bean.bagSize && <span>{bean.bagSize}g</span>}
         {bean.roastDate && <span>Roasted {bean.roastDate}</span>}
         {ps.days !== undefined && <span>{ps.days}d post-roast</span>}
+        {bean.frozenAt && <span style={{ color: '#3B82F6' }}>Frozen {bean.frozenAt} ({daysBetween(bean.frozenAt, today())}d frozen)</span>}
         {dOpen !== null && <span style={{ color: C.accent }}>{dOpen}d open</span>}
       </div>
       {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
@@ -105,8 +183,10 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean }) => {
           onClose={() => setEditOpen(false)}
           bean={bean}
           updateBean={updateBean}
+          uid={uid}
         />
       )}
+      </div>
     </div>
   );
 };

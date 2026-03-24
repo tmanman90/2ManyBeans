@@ -46,7 +46,7 @@ const phaseMessages = {
 };
 
 export const AidenModal = ({ open, onClose, recipe, result, loading, error, phase, onRetry, onRetryPush }) => {
-  const isDeviceFull = error && error.includes('14 profiles');
+  const isDeviceFull = error && error.includes('14 profiles') && !error.includes('(400)');
   const msg = phaseMessages[phase] || phaseMessages.recipe;
   return (
     <Modal open={open} onClose={onClose} title="Brew with Aiden">

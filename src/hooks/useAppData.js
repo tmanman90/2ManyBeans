@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { today } from '../lib/peakStatus';
+import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 
 export const useAppData = (uid) => {
@@ -48,11 +49,12 @@ export const useAppData = (uid) => {
   const addBean = useCallback(async (beanData) => {
     if (!uid) return;
     const beansRef = collection(db, 'users', uid, 'beans');
-    await addDoc(beansRef, {
+    const docRef = await addDoc(beansRef, {
       ...beanData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    return docRef.id;
   }, [uid]);
 
   const updateBean = useCallback(async (beanId, updates) => {
@@ -66,6 +68,8 @@ export const useAppData = (uid) => {
 
   const deleteBean = useCallback(async (beanId) => {
     if (!uid) return;
+    // Clean up Storage photo (non-blocking)
+    try { await deleteBeanPhoto(uid, beanId); } catch (e) { /* silent */ }
     const beanRef = doc(db, 'users', uid, 'beans', beanId);
     await deleteDoc(beanRef);
   }, [uid]);
@@ -73,11 +77,12 @@ export const useAppData = (uid) => {
   const addTasting = useCallback(async (tastingData) => {
     if (!uid) return;
     const tastingsRef = collection(db, 'users', uid, 'tastings');
-    await addDoc(tastingsRef, {
+    const docRef = await addDoc(tastingsRef, {
       ...tastingData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    return docRef.id;
   }, [uid]);
 
   const updateTasting = useCallback(async (tastingId, updates) => {
@@ -110,6 +115,15 @@ export const useAppData = (uid) => {
       status: 'FINISHED',
       atmosSlot: null,
       finishDate: today(),
+    });
+  }, [updateBean]);
+
+  // Convenience: return an active bean to sealed inventory
+  const returnBean = useCallback(async (beanId) => {
+    await updateBean(beanId, {
+      status: 'SEALED',
+      atmosSlot: null,
+      openDate: null,
     });
   }, [updateBean]);
 
@@ -165,6 +179,7 @@ export const useAppData = (uid) => {
     deleteTasting,
     openBean,
     finishBean,
+    returnBean,
     seedTalData,
     loaded,
   };

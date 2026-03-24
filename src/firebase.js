@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
@@ -23,3 +24,4 @@ const tabManager = Capacitor.isNativePlatform()
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager }),
 });
+export const storage = getStorage(app);

@@ -21,10 +21,20 @@ export const useAuth = () => {
 
   const signIn = useCallback(async () => {
     if (Capacitor.isNativePlatform()) {
-      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-      const result = await GoogleAuth.signIn();
-      const credential = GoogleAuthProvider.credential(result.authentication.idToken);
-      await signInWithCredential(auth, credential);
+      try {
+        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+        await GoogleAuth.initialize({
+          clientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+        const result = await GoogleAuth.signIn();
+        const credential = GoogleAuthProvider.credential(result.authentication.idToken);
+        await signInWithCredential(auth, credential);
+      } catch (err) {
+        console.error('Google Sign-In failed:', err);
+        alert('Sign-in failed: ' + (err.message || err));
+      }
     } else {
       // signInWithPopup works in both browser and iOS standalone PWA mode
       // (iOS 16.4+ supports popups in standalone via in-app browser sheet).

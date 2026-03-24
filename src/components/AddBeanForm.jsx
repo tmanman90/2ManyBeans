@@ -6,14 +6,15 @@ import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
-import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
+import { scanBeanLabel, researchBeanOnline, generateProductShot } from '../lib/gemini';
 import { generateRuphusStory } from '../lib/professorRuphus';
+import { uploadBeanPhoto } from '../lib/storage';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
 
-export const AddBeanForm = ({ open, onClose, onAdd }) => {
+export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
     roastDate: today(), bagSize: 100, bagNotes: '', producer: '',
@@ -187,7 +188,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     return null;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
     const p = getProfileForRoaster(f.roaster);
 
@@ -229,9 +230,20 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     // Include Professor Ruphus story if background generation finished
     if (storyRef.current) beanData.story = storyRef.current;
 
-    onAdd(beanData);
+    // Capture first photo before reset (for background product shot generation)
+    const scanPhoto = photos.length > 0 ? photos[0] : null;
+
+    const beanId = await onAdd(beanData);
     reset();
     onClose();
+
+    // Background: generate product shot from first scan photo (non-blocking)
+    if (scanPhoto && beanId && uid && updateBean) {
+      generateProductShot(scanPhoto)
+        .then(result => uploadBeanPhoto(uid, beanId, result.base64, result.mimeType))
+        .then(photoUrl => updateBean(beanId, { photoUrl }))
+        .catch(err => console.log('Background product shot skipped:', err.message));
+    }
   };
 
   const hasSearchableData = f.roaster.trim() || f.name.trim();

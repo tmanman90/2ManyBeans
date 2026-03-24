@@ -8,13 +8,28 @@ export const daysBetween = (a, b) => {
   return Math.floor((new Date(b) - new Date(a)) / 86400000);
 };
 
-export const daysSinceRoast = (roastDate) => daysBetween(roastDate, today());
+export const daysSinceRoast = (roastDate, bean = {}) => {
+  const { frozenAt, frozenDays = 0 } = bean;
+  if (frozenAt) {
+    // Frozen: count days from roast to freeze date, minus any prior frozen time
+    const raw = daysBetween(roastDate, frozenAt);
+    return raw === null ? null : raw - frozenDays;
+  }
+  // Not frozen: normal calculation minus total frozen days
+  const raw = daysBetween(roastDate, today());
+  return raw === null ? null : raw - frozenDays;
+};
 
 export const daysOpen = (openDate) => openDate ? daysBetween(openDate, today()) : null;
 
 export const getPeakStatus = (bean) => {
-  const days = daysSinceRoast(bean.roastDate);
+  const days = daysSinceRoast(bean.roastDate, bean);
+  const frozen = !!bean.frozenAt;
   if (days === null) return { label: "Unknown", color: C.textMuted, bg: C.borderLight };
+  if (frozen) {
+    // Show frozen status with the paused day count
+    return { label: `Frozen (${days}d)`, color: C.blue || '#3B82F6', bg: C.blueBg || '#DBEAFE', days, frozen: true };
+  }
   if (days < bean.degasMin) return { label: "Degassing", color: C.purple, bg: C.purpleBg, days };
   if (days < bean.peakStart) return { label: "Resting", color: C.amber, bg: C.amberBg, days };
   if (days <= bean.peakEnd) {

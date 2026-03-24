@@ -5,14 +5,26 @@ import { MessageCircle, Plus, Check, Send, Pencil, Trash2 } from 'lucide-react';
 import { C, fonts, journalCard, shadows } from '../styles/theme';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
+import { convertTastingScores } from '../lib/professorRuphus';
 import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
+import { TastingForm } from '../components/TastingForm';
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, updateBean }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const [sel, setSel] = useState(active[0]?.id || '');
-  const emptyForm = { aroma: '', firstSip: '', acidity: '', sweetness: '', body: '', finish: '', oneWord: '', rating: 0, notes: '', changeTomorrow: '' };
-  const [form, setForm] = useState(emptyForm);
+  // Background tasting score conversion for spider chart overlay
+  const convertScoresInBackground = (tastingId, tastingData) => {
+    const bean = beans.find(b => b.id === tastingData.beanId);
+    if (!bean) return;
+    // Only convert if there's meaningful text to convert
+    const hasText = tastingData.aroma || tastingData.acidity || tastingData.sweetness ||
+      tastingData.body || tastingData.firstSip || tastingData.finish;
+    if (!hasText) return;
+    convertTastingScores(tastingData, bean)
+      .then(scores => { onUpdateTasting(tastingId, { tastingScores: scores }); })
+      .catch(err => console.log('Score conversion skipped:', err.message));
+  };
   const [mode, setMode] = useState('list');
   const [sortBy, setSortBy] = useState('rating');
   const [editingId, setEditingId] = useState(null);
@@ -44,10 +56,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     return b ? `${b.name} (${b.roaster})` : 'Unknown';
   };
 
-  const handleSubmit = () => {
-    if (!sel) return;
-    onAddTasting({ beanId: sel, date: today(), ...form, rating: form.rating || null });
-    setForm(emptyForm);
+  const handleFormSubmit = async (formData) => {
+    const tastingData = { date: today(), ...formData };
+    const tastingId = await onAddTasting(tastingData);
+    if (tastingId) convertScoresInBackground(tastingId, tastingData);
     setMode('list');
   };
 
@@ -70,16 +82,32 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
 
+  // Build the tasting chat opening message for a given bean
+  const buildOpeningMessage = (bean) => {
+    const beanName = bean ? `${bean.name} (${bean.roaster})` : 'your coffee';
+    const beanContext = bean ? [bean.process, bean.origin].filter(Boolean) : [];
+    const contextLine = beanContext.length > 0
+      ? ` This is a ${beanContext.join(' coffee from ')}.`
+      : '';
+    return `Let's taste ${beanName}!${contextLine}\n\nStep 1: Smell it first. Bring the cup to your nose and breathe in slowly. What do you get?\n\n- Fruity (berries, citrus, tropical)?\n- Floral (jasmine, rose, tea-like)?\n- Sweet (chocolate, caramel, honey)?\n- Nutty or earthy?\n- Funky or fermented?\n\nOr just describe it in your own words.`;
+  };
+
   // Chat tasting flow
   const startChat = () => {
-    const beanName = sel ? getBeanName(sel) : 'your coffee';
+    const bean = beans.find(b => b.id === sel);
     setMode('chat');
-    setChatMessages([{
-      role: 'assistant',
-      content: `Let's taste ${beanName}! ☕ I'll walk you through it step by step.\n\n**Step 1 — Smell it first.** Bring the cup to your nose and breathe in slowly. What do you notice?\n\n🍓 Fruity — berries, citrus, tropical?\n🌸 Floral — jasmine, rose, tea-like?\n🍫 Sweet — chocolate, caramel, honey?\n🌰 Nutty or earthy?\n🧀 Funky or fermented?\n\nOr just describe it in your own words — there's no wrong answer!`,
-    }]);
+    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
     setChatExtracted(null);
   };
+
+  // Reset chat when bean changes mid-session
+  useEffect(() => {
+    if (mode === 'chat' && sel && chatMessages.length > 0) {
+      const bean = beans.find(b => b.id === sel);
+      setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
+      setChatExtracted(null);
+    }
+  }, [sel]);
 
   const handleChatSend = async () => {
     if (!chatInput.trim() || chatLoading) return;
@@ -89,8 +117,9 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     setChatLoading(true);
 
     try {
+      const selectedBean = beans.find(b => b.id === sel);
       const beanName = sel ? getBeanName(sel) : 'unknown bean';
-      const systemPrompt = buildTastingSystemPrompt(beanName, beans);
+      const systemPrompt = buildTastingSystemPrompt(beanName, beans, selectedBean, tastings);
       const history = [...chatMessages.filter(m => m.role !== 'system'), userMsg];
       const text = await sendTastingMessage(systemPrompt, history);
 
@@ -118,9 +147,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     setChatLoading(false);
   };
 
-  const saveChatTasting = () => {
+  const saveChatTasting = async () => {
     if (!chatExtracted || !sel) return;
-    onAddTasting({ beanId: sel, date: today(), ...chatExtracted, rating: chatExtracted.rating || null });
+    const tastingData = { beanId: sel, date: today(), ...chatExtracted, rating: chatExtracted.rating || null };
+    const tastingId = await onAddTasting(tastingData);
+    if (tastingId) convertScoresInBackground(tastingId, tastingData);
     setChatExtracted(null);
     setChatMessages([]);
     setMode('list');
@@ -153,8 +184,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>{tastings.length} tastings logged</div>
 
-      {/* Bean selector for form/chat */}
-      {(mode === 'form' || mode === 'chat') && (
+      {/* Bean selector for chat mode */}
+      {mode === 'chat' && (
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>Bean</label>
           <select value={sel} onChange={e => setSel(e.target.value)} style={inputStyle}>
@@ -165,25 +196,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
       {/* Form Mode */}
       {mode === 'form' && (
-        <div style={{ ...journalCard, padding: 18 }}>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 6 }}>Rating</label>
-            <StarRating value={form.rating} onChange={r => setForm(p => ({ ...p, rating: r }))} size={28} />
-          </div>
-          {Object.entries(tastingFields).map(([key, label]) => (
-            <div key={key} style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>{label}</label>
-              {key === 'notes' ? (
-                <textarea value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
-              ) : (
-                <input value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} style={inputStyle} />
-              )}
-            </div>
-          ))}
-          <Btn variant="primary" onClick={handleSubmit} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
-            <Check size={14} /> Save Tasting
-          </Btn>
-        </div>
+        <TastingForm beans={active} onSubmit={handleFormSubmit} submitLabel="Save Tasting" />
       )}
 
       {/* Chat Mode */}

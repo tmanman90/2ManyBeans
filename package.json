@@ -1,7 +1,7 @@
 {
   "name": "coffee-hub",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,9 +16,11 @@
     "@capacitor/camera": "^8.0.2",
     "@capacitor/core": "^8.2.0",
     "@capacitor/haptics": "^8.0.1",
+    "@capacitor/ios": "^8.2.0",
     "@capacitor/keyboard": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.1",
+    "@capgo/capacitor-updater": "^8.45.0",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "firebase": "^12.9.0",
     "lucide-react": "^0.575.0",
@@ -39,6 +41,7 @@
     "firebase-admin": "^13.6.1",
     "globals": "^16.5.0",
     "openai": "^6.32.0",
+    "typescript": "^6.0.2",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.2.0"
   }

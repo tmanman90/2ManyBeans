@@ -18,7 +18,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
 ];
 
-export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, seedTalData }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, seedTalData }) => {
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
@@ -94,6 +94,7 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 100px', position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
+            uid={uid}
             beans={beans}
             tastings={tastings}
             onFinishBean={finishBean}
@@ -108,6 +109,7 @@ export const App = ({ beans, tastings, addBean, updateBean, deleteBean, addTasti
         )}
         {tab === 'inventory' && (
           <InventoryTab
+            uid={uid}
             beans={beans}
             tastings={tastings}
             onOpenBean={handleOpenBean}
