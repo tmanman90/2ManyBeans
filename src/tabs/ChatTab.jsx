@@ -55,9 +55,40 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const [photos, setPhotos] = useState([]); // { base64, mediaType, previewUrl }
   const [scannedBean, setScannedBean] = useState(null);
   const [toast, setToast] = useState(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
+  const inputRef = useRef(null);
   const blobUrlsRef = useRef([]); // Track all created blob URLs for cleanup
+
+  // Track keyboard open/close on iOS native
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let cleanup;
+    import('@capacitor/keyboard').then(({ Keyboard }) => {
+      const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
+        setKeyboardHeight(info.keyboardHeight);
+        // Hide tab bar when keyboard is open
+        const tabBar = document.querySelector('.app-tab-bar');
+        if (tabBar) tabBar.style.display = 'none';
+        setTimeout(() => {
+          const el = scrollRef.current;
+          if (el) el.scrollTop = el.scrollHeight;
+        }, 50);
+      });
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardHeight(0);
+        // Show tab bar again
+        const tabBar = document.querySelector('.app-tab-bar');
+        if (tabBar) tabBar.style.display = 'flex';
+      });
+      cleanup = () => {
+        showListener.then(h => h.remove());
+        hideListener.then(h => h.remove());
+      };
+    });
+    return () => { if (cleanup) cleanup(); };
+  }, []);
 
   // No-op updateBean wrapper for ephemeral beans (no id to persist to)
   const ephemeralUpdateBean = async (beanId, updates) => {
@@ -246,12 +277,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', minHeight: 400 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4 }}>Coffee Chat</div>
       <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>AI with your real inventory data</div>
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        ref={scrollRef}
+        onClick={() => { if (inputRef.current) inputRef.current.blur(); }}
+        style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: keyboardHeight > 0 ? 80 : 140, height: keyboardHeight > 0 ? `calc(100vh - ${keyboardHeight + 200}px)` : 'calc(100vh - 340px)' }}>
         {messages.map((m, i) => (
           <div key={i}>
             {/* Photo thumbnails for user messages */}
@@ -357,8 +391,18 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         </div>
       )}
 
-      {/* Input bar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      {/* Input bar - fixed above tab bar, moves up with keyboard */}
+      <div style={{
+        position: 'fixed',
+        bottom: keyboardHeight > 0 ? keyboardHeight : 80,
+        left: 0, right: 0,
+        display: 'flex', gap: 8, alignItems: 'center',
+        padding: '8px 20px',
+        paddingBottom: keyboardHeight > 0 ? 8 : 8,
+        background: C.bg,
+        borderTop: `1px solid ${C.borderLight}`,
+        zIndex: 50,
+      }}>
         <input
           ref={fileRef}
           type="file"
@@ -381,17 +425,19 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           <Camera size={20} color={C.accent} />
         </button>
         <input
+          ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          onKeyDown={e => { if (e.key === 'Enter') { handleSend(); inputRef.current?.blur(); } }}
           placeholder={photos.length > 0 ? 'Add a note or just send...' : 'What should I open next?'}
+          enterKeyHint="send"
           style={{
             flex: 1,
             padding: '12px 14px',
             borderRadius: 12,
             border: `1px solid ${C.border}`,
             fontFamily: fonts.body,
-            fontSize: 14,
+            fontSize: 16,
             background: C.card,
             color: C.text,
             outline: 'none',
