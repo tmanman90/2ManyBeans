@@ -2,41 +2,11 @@
 
 Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with Firebase backend.
 
-## Agent Behavior Rules
-
-### Planning
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately — don't keep pushing
-- Write clear specs upfront to reduce ambiguity
-
-### Execution
-- Use subagents for research, exploration, and parallel analysis to keep the main context clean
-- For complex problems, throw more compute at it via subagents. One task per subagent.
-- Make every change as simple as possible. Touch minimal code.
-- Find root causes. No temporary fixes. No over-engineering.
-- Changes should only affect what's necessary.
-
-### Verification
-- Never mark a task complete without proving it works
-- Run tests, check logs, demonstrate correctness
-- Ask yourself: "Would a staff engineer approve this?"
-- If a fix feels hacky, step back and implement the cleaner solution
-
-### Self-Improvement
-- Review `session-start.md` and `lessons.md` at the start of each session
-- After ANY correction: update `lessons.md` in this project folder
-- Format: `- **[Topic]**: [What went wrong] → [What to do instead]`
-
-### Markdown Maintenance
+## Project-Specific Notes
 - **CLAUDE.md**: Update when project structure, conventions, or tech stack change
 - **lessons.md**: Add a bullet after any painful debugging session or gotcha
 - **PRD.md**: Update only when feature specs actually change
 - Don't update MDs for routine changes. Keep files concise.
-
-### Principles
-- **Simplicity First**: Make every change as simple as possible
-- **No Laziness**: Find root causes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary
 
 ## Tech Stack
 - React 19 + Vite + Capacitor 8 (iOS native app)

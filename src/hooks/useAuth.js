@@ -13,23 +13,42 @@ export const useAuth = () => {
       setLoading(false);
     });
 
-    // Capture any pending redirect result from a previous attempt
-    getRedirectResult(auth).catch(() => {});
+    // Safety timeout — if auth never resolves on native, show sign-in after 3s
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
 
-    return unsubscribe;
+    // Capture any pending redirect result from a previous attempt (web only;
+    // on native this triggers iframe setup to authDomain which can interfere
+    // with WKWebView auth state)
+    if (!Capacitor.isNativePlatform()) {
+      getRedirectResult(auth).catch(() => {});
+    }
+
+    return () => { unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   const signIn = useCallback(async () => {
     if (Capacitor.isNativePlatform()) {
       try {
-        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-        await GoogleAuth.initialize({
-          clientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
-          scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        await SocialLogin.initialize({
+          google: {
+            webClientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
+            iOSClientId: '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com',
+            iOSServerClientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
+            mode: 'online',
+          },
         });
-        const result = await GoogleAuth.signIn();
-        const credential = GoogleAuthProvider.credential(result.authentication.idToken);
+        const res = await SocialLogin.login({
+          provider: 'google',
+          options: { scopes: ['email', 'profile'] },
+        });
+        if (!res?.result?.idToken) {
+          alert('Sign-in failed: no token received from Google');
+          return;
+        }
+        const credential = GoogleAuthProvider.credential(res.result.idToken);
         await signInWithCredential(auth, credential);
       } catch (err) {
         console.error('Google Sign-In failed:', err);

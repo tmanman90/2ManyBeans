@@ -1,6 +1,7 @@
 // Vercel serverless proxy for Gemini API
 // Keeps GEMINI_API_KEY server-side only
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { withCorsAuth } from './lib/cors-auth.js';
 
 let genAI;
 function getClient() {
@@ -8,21 +9,6 @@ function getClient() {
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   }
   return genAI;
-}
-
-const ALLOWED_ORIGINS = [
-  'https://2manybeans.vercel.app',
-  'capacitor://localhost',
-  'http://localhost',
-];
-
-function setCorsHeaders(req, res) {
-  const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.some(o => origin?.startsWith(o))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 const PRODUCT_SHOT_PROMPT = `You are a product photography AI. Generate a NEW studio product photo of this coffee bag.
@@ -116,14 +102,7 @@ async function handleText(req, res) {
   return res.status(200).json({ text, groundingMetadata });
 }
 
-export default async function handler(req, res) {
-  setCorsHeaders(req, res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export default withCorsAuth(async (req, res) => {
   try {
     const { action } = req.body;
 
@@ -138,4 +117,4 @@ export default async function handler(req, res) {
     const detail = error.message || 'Unknown Gemini error';
     return res.status(status).json({ error: detail });
   }
-}
+});

@@ -1,4 +1,4 @@
-// Bean display card — journal-page treatment
+// Bean display card -- journal-page treatment
 import { useState } from 'react';
 import { Pencil, Snowflake } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
@@ -10,6 +10,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
   const [editOpen, setEditOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [freezing, setFreezing] = useState(false);
   const ps = getPeakStatus(bean);
   const dOpen = daysOpen(bean.openDate);
 
@@ -65,7 +66,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
             {bean.name}
           </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-            {bean.roaster} · {bean.origin}
+            {bean.roaster || 'Unknown'} · {bean.origin || 'Unknown'}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -84,26 +85,32 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
           )}
           {updateBean && bean.status !== 'FINISHED' && (
             <button
-              onClick={() => {
-                if (bean.frozenAt) {
-                  // Unfreeze
-                  const daysFrozenThisCycle = daysBetween(bean.frozenAt, today());
-                  updateBean(bean.id, {
-                    frozenAt: null,
-                    frozenDays: (bean.frozenDays || 0) + (daysFrozenThisCycle || 0),
-                  });
-                } else {
-                  // Freeze
-                  updateBean(bean.id, { frozenAt: today() });
+              onClick={async () => {
+                if (freezing) return;
+                setFreezing(true);
+                try {
+                  if (bean.frozenAt) {
+                    const daysFrozenThisCycle = daysBetween(bean.frozenAt, today());
+                    await updateBean(bean.id, {
+                      frozenAt: null,
+                      frozenDays: (bean.frozenDays || 0) + (daysFrozenThisCycle || 0),
+                    });
+                  } else {
+                    await updateBean(bean.id, { frozenAt: today() });
+                  }
+                } finally {
+                  setFreezing(false);
                 }
               }}
+              disabled={freezing}
               style={{
-                background: 'none', border: 'none', cursor: 'pointer',
+                background: 'none', border: 'none', cursor: freezing ? 'default' : 'pointer',
                 padding: 4, display: 'flex', alignItems: 'center',
+                opacity: freezing ? 0.5 : 1,
               }}
               title={bean.frozenAt ? 'Unfreeze bean' : 'Freeze bean'}
             >
-              <Snowflake size={14} color={bean.frozenAt ? '#3B82F6' : C.textMuted} fill={bean.frozenAt ? '#3B82F6' : 'none'} />
+              <Snowflake size={14} color={bean.frozenAt ? C.blue : C.textMuted} fill={bean.frozenAt ? C.blue : 'none'} />
             </button>
           )}
           {updateBean && (
@@ -125,17 +132,17 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
         {bean.bagSize && <span>{bean.bagSize}g</span>}
         {bean.roastDate && <span>Roasted {bean.roastDate}</span>}
         {ps.days !== undefined && <span>{ps.days}d post-roast</span>}
-        {bean.frozenAt && <span style={{ color: '#3B82F6' }}>Frozen {bean.frozenAt} ({daysBetween(bean.frozenAt, today())}d frozen)</span>}
+        {bean.frozenAt && <span style={{ color: C.blue }}>Frozen {bean.frozenAt} ({daysBetween(bean.frozenAt, today())}d frozen)</span>}
         {dOpen !== null && <span style={{ color: C.accent }}>{dOpen}d open</span>}
       </div>
       {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
         <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: (bean.aidenGrind || hasDetails || actions) ? 6 : 0 }}>
-          ☕ {bean.bagNotes}
+          {bean.bagNotes}
         </div>
       )}
       {bean.aidenGrind && (
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
-          ⚙ Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
+          Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
         </div>
       )}
 

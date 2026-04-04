@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch,
   serverTimestamp, query, orderBy, getDocs, limit
 } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
 import { today } from '../lib/peakStatus';
 import { deleteBeanPhoto } from '../lib/storage';
@@ -12,14 +13,96 @@ export const useAppData = (uid) => {
   const [beans, setBeans] = useState([]);
   const [tastings, setTastings] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const pollRef = useRef(null);
+  const skipNextPoll = useRef(false);
+  const beansRef = useRef(beans);
+  beansRef.current = beans; // Always track latest beans for stable callbacks
 
-  // Real-time Firestore listeners
+  // Refetch data on native after mutations (replaces real-time listener updates)
+  const refetch = useCallback(async () => {
+    if (!uid || !Capacitor.isNativePlatform()) return;
+    try {
+      const [beansSnap, tastingsSnap] = await Promise.all([
+        getDocs(collection(db, 'users', uid, 'beans')),
+        getDocs(collection(db, 'users', uid, 'tastings')),
+      ]);
+      setBeans(beansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      skipNextPoll.current = true; // Skip next poll since we just fetched
+    } catch (err) { /* polling will catch up */ }
+  }, [uid]);
+
+  // Fetch data from Firestore
   useEffect(() => {
     if (!uid) return;
+
+    // Clear previous user's data immediately
+    setBeans([]);
+    setTastings([]);
+    setLoaded(false);
 
     const beansRef = collection(db, 'users', uid, 'beans');
     const tastingsRef = collection(db, 'users', uid, 'tastings');
 
+    if (Capacitor.isNativePlatform()) {
+      // Native: use getDocs (HTTP fetch) instead of onSnapshot (WebSocket).
+      // WebSocket-based listeners are unreliable in WKWebView.
+      const fetchData = async () => {
+        try {
+          const [beansSnap, tastingsSnap] = await Promise.all([
+            getDocs(beansRef),
+            getDocs(tastingsRef),
+          ]);
+          setBeans(beansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (err) {
+          console.error('Firestore fetch error:', err);
+        }
+        setLoaded(true);
+      };
+      // Safety timeout: if fetch hangs, show app anyway after 5s
+      const fetchTimeout = setTimeout(() => setLoaded(true), 5000);
+      fetchData().finally(() => clearTimeout(fetchTimeout));
+
+      // Poll every 60s to keep data fresh (replaces real-time listeners)
+      const startPoll = () => {
+        pollRef.current = setInterval(async () => {
+          // Skip if a mutation refetch just happened
+          if (skipNextPoll.current) {
+            skipNextPoll.current = false;
+            return;
+          }
+          try {
+            const [beansSnap, tastingsSnap] = await Promise.all([
+              getDocs(beansRef),
+              getDocs(tastingsRef),
+            ]);
+            setBeans(beansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          } catch (err) { /* silent retry next interval */ }
+        }, 60000);
+      };
+      startPoll();
+
+      // Pause polling when app is backgrounded (battery optimization)
+      const handleVisibility = () => {
+        if (document.hidden) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+        } else {
+          if (!pollRef.current) startPoll();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
+        clearTimeout(fetchTimeout);
+        document.removeEventListener('visibilitychange', handleVisibility);
+      };
+    }
+
+    // Web: use real-time listeners (WebSockets work fine in browser)
     let beansLoaded = false;
     let tastingsLoaded = false;
     const checkLoaded = () => {
@@ -54,8 +137,9 @@ export const useAppData = (uid) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    await refetch();
     return docRef.id;
-  }, [uid]);
+  }, [uid, refetch]);
 
   const updateBean = useCallback(async (beanId, updates) => {
     if (!uid) return;
@@ -64,7 +148,8 @@ export const useAppData = (uid) => {
       ...updates,
       updatedAt: serverTimestamp(),
     });
-  }, [uid]);
+    await refetch();
+  }, [uid, refetch]);
 
   const deleteBean = useCallback(async (beanId) => {
     if (!uid) return;
@@ -72,7 +157,8 @@ export const useAppData = (uid) => {
     try { await deleteBeanPhoto(uid, beanId); } catch (e) { /* silent */ }
     const beanRef = doc(db, 'users', uid, 'beans', beanId);
     await deleteDoc(beanRef);
-  }, [uid]);
+    await refetch();
+  }, [uid, refetch]);
 
   const addTasting = useCallback(async (tastingData) => {
     if (!uid) return;
@@ -82,8 +168,9 @@ export const useAppData = (uid) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    await refetch();
     return docRef.id;
-  }, [uid]);
+  }, [uid, refetch]);
 
   const updateTasting = useCallback(async (tastingId, updates) => {
     if (!uid) return;
@@ -92,16 +179,23 @@ export const useAppData = (uid) => {
       ...updates,
       updatedAt: serverTimestamp(),
     });
-  }, [uid]);
+    await refetch();
+  }, [uid, refetch]);
 
   const deleteTasting = useCallback(async (tastingId) => {
     if (!uid) return;
     const tastingRef = doc(db, 'users', uid, 'tastings', tastingId);
     await deleteDoc(tastingRef);
-  }, [uid]);
+    await refetch();
+  }, [uid, refetch]);
 
   // Convenience: open a bean into a slot
   const openBean = useCallback(async (beanId, slot) => {
+    // Clear slot from any other bean first (prevent duplicate slot assignment)
+    const existing = beansRef.current.find(b => b.status === 'ACTIVE' && b.atmosSlot === slot && b.id !== beanId);
+    if (existing) {
+      await updateBean(existing.id, { atmosSlot: null, status: 'SEALED', openDate: null });
+    }
     await updateBean(beanId, {
       status: 'ACTIVE',
       atmosSlot: slot,
@@ -138,7 +232,7 @@ export const useAppData = (uid) => {
 
     const batch = writeBatch(db);
 
-    // Map seedId → new Firestore doc ID so tastings can reference the right bean
+    // Map seedId -> new Firestore doc ID so tastings can reference the right bean
     const seedIdMap = {};
 
     for (const bean of INITIAL_BEANS) {

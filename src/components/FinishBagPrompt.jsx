@@ -1,4 +1,4 @@
-// Finish bag rating prompt — intercepts finish flow for unrated beans
+// Finish bag rating prompt -- intercepts finish flow for unrated beans
 // Single modal with view swapping: 'prompt' (quick rate) | 'fullReview'
 import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
@@ -15,6 +15,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   const [rating, setRating] = useState(0);
   const [oneWord, setOneWord] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -23,15 +24,17 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       setRating(0);
       setOneWord('');
       setSaving(false);
+      setError(null);
     }
   }, [open]);
 
   if (!bean) return null;
 
-  const beanLabel = bean.roaster ? `${bean.name} — ${bean.roaster}` : bean.name;
+  const beanLabel = bean.roaster ? `${bean.name} -- ${bean.roaster}` : bean.name;
 
   const handleQuickSave = async () => {
     if (saving || rating === 0) return;
+    setError(null);
     setSaving(true);
     try {
       await onAddTasting({
@@ -43,12 +46,14 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       onClose('Saved & finished!');
     } catch (err) {
       console.error('Quick save failed:', err);
+      setError('Failed to save rating. Try again.');
       setSaving(false);
     }
   };
 
   const handleFullReview = async (tastingData) => {
     if (saving) return;
+    setError(null);
     setSaving(true);
     try {
       const data = { ...tastingData, date: today() };
@@ -69,18 +74,21 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       onClose('Saved & finished!');
     } catch (err) {
       console.error('Full review save failed:', err);
+      setError('Failed to save review. Try again.');
       setSaving(false);
     }
   };
 
   const handleSkip = async () => {
     if (saving) return;
+    setError(null);
     setSaving(true);
     try {
       await onFinish(bean.id);
       onClose();
     } catch (err) {
       console.error('Skip finish failed:', err);
+      setError('Failed to finish bag. Try again.');
       setSaving(false);
     }
   };
@@ -102,6 +110,11 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
             <ArrowLeft size={14} /> Back
           </span>
         </div>
+        {error && (
+          <div style={{ background: C.redBg, color: C.red, padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
         <TastingForm
           beanId={bean.id}
           beanLabel={beanLabel}
@@ -122,6 +135,12 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
           <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{bean.roaster}</div>
         )}
       </div>
+
+      {error && (
+        <div style={{ background: C.redBg, color: C.red, padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
 
       {/* Star rating */}
       <div style={{ marginBottom: 16 }}>

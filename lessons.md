@@ -4,12 +4,21 @@ Lessons learned during development. Review at the start of each session.
 
 Format: `- **[Topic]**: [What went wrong] → [What to do instead]`
 
-- **[Capacitor Firebase Auth]**: `onAuthStateChanged` can hang indefinitely in WKWebView, leaving app stuck on loading screen → Add a 3s safety timeout that forces `loading=false`
-- **[Capacitor Firestore]**: `persistentLocalCache` with `persistentSingleTabManager` hangs in WKWebView IndexedDB → Skip persistent cache on native, use default Firestore init
-- **[Capacitor Auth Redirect]**: `getRedirectResult(auth)` hangs in Capacitor WKWebView → Skip it on native with `Capacitor.isNativePlatform()` check
+- **[WKWebView IndexedDB]**: IndexedDB is unreliable in Capacitor WKWebView. It causes Firebase Auth persistence and Firestore persistent cache to hang silently. → Use `initializeAuth` with `browserLocalPersistence` (localStorage) on native. Use empty `{}` Firestore settings on native (no persistent cache).
+- **[WKWebView WebSockets]**: Firestore `onSnapshot` real-time listeners (WebSocket-based) are unreliable in WKWebView, causing "Loading" hang on app reopen. → Use `getDocs` (HTTP fetch) on native with polling interval. Keep `onSnapshot` for web only.
+- **[Firebase Auth WKWebView]**: `getRedirectResult(auth)` triggers iframe setup to authDomain which interferes with WKWebView auth state. → Skip it on native with `Capacitor.isNativePlatform()` check. Always add a 3s safety timeout on `onAuthStateChanged`.
+- **[Capacitor Google Sign-In]**: `@codetrix-studio/capacitor-google-auth` has no Package.swift and is incompatible with Capacitor 8 (SPM). The "plugin is not implemented on iOS" error means no native code was compiled. → Use `@capgo/capacitor-social-login` instead. Always check cap sync output for "does not have a Package.swift" warnings.
+- **[Google OAuth Client IDs]**: Native Google Sign-In needs THREE client IDs: `iOSClientId` (from GoogleService-Info.plist), `webClientId` (from Google Cloud Console, type "Web application"), and `iOSServerClientId` (same as webClientId). The `serverClientId` in capacitor.config must be the WEB client ID, not the iOS one. Find them at Google Cloud Console > APIs & Services > Credentials > OAuth 2.0 Client IDs.
+- **[iOS cap sync staleness]**: `cap sync` copies web assets + config to `ios/App/App/`. If you edit source files AFTER cap sync, the iOS bundle is stale. → Always verify iOS bundle timestamps and content match your latest changes before archiving. Run cap sync AFTER all code changes.
+- **[Xcode SPM packages]**: After changing Capacitor plugins (npm install/uninstall), Xcode may cache old SPM packages. → Do File > Packages > Reset Package Caches, then Resolve Package Versions, then Clean Build Folder before archiving.
+- **[GoogleService-Info.plist in Xcode]**: The file must be added to the Xcode project via GUI (right-click > Add Files > target checked), not just exist on disk. Without this, the file isn't bundled into the app.
+- **[Capgo OTA interference]**: Capgo autoUpdate can download and apply an older JS bundle on app reopen, overwriting TestFlight fixes. → Disable autoUpdate during debugging. Only re-enable after the base app is stable.
+- **[TestFlight build numbers]**: Apple rejects duplicate build numbers. Bump CURRENT_PROJECT_VERSION in project.pbxproj before each upload.
+- **[Apple Developer new account]**: New accounts need: (1) accept agreements on developer.apple.com, (2) register a device (plug in iPhone), (3) create app record in App Store Connect, (4) answer export compliance for each build.
 - **[Xcode DerivedData]**: Never delete DerivedData to "fix" issues, it wipes SPM packages and causes "No such module" build failures → Use `Product > Clean Build Folder` (Cmd+Shift+K) instead
-- **[Capacitor Node Version]**: Capacitor 8 requires Node 22+. Use `nvm use 22` before any `cap` commands
-- **[Google Sign-In Simulator]**: Google Sign-In does not work in iOS Simulator (no Google account). Must test on a real device or via TestFlight
+- **[Capacitor Node Version]**: Capacitor 8 requires Node 22+. Use `nvm alias default 22` to make it permanent.
+- **[Debug before deploy]**: Never tell the user a fix works without verifying. Add visible debug alerts, check bundle contents, verify timestamps. Guessing wastes hours.
+- **[iOS Camera plist permissions]**: Capacitor Camera plugin requires ALL THREE plist keys: `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`, AND `NSPhotoLibraryAddUsageDescription`. Missing any one causes a runtime rejection with a clear error message. Also add explicit `Camera.checkPermissions()` + `Camera.requestPermissions()` before `Camera.getPhoto()` calls.
 
 ---
 

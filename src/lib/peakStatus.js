@@ -1,7 +1,10 @@
 // Peak status utilities — ported from prototype lines 86-107
 import { C } from '../styles/theme';
 
-export const today = () => new Date().toISOString().split("T")[0];
+export const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export const daysBetween = (a, b) => {
   if (!a || !b) return null;
@@ -28,7 +31,7 @@ export const getPeakStatus = (bean) => {
   if (days === null) return { label: "Unknown", color: C.textMuted, bg: C.borderLight };
   if (frozen) {
     // Show frozen status with the paused day count
-    return { label: `Frozen (${days}d)`, color: C.blue || '#3B82F6', bg: C.blueBg || '#DBEAFE', days, frozen: true };
+    return { label: `Frozen (${days}d)`, color: C.blue, bg: C.blueBg, days, frozen: true };
   }
   if (days < bean.degasMin) return { label: "Degassing", color: C.purple, bg: C.purpleBg, days };
   if (days < bean.peakStart) return { label: "Resting", color: C.amber, bg: C.amberBg, days };

@@ -73,7 +73,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             height: '100%', paddingBottom: 12,
           }}>
             <div>
-              <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>Coffee Hub</div>
+              <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>2manybeans</div>
               <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{today()}</div>
             </div>
           </div>
@@ -84,7 +84,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           borderBottom: `1px solid ${C.borderLight}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>Coffee Hub</div>
+            <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
             <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body }}>{today()}</div>
           </div>
         </div>

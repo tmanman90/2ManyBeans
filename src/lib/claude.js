@@ -1,60 +1,16 @@
-// Claude API helpers — all calls go through /api/claude serverless proxy
+// Claude API helpers -- all calls go through /api/claude serverless proxy
 // No Anthropic SDK in the browser. No API key in client code.
 import { today, getPeakStatus, daysOpen } from './peakStatus';
 import { TASTING_KNOWLEDGE, BREWING_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { API_BASE } from './apiBase';
+import { fetchWithRetry } from './fetchWithRetry';
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
-const FRIENDLY_ERRORS = {
-  429: 'AI is rate-limited — please wait a moment and try again',
-  529: 'AI service is temporarily busy — please try again in a moment',
-  503: 'AI service is temporarily unavailable — please try again shortly',
-};
-
-export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools, retries = 2 }) {
+export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools }) {
   const body = { system, messages, maxTokens, model };
   if (tools) body.tools = tools;
-
-  let lastError;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    if (attempt > 0) {
-      // Exponential backoff: 1s, 2s
-      await new Promise(r => setTimeout(r, 1000 * attempt));
-    }
-
-    const response = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (response.ok) {
-      return response.json();
-    }
-
-    // Retry on transient errors
-    if ([429, 529, 503].includes(response.status) && attempt < retries) {
-      lastError = response.status;
-      continue;
-    }
-
-    const friendly = FRIENDLY_ERRORS[response.status];
-    if (friendly) throw new Error(friendly);
-
-    // Try to get server error detail
-    try {
-      const data = await response.json();
-      throw new Error(data.error || `Claude API error: ${response.status}`);
-    } catch (e) {
-      if (e.message && e.message !== 'Unexpected token') throw e;
-      throw new Error(`Claude API error: ${response.status}`);
-    }
-  }
-
-  // All retries exhausted
-  const friendly = FRIENDLY_ERRORS[lastError];
-  throw new Error(friendly || `Claude API error: ${lastError}`);
+  return fetchWithRetry({ url: PROXY_URL, body, serviceName: 'Claude' });
 }
 
 // --- Image compression utility ---
@@ -110,7 +66,7 @@ export function compressImage(file) {
 
 export async function getRecBlurb(activeDesc, recDesc) {
   const data = await callClaude({
-    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated. No headers or bullets — just a flowing paragraph.`,
+    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated. No headers or bullets -- just a flowing paragraph.`,
     messages: [{ role: 'user', content: `Current rotation:\n${activeDesc || "(empty)"}\n\nTop candidates:\n${recDesc}\n\nWhy would each be a good pick?` }],
     maxTokens: 400,
   });
@@ -213,21 +169,21 @@ export async function sendTastingMessage(systemPrompt, history) {
 export function buildChatContext(beans, tastings) {
   const active = beans.filter(b => b.status === 'ACTIVE').map(b => {
     const ps = getPeakStatus(b);
-    return `  Atmos #${b.atmosSlot}: ${b.roaster} — ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${b.bagNotes}`;
+    return `  Atmos #${b.atmosSlot}: ${b.roaster} -- ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${b.bagNotes}`;
   }).join('\n');
 
   const sealed = beans.filter(b => b.status === 'SEALED').map(b => {
     const ps = getPeakStatus(b);
-    return `  ${b.roaster} — ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${b.bagNotes}`;
+    return `  ${b.roaster} -- ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${b.bagNotes}`;
   }).join('\n');
 
   const finished = beans.filter(b => b.status === 'FINISHED').slice(0, 5).map(b =>
-    `  ${b.roaster} — ${b.name} (${b.origin}) | Finished: ${b.finishDate}`
+    `  ${b.roaster} -- ${b.name} (${b.origin}) | Finished: ${b.finishDate}`
   ).join('\n');
 
   const recentTastings = tastings.slice(0, 5).map(t => {
     const bean = beans.find(x => x.id === t.beanId);
-    return `  ${t.date}: ${bean?.name || '?'} — ${t.oneWord || ''} ${t.rating ? '★'.repeat(t.rating) : ''} — ${t.notes || ''}`;
+    return `  ${t.date}: ${bean?.name || '?'} -- ${t.oneWord || ''} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${t.notes || ''}`;
   }).join('\n');
 
   return `You are Tal's coffee assistant. You have access to his REAL, CURRENT coffee data. NEVER suggest beans that are already finished or opened. Only recommend from SEALED inventory.
@@ -249,11 +205,11 @@ RECENT TASTINGS:
 ${recentTastings || '  (none)'}
 
 ROTATION RULES:
-- Keep 3 beans active (Atmos #1–#3)
+- Keep 3 beans active (Atmos #1-#3)
 - Priority: (1) Already opened, (2) In/approaching peak window, (3) Smaller bags first
-- Apollon's Gold: Degas 35–45 days, Peak 60–90 days post-roast, 1:17.5–1:19 ratio, 90–93°C
-- Other roasters without guidance: rest 7–14 days, general peak 14–60 days
-- After opening (Atmos): finish within 2–4 weeks; 100g bags within 7–14 days
+- Apollon's Gold: Degas 35-45 days, Peak 60-90 days post-roast, 1:17.5-1:19 ratio, 90-93C
+- Other roasters without guidance: rest 7-14 days, general peak 14-60 days
+- After opening (Atmos): finish within 2-4 weeks; 100g bags within 7-14 days
 - Bag-stated guidance always overrides defaults
 
 Be concise, warm, and opinionated. If recommending a bean, explain WHY based on timing and variety.

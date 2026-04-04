@@ -14,7 +14,7 @@ export const SignInScreen = ({ onSignIn }) => (
     padding: 24,
   }}>
     <div style={{ fontFamily: fonts.title, fontSize: 42, color: C.accent, marginBottom: 4 }}>
-      Coffee Hub
+      2manybeans
     </div>
     <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 32, textAlign: 'center' }}>
       Track your specialty coffee rotation,<br />tastings, and freshness

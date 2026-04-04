@@ -1,24 +1,10 @@
 // Vercel serverless proxy for Fellow Aiden API
 // Keeps FELLOW_EMAIL / FELLOW_PASSWORD server-side only
-// Flow: auth → device → create profile → share (brew.link) → delete temp profile
-// NEVER touches existing profiles — if device is full, returns error gracefully
+// Flow: auth -> device -> create profile -> share (brew.link) -> delete temp profile
+// NEVER touches existing profiles -- if device is full, returns error gracefully
+import { withCorsAuth } from './lib/cors-auth.js';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
-
-const ALLOWED_ORIGINS = [
-  'https://2manybeans.vercel.app',
-  'capacitor://localhost',
-  'http://localhost',
-];
-
-function setCorsHeaders(req, res) {
-  const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.some(o => origin?.startsWith(o))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
 
 function validateProfile(profile) {
   const errors = [];
@@ -67,14 +53,7 @@ async function fellowFetch(path, options = {}) {
   return res.json();
 }
 
-export default async function handler(req, res) {
-  setCorsHeaders(req, res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export default withCorsAuth(async (req, res) => {
   const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
   if (!FELLOW_EMAIL || !FELLOW_PASSWORD) {
     return res.status(500).json({ error: 'Fellow credentials not configured' });
@@ -116,7 +95,6 @@ export default async function handler(req, res) {
       });
     } catch (createErr) {
       if (createErr.status === 400) {
-        // Log the actual error for debugging — could be full device OR validation failure
         console.error('Profile create 400:', createErr.message);
         return res.status(409).json({
           error: `Fellow rejected the profile (400): ${createErr.message}`,
@@ -126,22 +104,20 @@ export default async function handler(req, res) {
     }
     const profileId = created.id || created.profileId;
 
-    // 4. Share profile → get brew.link
+    // 4. Share profile -> get brew.link
     const shared = await fellowFetch(`/devices/${deviceId}/profiles/${profileId}/share`, {
       method: 'POST',
       headers: authHeaders,
     });
     const link = shared.link || shared.url || shared.shareUrl;
 
-    // 5. Delete the temp profile we just created — keep Aiden clean
-    //    Only deletes the profile WE just created (by profileId), never existing ones
+    // 5. Delete the temp profile we just created -- keep Aiden clean
     try {
       await fellowFetch(`/devices/${deviceId}/profiles/${profileId}`, {
         method: 'DELETE',
         headers: authHeaders,
       });
     } catch {
-      // Non-fatal — brew.link already generated
       console.warn('Could not clean up temp profile from device');
     }
 
@@ -154,4 +130,4 @@ export default async function handler(req, res) {
     console.error('Fellow API error:', error);
     return res.status(502).json({ error: error.message || 'Failed to push profile to Fellow' });
   }
-}
+});

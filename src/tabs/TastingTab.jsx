@@ -107,7 +107,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
       setChatExtracted(null);
     }
-  }, [sel]);
+  }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only resets on selection change, not data changes
 
   const handleChatSend = async () => {
     if (!chatInput.trim() || chatLoading) return;

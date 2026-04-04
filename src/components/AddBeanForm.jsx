@@ -17,7 +17,7 @@ const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore
 export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
-    roastDate: today(), bagSize: 100, bagNotes: '', producer: '',
+    roastDate: '', bagSize: 100, bagNotes: '', producer: '',
     altitude: '', region: '', farm: '', roastLevel: '', cupScore: '',
     brewingRec: '', sourcedBy: '', shelfLife: '',
   };
@@ -51,7 +51,16 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
 
   const takeNativePhoto = async () => {
     try {
-      const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      const { Camera, CameraResultType, CameraSource, CameraPermissionType } = await import('@capacitor/camera');
+      // Ensure camera + photo library permissions are granted
+      const perms = await Camera.checkPermissions();
+      if (perms.camera !== 'granted' || perms.photos !== 'granted') {
+        const requested = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+        if (requested.camera === 'denied') {
+          setScanError('Camera permission denied. Enable it in Settings > 2manybeans.');
+          return;
+        }
+      }
       const image = await Camera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
@@ -66,7 +75,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
         console.error('Camera error:', err);
-        setScanError('Failed to capture photo. Try again.');
+        setScanError(`Failed to capture photo: ${err.message || 'Unknown error'}`);
       }
     }
   };
@@ -202,7 +211,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
       origin: f.origin.trim(),
       variety: f.variety.trim(),
       process: f.process,
-      roastDate: f.roastDate || today(),
+      roastDate: f.roastDate || '',
       bagSize: Number(f.bagSize) || 100,
       status: 'SEALED',
       atmosSlot: null,

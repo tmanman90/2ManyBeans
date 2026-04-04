@@ -59,6 +59,11 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
   const handleNativePhoto = async () => {
     try {
       const { Camera: CapCamera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      const perms = await CapCamera.checkPermissions();
+      if (perms.camera !== 'granted' || perms.photos !== 'granted') {
+        const requested = await CapCamera.requestPermissions({ permissions: ['camera', 'photos'] });
+        if (requested.camera === 'denied') return;
+      }
       const image = await CapCamera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
@@ -109,8 +114,10 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
     if (f.sourcedBy.trim() !== (bean.sourcedBy || '')) changes.sourcedBy = f.sourcedBy.trim();
 
     // Grind handling
-    const ss = f.ssGrind !== '' ? Number(f.ssGrind) : null;
-    const batch = f.batchGrind !== '' ? Number(f.batchGrind) : null;
+    const ssNum = Number(f.ssGrind);
+    const ss = f.ssGrind !== '' && !isNaN(ssNum) ? ssNum : null;
+    const batchNum = Number(f.batchGrind);
+    const batch = f.batchGrind !== '' && !isNaN(batchNum) ? batchNum : null;
     const oldSs = bean.aidenGrind?.singleServe ?? null;
     const oldBatch = bean.aidenGrind?.batch ?? null;
 

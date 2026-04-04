@@ -2,16 +2,19 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.talmeltzer.coffeehub',
-  appName: 'Coffee Hub',
+  appName: '2manybeans',
   webDir: 'dist',
   plugins: {
     CapacitorHttp: {
       enabled: true,
     },
-    GoogleAuth: {
-      scopes: ['profile', 'email'],
-      serverClientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
-      forceCodeForRefreshToken: true,
+    SocialLogin: {
+      providers: {
+        google: true,
+        apple: false,
+        facebook: false,
+        twitter: false,
+      },
     },
     StatusBar: {
       overlaysWebView: true,
