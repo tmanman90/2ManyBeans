@@ -12,10 +12,16 @@ import { Toast } from '../components/Toast';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
+import { getBrewMethod } from '../lib/brewMethods';
+import { usePreferences } from '../hooks/useUserProfile';
 
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, onFinishBean, addTasting, updateTasting }) => {
+  const { preferences } = usePreferences();
+  const brewMethod = getBrewMethod(preferences.brewMethod);
+  const canisterCount = preferences.canisterCount || 3;
   const sealed = beans.filter(b => b.status === 'SEALED');
-  const emptySlots = [1, 2, 3].filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
+  const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
+  const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [finishPrompt, setFinishPrompt] = useState(null);
@@ -115,7 +121,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                     <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
                   )}
                   <Btn variant="small" onClick={() => aiden.handleBrewWithAiden(bean)}>
-                    <Coffee size={12} /> Brew with Aiden
+                    <Coffee size={12} /> {brewMethod.label}
                   </Btn>
                   <Btn variant="small" onClick={() => handleFinishBag(bean)}>
                     <Check size={12} /> Finish

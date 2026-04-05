@@ -8,6 +8,8 @@ import { AidenModal } from '../components/AidenModal';
 import { Toast } from '../components/Toast';
 import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
+import { getBrewMethod } from '../lib/brewMethods';
+import { usePreferences } from '../hooks/useUserProfile';
 
 // Parse ---BEAN_SCAN---{json}---END_SCAN--- from assistant text
 function parseBeanScan(text) {
@@ -43,8 +45,10 @@ function trimApiMessages(messages, keepRecent = 6) {
 const MAX_API_MESSAGES = 20;
 
 export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting }) => {
+  const { preferences } = usePreferences();
+  const brewMethod = getBrewMethod(preferences.brewMethod);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hey Tal! Ask me anything about your rotation, inventory, or what to brew next. You can also send photos of coffee bags and I'll scan them for you." },
+    { role: 'assistant', content: "Hey! Ask me anything about your rotation, inventory, or what to brew next. You can also send photos of coffee bags and I'll scan them for you." },
   ]);
   // apiMessages stores the raw messages sent to the API (with base64 images)
   const apiMessages = useRef([
@@ -349,7 +353,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           marginBottom: 8,
         }}>
           <Btn variant="small" onClick={handleBrewScanned}>
-            <Coffee size={12} /> Brew with Aiden
+            <Coffee size={12} /> {brewMethod.label}
           </Btn>
           <Btn variant="small" onClick={handleGuidedTasting}>
             <BookOpen size={12} /> Guided Tasting

@@ -15,8 +15,12 @@ import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
+import { getBrewMethod } from '../lib/brewMethods';
+import { usePreferences } from '../hooks/useUserProfile';
 
 export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, addTasting, updateTasting }) => {
+  const { preferences } = usePreferences();
+  const brewMethod = getBrewMethod(preferences.brewMethod);
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
   const aiden = useAidenBrew(updateBean);
   const [finishPrompt, setFinishPrompt] = useState(null);
@@ -47,9 +51,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     setReturnConfirm(null);
   };
 
-  const slots = [1, 2, 3].map(n => beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n) || null);
+  const canisterCount = preferences.canisterCount || 3;
+  const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
+  const slots = slotNumbers.map(n => beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n) || null);
   const recs = getRecommendations(beans);
-  const emptySlots = [1, 2, 3].filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
+  const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
 
   const handleOpenRec = (beanId) => {
     if (emptySlots.length === 0) return;
@@ -99,7 +105,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     <div>
       <div style={sectionTitle}>Active Rotation</div>
       <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your 3 Atmos canisters</div>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your {canisterCount} Atmos canister{canisterCount !== 1 ? 's' : ''}</div>
 
       {beans.length === 0 && (
         <div style={{ ...journalCard, textAlign: 'center', padding: 32 }}>
@@ -126,7 +132,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           {bean ? (
             <BeanCard bean={bean} updateBean={updateBean} onLearn={handleLearn} uid={uid} actions={<>
               <Btn variant="small" onClick={() => aiden.handleBrewWithAiden(bean)}>
-                <Coffee size={12} /> Brew with Aiden
+                <Coffee size={12} /> {brewMethod.label}
               </Btn>
               <Btn variant="small" onClick={() => setReturnConfirm(bean)}>
                 <Undo2 size={12} /> Return

@@ -5,8 +5,12 @@ import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
 import { Badge } from './Badge';
 import { EditBeanModal } from './EditBeanModal';
+import { getBrewMethod } from '../lib/brewMethods';
+import { usePreferences } from '../hooks/useUserProfile';
 
 export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, uid }) => {
+  const { preferences } = usePreferences();
+  const brewMethod = getBrewMethod(preferences.brewMethod);
   const [editOpen, setEditOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -151,9 +155,9 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
           ☕ {bean.bagNotes}
         </div>
       )}
-      {bean.aidenGrind && (
+      {brewMethod.grindLabel(bean, preferences) && (
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
-          ⚙ Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
+          ⚙ {brewMethod.grindLabel(bean, preferences)}
         </div>
       )}
 
