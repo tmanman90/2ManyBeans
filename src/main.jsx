@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/global.css';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from './hooks/useAuth';
+import { useUserProfile, UserPreferencesProvider } from './hooks/useUserProfile.jsx';
 import { useAppData } from './hooks/useAppData';
 import { SignInScreen } from './components/SignInScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { App } from './App';
+import { AuthContext } from './contexts/AuthContext';
 
 // Notify Capgo that the app loaded successfully (prevents rollback)
 if (Capacitor.isNativePlatform()) {
@@ -17,6 +19,13 @@ if (Capacitor.isNativePlatform()) {
 
 const Root = () => {
   const { user, loading: authLoading, signInWithGoogle, signInWithApple, logOut } = useAuth();
+
+  const {
+    profile, profileLoaded, preferences, isOnboarded,
+    createProfile, migrateExistingUser, updatePreferences,
+    updateProfile, completeOnboarding, contextValue,
+  } = useUserProfile(user?.uid);
+
   const {
     beans, tastings,
     addBean, updateBean, deleteBean,
@@ -25,31 +34,64 @@ const Root = () => {
     loaded: dataLoaded,
   } = useAppData(user?.uid);
 
-  // Auth loading
+  const authValue = useMemo(() => ({ user, logOut }), [user, logOut]);
+
+  // Gate 1: Auth loading
   if (authLoading) return <LoadingScreen />;
 
-  // Not signed in
+  // Gate 2: Not signed in
   if (!user) return <SignInScreen onSignInWithGoogle={signInWithGoogle} onSignInWithApple={signInWithApple} />;
 
-  // Waiting for Firestore data
+  // Gate 3: Profile loading
+  if (!profileLoaded) return <LoadingScreen />;
+
+  // Gate 4: No profile doc exists, need to determine if new or existing user
+  if (!profile) {
+    if (dataLoaded && beans.length > 0) {
+      migrateExistingUser(user);
+      return <LoadingScreen />;
+    }
+    if (!dataLoaded) return <LoadingScreen />;
+  }
+
+  // Gate 5: Onboarding not complete
+  if (!isOnboarded) {
+    const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
+    return (
+      <React.Suspense fallback={<LoadingScreen />}>
+        <OnboardingWizard
+          user={user}
+          profile={profile}
+          createProfile={createProfile}
+          completeOnboarding={completeOnboarding}
+        />
+      </React.Suspense>
+    );
+  }
+
+  // Gate 6: Waiting for Firestore data
   if (!dataLoaded) return <LoadingScreen />;
 
   return (
-    <App
-      uid={user.uid}
-      beans={beans}
-      tastings={tastings}
-      addBean={addBean}
-      updateBean={updateBean}
-      deleteBean={deleteBean}
-      addTasting={addTasting}
-      updateTasting={updateTasting}
-      deleteTasting={deleteTasting}
-      openBean={openBean}
-      finishBean={finishBean}
-      returnBean={returnBean}
-      seedTalData={seedTalData}
-    />
+    <AuthContext value={authValue}>
+      <UserPreferencesProvider value={contextValue}>
+        <App
+          uid={user.uid}
+          beans={beans}
+          tastings={tastings}
+          addBean={addBean}
+          updateBean={updateBean}
+          deleteBean={deleteBean}
+          addTasting={addTasting}
+          updateTasting={updateTasting}
+          deleteTasting={deleteTasting}
+          openBean={openBean}
+          finishBean={finishBean}
+          returnBean={returnBean}
+          seedTalData={seedTalData}
+        />
+      </UserPreferencesProvider>
+    </AuthContext>
   );
 };
 
