@@ -1,6 +1,7 @@
 // Shared Aiden brew hook — used by RotationTab, InventoryTab, ChatTab
 import { useState } from 'react';
-import { generateAidenRecipe, researchBean, pushToAiden } from '../lib/aiden';
+import { generateAidenRecipe, pushToAiden } from '../lib/aiden';
+import { researchBean } from '../lib/beanResearch';
 
 export function useAidenBrew(updateBean) {
   const [aidenModal, setAidenModal] = useState(false);
