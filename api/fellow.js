@@ -22,13 +22,16 @@ async function handleConnect(req, res, uid) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
+  // Fellow API is case-sensitive on email for device lookup
+  const normalizedEmail = email.trim().toLowerCase();
+
   // Validate credentials with Fellow API
   let fellowAuth;
   try {
     const authRes = await fetch(`${FELLOW_API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: normalizedEmail, password }),
     });
     if (!authRes.ok) {
       const status = authRes.status;
@@ -48,7 +51,7 @@ async function handleConnect(req, res, uid) {
   }
 
   // Encrypt credentials as single JSON blob
-  const encCredentials = encrypt(JSON.stringify({ email, password }));
+  const encCredentials = encrypt(JSON.stringify({ email: normalizedEmail, password }));
 
   // Atomic write: secrets doc + profile doc
   const db = getDb();
@@ -64,16 +67,16 @@ async function handleConnect(req, res, uid) {
   const profileRef = db.doc(`users/${uid}`);
   batch.update(profileRef, {
     'fellow.connected': true,
-    'fellow.email': email,
+    'fellow.email': normalizedEmail,
     'fellow.connectedAt': FieldValue.serverTimestamp(),
   });
 
   await batch.commit();
 
   // Log without credentials
-  console.log(`Fellow connected: uid=${uid}, email=${email}`);
+  console.log(`Fellow connected: uid=${uid}, email=${normalizedEmail}`);
 
-  return res.status(200).json({ connected: true, email });
+  return res.status(200).json({ connected: true, email: normalizedEmail });
 }
 
 async function handleDisconnect(req, res, uid) {
