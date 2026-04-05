@@ -18,16 +18,19 @@ const ODE_GEN2_STEPS = [
 // Cup-structure family grind bands (Ode Gen 2)
 // Layer 1 of two-layer grind model: family baseline determines the band,
 // reference profiles only modify within the band.
+// Widened bands: family sets the safe range, reference profile matching picks within it.
+// Previous bands were too narrow (0.2-0.3 steps), producing identical grinds for all beans.
+// New bands span the actual Fellow Brew Talks data range per family.
 const FAMILY_GRIND_BANDS = {
-  'washed-gesha-clarity':     { ssMin: 4.1, ssMax: 4.3, batchMin: 6,   batchMax: 6.2 },
-  'washed-kenya-clarity':     { ssMin: 4,   ssMax: 4.2, batchMin: 6.1, batchMax: 6.3 },
-  'washed-ethiopia-clarity':  { ssMin: 4.2, ssMax: 4.5, batchMin: 6.2, batchMax: 6.5 },
-  'natural-ethiopia-fruit':   { ssMin: 4.3, ssMax: 4.7, batchMin: 6.3, batchMax: 6.7 },
-  'honey-anaerobic':          { ssMin: 4.4, ssMax: 5,   batchMin: 6.5, batchMax: 7.1 },
-  'washed-colombia-clarity':  { ssMin: 4.1, ssMax: 4.5, batchMin: 6,   batchMax: 6.5 },
-  'washed-central-america':   { ssMin: 4.2, ssMax: 4.7, batchMin: 6.2, batchMax: 6.7 },
+  'washed-gesha-clarity':     { ssMin: 3,   ssMax: 5.2, batchMin: 5,   batchMax: 7 },
+  'washed-kenya-clarity':     { ssMin: 3,   ssMax: 4.2, batchMin: 5.1, batchMax: 7.2 },
+  'washed-ethiopia-clarity':  { ssMin: 3.2, ssMax: 6,   batchMin: 5,   batchMax: 8.2 },
+  'natural-ethiopia-fruit':   { ssMin: 3,   ssMax: 5.1, batchMin: 5,   batchMax: 8.2 },
+  'honey-anaerobic':          { ssMin: 3.2, ssMax: 6,   batchMin: 4.2, batchMax: 7.2 },
+  'washed-colombia-clarity':  { ssMin: 3,   ssMax: 6.2, batchMin: 5,   batchMax: 8 },
+  'washed-central-america':   { ssMin: 3,   ssMax: 5,   batchMin: 5,   batchMax: 7 },
   'medium-washed':            { ssMin: 5,   ssMax: 5.2, batchMin: 6,   batchMax: 8 },
-  'dark-roast':               { ssMin: 6.1, ssMax: 8,   batchMin: 7,   batchMax: 9.2 },
+  'dark-roast':               { ssMin: 5,   ssMax: 9,   batchMin: 6,   batchMax: 9.2 },
 };
 
 // Fallback family for beans that don't match any specific family
@@ -225,6 +228,15 @@ Key principle: aging shifts you toward MORE WATER + MORE EARLY ENERGY, not autom
 ### Ratio Sanity — MANDATORY
 
 - For light/washed clarity profiles, default ratio MUST be ≥ 1:16.5 (prefer ~1:17) unless the roaster explicitly recommends stronger.
+
+### Temperature Curve — MANDATORY
+For light roasts, prefer a DECLINING temperature profile across pulses:
+- Start at full bloom temperature (94-96°C for washed, 92-94°C for naturals)
+- Step down 0.5-1.5°C per pulse through the brew
+- This extracts desirable acids and sugars early at high temp, then avoids bitter compounds late
+- Example: 3 pulses at [96, 95, 94] or [95, 94, 93]
+- For dark roasts, flat temperatures are acceptable (e.g., [92, 92, 92])
+- Batch profiles can use a steeper decline since total contact time is longer
 
 ### Density / Altitude Handling — MANDATORY
 For high-altitude, dense, light-roast coffees:
@@ -459,6 +471,16 @@ Before returning your JSON, confirm ALL of the following:
 8. **FLORAL CHECK:** If the coffee is floral/tea-like, did I avoid both extremes: "fine + slow + hot" AND "coarse + hollow"?
 9. **BATCH CHECK:** If generating a batch recipe, default to 4 pulses unless there is a specific reason to use 3 or 5.
 
+## CRITICAL REMINDERS
+
+### Grind Steps Must Be EXACT
+Your grindRecommendation values MUST be chosen from this EXACT list. Do NOT interpolate or round to values not on this list:
+1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2, 5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2, 9, 9.1, 9.2, 10, 10.1, 10.2, 11
+Values like 4.8, 5.6, 3.5, 6.8 are INVALID. Pick the nearest valid step from the list above.
+
+### Past Peak / Fading Beans MUST Have Higher Ratio
+If the bean is Past Peak or Fading, you MUST add +0.5 to +1.0 to the ratio above the family baseline default. For example: if the family baseline is 17.0, past peak ratio should be 17.5. If baseline is 16.0, past peak should be 16.5-17.0. Never use the standard baseline ratio for an aged bean.
+
 RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
 // --- Deterministic enforcement helpers ---
@@ -609,16 +631,31 @@ function classifyFamilyFallback(bean) {
 }
 
 function enforceDeterministicGrind(recipe, bean, research) {
-  // Layer 1: Family baseline determines the grind band
+  // Layer 1: Family determines the safe grind range
   const family = research?.cupStructureFamily && FAMILY_GRIND_BANDS[research.cupStructureFamily]
     ? research.cupStructureFamily
     : classifyFamilyFallback(bean);
 
   const band = FAMILY_GRIND_BANDS[family] || FAMILY_GRIND_BANDS[DEFAULT_FAMILY];
 
-  // Pick 65th percentile within the family band
-  const ssGrind = pickUpperMiddle(band.ssMin, band.ssMax);
-  let batchGrind = pickUpperMiddle(band.batchMin, band.batchMax);
+  // Layer 2: Closest reference profile provides per-bean specificity
+  const ref = chooseReferenceForBean(bean, research);
+
+  let ssGrind, batchGrind;
+
+  if (ref?.grind) {
+    // Use the reference profile's midpoint, clamped to the family band
+    const refSsMid = (ref.grind.ssMin + ref.grind.ssMax) / 2;
+    const refBatchMid = (ref.grind.batchMin + ref.grind.batchMax) / 2;
+    ssGrind = nearestOdeStep(clamp(refSsMid, band.ssMin, band.ssMax), true);
+    batchGrind = nearestOdeStep(clamp(refBatchMid, band.batchMin, band.batchMax), true);
+    console.log(`[Aiden Grind] family="${family}" ref="${ref.name}" refSS=${ref.grind.ssMin}-${ref.grind.ssMax} → SS ${ssGrind} / Batch ${batchGrind}`);
+  } else {
+    // No reference match: fall back to 65th percentile of family band
+    ssGrind = pickUpperMiddle(band.ssMin, band.ssMax);
+    batchGrind = pickUpperMiddle(band.batchMin, band.batchMax);
+    console.log(`[Aiden Grind] family="${family}" (no ref match) band fallback → SS ${ssGrind} / Batch ${batchGrind}`);
+  }
 
   // Ensure batch is strictly coarser than single serve
   if (batchGrind <= ssGrind) {
@@ -631,8 +668,6 @@ function enforceDeterministicGrind(recipe, bean, research) {
   }
   recipe.grindRecommendation.singleServe = ssGrind;
   recipe.grindRecommendation.batch = batchGrind;
-
-  console.log(`[Aiden Grind] family="${family}" band=SS ${band.ssMin}-${band.ssMax} / Batch ${band.batchMin}-${band.batchMax} → SS ${ssGrind} / Batch ${batchGrind}`);
 }
 
 function enforceClarityRules(recipe, bean) {
@@ -723,6 +758,7 @@ export async function researchBean(bean) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      model: 'gpt-5.4-mini',
       messages: [
         { role: 'system', content: RESEARCH_SYSTEM_PROMPT },
         { role: 'user', content: `Research this coffee bean:\n\n${beanDescription}` },
@@ -771,6 +807,7 @@ export async function generateAidenRecipe(bean, research = null) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      model: 'gpt-5.4-mini',
       messages: [
         { role: 'system', content: AIDEN_SYSTEM_PROMPT },
         { role: 'user', content: userContent },
