@@ -20,6 +20,13 @@ const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
   </div>
 );
 
+const TECHNIQUE_LABELS = {
+  hoffmann: 'Hoffmann Classic',
+  'hedrick-121': 'Hedrick 1-2-1',
+  'kasuya-46': 'Kasuya 4:6',
+  hybrid: 'Hybrid Technique',
+};
+
 const phaseMessages = {
   research: {
     title: 'Researching your bean...',
@@ -27,7 +34,7 @@ const phaseMessages = {
   },
   recipe: {
     title: 'Crafting your brew recipe...',
-    subtitle: 'Building a Hoffmann-style pour-over tailored to this bean',
+    subtitle: 'Building a custom pour-over tailored to this bean',
   },
 };
 
@@ -70,9 +77,16 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
       {recipe && (
         <div>
           {/* Title */}
-          <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text, marginBottom: 12 }}>
+          <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text, marginBottom: 4 }}>
             {recipe.title || 'Pour-Over Recipe'}
           </div>
+
+          {/* Technique subtitle */}
+          {recipe.technique && TECHNIQUE_LABELS[recipe.technique] && (
+            <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
+              {TECHNIQUE_LABELS[recipe.technique]} Method
+            </div>
+          )}
 
           {/* Param grid: coffee, water, ratio */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
@@ -128,7 +142,9 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Water Temperature</div>
                 <div style={{ fontSize: 14, color: C.text }}>
-                  {recipe.waterTemp.celsius}°C / {recipe.waterTemp.fahrenheit}°F
+                  {typeof recipe.waterTemp.celsius === 'number' ? recipe.waterTemp.celsius : String(recipe.waterTemp.celsius).replace(/[^\d.]/g, '')}
+                  {'\u00B0'}C / {typeof recipe.waterTemp.fahrenheit === 'number' ? recipe.waterTemp.fahrenheit : String(recipe.waterTemp.fahrenheit).replace(/[^\d.]/g, '')}
+                  {'\u00B0'}F
                 </div>
               </div>
             </div>
@@ -213,6 +229,20 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
                 Tasting Tip
               </div>
               <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{recipe.tips}</div>
+            </div>
+          )}
+
+          {/* Reasoning (why this recipe) */}
+          {recipe.reasoning && (
+            <div style={{
+              fontSize: 12,
+              color: C.textMuted,
+              fontStyle: 'italic',
+              marginBottom: 14,
+              lineHeight: 1.5,
+              padding: '0 4px',
+            }}>
+              {recipe.reasoning}
             </div>
           )}
 

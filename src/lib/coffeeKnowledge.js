@@ -227,8 +227,7 @@ export function getOriginContext(origin) {
 }
 
 // --- HAND BREW KNOWLEDGE ---
-// Detailed Hoffmann methodology for hand brew recipe generation prompts.
-// Injected into GPT-5.4 system prompt alongside bean research context.
+// Full methodology including French Press and AeroPress (used by other features).
 export const HANDBREW_KNOWLEDGE = `
 HAND BREW METHODOLOGY (from James Hoffmann):
 
@@ -292,4 +291,28 @@ FILTER TYPES:
 - Paper: cleanest cup, removes oils and suspended material. Clear liquid. Use bleached white (unbleached = papery taste).
 - Metal: like French press, allows oils and small particles. Richer body, some sediment.
 - Cloth: removes particles but allows some oil. Rich, full mouthfeel. Must store wet in fridge.
+`;
+
+// --- POUR-OVER-ONLY KNOWLEDGE ---
+// Trimmed version for hand brew prompts. Strips French Press and AeroPress sections
+// to save ~200 tokens per request while keeping all pour-over-relevant content.
+export const HANDBREW_POUROVER_KNOWLEDGE = `
+POUR-OVER METHODOLOGY (from James Hoffmann):
+- Rinse paper filter under hot water (reduces paper taste, warms device). Use bleached white papers.
+- Bloom: Pour ~2x coffee weight in water. Pick up and swirl or stir to wet all grounds. Wait 30 seconds.
+- Slowly pour remainder of water directly onto coffee bed (NOT the walls). Weigh as you go.
+- When surface is 2-3cm below top, give gentle swirl (prevents grounds sticking to walls).
+- Diagnostic: flat, even bed = good extraction. Sloped/cratered bed = channeling (pour more evenly).
+- Troubleshooting: Bitter = grind coarser. Sour/weak/astringent = grind finer. Change ONE variable at a time.
+
+EXTRACTION SCIENCE:
+- Target: 18-22% extraction of ground coffee by weight.
+- Under-extracted: sour, sharp, lacking sweetness. Fix: grind finer, brew longer, hotter water.
+- Over-extracted: bitter, harsh, astringent. Fix: grind coarser, brew shorter, cooler water.
+- Finer grind = more extraction per unit time AND slower flow rate (double effect).
+- Stirring/agitation increases extraction. Pour-over: gentle swirl after pours.
+
+WATER:
+- Water is 98.5% of filter coffee by volume. It matters.
+- Hard water = cups lacking nuance and sweetness. Soft to moderate ideal.
 `;

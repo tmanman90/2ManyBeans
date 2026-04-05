@@ -50,10 +50,14 @@ export function useHandBrew(updateBean) {
       if (!mountedRef.current) return;
       setHandBrewRecipe(recipe);
       setHandBrewError(null);
-      // Persist recipe to bean doc
+      // Persist recipe to bean doc (include grinder key for cache invalidation)
       if (bean.id) {
         await updateBean(bean.id, {
-          handBrewRecipe: { ...recipe, generatedAt: new Date().toISOString() },
+          handBrewRecipe: {
+            ...recipe,
+            generatedAt: new Date().toISOString(),
+            grinder: preferences?.grinder || 'fellow-ode-gen2',
+          },
         });
       }
     } catch (err) {
