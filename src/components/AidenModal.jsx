@@ -6,6 +6,7 @@ import { Badge } from './Badge';
 import { ExternalLink, Coffee, Thermometer, Droplets, RefreshCw, AlertTriangle } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
+import { Capacitor } from '@capacitor/core';
 
 const TempChain = ({ temps, label }) => (
   <div style={{ marginBottom: 8 }}>
@@ -209,7 +210,20 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
 
           {/* Open in Fellow / Open on Aiden button */}
           {result?.link && (
-            <Btn variant="primary" onClick={() => window.open(result.link, '_blank')} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px' }}>
+            <Btn variant="primary" onClick={() => {
+              if (Capacitor.isNativePlatform()) {
+                // Native: use a temp anchor to let iOS handle the deep link
+                const a = document.createElement('a');
+                a.href = result.link;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => document.body.removeChild(a), 100);
+              } else {
+                window.open(result.link, '_blank');
+              }
+            }} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px' }}>
               <ExternalLink size={16} /> {fellowConnected && !result.usedRelay ? 'Open in Fellow' : 'Open on Aiden'}
             </Btn>
           )}
