@@ -4,6 +4,8 @@ import OpenAI from 'openai';
 import { withCorsAuth } from './lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'gpt-5.4-mini';
+const ALLOWED_MODELS = ['gpt-5.4', 'gpt-5.4-mini'];
+const MAX_TOKENS_CAP = 4000;
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,7 +15,7 @@ const client = new OpenAI({
 export default withCorsAuth(async (req, res) => {
   try {
     const {
-      model = 'gpt-5.4',
+      model: requestedModel = 'gpt-5.4',
       messages,
       maxTokens = 1000,
       responseFormat,
@@ -23,10 +25,13 @@ export default withCorsAuth(async (req, res) => {
       return res.status(400).json({ error: 'messages array is required' });
     }
 
+    const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'gpt-5.4';
+    const safeMaxTokens = Math.min(maxTokens || 1000, MAX_TOKENS_CAP);
+
     const params = {
       model,
       messages,
-      max_completion_tokens: maxTokens,
+      max_completion_tokens: safeMaxTokens,
     };
 
     if (responseFormat) {

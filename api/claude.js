@@ -4,6 +4,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { withCorsAuth } from './lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
+const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+const MAX_TOKENS_CAP = 4000;
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -12,15 +14,18 @@ const client = new Anthropic({
 
 export default withCorsAuth(async (req, res) => {
   try {
-    const { system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools } = req.body;
+    const { system, messages, maxTokens = 1000, model: requestedModel = 'claude-sonnet-4-6', tools } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array is required' });
     }
 
+    const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'claude-sonnet-4-6';
+    const safeMaxTokens = Math.min(maxTokens || 1000, MAX_TOKENS_CAP);
+
     const params = {
       model,
-      max_tokens: maxTokens,
+      max_tokens: safeMaxTokens,
       messages,
     };
 

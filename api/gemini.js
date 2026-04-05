@@ -73,9 +73,12 @@ async function handleProductShot(req, res) {
   return res.status(500).json({ error: 'No image generated' });
 }
 
+const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-3.1-flash-image-preview'];
+const MAX_TOKENS_CAP = 4000;
+
 async function handleText(req, res) {
   const {
-    model = 'gemini-2.5-flash',
+    model: requestedModel = 'gemini-2.5-flash',
     contents,
     systemInstruction,
     maxTokens = 1500,
@@ -86,12 +89,15 @@ async function handleText(req, res) {
     return res.status(400).json({ error: 'contents is required' });
   }
 
+  const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'gemini-2.5-flash';
+  const safeMaxTokens = Math.min(maxTokens || 1500, MAX_TOKENS_CAP);
+
   const client = getClient();
   const generativeModel = client.getGenerativeModel({
     model,
     ...(systemInstruction && { systemInstruction }),
     ...(tools && { tools }),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: { maxOutputTokens: safeMaxTokens },
   });
 
   const result = await generativeModel.generateContent({ contents });
