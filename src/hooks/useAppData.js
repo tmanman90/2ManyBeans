@@ -1,13 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch,
-  serverTimestamp, query, orderBy, getDocs, limit
+  serverTimestamp, query, orderBy, getDocs, limit, deleteField
 } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
 import { today } from '../lib/peakStatus';
 import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
+
+// Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
+const normalizeBean = (d) => {
+  const { atmosSlot, ...rest } = d.data();
+  return {
+    ...rest,
+    id: d.id,
+    jarSlot: rest.jarSlot ?? atmosSlot ?? null,
+  };
+};
 
 export const useAppData = (uid) => {
   const [beans, setBeans] = useState([]);
@@ -26,7 +36,7 @@ export const useAppData = (uid) => {
         getDocs(collection(db, 'users', uid, 'beans')),
         getDocs(collection(db, 'users', uid, 'tastings')),
       ]);
-      setBeans(beansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setBeans(beansSnap.docs.map(normalizeBean));
       setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       skipNextPoll.current = true; // Skip next poll since we just fetched
     } catch (err) { /* polling will catch up */ }
@@ -53,7 +63,7 @@ export const useAppData = (uid) => {
             getDocs(beansRef),
             getDocs(tastingsRef),
           ]);
-          setBeans(beansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          setBeans(beansSnap.docs.map(normalizeBean));
           setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (err) {
           console.error('Firestore fetch error:', err);
@@ -77,7 +87,7 @@ export const useAppData = (uid) => {
               getDocs(beansRef),
               getDocs(tastingsRef),
             ]);
-            setBeans(beansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setBeans(beansSnap.docs.map(normalizeBean));
             setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           } catch (err) { /* silent retry next interval */ }
         }, 60000);
@@ -110,7 +120,7 @@ export const useAppData = (uid) => {
     };
 
     const unsubBeans = onSnapshot(beansRef, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = snapshot.docs.map(normalizeBean);
       setBeans(data);
       beansLoaded = true;
       checkLoaded();
@@ -196,13 +206,14 @@ export const useAppData = (uid) => {
       return;
     }
     // Clear slot from any other bean first (prevent duplicate slot assignment)
-    const existing = beansRef.current.find(b => b.status === 'ACTIVE' && b.atmosSlot === slot && b.id !== beanId);
+    const existing = beansRef.current.find(b => b.status === 'ACTIVE' && b.jarSlot === slot && b.id !== beanId);
     if (existing) {
-      await updateBean(existing.id, { atmosSlot: null, status: 'SEALED', openDate: null });
+      await updateBean(existing.id, { jarSlot: null, atmosSlot: deleteField(), status: 'SEALED', openDate: null });
     }
     await updateBean(beanId, {
       status: 'ACTIVE',
-      atmosSlot: slot,
+      jarSlot: slot,
+      atmosSlot: deleteField(),
       openDate: today(),
     });
   }, [updateBean]);
@@ -211,7 +222,8 @@ export const useAppData = (uid) => {
   const finishBean = useCallback(async (beanId) => {
     await updateBean(beanId, {
       status: 'FINISHED',
-      atmosSlot: null,
+      jarSlot: null,
+      atmosSlot: deleteField(),
       finishDate: today(),
     });
   }, [updateBean]);
@@ -220,7 +232,8 @@ export const useAppData = (uid) => {
   const returnBean = useCallback(async (beanId) => {
     await updateBean(beanId, {
       status: 'SEALED',
-      atmosSlot: null,
+      jarSlot: null,
+      atmosSlot: deleteField(),
       openDate: null,
     });
   }, [updateBean]);

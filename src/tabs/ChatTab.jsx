@@ -269,7 +269,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         peakEnd: profile.peakEnd,
         guidance: profile.guidance,
         status: 'SEALED',
-        atmosSlot: null,
+        jarSlot: null,
       });
       setToast(`${scannedBean.name || 'Bean'} saved to inventory!`);
       setScannedBean(null);

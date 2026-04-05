@@ -12,7 +12,7 @@ export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, targetSlot, can
   const [search, setSearch] = useState('');
   const sealed = beans.filter(b => b.status === 'SEALED');
   const allSlots = Array.from({ length: canisterCount }, (_, i) => i + 1);
-  const emptySlots = allSlots.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
+  const emptySlots = allSlots.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
 
   useEffect(() => {
     if (!open) { setSearch(''); setSelectedId(null); }
@@ -40,7 +40,7 @@ export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, targetSlot, can
   return (
     <Modal open={open} onClose={onClose} title="Open a Bean">
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
-        Opening into Atmos #{targetSlot || emptySlots[0] || '?'} · Tap to select:
+        Opening in Jar #{targetSlot || emptySlots[0] || '?'} · Tap to select:
       </div>
       {sealed.length > 5 && (
         <div style={{ position: 'relative', marginBottom: 12 }}>

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, LogOut } from 'lucide-react';
-import { doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts, shadows } from '../styles/theme';
 import { haptic } from '../lib/haptics';
@@ -156,7 +156,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     // Check for active beans in slots that would be removed
     if (newCount < currentCount && beans) {
       const overflowBeans = beans.filter(
-        b => b.status === 'ACTIVE' && b.atmosSlot > newCount
+        b => b.status === 'ACTIVE' && b.jarSlot > newCount
       );
       if (overflowBeans.length > 0) {
         setCanisterConfirm({ newCount, overflowBeans });
@@ -167,9 +167,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     try {
       await updatePreferences({ canisterCount: newCount });
       haptic.light();
-      setToast(`Canisters set to ${newCount}`);
+      setToast(`Jars set to ${newCount}`);
     } catch (err) {
-      console.error('[Settings] Canister update failed:', err);
+      console.error('[Settings] Jar update failed:', err);
       setToast('Failed to save, try again');
     }
   };
@@ -184,7 +184,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         const beanRef = doc(db, 'users', uid, 'beans', bean.id);
         batch.update(beanRef, {
           status: 'SEALED',
-          atmosSlot: null,
+          jarSlot: null,
+          atmosSlot: deleteField(),
           openDate: null,
           updatedAt: serverTimestamp(),
         });
@@ -195,9 +196,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       // On native, batch bypasses per-hook refetch for beans
       if (Capacitor.isNativePlatform() && refetchBeans) await refetchBeans();
       haptic.light();
-      setToast(`Canisters set to ${newCount}`);
+      setToast(`Jars set to ${newCount}`);
     } catch (err) {
-      console.error('[Settings] Canister batch update failed:', err);
+      console.error('[Settings] Jar batch update failed:', err);
       setToast('Failed to save, try again');
     }
     setCanisterConfirm(null);
@@ -460,7 +461,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             <div style={separatorStyle} />
             {/* Canister Count */}
             <div style={rowStyle}>
-              <span style={rowLabelStyle}>Coffee Canisters</span>
+              <span style={rowLabelStyle}>Coffee Jars</span>
               <div style={rowValueStyle}>
                 <select
                   value={preferences.canisterCount}
@@ -537,12 +538,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             boxShadow: shadows.modal,
           }} onClick={e => e.stopPropagation()}>
             <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 12 }}>
-              Reduce canisters?
+              Reduce jars?
             </div>
             <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
               {canisterConfirm.overflowBeans.length === 1
-                ? `"${canisterConfirm.overflowBeans[0].name}" is in Atmos #${canisterConfirm.overflowBeans[0].atmosSlot}. It will be returned to your sealed inventory.`
-                : `${canisterConfirm.overflowBeans.length} beans are in canisters that will be removed. They will be returned to your sealed inventory.`
+                ? `"${canisterConfirm.overflowBeans[0].name}" is in Jar #${canisterConfirm.overflowBeans[0].jarSlot}. It will be returned to your sealed inventory.`
+                : `${canisterConfirm.overflowBeans.length} beans are in jars that will be removed. They will be returned to your sealed inventory.`
               }
             </div>
             <div style={{ display: 'flex', gap: 8 }}>

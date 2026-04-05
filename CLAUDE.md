@@ -50,14 +50,14 @@ src/
 ```
 
 ## Assets
-- All images go in `public/images/` — nav icons, illustrations, canister art, etc.
+- All images go in `public/images/` — nav icons, illustrations, jar art, etc.
 - App icons (favicon, PWA) go in `public/` — `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon.ico`
 - Never save generated images to other directories. Move them to the correct location immediately.
 
 ## Key Conventions
 - All dates are ISO strings (`"2026-02-21"`)
 - Bean statuses: `ACTIVE` | `SEALED` | `FINISHED`
-- Atmos slots are 1, 2, or 3 (Fellow Atmos vacuum canisters)
+- Jar slots are 1, 2, or 3 (numbered storage jars for active beans)
 - Roaster profiles auto-detected by fuzzy name match, fallback to default specialty light profile
 - Add Bean flow: multi-photo gallery (1-3) → Gemini vision scan → search grounding enrichment → review. Alt path: manual entry → AI Fill triggers same research.
 - Bean data model includes enriched fields: altitude, region, farm, roastLevel, cupScore, brewingRec, sourcedBy (all optional, filled by scan + research)

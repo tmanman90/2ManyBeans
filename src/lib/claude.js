@@ -191,7 +191,7 @@ function sanitize(str, maxLen = 100) {
 export function buildChatContext(beans, tastings) {
   const active = beans.filter(b => b.status === 'ACTIVE').map(b => {
     const ps = getPeakStatus(b);
-    let line = `  Atmos #${b.atmosSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
+    let line = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
     // Recipe context: handBrewRecipe or aidenGrind if available
     if (b.handBrewRecipe) {
       const r = b.handBrewRecipe;
@@ -227,11 +227,11 @@ Your responses render in a mobile chat bubble as plain text. Write in conversati
 ${BREWING_KNOWLEDGE}
 
 Rotation rules:
-- Keep 3 beans active (Atmos #1-#3)
+- Keep 3 beans active (Jar #1-#3)
 - Priority: (1) Already opened, (2) In/approaching peak window, (3) Smaller bags first
 - Apollon's Gold: Degas 35-45 days, Peak 60-90 days post-roast, 1:17.5-1:19 ratio, 90-93C
 - Other roasters without guidance: rest 7-14 days, general peak 14-60 days
-- After opening (Atmos): finish within 2-4 weeks; 100g bags within 7-14 days
+- After opening: finish within 2-4 weeks; 100g bags within 7-14 days
 - Bag-stated guidance always overrides defaults
 - Do not suggest beans that are already finished or opened. Only recommend from sealed inventory.
 
@@ -258,7 +258,7 @@ Rules for photo scanning:
   // Dynamic block: current inventory + tastings (uncached, changes per session)
   const dynamicBlock = `TODAY: ${today()}
 
-ACTIVE ROTATION (Atmos canisters):
+ACTIVE ROTATION (Jars):
 ${active || '  (none)'}
 
 SEALED INVENTORY:

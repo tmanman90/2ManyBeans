@@ -57,9 +57,9 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
 
   const canisterCount = preferences.canisterCount || 3;
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
-  const slots = slotNumbers.map(n => beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n) || null);
+  const slots = slotNumbers.map(n => beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n) || null);
   const recs = getRecommendations(beans);
-  const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
+  const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
 
   const handleOpenRec = (beanId) => {
     if (emptySlots.length === 0) return;
@@ -77,7 +77,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     try {
       const activeDesc = slots.filter(Boolean).map(b => {
         const ps = getPeakStatus(b);
-        return `Atmos #${b.atmosSlot}: ${b.roaster} ${b.name} (${b.origin}, ${b.variety} ${b.process}) — ${ps.days}d post-roast, ${ps.label}`;
+        return `Jar #${b.jarSlot}: ${b.roaster} ${b.name} (${b.origin}, ${b.variety} ${b.process}) — ${ps.days}d post-roast, ${ps.label}`;
       }).join('\n');
 
       const recDesc = recs.map((r, i) =>
@@ -109,11 +109,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     <div>
       <div style={sectionTitle}>Active Rotation</div>
       <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your {canisterCount} Atmos canister{canisterCount !== 1 ? 's' : ''}</div>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>
 
       {beans.length === 0 && (
         <div style={{ ...journalCard, textAlign: 'center', padding: 32 }}>
-          <img src="/images/empty-rotation.png" alt="Empty canister" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 16, marginBottom: 16 }} />
+          <img src="/images/empty-rotation.png" alt="Empty jar" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 16, marginBottom: 16 }} />
           <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>Your rotation is empty</div>
           <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Add your first coffee bag to get started</div>
           <Btn variant="primary" onClick={() => onOpenBean(null, 1)}><Plus size={16} /> Add Bean</Btn>
@@ -124,12 +124,12 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         <div key={i}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <img
-              src={bean ? '/images/atmos-full.png' : '/images/atmos-empty.png'}
-              alt={bean ? 'Full canister' : 'Empty canister'}
+              src={bean ? '/images/jar-full.png' : '/images/jar-empty.png'}
+              alt={bean ? 'Full jar' : 'Empty jar'}
               style={{ width: 24, height: 24, objectFit: 'contain' }}
             />
             <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Atmos #{i + 1}
+              Jar #{i + 1}
             </span>
           </div>
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
@@ -219,10 +219,10 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                     <div style={{ marginTop: 10 }}>
                       {slotPicker?.beanId === r.bean.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, color: C.textMuted }}>Which canister?</span>
+                          <span style={{ fontSize: 12, color: C.textMuted }}>Which jar?</span>
                           {emptySlots.map(s => (
                             <Btn key={s} variant="primary" onClick={() => { onOpenBean(r.bean.id, s); setSlotPicker(null); }} style={{ fontSize: 12, padding: '5px 12px' }}>
-                              Atmos #{s}
+                              Jar #{s}
                             </Btn>
                           ))}
                           <Btn variant="ghost" onClick={() => setSlotPicker(null)} style={{ fontSize: 12, padding: '5px 8px' }}>
@@ -269,7 +269,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         {returnConfirm && (
           <div>
             <div style={{ fontSize: 14, color: C.text, marginBottom: 16, lineHeight: 1.5 }}>
-              Return <strong>{returnConfirm.name}</strong> to sealed inventory? Atmos #{returnConfirm.atmosSlot} will be freed.
+              Return <strong>{returnConfirm.name}</strong> to sealed inventory? Jar #{returnConfirm.jarSlot} will be freed.
             </div>
             <Btn variant="primary" onClick={handleReturnConfirm} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>
               Yes, Return It

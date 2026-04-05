@@ -24,7 +24,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const canisterCount = preferences.canisterCount || 3;
   const sealed = beans.filter(b => b.status === 'SEALED');
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
-  const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
+  const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [finishPrompt, setFinishPrompt] = useState(null);

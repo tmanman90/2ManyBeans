@@ -214,7 +214,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
       roastDate: f.roastDate || '',
       bagSize: Number(f.bagSize) || 100,
       status: 'SEALED',
-      atmosSlot: null,
+      jarSlot: null,
       openDate: null,
       finishDate: null,
       bagNotes: f.bagNotes.trim(),

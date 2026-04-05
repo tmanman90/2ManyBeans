@@ -45,7 +45,7 @@ export const TastingForm = ({ beanId, beanLabel, beans, initialForm, onSubmit, s
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>Bean</label>
           <select value={sel} onChange={e => setSel(e.target.value)} style={inputStyle}>
-            {beans.map(b => <option key={b.id} value={b.id}>{b.name} (#{b.atmosSlot})</option>)}
+            {beans.map(b => <option key={b.id} value={b.id}>{b.name} (#{b.jarSlot})</option>)}
           </select>
         </div>
       )}

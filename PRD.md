@@ -2,7 +2,7 @@
 
 ## Overview
 
-Coffee Hub is a specialty coffee inventory and tasting tracker for enthusiasts who buy high-end light roast beans and manage freshness across multiple canisters. It tracks bean freshness using research-backed peak timing windows, manages a rotation system across 3 Fellow Atmos vacuum canisters, logs AI-guided tastings, and provides smart recommendations for what to open next.
+Coffee Hub is a specialty coffee inventory and tasting tracker for enthusiasts who buy high-end light roast beans and manage freshness across multiple jars. It tracks bean freshness using research-backed peak timing windows, manages a rotation system across numbered storage jars, logs AI-guided tastings, and provides smart recommendations for what to open next.
 
 ## User Context
 
@@ -28,7 +28,7 @@ interface Bean {
   roastDate: string;       // ISO date "2025-12-01"
   bagSize: number;         // grams, typically 100 or 200
   status: "ACTIVE" | "SEALED" | "FINISHED";
-  atmosSlot: number | null; // 1, 2, or 3 when active
+  jarSlot: number | null; // 1, 2, or 3 when active
   openDate: string | null;
   finishDate: string | null;
   bagNotes: string;         // flavor descriptors from bag label
@@ -122,7 +122,7 @@ Peak percentage: `((days - peakStart) / (peakEnd - peakStart)) * 100`
 ## Features by Tab
 
 ### 1. Rotation Tab (Home)
-- Shows 3 Fellow Atmos canister slots
+- Shows numbered jar slots (configurable count, default 3)
 - Each active bean displays: roaster, name, origin, variety, process, peak status badge, days post-roast, days open, bag notes
 - **"What should I open next?" button** → AI Recommendations:
   - Scores sealed beans (see scoring below)
@@ -377,20 +377,20 @@ service cloud.firestore {
 1. Tap "Open" on sealed bean
 2. Multiple empty slots → inline "Which canister?" picker
 3. One empty slot → opens directly
-4. Sets: `status: ACTIVE`, `atmosSlot: N`, `openDate: today()`
+4. Sets: `status: ACTIVE`, `jarSlot: N`, `openDate: today()`
 
 ### Finishing a Bean
 1. Tap "Finish" on active bean
-2. Sets: `status: FINISHED`, `atmosSlot: null`, `finishDate: today()`
+2. Sets: `status: FINISHED`, `jarSlot: null`, `finishDate: today()`
 
 ---
 
 ## Tal's Current Inventory (Seed Data)
 
 ### Active Rotation
-1. **Atmos #1**: Apollon's Gold — San Jose (Nicaragua, Pacamara, Natural) — roasted Dec 1, opened Feb 11
-2. **Atmos #2**: Apollon's Gold — El Triangulo (Honduras, Geisha, Washed) — roasted Dec 7, opened Feb 18
-3. **Atmos #3**: Empty
+1. **Jar #1**: Apollon's Gold — San Jose (Nicaragua, Pacamara, Natural) — roasted Dec 1, opened Feb 11
+2. **Jar #2**: Apollon's Gold — El Triangulo (Honduras, Geisha, Washed) — roasted Dec 7, opened Feb 18
+3. **Jar #3**: Empty
 
 ### Sealed (13 bags)
 - Apollon's Gold: San Jose (extra), Mulish, Arbegona, Chelbesa Natural, San Isidro Labrador, El Injerto

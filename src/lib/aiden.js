@@ -658,9 +658,9 @@ function repairRecipe(bean, recipe, research) {
   enforceDeterministicGrind(repaired, bean, research);
   enforceClarityRules(repaired, bean);
 
-  // Unique title: #{atmosSlot} {origin} {name} - {roaster} + short timestamp
+  // Unique title: #{jarSlot} {origin} {name} - {roaster} + short timestamp
   // Timestamp prevents Fellow "name already exists" collisions from leftover temp profiles
-  const slot = bean.atmosSlot ? `#${bean.atmosSlot} ` : '';
+  const slot = bean.jarSlot ? `#${bean.jarSlot} ` : '';
   const ts = Date.now().toString(36).slice(-4);
   const base = `${slot}${bean.origin || ''} ${bean.name || ''} - ${bean.roaster || ''}`.trim();
   const maxBase = 50 - 5; // leave room for " xxxx" suffix
