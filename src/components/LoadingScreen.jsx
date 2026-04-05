@@ -5,7 +5,7 @@ export const LoadingScreen = () => (
   <div style={{
     fontFamily: fonts.body,
     background: C.bg,
-    minHeight: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -13,7 +13,7 @@ export const LoadingScreen = () => (
     color: C.textMuted,
     gap: 12,
   }}>
-    <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent }}>Coffee Hub</div>
+    <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent }}>2manybeans</div>
     <div style={{ fontSize: 14 }}>Loading your beans...</div>
   </div>
 );

@@ -6,17 +6,18 @@ import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
-import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
+import { scanBeanLabel, researchBeanOnline, generateProductShot } from '../lib/gemini';
 import { generateRuphusStory } from '../lib/professorRuphus';
+import { uploadBeanPhoto } from '../lib/storage';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
 
-export const AddBeanForm = ({ open, onClose, onAdd }) => {
+export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
-    roastDate: today(), bagSize: 100, bagNotes: '', producer: '',
+    roastDate: '', bagSize: 100, bagNotes: '', producer: '',
     altitude: '', region: '', farm: '', roastLevel: '', cupScore: '',
     brewingRec: '', sourcedBy: '', shelfLife: '',
   };
@@ -51,6 +52,15 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
   const takeNativePhoto = async () => {
     try {
       const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      // Ensure camera + photo library permissions are granted
+      const perms = await Camera.checkPermissions();
+      if (perms.camera !== 'granted' || perms.photos !== 'granted') {
+        const requested = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+        if (requested.camera === 'denied') {
+          setScanError('Camera permission denied. Enable it in Settings > 2manybeans.');
+          return;
+        }
+      }
       const image = await Camera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
@@ -65,7 +75,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
         console.error('Camera error:', err);
-        setScanError('Failed to capture photo. Try again.');
+        setScanError(`Failed to capture photo: ${err.message || 'Unknown error'}`);
       }
     }
   };
@@ -187,7 +197,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     return null;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
     const p = getProfileForRoaster(f.roaster);
 
@@ -201,7 +211,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
       origin: f.origin.trim(),
       variety: f.variety.trim(),
       process: f.process,
-      roastDate: f.roastDate || today(),
+      roastDate: f.roastDate || '',
       bagSize: Number(f.bagSize) || 100,
       status: 'SEALED',
       atmosSlot: null,
@@ -229,9 +239,20 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
     // Include Professor Ruphus story if background generation finished
     if (storyRef.current) beanData.story = storyRef.current;
 
-    onAdd(beanData);
+    // Capture first photo before reset (for background product shot generation)
+    const scanPhoto = photos.length > 0 ? photos[0] : null;
+
+    const beanId = await onAdd(beanData);
     reset();
     onClose();
+
+    // Background: generate product shot from first scan photo (non-blocking)
+    if (scanPhoto && beanId && uid && updateBean) {
+      generateProductShot(scanPhoto)
+        .then(result => uploadBeanPhoto(uid, beanId, result.base64, result.mimeType))
+        .then(photoUrl => updateBean(beanId, { photoUrl }))
+        .catch(err => console.log('Background product shot skipped:', err.message));
+    }
   };
 
   const hasSearchableData = f.roaster.trim() || f.name.trim();
@@ -240,7 +261,7 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
   const inputStyle = {
     width: '100%', padding: '8px 10px', borderRadius: 8,
     border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 14, background: C.bg, color: C.text, boxSizing: 'border-box',
+    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
   const rowStyle = { marginBottom: 12 };
@@ -324,11 +345,11 @@ export const AddBeanForm = ({ open, onClose, onAdd }) => {
                     <button
                       onClick={() => removePhoto(idx)}
                       style={{
-                        position: 'absolute', top: -6, right: -6,
-                        width: 22, height: 22, borderRadius: '50%',
+                        position: 'absolute', top: -10, right: -10,
+                        width: 28, height: 28, borderRadius: '50%',
                         background: C.red, border: 'none', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: 0,
+                        padding: 8,
                       }}
                     >
                       <X size={12} color="#fff" />

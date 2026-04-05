@@ -1,17 +1,27 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useState } from 'react';
-import { Check, Plus, Star, X, Coffee } from 'lucide-react';
+import { Check, Plus, Star, X, Coffee, Undo2 } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
 import { getRecBlurb } from '../lib/claude';
 import { BeanCard } from '../components/BeanCard';
 import { AidenModal } from '../components/AidenModal';
+import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
-import { generateAidenRecipe, researchBean, pushToAiden } from '../lib/aiden';
+import { Modal } from '../components/Modal';
+import { FinishBagPrompt } from '../components/FinishBagPrompt';
+import { Toast } from '../components/Toast';
+import { useAidenBrew } from '../hooks/useAidenBrew';
+import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 
-export const RotationTab = ({ beans, onFinishBean, onOpenBean, updateBean, showSeedButton, onSeed }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, showSeedButton, onSeed, addTasting, updateTasting }) => {
+  const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
+  const aiden = useAidenBrew(updateBean);
+  const [finishPrompt, setFinishPrompt] = useState(null);
+  const [returnConfirm, setReturnConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
   const [seeding, setSeeding] = useState(false);
   const handleSeed = async () => {
     setSeeding(true);
@@ -21,14 +31,26 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, updateBean, showS
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
   const [slotPicker, setSlotPicker] = useState(null);
-  const [aidenModal, setAidenModal] = useState(false);
-  const [aidenRecipe, setAidenRecipe] = useState(null);
-  const [aidenResult, setAidenResult] = useState(null);
-  const [aidenLoading, setAidenLoading] = useState(false);
-  const [aidenError, setAidenError] = useState(null);
-  const [aidenBean, setAidenBean] = useState(null);
-  const [aidenResearch, setAidenResearch] = useState(null);
-  const [aidenPhase, setAidenPhase] = useState(null); // 'research' | 'recipe' | 'push'
+
+  const handleFinishBag = (bean) => {
+    const hasTasting = tastings.some(t => t.beanId === bean.id);
+    if (hasTasting) {
+      onFinishBean(bean.id);
+    } else {
+      setFinishPrompt(bean);
+    }
+  };
+
+  const handleReturnConfirm = async () => {
+    if (!returnConfirm) return;
+    try {
+      await onReturnBean(returnConfirm.id);
+      setToast(`${returnConfirm.name} returned to inventory`);
+    } catch (err) {
+      console.error('Return failed:', err);
+    }
+    setReturnConfirm(null);
+  };
 
   const slots = [1, 2, 3].map(n => beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n) || null);
   const recs = getRecommendations(beans);
@@ -41,63 +63,6 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, updateBean, showS
       return;
     }
     setSlotPicker({ beanId });
-  };
-
-  const handlePushToAiden = async (recipe) => {
-    setAidenError(null);
-    setAidenResult(null);
-    setAidenLoading(true);
-    try {
-      const result = await pushToAiden(recipe);
-      setAidenResult(result);
-      if (result.grindRecommendation) {
-        setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));
-      }
-    } catch (fellowErr) {
-      setAidenError(fellowErr.message || "Couldn't push to Aiden");
-    }
-    setAidenLoading(false);
-  };
-
-  const handleBrewWithAiden = async (bean, cachedResearch = null) => {
-    setAidenBean(bean);
-    setAidenRecipe(null);
-    setAidenResult(null);
-    setAidenError(null);
-    setAidenLoading(true);
-    setAidenModal(true);
-
-    // Step 1: Research (skip if cached)
-    let research = cachedResearch;
-    if (!research) {
-      setAidenPhase('research');
-      try {
-        research = await researchBean(bean);
-        setAidenResearch(research);
-      } catch (err) {
-        console.warn('Bean research failed, continuing without enrichment:', err.message);
-        research = null;
-      }
-    }
-
-    // Step 2: Recipe
-    setAidenPhase('recipe');
-    try {
-      const recipe = await generateAidenRecipe(bean, research);
-      setAidenRecipe(recipe);
-      setAidenError(null);
-      // Persist grind recommendation to the bean
-      if (recipe.grindRecommendation) {
-        await updateBean(bean.id, { aidenGrind: recipe.grindRecommendation });
-      }
-      // Step 3: Push to Fellow
-      setAidenPhase('push');
-      await handlePushToAiden(recipe);
-    } catch (err) {
-      setAidenError(err.message || "Couldn't generate a recipe");
-      setAidenLoading(false);
-    }
-    setAidenPhase(null);
   };
 
   const fetchRecBlurb = async () => {
@@ -171,11 +136,14 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, updateBean, showS
           </div>
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
-            <BeanCard bean={bean} updateBean={updateBean} actions={<>
-              <Btn variant="small" onClick={() => handleBrewWithAiden(bean)}>
+            <BeanCard bean={bean} updateBean={updateBean} onLearn={handleLearn} uid={uid} actions={<>
+              <Btn variant="small" onClick={() => aiden.handleBrewWithAiden(bean)}>
                 <Coffee size={12} /> Brew with Aiden
               </Btn>
-              <Btn variant="danger" onClick={() => onFinishBean(bean.id)}>
+              <Btn variant="small" onClick={() => setReturnConfirm(bean)}>
+                <Undo2 size={12} /> Return
+              </Btn>
+              <Btn variant="danger" onClick={() => handleFinishBag(bean)}>
                 <Check size={14} /> Finish Bag
               </Btn>
             </>} />
@@ -277,16 +245,42 @@ export const RotationTab = ({ beans, onFinishBean, onOpenBean, updateBean, showS
         </div>
       )}
       <AidenModal
-        open={aidenModal}
-        onClose={() => setAidenModal(false)}
-        recipe={aidenRecipe}
-        result={aidenResult}
-        loading={aidenLoading}
-        error={aidenError}
-        phase={aidenPhase}
-        onRetry={aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined}
-        onRetryPush={aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined}
+        open={aiden.aidenModal}
+        onClose={aiden.closeAidenModal}
+        recipe={aiden.aidenRecipe}
+        result={aiden.aidenResult}
+        loading={aiden.aidenLoading}
+        error={aiden.aidenError}
+        phase={aiden.aidenPhase}
+        onRetry={aiden.onRetry}
+        onRetryPush={aiden.onRetryPush}
       />
+      <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
+        {returnConfirm && (
+          <div>
+            <div style={{ fontSize: 14, color: C.text, marginBottom: 16, lineHeight: 1.5 }}>
+              Return <strong>{returnConfirm.name}</strong> to sealed inventory? Atmos #{returnConfirm.atmosSlot} will be freed.
+            </div>
+            <Btn variant="primary" onClick={handleReturnConfirm} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>
+              Yes, Return It
+            </Btn>
+            <Btn variant="ghost" onClick={() => setReturnConfirm(null)} style={{ width: '100%', justifyContent: 'center' }}>
+              Cancel
+            </Btn>
+          </div>
+        )}
+      </Modal>
+      <ProfessorRuphusSlideUp {...ruphusProps} />
+      <FinishBagPrompt
+        open={!!finishPrompt}
+        onClose={(msg) => { setFinishPrompt(null); if (msg) setToast(msg); }}
+        bean={finishPrompt}
+        onFinish={onFinishBean}
+        onAddTasting={addTasting}
+        onUpdateTasting={updateTasting}
+        beans={beans}
+      />
+      <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
+import { getAuth, initializeAuth, browserLocalPersistence, GoogleAuthProvider } from 'firebase/auth';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
@@ -14,16 +15,20 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+// On native (WKWebView), IndexedDB persistence is unreliable and can hang or
+// silently fail, causing signInWithCredential to never update auth state.
+// Use initializeAuth with browserLocalPersistence (localStorage) which is
+// reliable in WKWebView. On web, getAuth() uses the default persistence
+// stack (IndexedDB > localStorage > sessionStorage) which works fine.
+export const auth = Capacitor.isNativePlatform()
+  ? initializeAuth(app, { persistence: browserLocalPersistence })
+  : getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-let db;
-if (Capacitor.isNativePlatform()) {
-  // Skip persistent cache on native — IndexedDB can hang in WKWebView
-  db = initializeFirestore(app, {});
-} else {
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  });
-}
-export { db };
+// Skip persistent cache on native — IndexedDB hangs in WKWebView
+const firestoreSettings = Capacitor.isNativePlatform()
+  ? {}
+  : { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
+
+export const db = initializeFirestore(app, firestoreSettings);
+export const storage = getStorage(app);

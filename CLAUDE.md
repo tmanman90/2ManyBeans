@@ -2,41 +2,11 @@
 
 Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with Firebase backend.
 
-## Agent Behavior Rules
-
-### Planning
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately — don't keep pushing
-- Write clear specs upfront to reduce ambiguity
-
-### Execution
-- Use subagents for research, exploration, and parallel analysis to keep the main context clean
-- For complex problems, throw more compute at it via subagents. One task per subagent.
-- Make every change as simple as possible. Touch minimal code.
-- Find root causes. No temporary fixes. No over-engineering.
-- Changes should only affect what's necessary.
-
-### Verification
-- Never mark a task complete without proving it works
-- Run tests, check logs, demonstrate correctness
-- Ask yourself: "Would a staff engineer approve this?"
-- If a fix feels hacky, step back and implement the cleaner solution
-
-### Self-Improvement
-- Review `session-start.md` and `lessons.md` at the start of each session
-- After ANY correction: update `lessons.md` in this project folder
-- Format: `- **[Topic]**: [What went wrong] → [What to do instead]`
-
-### Markdown Maintenance
+## Project-Specific Notes
 - **CLAUDE.md**: Update when project structure, conventions, or tech stack change
 - **lessons.md**: Add a bullet after any painful debugging session or gotcha
 - **PRD.md**: Update only when feature specs actually change
 - Don't update MDs for routine changes. Keep files concise.
-
-### Principles
-- **Simplicity First**: Make every change as simple as possible
-- **No Laziness**: Find root causes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary
 
 ## Tech Stack
 - React 19 + Vite + Capacitor 8 (iOS native app)
@@ -89,17 +59,10 @@ src/
 - Bean statuses: `ACTIVE` | `SEALED` | `FINISHED`
 - Atmos slots are 1, 2, or 3 (Fellow Atmos vacuum canisters)
 - Roaster profiles auto-detected by fuzzy name match, fallback to default specialty light profile
-- AI features: photo bean scanning (multi-photo + web research), guided tasting (coach mode), recommendations, general chat, Aiden brew profiles
-- Add Bean flow: multi-photo gallery (1-3) → Gemini 2.5 Flash vision scan → Gemini search grounding enrichment (includes Reddit) → review. Alt path: manual entry → AI Fill button triggers same research.
+- Add Bean flow: multi-photo gallery (1-3) → Gemini vision scan → search grounding enrichment → review. Alt path: manual entry → AI Fill triggers same research.
 - Bean data model includes enriched fields: altitude, region, farm, roastLevel, cupScore, brewingRec, sourcedBy (all optional, filled by scan + research)
-- Four API proxies: `/api/claude` (Anthropic), `/api/openai` (OpenAI), `/api/gemini` (Google), `/api/aiden` (Fellow Aiden). Each has retry logic, error forwarding, and model fallback.
-- `/api/claude` proxy: Sonnet 4.6 primary, Haiku 4.5 fallback on 429/529. Client-side `callClaude` retries with exponential backoff.
-- `/api/openai` proxy: GPT-5.4 primary, GPT-5.4 Mini fallback. Supports `responseFormat` for structured output.
-- `/api/gemini` proxy: Gemini 2.5 Flash. Supports `tools: [{ googleSearchRetrieval: {} }]` for search grounding.
-- Aiden brew flow uses two-step GPT-5.4 calls with family-first classification: (1) researchBean() enriches with altitude/roast level/cup-structure family/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using family baseline defaults + research context. Research failure falls back gracefully.
-- Chat image routing: images in chat are sent to Gemini for vision analysis, then the text description is passed to Claude for conversational response.
-- Tasting chat uses `---EXTRACT---` / `---END---` markers for structured data extraction from conversation
 - The user (Tal) is a novice taster — all AI tasting interactions must use step-by-step coaching with scaffolded options, never vague open-ended questions
+- See `.claude/rules/` for path-scoped details on API proxies, AI model routing, and iOS layout
 
 ## Reference Files
 - **`PRD.md`** — Full product spec: data model, all features, Firebase schema, architecture, UI/design details
@@ -124,10 +87,8 @@ FELLOW_EMAIL, FELLOW_PASSWORD
 - `npm run cap:sync` — build + sync to Capacitor iOS project
 - `npm run cap:open` — open iOS project in Xcode
 
-## Platform Branching
-- Runtime detection via `Capacitor.isNativePlatform()` from `@capacitor/core`
-- API URLs: relative on web, absolute (`https://2manybeans.vercel.app`) on native (see `src/lib/apiBase.js`)
+## iOS & Platform
+- iOS layout rules, safe areas, and platform branching: auto-loaded from `.claude/rules/ios-layout.md` when editing UI files
+- Full reference: `.claude/skills/ios-design.md`
 - Auth: `signInWithPopup` on web, `@codetrix-studio/capacitor-google-auth` + `signInWithCredential` on native
 - Firestore: `persistentMultipleTabManager` on web, `persistentSingleTabManager` on native
-- Camera: `<input type="file">` on web, `@capacitor/camera` plugin on native
-- Haptics: no-op on web, `@capacitor/haptics` on native (see `src/lib/haptics.js`)

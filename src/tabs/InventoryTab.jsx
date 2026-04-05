@@ -1,20 +1,51 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Coffee, Check } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { BeanCard } from '../components/BeanCard';
 import { Btn } from '../components/Btn';
 import { AddBeanForm } from '../components/AddBeanForm';
+import { AidenModal } from '../components/AidenModal';
+import { FinishBagPrompt } from '../components/FinishBagPrompt';
+import { Toast } from '../components/Toast';
+import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
+import { useAidenBrew } from '../hooks/useAidenBrew';
+import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 
-export const InventoryTab = ({ beans, onOpenBean, onAddBean }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, onFinishBean, addTasting, updateTasting }) => {
   const sealed = beans.filter(b => b.status === 'SEALED');
   const emptySlots = [1, 2, 3].filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
   const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState('');
+  const [finishPrompt, setFinishPrompt] = useState(null);
+  const [toast, setToast] = useState(null);
+  const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
+  const aiden = useAidenBrew(updateBean);
+
+  const handleFinishBag = (bean) => {
+    const hasTasting = tastings.some(t => t.beanId === bean.id);
+    if (hasTasting) {
+      onFinishBean(bean.id);
+      setToast(`${bean.name} finished!`);
+    } else {
+      setFinishPrompt(bean);
+    }
+  };
+
+  const matchesSearch = (bean, q) => {
+    if (!q) return true;
+    const lq = q.toLowerCase();
+    return [bean.name, bean.roaster, bean.origin, bean.variety, bean.process,
+      bean.bagNotes, bean.producer, bean.region, bean.farm, bean.roastLevel, bean.sourcedBy]
+      .some(v => v && v.toLowerCase().includes(lq));
+  };
+
+  const filtered = sealed.filter(b => matchesSearch(b, search));
 
   // Group by roaster
   const grouped = {};
-  sealed.forEach(b => {
+  filtered.forEach(b => {
     (grouped[b.roaster] = grouped[b.roaster] || []).push(b);
   });
 
@@ -43,9 +74,27 @@ export const InventoryTab = ({ beans, onOpenBean, onAddBean }) => {
         </Btn>
       </div>
       <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
         {sealed.length} bags waiting · {emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}
       </div>
+
+      {sealed.length > 5 && (
+        <div style={{ position: 'relative', marginBottom: 16 }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.textMuted }} />
+          <input
+            type="text"
+            placeholder="Search beans..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%', padding: '8px 10px 8px 32px', borderRadius: 8,
+              border: `1px solid ${C.border}`, fontFamily: fonts.body,
+              fontSize: 16, background: C.cream, color: C.text,
+              boxSizing: 'border-box', outline: 'none',
+            }}
+          />
+        </div>
+      )}
 
       {Object.entries(grouped).map(([roaster, rBeans]) => (
         <div key={roaster} style={{ marginBottom: 20 }}>
@@ -57,10 +106,21 @@ export const InventoryTab = ({ beans, onOpenBean, onAddBean }) => {
               key={bean.id}
               bean={bean}
               compact
+              updateBean={updateBean}
+              onLearn={handleLearn}
+              uid={uid}
               actions={
-                emptySlots.length > 0
-                  ? <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
-                  : null
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {emptySlots.length > 0 && (
+                    <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
+                  )}
+                  <Btn variant="small" onClick={() => aiden.handleBrewWithAiden(bean)}>
+                    <Coffee size={12} /> Brew with Aiden
+                  </Btn>
+                  <Btn variant="small" onClick={() => handleFinishBag(bean)}>
+                    <Check size={12} /> Finish
+                  </Btn>
+                </div>
               }
             />
           ))}
@@ -72,8 +132,35 @@ export const InventoryTab = ({ beans, onOpenBean, onAddBean }) => {
           No sealed beans. Time to order!
         </div>
       )}
+      {sealed.length > 0 && filtered.length === 0 && (
+        <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
+          No beans match "{search}"
+        </div>
+      )}
 
-      <AddBeanForm open={showAdd} onClose={() => setShowAdd(false)} onAdd={onAddBean} />
+      <AddBeanForm open={showAdd} onClose={() => setShowAdd(false)} onAdd={onAddBean} uid={uid} updateBean={updateBean} />
+      <AidenModal
+        open={aiden.aidenModal}
+        onClose={aiden.closeAidenModal}
+        recipe={aiden.aidenRecipe}
+        result={aiden.aidenResult}
+        loading={aiden.aidenLoading}
+        error={aiden.aidenError}
+        phase={aiden.aidenPhase}
+        onRetry={aiden.onRetry}
+        onRetryPush={aiden.onRetryPush}
+      />
+      <FinishBagPrompt
+        open={!!finishPrompt}
+        onClose={(msg) => { setFinishPrompt(null); if (msg) setToast(msg); }}
+        bean={finishPrompt}
+        onFinish={onFinishBean}
+        onAddTasting={addTasting}
+        onUpdateTasting={updateTasting}
+        beans={beans}
+      />
+      <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
+      <ProfessorRuphusSlideUp {...ruphusProps} />
     </div>
   );
 };

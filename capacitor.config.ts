@@ -2,16 +2,23 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.talmeltzer.coffeehub',
-  appName: 'Coffee Hub',
+  appName: '2manybeans',
   webDir: 'dist',
   plugins: {
     CapacitorHttp: {
       enabled: true,
     },
+    SocialLogin: {
+      providers: {
+        google: true,
+        apple: false,
+        facebook: false,
+        twitter: false,
+      },
+    },
     StatusBar: {
       overlaysWebView: true,
-      style: 'LIGHT', // dark text on light background
-      backgroundColor: '#FAF6F1',
+      style: 'LIGHT',
     },
     Keyboard: {
       resize: 'body',
@@ -23,10 +30,8 @@ const config: CapacitorConfig = {
       backgroundColor: '#FAF6F1',
       showSpinner: false,
     },
-    GoogleAuth: {
-      scopes: ['profile', 'email'],
-      iosClientId: '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com',
-      forceCodeForRefreshToken: true,
+    CapacitorUpdater: {
+      autoUpdate: true,
     },
   },
 };

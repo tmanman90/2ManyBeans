@@ -1,6 +1,7 @@
 // Vercel serverless proxy for OpenAI API
 // Keeps OPENAI_API_KEY server-side only
 import OpenAI from 'openai';
+import { withCorsAuth } from './lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'gpt-5.4-mini';
 
@@ -9,29 +10,7 @@ const client = new OpenAI({
   maxRetries: 2,
 });
 
-const ALLOWED_ORIGINS = [
-  'https://2manybeans.vercel.app',
-  'capacitor://localhost',
-  'http://localhost',
-];
-
-function setCorsHeaders(req, res) {
-  const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.some(o => origin?.startsWith(o))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
-export default async function handler(req, res) {
-  setCorsHeaders(req, res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export default withCorsAuth(async (req, res) => {
   try {
     const {
       model = 'gpt-5.4',
@@ -77,4 +56,4 @@ export default async function handler(req, res) {
     const detail = error.error?.message || error.message || 'Unknown OpenAI error';
     return res.status(status).json({ error: detail });
   }
-}
+});

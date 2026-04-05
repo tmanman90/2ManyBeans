@@ -36,10 +36,7 @@ select:focus {
   border-radius: 4px;
 }
 
-/* Safe area padding for standalone PWA */
-.app-header {
-  padding-top: env(safe-area-inset-top, 0px);
-}
+/* Safe area handled per-header in inline styles */
 
 .app-tab-bar {
   padding-bottom: env(safe-area-inset-bottom, 12px);
@@ -62,4 +59,9 @@ select:focus {
 @keyframes toastSlideIn {
   from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

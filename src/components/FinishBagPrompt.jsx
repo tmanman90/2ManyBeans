@@ -1,0 +1,186 @@
+// Finish bag rating prompt -- intercepts finish flow for unrated beans
+// Single modal with view swapping: 'prompt' (quick rate) | 'fullReview'
+import { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { C, fonts } from '../styles/theme';
+import { today } from '../lib/peakStatus';
+import { convertTastingScores } from '../lib/professorRuphus';
+import { Modal } from './Modal';
+import { StarRating } from './StarRating';
+import { TastingForm } from './TastingForm';
+import { Btn } from './Btn';
+
+export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, onUpdateTasting }) => {
+  const [view, setView] = useState('prompt');
+  const [rating, setRating] = useState(0);
+  const [oneWord, setOneWord] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setView('prompt');
+      setRating(0);
+      setOneWord('');
+      setSaving(false);
+      setError(null);
+    }
+  }, [open]);
+
+  if (!bean) return null;
+
+  const beanLabel = bean.roaster ? `${bean.name} -- ${bean.roaster}` : bean.name;
+
+  const handleQuickSave = async () => {
+    if (saving || rating === 0) return;
+    setError(null);
+    setSaving(true);
+    try {
+      await onAddTasting({
+        beanId: bean.id, date: today(), rating,
+        oneWord, aroma: '', firstSip: '', acidity: '',
+        sweetness: '', body: '', finish: '', notes: '', changeTomorrow: '',
+      });
+      await onFinish(bean.id);
+      onClose('Saved & finished!');
+    } catch (err) {
+      console.error('Quick save failed:', err);
+      setError('Failed to save rating. Try again.');
+      setSaving(false);
+    }
+  };
+
+  const handleFullReview = async (tastingData) => {
+    if (saving) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const data = { ...tastingData, date: today() };
+      const tastingId = await onAddTasting(data);
+
+      // Spider chart conversion if meaningful text present
+      if (tastingId) {
+        const hasText = data.aroma || data.acidity || data.sweetness ||
+          data.body || data.firstSip || data.finish;
+        if (hasText) {
+          convertTastingScores(data, bean)
+            .then(scores => { onUpdateTasting(tastingId, { tastingScores: scores }); })
+            .catch(err => console.log('Score conversion skipped:', err.message));
+        }
+      }
+
+      await onFinish(bean.id);
+      onClose('Saved & finished!');
+    } catch (err) {
+      console.error('Full review save failed:', err);
+      setError('Failed to save review. Try again.');
+      setSaving(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    if (saving) return;
+    setError(null);
+    setSaving(true);
+    try {
+      await onFinish(bean.id);
+      onClose();
+    } catch (err) {
+      console.error('Skip finish failed:', err);
+      setError('Failed to finish bag. Try again.');
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = {
+    width: '100%', padding: '8px 10px', borderRadius: 8,
+    border: `1px solid ${C.border}`, fontFamily: fonts.body,
+    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
+  };
+
+  if (view === 'fullReview') {
+    return (
+      <Modal open={open} onClose={() => onClose()} title="Full Review">
+        <div style={{ marginBottom: 8 }}>
+          <span
+            onClick={() => setView('prompt')}
+            style={{ fontSize: 13, color: C.accent, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            <ArrowLeft size={14} /> Back
+          </span>
+        </div>
+        {error && (
+          <div style={{ background: C.redBg, color: C.red, padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
+        <TastingForm
+          beanId={bean.id}
+          beanLabel={beanLabel}
+          onSubmit={handleFullReview}
+          submitLabel="Save & Finish"
+          disabled={saving}
+        />
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open={open} onClose={() => onClose()} title="Rate this bean?" centered>
+      {/* Bean info */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text }}>{bean.name}</div>
+        {bean.roaster && (
+          <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{bean.roaster}</div>
+        )}
+      </div>
+
+      {error && (
+        <div style={{ background: C.redBg, color: C.red, padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Star rating */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 6 }}>Rating</label>
+        <StarRating value={rating} onChange={setRating} size={32} />
+      </div>
+
+      {/* One-word input */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>One word</label>
+        <input
+          value={oneWord}
+          onChange={e => setOneWord(e.target.value)}
+          placeholder="e.g. Smooth"
+          style={inputStyle}
+        />
+      </div>
+
+      {/* Quick Save */}
+      <Btn variant="primary" onClick={handleQuickSave} disabled={saving || rating === 0} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>
+        Quick Save
+      </Btn>
+
+      {/* Full Review */}
+      <Btn variant="secondary" onClick={() => setView('fullReview')} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginBottom: 16 }}>
+        Full Review
+      </Btn>
+
+      {/* Skip link */}
+      <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+        <span
+          onClick={handleSkip}
+          style={{
+            fontSize: 13, color: C.textLight, cursor: saving ? 'default' : 'pointer',
+            opacity: saving ? 0.5 : 1,
+          }}
+        >
+          Just finish it
+        </span>
+      </div>
+    </Modal>
+  );
+};

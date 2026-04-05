@@ -1,6 +1,7 @@
 // Vercel serverless proxy for Claude API
 // Keeps ANTHROPIC_API_KEY server-side only
 import Anthropic from '@anthropic-ai/sdk';
+import { withCorsAuth } from './lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -9,29 +10,7 @@ const client = new Anthropic({
   maxRetries: 2,
 });
 
-const ALLOWED_ORIGINS = [
-  'https://2manybeans.vercel.app',
-  'capacitor://localhost',
-  'http://localhost',
-];
-
-function setCorsHeaders(req, res) {
-  const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.some(o => origin?.startsWith(o))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
-export default async function handler(req, res) {
-  setCorsHeaders(req, res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export default withCorsAuth(async (req, res) => {
   try {
     const { system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools } = req.body;
 
@@ -67,37 +46,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // Multi-turn handling for tool_use (web_search etc.)
-    // Loop until we get end_turn or hit safety limit
-    let turns = 0;
-    const maxTurns = 5;
-    while (response.stop_reason === 'tool_use' && turns < maxTurns) {
-      turns++;
-      const assistantMsg = { role: 'assistant', content: response.content };
-      const toolResults = [];
-      for (const block of response.content) {
-        if (block.type === 'tool_use') {
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: 'continue',
-          });
-        }
-      }
-      const updatedMessages = [
-        ...params.messages,
-        assistantMsg,
-        { role: 'user', content: toolResults },
-      ];
-      params.messages = updatedMessages;
-      response = await client.messages.create(params);
-    }
-
-    return res.status(200).json({ content: response.content, stop_reason: response.stop_reason });
+    return res.status(200).json({ content: response.content, stop_reason: response.stop_reason, usage: response.usage });
   } catch (error) {
     console.error('Claude API error:', error);
     const status = error.status || 500;
     const detail = error.error?.error?.message || error.message || 'Unknown error';
     return res.status(status).json({ error: detail });
   }
-}
+});

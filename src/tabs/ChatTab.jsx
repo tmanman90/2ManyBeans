@@ -1,4 +1,4 @@
-// Chat tab — with photo scanning, Aiden brew, and save-to-inventory
+// Chat tab -- with photo scanning, Aiden brew, and save-to-inventory
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Send, Camera, X, Coffee, BookOpen, Save } from 'lucide-react';
@@ -23,6 +23,25 @@ function parseBeanScan(text) {
   }
 }
 
+// Strip base64 image data from older API messages to prevent memory bloat
+function trimApiMessages(messages, keepRecent = 6) {
+  if (messages.length <= keepRecent) return messages;
+  return messages.map((msg, i) => {
+    if (i >= messages.length - keepRecent) return msg;
+    if (Array.isArray(msg.content)) {
+      return {
+        ...msg,
+        content: msg.content.map(block =>
+          block.type === 'image' ? { type: 'text', text: '[image]' } : block
+        ),
+      };
+    }
+    return msg;
+  });
+}
+
+const MAX_API_MESSAGES = 20;
+
 export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting }) => {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: "Hey Tal! Ask me anything about your rotation, inventory, or what to brew next. You can also send photos of coffee bags and I'll scan them for you." },
@@ -36,8 +55,40 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const [photos, setPhotos] = useState([]); // { base64, mediaType, previewUrl }
   const [scannedBean, setScannedBean] = useState(null);
   const [toast, setToast] = useState(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
+  const inputRef = useRef(null);
+  const blobUrlsRef = useRef([]); // Track all created blob URLs for cleanup
+
+  // Track keyboard open/close on iOS native
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let cleanup;
+    import('@capacitor/keyboard').then(({ Keyboard }) => {
+      const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
+        setKeyboardHeight(info.keyboardHeight);
+        // Hide tab bar when keyboard is open
+        const tabBar = document.querySelector('.app-tab-bar');
+        if (tabBar) tabBar.style.display = 'none';
+        setTimeout(() => {
+          const el = scrollRef.current;
+          if (el) el.scrollTop = el.scrollHeight;
+        }, 50);
+      });
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardHeight(0);
+        // Show tab bar again
+        const tabBar = document.querySelector('.app-tab-bar');
+        if (tabBar) tabBar.style.display = 'flex';
+      });
+      cleanup = () => {
+        showListener.then(h => h.remove());
+        hideListener.then(h => h.remove());
+      };
+    });
+    return () => { if (cleanup) cleanup(); };
+  }, []);
 
   // No-op updateBean wrapper for ephemeral beans (no id to persist to)
   const ephemeralUpdateBean = async (beanId, updates) => {
@@ -50,9 +101,21 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
+  // Cleanup all tracked blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   const takeNativePhoto = async () => {
     try {
       const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      const perms = await Camera.checkPermissions();
+      if (perms.camera !== 'granted' || perms.photos !== 'granted') {
+        const requested = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+        if (requested.camera === 'denied') return;
+      }
       const image = await Camera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
@@ -62,7 +125,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       });
       const mediaType = 'image/jpeg';
       const base64 = image.dataUrl.split(',')[1];
-      setPhotos(prev => [...prev, { base64, mediaType, previewUrl: image.dataUrl }].slice(0, 3));
+      const previewUrl = image.dataUrl;
+      blobUrlsRef.current.push(previewUrl);
+      setPhotos(prev => [...prev, { base64, mediaType, previewUrl }].slice(0, 3));
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
         console.error('Camera error:', err);
@@ -78,6 +143,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
     try {
       const compressed = await Promise.all(toProcess.map(f => compressImage(f)));
+      compressed.forEach(c => { if (c.previewUrl) blobUrlsRef.current.push(c.previewUrl); });
       setPhotos(prev => [...prev, ...compressed].slice(0, 3));
     } catch (err) {
       console.error('Photo compression failed:', err);
@@ -87,7 +153,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   };
 
   const removePhoto = (idx) => {
-    setPhotos(prev => prev.filter((_, i) => i !== idx));
+    setPhotos(prev => {
+      // Revoke blob URL for the removed photo
+      if (prev[idx]?.previewUrl) URL.revokeObjectURL(prev[idx].previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const handleSend = async () => {
@@ -139,6 +209,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       const assistantMsg = { role: 'assistant', content: cleanText };
       setMessages(prev => [...prev, assistantMsg]);
       apiMessages.current = [...apiMessages.current, { role: 'assistant', content: rawText }];
+
+      // Cap and trim apiMessages to prevent unbounded memory growth
+      if (apiMessages.current.length > MAX_API_MESSAGES) {
+        apiMessages.current = apiMessages.current.slice(-MAX_API_MESSAGES);
+      }
+      apiMessages.current = trimApiMessages(apiMessages.current);
     } catch {
       const errMsg = { role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." };
       setMessages(prev => [...prev, errMsg]);
@@ -201,12 +277,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', minHeight: 400 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4 }}>Coffee Chat</div>
       <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>AI with your real inventory data</div>
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        ref={scrollRef}
+        onClick={() => { if (inputRef.current) inputRef.current.blur(); }}
+        style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: keyboardHeight > 0 ? 80 : 140, height: keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight + 200}px)` : 'calc(100dvh - 340px)' }}>
         {messages.map((m, i) => (
           <div key={i}>
             {/* Photo thumbnails for user messages */}
@@ -233,7 +312,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                 maxWidth: '85%',
                 background: m.role === 'user' ? C.accent : C.cream,
-                color: m.role === 'user' ? '#fff' : C.text,
+                color: m.role === 'user' ? C.card : C.text,
                 borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                 padding: '10px 14px',
                 fontSize: 14,
@@ -297,12 +376,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
               <button
                 onClick={() => removePhoto(i)}
                 style={{
-                  position: 'absolute', top: -6, right: -6,
-                  width: 20, height: 20, borderRadius: '50%',
-                  background: C.accent, color: '#fff', border: 'none',
+                  position: 'absolute', top: -10, right: -10,
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: C.accent, color: C.card, border: 'none',
                   cursor: 'pointer', display: 'flex',
                   alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, padding: 0,
+                  fontSize: 10, padding: 8,
                 }}
               >
                 <X size={12} />
@@ -312,8 +391,18 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         </div>
       )}
 
-      {/* Input bar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      {/* Input bar - fixed above tab bar, moves up with keyboard */}
+      <div style={{
+        position: 'fixed',
+        bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
+        left: 0, right: 0,
+        display: 'flex', gap: 8, alignItems: 'center',
+        padding: '8px 20px',
+        paddingBottom: keyboardHeight > 0 ? 8 : 8,
+        background: C.bg,
+        borderTop: `1px solid ${C.borderLight}`,
+        zIndex: 50,
+      }}>
         <input
           ref={fileRef}
           type="file"
@@ -336,17 +425,19 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           <Camera size={20} color={C.accent} />
         </button>
         <input
+          ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          onKeyDown={e => { if (e.key === 'Enter') { handleSend(); inputRef.current?.blur(); } }}
           placeholder={photos.length > 0 ? 'Add a note or just send...' : 'What should I open next?'}
+          enterKeyHint="send"
           style={{
             flex: 1,
             padding: '12px 14px',
             borderRadius: 12,
             border: `1px solid ${C.border}`,
             fontFamily: fonts.body,
-            fontSize: 14,
+            fontSize: 16,
             background: C.card,
             color: C.text,
             outline: 'none',
@@ -357,7 +448,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           disabled={loading || (!input.trim() && photos.length === 0)}
           style={{
             background: C.accent,
-            color: '#fff',
+            color: C.card,
             border: 'none',
             borderRadius: 12,
             width: 44,

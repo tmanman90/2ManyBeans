@@ -19,6 +19,8 @@ export const C = {
   redBg: "#FDF0EB",
   purple: "#6B5B95",
   purpleBg: "#F0EDF5",
+  blue: "#3B82F6",
+  blueBg: "#DBEAFE",
   navBg: "#FFF8F0",
   navText: "#8B7B6F",
   navActive: "#A0714B",

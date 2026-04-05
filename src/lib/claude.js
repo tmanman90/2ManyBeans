@@ -1,60 +1,16 @@
-// Claude API helpers — all calls go through /api/claude serverless proxy
+// Claude API helpers -- all calls go through /api/claude serverless proxy
 // No Anthropic SDK in the browser. No API key in client code.
 import { today, getPeakStatus, daysOpen } from './peakStatus';
 import { TASTING_KNOWLEDGE, BREWING_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { API_BASE } from './apiBase';
+import { fetchWithRetry } from './fetchWithRetry';
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
-const FRIENDLY_ERRORS = {
-  429: 'AI is rate-limited — please wait a moment and try again',
-  529: 'AI service is temporarily busy — please try again in a moment',
-  503: 'AI service is temporarily unavailable — please try again shortly',
-};
-
-export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools, retries = 2 }) {
+export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools }) {
   const body = { system, messages, maxTokens, model };
   if (tools) body.tools = tools;
-
-  let lastError;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    if (attempt > 0) {
-      // Exponential backoff: 1s, 2s
-      await new Promise(r => setTimeout(r, 1000 * attempt));
-    }
-
-    const response = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (response.ok) {
-      return response.json();
-    }
-
-    // Retry on transient errors
-    if ([429, 529, 503].includes(response.status) && attempt < retries) {
-      lastError = response.status;
-      continue;
-    }
-
-    const friendly = FRIENDLY_ERRORS[response.status];
-    if (friendly) throw new Error(friendly);
-
-    // Try to get server error detail
-    try {
-      const data = await response.json();
-      throw new Error(data.error || `Claude API error: ${response.status}`);
-    } catch (e) {
-      if (e.message && e.message !== 'Unexpected token') throw e;
-      throw new Error(`Claude API error: ${response.status}`);
-    }
-  }
-
-  // All retries exhausted
-  const friendly = FRIENDLY_ERRORS[lastError];
-  throw new Error(friendly || `Claude API error: ${lastError}`);
+  return fetchWithRetry({ url: PROXY_URL, body, serviceName: 'Claude' });
 }
 
 // --- Image compression utility ---
@@ -110,7 +66,7 @@ export function compressImage(file) {
 
 export async function getRecBlurb(activeDesc, recDesc) {
   const data = await callClaude({
-    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated. No headers or bullets — just a flowing paragraph.`,
+    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated. No headers or bullets -- just a flowing paragraph.`,
     messages: [{ role: 'user', content: `Current rotation:\n${activeDesc || "(empty)"}\n\nTop candidates:\n${recDesc}\n\nWhy would each be a good pick?` }],
     maxTokens: 400,
   });
@@ -159,17 +115,25 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
       ).join('\n')}\n`
     : '';
 
-  return `You are a patient, encouraging coffee tasting COACH helping a novice taster log a tasting. The pre-selected bean is: ${beanName}.${beanList}
-${beanSection}${originSection}${pastSection}
+  // Static block: tasting knowledge + rules + guided flow (cached)
+  const staticBlock = `You are a patient, encouraging coffee tasting COACH helping a novice taster log a tasting.
+
 ${TASTING_KNOWLEDGE}
 
 CRITICAL RULES:
 - Tal is learning to taste. NEVER ask vague questions like "how is it?" or "what do you notice?"
 - ALWAYS give specific instructions: what to do physically, what to pay attention to, and multiple-choice options to pick from
 - Teach tasting vocabulary naturally by labeling what he describes (e.g. "That funky smell? That's classic natural process fermentation!")
-- Be warm, encouraging, and brief (2-3 sentences + options per turn, plus reveal sentences when applicable)
+- Be warm, encouraging, and brief. Max 4 sentences per turn (plus reveal sentences when applicable).
+- ALWAYS label the tasting vocabulary word for what the user described. This is mandatory every turn.
 - If Tal mentions a DIFFERENT bean name than the pre-selected one, use that bean instead for the extraction
 - No emojis in your responses
+
+BREW TROUBLESHOOTING (use these exact rules):
+- Sour/bright/sharp = grind finer OR use hotter water
+- Bitter/harsh/astringent = grind coarser OR use cooler water
+- Weak/watery/thin = use more coffee (higher dose)
+- Good as-is = keep current recipe
 
 WITHHOLD-THEN-REVEAL COACHING:
 - You have the bean profile and bag notes internally. Do NOT reveal bag notes or expected flavors BEFORE the taster gives their answer.
@@ -188,9 +152,10 @@ GUIDED FLOW (follow this order across your turns):
 5. ONE WORD - "If you had to describe this whole cup in one word, what would it be?"
 6. BREW DIAL-IN - Don't ask "what would you change?" Instead, run a quick diagnostic:
    "Quick check: was the cup (a) too sour/bright, (b) too bitter/harsh, (c) too weak/watery, or (d) pretty good as-is?"
-   Then TELL them the fix: sour = finer grind or hotter water, bitter = coarser or cooler, weak = more coffee, good = keep it.
+   Then TELL them the fix using the BREW TROUBLESHOOTING rules above.
 
-After covering these areas (typically 3-4 exchanges), end your message with EXACTLY:
+EXTRACTION (mandatory on final turn):
+After covering these areas (typically 3-4 exchanges), you MUST end your message with EXACTLY:
 
 ---EXTRACT---
 {"beanName":"exact bean name from AVAILABLE BEANS list","aroma":"...","firstSip":"...","acidity":"...","sweetness":"...","body":"...","finish":"...","oneWord":"...","notes":"...","changeTomorrow":"...","rating":0}
@@ -199,12 +164,21 @@ After covering these areas (typically 3-4 exchanges), end your message with EXAC
 For beanName: use the bean the user is clearly tasting. Match it EXACTLY to one of the AVAILABLE BEANS names. If unclear, use the pre-selected bean name.
 For rating, suggest 1-5 stars based on enthusiasm. 0 if unclear.
 Keep values concise (2-8 words). Use "" for fields not discussed.`;
+
+  // Dynamic block: bean-specific data (uncached, changes per session)
+  const dynamicBlock = `The pre-selected bean is: ${beanName}.${beanList}
+${beanSection}${originSection}${pastSection}`;
+
+  return [
+    { type: 'text', text: staticBlock, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: dynamicBlock },
+  ];
 }
 
 export async function sendTastingMessage(systemPrompt, history) {
   const data = await callClaude({
     system: systemPrompt,
-    messages: history.slice(-10),
+    messages: history.slice(-8),
     maxTokens: 1000,
   });
   return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
@@ -213,47 +187,34 @@ export async function sendTastingMessage(systemPrompt, history) {
 export function buildChatContext(beans, tastings) {
   const active = beans.filter(b => b.status === 'ACTIVE').map(b => {
     const ps = getPeakStatus(b);
-    return `  Atmos #${b.atmosSlot}: ${b.roaster} — ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${b.bagNotes}`;
+    return `  Atmos #${b.atmosSlot}: ${b.roaster} -- ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${b.bagNotes}`;
   }).join('\n');
 
   const sealed = beans.filter(b => b.status === 'SEALED').map(b => {
     const ps = getPeakStatus(b);
-    return `  ${b.roaster} — ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${b.bagNotes}`;
+    return `  ${b.roaster} -- ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${b.bagNotes}`;
   }).join('\n');
 
   const finished = beans.filter(b => b.status === 'FINISHED').slice(0, 5).map(b =>
-    `  ${b.roaster} — ${b.name} (${b.origin}) | Finished: ${b.finishDate}`
+    `  ${b.roaster} -- ${b.name} (${b.origin}) | Finished: ${b.finishDate}`
   ).join('\n');
 
   const recentTastings = tastings.slice(0, 5).map(t => {
     const bean = beans.find(x => x.id === t.beanId);
-    return `  ${t.date}: ${bean?.name || '?'} — ${t.oneWord || ''} ${t.rating ? '★'.repeat(t.rating) : ''} — ${t.notes || ''}`;
+    return `  ${t.date}: ${bean?.name || '?'} -- ${t.oneWord || ''} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${t.notes || ''}`;
   }).join('\n');
 
-  return `You are Tal's coffee assistant. You have access to his REAL, CURRENT coffee data. NEVER suggest beans that are already finished or opened. Only recommend from SEALED inventory.
+  // Static block: brewing knowledge + rotation rules + photo handling (cached)
+  const staticBlock = `You are Tal's coffee assistant. You have access to his REAL, CURRENT coffee data. NEVER suggest beans that are already finished or opened. Only recommend from SEALED inventory.
 
 ${BREWING_KNOWLEDGE}
 
-TODAY: ${today()}
-
-ACTIVE ROTATION (Atmos canisters):
-${active || '  (none)'}
-
-SEALED INVENTORY:
-${sealed || '  (none)'}
-
-RECENTLY FINISHED:
-${finished || '  (none)'}
-
-RECENT TASTINGS:
-${recentTastings || '  (none)'}
-
 ROTATION RULES:
-- Keep 3 beans active (Atmos #1–#3)
+- Keep 3 beans active (Atmos #1-#3)
 - Priority: (1) Already opened, (2) In/approaching peak window, (3) Smaller bags first
-- Apollon's Gold: Degas 35–45 days, Peak 60–90 days post-roast, 1:17.5–1:19 ratio, 90–93°C
-- Other roasters without guidance: rest 7–14 days, general peak 14–60 days
-- After opening (Atmos): finish within 2–4 weeks; 100g bags within 7–14 days
+- Apollon's Gold: Degas 35-45 days, Peak 60-90 days post-roast, 1:17.5-1:19 ratio, 90-93C
+- Other roasters without guidance: rest 7-14 days, general peak 14-60 days
+- After opening (Atmos): finish within 2-4 weeks; 100g bags within 7-14 days
 - Bag-stated guidance always overrides defaults
 
 Be concise, warm, and opinionated. If recommending a bean, explain WHY based on timing and variety.
@@ -273,11 +234,31 @@ Rules for photo scanning:
 - If the photo is NOT a coffee bag, respond normally with no markers
 - If photos are too blurry, ask for clearer photos
 - After the scan data, briefly summarize what you found and offer next steps`;
+
+  // Dynamic block: current inventory + tastings (uncached, changes per session)
+  const dynamicBlock = `TODAY: ${today()}
+
+ACTIVE ROTATION (Atmos canisters):
+${active || '  (none)'}
+
+SEALED INVENTORY:
+${sealed || '  (none)'}
+
+RECENTLY FINISHED:
+${finished || '  (none)'}
+
+RECENT TASTINGS:
+${recentTastings || '  (none)'}`;
+
+  return [
+    { type: 'text', text: staticBlock, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: dynamicBlock },
+  ];
 }
 
 export async function sendChatMessage(systemPrompt, history) {
   // Route images through Gemini for vision, then pass text description to Claude
-  const recentMessages = history.slice(-10);
+  const recentMessages = history.slice(-8);
   const lastMsg = recentMessages[recentMessages.length - 1];
 
   if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content)) {
@@ -307,7 +288,7 @@ export async function sendChatMessage(systemPrompt, history) {
   const data = await callClaude({
     system: systemPrompt,
     messages: recentMessages,
-    maxTokens: 1200,
+    maxTokens: 800,
   });
   return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
 }
