@@ -7,6 +7,7 @@ import { getRecommendations } from '../lib/recommendations';
 import { getRecBlurb } from '../lib/claude';
 import { BeanCard } from '../components/BeanCard';
 import { AidenModal } from '../components/AidenModal';
+import { HandBrewModal } from '../components/HandBrewModal';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
@@ -14,6 +15,7 @@ import { Modal } from '../components/Modal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { useAidenBrew } from '../hooks/useAidenBrew';
+import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
@@ -21,8 +23,10 @@ import { usePreferences } from '../hooks/useUserProfile';
 export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, addTasting, updateTasting }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
+  const isHandBrew = preferences.brewMethod === 'handbrew';
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
   const aiden = useAidenBrew(updateBean);
+  const handBrew = useHandBrew(updateBean);
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
   const [toast, setToast] = useState(null);
@@ -131,7 +135,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
             <BeanCard bean={bean} updateBean={updateBean} onLearn={handleLearn} uid={uid} actions={<>
-              <Btn variant="small" onClick={() => aiden.handleBrewWithAiden(bean)}>
+              <Btn variant="small" onClick={() => isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean)} aria-label={brewMethod.label}>
                 <Coffee size={12} /> {brewMethod.label}
               </Btn>
               <Btn variant="small" onClick={() => setReturnConfirm(bean)}>
@@ -248,6 +252,16 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         phase={aiden.aidenPhase}
         onRetry={aiden.onRetry}
         onRetryPush={aiden.onRetryPush}
+      />
+      <HandBrewModal
+        open={handBrew.handBrewModal}
+        onClose={handBrew.closeHandBrewModal}
+        recipe={handBrew.handBrewRecipe}
+        loading={handBrew.handBrewLoading}
+        error={handBrew.handBrewError}
+        phase={handBrew.handBrewPhase}
+        onRetry={handBrew.onRetry}
+        onRegenerate={handBrew.onRegenerate}
       />
       <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
         {returnConfirm && (

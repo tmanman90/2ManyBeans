@@ -156,8 +156,13 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
         </div>
       )}
       {brewMethod.grindLabel(bean, preferences) && (
-        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (bean.handBrewRecipe && preferences.brewMethod === 'handbrew') ? 4 : (hasDetails || actions) ? 10 : 0 }}>
           ⚙ {brewMethod.grindLabel(bean, preferences)}
+        </div>
+      )}
+      {bean.handBrewRecipe && preferences.brewMethod === 'handbrew' && (
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
+          ☕ Last brew: {bean.handBrewRecipe.method || 'Pour-over'}, {bean.handBrewRecipe.coffeeGrams}g / {bean.handBrewRecipe.waterGrams}g
         </div>
       )}
 

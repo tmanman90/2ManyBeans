@@ -1,27 +1,39 @@
 // Brew method registry — strategy pattern per Architecture Strategist recommendation
-// Each tab renders method.label and method.icon based on the user's preference.
+// Each tab renders method.label based on the user's preference.
 // Adding a new brew method (e.g., espresso) requires one entry here, not editing three tabs.
-import { lazy } from 'react';
+
+const GRINDER_LABELS = {
+  'fellow-ode-gen2': 'Ode Gen 2',
+  'fellow-opus': 'Fellow Opus',
+  'baratza-encore-esp': 'Encore ESP',
+  'comandante-c40': 'Comandante C40',
+  '1zpresso-jx-pro': 'JX-Pro',
+  'baratza-virtuoso-plus': 'Virtuoso+',
+};
 
 export const BREW_METHODS = {
   aiden: {
     label: 'Brew with Aiden',
     icon: '/images/aiden-icon.png',
-    Modal: lazy(() => import('../components/AidenModal').then(m => ({ default: m.AidenModal }))),
     grindLabel: (bean, preferences) => {
       if (!bean.aidenGrind) return null;
-      const grinderName = preferences?.grinder === 'fellow-ode-gen2' ? 'Ode Gen 2' : 'Grinder';
+      const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
       return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
     },
   },
   handbrew: {
     label: 'Hand Brew Recipe',
     icon: '/images/handbrew-icon.png',
-    Modal: null, // Phase 3: lazy(() => import('../components/HandBrewModal'))
     grindLabel: (bean, preferences) => {
-      // Phase 3 will add handBrewRecipe display
+      // Show hand brew recipe grind if available, fall back to aiden grind
+      if (bean.handBrewRecipe?.grindSize) {
+        const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
+        const gs = bean.handBrewRecipe.grindSize;
+        const microns = gs.microns ? ` (~${gs.microns}\u00B5m)` : '';
+        return `${grinderName}: ${gs.setting} ${gs.description}${microns}`;
+      }
       if (!bean.aidenGrind) return null;
-      const grinderName = preferences?.grinder === 'fellow-ode-gen2' ? 'Ode Gen 2' : 'Grinder';
+      const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
       return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
     },
   },

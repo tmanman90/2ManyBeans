@@ -7,10 +7,12 @@ import { BeanCard } from '../components/BeanCard';
 import { Btn } from '../components/Btn';
 import { AddBeanForm } from '../components/AddBeanForm';
 import { AidenModal } from '../components/AidenModal';
+import { HandBrewModal } from '../components/HandBrewModal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useAidenBrew } from '../hooks/useAidenBrew';
+import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
@@ -18,6 +20,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, onFinishBean, addTasting, updateTasting }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
+  const isHandBrew = preferences.brewMethod === 'handbrew';
   const canisterCount = preferences.canisterCount || 3;
   const sealed = beans.filter(b => b.status === 'SEALED');
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
@@ -28,6 +31,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const [toast, setToast] = useState(null);
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
   const aiden = useAidenBrew(updateBean);
+  const handBrew = useHandBrew(updateBean);
 
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
@@ -120,7 +124,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                   {emptySlots.length > 0 && (
                     <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
                   )}
-                  <Btn variant="small" onClick={() => aiden.handleBrewWithAiden(bean)}>
+                  <Btn variant="small" onClick={() => isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean)} aria-label={brewMethod.label}>
                     <Coffee size={12} /> {brewMethod.label}
                   </Btn>
                   <Btn variant="small" onClick={() => handleFinishBag(bean)}>
@@ -155,6 +159,16 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         phase={aiden.aidenPhase}
         onRetry={aiden.onRetry}
         onRetryPush={aiden.onRetryPush}
+      />
+      <HandBrewModal
+        open={handBrew.handBrewModal}
+        onClose={handBrew.closeHandBrewModal}
+        recipe={handBrew.handBrewRecipe}
+        loading={handBrew.handBrewLoading}
+        error={handBrew.handBrewError}
+        phase={handBrew.handBrewPhase}
+        onRetry={handBrew.onRetry}
+        onRegenerate={handBrew.onRegenerate}
       />
       <FinishBagPrompt
         open={!!finishPrompt}

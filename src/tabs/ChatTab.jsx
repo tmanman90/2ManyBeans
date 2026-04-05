@@ -5,9 +5,11 @@ import { Send, Camera, X, Coffee, BookOpen, Save } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { buildChatContext, sendChatMessage, compressImage } from '../lib/claude';
 import { AidenModal } from '../components/AidenModal';
+import { HandBrewModal } from '../components/HandBrewModal';
 import { Toast } from '../components/Toast';
 import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
+import { useHandBrew } from '../hooks/useHandBrew';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
@@ -99,7 +101,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     if (!beanId) return;
     await updateBean(beanId, updates);
   };
+  const isHandBrew = preferences.brewMethod === 'handbrew';
   const aiden = useAidenBrew(ephemeralUpdateBean);
+  const handBrew = useHandBrew(ephemeralUpdateBean);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -229,12 +233,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
   const handleBrewScanned = () => {
     if (!scannedBean) return;
-    // Create ephemeral bean object (no id = won't persist grind)
-    const ephemeralBean = {
-      ...scannedBean,
-      status: 'SEALED',
-    };
-    aiden.handleBrewWithAiden(ephemeralBean);
+    const ephemeralBean = { ...scannedBean, status: 'SEALED' };
+    if (isHandBrew) {
+      handBrew.handleBrewHandBrew(ephemeralBean);
+    } else {
+      aiden.handleBrewWithAiden(ephemeralBean);
+    }
   };
 
   const handleSaveToInventory = async () => {
@@ -479,6 +483,16 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         phase={aiden.aidenPhase}
         onRetry={aiden.onRetry}
         onRetryPush={aiden.onRetryPush}
+      />
+      <HandBrewModal
+        open={handBrew.handBrewModal}
+        onClose={handBrew.closeHandBrewModal}
+        recipe={handBrew.handBrewRecipe}
+        loading={handBrew.handBrewLoading}
+        error={handBrew.handBrewError}
+        phase={handBrew.handBrewPhase}
+        onRetry={handBrew.onRetry}
+        onRegenerate={handBrew.onRegenerate}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>

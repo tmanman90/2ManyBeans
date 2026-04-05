@@ -4,8 +4,7 @@
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
-import { HANDBREW_KNOWLEDGE } from './coffeeKnowledge';
-import { getOriginProfile } from './coffeeKnowledge';
+import { HANDBREW_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -69,7 +68,7 @@ RESPOND WITH ONLY THE JSON OBJECT.`;
 
 export async function generateHandBrewRecipe(bean, research, preferences) {
   const { text: beanDescription } = buildBeanDescription(bean);
-  const originProfile = getOriginProfile(bean.origin);
+  const originProfile = getOriginContext(bean.origin);
 
   let userContent = `Generate a hand brew pour-over recipe for this bean:\n\n${sanitize(beanDescription, 500)}`;
 
