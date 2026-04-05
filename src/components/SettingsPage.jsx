@@ -560,7 +560,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       Enter your Fellow app credentials
                     </div>
                     <input
-                      type="email"
+                      type="text"
+                      inputMode="email"
                       placeholder="Fellow email"
                       value={fellowEmailInput}
                       onChange={e => setFellowEmailInput(e.target.value)}
