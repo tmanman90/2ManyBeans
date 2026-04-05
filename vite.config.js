@@ -11,6 +11,7 @@ export default defineConfig({
     ...(!isCapacitor ? [VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB (onboarding-welcome.png is 2.68MB)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
