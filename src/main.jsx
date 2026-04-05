@@ -88,7 +88,6 @@ const Root = () => {
           openBean={openBean}
           finishBean={finishBean}
           returnBean={returnBean}
-          seedTalData={seedTalData}
         />
       </UserPreferencesProvider>
     </AuthContext>

@@ -1,8 +1,10 @@
 // App shell — warm Ghibli-inspired coffee journal
 import { useState, useEffect } from 'react';
+import { LogOut } from 'lucide-react';
 import { C, fonts, shadows } from './styles/theme';
 import { haptic } from './lib/haptics';
 import { today } from './lib/peakStatus';
+import { useAuthContext } from './contexts/AuthContext';
 import { RotationTab } from './tabs/RotationTab';
 import { InventoryTab } from './tabs/InventoryTab';
 import { TastingTab } from './tabs/TastingTab';
@@ -18,12 +20,12 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, seedTalData }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean }) => {
+  const { logOut } = useAuthContext();
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
 
-  const showSeedButton = beans.length === 0;
 
   const handleOpenBean = (preselectedBeanId, slot) => {
     if (preselectedBeanId) {
@@ -79,13 +81,16 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             position: 'relative', zIndex: 1,
             padding: '0 20px',
             paddingTop: 'env(safe-area-inset-top, 0px)',
-            display: 'flex', alignItems: 'flex-end',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
             height: '100%', paddingBottom: 12,
           }}>
             <div>
               <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>2manybeans</div>
               <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{today()}</div>
             </div>
+            <button onClick={logOut} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Sign out">
+              <LogOut size={18} color={C.textMuted} />
+            </button>
           </div>
         </div>
       ) : (
@@ -98,9 +103,14 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           flexShrink: 0,
           zIndex: 10,
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
-            <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body }}>{today()}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
+              <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body }}>{today()}</div>
+            </div>
+            <button onClick={logOut} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Sign out">
+              <LogOut size={18} color={C.textMuted} />
+            </button>
           </div>
         </div>
       )}
@@ -116,8 +126,6 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             onReturnBean={returnBean}
             onOpenBean={handleOpenBean}
             updateBean={updateBean}
-            showSeedButton={showSeedButton}
-            onSeed={seedTalData}
             addTasting={addTasting}
             updateTasting={updateTasting}
           />

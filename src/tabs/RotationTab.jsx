@@ -16,17 +16,12 @@ import { Toast } from '../components/Toast';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, showSeedButton, onSeed, addTasting, updateTasting }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, addTasting, updateTasting }) => {
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
   const aiden = useAidenBrew(updateBean);
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
   const [toast, setToast] = useState(null);
-  const [seeding, setSeeding] = useState(false);
-  const handleSeed = async () => {
-    setSeeding(true);
-    try { await onSeed(); } catch (e) { console.error(e); setSeeding(false); }
-  };
   const [showRec, setShowRec] = useState(false);
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
@@ -106,19 +101,12 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your 3 Atmos canisters</div>
 
-      {showSeedButton && (
-        <div style={{
-          background: C.amberBg,
-          borderRadius: 14,
-          padding: 16,
-          border: `1px solid #E8D5A0`,
-          marginBottom: 16,
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>Welcome! Import your coffee inventory?</div>
-          <Btn variant="primary" onClick={handleSeed} disabled={seeding}>
-            {seeding ? 'Importing…' : "Import Tal's Inventory"}
-          </Btn>
+      {beans.length === 0 && (
+        <div style={{ ...journalCard, textAlign: 'center', padding: 32 }}>
+          <img src="/images/empty-rotation.png" alt="Empty canister" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 16, marginBottom: 16 }} />
+          <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>Your rotation is empty</div>
+          <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Add your first coffee bag to get started</div>
+          <Btn variant="primary" onClick={() => onOpenBean(null, 1)}><Plus size={16} /> Add Bean</Btn>
         </div>
       )}
 
