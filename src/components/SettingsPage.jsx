@@ -1,8 +1,8 @@
 // Settings page — iOS grouped table style, full-screen page sheet modal
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, LogOut } from 'lucide-react';
-import { doc, setDoc, deleteDoc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts, shadows } from '../styles/theme';
 import { haptic } from '../lib/haptics';
@@ -78,6 +78,14 @@ const rowValueStyle = {
   gap: 4,
 };
 
+const selectStyle = {
+  fontFamily: fonts.body, fontSize: 16, color: C.textMuted,
+  background: 'transparent', border: 'none',
+  appearance: 'none', WebkitAppearance: 'none',
+  cursor: 'pointer', textAlign: 'right',
+  paddingRight: 4,
+};
+
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
   const { preferences, updatePreferences } = usePreferences();
   const { logOut } = useAuthContext();
@@ -87,23 +95,19 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const [usernameValue, setUsernameValue] = useState('');
   const [canisterConfirm, setCanisterConfirm] = useState(null); // { newCount, overflowBeans }
 
-  const showToast = useCallback((msg) => {
-    setToast(msg);
-  }, []);
-
   // --- Preference handlers (auto-save + toast) ---
 
   const handleGrinderChange = async (e) => {
     const val = e.target.value;
     try {
-      await updatePreferences({ grinder: val });
-      if (val !== 'other') {
-        await updatePreferences({ grinderCustomName: null });
-      }
+      const updates = { grinder: val };
+      if (val !== 'other') updates.grinderCustomName = null;
+      await updatePreferences(updates);
       haptic.light();
-      showToast('Grinder updated');
+      setToast('Grinder updated');
     } catch (err) {
       console.error('[Settings] Grinder update failed:', err);
+      setToast('Failed to save, try again');
     }
   };
 
@@ -113,9 +117,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       try {
         await updatePreferences({ grinderCustomName: val || null });
         haptic.light();
-        showToast('Custom grinder saved');
+        setToast('Custom grinder saved');
       } catch (err) {
         console.error('[Settings] Custom grinder update failed:', err);
+        setToast('Failed to save, try again');
       }
     }
   };
@@ -125,9 +130,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     try {
       await updatePreferences({ brewMethod: val });
       haptic.light();
-      showToast('Brew method updated');
+      setToast('Brew method updated');
     } catch (err) {
       console.error('[Settings] Brew method update failed:', err);
+      setToast('Failed to save, try again');
     }
   };
 
@@ -136,9 +142,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     try {
       await updatePreferences({ grindSizeDisplay: val });
       haptic.light();
-      showToast('Grind display updated');
+      setToast('Grind display updated');
     } catch (err) {
       console.error('[Settings] Grind display update failed:', err);
+      setToast('Failed to save, try again');
     }
   };
 
@@ -160,9 +167,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     try {
       await updatePreferences({ canisterCount: newCount });
       haptic.light();
-      showToast(`Canisters set to ${newCount}`);
+      setToast(`Canisters set to ${newCount}`);
     } catch (err) {
       console.error('[Settings] Canister update failed:', err);
+      setToast('Failed to save, try again');
     }
   };
 
@@ -171,9 +179,6 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     const { newCount, overflowBeans } = canisterConfirm;
     try {
       const batch = writeBatch(db);
-      // Update preferences
-      const profileRef = doc(db, 'users', uid);
-      batch.update(profileRef, { 'preferences.canisterCount': newCount });
       // Return overflow beans to sealed
       for (const bean of overflowBeans) {
         const beanRef = doc(db, 'users', uid, 'beans', bean.id);
@@ -185,14 +190,15 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         });
       }
       await batch.commit();
-      // Optimistic local update for preferences
+      // Update preferences (single Firestore write + optimistic local update)
       await updatePreferences({ canisterCount: newCount });
-      // On native, batch bypasses per-hook refetch
+      // On native, batch bypasses per-hook refetch for beans
       if (Capacitor.isNativePlatform() && refetchBeans) await refetchBeans();
       haptic.light();
-      showToast(`Canisters set to ${newCount}`);
+      setToast(`Canisters set to ${newCount}`);
     } catch (err) {
       console.error('[Settings] Canister batch update failed:', err);
+      setToast('Failed to save, try again');
     }
     setCanisterConfirm(null);
   };
@@ -205,42 +211,51 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const handleUsernameSave = async () => {
     const cleaned = usernameValue.trim().replace(/[^a-zA-Z0-9_]/g, '');
     if (cleaned.length > 0 && (cleaned.length < 3 || cleaned.length > 30)) {
-      showToast('Username must be 3-30 characters');
+      setToast('Username must be 3-30 characters');
       return;
     }
     try {
       await updateProfile({ username: cleaned || null });
       haptic.light();
-      showToast(cleaned ? 'Username saved' : 'Username removed');
+      setToast(cleaned ? 'Username saved' : 'Username removed');
       setEditingUsername(false);
     } catch (err) {
       console.error('[Settings] Username update failed:', err);
+      setToast('Failed to save, try again');
     }
   };
 
   const handleMarketingToggle = async () => {
     const newVal = !profile?.marketingConsent;
     try {
-      await updateProfile({
+      const batch = writeBatch(db);
+      const profileRef = doc(db, 'users', uid);
+      batch.update(profileRef, {
         marketingConsent: newVal,
         marketingConsentDate: serverTimestamp(),
       });
-      // Sync emailList collection
       const emailRef = doc(db, 'emailList', uid);
       if (newVal) {
-        await setDoc(emailRef, {
+        batch.set(emailRef, {
           email: profile?.email || '',
           displayName: profile?.displayName || '',
           signUpDate: serverTimestamp(),
           source: 'settings',
         });
       } else {
-        await deleteDoc(emailRef);
+        batch.delete(emailRef);
       }
+      await batch.commit();
+      // Optimistic local update
+      await updateProfile({
+        marketingConsent: newVal,
+        marketingConsentDate: new Date(),
+      });
       haptic.light();
-      showToast(newVal ? 'Email updates enabled' : 'Email updates disabled');
+      setToast(newVal ? 'Email updates enabled' : 'Email updates disabled');
     } catch (err) {
       console.error('[Settings] Marketing toggle failed:', err);
+      setToast('Failed to save, try again');
     }
   };
 
@@ -252,12 +267,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
 
   if (!open) return null;
 
-  const grinderLabel = GRINDERS.find(g => g.key === preferences.grinder)?.label || preferences.grinder;
-
   return createPortal(
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.4)',
+      background: 'rgba(44,24,16,0.4)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
       zIndex: 1000,
       display: 'flex',
       alignItems: 'flex-end',
@@ -379,13 +394,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <select
                   value={preferences.grinder}
                   onChange={handleGrinderChange}
-                  style={{
-                    fontFamily: fonts.body, fontSize: 16, color: C.textMuted,
-                    background: 'transparent', border: 'none',
-                    appearance: 'none', WebkitAppearance: 'none',
-                    cursor: 'pointer', textAlign: 'right',
-                    paddingRight: 4,
-                  }}
+                  style={selectStyle}
                 >
                   {GRINDERS.map(g => (
                     <option key={g.key} value={g.key}>{g.label}</option>
@@ -424,13 +433,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <select
                   value={preferences.brewMethod}
                   onChange={handleBrewMethodChange}
-                  style={{
-                    fontFamily: fonts.body, fontSize: 16, color: C.textMuted,
-                    background: 'transparent', border: 'none',
-                    appearance: 'none', WebkitAppearance: 'none',
-                    cursor: 'pointer', textAlign: 'right',
-                    paddingRight: 4,
-                  }}
+                  style={selectStyle}
                 >
                   <option value="aiden">Aiden Brew</option>
                   <option value="handbrew">Hand Brew</option>
@@ -446,13 +449,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <select
                   value={preferences.grindSizeDisplay}
                   onChange={handleGrindDisplayChange}
-                  style={{
-                    fontFamily: fonts.body, fontSize: 16, color: C.textMuted,
-                    background: 'transparent', border: 'none',
-                    appearance: 'none', WebkitAppearance: 'none',
-                    cursor: 'pointer', textAlign: 'right',
-                    paddingRight: 4,
-                  }}
+                  style={selectStyle}
                 >
                   <option value="default">Grinder Steps</option>
                   <option value="microns">Microns</option>
@@ -468,13 +465,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <select
                   value={preferences.canisterCount}
                   onChange={handleCanisterChange}
-                  style={{
-                    fontFamily: fonts.body, fontSize: 16, color: C.textMuted,
-                    background: 'transparent', border: 'none',
-                    appearance: 'none', WebkitAppearance: 'none',
-                    cursor: 'pointer', textAlign: 'right',
-                    paddingRight: 4,
-                  }}
+                  style={selectStyle}
                 >
                   {CANISTER_OPTIONS.map(n => (
                     <option key={n} value={n}>{n}</option>
@@ -536,7 +527,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       {canisterConfirm && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1100,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(44,24,16,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: 24,
         }} onClick={() => setCanisterConfirm(null)}>

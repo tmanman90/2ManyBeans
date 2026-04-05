@@ -11,7 +11,12 @@ service cloud.firestore {
           'marketingConsent', 'marketingConsentDate', 'preferences'
         ])
         && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 100;
+        && request.resource.data.displayName.size() <= 100
+        && (request.resource.data.username == null
+            || (request.resource.data.username is string
+                && request.resource.data.username.size() >= 3
+                && request.resource.data.username.size() <= 30
+                && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')));
     }
 
     // Bean and tasting subcollections

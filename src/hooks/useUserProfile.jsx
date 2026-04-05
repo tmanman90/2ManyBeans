@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from 'react';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
@@ -177,7 +177,17 @@ export const useUserProfile = (uid) => {
     setProfile(prev => prev ? { ...prev, onboardingComplete: true } : prev);
   }, [uid]);
 
-  const preferences = profile?.preferences || DEFAULT_PREFERENCES;
+  // Stabilize preferences reference: only change when values actually differ
+  const prevPrefsRef = useRef(null);
+  const preferences = useMemo(() => {
+    const next = profile?.preferences || DEFAULT_PREFERENCES;
+    if (prevPrefsRef.current && JSON.stringify(prevPrefsRef.current) === JSON.stringify(next)) {
+      return prevPrefsRef.current;
+    }
+    prevPrefsRef.current = next;
+    return next;
+  }, [profile?.preferences]);
+
   const isOnboarded = profile?.onboardingComplete === true;
 
   // Memoize context value to prevent unnecessary re-renders
