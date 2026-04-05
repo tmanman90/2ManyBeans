@@ -51,7 +51,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hey! Ask me anything about your rotation, inventory, or what to brew next. You can also send photos of coffee bags and I'll scan them for you." },
+    { role: 'assistant', content: "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you." },
   ]);
   // apiMessages stores the raw messages sent to the API (with base64 images)
   const apiMessages = useRef([
@@ -444,7 +444,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { handleSend(); inputRef.current?.blur(); } }}
-          placeholder={photos.length > 0 ? 'Add a note or just send...' : 'What should I open next?'}
+          placeholder={photos.length > 0 ? 'Add a note or just send...' : 'Ask Professor Ruphus about your brew'}
           enterKeyHint="send"
           style={{
             flex: 1,

@@ -184,42 +184,62 @@ export async function sendTastingMessage(systemPrompt, history) {
   return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
 }
 
+function sanitize(str, maxLen = 100) {
+  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'.,()\/]/g, '');
+}
+
 export function buildChatContext(beans, tastings) {
   const active = beans.filter(b => b.status === 'ACTIVE').map(b => {
     const ps = getPeakStatus(b);
-    return `  Atmos #${b.atmosSlot}: ${b.roaster} -- ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${b.bagNotes}`;
+    let line = `  Atmos #${b.atmosSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
+    // Recipe context: handBrewRecipe or aidenGrind if available
+    if (b.handBrewRecipe) {
+      const r = b.handBrewRecipe;
+      const grind = r.grindSize ? `grind ${sanitize(r.grindSize.setting, 50)} ${sanitize(r.grindSize.description, 50)}` : '';
+      const temp = r.waterTemp?.celsius ? `${r.waterTemp.celsius}C` : '';
+      line += ` | Brew: ${sanitize(r.method, 50)}, ${sanitize(r.ratio, 20)}, ${temp}, ${grind}, ${sanitize(r.totalBrewTime, 20)}`;
+    } else if (b.aidenGrind && typeof b.aidenGrind.singleServe === 'number') {
+      line += ` | Aiden grind: SS ${b.aidenGrind.singleServe}`;
+      if (typeof b.aidenGrind.batch === 'number') line += ` / Batch ${b.aidenGrind.batch}`;
+    }
+    return line;
   }).join('\n');
 
   const sealed = beans.filter(b => b.status === 'SEALED').map(b => {
     const ps = getPeakStatus(b);
-    return `  ${b.roaster} -- ${b.name} (${b.origin}) | ${b.variety} ${b.process} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${b.bagNotes}`;
+    return `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${sanitize(b.bagNotes, 200)}`;
   }).join('\n');
 
   const finished = beans.filter(b => b.status === 'FINISHED').slice(0, 5).map(b =>
-    `  ${b.roaster} -- ${b.name} (${b.origin}) | Finished: ${b.finishDate}`
+    `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | Finished: ${b.finishDate}`
   ).join('\n');
 
   const recentTastings = tastings.slice(0, 5).map(t => {
     const bean = beans.find(x => x.id === t.beanId);
-    return `  ${t.date}: ${bean?.name || '?'} -- ${t.oneWord || ''} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${t.notes || ''}`;
+    return `  ${t.date}: ${sanitize(bean?.name) || '?'} -- ${sanitize(t.oneWord, 50)} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${sanitize(t.notes, 200)}`;
   }).join('\n');
 
   // Static block: brewing knowledge + rotation rules + photo handling (cached)
-  const staticBlock = `You are Tal's coffee assistant. You have access to his REAL, CURRENT coffee data. NEVER suggest beans that are already finished or opened. Only recommend from SEALED inventory.
+  const staticBlock = `You are Professor Ruphus, Tal's friendly and knowledgeable coffee guide. You're warm but concise, opinionated about good coffee, and always helpful. You have access to his REAL, CURRENT coffee data.
+
+Your responses render in a mobile chat bubble as plain text. Write in conversational paragraphs. Do not use markdown formatting: no bold, italic, headers, or bullet lists. Use line breaks to separate thoughts.
 
 ${BREWING_KNOWLEDGE}
 
-ROTATION RULES:
+Rotation rules:
 - Keep 3 beans active (Atmos #1-#3)
 - Priority: (1) Already opened, (2) In/approaching peak window, (3) Smaller bags first
 - Apollon's Gold: Degas 35-45 days, Peak 60-90 days post-roast, 1:17.5-1:19 ratio, 90-93C
 - Other roasters without guidance: rest 7-14 days, general peak 14-60 days
 - After opening (Atmos): finish within 2-4 weeks; 100g bags within 7-14 days
 - Bag-stated guidance always overrides defaults
+- Do not suggest beans that are already finished or opened. Only recommend from sealed inventory.
 
-Be concise, warm, and opinionated. If recommending a bean, explain WHY based on timing and variety.
+When the user asks about brewing, reference their bean's stored recipe if one is listed above.
 
-PHOTO HANDLING:
+Be concise, warm, and opinionated. If recommending a bean, explain why based on timing and variety.
+
+Photo handling:
 When the user sends photos of a coffee bag, scan the label carefully and present what you find. Then include structured data using markers:
 
 ---BEAN_SCAN---
