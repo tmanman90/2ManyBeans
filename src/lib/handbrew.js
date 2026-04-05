@@ -64,13 +64,13 @@ const FAMILY_POUROVER_DEFAULTS = {
   'washed-floral-clarity': {
     ratio: '1:15.5 to 1:16', tempC: '97-100', bloom: '2-3x, 30-45s',
     grindDirection: 'finer end of pour-over range',
-    technique: 'Hoffmann or Hedrick 1-2-1 (extended bloom helps with florals)',
+    technique: 'Hoffmann classic (even extraction brings out florals)',
     notes: 'Push extraction for clarity. Full boil OK.',
   },
   'washed-ethiopia-clarity': {
     ratio: '1:15.5 to 1:16', tempC: '97-100', bloom: '2-3x, 30-45s',
     grindDirection: 'finer end of pour-over range',
-    technique: 'Hedrick 1-2-1 (extended bloom maximizes floral/citrus clarity)',
+    technique: 'Hoffmann classic (even extraction maximizes floral/citrus clarity)',
     notes: 'Dense, high-altitude. Needs heat. Expect bergamot, jasmine, citrus.',
   },
   'washed-kenya-clarity': {
@@ -144,18 +144,21 @@ function roastToGrindTier(roastLevel) {
 // Post-generation enforcement (mirrors Aiden's repairRecipe pattern)
 // Clamps GPT output to valid ranges. Logs warnings but never rejects.
 // ---------------------------------------------------------------------------
-function repairHandBrewRecipe(recipe, grinderKey, family) {
+function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   const defaults = FAMILY_POUROVER_DEFAULTS[family] || FAMILY_POUROVER_DEFAULTS[DEFAULT_POUROVER_FAMILY];
   const repairs = [];
 
-  // 1. Clamp grind setting to valid pour-over range (skip for custom/"other" grinders)
+  // 1. Clamp grind setting to pour-over start point floor (not just validRange.min)
+  // The pourOverStart is the research-backed minimum for each roast tier.
   if (grinder && recipe.grindSize?.setting != null) {
     const setting = parseFloat(recipe.grindSize.setting);
+    const grindTier = roastToGrindTier(roastLevel);
+    const floor = grinder.pourOverStart[grindTier] || grinder.validRange.min;
     if (!isNaN(setting)) {
-      if (setting < grinder.validRange.min) {
-        recipe.grindSize.setting = String(grinder.validRange.min);
-        repairs.push(`Grind clamped from ${setting} to ${grinder.validRange.min} (below pour-over range)`);
+      if (setting < floor) {
+        recipe.grindSize.setting = String(floor);
+        repairs.push(`Grind clamped from ${setting} to ${floor} (below pour-over start for ${grindTier} roast)`);
       }
       if (setting > grinder.validRange.max) {
         recipe.grindSize.setting = String(grinder.validRange.max);
@@ -248,14 +251,13 @@ BEAN'S FAMILY DEFAULTS (use as your starting parameters, adjust based on bean sp
 - Notes: ${familyDefaults.notes}
 
 TECHNIQUE OPTIONS (choose the best for this bean, or blend approaches):
-- Hoffmann Classic: all-rounder, bloom then 2-3 pours to target weight, gentle swirl, target 2:30-3:30.
-- Hedrick 1-2-1: best for light/floral beans, 1 bloom pour, 2-minute extended bloom for full CO2 release, 1 final pour from slight height. Boiling water OK.
-- Kasuya 4:6: best for naturals and flavor tuning, coarse grind (French Press level), 5 equal pours at 45s intervals. First 2 pours (40%) control sweetness/acidity, last 3 (60%) control strength.
+- Hoffmann Classic: all-rounder, bloom then 2-3 pours to target weight, gentle swirl after each pour, target 2:30-3:30. Best for washed beans, light-to-medium roasts, and when you want even extraction.
+- Kasuya 4:6: best for naturals and flavor tuning, slightly coarser grind, 5 pours at 45s intervals. First 2 pours (40%) control sweetness/acidity balance, last 3 (60%) control strength. Great for experimenting with flavor profile.
 
 OUTPUT FORMAT (JSON only, no markdown, no backticks):
 {
   "method": "pour-over",
-  "technique": string ("hoffmann" | "hedrick-121" | "kasuya-46" | "hybrid"),
+  "technique": string ("hoffmann" | "kasuya-46"),
   "coffeeGrams": number,
   "waterGrams": number,
   "ratio": string (e.g., "1:15.5"),
@@ -274,7 +276,7 @@ FINAL CHECKLIST (verify before outputting):
 - Ratio MUST match the family defaults above, NOT 1:16.7 for every bean.
 - Grind setting MUST be within the grinder's valid pour-over range provided above.
 - Water temperature MUST vary with roast level (light = hotter, dark = cooler).
-- Technique MUST match the family recommendation unless you have a specific reason to deviate.
+- Technique should start from the family recommendation, but choose whichever best serves this bean.
 - Bloom duration and water MUST vary (light roasts get longer/more bloom).
 - Steps must have ascending waterTotal values.
 
@@ -339,7 +341,7 @@ BEAN CLASSIFICATION:
   }
 
   // Enforce valid ranges (mirrors Aiden's repairRecipe pattern)
-  repairHandBrewRecipe(parsed, grinderKey, family);
+  repairHandBrewRecipe(parsed, grinderKey, family, roastLevel);
 
   return validateRecipe(parsed);
 }

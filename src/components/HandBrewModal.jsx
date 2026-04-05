@@ -22,9 +22,9 @@ const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
 
 const TECHNIQUE_LABELS = {
   hoffmann: 'Hoffmann Classic',
-  'hedrick-121': 'Hedrick 1-2-1',
   'kasuya-46': 'Kasuya 4:6',
-  hybrid: 'Hybrid Technique',
+  // Hedrick 1-2-1 saved for future: too few steps for a recipe card UX
+  // 'hedrick-121': 'Hedrick 1-2-1',
 };
 
 const phaseMessages = {
