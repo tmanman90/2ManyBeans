@@ -118,6 +118,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         retries: 1,
         serviceName: 'Fellow',
       });
+      // Update local profile state (server already wrote to Firestore via Admin SDK)
+      await updateProfile({ fellow: { connected: true, email: fellowEmailInput.trim() } }, { localOnly: true });
       haptic.light();
       setToast('Fellow account connected');
       setFellowFormOpen(false);
@@ -138,6 +140,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         retries: 1,
         serviceName: 'Fellow',
       });
+      // Update local profile state (server already wrote to Firestore via Admin SDK)
+      await updateProfile({ fellow: { connected: false } }, { localOnly: true });
       haptic.light();
       setToast('Fellow account disconnected');
     } catch (err) {

@@ -161,10 +161,13 @@ export const useUserProfile = (uid) => {
   }, [uid]);
 
   // Update profile fields (displayName, username, marketingConsent, etc.)
-  const updateProfile = useCallback(async (partialProfile) => {
+  // Use localOnly: true for fields written by Admin SDK (e.g. fellow.*)
+  const updateProfile = useCallback(async (partialProfile, { localOnly = false } = {}) => {
     if (!uid) return;
-    const profileRef = doc(db, 'users', uid);
-    await updateDoc(profileRef, partialProfile);
+    if (!localOnly) {
+      const profileRef = doc(db, 'users', uid);
+      await updateDoc(profileRef, partialProfile);
+    }
     // Optimistic local update
     setProfile(prev => prev ? { ...prev, ...partialProfile } : prev);
   }, [uid]);
