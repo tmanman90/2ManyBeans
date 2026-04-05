@@ -209,11 +209,9 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
 
           {/* Open in Fellow / Open on Aiden button */}
           {result?.link && (
-            <a href={result.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
-              <Btn variant="primary" style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px' }}>
-                <ExternalLink size={16} /> {fellowConnected && !result.usedRelay ? 'Open in Fellow' : 'Open on Aiden'}
-              </Btn>
-            </a>
+            <Btn variant="primary" onClick={() => window.open(result.link, '_blank')} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px' }}>
+              <ExternalLink size={16} /> {fellowConnected && !result.usedRelay ? 'Open in Fellow' : 'Open on Aiden'}
+            </Btn>
           )}
 
           {/* Push cached recipe to Aiden (when viewing saved recipe, no push yet) */}
