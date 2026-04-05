@@ -48,7 +48,7 @@ const phaseMessages = {
 };
 
 export const AidenModal = ({ open, onClose, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached }) => {
-  const { preferences } = usePreferences();
+  const { preferences, fellowConnected } = usePreferences();
   const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
   const isDeviceFull = error && error.includes('14 profiles') && !error.includes('(400)');
   const msg = phaseMessages[phase] || phaseMessages.recipe;
@@ -192,11 +192,26 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
             )
           )}
 
-          {/* Open in Fellow button */}
+          {/* Fellow credentials invalid notice */}
+          {result?.fellowCredentialsInvalid && (
+            <div style={{
+              background: C.amberBg,
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 10,
+              fontSize: 13,
+              color: C.text,
+              border: '1px solid #E8D5A0',
+            }}>
+              Your Fellow connection needs updating. Reconnect in Settings.
+            </div>
+          )}
+
+          {/* Open in Fellow / Open on Aiden button */}
           {result?.link && (
             <a href={result.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
               <Btn variant="primary" style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px' }}>
-                <ExternalLink size={16} /> Open in Fellow
+                <ExternalLink size={16} /> {fellowConnected && !result.usedRelay ? 'Open in Fellow' : 'Open on Aiden'}
               </Btn>
             </a>
           )}
@@ -204,7 +219,7 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
           {/* Push cached recipe to Aiden (when viewing saved recipe, no push yet) */}
           {!result && !loading && !error && onPushCached && (
             <Btn variant="primary" onClick={() => onPushCached(recipe)} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px', marginBottom: 8 }}>
-              <ExternalLink size={16} /> Push to Aiden
+              <ExternalLink size={16} /> {fellowConnected ? 'Send to Aiden' : 'Push to Aiden'}
             </Btn>
           )}
 

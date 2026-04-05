@@ -1,6 +1,7 @@
 // Shared CORS + Firebase Auth for all API proxies
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Lazy-init Firebase Admin
 function getFirebaseAdmin() {
@@ -62,6 +63,12 @@ async function verifyAuth(req) {
     err.status = 401;
     throw err;
   }
+}
+
+// Get Firestore instance from the existing admin singleton
+export function getDb() {
+  getFirebaseAdmin(); // ensure app is initialized
+  return getFirestore();
 }
 
 export function withCorsAuth(handler) {

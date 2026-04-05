@@ -23,6 +23,7 @@ export function useAidenBrew(updateBean) {
     try {
       const result = await pushToAiden(recipe);
       if (!mountedRef.current) return;
+      // Pass through usedRelay and fellowCredentialsInvalid for the modal
       setAidenResult(result);
       if (result.grindRecommendation) {
         setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));

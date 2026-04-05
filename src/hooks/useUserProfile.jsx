@@ -190,11 +190,15 @@ export const useUserProfile = (uid) => {
 
   const isOnboarded = profile?.onboardingComplete === true;
 
+  // Fellow connection status (primitive to avoid re-render cascades)
+  const fellowConnected = profile?.fellow?.connected ?? false;
+
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({
     preferences,
     updatePreferences,
-  }), [preferences, updatePreferences]);
+    fellowConnected,
+  }), [preferences, updatePreferences, fellowConnected]);
 
   return {
     profile,

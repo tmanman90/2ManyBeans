@@ -10,6 +10,8 @@ import { Toast } from './Toast';
 import { usePreferences } from '../hooks/useUserProfile';
 import { useAuthContext } from '../contexts/AuthContext';
 import { db } from '../firebase';
+import { fetchWithRetry } from '../lib/fetchWithRetry';
+import { API_BASE } from '../lib/apiBase';
 
 // --- Grinder options ---
 const GRINDERS = [
@@ -94,6 +96,55 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameValue, setUsernameValue] = useState('');
   const [canisterConfirm, setCanisterConfirm] = useState(null); // { newCount, overflowBeans }
+
+  // Fellow account connection
+  const fellowConnected = profile?.fellow?.connected ?? false;
+  const fellowEmail = profile?.fellow?.email ?? null;
+  const [fellowFormOpen, setFellowFormOpen] = useState(false);
+  const [fellowEmailInput, setFellowEmailInput] = useState('');
+  const [fellowPasswordInput, setFellowPasswordInput] = useState('');
+  const [fellowLoading, setFellowLoading] = useState(false);
+  const [fellowError, setFellowError] = useState(null);
+
+  // --- Fellow account handlers ---
+
+  const handleFellowConnect = async () => {
+    setFellowError(null);
+    setFellowLoading(true);
+    try {
+      await fetchWithRetry({
+        url: `${API_BASE}/api/fellow?action=connect`,
+        body: { email: fellowEmailInput.trim(), password: fellowPasswordInput },
+        retries: 1,
+        serviceName: 'Fellow',
+      });
+      haptic.light();
+      setToast('Fellow account connected');
+      setFellowFormOpen(false);
+      setFellowEmailInput('');
+      setFellowPasswordInput('');
+    } catch (err) {
+      setFellowError(err.message || 'Connection failed');
+    }
+    setFellowLoading(false);
+  };
+
+  const handleFellowDisconnect = async () => {
+    setFellowLoading(true);
+    try {
+      await fetchWithRetry({
+        url: `${API_BASE}/api/fellow?action=disconnect`,
+        body: {},
+        retries: 1,
+        serviceName: 'Fellow',
+      });
+      haptic.light();
+      setToast('Fellow account disconnected');
+    } catch (err) {
+      setToast('Failed to disconnect, try again');
+    }
+    setFellowLoading(false);
+  };
 
   // --- Preference handlers (auto-save + toast) ---
 
@@ -476,6 +527,119 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               </div>
             </div>
           </div>
+
+          {/* --- Fellow Aiden Section --- */}
+          {preferences.brewMethod === 'aiden' && (
+            <>
+              <div style={sectionHeaderStyle}>Fellow Aiden</div>
+              <div style={groupStyle}>
+                {fellowConnected && !fellowFormOpen ? (
+                  /* Connected state */
+                  <div style={rowStyle}>
+                    <div>
+                      <span style={rowLabelStyle}>Connected as</span>
+                      <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{fellowEmail}</div>
+                    </div>
+                    <button
+                      onClick={handleFellowDisconnect}
+                      disabled={fellowLoading}
+                      style={{
+                        background: 'none', border: `1px solid ${C.red}30`,
+                        borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
+                        fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
+                        color: C.red, opacity: fellowLoading ? 0.5 : 1,
+                      }}
+                    >
+                      {fellowLoading ? 'Disconnecting...' : 'Disconnect'}
+                    </button>
+                  </div>
+                ) : fellowFormOpen ? (
+                  /* Connect form */
+                  <div style={{ padding: 16 }}>
+                    <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
+                      Enter your Fellow app credentials
+                    </div>
+                    <input
+                      type="email"
+                      placeholder="Fellow email"
+                      value={fellowEmailInput}
+                      onChange={e => setFellowEmailInput(e.target.value)}
+                      autoComplete="email"
+                      style={{
+                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                        border: `1px solid ${C.border}`, fontFamily: fonts.body,
+                        fontSize: 16, background: C.bg, color: C.text,
+                        boxSizing: 'border-box', marginBottom: 8,
+                      }}
+                    />
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={fellowPasswordInput}
+                      onChange={e => setFellowPasswordInput(e.target.value)}
+                      autoComplete="current-password"
+                      onKeyDown={e => e.key === 'Enter' && !fellowLoading && handleFellowConnect()}
+                      style={{
+                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                        border: `1px solid ${C.border}`, fontFamily: fonts.body,
+                        fontSize: 16, background: C.bg, color: C.text,
+                        boxSizing: 'border-box', marginBottom: fellowError ? 8 : 12,
+                      }}
+                    />
+                    {fellowError && (
+                      <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+                        {fellowError}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => { setFellowFormOpen(false); setFellowError(null); }}
+                        style={{
+                          flex: 1, padding: '10px 16px', borderRadius: 10,
+                          border: `1px solid ${C.border}`, background: C.bg,
+                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                          color: C.text, cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleFellowConnect}
+                        disabled={fellowLoading || !fellowEmailInput.trim() || !fellowPasswordInput}
+                        style={{
+                          flex: 1, padding: '10px 16px', borderRadius: 10,
+                          border: 'none', background: C.accent,
+                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                          color: '#fff', cursor: 'pointer',
+                          opacity: (fellowLoading || !fellowEmailInput.trim() || !fellowPasswordInput) ? 0.5 : 1,
+                        }}
+                      >
+                        {fellowLoading ? 'Connecting...' : 'Connect'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Disconnected state */
+                  <div style={rowStyle}>
+                    <span style={{ ...rowLabelStyle, fontSize: 14, flex: 1, paddingRight: 12 }}>
+                      Connect your Fellow account for one-tap recipe push
+                    </span>
+                    <button
+                      onClick={() => setFellowFormOpen(true)}
+                      style={{
+                        background: C.accent, color: '#fff', border: 'none',
+                        borderRadius: 8, padding: '8px 16px', cursor: 'pointer',
+                        fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Connect
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* --- Notifications Section --- */}
           <div style={sectionHeaderStyle}>Notifications</div>

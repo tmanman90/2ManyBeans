@@ -1,14 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profile document (new for consumer launch)
+    // User profile document
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
           'displayName', 'email', 'photoURL', 'signUpProvider',
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
-          'marketingConsent', 'marketingConsentDate', 'preferences'
+          'marketingConsent', 'marketingConsentDate', 'preferences',
+          'fellow'
         ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100
@@ -16,10 +17,17 @@ service cloud.firestore {
             || (request.resource.data.username is string
                 && request.resource.data.username.size() >= 3
                 && request.resource.data.username.size() <= 30
-                && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')));
+                && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')))
+        // Client cannot modify fellow.* (managed by Admin SDK only)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fellow']));
     }
 
-    // Bean and tasting subcollections
+    // Fellow secrets: Admin SDK only, client cannot read or write
+    match /users/{userId}/secrets/{secretId} {
+      allow read, write: if false;
+    }
+
+    // Bean and tasting subcollections (excludes secrets due to more specific rule above)
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
