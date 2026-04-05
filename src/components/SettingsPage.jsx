@@ -561,11 +561,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     </div>
                     <input
                       type="text"
-                      inputMode="email"
                       placeholder="Fellow email"
                       value={fellowEmailInput}
                       onChange={e => setFellowEmailInput(e.target.value)}
-                      autoComplete="email"
                       style={{
                         width: '100%', padding: '10px 12px', borderRadius: 8,
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,
@@ -574,11 +572,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       }}
                     />
                     <input
-                      type="password"
+                      type="text"
                       placeholder="Password"
                       value={fellowPasswordInput}
                       onChange={e => setFellowPasswordInput(e.target.value)}
-                      autoComplete="current-password"
                       onKeyDown={e => e.key === 'Enter' && !fellowLoading && handleFellowConnect()}
                       style={{
                         width: '100%', padding: '10px 12px', borderRadius: 8,
