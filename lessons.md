@@ -43,3 +43,6 @@ Format: `- **[Topic]**: [What went wrong] → [What to do instead]`
 - **Capgo OTA: verify on device, not CLI**: `npx @capgo/cli probe` confirms availability but not application. If update doesn't appear after 2 restarts, fall back to cap sync + TestFlight. Never tell user "it's live" from CLI output alone.
 - **Modal overlay consistency**: All modals must use warm brown `rgba(44,24,16,0.4)` + `backdropFilter: blur(4px)`. Never use `rgba(0,0,0,...)`. Check Modal.jsx for the canonical pattern.
 - **PWA workbox precache limit**: Images > 2MB silently fail to cache. Set `maximumFileSizeToCacheInBytes` in vite.config.js or compress images before adding to `public/`.
+- **Sanitize at the source, not the call site**: When extracting shared functions (like `buildBeanDescription`), put sanitization inside the shared function. Call-site sanitization is fragile because new callers won't know to add it.
+- **Always wrap JSON.parse on LLM output**: GPT/Claude regularly produce malformed JSON. Every `JSON.parse` on LLM output needs try/catch with a user-friendly error message.
+- **System prompt injection is higher impact**: User-controlled strings in system prompts (like `grinderCustomName`) must be sanitized. System prompt injection can override model behavior more effectively than user message injection.
