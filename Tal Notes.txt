@@ -1,0 +1,74 @@
+The Real Cost Problem: Chat
+
+  Your tasting coach and general chat use Claude Sonnet at $3/$15 per 1M tokens, called on EVERY message. A 10-message tasting
+  session with a 2,500-token system prompt is roughly $0.05-0.08 per session. That's 4x more than an entire Aiden recipe.
+
+  ┌───────────────┬──────────────┬────────────────┬──────────────────┬─────────────────────┐
+  │    Feature    │    Model     │    Cost/use    │    Frequency     │ Monthly @ 10k users │
+  ├───────────────┼──────────────┼────────────────┼──────────────────┼─────────────────────┤
+  │ Tasting chat  │ Sonnet 4.6   │ ~$0.06/session │ 2x/week          │ $4,800/mo           │
+  ├───────────────┼──────────────┼────────────────┼──────────────────┼─────────────────────┤
+  │ General chat  │ Sonnet 4.6   │ ~$0.04/session │ 3x/week          │ $4,800/mo           │
+  ├───────────────┼──────────────┼────────────────┼──────────────────┼─────────────────────┤
+  │ Aiden recipe  │ GPT-5.4      │ $0.019/recipe  │ 2x/week          │ $1,520/mo           │
+  ├───────────────┼──────────────┼────────────────┼──────────────────┼─────────────────────┤
+  │ Ruphus story  │ GPT-5.4      │ ~$0.01/bean    │ 1x/bean (cached) │ $400/mo             │
+  ├───────────────┼──────────────┼────────────────┼──────────────────┼─────────────────────┤
+  │ Bean scan     │ Gemini Flash │ ~$0.002/scan   │ 1x/bean          │ $80/mo              │
+  ├───────────────┼──────────────┼────────────────┼──────────────────┼─────────────────────┤
+  │ Score extract │ GPT-5.4 Mini │ ~$0.001        │ per tasting      │ $40/mo              │
+  └───────────────┴──────────────┴────────────────┴──────────────────┴─────────────────────┘
+
+  Chat is 80%+ of your projected AI spend. At 10k users, you're looking at ~$11,600/mo total, and $9,600 of that is chat.
+
+  What Actually Moves the Needle
+
+  1. Chat model optimization (biggest win): Run this same autoresearch harness on tasting coach + general chat. If Haiku 4.5 or Mini
+   can handle chat at 95%+ quality, you save ~$8,000/mo at 10k users.
+  2. Aiden swap to Mini (proven): $1,280/mo savings at 10k. Already validated at 98% quality.
+  3. Prompt caching: Your system prompts are massive (2,500-4,000 tokens) and identical across users. Anthropic and OpenAI both
+  offer 90% discount on cached input tokens. That alone could cut chat costs in half with zero quality change.
+  4. Ruphus caching: Already cached per bean. Good. No action needed.
+
+  Bottom Line
+
+  Aiden switching to Mini is a no-brainer, do it. But the real consumer-app question is whether you can run chat on a cheaper model
+  and whether you can get prompt caching working. Those two moves together would take a 10k-user monthly bill from ~$11,600 down to
+  ~$2,000-3,000.
+
+  Want me to build the same autoresearch harness for the tasting coach and chat features? That's where the real savings are.
+
+
+❯ i forgot did we end up using the ralph wiggins loop? Or wat was the lfg thing? I'm      
+still confused on exactly what i should do when i'm doing reviews and fixes..... OR what  
+i should do when trying to implement new features effectively.                            
+                                                                                          
+⏺ Let me break it down simply.                                                            
+                                                                                        
+  What you used today: /lfg in the claude-ce terminal. That's the compound engineering    
+  plugin's autonomous workflow. It plans, builds, reviews, and fixes on its own. The Ralph
+   Wiggins loop (ralph-loop) is just a small piece inside /lfg that keeps it running until
+   everything is done. You don't need to think about it separately.
+                                                                                          
+  Here are the two playbooks:                                                             
+
+  ---
+  When you want to review and fix existing code:
+                                                                                          
+  1. Come to regular Claude Code, say "review my code"
+  2. I run the review, tell you to run /codex:rescue in another terminal for a second     
+  opinion                                                                                 
+  3. I combine both reports into one fix list                                             
+  4. You open a new terminal, run claude-ce, paste /lfg [description of all fixes]        
+  5. Walk away. Come back when it's done.                                                 
+  6. Run /codex:adversarial-review to check the work                                      
+  7. Tell me to deploy (I handle Vercel + Capgo)                                          
+                                                                                          
+  When you want to build a new feature:                                                   
+                                                                                          
+  1. Come to regular Claude Code, describe what you want                                  
+  2. I plan it out, you approve                                   
+  3. You open a new terminal, run claude-ce, paste /lfg [feature description]             
+  4. Walk away. Come back when it's done.
+  5. Run /codex:adversarial-review to check the work                                      
+  6. Tell me to deploy   

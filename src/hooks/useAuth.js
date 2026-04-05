@@ -1,7 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, signInWithPopup, signInWithCredential, getRedirectResult, signOut, GoogleAuthProvider } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithCredential, getRedirectResult, signOut, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-import { auth, googleProvider } from '../firebase';
+import { auth, googleProvider, appleProvider } from '../firebase';
+
+// Nonce utilities for Apple Sign-In
+function generateNonce(length = 32) {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return values.reduce((acc, x) => acc + charset[x % charset.length], '');
+}
+
+async function sha256(input) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+}
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -13,14 +27,16 @@ export const useAuth = () => {
       setLoading(false);
     });
 
-    // Safety timeout — if auth never resolves on native, show sign-in after 3s
+    // Safety timeout: if Firebase Auth hasn't responded in 3s, stop loading
+    // This prevents infinite loading screen on native where auth init can stall
     const timeout = setTimeout(() => {
-      setLoading(false);
+      setLoading(prev => {
+        if (prev) console.warn('[Auth] timeout - forcing past loading screen');
+        return false;
+      });
     }, 3000);
 
-    // Capture any pending redirect result from a previous attempt (web only;
-    // on native this triggers iframe setup to authDomain which can interfere
-    // with WKWebView auth state)
+    // Only check redirect result on web (hangs in Capacitor WKWebView)
     if (!Capacitor.isNativePlatform()) {
       getRedirectResult(auth).catch(() => {});
     }
@@ -28,43 +44,90 @@ export const useAuth = () => {
     return () => { unsubscribe(); clearTimeout(timeout); };
   }, []);
 
-  const signIn = useCallback(async () => {
+  const signInWithGoogle = useCallback(async () => {
     if (Capacitor.isNativePlatform()) {
+      const { SocialLogin } = await import('@capgo/capacitor-social-login');
+      await SocialLogin.initialize({ google: { iOSClientId: '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com' } });
+      const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+      const idToken = result?.result?.idToken;
+      if (!idToken) throw new Error('No idToken from Google sign-in');
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+    } else {
+      await signInWithPopup(auth, googleProvider);
+    }
+  }, []);
+
+  const signInWithApple = useCallback(async () => {
+    if (Capacitor.isNativePlatform()) {
+      const { SocialLogin } = await import('@capgo/capacitor-social-login');
+      await SocialLogin.initialize({ apple: {} });
+
+      // Generate nonce: hashed goes to Apple, raw goes to Firebase
+      const rawNonce = generateNonce();
+      const hashedNonce = await sha256(rawNonce);
+
+      const result = await SocialLogin.login({
+        provider: 'apple',
+        options: { scopes: ['email', 'name'], nonce: hashedNonce },
+      });
+
+      const idToken = result?.result?.idToken;
+      if (!idToken) throw new Error('No idToken from Apple sign-in');
+
+      // Stash Apple's name immediately (Apple only sends it on first sign-in)
+      const profile = result?.result?.profile;
+      if (profile?.givenName || profile?.familyName) {
+        try {
+          localStorage.setItem('apple_pending_name', JSON.stringify({
+            givenName: profile.givenName || '',
+            familyName: profile.familyName || '',
+            email: profile.email || '',
+          }));
+        } catch { /* localStorage unavailable */ }
+      }
+
+      const credential = new OAuthProvider('apple.com').credential({
+        idToken,
+        rawNonce,
+      });
+
       try {
-        const { SocialLogin } = await import('@capgo/capacitor-social-login');
-        await SocialLogin.initialize({
-          google: {
-            webClientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
-            iOSClientId: '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com',
-            iOSServerClientId: '902243550931-id9eaan23rn6au5jfdq0u0it8pei1lqb.apps.googleusercontent.com',
-            mode: 'online',
-          },
-        });
-        const res = await SocialLogin.login({
-          provider: 'google',
-          options: { scopes: ['email', 'profile'] },
-        });
-        if (!res?.result?.idToken) {
-          alert('Sign-in failed: no token received from Google');
-          return;
-        }
-        const credential = GoogleAuthProvider.credential(res.result.idToken);
         await signInWithCredential(auth, credential);
-      } catch (err) {
-        console.error('Google Sign-In failed:', err);
-        alert('Sign-in failed: ' + (err.message || err));
+      } catch (error) {
+        // Handle multi-provider conflict (same email, different provider)
+        if (error.code === 'auth/account-exists-with-different-credential') {
+          const pendingCred = OAuthProvider.credentialFromError(error);
+          // Sign in with existing provider first, then link
+          const googleResult = await signInWithPopup(auth, googleProvider);
+          if (pendingCred) {
+            const { linkWithCredential } = await import('firebase/auth');
+            await linkWithCredential(googleResult.user, pendingCred);
+          }
+        } else {
+          throw error;
+        }
       }
     } else {
-      // signInWithPopup works in both browser and iOS standalone PWA mode
-      // (iOS 16.4+ supports popups in standalone via in-app browser sheet).
-      // signInWithRedirect does NOT work in standalone mode because the
-      // redirect completes in a separate browser context that can't pass
-      // auth state back to the standalone app.
-      await signInWithPopup(auth, googleProvider);
+      // Web: use Firebase's built-in Apple popup
+      try {
+        await signInWithPopup(auth, appleProvider);
+      } catch (error) {
+        if (error.code === 'auth/account-exists-with-different-credential') {
+          const pendingCred = OAuthProvider.credentialFromError(error);
+          const googleResult = await signInWithPopup(auth, googleProvider);
+          if (pendingCred) {
+            const { linkWithCredential } = await import('firebase/auth');
+            await linkWithCredential(googleResult.user, pendingCred);
+          }
+        } else {
+          throw error;
+        }
+      }
     }
   }, []);
 
   const logOut = useCallback(() => signOut(auth), []);
 
-  return { user, loading, signIn, logOut };
+  return { user, loading, signInWithGoogle, signInWithApple, logOut };
 };

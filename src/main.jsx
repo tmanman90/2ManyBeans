@@ -16,7 +16,7 @@ if (Capacitor.isNativePlatform()) {
 }
 
 const Root = () => {
-  const { user, loading: authLoading, signIn, logOut } = useAuth();
+  const { user, loading: authLoading, signInWithGoogle, signInWithApple, logOut } = useAuth();
   const {
     beans, tastings,
     addBean, updateBean, deleteBean,
@@ -29,7 +29,7 @@ const Root = () => {
   if (authLoading) return <LoadingScreen />;
 
   // Not signed in
-  if (!user) return <SignInScreen onSignIn={signIn} />;
+  if (!user) return <SignInScreen onSignInWithGoogle={signInWithGoogle} onSignInWithApple={signInWithApple} />;
 
   // Waiting for Firestore data
   if (!dataLoaded) return <LoadingScreen />;

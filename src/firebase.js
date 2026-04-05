@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, initializeAuth, browserLocalPersistence, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, initializeAuth, browserLocalPersistence, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { Capacitor } from '@capacitor/core';
@@ -24,6 +24,9 @@ export const auth = Capacitor.isNativePlatform()
   ? initializeAuth(app, { persistence: browserLocalPersistence })
   : getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+export const appleProvider = new OAuthProvider('apple.com');
+appleProvider.addScope('email');
+appleProvider.addScope('name');
 
 // Skip persistent cache on native — IndexedDB hangs in WKWebView
 const firestoreSettings = Capacitor.isNativePlatform()

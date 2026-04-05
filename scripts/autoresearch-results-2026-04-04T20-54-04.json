@@ -1,0 +1,4651 @@
+{
+  "timestamp": "2026-04-04T20:54:04.474Z",
+  "models": [
+    {
+      "name": "GPT-5.4",
+      "model": "gpt-5.4",
+      "provider": "openai",
+      "pricing": {
+        "input": 2.5,
+        "output": 10
+      }
+    },
+    {
+      "name": "GPT-5.4 Mini",
+      "model": "gpt-5.4-mini",
+      "provider": "openai",
+      "pricing": {
+        "input": 0.4,
+        "output": 1.6
+      }
+    },
+    {
+      "name": "Gemini 2.5 Flash",
+      "model": "gemini-2.5-flash",
+      "provider": "gemini",
+      "pricing": {
+        "input": 0.15,
+        "output": 0.6
+      }
+    },
+    {
+      "name": "Gemini 2.0 Flash",
+      "model": "gemini-2.0-flash",
+      "provider": "gemini",
+      "pricing": {
+        "input": 0.1,
+        "output": 0.4
+      }
+    },
+    {
+      "name": "Haiku 4.5",
+      "model": "claude-haiku-4-5-20251001",
+      "provider": "anthropic",
+      "pricing": {
+        "input": 0.8,
+        "output": 4
+      }
+    },
+    {
+      "name": "Grok 4.1 Fast",
+      "model": "grok-4-1-fast-non-reasoning",
+      "provider": "xai",
+      "pricing": {
+        "input": 3,
+        "output": 15
+      }
+    }
+  ],
+  "beans": [
+    "El Placer",
+    "Finca La Fuente",
+    "Mulish",
+    "Gichathaini AA",
+    "Gesha Village Lot 74",
+    "Worka Sakaro",
+    "Antigua Pastores",
+    "Huila Castillo",
+    "Intango Dark",
+    "Finca Las Flores"
+  ],
+  "phase1": {
+    "El Placer": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "experimental and innovative, focusing on high-grown lots with nuanced processing for bright, floral, and tea-like profiles",
+          "processingNuance": "anaerobic white honey preserves mucilage under controlled oxygen-deprived fermentation, enhancing floral esters and bergamot aromatics while maintaining clarity; expect sticky puck and potential for over-extraction if not precise",
+          "densityEstimate": "high",
+          "flavorExpectations": "gardenia flowers, Earl Grey tea, bergamot, with lifted jasmine and citrus-tea brightness",
+          "extractionNotes": "24-48g/L, 92-94C water, medium-fine grind, 2:00-2:30 pour-over timing to preserve florals; finer grind for clarity, watch for astringency from honey sugars",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha variety with semi-washed processing yielding similar tea-like floral clarity"
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Colombian light roast washed with high clarity and lifted aromatics"
+            },
+            {
+              "number": 8,
+              "name": "Flower Child El Nevado Decaf",
+              "why": "Colombian light roast with floral/tea notes from high-grown varieties"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3434,
+        "inputTokens": 1494,
+        "outputTokens": 333,
+        "cost": 0.009477
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Dayglow (Promethium) specializes in experimental processing methods and anaerobic fermentation, pushing the boundaries of flavor extraction through controlled microbial environments and innovative honey processing techniques.",
+          "processingNuance": "Anaerobic white honey processing involves extended fermentation in oxygen-depleted conditions during the honey stage, creating complex fermentation byproducts (esters, volatile acids) while maintaining the delicate tea-like clarity of white honey. Extended fermentation amplifies floral and bergamot-forward aromatics typical of Geisha varieties.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Gardenia florals, Earl Grey tea character with bergamot citrus, delicate sweetness from white honey processing. Expect bright acidity with aromatic complexity rather than body.",
+          "extractionNotes": "Use 195-200°F water to preserve volatile aromatics; grind medium-fine to access clarity without overextracting fermentation compounds. Target 27-30 second espresso or 3:30-4:00 pour-over. Anaerobic processing produces more volatile compounds—slightly shorter contact time may prevent astringency while capturing tea-like structure.",
+          "cupStructureFamily": "washed-geisha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha variety with light roast and semi-washed processing shares varietal florality and tea-like clarity; closest geisha reference point"
+            },
+            {
+              "number": 22,
+              "name": "Special Guests Andres Cardona Purple Honey",
+              "why": "Anaerobic honey processing from Colombia with floral/aromatic complexity mirrors the experimental fermentation approach and delicate cup structure"
+            },
+            {
+              "number": 21,
+              "name": "Sightglass Guatemala Cuevitas",
+              "why": "Anaerobic processing creates similar volatile aromatic complexity and tea-like clarity despite medium roast level"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": false,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 5,
+        "max": 6,
+        "elapsed": 6482,
+        "inputTokens": 1643,
+        "outputTokens": 546,
+        "cost": 0.0034984
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Dayglow/Promethium typically favors vibrant, high-clarity Nordic-leaning light roasts that preserve florals, layered fruit, and precise sweetness while keeping process character articulate",
+          "processingNuance": "Anaerobic white honey on Geisha usually means extended low-oxygen fermentation followed by partial mucilage retention during drying, which can amplify aromatics, tea-like sweetness, and perfumed florals while also adding subtle tropical esters and a silken, syrupy mid-palate. Because white honey sits toward the cleaner end of honey processing, expect more structure and transparency than a heavy honey or natural, but the anaerobic step can slightly lower perceived acidity sharpness and increase aromatic volatility. At peak age, the cup should be especially open and floral rather than boozy or ferment-forward.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for gardenia, jasmine, bergamot, Earl Grey tea, sweet citrus oil, delicate white peach, and a clean honeyed finish. Look for lifted florals up front, elegant citrus brightness in the mid-palate, and a refined tea-like aftertaste rather than heavy sweetness or dark fruit.",
+          "extractionNotes": "Use relatively soft-to-medium water and a light-roast extraction approach: 93-96C water, fine-to-medium-fine grind, and a brew recipe that emphasizes clarity without over-extracting the floral aromatics. For pour-over, a higher brew ratio with moderate agitation helps preserve perfume and tea structure; if the cup gets thin, increase contact time slightly before increasing temperature. Because the coffee is high-density Geisha and process-processed, it can tolerate a finer grind, but too much agitation may push the anaerobic notes forward and blur the bergamot/gardenia. In espresso, run a slightly longer ratio with careful temperature control and avoid excessive preinfusion pressure to keep the cup aromatic rather than ferment-heavy.",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha-driven floral clarity with refined acidity and tea-like elegance closely matches the structure expected here, despite the different origin and processing."
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "High-clarity light roast with polished florals and bright, clean structure is a strong analog for how this cup should present."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Light roasted Colombian washed profile with lifted aromatics and citrus/stonefruit clarity provides a useful Colombia-based reference, though this coffee should be more floral and process-expressive."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 8155,
+        "inputTokens": 1368,
+        "outputTokens": 630,
+        "cost": 0.0015552
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 10146,
+        "inputTokens": 1443,
+        "outputTokens": 429,
+        "cost": 0.00047384999999999994
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1750-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Dayglow's Promethium selections tend to emphasize modern, competition-style coffees with high aromatic intensity, clean but expressive processing, and relatively light roasting that preserves florals and volatile top notes rather than pushing caramelization.",
+          "processingNuance": "Anaerobic white honey on Geisha usually means substantial mucilage retention with oxygen-limited fermentation before or during drying, but less fruit skin contact than a full natural. Expect a cup that keeps Geisha's floral-tea structure while adding a slightly rounder mid-palate, more perfume, and a lightly candied citrus quality. Compared with washed Geisha, this should show a touch more sweetness and fermentation-derived aromatic lift, but if well executed it will still brew best when treated like a clarity-driven coffee rather than a heavy process-forward one.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for lifted white florals, gardenia, bergamot, Earl Grey, sweet lime or mandarin-like citrus, delicate honey sweetness, and a silky tea-like finish. The best brews should prioritize perfume, transparency, and elegant citrus-floral layering over body.",
+          "extractionNotes": "Brew it like a high-grown light Geisha with slight process influence: use relatively soft-to-moderate mineral water, high but not aggressive temperature around 92-95C, and aim for even extraction rather than maximum yield. Because the coffee is 58 days off roast and in peak, it should be quite soluble for a light roast, so slightly finer than very fresh coffee is reasonable, but avoid over-extracting the honey-ferment character into harshness. Best results will likely come from a medium-fine pour-over grind, restrained agitation, and total brew times around 2:45-3:30 depending on brewer. If the cup turns too perfumy or savory, coarsen slightly or lower temperature; if it feels hollow and only floral, go a bit finer to pull more sweetness.",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Closest match in Gesha cup structure: floral, tea-like, clarity-driven, with a lightly processed profile that still benefits from delicate extraction."
+            },
+            {
+              "number": 23,
+              "name": "Sightglass Guatemala Cuevitas",
+              "why": "Shares anaerobic influence and a cleaner structured presentation rather than heavy fruit-bomb natural character, useful as a reference for managing fermentation in brewing."
+            },
+            {
+              "number": 22,
+              "name": "Special Guests Andres Cardona Purple Honey",
+              "why": "Most relevant honey-process reference in the set for sweetness and aromatic lift, though this El Placer should be more elegant and floral due to the Geisha variety."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 18935,
+        "inputTokens": 1368,
+        "outputTokens": 638,
+        "cost": 0.0098
+      }
+    },
+    "Finca La Fuente": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "ultra-light Scandinavian style emphasizing origin clarity, nuance, and minimal intervention roasting",
+          "processingNuance": "Washed process on high-altitude Pink Bourbon enhances clean extraction, highlighting bright tropical fruit acidity and delicate florals without fermentation residues",
+          "densityEstimate": "high",
+          "flavorExpectations": "tropical fruits (mango, pineapple), florals (jasmine, rose), complex citrus and stonefruit undertones",
+          "extractionNotes": "Finer grind, 92-95C water temp, 2:00-2:30 extraction time to preserve clarity and lift aromatics; avoid over-extraction to prevent bitterness masking florals",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Light roast washed Colombia field blend with similar high-altitude clarity and lifted aromatics"
+            },
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Light roast washed Colombia matching clean structure and complex fruit-floral profile"
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Light washed Bourbon from high altitude with comparable tropical fruit and clarity"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 2829,
+        "inputTokens": 1491,
+        "outputTokens": 307,
+        "cost": 0.009078
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1950 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi typically roasts with a Nordic-leaning, transparent, origin-forward approach that emphasizes sweetness, florality, and layered acidity rather than roast depth.",
+          "processingNuance": "This is a washed Pink Bourbon from Huila, so expect a clean fermentation profile with high aromatic lift. The process usually accentuates jasmine-like florals, citrus, and tropical-fruit esters while keeping the cup structured and tea-like. In extraction, its clarity can make slight underdevelopment or overextraction show quickly, so grind uniformity and even saturation matter more than aggressive brew strength.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for tropical fruit, florals, citrus brightness, and a complex sweet structure with a clean, silky finish. Look for notes like passionfruit, peach, bergamot, hibiscus, and sugarcane sweetness.",
+          "extractionNotes": "Use relatively hot water, around 94-96 C, to fully express florals and fruit without flattening the cup. A medium-fine grind is usually appropriate for filter brewing, but lean slightly finer if the cup tastes thin or muted. Keep brew times controlled and avoid excessive agitation; this coffee should reward a clean, balanced extraction with high clarity. If using espresso, a longer ratio and careful puck prep can help preserve the fruity top notes.",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 1,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Washed Colombian light roast with clarity-forward structure and similar origin-driven sweetness and lift."
+            },
+            {
+              "number": 2,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Colombian washed profile with bright, clean aromatics and a similar approachable but nuanced structure."
+            },
+            {
+              "number": 3,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Light washed Colombian coffee with transparent fruit and floral notes that likely overlaps well with Pink Bourbon character."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4382,
+        "inputTokens": 1363,
+        "outputTokens": 476,
+        "cost": 0.0013068
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi is a Swedish specialty roaster known for precise, light roasts that emphasize origin clarity and varietal expression. They favor transparency in sourcing and extraction-focused roasting that highlights the intrinsic qualities of high-quality beans.",
+          "processingNuance": "Washed processing with careful fermentation control typical of quality Colombian producers in Huila. Pink Bourbon's natural sweetness is enhanced by washed clarity, with likely 12-18 hour fermentation and thorough washing to remove mucilage while preserving floral aromatics.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Tropical fruits (mango, pineapple, peach), floral notes (jasmine, rose), honey sweetness, delicate fruit complexity with tea-like clarity and subtle spice undertones characteristic of Pink Bourbon.",
+          "extractionNotes": "Target 88-92°C water temperature with a slightly finer grind than typical washed coffees to extract floral complexity without over-extracting. Aim for 1:16-1:17 ratio with 3-4 minute contact time. The coffee is at 66 days post-roast (peak window 2-4 months), so CO2 is well-released; expect bright, articulate cup with minimal channeling risk.",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Colombian washed light roast emphasizing floral and fruit clarity; similar altitude range and processing approach to highlight varietal complexity"
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Colombian washed Caturra/Castillo light roast from similar high-altitude region; shares tropical fruit and floral profile with comparable clarity focus"
+            },
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Colombian light washed with emphasis on fruit and floral aromatics; similar roast philosophy and varietal expression strategy"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6589,
+        "inputTokens": 1641,
+        "outputTokens": 565,
+        "cost": 0.0035728
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 9596,
+        "inputTokens": 1438,
+        "outputTokens": 78,
+        "cost": 0.0002625
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi typically roasts with a Scandinavian light-roast approach focused on transparency, high-definition acidity, and origin expression rather than roast development or body emphasis.",
+          "processingNuance": "This is a washed Pink Bourbon from high-elevation Huila, so expect a very clean cup with pronounced aromatic lift and structured acidity. In Tarqui, washed processing commonly includes selective picking, depulping, a fermentation stage before washing, and careful patio or raised-bed drying. With Pink Bourbon, washed processing often preserves intense florals and tropical/citrus top notes while keeping the finish crisp rather than fermenty.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for jasmine-like florals, tropical fruit brightness, pink/red citrus, stonefruit, and a refined sugary sweetness with a tea-like, complex finish.",
+          "extractionNotes": "High-density, light-roasted washed Pink Bourbon usually benefits from relatively high energy extraction. Start with near-boiling water around 95-98C, especially for pourover. Grind slightly finer than a comfort-bodied washed Central profile but avoid pushing so fine that florals get buried under chalky bitterness. Expect best results with strong agitation control and enough contact time to fully open sweetness and aromatics. Because the coffee is 66 days off roast and well rested, solubility should be stable and flavors may present with excellent clarity; you may need a slightly finer grind than at earlier rest. If cups taste sharp or thin, increase extraction with finer grind or hotter water. If cups become drying, mute the agitation and back off slightly on extraction.",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Closest overall match as a light-roasted washed Colombia with clarity-driven structure and lifted aromatics."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Another light washed Colombian profile likely emphasizing citrus, florals, and clean acidity rather than body."
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Similar high-elevation washed Colombia cup architecture with transparent sweetness and articulate acidity."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 10991,
+        "inputTokens": 1363,
+        "outputTokens": 524,
+        "cost": 0.0086475
+      }
+    },
+    "Mulish": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "third-wave specialty roaster focused on light roasts highlighting origin character and floral aromatics",
+          "processingNuance": "washed process on heirloom varieties typically yields clean, bright acidity with minimal fermentation residue, allowing precise control over extraction for floral and stone fruit notes",
+          "densityEstimate": "high",
+          "flavorExpectations": "optimize for nectarine stone fruit sweetness, honeysuckle nectar, and lavender florals with jasmine undertones",
+          "extractionNotes": "use 92-94°C water, medium-fine grind, 2:00-2:30 pour-over timing to preserve delicate florals; avoid over-extraction to prevent muted aromatics given age past peak",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "light roast washed Ethiopian with similar heirloom/JARC varieties and clarity-focused structure"
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "light roast washed Ethiopian landraces matching floral clarity and processing nuance"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 2779,
+        "inputTokens": 1488,
+        "outputTokens": 274,
+        "cost": 0.008574
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2300 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold typically roasts very light and transparency-driven, aiming for floral precision, tea-like structure, and high sweetness with minimal roast influence",
+          "processingNuance": "A washed Ethiopian heirloom coffee like this is usually fully depulped, carefully fermented in water or dry conditions, then thoroughly washed and dried on raised beds. That tends to preserve aromatics, but as the coffee moves past peak, the crisp florals and citrus lift fade first while stonefruit becomes softer and the cup can read cleaner but less vivid. Expect relatively low process-derived funk and a profile that depends more on cultivar expression and high-grown density than fermentation character.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Nectarine, white peach, honeysuckle, lavender, jasmine-like floral notes, sweet lemon tea, and a delicate honeyed finish. At this stage, optimize for sweetness and soft florals rather than maximal sparkling acidity.",
+          "extractionNotes": "Use a slightly finer grind than you might for an older light roast only if the cup is thinning; otherwise keep a balanced medium-fine grind. Water around 92-95 C is appropriate. A longer brew contact can help recover sweetness from a past-peak light Ethiopian, but avoid pushing too hard or the florals may flatten into dryness. In pourover, moderate agitation and a slightly higher ratio can help preserve clarity while lifting fruit. For espresso, expect reduced vibrancy and consider a slightly longer ratio or lower pressure to avoid sharpness.",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Light washed Ethiopian heirloom profile with floral clarity and high-toned fruit, closely matching the expected structure."
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Washed Ethiopian landrace/heirloom cup with jasmine-like florals and delicate sweetness similar to this coffee's profile."
+            },
+            {
+              "number": 6,
+              "name": "Sey Burundi Heza",
+              "why": "Not Ethiopian, but shares a clean washed structure with lifted sweetness and refined florals that overlaps with the expected cup style."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4154,
+        "inputTokens": 1361,
+        "outputTokens": 521,
+        "cost": 0.001378
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold emphasizes origin clarity and varietal expression, favoring light roasts that preserve origin characteristics and floral/aromatic complexity",
+          "processingNuance": "Ethiopian washed Heirloom coffees undergo careful fermentation control post-pulping to develop clarity while retaining subtle fruit esters. Extended drying on raised beds accentuates delicate aromatics and floral notes",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Stone fruit (nectarine), floral sweetness (honeysuckle, lavender), with potential white tea or bergamot undertones. Brightness with gentle body; avoid over-extraction which would amplify any remaining astringency given age",
+          "extractionNotes": "At 118 days post-roast (15 days past peak), CO2 has largely degassed. Target 195-198°F water temperature, medium-fine grind, 3:00-3:15 min immersion (pour-over) or 2:45-3:00 (espresso-style). Slightly shorter contact time compensates for diminished aromatics; focus on clarity extraction to preserve remaining floral/stone fruit notes",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Light washed Ethiopian with JARC varieties; emphasizes clarity and floral character similar to nectarine/honeysuckle profile"
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Light washed Ethiopian Landrace with aromatic complexity and delicate stone fruit notes"
+            },
+            {
+              "number": 12,
+              "name": "April Ethiopia Regessa",
+              "why": "Ethiopian origin with similar floral/aromatic character, though natural-processed; cup structure shares lavender/honeysuckle clarity"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6376,
+        "inputTokens": 1636,
+        "outputTokens": 526,
+        "cost": 0.0034128
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold focuses on extremely transparent, light roasts designed to highlight origin characteristics, delicate aromatics, and vibrant acidity.",
+          "processingNuance": "High-quality Ethiopian washed processing typically involves precise fermentation (often 24-48 hours in tanks), followed by thorough washing to remove all mucilage, and then slow drying on raised beds. This careful process aims to maximize clarity, floral notes, and bright acidity, allowing the delicate heirloom aromatics like nectarine, honeysuckle, and lavender to shine through.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a very clean, bright, and aromatic cup. The primary notes should be delicate stone fruit (nectarine), prominent sweet floral characteristics (honeysuckle), and a refined herbal-floral perfumed quality (lavender). It should have a light body, vibrant acidity, and a very long, clean finish.",
+          "extractionNotes": "Due to its high density, light roast, and delicate flavor profile, use hot water (96-98°C / 205-208°F) to ensure thorough extraction. A finer grind than average will be necessary to achieve balance and sweetness without sourness. Focus on even saturation during the bloom and pour to prevent channeling. As it's past peak, consider a slightly higher dose or a slightly longer contact time to compensate for some volatile loss and enhance intensity. Use soft, mineral-balanced water to allow the intricate floral notes to fully express themselves.",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Shares the origin, washed process, light roast, and similar JARC heirloom varieties, all known for high clarity and floral/fruity notes."
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Directly matches origin (Ethiopia), process (washed), roast level (light), and varietal (Landrace/Heirloom), making it a very close cup profile match."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7972,
+        "inputTokens": 1435,
+        "outputTokens": 513,
+        "cost": 0.00052305
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold typically pursues very high-clarity, competition-influenced light roasts with careful development for sweetness and transparency rather than roast character, often aiming for articulate florals, clean acidity, and precise extraction windows.",
+          "processingNuance": "This is most likely a classically washed Ethiopian lot from a high-elevation station, meaning depulped coffee underwent fermentation and full washing before raised-bed drying. In the cup, that usually translates to less ferment-driven fruit and more lifted florals, citrus-stonefruit definition, and tea-like structure. With Ethiopian heirloom material, washed processing often emphasizes aromatic delicacy and a slightly narrow but very refined extraction band. At 118 days off roast, some of the highest volatile florals may have softened, but washed structure and sweetness should remain if storage was good.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for white florals, honeysuckle, lavender, nectarine, sweet lemon or mandarin lift, soft peach-tea character, and a transparent sugar sweetness rather than heavy body. Expect a silky to tea-like cup with elegant acidity and a perfumed finish.",
+          "extractionNotes": "Treat as a high-density light-roasted washed Ethiopian: use relatively high water temperature, around 94-97C, unless bitterness from age appears. Grind on the finer side of light-roast filter settings, but keep drawdown controlled because washed Ethiopian coffees can stall if pushed too fine. Best results usually come from thorough saturation and moderate agitation early, then a gentler finish to preserve clarity. Since the coffee is well past peak, you may need slightly finer grind or a bit more agitation to recover sweetness and intensity; if the florals feel faded or the cup turns hollow, increase extraction before increasing dose. For espresso, expect fast-looking acidity unless pushed with a longer ratio and slightly higher temperature.",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Closest overall match: light-roasted washed Ethiopian with clarity-focused structure, floral aromatics, and tea-like fruit expression."
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Another light washed Ethiopia reference with similar heirloom-driven florals, citrus-stonefruit clarity, and delicate extraction behavior."
+            },
+            {
+              "number": 6,
+              "name": "Sey Burundi Heza",
+              "why": "Not Ethiopian, but structurally similar to an ultra-clean, high-elevation, light-roasted washed clarity profile emphasizing florals, sweetness, and finesse over body."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 13741,
+        "inputTokens": 1361,
+        "outputTokens": 608,
+        "cost": 0.0094825
+      }
+    },
+    "Gichathaini AA": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Nordic-inspired third wave roaster focusing on light roasts to highlight origin clarity and vibrant acidity",
+          "processingNuance": "Washed process typical of Nyeri region involves double fermentation with extended soaking, yielding bright acidity and clean fruit separation ideal for precise extractions",
+          "densityEstimate": "high",
+          "flavorExpectations": "blackcurrant, grapefruit, pomelo citrus brightness, brown sugar sweetness, black tea structure",
+          "extractionNotes": "Finer grind for immersion or medium-fine for pour-over; 92-96C water temp; 2:00-2:30 brew time to capture pomelo/clarity without bitterness; agitate early for even extraction",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Nyeri-region Kenyan washed SL varieties with similar pomelo/clarity structure"
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Light roast Kenyan washed SL28/SL34 matching blackcurrant/grapefruit brightness"
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Kenyan SL28/SL34 washed process with comparable vibrant citrus and tea-like cup"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3723,
+        "inputTokens": 1499,
+        "outputTokens": 323,
+        "cost": 0.009342
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1950 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters typically roasts with a clean, modern Nordic-leaning approach: light to light-medium, aimed at preserving origin transparency, high aromatics, and structured sweetness without overt roast character.",
+          "processingNuance": "Classic Kenyan washed lots from Nyeri usually undergo selective cherry picking, pulping, fermentation, thorough washing, and drying on raised beds. Expect very high acidity, strong sorting, and a clean cup with pronounced blackcurrant/citrus top notes. With SL28/SL34, the lot often expresses juicy berry-like acidity plus a sweet, syrupy mid-palate; extraction should emphasize clarity and sweetness while avoiding underdevelopment that can make the cup sharp or thin.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for blackcurrant, grapefruit, pomelo, and brown sugar sweetness. Expect vivid citric/tropical-like acidity layered over red-berry depth, with a tea-like finish and crisp separation between fruit and sweetness.",
+          "extractionNotes": "Use relatively hot water, around 93-96 C, to fully open the aromatics and sweetness. Grind moderately fine but avoid choking; this style often rewards a slightly longer contact time and a stable flow. If brewed too cool or too coarse, the cup can skew sour and hollow; if overextracted, the grapefruit can turn pithy and the blackcurrant can become harsh. For filter brewing, aim for high clarity with a balanced, clean finish and adjust agitation carefully to keep the acidity bright rather than sharp.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Very close match in origin, washed process, Kenyan clarity, and SL28/SL34 profile with blackcurrant-citrus structure."
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Similar Kenya washed profile with classic structured acidity, red fruit, and a clean Nordic-style presentation."
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Another Kenyan washed coffee emphasizing high clarity, juicy acidity, and berry-forward sweetness."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4010,
+        "inputTokens": 1371,
+        "outputTokens": 526,
+        "cost": 0.00139
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters is known for meticulously sourced, exceptionally high-quality coffees, roasted very lightly to highlight the nuanced origin characteristics, vibrant acidity, and clarity of the bean. Their approach prioritizes transparency and precision.",
+          "processingNuance": "Kenyan washed processing typically involves an initial dry fermentation (12-24 hours) to break down mucilage, followed by washing and then a secondary wet fermentation/soaking period (12-24 hours) in fresh water before drying on raised beds. This double fermentation contributes significantly to the characteristic sparkling acidity, complex fruit notes, and clean finish.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a vibrant, complex cup dominated by classic Kenyan notes: intense blackcurrant, zesty grapefruit, and tart pomelo-like acidity. These bright fruit flavors will be balanced by a foundational sweetness akin to brown sugar, potentially revealing subtle floral hints or a savory complexity typical of high-quality SL varieties.",
+          "extractionNotes": "The high density and light roast of this Kenyan coffee necessitate careful extraction. Use higher water temperatures (94-98°C) to facilitate solubles extraction. A finer grind setting than what might typically be used for other washed coffees is often required to achieve proper extraction without under-extraction or sourness. Extended pre-infusion and gentle agitation during the bloom can help ensure even saturation and a cleaner, sweeter cup. Aim for a slightly longer contact time overall to fully develop the complex acidity and sweetness.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Shares origin (Kenya), process (Washed Double Ferm), roast level (Light), and key varietals (SL28/SL34), ensuring a very similar cup profile focused on vibrant clarity."
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Another Kenyan washed coffee featuring SL varietals and a light roast, aligning perfectly with the cup structure and flavor expectations."
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "An excellent match in terms of origin (Kenya), varietal (SL28/SL34), process (Washed), and light roast, known for similar bright and complex fruit notes."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6757,
+        "inputTokens": 1448,
+        "outputTokens": 588,
+        "cost": 0.00057
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters emphasizes clean, bright extraction with respect for origin character. They typically employ light roasts on quality African and Central American coffees to highlight varietal expression and terroir clarity.",
+          "processingNuance": "Washed process with careful fermentation control typical of Nyeri district. AA grading indicates larger bean size, which requires attention to even heat penetration during roasting. The clean water processing removes fruit mucilage entirely, allowing varietal SL28/SL34 acidity and structure to dominate the cup.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Lead with blackcurrant and pomelo brightness; support with grapefruit tartness and subtle brown sugar sweetness. Expect tea-like body with pronounced citric acidity and stone fruit undertones. The SL28/SL34 blend should deliver complex berry/citrus interplay with floral herbaceousness.",
+          "extractionNotes": "Target 195-200°F water temperature to maximize bright acid expression without over-extracting. Use medium-fine grind (similar to pour-over consistency). Aim for 27-30 second espresso pulls or 3:30-4:00 minute pour-overs. At 25 days post-roast and 45% peak status, this coffee is entering optimal sweetness window—avoid under-extraction which will emphasize harsh citrus; avoid over-extraction which will mute the blackcurrant complexity.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Light-roasted Kenya with SL28/SL34, same varietal pairing and washed processing. Comparable altitude and cup clarity focus."
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Washed Kenya SL28/SL34 emphasizing bright citrus and berry character. Similar terroir (Kenya highlands) and roast philosophy."
+            },
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Light washed Kenya with extended fermentation handling of SL28/SL34. Shares focus on clarity and complex acidity expression."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7842,
+        "inputTokens": 1650,
+        "outputTokens": 611,
+        "cost": 0.003764
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1900 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan typically roasts for high transparency and vivid acidity, favoring modern light development that preserves origin character, aromatics, and structure rather than sweetness-through-roast. Their coffees often present as clean, expressive, and extraction-friendly but still benefit from precise brewing.",
+          "processingNuance": "Classic Kenyan washed profile, likely involving careful cherry sorting, pulping, fermentation to remove mucilage, washing, grading by density/size, and drying on raised beds. In Nyeri with SL28/SL34, this usually yields intense phosphoric/citric acidity, saturated dark-fruit character, and a structured finish. AA screen size suggests larger beans, but cup quality is more driven by altitude, cultivar, and processing rigor than size alone. Expect very clear separation of fruit notes with a firm acid backbone and less fermentation blur than naturals or anaerobics.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for classic high-definition Kenyan character: blackcurrant, pink/red grapefruit, pomelo, cassis-like acidity, layered citrus, and a brown sugar sweetness in the finish. If well extracted, expect juicy yet structured acidity, savory berry depth, and a crisp, articulate finish rather than soft roundness.",
+          "extractionNotes": "High-density light-roasted Kenyan washed coffee usually prefers relatively high energy extraction. Use near-boiling water, roughly 96-99C depending on brewer and dose, especially if cups seem tight or underdeveloped. Grind a touch finer than for softer washed Centrals, but manage flow to avoid astringency. Agitation can help unlock sweetness, though too much can exaggerate sharpness and finish dryness. For pourover, target a balanced contact time with full drawdown rather than rushing; if blackcurrant and brown sugar are muted, go finer or hotter. If grapefruit turns harsh and pithy, back off extraction slightly or reduce agitation. At 25 days post-roast it should be open and stable, with good solubility for both filter and modern espresso.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Closest match in origin, cultivar, process, roast style, and expected Nyeri-style pomelo/blackcurrant clarity."
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Very similar washed Kenya SL-driven cup structure with high acidity, berry-citrus definition, and light roast transparency."
+            },
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Another archetypal light-roasted washed Kenyan profile emphasizing phosphoric brightness, blackcurrant fruit, and crisp structure."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 13477,
+        "inputTokens": 1371,
+        "outputTokens": 637,
+        "cost": 0.0097975
+      }
+    },
+    "Gesha Village Lot 74": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Nordic-inspired ultra-light roasts emphasizing clarity, vibrancy, and origin character with meticulous quality control",
+          "processingNuance": "Washed process at Gesha Village enhances pristine clarity and high notes; fully depulped, fermented in clean water tanks with precise temperature control to minimize defects and highlight varietal purity",
+          "densityEstimate": "high",
+          "flavorExpectations": "jasmine florals, bergamot citrus, white peach stonefruit, lemongrass herbal brightness",
+          "extractionNotes": "Finer grind than typical washed; 92-94C water to unlock florals without scorching; 2:00-2:30 extraction time; target 1.3-1.4% TDS for clarity; avoid over-extraction to preserve delicacy",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 6,
+              "name": "Sey Burundi Heza",
+              "why": "SEY light roast washed African highland with similar floral/clarity structure"
+            },
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Light washed Ethiopian emphasizing clean floral and citrus vibrancy"
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Light washed high-altitude floral/bergamot profile matching Gesha clarity"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3701,
+        "inputTokens": 1503,
+        "outputTokens": 325,
+        "cost": 0.009384
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "SEY typically roasts very light and transparent, aiming to preserve high-toned aromatics, structure, and origin detail with minimal roast imprint",
+          "processingNuance": "Classic washed Gesha from Gesha Village usually involves selective cherry picking, careful depulping, fermentation to remove mucilage, thorough washing, and slow drying. Expect very clean cup structure, high aromatic lift, and a delicate tea-like sweetness. Because Gesha lots can be extremely floral and brittle in extraction, underdeveloped roast or uneven grinding can exaggerate acidity; a balanced extraction should emphasize clarity over body.",
+          "densityEstimate": "high",
+          "flavorExpectations": "jasmine, bergamot, white peach, lemongrass, with possible honeyed tea sweetness, citrus oil, and a silky floral finish",
+          "extractionNotes": "Use relatively hot water for a light Ethiopian Gesha, around 93-96 C, with a fine-to-medium grind and a controlled, even extraction. Aim for moderate brew times and avoid choking the bed, as over-fine grinding can mute florals and create a hollow finish. If brewing filter, a slightly higher ratio and gentle agitation can help unlock aromatics; if espresso, expect a narrow sweet spot and consider slightly higher yield to preserve florals and avoid sharp lemony acidity.",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Light washed Ethiopian cup with high clarity and floral complexity, closest in structure and roast intent"
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Washed Ethiopian profile with lifted florals, citrus, and clean sweetness, similar aromatic shape"
+            },
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha varietal reference with floral-tea-like clarity and delicate citrus/stonefruit tendencies"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4003,
+        "inputTokens": 1376,
+        "outputTokens": 473,
+        "cost": 0.0013072000000000001
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Sey Coffee specializes in precision light roasts that showcase terroir and varietal expression through meticulous sourcing and careful roast development. Known for highlighting floral and delicate aromatics in specialty lots.",
+          "processingNuance": "Washed processing in Geisha Village's high-altitude environment with careful fermentation control emphasizing clarity. The Geisha 1931 varietal's natural jasmine and floral compounds are enhanced by washed processing that removes fruit mucilage while preserving aromatic precursors.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Jasmine florality (primary), bergamot citrus brightness, white stone fruit (peach), herbal lemongrass notes. Target delicate floral clarity with subtle citrus complexity and white fruit undertones.",
+          "extractionNotes": "Use 195-197°F water (Geisha's floral compounds extract cleanly at slightly lower temps). Aim for 1:16-1:17 ratio with medium-fine grind. Extended pre-bloom (45-50s) to fully develop jasmine aromatics. Total brew time 3:00-3:15 for pour-over; 27-29s espresso pull. At 34 days post-roast, coffee is in peak window—acidity is balanced, aromatics fully developed. Avoid over-extraction which muddies the delicate florality.",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha varietal light washed highlighting floral/aromatic delicacy; similar brightness and botanical character in cup structure"
+            },
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Ethiopian washed light roast with clean, aromatic profile prioritizing clarity and subtle florality in high-altitude context"
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Light washed clarity-focused specialty with floral/citrus brightness and refined cup structure similar to Geisha expression"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7388,
+        "inputTokens": 1654,
+        "outputTokens": 592,
+        "cost": 0.0036912
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2100 masl",
+          "roastLevel": "ultra-light",
+          "roasterStyle": "SEY is renowned for its extremely light, transparent roasting style, meticulously designed to highlight the intrinsic clarity, delicate aromatics, and nuanced acidity of exceptional single-origin coffees. Their focus is on preserving the unique terroir and varietal characteristics, often resulting in bright, tea-like, and highly aromatic cups.",
+          "processingNuance": "As a washed Gesha, the processing for Lot 74 would involve careful hand-sorting of cherries, precise depulping, and controlled wet fermentation (likely 12-24 hours depending on conditions) to break down mucilage while enhancing clarity and delicate aromatics. This would be followed by meticulous washing and slow drying on raised beds to ensure even moisture reduction and preserve volatile compounds, all aimed at maximizing the varietal's signature floral and citrus notes.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect an incredibly clean and vibrant cup. Dominant notes of jasmine and bergamot will define the aromatic profile, alongside a delicate sweetness reminiscent of white peach. A bright, zesty lemongrass nuance will provide an uplifting finish. The body will be light and tea-like, with a sparkling acidity and a long, perfumed aftertaste.",
+          "extractionNotes": "This ultra-light roasted, high-density Gesha requires meticulous extraction. Use a high brewing temperature (96-99°C / 205-210°F) to ensure full flavor solubility. A finer grind than typical is recommended to achieve adequate extraction and balance. Aim for a slightly longer contact time, potentially with gentle agitation or pulse pours, to fully develop the delicate floral and fruit notes without under-extracting or creating astringency. Grinding very fine and pushing extraction can unlock complex nuances.",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Direct match for Gesha variety, light roast, and focus on exceptional clarity and delicate aromatics."
+            },
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Washed Ethiopian landrace varieties often share the delicate floral, citrus, and tea-like clarity that SEY aims for in their light roasts, providing a similar cup profile."
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Another light-roasted, washed Ethiopian landrace known for its bright, clean, and floral characteristics, aligning well with the Gesha 1931 profile."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7837,
+        "inputTokens": 1452,
+        "outputTokens": 629,
+        "cost": 0.0005951999999999999
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "SEY is known for extremely light, transparency-focused roasting aimed at preserving high-elevation structure, aromatic detail, and origin-specific acidity rather than roast development or body emphasis.",
+          "processingNuance": "This is a high-altitude washed Ethiopian Gesha 1931 from Gesha Village, likely fully washed with careful cherry selection, depulping, fermentation, washing, and raised-bed drying. In the cup this usually means very low ferment character, high aromatic separation, tea-like texture, and transparent florals/citrus. Compared with standard washed Ethiopian heirloom coffees, Gesha 1931 tends to present even more lifted jasmine, bergamot, and soft stonefruit with less bass-note sweetness and more delicate structure, so extraction must protect clarity and avoid muting the floral top end.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for jasmine florals, bergamot/citrus oil, white peach, lemongrass, sweet tea-like sugars, and a very clean, elongated finish. Best brews should emphasize elegance, perfume, and silky acidity over heavy sweetness or body.",
+          "extractionNotes": "Treat as a dense, very light roast: use relatively high water temperature, around 94-97 C, with strong grinder alignment and a grind fine enough to reach full sweetness without pushing into astringency. This coffee should respond well to high-extraction pour-over styles, but because Gesha structure is delicate, avoid excessive agitation that can flatten florals and overemphasize pithy citrus. Expect longer drawdowns than a more developed roast. If the cup is sharp or hollow, go finer before lowering temperature; if aromatics seem muted or the finish turns drying, reduce agitation or back off extraction slightly. At 34 days off roast from SEY, it should be opening well and can likely handle aggressive bloom and thorough wetting, but still benefits from a clarity-oriented brew ratio rather than body-heavy recipes.",
+          "cupStructureFamily": "washed-gesha-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Closest varietal and cup-shape match: a light-roasted Geisha with floral, tea-like clarity and delicate high-tone aromatics."
+            },
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Washed Ethiopian light roast with strong aromatic clarity and citrus-floral structure, though less specifically Gesha-like."
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Another light washed Ethiopia reference with clean florals and transparent acidity that maps well to the washed Ethiopian side of this coffee's profile."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 12341,
+        "inputTokens": 1376,
+        "outputTokens": 623,
+        "cost": 0.00967
+      }
+    },
+    "Worka Sakaro": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Nordic-inspired light roaster focusing on origin character, high clarity, and fruit-forward profiles",
+          "processingNuance": "Natural process from high-elevation Yirgacheffe microregion; extended fermentation enhances fermented fruit notes like blueberry, strawberry jam, and winey depth, with risk of muddiness if over-extracted",
+          "densityEstimate": "high",
+          "flavorExpectations": "optimize for ripe berry (blueberry, strawberry), jammy fruit, dark chocolate, and winey/fermented complexity",
+          "extractionNotes": "use 92-95C water, medium-fine grind, 2:00-2:30 pour-over timing to balance fruit clarity and body; coarser grind prevents over-extraction of winey notes; 43 days post-roast suits longer brews",
+          "cupStructureFamily": "natural-ethiopia-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 12,
+              "name": "April Ethiopia Regessa",
+              "why": "same roaster, light roast natural Ethiopia with heirloom varieties and fruit focus"
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "light roast natural Ethiopian heirloom with prominent fruit structure"
+            },
+            {
+              "number": 20,
+              "name": "Proud Mary Ethiopia Yirg Adado",
+              "why": "Yirgacheffe natural heirloom emphasizing jammy berry and winey notes"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3610,
+        "inputTokens": 1498,
+        "outputTokens": 341,
+        "cost": 0.009609
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "April Coffee typically roasts very light and transparent, aiming for high clarity, clean acidity, and origin expression with restrained roast development",
+          "processingNuance": "Natural processed Ethiopian coffees from Gedeb/Yirgacheffe are often slow-dried on raised beds with intact fruit, which boosts berry sweetness, florality, and wine-like fermentation notes. Worka Sakaro lots commonly show ripe, dense fruit character with a cleaner profile than more heavily fermented naturals, but they can still shift toward jammy sweetness and cocoa as they age. At peak rest, the cup should balance fruit intensity with a clean finish rather than overt funk.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Blueberry, strawberry jam, red wine, cocoa, dark chocolate, floral lift, and a syrupy sweet finish; optimize for layered fruit sweetness rather than sharp acidity",
+          "extractionNotes": "Use a medium-fine grind and slightly cooler water than for a washed Ethiopian if you want to preserve the berry top notes, around 92-94C. If the cup tastes thin or sharply acidic, extend contact time or grind slightly finer to emphasize jammy sweetness. If the natural character turns heavy or boozy, back off agitation and keep brew ratios moderate to avoid overextracting the fruit pulp-derived compounds. Works well with pour-over recipes that allow a long, even extraction and a small amount of bypass sweetness.",
+          "cupStructureFamily": "natural-ethiopia-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 18,
+              "name": "Brandywine Felloween IV",
+              "why": "Ethiopian natural with similar fruit-forward structure, high sweetness, and berry-driven aromatic intensity"
+            },
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "Natural Ethiopian profile with layered fruit, sweetness, and a similarly expressive cup structure"
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Heirloom natural character with vivid fruit and floral complexity aligned with Worka Sakaro's style"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4052,
+        "inputTokens": 1368,
+        "outputTokens": 494,
+        "cost": 0.0013376000000000002
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "April Coffee specializes in light roasts that emphasize origin clarity and natural process character, with particular expertise in Ethiopian naturals that showcase fruit-forward profiles while maintaining sweetness and complexity.",
+          "processingNuance": "Natural/dry process Ethiopian from Gedeb's high-altitude terroir, likely fermented in fruit and extended drying to develop jammy, wine-like aromatics. The heirloom varietal complexity and terroir interplay create layered berry and floral notes typical of Yirgacheffe naturals.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Optimize for blueberry and strawberry jam sweetness with wine-like fermentation notes; dark chocolate provides body. Expect high acidity with berry brightness, avoid over-extraction that would muddy the delicate fruit character.",
+          "extractionNotes": "Medium-fine grind; water temperature 195-198°F to preserve fruit aromatics without emphasizing tannins. Shorter contact times (3-4 min pour-over, 3:30-3:45 immersion) to maintain clarity. At 43 days post-roast, CO2 outgassing is minimal; expect stable, sweet extraction. Avoid long steep times that could extract earthy/funky notes.",
+          "cupStructureFamily": "natural-ethiopia-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Light natural Ethiopian heirloom with similar altitude terroir and fruit-forward character; both emphasize berry/fermentation complexity"
+            },
+            {
+              "number": 18,
+              "name": "Brandywine Felloween IV",
+              "why": "Light natural Ethiopian with heirloom genetics; comparable jammy sweetness and wine-like aromatics from extended natural fermentation"
+            },
+            {
+              "number": 20,
+              "name": "Proud Mary Ethiopia Yirg Adado",
+              "why": "Natural Ethiopian from similar Yirgacheffe region (though medium roast); shares the heirloom varietal fruitiness and chocolate undertones"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7024,
+        "inputTokens": 1646,
+        "outputTokens": 562,
+        "cost": 0.0035648000000000003
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "ultra-light",
+          "roasterStyle": "April Coffee is known for an ultra-light, Nordic-style roast profile that prioritizes transparency, clarity, and the inherent sweetness and complexity of high-quality green coffee. Their approach aims to highlight the unique terroir and varietal characteristics.",
+          "processingNuance": "Traditional Ethiopian natural processing, where the whole coffee cherries are sun-dried on raised beds. This method allows the fruit pulp to infuse sugars and flavors into the bean, resulting in prominent, intense fruit notes (blueberry, strawberry jam), often with wine-like fermentation characteristics and a heavier body. The 'dark chocolate' note suggests a good balance of roast development with the fruit, or a specific fermentation profile.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect an intensely fruity cup dominated by sweet berry notes like blueberry and strawberry jam. These will be complemented by a distinct wine-like acidity and complexity, suggesting well-integrated fermentation notes. A clean, rich dark chocolate finish should provide a balancing depth and body.",
+          "extractionNotes": "Due to its high density and ultra-light roast, this coffee will benefit from higher brewing temperatures (96-98°C / 205-208°F) to ensure thorough extraction of sugars and aromatics. A finer grind than typically used for washed coffees, combined with a slightly longer contact time, will help fully develop the complex flavors and mitigate potential sourness. Pay close attention to pre-infusion to ensure even saturation of the dense beans.",
+          "cupStructureFamily": "natural-ethiopia-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 12,
+              "name": "April Ethiopia Regessa",
+              "why": "Same roaster, origin, process, and general varietal type (heirloom). This is an extremely close match in profile and roasting philosophy."
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Ethiopian, light roast, natural process, and heirloom varietal. Shares the core characteristics for a similar cup structure and flavor profile."
+            },
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "Ethiopian, light roast, natural process, and JARC varieties (heirloom family). Very similar in terms of origin, processing, and intended flavor profile."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7662,
+        "inputTokens": 1443,
+        "outputTokens": 571,
+        "cost": 0.00055905
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "April typically pursues transparent, methodical light roasts designed for high sweetness, clear structure, and controlled solubility rather than aggressive underdevelopment. Their coffees often emphasize balance and expressive aromatics with brews tuned for even extraction and clarity.",
+          "processingNuance": "This is a classic high-elevation Ethiopian natural, likely dried whole cherry on raised beds with substantial fruit contact before milling. For extraction, that usually means a more porous bean structure than an equivalent washed coffee from the same altitude, with prominent berry aromatics, fermented fruit sweetness, and a slightly broader, more diffuse flavor presentation. Expect some variability in solubility compared with washed lots: the coffee can show intense top-note fruit early, then deepen into jammy sweetness and cocoa if extraction is pushed slightly further.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for ripe blueberry, strawberry preserve, red wine-like fruit depth, syrupy sweetness, and a dark chocolate finish. Best brews should present saturated berry fruit with a clean enough finish to keep the winey notes pleasant rather than boozy or heavy.",
+          "extractionNotes": "At 43 days off roast, the coffee should be quite usable and relatively settled. Because it is a light-roasted, high-grown Ethiopian natural, start with near-boiling water or about 96-99C for filter if you want full fruit saturation and sweetness. Grind slightly coarser than a washed Ethiopia if fines are clogging, but not so coarse that you lose jammy intensity. Aim for moderate-to-high extraction: this style often improves when pushed enough to bring out chocolate and preserve-like sweetness beneath the berry aromatics. If the cup tastes thin, sharp, or overly winey, grind finer or extend contact time; if it gets muddy or overly fermenty, coarsen slightly and reduce agitation. For pourover, a gentle bloom and controlled pours help keep clarity while preserving body.",
+          "cupStructureFamily": "natural-ethiopia-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "Closest in overall structure: light-roasted Ethiopian natural with ripe fruit-forward sweetness and a classic jammy natural profile."
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Another light Ethiopian natural emphasizing berry fruit, floral lift, and a sweet, expressive cup rather than heavy fermentation."
+            },
+            {
+              "number": 12,
+              "name": "April Ethiopia Regessa",
+              "why": "Same roaster, similar roast philosophy, and a closely related Ethiopian light natural cup structure focused on sweetness and clean fruit definition."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 13040,
+        "inputTokens": 1368,
+        "outputTokens": 608,
+        "cost": 0.0095
+      }
+    },
+    "Antigua Pastores": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1700 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "science-driven light roasts emphasizing origin clarity and sweetness with precise development",
+          "processingNuance": "fully washed with controlled fermentation typical of Antigua's clay-rich soils, yielding clean extraction with balanced acidity and body",
+          "densityEstimate": "high",
+          "flavorExpectations": "milk chocolate, orange citrus, toasted almond, caramel sweetness",
+          "extractionNotes": "18-92C water, medium-fine grind, 2:30-3:00 brew time to highlight chocolate and citrus without muddiness; finer grind safe for clarity",
+          "cupStructureFamily": "washed-central-america",
+          "closestReferenceProfiles": [
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Guatemala washed Bourbon at med-light roast with similar body-forward clarity"
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "light washed Bourbon/Caturra structure matching balanced sweetness and density"
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark",
+              "why": "Guatemala Caturra washed base, adjusted for lighter roast but similar cup body"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3195,
+        "inputTokens": 1493,
+        "outputTokens": 285,
+        "cost": 0.008754
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Counter Culture typically roasts with a clarity-first, origin-transparent approach: light to light-medium development, clean sweetness, and restrained roast imprint while keeping structure and balance.",
+          "processingNuance": "Washed Guatemalan coffee from Antigua usually brings thorough mucilage removal and clean drying, which preserves sweetness and a structured, cocoa-forward cup. At 48 days post-roast and marked in peak, this should be well-settled: acidity will be rounded, aromatics integrated, and body a touch fuller than at rest. Expect the washed process to support orange-like brightness without fermentation artifacts, with chocolate and nut notes becoming more prominent as extraction increases.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Milk chocolate, caramel, toasted almond, and orange zest/juice. Optimize for a balanced cup with sweet cocoa base, gentle citrus lift, and a clean nutty finish.",
+          "extractionNotes": "Use a medium-fine grind and target a medium extraction: water around 93-96 C is appropriate, slightly higher if you want more orange lift, slightly lower if the cup turns sharp. This coffee should tolerate a moderate brew ratio and slightly longer contact time because the peak rest should improve solubility and sweetness. For filter, aim for clean but not overly fast drawdown; for espresso, a slightly longer ratio can emphasize caramel and almond while keeping citrus vivid. If the cup tastes thin, grind finer before increasing temperature too much.",
+          "cupStructureFamily": "washed-central-america",
+          "closestReferenceProfiles": [
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Similar Guatemalan washed profile with bourbon-caturra-like sweetness and balanced structure."
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Shares washed Bourbon/Caturra sweetness and a chocolate-caramel centered cup structure, though Peru is typically a bit softer."
+            },
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Comparable medium washed profile with cocoa sweetness and approachable citrus, even if Colombian cup is often a touch brighter."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4552,
+        "inputTokens": 1365,
+        "outputTokens": 505,
+        "cost": 0.001354
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "medium",
+          "roasterStyle": "Counter Culture is known for precision washed coffees with balanced body and clarity, often highlighting origin character through medium roasts that preserve complexity while developing sweet, chocolate-forward notes",
+          "processingNuance": "Washed processing typical of Antigua region; volcanic soil mineral influence and careful fermentation contribute to clean cup with structured sweetness and moderate acidity. Water availability in Antigua allows for complete washing cycles",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Milk chocolate, orange brightness, toasted almond nuttiness, caramel sweetness—balanced profile favoring body and comfort over sharp clarity, with subtle citrus undertones",
+          "extractionNotes": "Target 200-205°F water temperature; medium-fine grind; 3:00-3:30 contact time for pour-over. Medium roast benefits from slightly lower temps to preserve orange acidity without over-extracting the caramel base. At 48 days post-roast, in excellent peak window—sweetness fully developed",
+          "cupStructureFamily": "washed-central-america",
+          "closestReferenceProfiles": [
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Same origin country, medium roast, washed process with Bourbon varietal; comfort-forward body profile aligned with Antigua's character"
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Medium roast washed Colombian with Caturra variety; similar body-first approach and chocolate/caramel sweetness development"
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Same roaster's signature light-roasted Colombia; demonstrates Counter Culture's precision washed methodology, though this Antigua sits at medium roast for added body"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6267,
+        "inputTokens": 1642,
+        "outputTokens": 506,
+        "cost": 0.0033376000000000005
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 9036,
+        "inputTokens": 1440,
+        "outputTokens": 112,
+        "cost": 0.0002832
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Counter Culture typically aims for transparent, balanced roasting with enough development for sweetness and approachability while preserving origin character; their washed Latin American offerings often lean clean, structured, and versatile rather than extremely Nordic-light.",
+          "processingNuance": "Traditional washed Antigua coffee, likely involving depulping, wet fermentation to remove mucilage, washing, and patio or raised-bed drying in a dry, sunny valley climate. Antigua washed lots often cup with very clean structure, moderated acidity, and cocoa-nut sweetness rather than intensely high-toned florals. At 48 days off roast, the coffee should be fully rested and comparatively stable, with reduced CO2 and slightly softened aromatic intensity but improved extraction evenness.",
+          "densityEstimate": "medium-high",
+          "flavorExpectations": "Optimize for milk chocolate, caramelized sugar, toasted almond, and gentle orange/citrus lift. Expect a round, sweet, comfort-forward cup with clean finish, moderate acidity, and more praline/cocoa structure than sparkling fruit clarity.",
+          "extractionNotes": "Because this is a washed Antigua Bourbon/Caturra roasted light-medium, it should respond well to moderate-to-high extraction without requiring extreme heat. Start around 93-95C for filter; if the cup tastes flat or nutty-dull, raise temperature slightly or grind finer. If orange notes get sharp or the finish dries out, lower temperature slightly or coarsen. Compared with ultra-light high-clarity coffees, this coffee will usually tolerate a somewhat finer grind and slightly longer contact time while still presenting sweetness. With 48 days rest, expect lower bloom activity, so don't overemphasize bloom volume; focus on even saturation. For pourover, target balanced extractions with medium drawdowns rather than chasing very fast clarity-driven brews. For espresso, expect easier puck prep and lower gas, but be careful not to overextract into woody cocoa bitterness.",
+          "cupStructureFamily": "washed-central-america",
+          "closestReferenceProfiles": [
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Closest match in origin, washed Central American structure, and comfort-forward sweetness with moderate clarity rather than high-acid florality."
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Similar washed Bourbon/Caturra composition and light-to-light-medium sweet nutty chocolate profile with balanced acidity."
+            },
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Comparable developed washed profile emphasizing caramelized sweetness and body over sparkling top-note clarity, though the origin is different."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": false
+        },
+        "total": 5,
+        "max": 6,
+        "elapsed": 12880,
+        "inputTokens": 1365,
+        "outputTokens": 600,
+        "cost": 0.0094125
+      }
+    },
+    "Huila Castillo": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Onyx Coffee Lab typically roasts for clarity, structure, and sweetness with precise profile development and a modern specialty emphasis, often balancing transparency with approachable intensity.",
+          "processingNuance": "Washed Colombian Huila coffees are typically depulped, fermented to break down mucilage, then thoroughly washed and dried, giving a cleaner cup with sweet-sugar, apple/stonefruit, and gentle nutty undertones. With Castillo/Caturra, expect moderate structural complexity rather than extreme florality; past-peak freshness can slightly mute top-end brightness and make the sweetness read more like browned sugar and baked apple.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Optimize for brown sugar sweetness, red apple, light nutty notes, and a smooth, rounded cup with moderate acidity rather than sharp citrus. At its best, it should read as comforting and polished, with subtle caramelized fruit and a clean finish.",
+          "extractionNotes": "Use a medium-fine grind and a slightly higher brew temperature to keep sweetness and structure present, but avoid over-extraction that could emphasize dryness or dull nuttiness. For filter, 93-95 C water is appropriate; a normal ratio around 1:15 to 1:17 should work well. Because it is past peak, consider a touch finer grind or slightly longer contact time to compensate for reduced aromatics, while watching for flattening or woody bitterness. If using espresso, aim for a modestly longer ratio to maintain sweetness and reduce harshness.",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Washed Colombian structure with similar sweet, approachable clarity and likely comparable Huila cup balance."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Colombian washed profile with Caturra/Castillo-like sweetness, balance, and clean fruit without high-floral intensity."
+            },
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Another light washed Colombian profile likely to share sweet, smooth, fruit-forward structure and regional similarity."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4186,
+        "inputTokens": 1369,
+        "outputTokens": 516,
+        "cost": 0.0013732
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Onyx Coffee Lab roasts to highlight origin character with balanced extraction, favoring clarity and sweetness in lightly developed profiles",
+          "processingNuance": "Washed process on Castillo/Caturra emphasizes clean fruit clarity and sweetness; Huila washed coffees often feature double-soaked fermentation for reduced astringency and enhanced brown sugar notes",
+          "densityEstimate": "medium",
+          "flavorExpectations": "brown sugar sweetness, red apple acidity, nutty depth, smooth mouthfeel",
+          "extractionNotes": "Use 92-94°C water, medium-fine grind to accentuate sweetness without bitterness; 2:30-3:00 min pour-over timing; past peak suggests coarser grind to avoid over-extraction staleness",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Light washed Colombian field blend with similar clarity and sweetness focus"
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Light washed Colombia Caturra/Castillo matching clean structure and varietals"
+            },
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Light washed Colombia with aligned cup profile and processing"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4709,
+        "inputTokens": 1497,
+        "outputTokens": 315,
+        "cost": 0.009216
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "medium",
+          "roasterStyle": "Onyx Coffee Lab is known for approachable, well-balanced medium roasts that prioritize sweetness and body while maintaining clarity. They focus on clean processing and consistent execution across their lineup.",
+          "processingNuance": "Washed Colombian Castillo and Caturra from Huila benefit from the region's consistent rainfall and volcanic soils. Washed processing emphasizes clean fermentation and bright acidity; these varieties develop brown sugar sweetness and structured body during drying.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Brown sugar, red apple, nutty character with smooth body. Huila washed coffees typically show balanced sweetness, mild stone fruit, and gentle spice notes without excessive brightness.",
+          "extractionNotes": "At 74 days post-roast (past peak), this coffee is losing some aromatics but remains in drinkable range. Brew at 195-197°F to extract sweetness; use medium-fine grind (0.8-0.9mm) to maintain clarity without over-extracting. Expect slightly muted top notes compared to fresh; compensate with slightly longer contact time (3:00-3:15 pour-over window).",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Same origin (Huila), similar varietals (Castillo/Caturra), medium washed Colombian with brown sugar and body-forward profile"
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Medium-roasted Colombian washed with Caturra, balanced sweetness and smooth body matching the tasting notes"
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Colombian washed with Caturra/Castillo blend; light roast reference showing how these varietals express in washed format"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6412,
+        "inputTokens": 1646,
+        "outputTokens": 547,
+        "cost": 0.0035048
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1600-1900 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Onyx Coffee Lab is known for meticulous sourcing, often highlighting transparency, quality, and a balanced, accessible presentation of specialty coffee. Their profiles typically emphasize sweetness, clarity, and clean finish, aiming for a harmonious cup rather than extreme acidity or wild fermentation notes in classic washed offerings.",
+          "processingNuance": "Washed processing in Colombia typically involves depulping the cherries, followed by a period of fermentation (either in tanks with water, often called 'wet fermentation,' or without water, 'dry fermentation'), to break down mucilage. After fermentation, the beans are thoroughly washed to remove any remaining mucilage and then dried, often on raised beds or patios. This method is designed to produce a very clean, bright, and articulate cup profile, highlighting the inherent characteristics of the bean and terroir.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a comforting and balanced cup with prominent notes of brown sugar sweetness and a crisp, malic red apple acidity. A smooth, nutty undertone, likely resembling almond or hazelnut, will provide depth and a clean finish. The overall profile should be round, clean, and highly drinkable, balancing sweetness, mild fruitiness, and subtle savory notes.",
+          "extractionNotes": "Due to the high density and washed process, this coffee will benefit from higher brew temperatures (200-205°F / 93-96°C) to ensure thorough extraction of sugars and nuanced acids. A medium-fine grind setting, slightly finer than typical, will likely be optimal to overcome density and achieve a balanced extraction. Given it's past peak, slightly longer contact times or more agitation during brewing might be necessary to fully express its flavors and mitigate potential staleness, ensuring a sweet, clean, and full-bodied cup.",
+          "cupStructureFamily": "washed-colombia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Excellent match for origin (Colombia), process (Washed), varieties (Caturra/Castillo), and typical light roast approach for such coffees."
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Shares origin (Colombia), washed process, and a light roast, representing a similar clean and balanced Colombian profile."
+            },
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Direct match for origin (Huila, Colombia), varieties (Castillo/Caturra), and washed process, providing a regional and varietal reference point."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 9954,
+        "inputTokens": 1442,
+        "outputTokens": 627,
+        "cost": 0.0005925
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1600-1900 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Onyx typically roasts with a modern clarity-first approach but often aims for broad accessibility: transparent origin character, polished sweetness, and enough development to make coffees expressive across both filter and espresso.",
+          "processingNuance": "Standard washed Colombia profile is most likely: selective picking, depulping, short to moderate fermentation, washing, and careful patio or mechanical drying. For Castillo/Caturra from Huila, this usually yields a clean cup with malic acidity, caramelized sugar sweetness, and moderate structure rather than highly floral or intensely fermenty character. At 74 days off roast and slightly past peak, expect some softening of aromatics and acidity with sweetness and nutty notes becoming more prominent.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Optimize for brown sugar sweetness, red apple-like malic acidity, mild citrus lift, toasted nut character, and a smooth, rounded finish. Expect comfort-forward washed Colombian structure more than sparkling high-definition florals.",
+          "extractionNotes": "Brew a little finer than a typical medium roast but not as aggressively as a high-elevation ultra-light clarity coffee. Water around 92-95C should suit the current age well; use the higher end if the cup tastes flat, lower end if nutty bitterness dominates. Because it is past peak, push extraction slightly to recover sweetness and structure: longer ratio or slightly finer grind can help. For pour over, aim for even flow and moderate contact time; for immersion, extend steep modestly if needed. Expect lower CO2 and faster wetting, so drawdown may run a bit quicker than when fresh.",
+          "cupStructureFamily": "washed-central-america",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Very close match in origin, washed process, and likely comfort-forward Huila cup structure with caramelized sweetness over extreme clarity."
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Similar medium-leaning washed Colombia profile with rounded body, sweetness, and approachable fruit rather than highly floral structure."
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Another washed Colombian reference that aligns with balanced sweetness and clean structure, though likely a bit lighter and more clarity-driven than this Onyx roast."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 11001,
+        "inputTokens": 1369,
+        "outputTokens": 549,
+        "cost": 0.0089125
+      }
+    },
+    "Intango Dark": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1900 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "third-wave roaster emphasizing origin transparency and balanced profiles, pushing darker roasts for structured body and roast-driven complexity",
+          "processingNuance": "Washed process from high-elevation Rwandan sites yields clean base structure with suppressed acidity, ideal for dark roasting where fruit notes caramelize into dried fruit and roast flavors dominate",
+          "densityEstimate": "low",
+          "flavorExpectations": "dark chocolate, molasses, dried cherry, balanced smoke, roasted nuts, low underlying acidity",
+          "extractionNotes": "Use hotter water (205-210°F) and coarser grind to avoid over-extraction bitterness; shorter brew times or immersion methods (French press, 4 min steep) enhance body and roast character; forgiving at 30 days post-roast",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "exact same coffee - Rwandan washed dark roast with chocolate/molasses/dried fruit structure"
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark",
+              "why": "similar dark roast washed profile with body-forward chocolate and caramelized notes"
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark",
+              "why": "dark roast with comparable molasses and dried fruit in a structured, low-acidity cup"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4389,
+        "inputTokens": 1497,
+        "outputTokens": 326,
+        "cost": 0.009381
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1600-1900 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture typically roasts with a precision-driven, origin-transparent approach; this dark expression is more developed than their standard light offerings, aiming for sweetness, structure, and roast-integrated comfort rather than high-toned clarity.",
+          "processingNuance": "A washed Rwandan coffee from Nyamasheke usually brings clean fruit and cocoa-like sweetness, but at dark roast the origin character is filtered through caramelization and roast development. Expect lower acidity, more soluble surfaces, and a heavier-bodied cup with molasses, cocoa, and dried-fruit notes. Because the roast is dark and the coffee is 30 days off roast and still in peak, it should be stable and forgiving, though excessive heat can quickly emphasize smoke and dryness.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Optimize for dark chocolate, molasses, dried cherry, toasted sugar, and a restrained smoky finish with some lingering sweetness.",
+          "extractionNotes": "Use boiling to just-off-boil water, but avoid overextraction if smoke becomes dominant; a slightly coarser grind than you would use for a light roast is usually safer. Aim for a shorter brew window in espresso or a moderate contact time in filter to emphasize sweetness over ashiness. If brewing filter, consider slightly lower agitation and a brew ratio that preserves body, such as 1:15.5 to 1:16.5. In espresso, a slightly longer ratio can help open up dried fruit and molasses while keeping bitterness in check.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "Direct match on origin region, washed process, dark roast, and similar Bourbon-family structure."
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark",
+              "why": "Closest structural analog for a developed washed coffee with chocolate-forward, roast-driven sweetness and lower clarity."
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark",
+              "why": "Another dark-roast profile emphasizing cocoa, depth, and reduced acidity, useful as a roast-level comparison."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4390,
+        "inputTokens": 1369,
+        "outputTokens": 503,
+        "cost": 0.0013524000000000001
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1400-1800 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture is known for precise roasting with emphasis on origin clarity even in darker roasts, balancing development heat with retained acidity and complexity",
+          "processingNuance": "Washed process from Nyamasheke region; typical Rwandan washed coffees benefit from volcanic soil minerality and careful fermentation control, resulting in cleaner cup profiles that maintain character even when darkly roasted",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Dark chocolate, molasses, dried cherry with subtle smoky undertones; expect reduced acidity with retained sweetness and body from the dark roast",
+          "extractionNotes": "At 30 days post-roast, coffee is in peak window (40% remaining). Use slightly cooler water (195-198°F) to avoid over-extraction of bitter compounds; medium-fine grind recommended. Shorter pull times (25-30s espresso) work well with dark roasts. For filter, aim for balanced extraction favoring body over brightness.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "This is the exact coffee being analyzed; same roaster, origin, varietal blend, and roast level"
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark",
+              "why": "Dark roast natural process with similar body-forward profile and chocolate/molasses character; similar roast philosophy prioritizing sweetness in dark roasts"
+            },
+            {
+              "number": 6,
+              "name": "Sey Burundi Heza",
+              "why": "Regional neighbor to Rwanda with similar altitude/volcanic terroir; washed process with related varietal profile, lighter roast but same origin characteristics"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 5955,
+        "inputTokens": 1644,
+        "outputTokens": 488,
+        "cost": 0.0032671999999999996
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture focuses on direct trade and sustainability, offering a range of roast levels. Their darker roasts emphasize deep sweetness, rich body, and approachable flavors, prioritizing balance and clarity even with significant roast development.",
+          "processingNuance": "The washed process provides a clean canvas for the darker roast, allowing for a focused development of caramelized sugars and dark fruit notes (like dried cherry) without any off-flavors. It ensures a clean, sweet finish beneath the roast-driven characteristics.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a rich, full-bodied cup with prominent notes of dark chocolate and molasses, complemented by hints of dried cherry. A subtle smokiness will be present, balanced by a lingering sweetness and low acidity.",
+          "extractionNotes": "To optimize for sweetness and avoid excessive bitterness, start with water temperatures in the range of 90-94°C (195-200°F). Use a medium-fine to medium grind. Darker roasts are more soluble, so aim for slightly shorter brew times than very light roasts, focusing on a thorough pre-infusion and controlled flow to achieve a balanced extraction of body and sweetness without over-extracting roast character.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "This is the exact coffee being analyzed, making it the perfect reference point for roast level, origin characteristics (as they present in a dark roast), and processing."
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark",
+              "why": "Shares a similar medium-dark to dark roast profile and a washed process, focusing on delivering a rich, sweet, and approachable cup with developed flavors, characteristic of well-executed darker roasts."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 9436,
+        "inputTokens": 1444,
+        "outputTokens": 464,
+        "cost": 0.000495
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture typically emphasizes transparency, seasonality, and origin expression, but in darker offerings they aim for a cleaner, more structured dark roast rather than a heavily carbonized profile—seeking sweetness, roast depth, and drinkability while retaining some regional character.",
+          "processingNuance": "This is a classic washed Rwanda profile, likely involving depulping, fermentation to remove mucilage, washing, and drying on raised beds before a deliberately developed dark roast. The washed process reduces ferment-heavy fruit and supports a clearer cocoa-caramel structure, but at this roast level most processing nuance shows up as integrated sweetness, restrained dried-fruit notes, and a cleaner finish compared with dark natural coffees.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Prioritize dark chocolate, molasses, toasted sugar, light smoke, and dried cherry in the finish. Expect a round, bittersweet cup with moderate acidity, heavier body, and a cleaner profile than many dark roasts from Brazil-heavy blends.",
+          "extractionNotes": "Because the coffee is dark and 30 days off roast, it should be relatively soluble and easy to extract. Use slightly cooler water, roughly 88-92C, to avoid excessive roast bitterness and ashiness. Grind a bit coarser than for light roasts and aim for shorter contact if bitterness builds quickly. For pour over, a lower-agitation recipe usually preserves chocolate sweetness and keeps smoky notes in check. For espresso, expect fast extraction and consider a slightly lower ratio or cooler brew temp if dryness appears. If the cup tastes hollow or overly smoky, reduce extraction; if it tastes flat and one-dimensional, a touch finer or hotter can help recover dried-fruit sweetness.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "Exact match: same roaster, origin, washed process, varieties, and dark roast intent."
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark",
+              "why": "Another Central/Latin-style washed dark roast profile with emphasis on roast sweetness, chocolate depth, and approachable extraction."
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark",
+              "why": "Similar dark-roast extraction behavior and bittersweet cup structure, though Intango should be cleaner and less natural-heavy in profile."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 11163,
+        "inputTokens": 1369,
+        "outputTokens": 552,
+        "cost": 0.0089425
+      }
+    },
+    "Finca Las Flores": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 6
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "research": {
+          "altitude": "1600-1800 masl",
+          "roastLevel": "light",
+          "roasterStyle": "ultra-light to light roasts emphasizing origin character, clarity, and sweetness in single-origin microlots",
+          "processingNuance": "Yellow honey process retains some mucilage during drying for enhanced sweetness and body; expect sticky fruit notes like peach and brown sugar with mild fermentation contributing floral lift",
+          "densityEstimate": "high",
+          "flavorExpectations": "peach, brown sugar sweetness, mild florals, creamy body",
+          "extractionNotes": "Finer grind than washed for body and sweetness extraction; 92-94C water to balance clarity and creaminess; 2:00-2:30 brew time to avoid under-extraction of honey sugars; V60 or Kalita optimal",
+          "cupStructureFamily": "honey-anaerobic",
+          "closestReferenceProfiles": [
+            {
+              "number": 26,
+              "name": "Verve Miel de Flores",
+              "why": "Honduras honey-processed Pacas/Catuai with similar sweetness and body focus"
+            },
+            {
+              "number": 19,
+              "name": "Santa Felisa by Bean & Bean",
+              "why": "Light natural/honey Central American with creamy, sweet cup structure"
+            },
+            {
+              "number": 25,
+              "name": "Onyx Honey Advent",
+              "why": "Honey process emphasizing sweetness and body matching yellow honey profile"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4104,
+        "inputTokens": 1493,
+        "outputTokens": 308,
+        "cost": 0.009099
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Brandywine typically roasts for expressive, high-aroma cups with a modern fruit-forward light-roast approach, aiming to preserve sweetness, clarity, and lots of top-note lift",
+          "processingNuance": "Yellow honey in Honduras usually means the coffee was depulped and dried with a moderate amount of mucilage left on the seed, often producing a cleaner profile than more heavily mucilaginous honey processes but with extra sugar-cane sweetness, stonefruit depth, and a silkier texture. For extraction, expect some syrupy body and ripe fruit sweetness without the funk of anaerobic processing; the process can accentuate peach/apricot notes while keeping florals gentle and the finish brown-sugar-like.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Prioritize peach, apricot, brown sugar, mild jasmine-like florals, and a creamy, rounded mouthfeel; look for sweet, ripe fruit over sharp citrus, with a soft finish and modest acidity",
+          "extractionNotes": "Brew to highlight sweetness and texture: use moderately hot water around 93-95 C, a medium-fine grind, and avoid over-aggressive agitation. If using filter, a slightly longer contact time can help unlock the creamy body and brown sugar notes, but too much extraction may mute the delicate floral layer. In espresso, aim for a slightly longer ratio and keep yield reasonable to preserve peach sweetness without drying the cup.",
+          "cupStructureFamily": "honey-anaerobic",
+          "closestReferenceProfiles": [
+            {
+              "number": 26,
+              "name": "Verve Miel de Flores",
+              "why": "Closest match on honey processing, floral sweetness, and syrupy fruit-forward structure."
+            },
+            {
+              "number": 25,
+              "name": "Onyx Honey Advent",
+              "why": "Shares the honey-process cup shape with layered sweetness and broad fruit expression."
+            },
+            {
+              "number": 19,
+              "name": "Santa Felisa by Bean & Bean",
+              "why": "Comparable sweet, ripe-fruit-leaning profile from a light-roast Latin American coffee with similar texture expectations."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4107,
+        "inputTokens": 1366,
+        "outputTokens": 489,
+        "cost": 0.0013288000000000002
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1400-1700 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Brandywine is known for meticulous sourcing and lighter roasts that preserve origin character, with particular expertise in natural and honey-processed coffees that highlight fruit-forward and floral profiles.",
+          "processingNuance": "Yellow honey (pulped natural) retains some mucilage during drying, creating a middle ground between washed clarity and natural fruit intensity. This process typically produces balanced sweetness with mild fermentation notes and enhanced body without overwhelming funk.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Stone fruit (peach, apricot), brown sugar sweetness, delicate floral notes (jasmine-like), creamy mouthfeel with balanced acidity. Yellow honey on Pacas typically avoids heavy fermentation, favoring clean fruit and subtle caramel notes.",
+          "extractionNotes": "Brew at 195-200°F; medium-fine grind recommended to balance clarity with the body this process provides. Shorter contact times (3-4 min immersion) preserve peach and floral delicacy; slightly extended pulls can emphasize brown sugar and cream. Currently at 38 days post-roast (peak 60%), optimal extraction window for 3-4 more weeks.",
+          "cupStructureFamily": "honey-anaerobic",
+          "closestReferenceProfiles": [
+            {
+              "number": 26,
+              "name": "Verve Miel de Flores — Honduras, Light, Honey",
+              "why": "Same origin country, honey process, light roast, Pacas/Catuai varieties; similar stone fruit and floral profile expectations"
+            },
+            {
+              "number": 22,
+              "name": "Special Guests Andres Cardona Purple Honey — Colombia, Light, Natural Honey Co-Ferment",
+              "why": "Light roast honey-processed coffee with emphasis on stone fruit, brown sugar sweetness, and creamy body structure"
+            },
+            {
+              "number": 24,
+              "name": "Black & White Fruit Cake — Costa Rica, Medium, Cinnamon Anaerobic",
+              "why": "Central American anaerobic/honey process with balanced stone fruit, caramel sweetness, and clean fruit clarity at similar roast depth"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6661,
+        "inputTokens": 1643,
+        "outputTokens": 579,
+        "cost": 0.0036304
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 10204,
+        "inputTokens": 1440,
+        "outputTokens": 477,
+        "cost": 0.0005022
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1450-1700 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Brandywine typically favors expressive, modern light roasts that highlight vivid fruit, sweetness, and distinct process character while keeping enough development for approachable solubility and texture.",
+          "processingNuance": "Yellow honey processing means a meaningful portion of mucilage was left on the seed during drying, usually producing more sweetness and rounded texture than a fully washed coffee but with cleaner fruit expression than heavier red or black honey lots. With Pacas from Marcala, expect a balance of stonefruit, caramelized sugar, light florals, and a creamy mid-palate rather than intense ferment. Extraction often benefits from enough energy to open the sticky-process sweetness without pushing into muddled dryness.",
+          "densityEstimate": "medium-high",
+          "flavorExpectations": "Optimize for peach and soft stonefruit, brown sugar sweetness, gentle floral lift, and a creamy, rounded body. Best cups should feel sweet and plush with restrained acidity rather than sharply citrusy or ultra-tea-like clarity.",
+          "extractionNotes": "Use slightly higher extraction than you might for a very delicate washed coffee, but not as aggressively as a funky anaerobic. Start around 92-94C for filter; push toward 94C if the cup tastes too soft or underdefined. Grind a touch finer than a body-forward medium roast, but slightly coarser than a high-grown washed Ethiopia or Kenya. Aim for even flow and moderate contact time to preserve honeyed sweetness and avoid silt-driven heaviness. If the cup turns flat, increase agitation or temperature slightly; if it becomes drying or loses florals, back off agitation and coarsen slightly. At 38 days off roast it should be well-settled and brew with stable solubility.",
+          "cupStructureFamily": "honey-anaerobic",
+          "closestReferenceProfiles": [
+            {
+              "number": 26,
+              "name": "Verve Miel de Flores",
+              "why": "Closest match in process family and regional cup shape: a light-roasted Central American honey coffee with sweetness, rounded fruit, and soft floral character."
+            },
+            {
+              "number": 25,
+              "name": "Onyx Honey Advent",
+              "why": "Useful structural match for honey-processed sweetness and texture, even though origin and specific profile may vary."
+            },
+            {
+              "number": 19,
+              "name": "Santa Felisa by Bean & Bean",
+              "why": "A light-roasted Central American fruit-forward coffee with sweetness and body, similar in approachable structure though this Honduras lot should be cleaner and less fermenty than a natural."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": false
+        },
+        "total": 5,
+        "max": 6,
+        "elapsed": 12434,
+        "inputTokens": 1366,
+        "outputTokens": 574,
+        "cost": 0.009155
+      }
+    }
+  },
+  "phase2": {
+    "El Placer": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "El Placer Bergamot Veil",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 94,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            94,
+            93.5,
+            93.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            94,
+            94,
+            93.5,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 5,
+            "batch": 6
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1403,
+        "inputTokens": 3167,
+        "outputTokens": 138,
+        "cost": 0.0014876000000000002
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "El Placer Geisha Floral Clarity",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 94,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 25,
+          "ssPulseTemperatures": [
+            94,
+            93.5,
+            93
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 32,
+          "batchPulseTemperatures": [
+            94,
+            93.5,
+            93,
+            92.5
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1773,
+        "inputTokens": 3271,
+        "outputTokens": 191,
+        "cost": 0.012678
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "El Placer Garden Tea",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 94,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 25,
+          "ssPulseTemperatures": [
+            94,
+            93.5,
+            93
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 31,
+          "batchPulseTemperatures": [
+            94,
+            94,
+            93.5,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2168,
+        "inputTokens": 3167,
+        "outputTokens": 140,
+        "cost": 0.0093175
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "El Placer Gardenia Clarity",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 93,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 24,
+          "ssPulseTemperatures": [
+            93,
+            92,
+            91
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            93,
+            92,
+            91,
+            90
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2743,
+        "inputTokens": 3595,
+        "outputTokens": 240,
+        "cost": 0.003836
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8906,
+        "inputTokens": 3419,
+        "outputTokens": 78,
+        "cost": 0.00055965
+      }
+    },
+    "Finca La Fuente": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "La Fuente Pink Bourbon",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 1229,
+        "inputTokens": 3048,
+        "outputTokens": 131,
+        "cost": 0.0014288000000000003
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Huila Pink Bourbon Floral Bloom",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 95.5,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            95.5,
+            95,
+            94.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95.5,
+            95,
+            94.5,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 1563,
+        "inputTokens": 3154,
+        "outputTokens": 194,
+        "cost": 0.012372
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Tarqui Pink Bourbon Florals",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 48,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 2683,
+        "inputTokens": 3461,
+        "outputTokens": 241,
+        "cost": 0.0037328
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "La Fuente Pink Bloom",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 2685,
+        "inputTokens": 3048,
+        "outputTokens": 196,
+        "cost": 0.00958
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 9014,
+        "inputTokens": 3291,
+        "outputTokens": 80,
+        "cost": 0.00054165
+      }
+    },
+    "Mulish": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Mulish Lavender Nectar",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            96,
+            95.5,
+            95
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95.5,
+            95
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.6,
+            "batch": 6.8
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": false,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 1169,
+        "inputTokens": 3130,
+        "outputTokens": 139,
+        "cost": 0.0014744
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Mulish Washed Heirloom Past Peak",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 95.5,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            96,
+            95.5,
+            95
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            95.5,
+            95,
+            94.5
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 1457,
+        "inputTokens": 3230,
+        "outputTokens": 195,
+        "cost": 0.012615
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Mulish Lavender Clarity",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            95,
+            94,
+            93
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 29,
+          "batchPulseTemperatures": [
+            95,
+            94,
+            93,
+            92
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 2506,
+        "inputTokens": 3551,
+        "outputTokens": 239,
+        "cost": 0.0037968000000000003
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Mulish Lavender Nectar",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 95.5,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            95.5,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95.5,
+            95.5,
+            94.5,
+            93.5
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 3035,
+        "inputTokens": 3130,
+        "outputTokens": 208,
+        "cost": 0.009905
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Mulish's Lingering Bloom",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 97,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            97,
+            96,
+            95
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            97,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 7.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 8017,
+        "inputTokens": 3365,
+        "outputTokens": 235,
+        "cost": 0.00064575
+      }
+    },
+    "Gichathaini AA": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Nyeri Blackcurrant Spark",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 45,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            95
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A6": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 925,
+        "inputTokens": 3169,
+        "outputTokens": 139,
+        "cost": 0.0014900000000000002
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Nyeri Blackcurrant Pomelo",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.8,
+          "bloomDuration": 50,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            95,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            95,
+            94,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 3.2,
+            "batch": 5.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A6": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 1459,
+        "inputTokens": 3264,
+        "outputTokens": 183,
+        "cost": 0.012537
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Gichathaini AA | Blackcurrant Clarity",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.75,
+          "bloomDuration": 48,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            95,
+            94,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            95,
+            94,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 3.2,
+            "batch": 5.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A6": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 2585,
+        "inputTokens": 3602,
+        "outputTokens": 246,
+        "cost": 0.0038656000000000003
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Nyeri Currant Lift",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            96,
+            96,
+            95
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.1,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A6": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 2643,
+        "inputTokens": 3169,
+        "outputTokens": 193,
+        "cost": 0.0098525
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Nyeri Blackcurrant Burst",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.8,
+          "bloomDuration": 45,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 28,
+          "batchPulseTemperatures": [
+            96,
+            95,
+            94,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 3.1,
+            "batch": 4.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A6": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 7829,
+        "inputTokens": 3410,
+        "outputTokens": 234,
+        "cost": 0.0006519
+      }
+    },
+    "Gesha Village Lot 74": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Gesha Village Jasmine Lift",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.8,
+            "batch": 6
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": false,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 9,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 1336,
+        "inputTokens": 3161,
+        "outputTokens": 195,
+        "cost": 0.0015764000000000002
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Gesha Village Jasmine Clarity",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            95,
+            94.5,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            94.5,
+            94,
+            93.5
+          ],
+          "grindRecommendation": {
+            "singleServe": 3.2,
+            "batch": 5.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 1866,
+        "inputTokens": 3265,
+        "outputTokens": 189,
+        "cost": 0.01263
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Gesha 1931 Jasmine Clarity",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 2384,
+        "inputTokens": 3589,
+        "outputTokens": 243,
+        "cost": 0.0038432
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Bench Maji Jasmine",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 22,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            96,
+            95,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 2565,
+        "inputTokens": 3161,
+        "outputTokens": 196,
+        "cost": 0.0098625
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8687,
+        "inputTokens": 3408,
+        "outputTokens": 78,
+        "cost": 0.000558
+      }
+    },
+    "Worka Sakaro": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Worka Sakaro Berry Jam",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96,
+            95,
+            94,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 6,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1203,
+        "inputTokens": 3138,
+        "outputTokens": 139,
+        "cost": 0.0014776000000000001
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Worka Sakaro Berry Jam",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 94,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            94,
+            93,
+            92
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            94,
+            93,
+            93,
+            92
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1598,
+        "inputTokens": 3241,
+        "outputTokens": 184,
+        "cost": 0.012483
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Worka Sakaro | Blueberry Wine",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 27,
+          "ssPulseTemperatures": [
+            96,
+            95,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 32,
+          "batchPulseTemperatures": [
+            96,
+            95,
+            94,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2344,
+        "inputTokens": 3545,
+        "outputTokens": 243,
+        "cost": 0.003808
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Worka Berry Jam",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 94,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            94.5,
+            94.5,
+            93.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            94.5,
+            94.5,
+            94,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2741,
+        "inputTokens": 3138,
+        "outputTokens": 206,
+        "cost": 0.009905
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8901,
+        "inputTokens": 3377,
+        "outputTokens": 76,
+        "cost": 0.00055215
+      }
+    },
+    "Antigua Pastores": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Antigua Almond Bloom",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 94.5,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 25,
+          "ssPulseTemperatures": [
+            94.5,
+            94,
+            93.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            94.5,
+            94,
+            93.5,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 1193,
+        "inputTokens": 3127,
+        "outputTokens": 151,
+        "cost": 0.0014924
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Antigua Pastores Sweet Structure",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 25,
+          "ssPulseTemperatures": [
+            95,
+            94.5,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            95,
+            94.5,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 1310,
+        "inputTokens": 3233,
+        "outputTokens": 188,
+        "cost": 0.012519
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Antigua Pastores – Chocolate & Caramel",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            95,
+            94,
+            93
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            94,
+            94,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 3013,
+        "inputTokens": 3560,
+        "outputTokens": 244,
+        "cost": 0.003824
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Antigua Comfort Lift",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 24,
+          "ssPulseTemperatures": [
+            95,
+            94,
+            93
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            95,
+            94,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true,
+          "A7": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 3147,
+        "inputTokens": 3127,
+        "outputTokens": 194,
+        "cost": 0.0097575
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 9238,
+        "inputTokens": 3380,
+        "outputTokens": 80,
+        "cost": 0.000555
+      }
+    },
+    "Huila Castillo": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Huila Sugar Apple",
+          "ratio": 16.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 25,
+          "ssPulseTemperatures": [
+            95,
+            94,
+            93
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            94,
+            93,
+            92
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.1,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": false,
+          "A12": true
+        },
+        "total": 8,
+        "max": 9,
+        "applicable": 9,
+        "elapsed": 1286,
+        "inputTokens": 3077,
+        "outputTokens": 143,
+        "cost": 0.0014596000000000001
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Huila Castillo Brown Sugar Apple",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 50,
+          "bloomTemperature": 94.5,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            94.5,
+            94,
+            93.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            94.5,
+            94,
+            93.5,
+            93
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 9,
+        "max": 9,
+        "applicable": 9,
+        "elapsed": 1394,
+        "inputTokens": 3183,
+        "outputTokens": 194,
+        "cost": 0.012459
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Huila Castillo Sweet & Smooth",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 94,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            94,
+            93,
+            92
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            94,
+            93,
+            92,
+            91
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 9,
+        "max": 9,
+        "applicable": 9,
+        "elapsed": 2183,
+        "inputTokens": 3495,
+        "outputTokens": 241,
+        "cost": 0.00376
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Huila Apple Sugar",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 3,
+          "bloomDuration": 45,
+          "bloomTemperature": 95,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 23,
+          "ssPulseTemperatures": [
+            95,
+            94.5,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            95,
+            95,
+            94.5,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A11": true,
+          "A12": true
+        },
+        "total": 9,
+        "max": 9,
+        "applicable": 9,
+        "elapsed": 2591,
+        "inputTokens": 3077,
+        "outputTokens": 198,
+        "cost": 0.0096725
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8861,
+        "inputTokens": 3315,
+        "outputTokens": 78,
+        "cost": 0.0005440499999999999
+      }
+    },
+    "Intango Dark": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Intango Dark Ember",
+          "ratio": 16,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 90,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 25,
+          "ssPulseTemperatures": [
+            90,
+            89.5,
+            89
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            90,
+            90,
+            89.5,
+            89
+          ],
+          "grindRecommendation": {
+            "singleServe": 7.1,
+            "batch": 8
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1308,
+        "inputTokens": 3082,
+        "outputTokens": 145,
+        "cost": 0.0014648000000000003
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Intango Dark Chocolate Molasses",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 92,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            91.5,
+            91.5,
+            91.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 3,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            92,
+            91.5,
+            91
+          ],
+          "grindRecommendation": {
+            "singleServe": 7.1,
+            "batch": 8.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1866,
+        "inputTokens": 3186,
+        "outputTokens": 189,
+        "cost": 0.012393
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Intango Dark – Rwandan Chocolate",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            94.5,
+            94.5,
+            94.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 1,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96
+          ],
+          "grindRecommendation": {
+            "singleServe": 6.1,
+            "batch": 7
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2368,
+        "inputTokens": 3496,
+        "outputTokens": 234,
+        "cost": 0.0037328
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Intango Molasses Drift",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 96,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            94.5,
+            94.5,
+            94.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 1,
+          "batchPulsesInterval": 30,
+          "batchPulseTemperatures": [
+            96
+          ],
+          "grindRecommendation": {
+            "singleServe": 6.2,
+            "batch": 7.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2878,
+        "inputTokens": 3082,
+        "outputTokens": 192,
+        "cost": 0.009625
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8834,
+        "inputTokens": 3324,
+        "outputTokens": 78,
+        "cost": 0.0005454
+      }
+    },
+    "Finca Las Flores": {
+      "Gemini 2.0 Flash": {
+        "success": false,
+        "error": "Gemini 404: {\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a n",
+        "scores": {},
+        "total": 0,
+        "max": 0,
+        "applicable": 0
+      },
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Peach Honey Glow",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 45,
+          "bloomTemperature": 93,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 27,
+          "ssPulseTemperatures": [
+            93,
+            93.5,
+            94
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 32,
+          "batchPulseTemperatures": [
+            93,
+            93.5,
+            94,
+            94
+          ],
+          "grindRecommendation": {
+            "singleServe": 5,
+            "batch": 6
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1094,
+        "inputTokens": 3101,
+        "outputTokens": 137,
+        "cost": 0.0014596000000000001
+      },
+      "Grok 4.1 Fast": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Finca Las Flores Yellow Honey",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 93,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            93,
+            92.5,
+            92
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 32,
+          "batchPulseTemperatures": [
+            93,
+            92.5,
+            92,
+            92
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.2,
+            "batch": 5.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 1575,
+        "inputTokens": 3197,
+        "outputTokens": 188,
+        "cost": 0.012411
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Finca Las Flores Honeyed Stone",
+          "ratio": 17,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 48,
+          "bloomTemperature": 93,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 27,
+          "ssPulseTemperatures": [
+            93,
+            92,
+            91
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 31,
+          "batchPulseTemperatures": [
+            93,
+            92,
+            91,
+            90
+          ],
+          "grindRecommendation": {
+            "singleServe": 4.1,
+            "batch": 6.1
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2194,
+        "inputTokens": 3515,
+        "outputTokens": 241,
+        "cost": 0.003776
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "profileType": 0,
+          "title": "Marcala Peach Honey",
+          "ratio": 17.5,
+          "bloomEnabled": true,
+          "bloomRatio": 2.5,
+          "bloomDuration": 50,
+          "bloomTemperature": 93,
+          "ssPulsesEnabled": true,
+          "ssPulsesNumber": 3,
+          "ssPulsesInterval": 28,
+          "ssPulseTemperatures": [
+            93.5,
+            93.5,
+            92.5
+          ],
+          "batchPulsesEnabled": true,
+          "batchPulsesNumber": 4,
+          "batchPulsesInterval": 32,
+          "batchPulseTemperatures": [
+            93.5,
+            93.5,
+            93,
+            92.5
+          ],
+          "grindRecommendation": {
+            "singleServe": 5.2,
+            "batch": 6.2
+          }
+        },
+        "scores": {
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A8": true,
+          "A9": true,
+          "A10": true,
+          "A12": true
+        },
+        "total": 8,
+        "max": 8,
+        "applicable": 8,
+        "elapsed": 2756,
+        "inputTokens": 3101,
+        "outputTokens": 208,
+        "cost": 0.0098325
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "A1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 9308,
+        "inputTokens": 3338,
+        "outputTokens": 78,
+        "cost": 0.0005475
+      }
+    }
+  },
+  "summary": [
+    {
+      "name": "GPT-5.4",
+      "researchPct": 97,
+      "recipePct": 100,
+      "combinedPct": 99,
+      "avgLatency": 7861,
+      "totalCost": 0.19062999999999994,
+      "costPerCall": 0.009531499999999997,
+      "callCount": 20
+    },
+    {
+      "name": "GPT-5.4 Mini",
+      "researchPct": 100,
+      "recipePct": 97,
+      "combinedPct": 98,
+      "avgLatency": 2907,
+      "totalCost": 0.02849440000000001,
+      "costPerCall": 0.0014247200000000004,
+      "callCount": 20
+    },
+    {
+      "name": "Gemini 2.5 Flash",
+      "researchPct": 60,
+      "recipePct": 73,
+      "combinedPct": 69,
+      "avgLatency": 8810,
+      "totalCost": 0.010557599999999999,
+      "costPerCall": 0.0005278799999999999,
+      "callCount": 20
+    },
+    {
+      "name": "Gemini 2.0 Flash",
+      "researchPct": 0,
+      "recipePct": 0,
+      "combinedPct": 0,
+      "avgLatency": 0,
+      "totalCost": 0,
+      "costPerCall": 0,
+      "callCount": 0
+    },
+    {
+      "name": "Haiku 4.5",
+      "researchPct": 98,
+      "recipePct": 100,
+      "combinedPct": 99,
+      "avgLatency": 4600,
+      "totalCost": 0.0732192,
+      "costPerCall": 0.00366096,
+      "callCount": 20
+    },
+    {
+      "name": "Grok 4.1 Fast",
+      "researchPct": 100,
+      "recipePct": 100,
+      "combinedPct": 100,
+      "avgLatency": 2617,
+      "totalCost": 0.217011,
+      "costPerCall": 0.01085055,
+      "callCount": 20
+    }
+  ]
+}
