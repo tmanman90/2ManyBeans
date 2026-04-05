@@ -11,10 +11,21 @@ export const GRINDER_LABELS = {
   'baratza-virtuoso-plus': 'Virtuoso+',
 };
 
-// Format grind label for aiden grind data (singleServe/batch steps only, no microns)
+// Approximate micron value for Ode Gen 2 step (linear: ~200µm at 1, ~25µm per step)
+function odeStepToMicrons(step) {
+  return Math.round(200 + (step - 1) * 70);
+}
+
+// Format grind label for aiden grind data (singleServe/batch steps)
 function formatAidenGrind(bean, preferences) {
   if (!bean.aidenGrind) return null;
+  const useMicrons = preferences?.grindSizeDisplay === 'microns';
   const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
+  if (useMicrons) {
+    const ssMicrons = odeStepToMicrons(bean.aidenGrind.singleServe);
+    const batchMicrons = odeStepToMicrons(bean.aidenGrind.batch);
+    return `SS ~${ssMicrons}µm / Batch ~${batchMicrons}µm`;
+  }
   return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
 }
 
