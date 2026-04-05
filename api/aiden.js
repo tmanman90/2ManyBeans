@@ -161,12 +161,14 @@ async function pushWithCredentials(profile, creds) {
   // Get device if not cached
   if (!deviceId) {
     const devices = await fellowFetch('/devices', { headers: authHeaders });
+    console.log('Fellow /devices response:', JSON.stringify(devices).slice(0, 500));
     const deviceList = devices.devices || devices;
     const device = Array.isArray(deviceList) ? deviceList[0] : null;
     if (!device) {
       throw Object.assign(new Error('No Aiden brewer found on your Fellow account'), { status: 404 });
     }
     deviceId = device.id || device.deviceId;
+    console.log('Using device:', deviceId);
   }
 
   // Cache token + device for next time (non-blocking)
@@ -221,6 +223,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
 
     // Get credentials (per-user or relay)
     const creds = await getFellowCredentials(uid);
+    console.log(`Fellow push: uid=${uid}, source=${creds.source}, email=${creds.source === 'user' ? creds.email : 'relay'}`);
 
     // Decryption failed: return error + try relay fallback for brew.link
     if (creds.source === 'decrypt_failed') {
