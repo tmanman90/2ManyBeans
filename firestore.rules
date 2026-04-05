@@ -23,8 +23,11 @@ service cloud.firestore {
     match /emailList/{userId} {
       allow read, delete: if request.auth != null && request.auth.uid == userId;
       allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'signUpDate', 'source'])
         && request.resource.data.email is string
-        && request.resource.data.email.size() <= 320;
+        && request.resource.data.email.size() <= 320
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100;
     }
   }
 }

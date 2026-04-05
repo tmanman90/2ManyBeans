@@ -34,8 +34,9 @@ export default withCorsAuth(async (req, res) => {
       max_completion_tokens: safeMaxTokens,
     };
 
-    if (responseFormat) {
-      params.response_format = responseFormat;
+    // Only allow json_object response format (used by Aiden recipe generation)
+    if (responseFormat?.type === 'json_object') {
+      params.response_format = { type: 'json_object' };
     }
 
     let response;

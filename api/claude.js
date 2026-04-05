@@ -14,7 +14,7 @@ const client = new Anthropic({
 
 export default withCorsAuth(async (req, res) => {
   try {
-    const { system, messages, maxTokens = 1000, model: requestedModel = 'claude-sonnet-4-6', tools } = req.body;
+    const { system, messages, maxTokens = 1000, model: requestedModel = 'claude-sonnet-4-6' } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array is required' });
@@ -31,10 +31,6 @@ export default withCorsAuth(async (req, res) => {
 
     if (system) {
       params.system = system;
-    }
-
-    if (tools && Array.isArray(tools)) {
-      params.tools = tools;
     }
 
     let response;

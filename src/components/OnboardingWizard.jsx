@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C, fonts, radius, shadows, cardBase } from '../styles/theme';
-import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const GRINDERS = [
@@ -13,7 +13,7 @@ const GRINDERS = [
   { key: 'other', label: 'Other' },
 ];
 
-const OnboardingWizard = ({ user, profile, createProfile, completeOnboarding }) => {
+const OnboardingWizard = ({ user, profile, createProfile, updateProfile }) => {
   const [name, setName] = useState(user?.displayName || '');
   const [grinder, setGrinder] = useState(profile?.preferences?.grinder || 'fellow-ode-gen2');
   const [grinderCustomName, setGrinderCustomName] = useState('');
@@ -37,9 +37,7 @@ const OnboardingWizard = ({ user, profile, createProfile, completeOnboarding }) 
 
       if (profile) {
         // Profile exists but onboarding not complete (partial completion case)
-        const { updateDoc } = await import('firebase/firestore');
-        const profileRef = doc(db, 'users', user.uid);
-        await updateDoc(profileRef, {
+        await updateProfile({
           preferences,
           onboardingComplete: true,
           marketingConsent,

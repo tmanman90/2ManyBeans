@@ -95,18 +95,11 @@ export const useAuth = () => {
       try {
         await signInWithCredential(auth, credential);
       } catch (error) {
-        // Handle multi-provider conflict (same email, different provider)
         if (error.code === 'auth/account-exists-with-different-credential') {
-          const pendingCred = OAuthProvider.credentialFromError(error);
-          // Sign in with existing provider first, then link
-          const googleResult = await signInWithPopup(auth, googleProvider);
-          if (pendingCred) {
-            const { linkWithCredential } = await import('firebase/auth');
-            await linkWithCredential(googleResult.user, pendingCred);
-          }
-        } else {
-          throw error;
+          // On native, we can't open a popup to link. Tell user to use Google instead.
+          throw new Error('An account with this email already exists. Please sign in with Google instead.');
         }
+        throw error;
       }
     } else {
       // Web: use Firebase's built-in Apple popup
@@ -114,6 +107,7 @@ export const useAuth = () => {
         await signInWithPopup(auth, appleProvider);
       } catch (error) {
         if (error.code === 'auth/account-exists-with-different-credential') {
+          // On web, we can link via popup
           const pendingCred = OAuthProvider.credentialFromError(error);
           const googleResult = await signInWithPopup(auth, googleProvider);
           if (pendingCred) {

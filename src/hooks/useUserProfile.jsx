@@ -33,30 +33,42 @@ export const usePreferences = () => {
 export const useUserProfile = (uid) => {
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (!uid) {
       setProfile(null);
       setLoaded(false);
+      setLoadError(false);
       return;
     }
 
     const profileRef = doc(db, 'users', uid);
 
     if (Capacitor.isNativePlatform()) {
-      // Native: single read at boot, no polling (profile changes only in-app)
-      getDoc(profileRef).then(snap => {
-        if (snap.exists()) {
-          setProfile({ id: snap.id, ...snap.data() });
-        } else {
-          setProfile(null);
-        }
-        setLoaded(true);
-      }).catch(err => {
-        console.error('[Profile] Failed to load:', err);
-        setProfile(null);
-        setLoaded(true);
-      });
+      // Native: single read at boot with retry on failure
+      const loadProfile = (attempt = 1) => {
+        getDoc(profileRef).then(snap => {
+          if (snap.exists()) {
+            setProfile({ id: snap.id, ...snap.data() });
+          } else {
+            setProfile(null); // genuinely doesn't exist
+          }
+          setLoaded(true);
+          setLoadError(false);
+        }).catch(err => {
+          console.error(`[Profile] Load attempt ${attempt} failed:`, err);
+          if (attempt < 3) {
+            // Retry with backoff
+            setTimeout(() => loadProfile(attempt + 1), 1000 * attempt);
+          } else {
+            // After 3 attempts, mark as error (NOT as "profile doesn't exist")
+            setLoadError(true);
+            setLoaded(true);
+          }
+        });
+      };
+      loadProfile();
     } else {
       // Web: real-time listener
       const unsub = onSnapshot(profileRef, (snap) => {
@@ -177,6 +189,7 @@ export const useUserProfile = (uid) => {
   return {
     profile,
     profileLoaded: loaded,
+    profileLoadError: loadError,
     preferences,
     isOnboarded,
     createProfile,

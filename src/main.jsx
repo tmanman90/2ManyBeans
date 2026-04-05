@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/global.css';
 import { Capacitor } from '@capacitor/core';
@@ -10,6 +10,9 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { App } from './App';
 import { AuthContext } from './contexts/AuthContext';
 
+// Module-scope lazy load (must NOT be inside component body)
+const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
+
 // Notify Capgo that the app loaded successfully (prevents rollback)
 if (Capacitor.isNativePlatform()) {
   import('@capgo/capacitor-updater').then(({ CapacitorUpdater }) => {
@@ -18,10 +21,11 @@ if (Capacitor.isNativePlatform()) {
 }
 
 const Root = () => {
+  const migrationStarted = useRef(false);
   const { user, loading: authLoading, signInWithGoogle, signInWithApple, logOut } = useAuth();
 
   const {
-    profile, profileLoaded, preferences, isOnboarded,
+    profile, profileLoaded, profileLoadError, preferences, isOnboarded,
     createProfile, migrateExistingUser, updatePreferences,
     updateProfile, completeOnboarding, contextValue,
   } = useUserProfile(user?.uid);
@@ -45,10 +49,19 @@ const Root = () => {
   // Gate 3: Profile loading
   if (!profileLoaded) return <LoadingScreen />;
 
+  // Gate 3b: Profile load failed after retries (don't confuse with "doesn't exist")
+  if (profileLoadError) return <LoadingScreen message="Connection issue. Retrying..." />;
+
   // Gate 4: No profile doc exists, need to determine if new or existing user
   if (!profile) {
     if (dataLoaded && beans.length > 0) {
-      migrateExistingUser(user);
+      if (!migrationStarted.current) {
+        migrationStarted.current = true;
+        migrateExistingUser(user).catch(err => {
+          console.error('[Migration] Failed:', err);
+          migrationStarted.current = false; // allow retry on next render
+        });
+      }
       return <LoadingScreen />;
     }
     if (!dataLoaded) return <LoadingScreen />;
@@ -56,14 +69,13 @@ const Root = () => {
 
   // Gate 5: Onboarding not complete
   if (!isOnboarded) {
-    const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
     return (
       <React.Suspense fallback={<LoadingScreen />}>
         <OnboardingWizard
           user={user}
           profile={profile}
           createProfile={createProfile}
-          completeOnboarding={completeOnboarding}
+          updateProfile={updateProfile}
         />
       </React.Suspense>
     );
