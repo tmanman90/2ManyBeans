@@ -109,7 +109,7 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
                 <div>
                   <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{recipe.grindSize.description}</div>
                   {recipe.grindSize.microns && (
-                    <div style={{ fontSize: 12, color: C.textMuted }}>~{recipe.grindSize.microns}\u00B5m</div>
+                    <div style={{ fontSize: 12, color: C.textMuted }}>~{recipe.grindSize.microns}µm</div>
                   )}
                 </div>
               </div>
@@ -131,7 +131,7 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Water Temperature</div>
                 <div style={{ fontSize: 14, color: C.text }}>
-                  {recipe.waterTemp.celsius}\u00B0C / {recipe.waterTemp.fahrenheit}\u00B0F
+                  {recipe.waterTemp.celsius}°C / {recipe.waterTemp.fahrenheit}°F
                 </div>
               </div>
             </div>

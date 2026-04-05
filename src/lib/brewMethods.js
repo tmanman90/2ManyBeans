@@ -29,7 +29,7 @@ export const BREW_METHODS = {
       if (bean.handBrewRecipe?.grindSize) {
         const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
         const gs = bean.handBrewRecipe.grindSize;
-        const microns = gs.microns ? ` (~${gs.microns}\u00B5m)` : '';
+        const microns = gs.microns ? ` (~${gs.microns}µm)` : '';
         return `${grinderName}: ${gs.setting} ${gs.description}${microns}`;
       }
       if (!bean.aidenGrind) return null;
