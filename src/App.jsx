@@ -12,6 +12,7 @@ import { ChatTab } from './tabs/ChatTab';
 import { ArchiveTab } from './tabs/ArchiveTab';
 import { OpenBeanFlow } from './components/OpenBeanFlow';
 import { SettingsPage } from './components/SettingsPage';
+import { usePreferences } from './hooks/useUserProfile';
 
 const tabs = [
   { key: 'rotation', label: 'Rotation', img: '/images/nav-rotation.png' },
@@ -22,6 +23,7 @@ const tabs = [
 ];
 
 export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, profile, updateProfile, refetchBeans }) => {
+  const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
@@ -239,6 +241,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         beans={beans}
         onOpenBean={handleModalOpen}
         targetSlot={targetSlot}
+        canisterCount={preferences.canisterCount || 3}
       />
 
       {/* Settings */}

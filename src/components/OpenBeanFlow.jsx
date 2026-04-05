@@ -7,11 +7,12 @@ import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { Btn } from './Btn';
 
-export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, targetSlot }) => {
+export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, targetSlot, canisterCount = 3 }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState('');
   const sealed = beans.filter(b => b.status === 'SEALED');
-  const emptySlots = [1, 2, 3].filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
+  const allSlots = Array.from({ length: canisterCount }, (_, i) => i + 1);
+  const emptySlots = allSlots.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.atmosSlot === n));
 
   useEffect(() => {
     if (!open) { setSearch(''); setSelectedId(null); }

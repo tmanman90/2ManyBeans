@@ -11,6 +11,7 @@ import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { getBrewMethod } from '../lib/brewMethods';
+import { getProfileForRoaster } from '../lib/roasterProfiles';
 import { usePreferences } from '../hooks/useUserProfile';
 
 // Parse ---BEAN_SCAN---{json}---END_SCAN--- from assistant text
@@ -244,6 +245,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const handleSaveToInventory = async () => {
     if (!scannedBean) return;
     try {
+      const profile = getProfileForRoaster(scannedBean.roaster);
       await addBean({
         name: scannedBean.name || 'Unknown',
         roaster: scannedBean.roaster || 'Unknown',
@@ -261,6 +263,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         cupScore: scannedBean.cupScore || '',
         brewingRec: scannedBean.brewingRec || '',
         sourcedBy: scannedBean.sourcedBy || '',
+        degasMin: profile.degasMin,
+        degasMax: profile.degasMax,
+        peakStart: profile.peakStart,
+        peakEnd: profile.peakEnd,
+        guidance: profile.guidance,
         status: 'SEALED',
         atmosSlot: null,
       });
