@@ -21,7 +21,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, profile, updateProfile }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, profile, updateProfile, refetchBeans }) => {
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
@@ -248,6 +248,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         profile={profile}
         updateProfile={updateProfile}
         uid={uid}
+        beans={beans}
+        refetchBeans={refetchBeans}
       />
     </div>
   );

@@ -34,7 +34,7 @@ const Root = () => {
     beans, tastings,
     addBean, updateBean, deleteBean,
     addTasting, updateTasting, deleteTasting,
-    openBean, finishBean, returnBean, seedTalData,
+    openBean, finishBean, returnBean, seedTalData, refetch,
     loaded: dataLoaded,
   } = useAppData(user?.uid);
 
@@ -102,6 +102,7 @@ const Root = () => {
           returnBean={returnBean}
           profile={profile}
           updateProfile={updateProfile}
+          refetchBeans={refetch}
         />
       </UserPreferencesProvider>
     </AuthContext>

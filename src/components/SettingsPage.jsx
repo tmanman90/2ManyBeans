@@ -2,7 +2,8 @@
 import { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, LogOut } from 'lucide-react';
-import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 import { C, fonts, shadows } from '../styles/theme';
 import { haptic } from '../lib/haptics';
 import { Toast } from './Toast';
@@ -77,13 +78,14 @@ const rowValueStyle = {
   gap: 4,
 };
 
-export const SettingsPage = ({ open, onClose, profile, updateProfile, uid }) => {
+export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
   const { preferences, updatePreferences } = usePreferences();
   const { logOut } = useAuthContext();
 
   const [toast, setToast] = useState(null);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameValue, setUsernameValue] = useState('');
+  const [canisterConfirm, setCanisterConfirm] = useState(null); // { newCount, overflowBeans }
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -142,8 +144,19 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid }) => 
 
   const handleCanisterChange = async (e) => {
     const newCount = Number(e.target.value);
-    // Canister decrease with overflow beans is handled by the parent via onCanisterDecrease
-    // For now, just update the preference (overflow handling added in task 4)
+    const currentCount = preferences.canisterCount || 3;
+
+    // Check for active beans in slots that would be removed
+    if (newCount < currentCount && beans) {
+      const overflowBeans = beans.filter(
+        b => b.status === 'ACTIVE' && b.atmosSlot > newCount
+      );
+      if (overflowBeans.length > 0) {
+        setCanisterConfirm({ newCount, overflowBeans });
+        return;
+      }
+    }
+
     try {
       await updatePreferences({ canisterCount: newCount });
       haptic.light();
@@ -151,6 +164,37 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid }) => 
     } catch (err) {
       console.error('[Settings] Canister update failed:', err);
     }
+  };
+
+  const handleCanisterConfirm = async () => {
+    if (!canisterConfirm) return;
+    const { newCount, overflowBeans } = canisterConfirm;
+    try {
+      const batch = writeBatch(db);
+      // Update preferences
+      const profileRef = doc(db, 'users', uid);
+      batch.update(profileRef, { 'preferences.canisterCount': newCount });
+      // Return overflow beans to sealed
+      for (const bean of overflowBeans) {
+        const beanRef = doc(db, 'users', uid, 'beans', bean.id);
+        batch.update(beanRef, {
+          status: 'SEALED',
+          atmosSlot: null,
+          openDate: null,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      await batch.commit();
+      // Optimistic local update for preferences
+      await updatePreferences({ canisterCount: newCount });
+      // On native, batch bypasses per-hook refetch
+      if (Capacitor.isNativePlatform() && refetchBeans) await refetchBeans();
+      haptic.light();
+      showToast(`Canisters set to ${newCount}`);
+    } catch (err) {
+      console.error('[Settings] Canister batch update failed:', err);
+    }
+    setCanisterConfirm(null);
   };
 
   const handleUsernameEdit = () => {
@@ -487,6 +531,56 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid }) => 
         </div>
       </div>
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
+
+      {/* Canister decrease confirmation */}
+      {canisterConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1100,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }} onClick={() => setCanisterConfirm(null)}>
+          <div style={{
+            background: C.bg, borderRadius: 16, padding: 24,
+            maxWidth: 340, width: '100%',
+            boxShadow: shadows.modal,
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 12 }}>
+              Reduce canisters?
+            </div>
+            <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
+              {canisterConfirm.overflowBeans.length === 1
+                ? `"${canisterConfirm.overflowBeans[0].name}" is in Atmos #${canisterConfirm.overflowBeans[0].atmosSlot}. It will be returned to your sealed inventory.`
+                : `${canisterConfirm.overflowBeans.length} beans are in canisters that will be removed. They will be returned to your sealed inventory.`
+              }
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setCanisterConfirm(null)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10,
+                  border: `1px solid ${C.border}`, background: C.bg,
+                  fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                  color: C.text, cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCanisterConfirm}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10,
+                  border: 'none', background: C.accent,
+                  fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                  color: '#fff', cursor: 'pointer',
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

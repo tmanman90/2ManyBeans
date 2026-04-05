@@ -189,8 +189,12 @@ export const useAppData = (uid) => {
     await refetch();
   }, [uid, refetch]);
 
-  // Convenience: open a bean into a slot
-  const openBean = useCallback(async (beanId, slot) => {
+  // Convenience: open a bean into a slot (maxSlot guards against invalid slot assignments)
+  const openBean = useCallback(async (beanId, slot, maxSlot) => {
+    if (maxSlot && slot > maxSlot) {
+      console.warn(`[openBean] Slot ${slot} exceeds max ${maxSlot}, rejecting`);
+      return;
+    }
     // Clear slot from any other bean first (prevent duplicate slot assignment)
     const existing = beansRef.current.find(b => b.status === 'ACTIVE' && b.atmosSlot === slot && b.id !== beanId);
     if (existing) {
@@ -276,5 +280,6 @@ export const useAppData = (uid) => {
     returnBean,
     seedTalData,
     loaded,
+    refetch,
   };
 };
