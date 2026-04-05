@@ -87,6 +87,13 @@ FELLOW_EMAIL, FELLOW_PASSWORD
 - `npm run cap:sync` — build + sync to Capacitor iOS project
 - `npm run cap:open` — open iOS project in Xcode
 
+## Testing
+- **iOS QA**: `/ios-qa` -- autonomous build-test-fix loop (Karpathy autoresearch pattern). Builds Capacitor app, launches simulator, screenshots all 5 tabs, scores against binary checklist. Auto-fixes and commits on improvement, reverts on regression. Escalates after 5 failed attempts.
+- **iOS Screenshot**: `/ios-screenshot` -- passive screenshot of all 5 tabs, no code changes. Use for pre-deploy verification.
+- **Browser Test**: `/test-browser` -- Playwright web testing on localhost
+- After completing any /ce:work task that touches files in `src/tabs/`, `src/components/`, `src/App.jsx`, or `styles/`: offer `/ios-qa` before moving to the next task
+- Results log: `.claude/ios-qa-log.md` (appended each run, compounds over time)
+
 ## iOS & Platform
 - iOS layout rules, safe areas, and platform branching: auto-loaded from `.claude/rules/ios-layout.md` when editing UI files
 - Full reference: `.claude/skills/ios-design.md`
