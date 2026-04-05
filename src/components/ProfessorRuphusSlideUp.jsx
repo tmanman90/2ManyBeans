@@ -92,14 +92,14 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, er
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {story && onRefresh && (
               <button onClick={onRefresh} style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                background: 'none', border: 'none', cursor: 'pointer', padding: 12,
                 display: 'flex', alignItems: 'center', opacity: 0.5,
               }}>
                 <RefreshCw size={16} color={C.textMuted} />
               </button>
             )}
             <button onClick={onClose} style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+              background: 'none', border: 'none', cursor: 'pointer', padding: 10,
               display: 'flex', alignItems: 'center',
             }}>
               <X size={20} color={C.textMuted} />

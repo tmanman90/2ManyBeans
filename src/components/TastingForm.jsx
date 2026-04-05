@@ -16,7 +16,7 @@ const tastingFields = {
 const inputStyle = {
   width: '100%', padding: '8px 10px', borderRadius: 8,
   border: `1px solid ${C.border}`, fontFamily: fonts.body,
-  fontSize: 14, background: C.bg, color: C.text, boxSizing: 'border-box',
+  fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
 };
 
 export { emptyForm };

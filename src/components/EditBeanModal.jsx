@@ -140,7 +140,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
   const inputStyle = {
     width: '100%', padding: '8px 10px', borderRadius: 8,
     border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 14, background: C.bg, color: C.text, boxSizing: 'border-box',
+    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
   const rowStyle = { marginBottom: 12 };

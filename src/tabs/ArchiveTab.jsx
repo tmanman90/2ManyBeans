@@ -60,7 +60,8 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean }) => {
                 onClick={() => handleLearn(bean)}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 2, display: 'flex', alignItems: 'center',
+                  padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  minWidth: 44, minHeight: 44,
                 }}
                 title="Learn about this coffee"
               >

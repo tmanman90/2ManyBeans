@@ -5,7 +5,7 @@ export const LoadingScreen = () => (
   <div style={{
     fontFamily: fonts.body,
     background: C.bg,
-    minHeight: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',

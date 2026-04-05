@@ -1,5 +1,5 @@
 // App shell — warm Ghibli-inspired coffee journal
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { C, fonts, shadows } from './styles/theme';
 import { haptic } from './lib/haptics';
 import { today } from './lib/peakStatus';
@@ -42,33 +42,43 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
 
   const isRotation = tab === 'rotation';
 
+  // Set html background to match header — covers WKWebView canvas gap at viewport edge
+  useEffect(() => {
+    document.documentElement.style.background = isRotation ? '#5C6B4E' : C.bg;
+  }, [isRotation]);
+
   return (
-    <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      {/* html background set via useEffect covers WKWebView canvas gap */}
       {/* Header */}
       {isRotation ? (
         <div className="app-header" style={{
           position: 'relative',
-          height: 160,
-          zIndex: 0,
+          height: `calc(160px + env(safe-area-inset-top, 0px))`,
+          flexShrink: 0,
+          zIndex: 10,
+          overflow: 'hidden',
+          background: '#5C6B4E',
         }}>
           <img
             src="/images/rotation-header.png"
             alt=""
             style={{
-              position: 'absolute', top: 0, left: 0, right: 0,
-              width: '100%', height: 450,
+              position: 'absolute', top: -1, left: 0, right: 0,
+              width: '100%', height: 'calc(100% + 1px)',
               objectFit: 'cover', objectPosition: 'center 30%',
               pointerEvents: 'none',
             }}
           />
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0,
-            height: 450, pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, rgba(250,246,241,0.15) 0%, rgba(250,246,241,0.7) 25%, rgba(250,246,241,0.88) 40%, rgba(250,246,241,0.95) 60%, rgba(250,246,241,1) 85%)',
+            height: '100%', pointerEvents: 'none',
+            background: 'linear-gradient(to bottom, rgba(250,246,241,0) 0%, rgba(250,246,241,0.3) 40%, rgba(250,246,241,0.7) 65%, rgba(250,246,241,0.95) 85%, rgba(250,246,241,1) 100%)',
           }} />
           <div style={{
             position: 'relative', zIndex: 1,
             padding: '0 20px',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
             display: 'flex', alignItems: 'flex-end',
             height: '100%', paddingBottom: 12,
           }}>
@@ -80,8 +90,13 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         </div>
       ) : (
         <div className="app-header" style={{
-          padding: '16px 20px 12px',
+          position: 'sticky',
+          top: 0,
+          padding: `calc(env(safe-area-inset-top, 0px) + 16px) 20px 12px`,
           borderBottom: `1px solid ${C.borderLight}`,
+          background: C.bg,
+          flexShrink: 0,
+          zIndex: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
@@ -91,7 +106,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 100px', position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             uid={uid}
@@ -151,7 +166,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           background: C.navBg,
           borderTop: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-around',
-          padding: '6px 0',
+          padding: '6px env(safe-area-inset-right, 8px) calc(env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 8px)',
           zIndex: 100,
         }}
       >
@@ -170,18 +185,25 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             >
               <div style={{
                 width: 56, height: 56,
-                borderRadius: '50%',
+                position: 'relative',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: active ? C.amberBg : 'transparent',
-                border: active ? `2px solid ${C.accentLight}` : '2px solid transparent',
-                boxShadow: active ? shadows.navActive : 'none',
-                transition: 'all 0.15s',
               }}>
+                {/* Circle background (separate from image to avoid clipping) */}
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  borderRadius: '50%',
+                  background: active ? C.amberBg : 'transparent',
+                  border: active ? `2px solid ${C.accentLight}` : '2px solid transparent',
+                  boxShadow: active ? shadows.navActive : 'none',
+                  transition: 'all 0.15s',
+                }} />
                 <img
                   src={t.img}
                   alt={t.label}
                   style={{
-                    width: 44, height: 44,
+                    position: 'relative',
+                    width: 44,
+                    height: 44,
                     objectFit: 'contain',
                     opacity: active ? 1 : 0.55,
                     transition: 'opacity 0.15s',

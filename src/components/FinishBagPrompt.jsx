@@ -7,10 +7,10 @@ import { today } from '../lib/peakStatus';
 import { convertTastingScores } from '../lib/professorRuphus';
 import { Modal } from './Modal';
 import { StarRating } from './StarRating';
-import { TastingForm, emptyForm } from './TastingForm';
+import { TastingForm } from './TastingForm';
 import { Btn } from './Btn';
 
-export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, onUpdateTasting, beans }) => {
+export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, onUpdateTasting }) => {
   const [view, setView] = useState('prompt');
   const [rating, setRating] = useState(0);
   const [oneWord, setOneWord] = useState('');
@@ -96,7 +96,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   const inputStyle = {
     width: '100%', padding: '8px 10px', borderRadius: 8,
     border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 14, background: C.bg, color: C.text, boxSizing: 'border-box',
+    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
   };
 
   if (view === 'fullReview') {

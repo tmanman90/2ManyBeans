@@ -94,6 +94,18 @@ FELLOW_EMAIL, FELLOW_PASSWORD
 - `npm run cap:sync` — build + sync to Capacitor iOS project
 - `npm run cap:open` — open iOS project in Xcode
 
+## iOS Design Rules (always apply when touching UI)
+- ALWAYS use `env(safe-area-inset-top)` / `env(safe-area-inset-bottom)` for content near screen edges. NEVER hardcode status bar or home indicator heights.
+- `<meta name="viewport">` MUST include `viewport-fit=cover` for safe area env vars to work
+- Fixed bottom bars need `padding-bottom: env(safe-area-inset-bottom)`
+- Input fields MUST be 16px+ font-size (prevents iOS Safari auto-zoom on focus)
+- Minimum tap target: 44x44pt (Apple HIG)
+- `100vh` on iOS includes URL bar area. Use `100dvh` or JS measurement for true visible height.
+- `position: fixed; bottom: 0` is unreliable with iOS keyboards. Use Keyboard plugin events to adjust.
+- Prefer `transform`/`opacity` for animations (GPU-accelerated). Avoid `box-shadow` on scrolling lists.
+- On native, `StatusBar.setOverlaysWebView(true)` means YOUR layout handles the status bar area.
+- See `.claude/skills/ios-design.md` for the full reference.
+
 ## Platform Branching
 - Runtime detection via `Capacitor.isNativePlatform()` from `@capacitor/core`
 - API URLs: relative on web, absolute (`https://2manybeans.vercel.app`) on native (see `src/lib/apiBase.js`)

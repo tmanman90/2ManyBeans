@@ -61,7 +61,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
 
       <div style={{ padding: compact ? 16 : 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: fonts.heading, fontSize: compact ? 16 : 18, color: C.text, lineHeight: 1.2 }}>
             {bean.name}
           </div>
@@ -75,7 +75,8 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               onClick={() => onLearn(bean)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: 2, display: 'flex', alignItems: 'center',
+                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 44, minHeight: 44,
               }}
               title="Learn about this coffee"
             >
@@ -105,7 +106,8 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               disabled={freezing}
               style={{
                 background: 'none', border: 'none', cursor: freezing ? 'default' : 'pointer',
-                padding: 4, display: 'flex', alignItems: 'center',
+                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 44, minHeight: 44,
                 opacity: freezing ? 0.5 : 1,
               }}
               title={bean.frozenAt ? 'Unfreeze bean' : 'Freeze bean'}
@@ -118,7 +120,8 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               onClick={() => setEditOpen(true)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: 4, display: 'flex', alignItems: 'center',
+                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 44, minHeight: 44,
               }}
             >
               <Pencil size={14} color={C.textMuted} />
@@ -137,12 +140,12 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
       </div>
       {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
         <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: (bean.aidenGrind || hasDetails || actions) ? 6 : 0 }}>
-          {bean.bagNotes}
+          ☕ {bean.bagNotes}
         </div>
       )}
       {bean.aidenGrind && (
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
-          Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
+          ⚙ Ode Gen 2: SS {bean.aidenGrind.singleServe} / Batch {bean.aidenGrind.batch}
         </div>
       )}
 
@@ -153,7 +156,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
             onClick={() => setExpanded(!expanded)}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              padding: 0, fontSize: 11, color: C.accent,
+              padding: '12px 0', fontSize: 11, color: C.accent,
               fontFamily: fonts.body, marginBottom: expanded ? 8 : (actions ? 10 : 0),
             }}
           >

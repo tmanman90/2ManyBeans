@@ -285,7 +285,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       <div
         ref={scrollRef}
         onClick={() => { if (inputRef.current) inputRef.current.blur(); }}
-        style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: keyboardHeight > 0 ? 80 : 140, height: keyboardHeight > 0 ? `calc(100vh - ${keyboardHeight + 200}px)` : 'calc(100vh - 340px)' }}>
+        style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: keyboardHeight > 0 ? 80 : 140, height: keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight + 200}px)` : 'calc(100dvh - 340px)' }}>
         {messages.map((m, i) => (
           <div key={i}>
             {/* Photo thumbnails for user messages */}
@@ -376,12 +376,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
               <button
                 onClick={() => removePhoto(i)}
                 style={{
-                  position: 'absolute', top: -6, right: -6,
-                  width: 20, height: 20, borderRadius: '50%',
+                  position: 'absolute', top: -10, right: -10,
+                  width: 28, height: 28, borderRadius: '50%',
                   background: C.accent, color: C.card, border: 'none',
                   cursor: 'pointer', display: 'flex',
                   alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, padding: 0,
+                  fontSize: 10, padding: 8,
                 }}
               >
                 <X size={12} />

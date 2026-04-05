@@ -89,7 +89,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
             style={{
               width: '100%', padding: '8px 10px 8px 32px', borderRadius: 8,
               border: `1px solid ${C.border}`, fontFamily: fonts.body,
-              fontSize: 14, background: C.cream, color: C.text,
+              fontSize: 16, background: C.cream, color: C.text,
               boxSizing: 'border-box', outline: 'none',
             }}
           />

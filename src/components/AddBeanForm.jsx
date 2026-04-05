@@ -51,7 +51,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
 
   const takeNativePhoto = async () => {
     try {
-      const { Camera, CameraResultType, CameraSource, CameraPermissionType } = await import('@capacitor/camera');
+      const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
       // Ensure camera + photo library permissions are granted
       const perms = await Camera.checkPermissions();
       if (perms.camera !== 'granted' || perms.photos !== 'granted') {
@@ -261,7 +261,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
   const inputStyle = {
     width: '100%', padding: '8px 10px', borderRadius: 8,
     border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 14, background: C.bg, color: C.text, boxSizing: 'border-box',
+    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
   const rowStyle = { marginBottom: 12 };
@@ -345,11 +345,11 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
                     <button
                       onClick={() => removePhoto(idx)}
                       style={{
-                        position: 'absolute', top: -6, right: -6,
-                        width: 22, height: 22, borderRadius: '50%',
+                        position: 'absolute', top: -10, right: -10,
+                        width: 28, height: 28, borderRadius: '50%',
                         background: C.red, border: 'none', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: 0,
+                        padding: 8,
                       }}
                     >
                       <X size={12} color="#fff" />

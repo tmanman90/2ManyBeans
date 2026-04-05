@@ -2,7 +2,7 @@
 // 3 modes: list, form, chat
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Plus, Check, Send, Pencil, Trash2 } from 'lucide-react';
-import { C, fonts, journalCard, shadows } from '../styles/theme';
+import { C, fonts, journalCard } from '../styles/theme';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { convertTastingScores } from '../lib/professorRuphus';
@@ -10,7 +10,7 @@ import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
 import { TastingForm } from '../components/TastingForm';
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, updateBean }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const [sel, setSel] = useState(active[0]?.id || '');
   // Background tasting score conversion for spider chart overlay
@@ -44,7 +44,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const inputStyle = {
     width: '100%', padding: '8px 10px', borderRadius: 8,
     border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 14, background: C.bg, color: C.text, boxSizing: 'border-box',
+    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
   };
 
   useEffect(() => {
@@ -277,7 +277,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div style={{ flex: 1, marginRight: 8 }}>
                 <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 3 }}>Bean</label>
-                <select value={editForm.beanId} onChange={e => setEditForm(p => ({ ...p, beanId: e.target.value }))} style={{ ...inputStyle, fontSize: 13 }}>
+                <select value={editForm.beanId} onChange={e => setEditForm(p => ({ ...p, beanId: e.target.value }))} style={inputStyle}>
                   {beans.map(b => <option key={b.id} value={b.id}>{b.name} ({b.roaster})</option>)}
                 </select>
               </div>
@@ -294,9 +294,9 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <div key={key} style={{ marginBottom: 8 }}>
                 <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 3 }}>{label}</label>
                 {key === 'notes' ? (
-                  <textarea value={editForm[key] || ''} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))} rows={2} style={{ ...inputStyle, fontSize: 13, resize: 'vertical' }} />
+                  <textarea value={editForm[key] || ''} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
                 ) : (
-                  <input value={editForm[key] || ''} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))} style={{ ...inputStyle, fontSize: 13 }} />
+                  <input value={editForm[key] || ''} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))} style={inputStyle} />
                 )}
               </div>
             ))}
@@ -309,10 +309,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 12, color: C.textMuted }}>{t.date}</span>
-                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 2 }}>
+                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Pencil size={13} />
                 </span>
-                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 2 }}>
+                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Trash2 size={13} />
                 </span>
               </div>
