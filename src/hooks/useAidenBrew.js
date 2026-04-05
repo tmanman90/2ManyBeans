@@ -41,11 +41,12 @@ export function useAidenBrew(updateBean) {
     setAidenError(null);
     setAidenModal(true);
 
-    // Show cached recipe immediately if available (skip generation)
+    // Show cached recipe immediately if available (skip generation), then auto-push
     if (!forceRegenerate && bean.aidenRecipe) {
       setAidenRecipe(bean.aidenRecipe);
-      setAidenLoading(false);
-      setAidenPhase(null);
+      setAidenPhase('push');
+      await handlePushToAiden(bean.aidenRecipe);
+      if (mountedRef.current) setAidenPhase(null);
       return;
     }
 
