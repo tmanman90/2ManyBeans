@@ -47,7 +47,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, recipe, result, loading, error, phase, onRetry, onRetryPush }) => {
+export const AidenModal = ({ open, onClose, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached }) => {
   const { preferences } = usePreferences();
   const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
   const isDeviceFull = error && error.includes('14 profiles') && !error.includes('(400)');
@@ -199,6 +199,20 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
                 <ExternalLink size={16} /> Open in Fellow
               </Btn>
             </a>
+          )}
+
+          {/* Push cached recipe to Aiden (when viewing saved recipe, no push yet) */}
+          {!result && !loading && !error && onPushCached && (
+            <Btn variant="primary" onClick={() => onPushCached(recipe)} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px', marginBottom: 8 }}>
+              <ExternalLink size={16} /> Push to Aiden
+            </Btn>
+          )}
+
+          {/* Regenerate button */}
+          {onRegenerate && !loading && (
+            <Btn variant="ghost" onClick={onRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate Aiden recipe">
+              <RefreshCw size={14} /> Regenerate Recipe
+            </Btn>
           )}
         </div>
       )}

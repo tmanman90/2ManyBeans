@@ -34,13 +34,22 @@ export function useAidenBrew(updateBean) {
     if (mountedRef.current) setAidenLoading(false);
   };
 
-  const handleBrewWithAiden = async (bean, cachedResearch = null) => {
+  const handleBrewWithAiden = async (bean, cachedResearch = null, forceRegenerate = false) => {
     setAidenBean(bean);
-    setAidenRecipe(null);
     setAidenResult(null);
     setAidenError(null);
-    setAidenLoading(true);
     setAidenModal(true);
+
+    // Show cached recipe immediately if available (skip generation)
+    if (!forceRegenerate && bean.aidenRecipe) {
+      setAidenRecipe(bean.aidenRecipe);
+      setAidenLoading(false);
+      setAidenPhase(null);
+      return;
+    }
+
+    setAidenRecipe(null);
+    setAidenLoading(true);
 
     // Step 1: Research (skip if cached)
     let research = cachedResearch;
@@ -64,9 +73,11 @@ export function useAidenBrew(updateBean) {
       if (!mountedRef.current) return;
       setAidenRecipe(recipe);
       setAidenError(null);
-      // Persist grind recommendation to the bean
-      if (recipe.grindRecommendation && bean.id) {
-        await updateBean(bean.id, { aidenGrind: recipe.grindRecommendation });
+      // Persist full recipe + grind recommendation to the bean
+      if (bean.id) {
+        const persist = { aidenRecipe: { ...recipe, generatedAt: new Date().toISOString() } };
+        if (recipe.grindRecommendation) persist.aidenGrind = recipe.grindRecommendation;
+        await updateBean(bean.id, persist);
       }
       // Step 3: Push to Fellow
       setAidenPhase('push');
@@ -87,5 +98,7 @@ export function useAidenBrew(updateBean) {
     handleBrewWithAiden, closeAidenModal,
     onRetry: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined,
     onRetryPush: aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined,
+    onRegenerate: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch, true) : undefined,
+    onPushCached: (recipe) => handlePushToAiden(recipe),
   };
 }

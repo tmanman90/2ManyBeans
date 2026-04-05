@@ -252,6 +252,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         phase={aiden.aidenPhase}
         onRetry={aiden.onRetry}
         onRetryPush={aiden.onRetryPush}
+        onRegenerate={aiden.onRegenerate}
+        onPushCached={aiden.onPushCached}
       />
       <HandBrewModal
         open={handBrew.handBrewModal}
