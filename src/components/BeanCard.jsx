@@ -56,6 +56,17 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               transition: 'opacity 0.3s ease',
             }}
           />
+          {/* Edge gradients: blend image background into card on all visible edges */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: [
+              `linear-gradient(to right, ${C.card}, transparent 25%)`,
+              `linear-gradient(to left, ${C.card}, transparent 25%)`,
+              `linear-gradient(to top, ${C.card}, transparent 15%)`,
+            ].join(', '),
+            pointerEvents: 'none',
+          }} />
         </div>
       )}
 
@@ -75,8 +86,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               onClick={() => onLearn(bean)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: 44, minHeight: 44,
+                padding: 2, display: 'flex', alignItems: 'center',
               }}
               title="Learn about this coffee"
             >
@@ -106,8 +116,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               disabled={freezing}
               style={{
                 background: 'none', border: 'none', cursor: freezing ? 'default' : 'pointer',
-                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: 44, minHeight: 44,
+                padding: 4, display: 'flex', alignItems: 'center',
                 opacity: freezing ? 0.5 : 1,
               }}
               title={bean.frozenAt ? 'Unfreeze bean' : 'Freeze bean'}
@@ -120,8 +129,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               onClick={() => setEditOpen(true)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: 44, minHeight: 44,
+                padding: 4, display: 'flex', alignItems: 'center',
               }}
             >
               <Pencil size={14} color={C.textMuted} />

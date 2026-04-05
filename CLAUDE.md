@@ -59,17 +59,10 @@ src/
 - Bean statuses: `ACTIVE` | `SEALED` | `FINISHED`
 - Atmos slots are 1, 2, or 3 (Fellow Atmos vacuum canisters)
 - Roaster profiles auto-detected by fuzzy name match, fallback to default specialty light profile
-- AI features: photo bean scanning (multi-photo + web research), guided tasting (coach mode), recommendations, general chat, Aiden brew profiles
-- Add Bean flow: multi-photo gallery (1-3) → Gemini 2.5 Flash vision scan → Gemini search grounding enrichment (includes Reddit) → review. Alt path: manual entry → AI Fill button triggers same research.
+- Add Bean flow: multi-photo gallery (1-3) → Gemini vision scan → search grounding enrichment → review. Alt path: manual entry → AI Fill triggers same research.
 - Bean data model includes enriched fields: altitude, region, farm, roastLevel, cupScore, brewingRec, sourcedBy (all optional, filled by scan + research)
-- Four API proxies: `/api/claude` (Anthropic), `/api/openai` (OpenAI), `/api/gemini` (Google), `/api/aiden` (Fellow Aiden). Each has retry logic, error forwarding, and model fallback.
-- `/api/claude` proxy: Sonnet 4.6 primary, Haiku 4.5 fallback on 429/529. Client-side `callClaude` retries with exponential backoff.
-- `/api/openai` proxy: GPT-5.4 primary, GPT-5.4 Mini fallback. Supports `responseFormat` for structured output.
-- `/api/gemini` proxy: Gemini 2.5 Flash. Supports `tools: [{ googleSearchRetrieval: {} }]` for search grounding.
-- Aiden brew flow uses two-step GPT-5.4 calls with family-first classification: (1) researchBean() enriches with altitude/roast level/cup-structure family/closest reference profiles, (2) generateAidenRecipe() generates JSON profile using family baseline defaults + research context. Research failure falls back gracefully.
-- Chat image routing: images in chat are sent to Gemini for vision analysis, then the text description is passed to Claude for conversational response.
-- Tasting chat uses `---EXTRACT---` / `---END---` markers for structured data extraction from conversation
 - The user (Tal) is a novice taster — all AI tasting interactions must use step-by-step coaching with scaffolded options, never vague open-ended questions
+- See `.claude/rules/` for path-scoped details on API proxies, AI model routing, and iOS layout
 
 ## Reference Files
 - **`PRD.md`** — Full product spec: data model, all features, Firebase schema, architecture, UI/design details
@@ -94,22 +87,8 @@ FELLOW_EMAIL, FELLOW_PASSWORD
 - `npm run cap:sync` — build + sync to Capacitor iOS project
 - `npm run cap:open` — open iOS project in Xcode
 
-## iOS Design Rules (always apply when touching UI)
-- ALWAYS use `env(safe-area-inset-top)` / `env(safe-area-inset-bottom)` for content near screen edges. NEVER hardcode status bar or home indicator heights.
-- `<meta name="viewport">` MUST include `viewport-fit=cover` for safe area env vars to work
-- Fixed bottom bars need `padding-bottom: env(safe-area-inset-bottom)`
-- Input fields MUST be 16px+ font-size (prevents iOS Safari auto-zoom on focus)
-- Minimum tap target: 44x44pt (Apple HIG)
-- `100vh` on iOS includes URL bar area. Use `100dvh` or JS measurement for true visible height.
-- `position: fixed; bottom: 0` is unreliable with iOS keyboards. Use Keyboard plugin events to adjust.
-- Prefer `transform`/`opacity` for animations (GPU-accelerated). Avoid `box-shadow` on scrolling lists.
-- On native, `StatusBar.setOverlaysWebView(true)` means YOUR layout handles the status bar area.
-- See `.claude/skills/ios-design.md` for the full reference.
-
-## Platform Branching
-- Runtime detection via `Capacitor.isNativePlatform()` from `@capacitor/core`
-- API URLs: relative on web, absolute (`https://2manybeans.vercel.app`) on native (see `src/lib/apiBase.js`)
+## iOS & Platform
+- iOS layout rules, safe areas, and platform branching: auto-loaded from `.claude/rules/ios-layout.md` when editing UI files
+- Full reference: `.claude/skills/ios-design.md`
 - Auth: `signInWithPopup` on web, `@codetrix-studio/capacitor-google-auth` + `signInWithCredential` on native
 - Firestore: `persistentMultipleTabManager` on web, `persistentSingleTabManager` on native
-- Camera: `<input type="file">` on web, `@capacitor/camera` plugin on native
-- Haptics: no-op on web, `@capacitor/haptics` on native (see `src/lib/haptics.js`)

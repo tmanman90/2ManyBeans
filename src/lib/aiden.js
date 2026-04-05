@@ -5,6 +5,7 @@
 import { getPeakStatus, daysSinceRoast } from './peakStatus';
 import { getProfileForRoaster } from './roasterProfiles';
 import { API_BASE } from './apiBase';
+import { fetchWithRetry } from './fetchWithRetry';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -16,19 +17,16 @@ const ODE_GEN2_STEPS = [
 ];
 
 // Cup-structure family grind bands (Ode Gen 2)
-// Layer 1 of two-layer grind model: family baseline determines the band,
-// reference profiles only modify within the band.
-// Widened bands: family sets the safe range, reference profile matching picks within it.
-// Previous bands were too narrow (0.2-0.3 steps), producing identical grinds for all beans.
-// New bands span the actual Fellow Brew Talks data range per family.
+// Tight clarity-first bands. Family determines the band, reference profiles are
+// secondary modifiers only. Grind comes from: FAMILY -> VOLUME/MODE -> PROCESS
+// INTENSITY -> DENSITY/ROAST ENERGY -> REFERENCE MODIFIERS. NOT from generic
+// country/process reference matches.
 const FAMILY_GRIND_BANDS = {
-  'washed-gesha-clarity':     { ssMin: 3,   ssMax: 5.2, batchMin: 5,   batchMax: 7 },
-  'washed-kenya-clarity':     { ssMin: 3,   ssMax: 4.2, batchMin: 5.1, batchMax: 7.2 },
-  'washed-ethiopia-clarity':  { ssMin: 3.2, ssMax: 6,   batchMin: 5,   batchMax: 8.2 },
-  'natural-ethiopia-fruit':   { ssMin: 3,   ssMax: 5.1, batchMin: 5,   batchMax: 8.2 },
-  'honey-anaerobic':          { ssMin: 3.2, ssMax: 6,   batchMin: 4.2, batchMax: 7.2 },
-  'washed-colombia-clarity':  { ssMin: 3,   ssMax: 6.2, batchMin: 5,   batchMax: 8 },
-  'washed-central-america':   { ssMin: 3,   ssMax: 5,   batchMin: 5,   batchMax: 7 },
+  'washed-floral-clarity':    { ssMin: 4.1, ssMax: 4.2, batchMin: 6,   batchMax: 6.2 },
+  'washed-kenya-clarity':     { ssMin: 4,   ssMax: 4.2, batchMin: 6.1, batchMax: 6.2 },
+  'washed-ethiopia-clarity':  { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
+  'clean-natural-fruit':      { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
+  'processed-clarity':        { ssMin: 4.2, ssMax: 5,   batchMin: 6.2, batchMax: 7.1 },
   'medium-washed':            { ssMin: 5,   ssMax: 5.2, batchMin: 6,   batchMax: 8 },
   'dark-roast':               { ssMin: 5,   ssMax: 9,   batchMin: 6,   batchMax: 9.2 },
 };
@@ -125,19 +123,22 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   "densityEstimate": "high | medium | low (based on altitude, variety, and roast)",
   "flavorExpectations": "what flavors to optimize for in brewing",
   "extractionNotes": "practical brewing implications (water temp, grind, timing considerations)",
-  "cupStructureFamily": "one of: washed-gesha-clarity | washed-kenya-clarity | washed-ethiopia-clarity | natural-ethiopia-fruit | honey-anaerobic | washed-colombia-clarity | washed-central-america | medium-washed | dark-roast",
+  "cupStructureFamily": "one of: washed-floral-clarity | washed-kenya-clarity | washed-ethiopia-clarity | clean-natural-fruit | processed-clarity | medium-washed | dark-roast",
   "closestReferenceProfiles": [
     { "number": 1, "name": "profile name", "why": "brief reason this is a close match" }
   ]
 }
 
 IMPORTANT: cupStructureFamily is based on the coffee's CUP STRUCTURE, not just its country of origin.
-- A washed Colombia Gesha with floral/tea-like character = "washed-gesha-clarity" (NOT "washed-colombia-clarity")
-- A washed Kenya with pomelo/hibiscus clarity = "washed-kenya-clarity"
-- "washed-colombia-clarity" is for high-altitude Colombian washed coffees with lifted aromatics (floral, citrus, stonefruit)
-- "washed-central-america" is for comfort/body-forward washed coffees from Guatemala, Costa Rica, etc.
-- "medium-washed" is for medium roast washed coffees prioritizing body over clarity
-- "dark-roast" is for any dark or medium-dark roast
+- "washed-floral-clarity" = washed Gesha, washed floral Pink Bourbon, washed floral heirloom, washed floral Colombia. Notes: jasmine, bergamot, white florals, lavender, honeysuckle, nectarine, peach, white grape, tea-like citrus lift.
+- "washed-kenya-clarity" = washed Kenya SL28/SL34/Batian/Ruiru with pomelo, hibiscus, cane sugar, berry. Often slightly finer than washed floral Ethiopia.
+- "washed-ethiopia-clarity" = classic washed Ethiopia with bergamot, white florals, citrus, tea, white grape, nectarine. Very similar to washed floral clarity. Can produce tea-tannin dryness if pushed too fine or too hot late.
+- "clean-natural-fruit" = natural Ethiopia with strawberry, mango, lychee, tropical fruit, clean sweetness. Slightly coarser than washed florals to protect from jammy heaviness.
+- "processed-clarity" = honey, anaerobic, co-ferment, white honey, experimental, floral tea-like processed Gesha. Slightly coarser than washed florals to protect from syrupy heaviness and drying finish.
+- "medium-washed" = medium roast washed coffees prioritizing body over clarity
+- "dark-roast" = any dark or medium-dark roast
+- A washed Colombia Gesha with floral/tea-like character = "washed-floral-clarity" (NOT a separate Colombia family)
+- A washed floral Colombia or Guatemala with jasmine/bergamot = "washed-floral-clarity"
 - When in doubt between clarity and body families, choose the clarity family (finer grind is safer than coarser)
 
 For closestReferenceProfiles, select the 2-3 most similar profiles from the reference database below. Match on cup structure, process, roast level, and varietal similarity (not just origin).
@@ -198,10 +199,30 @@ Batch is ALWAYS coarser than single serve. Pick ONE value (not a range).
 
 NOTE: Grind size is enforced deterministically by the app based on the coffee's cup-structure family. Your grind recommendation will be overridden. Focus your effort on getting the brew parameters (ratio, bloom, pulses, temps, intervals) right.
 
+GRIND PHILOSOPHY: Grind size comes from cup-structure family first, NOT from generic origin/process reference matches. The app enforces grind from the family baseline bands below. Your grind recommendation is advisory only.
+
+Family baseline grind bands (Ode Gen 2, 300ml single-serve clarity-first):
+- WASHED FLORAL CLARITY: SS 4.1-4.2, Batch 6.0-6.2
+- KENYA CLARITY: SS 4.0-4.2, Batch 6.1-6.2
+- WASHED ETHIOPIA CLARITY: SS 4.2-4.2, Batch 6.2-6.2
+- CLEAN NATURAL FRUIT: SS 4.2-4.2, Batch 6.2-6.2
+- PROCESSED CLARITY: SS 4.2-5.0, Batch 6.2-7.1
+
+Choose slightly finer within band if: very high altitude, very light roast, vivid cup target.
+Choose slightly coarser within band if: heavily processed, risks tannin/perfume overload, delicate florals that collapse when over-extracted.
+Choose center if: classic washed floral, no strong warning signs.
+
+RED FLAGS (these are WRONG):
+- Washed floral coffees at 5.0+ single serve
+- Washed floral Ethiopia at 5.2 single serve
+- Washed Gesha treated like generic washed Colombia
+- Batch grind at 7.2 for a light washed coffee (7.2 is dark roast territory)
+
 Rules for energy vs grind:
 1. Dense light washed coffees need more **early energy** (bloom temp + first pulse temps + bloom saturation), not finer grind. Avoid chasing extraction with grind size; use heat, bloom, and pulse structure first.
 2. Stop-loss (bright/thin): raise bloom temp, shorten intervals, or add a pulse. Do NOT fix by going finer.
 3. Stop-loss (dry/astringent): fix by lowering the final pulse temps by 1-2C. Do NOT fix dryness by lengthening intervals.
+4. Never use grind as the only extraction lever. Grind interacts with bloom size, bloom temperature, early pulse heat, intervals, and pulse count.
 
 ### Bean Age Adjustments — MANDATORY
 
@@ -249,17 +270,19 @@ For high-altitude, dense, light-roast coffees:
 Before using any reference profile, classify the coffee into ONE family based on process, varietal, tasting notes, and intended cup structure.
 
 Families:
-- Washed Gesha / washed floral Pink Bourbon / washed floral heirloom = WASHED FLORAL CLARITY
-- Washed Kenya SL28/SL34 = KENYA CLARITY
-- Washed Ethiopia = WASHED ETHIOPIA CLARITY
-- Natural Ethiopia / clean-fruit natural = CLEAN NATURAL FRUIT
-- Honey / anaerobic / co-ferment / white honey / experimental = PROCESSED CLARITY
+- Washed Gesha / washed floral Pink Bourbon / washed floral heirloom / washed floral Colombia = WASHED FLORAL CLARITY
+- Washed Kenya SL28/SL34/Batian/Ruiru with pomelo/hibiscus/cane sugar/berry = KENYA CLARITY
+- Classic washed Ethiopia with bergamot/white florals/citrus/tea/white grape/nectarine = WASHED ETHIOPIA CLARITY
+- Natural Ethiopia with strawberry/mango/lychee/tropical fruit / clean-fruit natural = CLEAN NATURAL FRUIT
+- Honey / anaerobic / co-ferment / white honey / experimental / floral tea-like processed Gesha = PROCESSED CLARITY
 
 Rules:
 - The family classification comes BEFORE origin-based reference matching.
 - If a generic country/process reference conflicts with the family baseline, trust the family baseline.
 - A washed floral Colombia (Gesha, Pink Bourbon, floral profile) must NOT be treated like a generic body-forward washed Colombia.
+- A washed floral Ethiopia must NOT be assigned a coarse grind just because a country reference happened to use a coarse range.
 - Use references to refine pulse count, intervals, and temperatures — not to override family structure.
+- Priority order: family -> volume/brew mode -> process intensity -> roast/density -> reference profile.
 
 ### Family Baseline Defaults (clarity-first)
 
@@ -305,6 +328,7 @@ Defaults:
 - profile goal: florals + nectarine/citrus, no tea-tannin dryness
 
 CLEAN NATURAL FRUIT
+Examples: natural Ethiopia with strawberry/mango/lychee, clean-fruit naturals
 Defaults:
 - ratio: 17.0 to 17.5
 - bloom ratio: 2.5
@@ -314,10 +338,11 @@ Defaults:
 - batch intervals: 28-32s
 - single-serve pulse count: usually 3
 - batch pulse count: usually 4
+- grind: SS ~4.2, Batch ~6.2 (slightly coarser than washed florals to protect from jammy heaviness)
 - profile goal: bright fruit clarity, avoid winey heaviness
 
 PROCESSED CLARITY
-Examples: honey, anaerobic, white honey, co-ferment, experimental
+Examples: honey, anaerobic, white honey, co-ferment, experimental, floral tea-like processed Gesha
 Defaults:
 - ratio: 17.0 to 17.5
 - bloom ratio: 2.5
@@ -327,6 +352,7 @@ Defaults:
 - batch intervals: 30-35s
 - single-serve pulse count: usually 3
 - batch pulse count: usually 4
+- grind: SS ~4.4-5.0, Batch ~6.4-7.1 (coarser than washed to avoid syrupy/drying finish)
 - profile goal: preserve tea/perfume/florals, avoid syrupy or drying finish
 
 ## ═══════════════════════════════════════════════
@@ -470,6 +496,7 @@ Before returning your JSON, confirm ALL of the following:
 7. **FAMILY CHECK:** Did I classify the coffee into the correct cup-structure family first, and did I avoid letting a generic country/process reference override that family?
 8. **FLORAL CHECK:** If the coffee is floral/tea-like, did I avoid both extremes: "fine + slow + hot" AND "coarse + hollow"?
 9. **BATCH CHECK:** If generating a batch recipe, default to 4 pulses unless there is a specific reason to use 3 or 5.
+10. **GRIND RED FLAG CHECK:** Is a washed floral coffee at 5.0+ SS? Is batch at 7.2 for a light roast? If yes, the grind is WRONG.
 
 ## CRITICAL REMINDERS
 
@@ -595,10 +622,12 @@ function enforceSchemaConstraints(recipe) {
 
 function classifyFamilyFallback(bean) {
   // Heuristic family classification when research doesn't provide one
+  // Priority: FAMILY -> cup structure, not generic origin/process
   const origin = (bean.origin || '').toLowerCase();
   const process = (bean.process || '').toLowerCase();
   const variety = (bean.variety || '').toLowerCase();
   const roastLevel = (bean.roastLevel || '').toLowerCase();
+  const notes = (bean.bagNotes || '').toLowerCase();
 
   // Dark/medium-dark roasts
   if (roastLevel.includes('dark')) return 'dark-roast';
@@ -607,55 +636,58 @@ function classifyFamilyFallback(bean) {
   // Medium roasts
   if (roastLevel === 'medium' && process.includes('washed')) return 'medium-washed';
 
-  // Gesha/Geisha variety (any origin)
-  if (variety.includes('gesha') || variety.includes('geisha')) return 'washed-gesha-clarity';
+  // Honey / anaerobic / co-ferment / experimental
+  if (process.includes('honey') || process.includes('anaerobic') || process.includes('co-ferment')) return 'processed-clarity';
 
-  // Honey / anaerobic
-  if (process.includes('honey') || process.includes('anaerobic')) return 'honey-anaerobic';
+  // Gesha/Geisha variety (any origin) or floral Pink Bourbon = washed floral clarity
+  if (variety.includes('gesha') || variety.includes('geisha')) return 'washed-floral-clarity';
+  if (variety.includes('pink bourbon') && (notes.includes('floral') || notes.includes('jasmine'))) return 'washed-floral-clarity';
 
-  // Natural Ethiopia
-  if (origin.includes('ethiopia') && process.includes('natural')) return 'natural-ethiopia-fruit';
+  // Natural Ethiopia or clean-fruit natural
+  if (process.includes('natural') && origin.includes('ethiopia')) return 'clean-natural-fruit';
 
   // Washed by origin
   if (process.includes('washed') || (!process.includes('natural') && !process.includes('honey'))) {
     if (origin.includes('kenya')) return 'washed-kenya-clarity';
     if (origin.includes('ethiopia')) return 'washed-ethiopia-clarity';
-    if (origin.includes('colombia')) return 'washed-colombia-clarity';
-    if (origin.includes('guatemala') || origin.includes('costa rica') || origin.includes('honduras') || origin.includes('el salvador')) return 'washed-central-america';
+    // Washed florals from any origin (Colombia, Guatemala, etc.) with floral notes
+    if (notes.includes('jasmine') || notes.includes('bergamot') || notes.includes('floral') || notes.includes('honeysuckle')) return 'washed-floral-clarity';
   }
 
   // Natural non-Ethiopia
-  if (process.includes('natural')) return 'natural-ethiopia-fruit';
+  if (process.includes('natural')) return 'clean-natural-fruit';
 
   return DEFAULT_FAMILY;
 }
 
 function enforceDeterministicGrind(recipe, bean, research) {
-  // Layer 1: Family determines the safe grind range
+  // Family-first grind selection: FAMILY -> VOLUME -> PROCESS -> DENSITY -> REFERENCE
+  // Reference profiles are secondary modifiers, NOT the source of truth for grind.
   const family = research?.cupStructureFamily && FAMILY_GRIND_BANDS[research.cupStructureFamily]
     ? research.cupStructureFamily
     : classifyFamilyFallback(bean);
 
   const band = FAMILY_GRIND_BANDS[family] || FAMILY_GRIND_BANDS[DEFAULT_FAMILY];
 
-  // Layer 2: Closest reference profile provides per-bean specificity
-  const ref = chooseReferenceForBean(bean, research);
+  // Pick center of family band (not 65th percentile, not reference-driven)
+  const ssMid = (band.ssMin + band.ssMax) / 2;
+  const batchMid = (band.batchMin + band.batchMax) / 2;
 
-  let ssGrind, batchGrind;
+  let ssGrind = nearestOdeStep(ssMid, true);
+  let batchGrind = nearestOdeStep(batchMid, true);
 
-  if (ref?.grind) {
-    // Use the reference profile's midpoint, clamped to the family band
-    const refSsMid = (ref.grind.ssMin + ref.grind.ssMax) / 2;
-    const refBatchMid = (ref.grind.batchMin + ref.grind.batchMax) / 2;
-    ssGrind = nearestOdeStep(clamp(refSsMid, band.ssMin, band.ssMax), true);
-    batchGrind = nearestOdeStep(clamp(refBatchMid, band.batchMin, band.batchMax), true);
-    console.log(`[Aiden Grind] family="${family}" ref="${ref.name}" refSS=${ref.grind.ssMin}-${ref.grind.ssMax} → SS ${ssGrind} / Batch ${batchGrind}`);
-  } else {
-    // No reference match: fall back to 65th percentile of family band
-    ssGrind = pickUpperMiddle(band.ssMin, band.ssMax);
-    batchGrind = pickUpperMiddle(band.batchMin, band.batchMax);
-    console.log(`[Aiden Grind] family="${family}" (no ref match) band fallback → SS ${ssGrind} / Batch ${batchGrind}`);
+  // Minor modifier: if research suggests high density / very high altitude, nudge finer within band
+  const density = (research?.densityEstimate || '').toLowerCase();
+  if (density === 'high' && band.ssMax - band.ssMin >= 0.2) {
+    ssGrind = nearestOdeStep(band.ssMin, true);
+    batchGrind = nearestOdeStep(band.batchMin, true);
   }
+
+  // Clamp to band (safety net)
+  ssGrind = nearestOdeStep(clamp(ssGrind, band.ssMin, band.ssMax), true);
+  batchGrind = nearestOdeStep(clamp(batchGrind, band.batchMin, band.batchMax), true);
+
+  console.log(`[Aiden Grind] family="${family}" band SS=${band.ssMin}-${band.ssMax} Batch=${band.batchMin}-${band.batchMax} → SS ${ssGrind} / Batch ${batchGrind}`);
 
   // Ensure batch is strictly coarser than single serve
   if (batchGrind <= ssGrind) {
@@ -754,24 +786,19 @@ function buildBeanDescription(bean) {
 export async function researchBean(bean) {
   const { text: beanDescription } = buildBeanDescription(bean);
 
-  const response = await fetch(PROXY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const data = await fetchWithRetry({
+    url: PROXY_URL,
+    body: {
       model: 'gpt-5.4-mini',
       messages: [
         { role: 'system', content: RESEARCH_SYSTEM_PROMPT },
         { role: 'user', content: `Research this coffee bean:\n\n${beanDescription}` },
       ],
       maxTokens: 600,
-    }),
+    },
+    retries: 2,
+    serviceName: 'OpenAI',
   });
-
-  if (!response.ok) {
-    throw new Error(`Research API error: ${response.status}`);
-  }
-
-  const data = await response.json();
   const text = data.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
   return JSON.parse(clean);
@@ -803,24 +830,19 @@ export async function generateAidenRecipe(bean, research = null) {
     }
   }
 
-  const response = await fetch(PROXY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const data = await fetchWithRetry({
+    url: PROXY_URL,
+    body: {
       model: 'gpt-5.4-mini',
       messages: [
         { role: 'system', content: AIDEN_SYSTEM_PROMPT },
         { role: 'user', content: userContent },
       ],
       maxTokens: 1000,
-    }),
+    },
+    retries: 2,
+    serviceName: 'OpenAI',
   });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
-  }
-
-  const data = await response.json();
   const text = data.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
   const parsed = JSON.parse(clean);
@@ -831,17 +853,11 @@ export async function pushToAiden(recipe) {
   // Strip grindRecommendation — not part of Fellow schema
   const { grindRecommendation, ...profile } = recipe;
 
-  const response = await fetch(`${API_BASE}/api/aiden`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(profile),
+  const result = await fetchWithRetry({
+    url: `${API_BASE}/api/aiden`,
+    body: profile,
+    retries: 1,
+    serviceName: 'Fellow',
   });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || `Fellow API error: ${response.status}`);
-  }
-
-  const result = await response.json();
   return { ...result, grindRecommendation };
 }

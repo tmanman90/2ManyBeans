@@ -46,7 +46,7 @@ export default withCorsAuth(async (req, res) => {
       }
     }
 
-    return res.status(200).json({ content: response.content, stop_reason: response.stop_reason });
+    return res.status(200).json({ content: response.content, stop_reason: response.stop_reason, usage: response.usage });
   } catch (error) {
     console.error('Claude API error:', error);
     const status = error.status || 500;

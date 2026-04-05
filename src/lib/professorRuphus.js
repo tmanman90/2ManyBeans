@@ -45,7 +45,7 @@ HALLUCINATION PREVENTION — THIS IS CRITICAL:
 TONE: Warm, enthusiastic, slightly nerdy professor who really loves coffee. First person ("I", "let me tell you"). Brief — the whole lesson should be a 60-90 second read (~200-300 words total across all sections).`;
 
   const data = await callOpenAI({
-    model: 'gpt-5.4',
+    model: 'gpt-5.4-mini',
     messages: [
       { role: 'system', content: systemPrompt },
       {
@@ -75,7 +75,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
 Replace the 7s with your actual 1-10 estimates. Use null for any section you can't fill reliably.`,
       },
     ],
-    maxTokens: 2000,
+    maxTokens: 1200,
   });
 
   const text = data.text || '';

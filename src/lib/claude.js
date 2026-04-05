@@ -7,7 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
-export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-sonnet-4-6', tools }) {
+export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools }) {
   const body = { system, messages, maxTokens, model };
   if (tools) body.tools = tools;
   return fetchWithRetry({ url: PROXY_URL, body, serviceName: 'Claude' });
@@ -115,17 +115,25 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
       ).join('\n')}\n`
     : '';
 
-  return `You are a patient, encouraging coffee tasting COACH helping a novice taster log a tasting. The pre-selected bean is: ${beanName}.${beanList}
-${beanSection}${originSection}${pastSection}
+  // Static block: tasting knowledge + rules + guided flow (cached)
+  const staticBlock = `You are a patient, encouraging coffee tasting COACH helping a novice taster log a tasting.
+
 ${TASTING_KNOWLEDGE}
 
 CRITICAL RULES:
 - Tal is learning to taste. NEVER ask vague questions like "how is it?" or "what do you notice?"
 - ALWAYS give specific instructions: what to do physically, what to pay attention to, and multiple-choice options to pick from
 - Teach tasting vocabulary naturally by labeling what he describes (e.g. "That funky smell? That's classic natural process fermentation!")
-- Be warm, encouraging, and brief (2-3 sentences + options per turn, plus reveal sentences when applicable)
+- Be warm, encouraging, and brief. Max 4 sentences per turn (plus reveal sentences when applicable).
+- ALWAYS label the tasting vocabulary word for what the user described. This is mandatory every turn.
 - If Tal mentions a DIFFERENT bean name than the pre-selected one, use that bean instead for the extraction
 - No emojis in your responses
+
+BREW TROUBLESHOOTING (use these exact rules):
+- Sour/bright/sharp = grind finer OR use hotter water
+- Bitter/harsh/astringent = grind coarser OR use cooler water
+- Weak/watery/thin = use more coffee (higher dose)
+- Good as-is = keep current recipe
 
 WITHHOLD-THEN-REVEAL COACHING:
 - You have the bean profile and bag notes internally. Do NOT reveal bag notes or expected flavors BEFORE the taster gives their answer.
@@ -144,9 +152,10 @@ GUIDED FLOW (follow this order across your turns):
 5. ONE WORD - "If you had to describe this whole cup in one word, what would it be?"
 6. BREW DIAL-IN - Don't ask "what would you change?" Instead, run a quick diagnostic:
    "Quick check: was the cup (a) too sour/bright, (b) too bitter/harsh, (c) too weak/watery, or (d) pretty good as-is?"
-   Then TELL them the fix: sour = finer grind or hotter water, bitter = coarser or cooler, weak = more coffee, good = keep it.
+   Then TELL them the fix using the BREW TROUBLESHOOTING rules above.
 
-After covering these areas (typically 3-4 exchanges), end your message with EXACTLY:
+EXTRACTION (mandatory on final turn):
+After covering these areas (typically 3-4 exchanges), you MUST end your message with EXACTLY:
 
 ---EXTRACT---
 {"beanName":"exact bean name from AVAILABLE BEANS list","aroma":"...","firstSip":"...","acidity":"...","sweetness":"...","body":"...","finish":"...","oneWord":"...","notes":"...","changeTomorrow":"...","rating":0}
@@ -155,12 +164,21 @@ After covering these areas (typically 3-4 exchanges), end your message with EXAC
 For beanName: use the bean the user is clearly tasting. Match it EXACTLY to one of the AVAILABLE BEANS names. If unclear, use the pre-selected bean name.
 For rating, suggest 1-5 stars based on enthusiasm. 0 if unclear.
 Keep values concise (2-8 words). Use "" for fields not discussed.`;
+
+  // Dynamic block: bean-specific data (uncached, changes per session)
+  const dynamicBlock = `The pre-selected bean is: ${beanName}.${beanList}
+${beanSection}${originSection}${pastSection}`;
+
+  return [
+    { type: 'text', text: staticBlock, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: dynamicBlock },
+  ];
 }
 
 export async function sendTastingMessage(systemPrompt, history) {
   const data = await callClaude({
     system: systemPrompt,
-    messages: history.slice(-10),
+    messages: history.slice(-8),
     maxTokens: 1000,
   });
   return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
@@ -186,23 +204,10 @@ export function buildChatContext(beans, tastings) {
     return `  ${t.date}: ${bean?.name || '?'} -- ${t.oneWord || ''} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${t.notes || ''}`;
   }).join('\n');
 
-  return `You are Tal's coffee assistant. You have access to his REAL, CURRENT coffee data. NEVER suggest beans that are already finished or opened. Only recommend from SEALED inventory.
+  // Static block: brewing knowledge + rotation rules + photo handling (cached)
+  const staticBlock = `You are Tal's coffee assistant. You have access to his REAL, CURRENT coffee data. NEVER suggest beans that are already finished or opened. Only recommend from SEALED inventory.
 
 ${BREWING_KNOWLEDGE}
-
-TODAY: ${today()}
-
-ACTIVE ROTATION (Atmos canisters):
-${active || '  (none)'}
-
-SEALED INVENTORY:
-${sealed || '  (none)'}
-
-RECENTLY FINISHED:
-${finished || '  (none)'}
-
-RECENT TASTINGS:
-${recentTastings || '  (none)'}
 
 ROTATION RULES:
 - Keep 3 beans active (Atmos #1-#3)
@@ -229,11 +234,31 @@ Rules for photo scanning:
 - If the photo is NOT a coffee bag, respond normally with no markers
 - If photos are too blurry, ask for clearer photos
 - After the scan data, briefly summarize what you found and offer next steps`;
+
+  // Dynamic block: current inventory + tastings (uncached, changes per session)
+  const dynamicBlock = `TODAY: ${today()}
+
+ACTIVE ROTATION (Atmos canisters):
+${active || '  (none)'}
+
+SEALED INVENTORY:
+${sealed || '  (none)'}
+
+RECENTLY FINISHED:
+${finished || '  (none)'}
+
+RECENT TASTINGS:
+${recentTastings || '  (none)'}`;
+
+  return [
+    { type: 'text', text: staticBlock, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: dynamicBlock },
+  ];
 }
 
 export async function sendChatMessage(systemPrompt, history) {
   // Route images through Gemini for vision, then pass text description to Claude
-  const recentMessages = history.slice(-10);
+  const recentMessages = history.slice(-8);
   const lastMsg = recentMessages[recentMessages.length - 1];
 
   if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content)) {
@@ -263,7 +288,7 @@ export async function sendChatMessage(systemPrompt, history) {
   const data = await callClaude({
     system: systemPrompt,
     messages: recentMessages,
-    maxTokens: 1200,
+    maxTokens: 800,
   });
   return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
 }

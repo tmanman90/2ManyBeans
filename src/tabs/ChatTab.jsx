@@ -394,7 +394,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       {/* Input bar - fixed above tab bar, moves up with keyboard */}
       <div style={{
         position: 'fixed',
-        bottom: keyboardHeight > 0 ? keyboardHeight : 80,
+        bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
         left: 0, right: 0,
         display: 'flex', gap: 8, alignItems: 'center',
         padding: '8px 20px',
