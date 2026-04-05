@@ -100,6 +100,8 @@ const Root = () => {
           openBean={openBean}
           finishBean={finishBean}
           returnBean={returnBean}
+          profile={profile}
+          updateProfile={updateProfile}
         />
       </UserPreferencesProvider>
     </AuthContext>

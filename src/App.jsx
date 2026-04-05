@@ -1,6 +1,6 @@
 // App shell — warm Ghibli-inspired coffee journal
 import { useState, useEffect } from 'react';
-import { LogOut } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { C, fonts, shadows } from './styles/theme';
 import { haptic } from './lib/haptics';
 import { today } from './lib/peakStatus';
@@ -11,6 +11,7 @@ import { TastingTab } from './tabs/TastingTab';
 import { ChatTab } from './tabs/ChatTab';
 import { ArchiveTab } from './tabs/ArchiveTab';
 import { OpenBeanFlow } from './components/OpenBeanFlow';
+import { SettingsPage } from './components/SettingsPage';
 
 const tabs = [
   { key: 'rotation', label: 'Rotation', img: '/images/nav-rotation.png' },
@@ -20,11 +21,11 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean }) => {
-  const { logOut } = useAuthContext();
+export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, profile, updateProfile }) => {
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
 
   const handleOpenBean = (preselectedBeanId, slot) => {
@@ -88,8 +89,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>2manybeans</div>
               <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{today()}</div>
             </div>
-            <button onClick={logOut} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Sign out">
-              <LogOut size={18} color={C.textMuted} />
+            <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Settings">
+              <SettingsIcon size={20} color={C.textMuted} />
             </button>
           </div>
         </div>
@@ -108,8 +109,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
               <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body }}>{today()}</div>
             </div>
-            <button onClick={logOut} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Sign out">
-              <LogOut size={18} color={C.textMuted} />
+            <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Settings">
+              <SettingsIcon size={20} color={C.textMuted} />
             </button>
           </div>
         </div>
@@ -238,6 +239,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         beans={beans}
         onOpenBean={handleModalOpen}
         targetSlot={targetSlot}
+      />
+
+      {/* Settings */}
+      <SettingsPage
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        profile={profile}
+        updateProfile={updateProfile}
+        uid={uid}
       />
     </div>
   );
