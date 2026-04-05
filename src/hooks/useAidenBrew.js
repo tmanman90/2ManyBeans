@@ -43,10 +43,26 @@ export function useAidenBrew(updateBean) {
 
     // Show cached recipe immediately if available (skip generation), then auto-push
     if (!forceRegenerate && bean.aidenRecipe) {
+      // Set recipe + loading in the SAME batch so "Send to Aiden" button never renders
       setAidenRecipe(bean.aidenRecipe);
+      setAidenLoading(true);
       setAidenPhase('push');
-      await handlePushToAiden(bean.aidenRecipe);
-      if (mountedRef.current) setAidenPhase(null);
+      // Push directly instead of calling handlePushToAiden (which would re-set loading)
+      try {
+        const result = await pushToAiden(bean.aidenRecipe);
+        if (!mountedRef.current) return;
+        setAidenResult(result);
+        if (result.grindRecommendation) {
+          setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));
+        }
+      } catch (fellowErr) {
+        if (!mountedRef.current) return;
+        setAidenError(fellowErr.message || "Couldn't push to Aiden");
+      }
+      if (mountedRef.current) {
+        setAidenLoading(false);
+        setAidenPhase(null);
+      }
       return;
     }
 
