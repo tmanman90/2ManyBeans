@@ -572,7 +572,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       }}
                     />
                     <input
-                      type="text"
+                      type="password"
                       placeholder="Password"
                       value={fellowPasswordInput}
                       onChange={e => setFellowPasswordInput(e.target.value)}
