@@ -4,15 +4,7 @@ import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Coffee, Droplets, Thermometer, RefreshCw } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
-
-const GRINDER_LABELS = {
-  'fellow-ode-gen2': 'Ode Gen 2',
-  'fellow-opus': 'Fellow Opus',
-  'baratza-encore-esp': 'Encore ESP',
-  'comandante-c40': 'Comandante C40',
-  '1zpresso-jx-pro': 'JX-Pro',
-  'baratza-virtuoso-plus': 'Virtuoso+',
-};
+import { GRINDER_LABELS } from '../lib/brewMethods';
 
 const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
   <div style={{
@@ -102,17 +94,22 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
                 <Droplets size={14} color={C.amber} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{grinderName} Grind</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                <div style={{ fontFamily: fonts.title, fontSize: 28, color: C.amber }}>
-                  {recipe.grindSize.setting}
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{recipe.grindSize.description}</div>
-                  {recipe.grindSize.microns && (
-                    <div style={{ fontSize: 12, color: C.textMuted }}>~{recipe.grindSize.microns}µm</div>
-                  )}
-                </div>
-              </div>
+              {(() => {
+                const isMicrons = preferences?.grindSizeDisplay === 'microns' && recipe.grindSize.microns;
+                const primary = isMicrons ? `~${recipe.grindSize.microns}µm` : recipe.grindSize.setting;
+                const secondary = isMicrons
+                  ? (recipe.grindSize.setting ? `${grinderName}: ${recipe.grindSize.setting}` : null)
+                  : (recipe.grindSize.microns ? `~${recipe.grindSize.microns}µm` : null);
+                return (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                    <div style={{ fontFamily: fonts.title, fontSize: 28, color: C.amber }}>{primary}</div>
+                    <div>
+                      <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{recipe.grindSize.description}</div>
+                      {secondary && <div style={{ fontSize: 12, color: C.textMuted }}>{secondary}</div>}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

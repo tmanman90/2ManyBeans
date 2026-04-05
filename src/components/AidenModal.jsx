@@ -4,6 +4,8 @@ import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Badge } from './Badge';
 import { ExternalLink, Coffee, Thermometer, Droplets, RefreshCw, AlertTriangle } from 'lucide-react';
+import { usePreferences } from '../hooks/useUserProfile';
+import { GRINDER_LABELS } from '../lib/brewMethods';
 
 const TempChain = ({ temps, label }) => (
   <div style={{ marginBottom: 8 }}>
@@ -46,6 +48,8 @@ const phaseMessages = {
 };
 
 export const AidenModal = ({ open, onClose, recipe, result, loading, error, phase, onRetry, onRetryPush }) => {
+  const { preferences } = usePreferences();
+  const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
   const isDeviceFull = error && error.includes('14 profiles') && !error.includes('(400)');
   const msg = phaseMessages[phase] || phaseMessages.recipe;
   return (
@@ -124,7 +128,7 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <Droplets size={14} color={C.amber} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Ode Gen 2 Grind</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{grinderName} Grind</span>
               </div>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div>

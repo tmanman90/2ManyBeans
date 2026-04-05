@@ -2,7 +2,7 @@
 // Each tab renders method.label based on the user's preference.
 // Adding a new brew method (e.g., espresso) requires one entry here, not editing three tabs.
 
-const GRINDER_LABELS = {
+export const GRINDER_LABELS = {
   'fellow-ode-gen2': 'Ode Gen 2',
   'fellow-opus': 'Fellow Opus',
   'baratza-encore-esp': 'Encore ESP',
@@ -11,30 +11,45 @@ const GRINDER_LABELS = {
   'baratza-virtuoso-plus': 'Virtuoso+',
 };
 
+// Format grind label for aiden grind data (singleServe/batch steps only, no microns)
+function formatAidenGrind(bean, preferences) {
+  if (!bean.aidenGrind) return null;
+  const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
+  return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
+}
+
+// Format grind label for hand brew recipe data (has setting, description, and optional microns)
+function formatHandBrewGrind(gs, preferences) {
+  const useMicrons = preferences?.grindSizeDisplay === 'microns';
+  const isOtherGrinder = !GRINDER_LABELS[preferences?.grinder];
+  const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
+
+  if (useMicrons && gs.microns) {
+    return isOtherGrinder
+      ? `${gs.description}, ~${gs.microns}µm`
+      : `${grinderName}: ~${gs.microns}µm`;
+  }
+  if (isOtherGrinder) {
+    const microns = gs.microns ? ` (~${gs.microns}µm)` : '';
+    return `${gs.description}${microns}`;
+  }
+  return `${grinderName}: ${gs.setting} ${gs.description}`;
+}
+
 export const BREW_METHODS = {
   aiden: {
     label: 'Brew with Aiden',
     icon: '/images/aiden-icon.png',
-    grindLabel: (bean, preferences) => {
-      if (!bean.aidenGrind) return null;
-      const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
-      return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
-    },
+    grindLabel: (bean, preferences) => formatAidenGrind(bean, preferences),
   },
   handbrew: {
     label: 'Hand Brew Recipe',
     icon: '/images/handbrew-icon.png',
     grindLabel: (bean, preferences) => {
-      // Show hand brew recipe grind if available, fall back to aiden grind
       if (bean.handBrewRecipe?.grindSize) {
-        const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
-        const gs = bean.handBrewRecipe.grindSize;
-        const microns = gs.microns ? ` (~${gs.microns}µm)` : '';
-        return `${grinderName}: ${gs.setting} ${gs.description}${microns}`;
+        return formatHandBrewGrind(bean.handBrewRecipe.grindSize, preferences);
       }
-      if (!bean.aidenGrind) return null;
-      const grinderName = GRINDER_LABELS[preferences?.grinder] || 'Grinder';
-      return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
+      return formatAidenGrind(bean, preferences);
     },
   },
 };
