@@ -25,7 +25,7 @@ function sanitize(str, maxLen = 100) {
 
 function buildHandBrewPrompt(preferences) {
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
-  const grinderName = GRINDER_LABELS[grinderKey] || preferences?.grinderCustomName || 'Unknown grinder';
+  const grinderName = GRINDER_LABELS[grinderKey] || sanitize(preferences?.grinderCustomName, 60) || 'Unknown grinder';
 
   return `You are a specialty coffee brew guide trained on James Hoffmann's methods.
 
@@ -107,7 +107,12 @@ export async function generateHandBrewRecipe(bean, research, preferences) {
 
   const text = data.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(clean);
+  let parsed;
+  try {
+    parsed = JSON.parse(clean);
+  } catch {
+    throw new Error('Recipe generation returned invalid data. Please try again.');
+  }
   return validateRecipe(parsed);
 }
 

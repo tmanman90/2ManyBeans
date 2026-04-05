@@ -83,6 +83,11 @@ ${REFERENCE_PROFILE_INDEX}
 
 RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
+// Sanitize user-controlled bean fields before prompt injection
+function sanitize(str, maxLen = 100) {
+  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'.,()\/]/g, '');
+}
+
 export function buildBeanDescription(bean) {
   const ps = getPeakStatus(bean);
   const dsr = daysSinceRoast(bean.roastDate, bean);
@@ -90,20 +95,20 @@ export function buildBeanDescription(bean) {
 
   return {
     text: [
-      `Roaster: ${bean.roaster}`,
-      `Name: ${bean.name}`,
-      `Origin: ${bean.origin}`,
-      bean.variety ? `Variety: ${bean.variety}` : null,
-      `Process: ${bean.process}`,
+      `Roaster: ${sanitize(bean.roaster)}`,
+      `Name: ${sanitize(bean.name)}`,
+      `Origin: ${sanitize(bean.origin)}`,
+      bean.variety ? `Variety: ${sanitize(bean.variety)}` : null,
+      `Process: ${sanitize(bean.process)}`,
       bean.roastDate ? `Roast date: ${bean.roastDate} (${dsr}d ago)` : null,
       `Peak status: ${ps.label}`,
       `Roaster category: ${profile.category}`,
-      bean.bagNotes ? `Bag tasting notes: ${bean.bagNotes}` : null,
-      bean.producer ? `Producer: ${bean.producer}` : null,
-      bean.altitude ? `Altitude: ${bean.altitude}` : null,
-      bean.roastLevel ? `Roast level: ${bean.roastLevel}` : null,
-      bean.farm ? `Farm: ${bean.farm}` : null,
-      bean.brewingRec ? `Roaster brewing recommendation: ${bean.brewingRec}` : null,
+      bean.bagNotes ? `Bag tasting notes: ${sanitize(bean.bagNotes, 200)}` : null,
+      bean.producer ? `Producer: ${sanitize(bean.producer)}` : null,
+      bean.altitude ? `Altitude: ${sanitize(bean.altitude)}` : null,
+      bean.roastLevel ? `Roast level: ${sanitize(bean.roastLevel)}` : null,
+      bean.farm ? `Farm: ${sanitize(bean.farm)}` : null,
+      bean.brewingRec ? `Roaster brewing recommendation: ${sanitize(bean.brewingRec, 200)}` : null,
     ].filter(Boolean).join('\n'),
     profile,
   };
@@ -127,5 +132,9 @@ export async function researchBean(bean) {
   });
   const text = data.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch {
+    throw new Error('Bean research returned invalid data. Please try again.');
+  }
 }
