@@ -12,6 +12,13 @@ Deploy the Coffee Hub app to both platforms in one command.
 
 Run these commands sequentially from the project directory `/Users/talmeltzer/Documents/VIBE CODING/Coffee App Build `:
 
+### 0. Pre-deploy QA (optional)
+If user says "deploy with test", "test then deploy", or "test and ship":
+- Run `/ios-screenshot` (passive mode, screenshots only, no code changes)
+- If any check fails: warn user with the score and failing checks, ask to proceed or abort
+- If 5/5: proceed to deploy
+- Default (no test mentioned): skip straight to Step 1
+
 ### 1. Build and deploy web (Vercel)
 ```bash
 cd "/Users/talmeltzer/Documents/VIBE CODING/Coffee App Build " && npm run build && npx vercel --prod 2>&1
