@@ -225,3 +225,71 @@ export function getOriginContext(origin) {
   );
   return key ? ORIGIN_PROFILES[key] : '';
 }
+
+// --- HAND BREW KNOWLEDGE ---
+// Detailed Hoffmann methodology for hand brew recipe generation prompts.
+// Injected into GPT-5.4 system prompt alongside bean research context.
+export const HANDBREW_KNOWLEDGE = `
+HAND BREW METHODOLOGY (from James Hoffmann):
+
+POUR-OVER TECHNIQUE (V60 / Chemex / Kalita / generic cone):
+- Ratio: 60g per liter (starting point, experiment to preference)
+- Grind: medium / caster sugar for ~30g/500g. Finer for single cup, coarser for larger volumes.
+- Water temp: just off the boil (96-100C / 205-212F). Wait 10 seconds after kettle boils if pouring direct.
+- Step 1: Rinse paper filter under hot water (reduces paper taste, warms device). Use bleached white papers.
+- Step 2: Add coffee to brewer, place on scales.
+- Step 3 (Bloom): Pour ~2x coffee weight in water. Pick up and swirl or stir to wet all grounds. Wait 30 seconds.
+- Step 4: Slowly pour remainder of water directly onto coffee bed (NOT the walls). Weigh as you go.
+- Step 5: When surface is 2-3cm below top, give gentle swirl (prevents grounds sticking to walls).
+- Step 6: Let drip through until bed looks dry and relatively flat.
+- Diagnostic: flat, even bed = good extraction. Sloped/cratered bed = channeling (pour more evenly).
+- Troubleshooting: Bitter = grind coarser. Sour/weak/astringent = grind finer. Change ONE variable at a time.
+
+FRENCH PRESS (Hoffmann's improved method):
+- Ratio: 75g per liter
+- Grind: medium (NOT coarse. Most people grind too coarse for French press.)
+- Water temp: boiling, fresh, low mineral content
+- Step 1: Add ground coffee, pour correct amount of water (weigh as you pour).
+- Step 2: Leave to steep 4 minutes (coffee floats, forms crust).
+- Step 3: After 4 minutes, stir the crust with a large spoon (coffee falls to bottom).
+- Step 4: Scoop off remaining foam and floating grounds, discard.
+- Step 5: Wait another 5 minutes (too hot to drink anyway; more silt sinks).
+- Step 6: Place mesh plunger in top but DO NOT PLUNGE (plunging creates turbulence, stirs up silt).
+- Step 7: Pour slowly through mesh. Stop before the very last bit (silt).
+
+AEROPRESS:
+- Ratio: 75g/L (regular cup) or 100g/L (short and strong)
+- Grind: variable (finer = brew quicker, coarser = extend steep time)
+- Water temp: just off the boil (10-20 seconds after kettle boils)
+- Steep ~1 minute, quick stir, slowly push plunger down.
+- Cannot make espresso (no 9-bar pressure). Makes small, strong cups.
+
+EXTRACTION SCIENCE:
+- Target: 18-22% extraction of ground coffee by weight.
+- Under-extracted (below 18%): sour, sharp, lacking sweetness. Fix: grind finer, brew longer, hotter water.
+- Over-extracted (above 22%): bitter, harsh, astringent. Fix: grind coarser, brew shorter, cooler water.
+- The three pour-over variables are interdependent: grind size, contact time, amount of coffee.
+- Finer grind = more extraction per unit time AND slower flow rate (more contact time). Double effect.
+- Stirring/agitation increases extraction. Pour-over: gentle swirl. French press: stir at 4 min only.
+
+ROAST-LEVEL ADJUSTMENTS:
+- Light roasts: harder to extract. Use finer grind, hotter water (full boil OK). More extraction needed to develop sweetness.
+- Medium roasts: standard parameters work well. Best starting point for new beans.
+- Dark roasts: give up flavors easily. Use coarser grind, slightly cooler water. Risk of over-extraction and bitterness.
+
+PROCESS ADJUSTMENTS:
+- Washed: standard grind range. Clean extraction, predictable.
+- Natural/honey: slightly coarser grind (higher solubility from fruit sugars). Can over-extract quickly.
+- Expect more body and fruit from naturals, more clarity and acidity from washed.
+
+WATER:
+- Water is 98.5% of filter coffee by volume. It matters.
+- Hard water = cups lacking nuance and sweetness. Soft to moderate ideal.
+- Chlorinated = terrible. Use carbon filter at minimum.
+- 0.1C temperature changes are undetectable. 1C is the smallest difference most people notice.
+
+FILTER TYPES:
+- Paper: cleanest cup, removes oils and suspended material. Clear liquid. Use bleached white (unbleached = papery taste).
+- Metal: like French press, allows oils and small particles. Richer body, some sediment.
+- Cloth: removes particles but allows some oil. Rich, full mouthfeel. Must store wet in fridge.
+`;
