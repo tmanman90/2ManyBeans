@@ -17,12 +17,21 @@ export function useHandBrew(updateBean) {
   const [handBrewResearch, setHandBrewResearch] = useState(null);
   const [handBrewPhase, setHandBrewPhase] = useState(null);
 
-  const handleBrewHandBrew = async (bean, cachedResearch = null) => {
+  const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false) => {
     setHandBrewBean(bean);
-    setHandBrewRecipe(null);
     setHandBrewError(null);
-    setHandBrewLoading(true);
     setHandBrewModal(true);
+
+    // Show cached recipe immediately if available (skip generation)
+    if (!forceRegenerate && bean.handBrewRecipe) {
+      setHandBrewRecipe(bean.handBrewRecipe);
+      setHandBrewLoading(false);
+      setHandBrewPhase(null);
+      return;
+    }
+
+    setHandBrewRecipe(null);
+    setHandBrewLoading(true);
 
     // Step 1: Research (skip if cached on bean doc or passed in)
     let research = cachedResearch || bean.beanResearch || null;
@@ -77,6 +86,6 @@ export function useHandBrew(updateBean) {
     handBrewPhase, handBrewBean, handBrewResearch,
     handleBrewHandBrew, closeHandBrewModal,
     onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch) : undefined,
-    onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch) : undefined,
+    onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true) : undefined,
   };
 }
