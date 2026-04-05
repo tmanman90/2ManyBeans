@@ -733,8 +733,8 @@ export async function generateAidenRecipe(bean, research = null) {
 }
 
 export async function pushToAiden(recipe) {
-  // Strip grindRecommendation — not part of Fellow schema
-  const { grindRecommendation, ...profile } = recipe;
+  // Strip fields not in Fellow schema
+  const { grindRecommendation, generatedAt, ...profile } = recipe;
 
   const result = await fetchWithRetry({
     url: `${API_BASE}/api/aiden`,
