@@ -274,6 +274,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 onChange={e => setChatInput(e.target.value)}
                 placeholder="Describe your cup..."
                 onKeyDown={e => e.key === 'Enter' && handleChatSend()}
+                onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }}
                 style={{ ...inputStyle, flex: 1 }}
               />
               <Btn variant="primary" onClick={handleChatSend} disabled={chatLoading} style={{ padding: '8px 12px' }}>
@@ -336,14 +337,14 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 12, color: C.textMuted }}>{t.date}</span>
-                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', color: C.accent, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: sharingId === t.id ? 0.5 : 1 }}>
-                  <Share2 size={13} />
+                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', color: C.accent, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: sharingId === t.id ? 0.5 : 1 }}>
+                  <Share2 size={14} />
                 </span>
-                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Pencil size={13} />
+                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Pencil size={14} />
                 </span>
-                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Trash2 size={13} />
+                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={14} />
                 </span>
               </div>
             </div>

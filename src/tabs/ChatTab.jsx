@@ -71,8 +71,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   // Track keyboard open/close on iOS native
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+    let canceled = false;
     let cleanup;
     import('@capacitor/keyboard').then(({ Keyboard }) => {
+      if (canceled) return;
       const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
         setKeyboardHeight(info.keyboardHeight);
         // Hide tab bar when keyboard is open
@@ -94,7 +96,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         hideListener.then(h => h.remove());
       };
     });
-    return () => { if (cleanup) cleanup(); };
+    return () => { canceled = true; if (cleanup) cleanup(); };
   }, []);
 
   // No-op updateBean wrapper for ephemeral beans (no id to persist to)
@@ -448,6 +450,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           enterKeyHint="send"
           style={{
             flex: 1,
+            minWidth: 0,
             padding: '12px 14px',
             borderRadius: 12,
             border: `1px solid ${C.border}`,
@@ -456,6 +459,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
             background: C.card,
             color: C.text,
             outline: 'none',
+            boxSizing: 'border-box',
           }}
         />
         <button

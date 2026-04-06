@@ -119,7 +119,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, overflowY: tab === 'inventory' ? 'hidden' : 'auto', padding: tab === 'inventory' ? 0 : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             uid={uid}

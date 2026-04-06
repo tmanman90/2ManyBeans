@@ -78,12 +78,14 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   };
 
   return (
-    <div>
-      {/* Sticky header: title, add button, search */}
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      position: 'absolute', inset: 0,
+    }}>
+      {/* Fixed header: title, add button, search (non-scrolling) */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: C.bg, paddingBottom: 8,
-        marginLeft: -20, marginRight: -20, paddingLeft: 20, paddingRight: 20,
+        flexShrink: 0, background: C.bg,
+        padding: '12px 20px 8px',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
           <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Sealed Inventory</div>
@@ -115,53 +117,59 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         )}
       </div>
 
-      {Object.entries(grouped).map(([roaster, rBeans]) => (
-        <div key={roaster} style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
-            {roaster}
+      {/* Scrollable cards area */}
+      <div style={{
+        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        padding: `0 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
+      }}>
+        {Object.entries(grouped).map(([roaster, rBeans]) => (
+          <div key={roaster} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
+              {roaster}
+            </div>
+            {rBeans.map(bean => (
+              <BeanCard
+                key={bean.id}
+                bean={bean}
+                compact
+                updateBean={updateBean}
+                onLearn={handleLearn}
+                uid={uid}
+                actions={
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {emptySlots.length > 0 && (
+                      <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
+                    )}
+                    <BrewButton
+                      bean={bean}
+                      label={brewMethod.label}
+                      isHandBrew={isHandBrew}
+                      brewMenuBean={brewMenuBean}
+                      setBrewMenuBean={setBrewMenuBean}
+                      onAiden={aiden.handleBrewWithAiden}
+                      onHandBrew={handBrew.handleBrewHandBrew}
+                    />
+                    <Btn variant="small" onClick={() => handleFinishBag(bean)}>
+                      <Check size={12} /> Finish
+                    </Btn>
+                  </div>
+                }
+              />
+            ))}
           </div>
-          {rBeans.map(bean => (
-            <BeanCard
-              key={bean.id}
-              bean={bean}
-              compact
-              updateBean={updateBean}
-              onLearn={handleLearn}
-              uid={uid}
-              actions={
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {emptySlots.length > 0 && (
-                    <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
-                  )}
-                  <BrewButton
-                    bean={bean}
-                    label={brewMethod.label}
-                    isHandBrew={isHandBrew}
-                    brewMenuBean={brewMenuBean}
-                    setBrewMenuBean={setBrewMenuBean}
-                    onAiden={aiden.handleBrewWithAiden}
-                    onHandBrew={handBrew.handleBrewHandBrew}
-                  />
-                  <Btn variant="small" onClick={() => handleFinishBag(bean)}>
-                    <Check size={12} /> Finish
-                  </Btn>
-                </div>
-              }
-            />
-          ))}
-        </div>
-      ))}
+        ))}
 
-      {sealed.length === 0 && (
-        <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
-          No sealed beans. Time to order!
-        </div>
-      )}
-      {sealed.length > 0 && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
-          No beans match "{search}"
-        </div>
-      )}
+        {sealed.length === 0 && (
+          <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
+            No sealed beans. Time to order!
+          </div>
+        )}
+        {sealed.length > 0 && filtered.length === 0 && (
+          <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
+            No beans match "{search}"
+          </div>
+        )}
+      </div>
 
       <AddBeanForm open={showAdd} onClose={() => setShowAdd(false)} onAdd={onAddBean} uid={uid} updateBean={updateBean} />
       <AidenModal

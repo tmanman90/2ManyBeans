@@ -78,6 +78,7 @@ const rowValueStyle = {
   display: 'flex',
   alignItems: 'center',
   gap: 4,
+  flexShrink: 0,
 };
 
 const selectStyle = {
@@ -85,7 +86,7 @@ const selectStyle = {
   background: 'transparent', border: 'none',
   appearance: 'none', WebkitAppearance: 'none',
   cursor: 'pointer', textAlign: 'right',
-  paddingRight: 0, paddingLeft: 0,
+  paddingRight: 0, paddingLeft: 8,
 };
 
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
@@ -469,6 +470,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     type="text"
                     defaultValue={preferences.grinderCustomName || ''}
                     onBlur={handleCustomGrinderBlur}
+                    onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }}
                     placeholder="e.g., Comandante C40"
                     style={{
                       fontFamily: fonts.body, fontSize: 16, color: C.text,
@@ -568,6 +570,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       placeholder="Fellow email"
                       value={fellowEmailInput}
                       onChange={e => setFellowEmailInput(e.target.value)}
+                      onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }}
                       style={{
                         width: '100%', padding: '10px 12px', borderRadius: 8,
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,
@@ -581,6 +584,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       value={fellowPasswordInput}
                       onChange={e => setFellowPasswordInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && !fellowLoading && handleFellowConnect()}
+                      onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }}
                       style={{
                         width: '100%', padding: '10px 12px', borderRadius: 8,
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,

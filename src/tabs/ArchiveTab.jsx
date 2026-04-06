@@ -1,6 +1,48 @@
 // Archive tab — ported from prototype lines 897-917
+import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
+
+// Inline image component with shimmer + gradient treatment (matches BeanCard)
+const ArchiveImage = ({ src, alt }) => {
+  const [loaded, setLoaded] = useState(() => {
+    if (!src) return false;
+    const img = new Image();
+    img.src = src;
+    return img.complete;
+  });
+  return (
+    <div style={{
+      width: '100%', height: 160, background: '#F0EBE3',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {!loaded && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `linear-gradient(110deg, ${C.bg} 30%, ${C.borderLight} 50%, ${C.bg} 70%)`,
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      )}
+      <img
+        src={src} alt={alt} loading="lazy"
+        onLoad={() => setLoaded(true)}
+        style={{
+          width: '100%', height: 160, objectFit: 'contain', objectPosition: 'center',
+          display: 'block', opacity: loaded ? 1 : 0, transition: 'opacity 0.05s ease',
+        }}
+      />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: [
+          `linear-gradient(to right, ${C.card}, transparent 25%)`,
+          `linear-gradient(to left, ${C.card}, transparent 25%)`,
+          `linear-gradient(to top, ${C.card}, transparent 15%)`,
+        ].join(', '),
+      }} />
+    </div>
+  );
+};
 import { StarRating } from '../components/StarRating';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
@@ -37,15 +79,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean }) => {
           opacity: 0.85,
         }}>
           {bean.photoUrl && (
-            <img
-              src={bean.photoUrl}
-              alt={`${bean.name} bag`}
-              loading="lazy"
-              style={{
-                width: '100%', height: 160, objectFit: 'contain', objectPosition: 'center',
-                display: 'block', background: C.cream,
-              }}
-            />
+            <ArchiveImage src={bean.photoUrl} alt={`${bean.name} bag`} />
           )}
           <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
