@@ -336,13 +336,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 12, color: C.textMuted }}>{t.date}</span>
-                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', color: C.accent, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: sharingId === t.id ? 0.5 : 1 }}>
+                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', color: C.accent, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: sharingId === t.id ? 0.5 : 1 }}>
                   <Share2 size={13} />
                 </span>
-                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Pencil size={13} />
                 </span>
-                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Trash2 size={13} />
                 </span>
               </div>
