@@ -5,6 +5,7 @@
 
 import { forwardRef } from 'react';
 import { domToPng } from 'modern-screenshot';
+import { Capacitor } from '@capacitor/core';
 import { C, fonts } from '../styles/theme';
 
 // --- Constants ---
@@ -259,7 +260,10 @@ export async function captureShareCard(ref) {
   if (capturing) return null;
   capturing = true;
   try {
-    await document.fonts.ready;
+    // Fonts load from disk on native — only wait on web PWA
+    if (!Capacitor.isNativePlatform()) {
+      await document.fonts.ready;
+    }
     // WKWebView paint delay
     await new Promise(r => setTimeout(r, 100));
 
@@ -277,7 +281,7 @@ export async function captureShareCard(ref) {
     // Retry once if blank (Safari foreignObject bug)
     if (!dataUrl || dataUrl.length < 1000) {
       await new Promise(r => setTimeout(r, 300));
-      return domToPng(ref.current, {
+      const retry = await domToPng(ref.current, {
         scale: 2,
         backgroundColor: CARD_BG,
         drawImageInterval: 400,
@@ -287,6 +291,7 @@ export async function captureShareCard(ref) {
         },
         font: { preferredFormat: 'woff2' },
       });
+      return (!retry || retry.length < 1000) ? null : retry;
     }
 
     return dataUrl;

@@ -38,7 +38,7 @@ export function useLongPress({ onTap, onLongPress, delay = 400 }) {
       firedRef.current = true;
       timerRef.current = null;
       haptic.medium();
-      onLongPress(e);
+      onLongPress?.(e);
     }, delay);
   }, [onLongPress, delay]);
 
@@ -46,7 +46,7 @@ export function useLongPress({ onTap, onLongPress, delay = 400 }) {
     if (timerRef.current) {
       // Timer hasn't fired yet — this is a tap
       clear();
-      onTap(e);
+      onTap?.(e);
     }
     // If firedRef.current is true, long press already handled it
   }, [clear, onTap]);
