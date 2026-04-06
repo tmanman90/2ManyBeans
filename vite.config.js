@@ -11,7 +11,7 @@ export default defineConfig({
     ...(!isCapacitor ? [VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB (onboarding-welcome.png is 2.68MB)
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB (share card concepts up to 3.53MB)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
