@@ -172,7 +172,7 @@ async function pushWithCredentials(profile, creds) {
   // Cache token + device for next time (non-blocking)
   cacheTokenAndDevice(creds.secretsRef, token, deviceId);
 
-  // Create temp profile on device
+  // Create temp profile on device (auto-delete duplicate if leftover from previous push)
   let created;
   try {
     created = await fellowFetch(`/devices/${deviceId}/profiles`, {
@@ -181,11 +181,32 @@ async function pushWithCredentials(profile, creds) {
       body: JSON.stringify(profile),
     });
   } catch (createErr) {
-    if (createErr.status === 400) {
+    if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists')) {
+      // Stale profile from a previous push that failed to clean up -- delete it and retry
+      console.warn('Duplicate profile detected, cleaning up and retrying...');
+      try {
+        const existing = await fellowFetch(`/devices/${deviceId}/profiles`, { headers: authHeaders });
+        const profiles = existing.profiles || existing;
+        const stale = Array.isArray(profiles) && profiles.find(p => p.title === profile.title || p.name === profile.title);
+        if (stale) {
+          const staleId = stale.id || stale.profileId;
+          await fellowFetch(`/devices/${deviceId}/profiles/${staleId}`, { method: 'DELETE', headers: authHeaders });
+        }
+        created = await fellowFetch(`/devices/${deviceId}/profiles`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify(profile),
+        });
+      } catch (retryErr) {
+        console.error('Retry after duplicate cleanup failed:', retryErr.message);
+        throw Object.assign(new Error(`Fellow rejected the profile after cleanup: ${retryErr.message}`), { status: 409 });
+      }
+    } else if (createErr.status === 400) {
       console.error('Profile create 400:', createErr.message);
       throw Object.assign(new Error(`Fellow rejected the profile (400): ${createErr.message}`), { status: 409 });
+    } else {
+      throw createErr;
     }
-    throw createErr;
   }
   const profileId = created.id || created.profileId;
 
