@@ -1,7 +1,7 @@
 // Tasting tab — ported from prototype lines 500-789
 // 3 modes: list, form, chat
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Plus, Check, Send, Pencil, Trash2 } from 'lucide-react';
+import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2 } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
@@ -9,6 +9,8 @@ import { convertTastingScores } from '../lib/professorRuphus';
 import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
 import { TastingForm } from '../components/TastingForm';
+import { TastingShareCard, captureShareCard, offScreenStyle } from '../components/ShareCard';
+import { shareImage } from '../lib/share';
 
 export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
@@ -155,6 +157,31 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     setChatExtracted(null);
     setChatMessages([]);
     setMode('list');
+  };
+
+  // Share tasting state
+  const [sharingId, setSharingId] = useState(null);
+  const shareCardRef = useRef(null);
+  const shareDataRef = useRef(null);
+
+  const handleShareTasting = async (tasting) => {
+    if (sharingId) return;
+    const bean = beans.find(b => b.id === tasting.beanId);
+    shareDataRef.current = { tasting, bean };
+    setSharingId(tasting.id);
+    // Wait for render of off-screen card
+    await new Promise(r => setTimeout(r, 50));
+    try {
+      const dataUrl = await captureShareCard(shareCardRef);
+      if (!dataUrl) return;
+      const beanName = bean ? `${bean.name} by ${bean.roaster}` : 'my coffee';
+      await shareImage(dataUrl, `My tasting of ${beanName} on 2manybeans`);
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error('Share failed:', e);
+    } finally {
+      setSharingId(null);
+      shareDataRef.current = null;
+    }
   };
 
   const accentBar = {
@@ -309,10 +336,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text }}>{getBeanName(t.beanId)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 12, color: C.textMuted }}>{t.date}</span>
-                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', color: C.accent, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: sharingId === t.id ? 0.5 : 1 }}>
+                  <Share2 size={13} />
+                </span>
+                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Pencil size={13} />
                 </span>
-                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 8, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Trash2 size={13} />
                 </span>
               </div>
@@ -334,6 +364,17 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
       {mode === 'list' && tastings.length === 0 && (
         <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>No tastings yet. Brew something!</div>
+      )}
+
+      {/* Off-screen share card for capture */}
+      {sharingId && shareDataRef.current && (
+        <div style={offScreenStyle}>
+          <TastingShareCard
+            ref={shareCardRef}
+            bean={shareDataRef.current.bean}
+            tasting={shareDataRef.current.tasting}
+          />
+        </div>
       )}
     </div>
   );

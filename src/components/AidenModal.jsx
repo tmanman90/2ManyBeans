@@ -1,12 +1,15 @@
 // Aiden brew recipe modal — shows recipe, grind, and "Open in Fellow" link
+import { useState, useRef } from 'react';
 import { C, fonts } from '../styles/theme';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Badge } from './Badge';
-import { ExternalLink, Coffee, Thermometer, Droplets, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ExternalLink, Coffee, Thermometer, Droplets, RefreshCw, AlertTriangle, Share2 } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
 import { Capacitor } from '@capacitor/core';
+import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
+import { shareImage } from '../lib/share';
 
 const TempChain = ({ temps, label }) => (
   <div style={{ marginBottom: 8 }}>
@@ -48,8 +51,27 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached }) => {
   const { preferences, fellowConnected } = usePreferences();
+  const [sharing, setSharing] = useState(false);
+  const shareCardRef = useRef(null);
+
+  const handleShareRecipe = async () => {
+    if (sharing || !shareCardRef.current) return;
+    setSharing(true);
+    try {
+      const dataUrl = await captureShareCard(shareCardRef);
+      if (!dataUrl) return;
+      const text = result?.link
+        ? `Check out my brew recipe for ${bean?.name || 'this coffee'}! ${result.link}`
+        : `Check out my brew recipe for ${bean?.name || 'this coffee'}!`;
+      await shareImage(dataUrl, text);
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error('Share failed:', e);
+    } finally {
+      setSharing(false);
+    }
+  };
   const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
   const isDeviceFull = error && error.includes('14 profiles') && !error.includes('(400)');
   const msg = phaseMessages[phase] || phaseMessages.recipe;
@@ -235,12 +257,35 @@ export const AidenModal = ({ open, onClose, recipe, result, loading, error, phas
             </Btn>
           )}
 
+          {/* Share Recipe button */}
+          {!loading && (
+            <Btn variant="ghost" onClick={handleShareRecipe} disabled={sharing} style={{ width: '100%', justifyContent: 'center' }}>
+              <Share2 size={14} /> {sharing ? 'Generating...' : 'Share Recipe'}
+            </Btn>
+          )}
+
           {/* Regenerate button */}
           {onRegenerate && !loading && (
             <Btn variant="ghost" onClick={onRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate Aiden recipe">
               <RefreshCw size={14} /> Regenerate Recipe
             </Btn>
           )}
+        </div>
+      )}
+
+      {/* Off-screen share card for capture */}
+      {recipe && (
+        <div style={offScreenStyle}>
+          <RecipeShareCard
+            ref={shareCardRef}
+            bean={bean}
+            recipe={{
+              ratio: `1:${recipe.ratio}`,
+              bloom: `${recipe.bloomRatio}x ${recipe.bloomDuration}s`,
+              grindSingleShot: recipe.grindRecommendation?.singleServe,
+              grindBatch: recipe.grindRecommendation?.batch,
+            }}
+          />
         </div>
       )}
     </Modal>

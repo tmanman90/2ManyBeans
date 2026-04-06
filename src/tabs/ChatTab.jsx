@@ -483,6 +483,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       <AidenModal
         open={aiden.aidenModal}
         onClose={aiden.closeAidenModal}
+        bean={aiden.aidenBean}
         recipe={aiden.aidenRecipe}
         result={aiden.aidenResult}
         loading={aiden.aidenLoading}

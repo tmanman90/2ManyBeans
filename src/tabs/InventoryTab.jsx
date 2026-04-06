@@ -159,6 +159,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
       <AidenModal
         open={aiden.aidenModal}
         onClose={aiden.closeAidenModal}
+        bean={aiden.aidenBean}
         recipe={aiden.aidenRecipe}
         result={aiden.aidenResult}
         loading={aiden.aidenLoading}
