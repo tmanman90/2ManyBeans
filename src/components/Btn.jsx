@@ -2,7 +2,7 @@
 import { C, fonts, shadows } from '../styles/theme';
 import { haptic } from '../lib/haptics';
 
-export const Btn = ({ children, onClick, variant = 'primary', style = {}, disabled = false }) => {
+export const Btn = ({ children, onClick, variant = 'primary', style = {}, disabled = false, ...rest }) => {
   const handleClick = (e) => {
     if (disabled || !onClick) return;
     if (variant === 'primary') haptic.light();
@@ -31,7 +31,7 @@ export const Btn = ({ children, onClick, variant = 'primary', style = {}, disabl
     small: { ...base, background: C.borderLight, color: C.text, padding: '6px 12px', fontSize: 12 },
   };
   return (
-    <button onClick={handleClick} disabled={disabled} style={{ ...variants[variant], ...style }}>
+    <button onClick={handleClick} disabled={disabled} style={{ ...variants[variant], ...style }} {...rest}>
       {children}
     </button>
   );
