@@ -42,8 +42,8 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean }) => {
               alt={`${bean.name} bag`}
               loading="lazy"
               style={{
-                width: '100%', height: 120, objectFit: 'cover', objectPosition: 'center',
-                display: 'block',
+                width: '100%', height: 160, objectFit: 'contain', objectPosition: 'center',
+                display: 'block', background: C.cream,
               }}
             />
           )}

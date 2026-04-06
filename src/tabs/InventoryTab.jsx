@@ -77,34 +77,41 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Sealed Inventory</div>
-        <Btn variant="primary" onClick={() => setShowAdd(true)} style={{ padding: '8px 14px' }}>
-          <Plus size={14} /> Add Bean
-        </Btn>
-      </div>
-      <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
-        {sealed.length} bags waiting · {emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}
-      </div>
-
-      {sealed.length > 5 && (
-        <div style={{ position: 'relative', marginBottom: 16 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.textMuted }} />
-          <input
-            type="text"
-            placeholder="Search beans..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              width: '100%', padding: '8px 10px 8px 32px', borderRadius: 8,
-              border: `1px solid ${C.border}`, fontFamily: fonts.body,
-              fontSize: 16, background: C.cream, color: C.text,
-              boxSizing: 'border-box', outline: 'none',
-            }}
-          />
+      {/* Sticky header: title, add button, search */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        background: C.bg, paddingBottom: 8,
+        marginLeft: -20, marginRight: -20, paddingLeft: 20, paddingRight: 20,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+          <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Sealed Inventory</div>
+          <Btn variant="primary" onClick={() => setShowAdd(true)} style={{ padding: '8px 14px' }}>
+            <Plus size={14} /> Add Bean
+          </Btn>
         </div>
-      )}
+        <div style={accentBar} />
+        <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 8 }}>
+          {sealed.length} bags waiting · {emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}
+        </div>
+
+        {sealed.length > 5 && (
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.textMuted }} />
+            <input
+              type="text"
+              placeholder="Search beans..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 10px 8px 32px', borderRadius: 8,
+                border: `1px solid ${C.border}`, fontFamily: fonts.body,
+                fontSize: 16, background: C.cream, color: C.text,
+                boxSizing: 'border-box', outline: 'none',
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       {Object.entries(grouped).map(([roaster, rBeans]) => (
         <div key={roaster} style={{ marginBottom: 20 }}>

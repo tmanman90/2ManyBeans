@@ -85,7 +85,7 @@ const selectStyle = {
   background: 'transparent', border: 'none',
   appearance: 'none', WebkitAppearance: 'none',
   cursor: 'pointer', textAlign: 'right',
-  paddingRight: 4,
+  paddingRight: 0, paddingLeft: 0,
 };
 
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {

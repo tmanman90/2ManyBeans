@@ -444,7 +444,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { handleSend(); inputRef.current?.blur(); } }}
-          placeholder={photos.length > 0 ? 'Add a note or just send...' : 'Ask Professor Ruphus about your brew'}
+          placeholder={photos.length > 0 ? 'Add a note or just send...' : 'Ask about your brew...'}
           enterKeyHint="send"
           style={{
             flex: 1,
