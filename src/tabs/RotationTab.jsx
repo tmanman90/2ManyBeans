@@ -1,6 +1,7 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useState } from 'react';
 import { Check, Plus, Star, X, Coffee, Undo2 } from 'lucide-react';
+import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
@@ -34,6 +35,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
   const [slotPicker, setSlotPicker] = useState(null);
+  const [brewMenuBean, setBrewMenuBean] = useState(null);
 
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
@@ -135,9 +137,15 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
             <BeanCard bean={bean} updateBean={updateBean} onLearn={handleLearn} uid={uid} actions={<>
-              <Btn variant="small" onClick={() => isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean)} aria-label={brewMethod.label}>
-                <Coffee size={12} /> {brewMethod.label}
-              </Btn>
+              <BrewButton
+                bean={bean}
+                label={brewMethod.label}
+                isHandBrew={isHandBrew}
+                brewMenuBean={brewMenuBean}
+                setBrewMenuBean={setBrewMenuBean}
+                onAiden={aiden.handleBrewWithAiden}
+                onHandBrew={handBrew.handleBrewHandBrew}
+              />
               <Btn variant="small" onClick={() => setReturnConfirm(bean)}>
                 <Undo2 size={12} /> Return
               </Btn>

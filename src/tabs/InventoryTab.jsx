@@ -1,6 +1,7 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState } from 'react';
 import { Plus, Search, Coffee, Check } from 'lucide-react';
+import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { BeanCard } from '../components/BeanCard';
@@ -32,6 +33,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean);
+  const [brewMenuBean, setBrewMenuBean] = useState(null);
 
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
@@ -131,9 +133,15 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                   {emptySlots.length > 0 && (
                     <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
                   )}
-                  <Btn variant="small" onClick={() => isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean)} aria-label={brewMethod.label}>
-                    <Coffee size={12} /> {brewMethod.label}
-                  </Btn>
+                  <BrewButton
+                    bean={bean}
+                    label={brewMethod.label}
+                    isHandBrew={isHandBrew}
+                    brewMenuBean={brewMenuBean}
+                    setBrewMenuBean={setBrewMenuBean}
+                    onAiden={aiden.handleBrewWithAiden}
+                    onHandBrew={handBrew.handleBrewHandBrew}
+                  />
                   <Btn variant="small" onClick={() => handleFinishBag(bean)}>
                     <Check size={12} /> Finish
                   </Btn>
