@@ -38,7 +38,7 @@ const phaseMessages = {
   },
 };
 
-export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, onRetry, onRegenerate }) => {
+export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, onRetry, onRegenerate, extraFooter }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
   const grinderName = GRINDER_LABELS[grinderKey] || preferences?.grinderCustomName || 'Grinder';
@@ -167,7 +167,7 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
                 borderRadius: 1,
               }} />
 
-              {recipe.steps.map((step, i) => (
+              {(recipe.steps || []).map((step, i) => (
                 <div key={i} style={{
                   position: 'relative',
                   marginBottom: i < recipe.steps.length - 1 ? 16 : 0,
@@ -252,6 +252,8 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
               <RefreshCw size={14} /> Regenerate Recipe
             </Btn>
           )}
+
+          {extraFooter}
         </div>
       )}
     </Modal>

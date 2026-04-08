@@ -118,13 +118,16 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         <button
           onClick={() => setQuickRecipeOpen(true)}
           style={{
-            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '0 14px',
             background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: 10,
             cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            fontFamily: fonts.body, fontSize: 13, fontWeight: 600, color: C.accent,
           }}
           aria-label="Quick Recipe"
         >
-          <Camera size={18} color={C.accent} />
+          <Camera size={16} color={C.accent} />
+          Quick Recipe
         </button>
       </div>
       <div style={accentBar} />
@@ -321,6 +324,9 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         open={quickRecipeOpen}
         onClose={() => setQuickRecipeOpen(false)}
         onSaveToInventory={(data) => setQuickRecipeSaveData(data)}
+        addBean={addBean}
+        addTasting={addTasting}
+        uid={uid}
       />
       {quickRecipeSaveData && (
         <AddBeanForm

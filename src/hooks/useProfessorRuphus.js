@@ -15,8 +15,8 @@ export const useProfessorRuphus = (updateBean, tastings = []) => {
     try {
       const story = await generateRuphusStory(bean, { useWebSearch });
       setRuphusStory(story);
-      // Persist to Firestore
-      if (updateBean) {
+      // Persist to Firestore (skip for ephemeral beans without an id)
+      if (updateBean && bean.id) {
         await updateBean(bean.id, { story });
       }
     } catch (err) {

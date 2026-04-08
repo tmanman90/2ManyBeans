@@ -1,29 +1,54 @@
-// Quick Recipe Flow — scan a coffee bag and generate an Aiden recipe without adding to inventory
+// Quick Recipe Flow — scan a coffee bag and generate a recipe without adding to inventory
 import { useState, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Camera as CameraIcon, X, Search, RotateCcw, Save } from 'lucide-react';
+import { Camera as CameraIcon, X, Search, RotateCcw, Save, Coffee, Star, BookOpen } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
 import { useAidenBrew } from '../hooks/useAidenBrew';
+import { useHandBrew } from '../hooks/useHandBrew';
+import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
+import { usePreferences } from '../hooks/useUserProfile';
 import { AidenModal } from './AidenModal';
+import { HandBrewModal } from './HandBrewModal';
+import { ProfessorRuphusSlideUp } from './ProfessorRuphusSlideUp';
+import { QuickRateForm } from './QuickRateForm';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
+import { Toast } from './Toast';
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
 
 const noop = () => {};
 
-export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory }) => {
+const toEphemeralBean = (data) => {
+  const bean = { ...data };
+  if (typeof bean.bagSize === 'string') {
+    bean.bagSize = parseInt(bean.bagSize, 10) || 100;
+  }
+  return bean;
+};
+
+export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, uid }) => {
+  const { preferences } = usePreferences();
+  const isHandBrew = preferences.brewMethod === 'handbrew';
+
   const [step, setStep] = useState('photo'); // photo | scanning | enriching | bagSize | brewing
   const [photo, setPhoto] = useState(null); // { base64, mediaType, previewUrl }
   const [scanData, setScanData] = useState(null);
   const [scanError, setScanError] = useState(null);
   const [bagSizeInput, setBagSizeInput] = useState('');
+  const [activeMethod, setActiveMethod] = useState(isHandBrew ? 'handbrew' : 'aiden');
+  const [savedBeanId, setSavedBeanId] = useState(null);
+  const [quickRateOpen, setQuickRateOpen] = useState(false);
+  const [toast, setToast] = useState(null);
   const fileRef = useRef(null);
+  const savingRef = useRef(null); // guards against double-tap race on auto-save
 
-  // Aiden brew hook with noop updateBean (ephemeral, no Firestore writes)
+  // Brew hooks with noop updateBean (ephemeral, no Firestore writes)
   const aiden = useAidenBrew(noop);
+  const handBrew = useHandBrew(noop);
+  const { handleLearn, ruphusProps } = useProfessorRuphus(noop);
 
   // Reset on close + revoke blob URL
   useEffect(() => {
@@ -36,6 +61,11 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory }) => {
       setScanData(null);
       setScanError(null);
       setBagSizeInput('');
+      setActiveMethod(isHandBrew ? 'handbrew' : 'aiden');
+      setSavedBeanId(null);
+      savingRef.current = null;
+      setQuickRateOpen(false);
+      setToast(null);
     }
   }, [open]);
 
@@ -148,16 +178,33 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory }) => {
 
   const startBrew = (data) => {
     setStep('brewing');
-    // Build ephemeral bean (no id = no Firestore writes)
-    const ephemeralBean = { ...data };
-    // Ensure bagSize is a number for the recipe system
-    if (typeof ephemeralBean.bagSize === 'string') {
-      ephemeralBean.bagSize = parseInt(ephemeralBean.bagSize, 10) || 100;
+    const ephemeralBean = toEphemeralBean(data);
+    // Start with user's preferred brew method
+    if (isHandBrew) {
+      setActiveMethod('handbrew');
+      handBrew.handleBrewHandBrew(ephemeralBean);
+    } else {
+      setActiveMethod('aiden');
+      aiden.handleBrewWithAiden(ephemeralBean);
     }
-    aiden.handleBrewWithAiden(ephemeralBean);
+  };
+
+  const handleToggleMethod = () => {
+    if (!scanData) return;
+    const ephemeralBean = toEphemeralBean(scanData);
+    if (activeMethod === 'aiden') {
+      // Switch to hand brew, pass Aiden's research as cache
+      setActiveMethod('handbrew');
+      handBrew.handleBrewHandBrew(ephemeralBean, aiden.aidenResearch);
+    } else {
+      // Switch to Aiden, pass hand brew's research as cache
+      setActiveMethod('aiden');
+      aiden.handleBrewWithAiden(ephemeralBean, handBrew.handBrewResearch);
+    }
   };
 
   const handleRetryPhoto = () => {
+    if (photo?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(photo.previewUrl);
     setPhoto(null);
     setScanData(null);
     setScanError(null);
@@ -167,16 +214,77 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory }) => {
 
   const handleSave = () => {
     if (!scanData || !onSaveToInventory) return;
-    // Pass scan data + Aiden recipe data for pre-fill
     const saveData = {
       ...scanData,
       aidenRecipe: aiden.aidenRecipe,
       aidenLink: aiden.aidenResult?.link || null,
       aidenGrind: aiden.aidenRecipe?.grindRecommendation || null,
+      handBrewRecipe: handBrew.handBrewRecipe || null,
       photo,
     };
     onClose();
     onSaveToInventory(saveData);
+  };
+
+  // Auto-save bean to inventory as SEALED (for tasting actions)
+  const handleAutoSave = async () => {
+    if (savedBeanId) return savedBeanId;
+    // Ref guard: if a save is already in flight, await it instead of starting a second
+    if (savingRef.current) return savingRef.current;
+    if (!addBean || !scanData) return null;
+    const savePromise = (async () => {
+      try {
+        const beanData = {
+          ...toEphemeralBean(scanData),
+          status: 'SEALED',
+          uid,
+        };
+        // Attach any generated recipes
+        if (aiden.aidenRecipe) {
+          beanData.aidenRecipe = { ...aiden.aidenRecipe, generatedAt: new Date().toISOString() };
+          if (aiden.aidenResult?.link) beanData.aidenLink = aiden.aidenResult.link;
+          if (aiden.aidenRecipe?.grindRecommendation) beanData.aidenGrind = aiden.aidenRecipe.grindRecommendation;
+        }
+        if (handBrew.handBrewRecipe) {
+          beanData.handBrewRecipe = { ...handBrew.handBrewRecipe, generatedAt: new Date().toISOString() };
+        }
+        const newId = await addBean(beanData);
+        setSavedBeanId(newId);
+        setToast(`${scanData.name || 'Bean'} saved to inventory`);
+        return newId;
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+        setToast('Failed to save bean');
+        // Clear ref on failure so user can retry
+        savingRef.current = null;
+        return null;
+      }
+    })();
+    savingRef.current = savePromise;
+    return savePromise;
+  };
+
+  const handleQuickRate = async () => {
+    const beanId = await handleAutoSave();
+    if (beanId) setQuickRateOpen(true);
+  };
+
+  const handleQuickRateSubmit = async ({ rating, notes }) => {
+    const beanId = savedBeanId;
+    if (!beanId || !addTasting) return;
+    await addTasting({ beanId, rating, notes });
+  };
+
+  const handleRuphusTasting = async () => {
+    const beanId = await handleAutoSave();
+    if (beanId) {
+      setToast(`${scanData?.name || 'Bean'} saved. Start a tasting from the Tasting tab.`);
+    }
+  };
+
+  const handleLearnPress = () => {
+    if (!scanData) return;
+    handleLearn(toEphemeralBean(scanData));
   };
 
   const spinner = (
@@ -197,31 +305,84 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory }) => {
     textAlign: 'center',
   };
 
-  // During brew phase, show AidenModal directly
+  // Build the action buttons shown in the recipe footer
+  const recipeHasLoaded = activeMethod === 'aiden'
+    ? aiden.aidenRecipe && !aiden.aidenLoading
+    : handBrew.handBrewRecipe && !handBrew.handBrewLoading;
+
+  const actionButtons = recipeHasLoaded ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+      {/* Brew method toggle */}
+      <Btn variant="secondary" onClick={handleToggleMethod} style={{ width: '100%', justifyContent: 'center' }}>
+        <Coffee size={14} />
+        {activeMethod === 'aiden' ? 'Get Hand Brew Recipe' : 'Get Aiden Recipe'}
+      </Btn>
+
+      {/* Quick Rate */}
+      <Btn variant="ghost" onClick={handleQuickRate} style={{ width: '100%', justifyContent: 'center' }}>
+        <Star size={14} /> Quick Rate
+      </Btn>
+
+      {/* Ruphus Tasting */}
+      <Btn variant="ghost" onClick={handleRuphusTasting} style={{ width: '100%', justifyContent: 'center' }}>
+        <Coffee size={14} /> Tasting with Ruphus
+      </Btn>
+
+      {/* Learn */}
+      <Btn variant="ghost" onClick={handleLearnPress} style={{ width: '100%', justifyContent: 'center' }}>
+        <BookOpen size={14} /> Learn About This Bean
+      </Btn>
+
+      {/* Save to Inventory */}
+      {onSaveToInventory && !savedBeanId && (
+        <Btn variant="ghost" onClick={handleSave} style={{ width: '100%', justifyContent: 'center' }}>
+          <Save size={14} /> Save to Inventory
+        </Btn>
+      )}
+    </div>
+  ) : null;
+
+  // During brew phase, show the appropriate modal
   if (step === 'brewing') {
     return (
       <>
-        <AidenModal
-          open={open}
-          onClose={onClose}
-          bean={aiden.aidenBean}
-          recipe={aiden.aidenRecipe}
-          result={aiden.aidenResult}
-          loading={aiden.aidenLoading}
-          error={aiden.aidenError}
-          phase={aiden.aidenPhase}
-          onRetry={aiden.onRetry}
-          onRetryPush={aiden.onRetryPush}
-          onRegenerate={aiden.onRegenerate}
-          onPushCached={aiden.onPushCached}
-          extraFooter={
-            aiden.aidenRecipe && !aiden.aidenLoading && onSaveToInventory ? (
-              <Btn variant="secondary" onClick={handleSave} style={{ width: '100%', justifyContent: 'center', marginTop: 6 }}>
-                <Save size={14} /> Save to Inventory
-              </Btn>
-            ) : null
-          }
+        {activeMethod === 'aiden' ? (
+          <AidenModal
+            open={open}
+            onClose={onClose}
+            bean={aiden.aidenBean}
+            recipe={aiden.aidenRecipe}
+            result={aiden.aidenResult}
+            loading={aiden.aidenLoading}
+            error={aiden.aidenError}
+            phase={aiden.aidenPhase}
+            onRetry={aiden.onRetry}
+            onRetryPush={aiden.onRetryPush}
+            onRegenerate={aiden.onRegenerate}
+            onPushCached={aiden.onPushCached}
+            extraFooter={actionButtons}
+          />
+        ) : (
+          <HandBrewModal
+            open={open}
+            onClose={onClose}
+            recipe={handBrew.handBrewRecipe}
+            loading={handBrew.handBrewLoading}
+            error={handBrew.handBrewError}
+            phase={handBrew.handBrewPhase}
+            onRetry={handBrew.onRetry}
+            onRegenerate={handBrew.onRegenerate}
+            extraFooter={actionButtons}
+          />
+        )}
+        <ProfessorRuphusSlideUp {...ruphusProps} />
+        <QuickRateForm
+          open={quickRateOpen}
+          onClose={() => setQuickRateOpen(false)}
+          beanName={scanData?.name}
+          onSubmit={handleQuickRateSubmit}
         />
+        <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
       </>
     );
   }
@@ -244,7 +405,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory }) => {
           >
             <CameraIcon size={36} color={C.accent} style={{ marginBottom: 8 }} />
             <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag</div>
-            <div style={{ fontSize: 13, color: C.textMuted }}>Get an Aiden recipe without adding to inventory</div>
+            <div style={{ fontSize: 13, color: C.textMuted }}>Get a brew recipe without adding to inventory</div>
           </div>
 
           {scanError && (
