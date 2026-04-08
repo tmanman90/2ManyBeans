@@ -4,16 +4,18 @@ import { Capacitor } from '@capacitor/core';
 import { Save, Camera } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
-import { generateProductShot } from '../lib/gemini';
-import { uploadBeanPhoto } from '../lib/storage';
+import { generateAndUploadProductShot } from '../lib/productShot';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
+import { scrollOnFocus } from '../lib/formHelpers';
 
 export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
   const [photoGenerating, setPhotoGenerating] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
   const fileRef = useRef(null);
+  const photoInFlight = useRef(false);
 
   useEffect(() => {
     if (bean && open) {
@@ -37,23 +39,38 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
         brewingRec: bean.brewingRec || '',
         sourcedBy: bean.sourcedBy || '',
       });
+      setPhotoError(false);
+      photoInFlight.current = false;
     }
   }, [bean, open]);
 
   if (!bean) return null;
 
-  const handlePhotoCapture = async (file) => {
-    if (!uid || !bean.id) return;
+  // Fire-and-forget product shot generation (non-blocking)
+  const fireProductShot = (photo) => {
+    if (photoInFlight.current || !uid || !bean.id) return;
+    photoInFlight.current = true;
     setPhotoGenerating(true);
+    setPhotoError(false);
+    const capturedBeanId = bean.id;
+    generateAndUploadProductShot(photo, uid, capturedBeanId, updateBean)
+      .then(() => { setPhotoGenerating(false); photoInFlight.current = false; })
+      .catch(err => {
+        console.error('Photo generation failed:', err);
+        setPhotoGenerating(false);
+        setPhotoError(true);
+        photoInFlight.current = false;
+      });
+  };
+
+  const handlePhotoCapture = async (file) => {
     try {
       const compressed = await compressImage(file);
-      const result = await generateProductShot(compressed);
-      const photoUrl = await uploadBeanPhoto(uid, bean.id, result.base64, result.mimeType);
-      await updateBean(bean.id, { photoUrl });
+      fireProductShot(compressed);
     } catch (err) {
-      console.error('Photo generation failed:', err);
+      console.error('Image compression failed:', err);
+      setPhotoError(true);
     }
-    setPhotoGenerating(false);
   };
 
   const handleNativePhoto = async () => {
@@ -72,16 +89,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
         height: 1200,
       });
       const base64 = image.dataUrl.split(',')[1];
-      // Create a fake file-like for compressImage compatibility
-      setPhotoGenerating(true);
-      try {
-        const result = await generateProductShot({ base64, mediaType: 'image/jpeg' });
-        const photoUrl = await uploadBeanPhoto(uid, bean.id, result.base64, result.mimeType);
-        await updateBean(bean.id, { photoUrl });
-      } catch (err) {
-        console.error('Photo generation failed:', err);
-      }
-      setPhotoGenerating(false);
+      fireProductShot({ base64, mediaType: 'image/jpeg' });
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
         console.error('Camera error:', err);
@@ -174,53 +182,63 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
             <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
             <Btn
               variant="ghost"
-              onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
+              onClick={() => { setPhotoError(false); Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click(); }}
               disabled={photoGenerating}
               style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
             >
-              {photoGenerating ? 'Generating...' : <><Camera size={12} /> Change Photo</>}
+              {photoError ? 'Failed. Retry?' : photoGenerating ? 'Generating...' : <><Camera size={12} /> Change Photo</>}
             </Btn>
           </div>
         ) : (
           <>
             <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
-            <Btn
-              variant="ghost"
-              onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
-              disabled={photoGenerating}
-              style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10 }}
-            >
-              {photoGenerating ? 'Generating product shot...' : <><Camera size={14} /> Add Photo</>}
-            </Btn>
+            {photoError ? (
+              <Btn
+                variant="ghost"
+                onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
+                style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10, color: C.amber }}
+              >
+                Photo generation failed. Tap to retry.
+              </Btn>
+            ) : (
+              <Btn
+                variant="ghost"
+                onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
+                disabled={photoGenerating}
+                style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10 }}
+              >
+                {photoGenerating ? 'Generating product shot...' : <><Camera size={14} /> Add Photo</>}
+              </Btn>
+            )}
           </>
         )}
       </div>
 
       <div style={rowStyle}>
         <label style={labelStyle}>Roaster *</label>
-        <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} style={inputStyle} />
+        <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
       </div>
 
       <div style={rowStyle}>
         <label style={labelStyle}>Coffee Name *</label>
-        <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} style={inputStyle} />
+        <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
         <div>
           <label style={labelStyle}>Origin</label>
-          <input value={f.origin} onChange={e => setF(p => ({ ...p, origin: e.target.value }))} style={inputStyle} />
+          <input value={f.origin} onChange={e => setF(p => ({ ...p, origin: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
         </div>
         <div>
           <label style={labelStyle}>Variety</label>
-          <input value={f.variety} onChange={e => setF(p => ({ ...p, variety: e.target.value }))} style={inputStyle} />
+          <input value={f.variety} onChange={e => setF(p => ({ ...p, variety: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
         <div>
           <label style={labelStyle}>Process</label>
-          <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle}>
+          <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
             {['Washed', 'Natural', 'Honey', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Anaerobic White Honey', 'Advanced Natural', 'Other'].map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
@@ -228,24 +246,24 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
         </div>
         <div>
           <label style={labelStyle}>Bag Size (g)</label>
-          <input value={f.bagSize} onChange={e => setF(p => ({ ...p, bagSize: e.target.value }))} type="number" min={1} style={inputStyle} />
+          <input value={f.bagSize} onChange={e => setF(p => ({ ...p, bagSize: e.target.value }))} type="number" min={1} style={inputStyle} onFocus={scrollOnFocus} />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Roast Date</label>
-          <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={inputStyle} />
+          <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, overflow: 'hidden' }} onFocus={scrollOnFocus} />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Producer</label>
-          <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={inputStyle} />
+          <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
         </div>
       </div>
 
       <div style={rowStyle}>
         <label style={labelStyle}>Tasting Notes</label>
-        <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} />
+        <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} onFocus={scrollOnFocus} />
       </div>
 
       {/* Enriched Details */}
@@ -255,22 +273,22 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
             <label style={labelStyle}>Region</label>
-            <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} />
+            <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
           <div>
             <label style={labelStyle}>Farm</label>
-            <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} />
+            <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
             <label style={labelStyle}>Altitude</label>
-            <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800 masl" style={inputStyle} />
+            <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800 masl" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
           <div>
             <label style={labelStyle}>Roast Level</label>
-            <select value={f.roastLevel} onChange={e => setF(p => ({ ...p, roastLevel: e.target.value }))} style={inputStyle}>
+            <select value={f.roastLevel} onChange={e => setF(p => ({ ...p, roastLevel: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
               <option value="">—</option>
               {['light', 'medium-light', 'medium', 'medium-dark', 'dark'].map(l => (
                 <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
@@ -282,17 +300,17 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
             <label style={labelStyle}>Cup Score</label>
-            <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} />
+            <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
           <div>
             <label style={labelStyle}>Sourced By</label>
-            <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} />
+            <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
         </div>
 
         <div style={{ marginBottom: 10 }}>
           <label style={labelStyle}>Brewing Recommendations</label>
-          <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} />
+          <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} onFocus={scrollOnFocus} />
         </div>
       </div>
 
@@ -310,6 +328,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
               min={0}
               placeholder="e.g. 4.0"
               style={inputStyle}
+              onFocus={scrollOnFocus}
             />
           </div>
           <div>
@@ -322,6 +341,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
               min={0}
               placeholder="e.g. 6.2"
               style={inputStyle}
+              onFocus={scrollOnFocus}
             />
           </div>
         </div>

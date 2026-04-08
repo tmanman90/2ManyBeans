@@ -5,6 +5,7 @@ import { Check } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { StarRating } from './StarRating';
 import { Btn } from './Btn';
+import { scrollOnFocus } from '../lib/formHelpers';
 
 const emptyForm = { aroma: '', firstSip: '', acidity: '', sweetness: '', body: '', finish: '', oneWord: '', rating: 0, notes: '', changeTomorrow: '' };
 
@@ -67,10 +68,10 @@ export const TastingForm = ({ beanId, beanLabel, beans, initialForm, onSubmit, s
           <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>{label}</label>
           {key === 'notes' ? (
             <textarea value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical' }}
-              onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }} />
+              onFocus={scrollOnFocus} />
           ) : (
             <input value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} style={inputStyle}
-              onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }} />
+              onFocus={scrollOnFocus} />
           )}
         </div>
       ))}

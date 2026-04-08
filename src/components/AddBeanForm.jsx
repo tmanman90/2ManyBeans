@@ -9,6 +9,8 @@ import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot } from '../lib/gemini';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { uploadBeanPhoto } from '../lib/storage';
+import { generateAndUploadProductShot } from '../lib/productShot';
+import { scrollOnFocus } from '../lib/formHelpers';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
@@ -29,6 +31,9 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const storyRef = useRef(null); // Background Professor Ruphus story
+  const genCounter = useRef(0); // Monotonic counter: invalidates stale product shot + story on rescan
+  const productShotResultRef = useRef(null); // Holds pre-generated product shot { base64, mimeType }
+  const [productShotStatus, setProductShotStatus] = useState('idle'); // idle | generating | ready | failed
 
   // Pre-fill from initialData (e.g. Quick Recipe save-to-inventory)
   const initialRef = useRef(null);
@@ -58,6 +63,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   }, [f.roaster]);
 
   const reset = () => {
+    photos.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
     setF(empty);
     setStep('photo');
     setScanError(null);
@@ -65,6 +71,9 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setProfileInfo(null);
     setAiFilling(false);
     storyRef.current = null;
+    productShotResultRef.current = null;
+    setProductShotStatus('idle');
+    genCounter.current++;
   };
 
   const takeNativePhoto = async () => {
@@ -126,8 +135,14 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setScanError(null);
     setStep('scanning');
 
+    const thisGen = ++genCounter.current;
+    productShotResultRef.current = null;
+
     try {
+      // Scan first (user-blocking, prioritize bandwidth on cellular)
       const parsed = await scanBeanLabel(photos);
+      // If user reset/rescanned while scan was in flight, discard stale results
+      if (thisGen !== genCounter.current) return;
       // Save scan results immediately — safe even if research fails
       const scanData = {
         roaster: parsed.roaster || '',
@@ -151,11 +166,26 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       };
       setF(scanData);
 
-      // Auto-trigger research
+      // Now start product shot in background (scan done, bandwidth free)
+      setProductShotStatus('generating');
+      generateProductShot(photos[0])
+        .then(result => {
+          if (thisGen === genCounter.current && result?.base64) {
+            productShotResultRef.current = result;
+            setProductShotStatus('ready');
+          }
+        })
+        .catch(err => {
+          console.log('Product shot generation skipped:', err.message);
+          if (thisGen === genCounter.current) setProductShotStatus('failed');
+        });
+
+      // Auto-trigger research (runs while product shot generates in background)
       setStep('researching');
       let enrichedData = scanData;
       try {
         const research = await researchBeanOnline(scanData);
+        if (thisGen !== genCounter.current) return; // stale guard
         // Merge: only fill empty fields
         const merged = { ...scanData };
         for (const field of ENRICHABLE_FIELDS) {
@@ -169,13 +199,15 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         console.log('Research skipped/failed:', researchErr.message);
         // Silent — scan data is already saved
       }
-      // Background: generate Professor Ruphus story (non-blocking)
+      if (thisGen !== genCounter.current) return; // stale guard
+      // Background: generate Professor Ruphus story (non-blocking, guarded by gen counter)
       storyRef.current = null;
       generateRuphusStory(enrichedData, { useWebSearch: false })
-        .then(story => { storyRef.current = story; })
+        .then(story => { if (thisGen === genCounter.current) storyRef.current = story; })
         .catch(err => console.log('Background story gen skipped:', err.message));
       setStep('review');
     } catch (err) {
+      if (thisGen !== genCounter.current) return; // stale guard
       console.error('Scan error:', err);
       setScanError(err.message || "Couldn't read the label. You can fill in details manually.");
       setStep('review');
@@ -185,6 +217,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   const handleAiFill = async () => {
     if (aiFilling) return;
     setAiFilling(true);
+    const thisGen = genCounter.current;
     try {
       const research = await researchBeanOnline(f);
       const merged = { ...f };
@@ -194,10 +227,10 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         }
       }
       setF(merged);
-      // Background: generate Professor Ruphus story (non-blocking)
+      // Background: generate Professor Ruphus story (non-blocking, guarded by gen counter)
       storyRef.current = null;
       generateRuphusStory(merged, { useWebSearch: false })
-        .then(story => { storyRef.current = story; })
+        .then(story => { if (thisGen === genCounter.current) storyRef.current = story; })
         .catch(err => console.log('Background story gen skipped:', err.message));
     } catch (err) {
       console.log('AI Fill failed:', err.message);
@@ -266,7 +299,8 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       if (initialData.aidenGrind) beanData.aidenGrind = initialData.aidenGrind;
     }
 
-    // Capture first photo before reset (for background product shot generation)
+    // Capture pre-generated product shot result before reset
+    const shotResult = productShotResultRef.current;
     const scanPhoto = photos.length > 0 ? photos[0] : null;
 
     let beanId;
@@ -279,12 +313,18 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     reset();
     onClose();
 
-    // Background: generate product shot from first scan photo (non-blocking)
-    if (scanPhoto && beanId && uid && updateBean) {
-      generateProductShot(scanPhoto)
-        .then(result => uploadBeanPhoto(uid, beanId, result.base64, result.mimeType))
-        .then(photoUrl => updateBean(beanId, { photoUrl }))
-        .catch(err => console.error('Product shot failed:', err.message, err));
+    // Upload product shot: use pre-generated result if available, else fire-and-forget
+    if (beanId && uid && updateBean) {
+      if (shotResult?.base64) {
+        // Product shot already generated during scan, just upload
+        uploadBeanPhoto(uid, beanId, shotResult.base64, shotResult.mimeType)
+          .then(photoUrl => updateBean(beanId, { photoUrl }))
+          .catch(err => console.error('Product shot upload failed:', err.message));
+      } else if (scanPhoto) {
+        // Fallback: fire-and-forget generation (product shot failed or still pending during scan)
+        generateAndUploadProductShot(scanPhoto, uid, beanId, updateBean)
+          .catch(err => console.error('Product shot failed:', err.message, err));
+      }
     }
   };
 
@@ -298,8 +338,6 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
   const rowStyle = { marginBottom: 12 };
-  const scrollOnFocus = e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); };
-
   const spinner = (
     <div style={{
       width: 16, height: 16,
@@ -315,20 +353,20 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean" centered footer={step === 'review' ? (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
+          <Btn variant="secondary" onClick={reset} style={{ flex: 1, justifyContent: 'center' }}>
             <RotateCcw size={14} /> Rescan
           </Btn>
           {hasSearchableData && hasEmptyEnrichable && (
             <Btn
-              variant="ghost"
+              variant="secondary"
               onClick={handleAiFill}
               disabled={aiFilling}
-              style={{ flex: 0, fontSize: 12 }}
+              style={{ flex: 1, justifyContent: 'center' }}
             >
               {aiFilling ? (
                 <>{spinner} Researching...</>
               ) : (
-                <><Search size={12} /> AI Fill</>
+                <><Search size={14} /> AI Fill</>
               )}
             </Btn>
           )}
@@ -467,14 +505,22 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       {step === 'review' && (
         <>
           {photos.length > 0 && (
-            <div style={{
-              display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto',
-              borderRadius: 12, border: `1px solid ${C.border}`, padding: 6,
-            }}>
-              {photos.map((photo, idx) => (
-                <img key={idx} src={photo.previewUrl} alt={`Photo ${idx + 1}`}
-                  style={{ height: 80, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
-              ))}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{
+                display: 'flex', gap: 6, overflowX: 'auto',
+                borderRadius: 12, border: `1px solid ${C.border}`, padding: 6,
+              }}>
+                {photos.map((photo, idx) => (
+                  <img key={idx} src={photo.previewUrl} alt={`Photo ${idx + 1}`}
+                    style={{ height: 80, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                ))}
+              </div>
+              {productShotStatus === 'generating' && (
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Generating product shot...</div>
+              )}
+              {productShotStatus === 'ready' && (
+                <div style={{ fontSize: 11, color: C.green, marginTop: 4 }}>Product shot ready</div>
+              )}
             </div>
           )}
           {scanError && (
@@ -485,7 +531,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
           <div style={rowStyle}>
             <label style={labelStyle}>Roaster *</label>
-            <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} placeholder="e.g. Apollon's Gold, Koppi..." style={inputStyle} />
+            <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} placeholder="e.g. Apollon's Gold, Koppi..." style={inputStyle} onFocus={scrollOnFocus} />
             {profileInfo && (
               <div style={{
                 marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 12,
@@ -507,24 +553,24 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
           <div style={rowStyle}>
             <label style={labelStyle}>Coffee Name *</label>
-            <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Finca San Antonio" style={inputStyle} />
+            <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Finca San Antonio" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
             <div>
               <label style={labelStyle}>Origin</label>
-              <input value={f.origin} onChange={e => setF(p => ({ ...p, origin: e.target.value }))} placeholder="e.g. Colombia" style={inputStyle} />
+              <input value={f.origin} onChange={e => setF(p => ({ ...p, origin: e.target.value }))} placeholder="e.g. Colombia" style={inputStyle} onFocus={scrollOnFocus} />
             </div>
             <div>
               <label style={labelStyle}>Variety</label>
-              <input value={f.variety} onChange={e => setF(p => ({ ...p, variety: e.target.value }))} placeholder="e.g. Geisha" style={inputStyle} />
+              <input value={f.variety} onChange={e => setF(p => ({ ...p, variety: e.target.value }))} placeholder="e.g. Geisha" style={inputStyle} onFocus={scrollOnFocus} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
             <div>
               <label style={labelStyle}>Process</label>
-              <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle}>
+              <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
                 <option value="" disabled>Select...</option>
                 {['Washed', 'Natural', 'Honey', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Anaerobic White Honey', 'Advanced Natural', 'Other'].map(p => (
                   <option key={p} value={p}>{p}</option>
@@ -533,14 +579,14 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
             </div>
             <div>
               <label style={labelStyle}>Bag Size (g)</label>
-              <input value={f.bagSize} onChange={e => setF(p => ({ ...p, bagSize: e.target.value }))} type="number" min={1} style={inputStyle} />
+              <input value={f.bagSize} onChange={e => setF(p => ({ ...p, bagSize: e.target.value }))} type="number" min={1} style={inputStyle} onFocus={scrollOnFocus} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Roast Date</label>
-              <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={inputStyle} />
+              <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, overflow: 'hidden' }} onFocus={scrollOnFocus} />
             </div>
             <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Producer</label>

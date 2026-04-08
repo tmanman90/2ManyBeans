@@ -6,19 +6,17 @@ function beanPhotoRef(uid, beanId) {
   return ref(storage, `users/${uid}/bean-photos/${beanId}.jpg`);
 }
 
-// Convert base64 string to Blob
-function base64ToBlob(base64, mimeType = 'image/jpeg') {
-  const bytes = atob(base64);
-  const arr = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    arr[i] = bytes.charCodeAt(i);
-  }
-  return new Blob([arr], { type: mimeType });
+// Convert base64 string to Blob using native fetch (lower memory than manual decode)
+async function base64ToBlob(base64, mimeType = 'image/jpeg') {
+  const res = await fetch(`data:${mimeType};base64,${base64}`);
+  const blob = await res.blob();
+  if (blob.size === 0) throw new Error('base64ToBlob produced empty blob');
+  return blob;
 }
 
 // Upload a product shot and return the download URL
 export async function uploadBeanPhoto(uid, beanId, base64, mimeType = 'image/jpeg') {
-  const blob = base64ToBlob(base64, mimeType);
+  const blob = await base64ToBlob(base64, mimeType);
   const photoRef = beanPhotoRef(uid, beanId);
   await uploadBytes(photoRef, blob, { contentType: mimeType });
   return getDownloadURL(photoRef);

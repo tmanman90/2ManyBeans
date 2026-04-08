@@ -8,6 +8,7 @@ import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { convertTastingScores } from '../lib/professorRuphus';
 import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
+import { scrollOnFocus } from '../lib/formHelpers';
 import { TastingForm } from '../components/TastingForm';
 import { TastingShareCard, captureShareCard, offScreenStyle } from '../components/ShareCard';
 import { shareImage } from '../lib/share';
@@ -287,7 +288,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 onChange={e => setChatInput(e.target.value)}
                 placeholder="Describe your cup..."
                 onKeyDown={e => e.key === 'Enter' && handleChatSend()}
-                onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }}
+                onFocus={scrollOnFocus}
                 style={{ ...inputStyle, flex: 1 }}
               />
               <Btn variant="primary" onClick={handleChatSend} disabled={chatLoading} style={{ padding: '8px 12px' }}>
