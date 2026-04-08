@@ -115,20 +115,9 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={sectionTitle}>Active Rotation</div>
-        <button
-          onClick={() => setQuickRecipeOpen(true)}
-          style={{
-            height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '0 14px',
-            background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: 10,
-            cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-            fontFamily: fonts.body, fontSize: 13, fontWeight: 600, color: C.accent,
-          }}
-          aria-label="Quick Recipe"
-        >
-          <Camera size={16} color={C.accent} />
-          Quick Recipe
-        </button>
+        <Btn variant="primary" onClick={() => setQuickRecipeOpen(true)} style={{ padding: '8px 14px' }}>
+          <Camera size={14} /> Quick Recipe
+        </Btn>
       </div>
       <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>
