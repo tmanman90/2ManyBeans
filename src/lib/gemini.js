@@ -85,12 +85,16 @@ If a field is not visible, use an empty string (or 100 for bagSize). For roastDa
     contents: [{
       parts: [...imageParts, { text: scanPrompt }],
     }],
-    maxTokens: 1200,
+    maxTokens: 2500,
   });
 
   const text = data.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(clean);
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('Could not read the label. Please try a clearer photo.');
+  }
+  const parsed = JSON.parse(jsonMatch[0]);
 
   if (parsed.error) {
     throw new Error(parsed.error);
