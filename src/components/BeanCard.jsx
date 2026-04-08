@@ -18,7 +18,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
   const ps = getPeakStatus(bean);
   const dOpen = daysOpen(bean.openDate);
 
-  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy;
+  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn;
 
   const photoHeight = compact ? 180 : 240;
 
@@ -33,7 +33,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
         <div style={{
           width: '100%',
           height: photoHeight,
-          background: '#F0EBE3',
+          background: C.card,
           position: 'relative',
           overflow: 'hidden',
         }}>
@@ -65,9 +65,9 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
             position: 'absolute',
             inset: 0,
             background: [
-              `linear-gradient(to right, ${C.card}, transparent 25%)`,
-              `linear-gradient(to left, ${C.card}, transparent 25%)`,
-              `linear-gradient(to top, ${C.card}, transparent 15%)`,
+              `linear-gradient(to right, ${C.card}, transparent 35%)`,
+              `linear-gradient(to left, ${C.card}, transparent 35%)`,
+              `linear-gradient(to top, ${C.card}, transparent 20%)`,
             ].join(', '),
             pointerEvents: 'none',
           }} />
@@ -192,7 +192,8 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
               {bean.farm && <span><strong>Farm:</strong> {bean.farm}</span>}
               {bean.altitude && <span><strong>Altitude:</strong> {bean.altitude}</span>}
               {bean.roastLevel && <span><strong>Roast Level:</strong> {bean.roastLevel}</span>}
-              {bean.cupScore && <span><strong>Cup Score:</strong> {bean.cupScore}</span>}
+              {bean.cupScore && <span><strong>Accolades:</strong> {bean.cupScore}</span>}
+              {bean.roastedIn && <span><strong>Roasted In:</strong> {bean.roastedIn}</span>}
               {bean.sourcedBy && <span><strong>Sourced By:</strong> {bean.sourcedBy}</span>}
               {bean.brewingRec && (
                 <span style={{ marginTop: 2 }}><strong>Brewing Rec:</strong> {bean.brewingRec}</span>

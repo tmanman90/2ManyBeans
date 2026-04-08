@@ -73,10 +73,11 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   "altitude": "altitude if shown (e.g. '1800-2100 masl')",
   "farm": "specific farm/estate name if shown",
   "roastLevel": "light, medium-light, medium, medium-dark, or dark -- if indicated",
-  "cupScore": "SCA cup score, micro lot score, lot score, Q grade, or any numeric quality/cupping score on the bag (e.g. '87.5')",
+  "cupScore": "any accolades: SCA cup score, Q grade, competition wins, championships, awards (e.g. '87.5', '1st Place Italian Roasting Championship 2026', 'Best of Panama 2025')",
   "brewingRec": "any brewing recommendations on the bag",
   "sourcedBy": "subscription service or curator if different from roaster",
-  "shelfLife": "shelf life or consume-by guidance from the bag (e.g. '3 months', '90 days', 'best within 6 weeks of roast')"
+  "shelfLife": "shelf life or consume-by guidance from the bag (e.g. '3 months', '90 days', 'best within 6 weeks of roast')",
+  "roastedIn": "country or city where the coffee was ROASTED (not the origin country of the beans) -- look for 'roasted in', 'torrefazione', roastery location, city/country on the roaster's branding"
 }
 
 If a field is not visible, use an empty string (or 100 for bagSize). For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
@@ -141,12 +142,13 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   "region": "specific region within the country",
   "farm": "farm or estate name",
   "roastLevel": "light, medium-light, medium, medium-dark, or dark",
-  "cupScore": "SCA score if available",
+  "cupScore": "SCA score, competition wins, awards, or championships if available",
   "brewingRec": "any brewing recommendations from the roaster",
   "variety": "variety if found and not already known",
   "process": "process if found and not already known",
   "sourcedBy": "retailer/selector if applicable",
   "producer": "producer name if found",
+  "roastedIn": "city/country where the coffee is roasted (roastery location)",
   "redditNotes": "community tasting notes or reviews from Reddit if found"
 }` }],
     }],

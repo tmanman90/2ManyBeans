@@ -12,14 +12,14 @@ import { uploadBeanPhoto } from '../lib/storage';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
-const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
+const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer', 'roastedIn'];
 
 export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData }) => {
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
     roastDate: '', bagSize: 100, bagNotes: '', producer: '',
     altitude: '', region: '', farm: '', roastLevel: '', cupScore: '',
-    brewingRec: '', sourcedBy: '', shelfLife: '',
+    brewingRec: '', sourcedBy: '', shelfLife: '', roastedIn: '',
   };
   const [f, setF] = useState(empty);
   const [profileInfo, setProfileInfo] = useState(null);
@@ -147,6 +147,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         brewingRec: parsed.brewingRec || '',
         sourcedBy: parsed.sourcedBy || '',
         shelfLife: parsed.shelfLife || '',
+        roastedIn: parsed.roastedIn || '',
       };
       setF(scanData);
 
@@ -253,6 +254,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     if (f.brewingRec.trim()) beanData.brewingRec = f.brewingRec.trim();
     if (f.sourcedBy.trim()) beanData.sourcedBy = f.sourcedBy.trim();
     if (f.shelfLife.trim()) beanData.shelfLife = f.shelfLife.trim();
+    if (f.roastedIn.trim()) beanData.roastedIn = f.roastedIn.trim();
 
     // Include Professor Ruphus story if background generation finished
     if (storyRef.current) beanData.story = storyRef.current;
@@ -282,7 +284,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       generateProductShot(scanPhoto)
         .then(result => uploadBeanPhoto(uid, beanId, result.base64, result.mimeType))
         .then(photoUrl => updateBean(beanId, { photoUrl }))
-        .catch(err => console.log('Background product shot skipped:', err.message));
+        .catch(err => console.error('Product shot failed:', err.message, err));
     }
   };
 
@@ -296,6 +298,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
   const rowStyle = { marginBottom: 12 };
+  const scrollOnFocus = e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); };
 
   const spinner = (
     <div style={{
@@ -310,28 +313,30 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   return (
     <Modal open={open} onClose={() => { reset(); onClose(); }} title="Add New Bean" centered footer={step === 'review' ? (
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
-          <RotateCcw size={14} /> Rescan
-        </Btn>
-        {hasSearchableData && hasEmptyEnrichable && (
-          <Btn
-            variant="ghost"
-            onClick={handleAiFill}
-            disabled={aiFilling}
-            style={{ flex: 0, fontSize: 12 }}
-          >
-            {aiFilling ? (
-              <>{spinner} Researching...</>
-            ) : (
-              <><Search size={12} /> AI Fill</>
-            )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn variant="secondary" onClick={reset} style={{ flex: 0 }}>
+            <RotateCcw size={14} /> Rescan
           </Btn>
-        )}
+          {hasSearchableData && hasEmptyEnrichable && (
+            <Btn
+              variant="ghost"
+              onClick={handleAiFill}
+              disabled={aiFilling}
+              style={{ flex: 0, fontSize: 12 }}
+            >
+              {aiFilling ? (
+                <>{spinner} Researching...</>
+              ) : (
+                <><Search size={12} /> AI Fill</>
+              )}
+            </Btn>
+          )}
+        </div>
         <Btn
           variant="primary"
           onClick={handleSave}
-          style={{ flex: 1, justifyContent: 'center', opacity: f.roaster.trim() && f.name.trim() ? 1 : 0.4 }}
+          style={{ width: '100%', justifyContent: 'center', opacity: f.roaster.trim() && f.name.trim() ? 1 : 0.4 }}
         >
           <Plus size={14} /> Add to Inventory
         </Btn>
@@ -537,15 +542,15 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
               <label style={labelStyle}>Roast Date</label>
               <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={inputStyle} />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Producer</label>
-              <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={inputStyle} />
+              <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
             </div>
           </div>
 
           <div style={rowStyle}>
             <label style={labelStyle}>Tasting Notes</label>
-            <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} />
+            <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
 
           {/* Enriched Details Section */}
@@ -555,18 +560,18 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
               <div>
                 <label style={labelStyle}>Region</label>
-                <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} />
+                <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
               <div>
                 <label style={labelStyle}>Farm</label>
-                <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} />
+                <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
               <div>
                 <label style={labelStyle}>Altitude</label>
-                <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800-2100 masl" style={inputStyle} />
+                <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800-2100 masl" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
               <div>
                 <label style={labelStyle}>Roast Level</label>
@@ -581,23 +586,30 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
               <div>
-                <label style={labelStyle}>Cup Score</label>
-                <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} />
+                <label style={labelStyle}>Accolades</label>
+                <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5, award" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
               <div>
                 <label style={labelStyle}>Sourced By</label>
-                <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} />
+                <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
               <div>
-                <label style={labelStyle}>Brewing Recommendations</label>
-                <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster, if any" style={inputStyle} />
+                <label style={labelStyle}>Roasted In</label>
+                <input value={f.roastedIn} onChange={e => setF(p => ({ ...p, roastedIn: e.target.value }))} placeholder="e.g. Florence, Italy" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
               <div>
+                <label style={labelStyle}>Brewing Recommendations</label>
+                <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} onFocus={scrollOnFocus} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+              <div>
                 <label style={labelStyle}>Shelf Life</label>
-                <input value={f.shelfLife} onChange={e => setF(p => ({ ...p, shelfLife: e.target.value }))} placeholder="e.g. 3 months" style={inputStyle} />
+                <input value={f.shelfLife} onChange={e => setF(p => ({ ...p, shelfLife: e.target.value }))} placeholder="e.g. 3 months" style={inputStyle} onFocus={scrollOnFocus} />
               </div>
             </div>
           </div>
