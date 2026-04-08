@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { today } from '../lib/peakStatus';
 import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
+import { cacheRead, cacheWrite } from '../lib/offlineCache';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -28,19 +29,29 @@ export const useAppData = (uid) => {
   const beansRef = useRef(beans);
   beansRef.current = beans; // Always track latest beans for stable callbacks
 
+  // Shared fetch+cache helper for native (used by initial load, poll, and refetch)
+  const fetchAndCache = useCallback(async (bColl, tColl, bKey, tKey) => {
+    const [beansSnap, tastingsSnap] = await Promise.all([getDocs(bColl), getDocs(tColl)]);
+    const freshBeans = beansSnap.docs.map(normalizeBean);
+    const freshTastings = tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setBeans(freshBeans);
+    setTastings(freshTastings);
+    cacheWrite(bKey, freshBeans);
+    cacheWrite(tKey, freshTastings);
+  }, []);
+
   // Refetch data on native after mutations (replaces real-time listener updates)
   const refetch = useCallback(async () => {
     if (!uid || !Capacitor.isNativePlatform()) return;
     try {
-      const [beansSnap, tastingsSnap] = await Promise.all([
-        getDocs(collection(db, 'users', uid, 'beans')),
-        getDocs(collection(db, 'users', uid, 'tastings')),
-      ]);
-      setBeans(beansSnap.docs.map(normalizeBean));
-      setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      skipNextPoll.current = true; // Skip next poll since we just fetched
+      await fetchAndCache(
+        collection(db, 'users', uid, 'beans'),
+        collection(db, 'users', uid, 'tastings'),
+        `beans_${uid}`, `tastings_${uid}`,
+      );
+      skipNextPoll.current = true;
     } catch (err) { /* polling will catch up */ }
-  }, [uid]);
+  }, [uid, fetchAndCache]);
 
   // Fetch data from Firestore
   useEffect(() => {
@@ -55,40 +66,41 @@ export const useAppData = (uid) => {
     const tastingsRef = collection(db, 'users', uid, 'tastings');
 
     if (Capacitor.isNativePlatform()) {
-      // Native: use getDocs (HTTP fetch) instead of onSnapshot (WebSocket).
-      // WebSocket-based listeners are unreliable in WKWebView.
+      // Native: load from localStorage cache first for instant render,
+      // then fetch from Firestore in background to get fresh data.
+      const beansCacheKey = `beans_${uid}`;
+      const tastingsCacheKey = `tastings_${uid}`;
+      const cachedBeans = cacheRead(beansCacheKey);
+      const cachedTastings = cacheRead(tastingsCacheKey);
+      if (cachedBeans && cachedTastings) {
+        setBeans(cachedBeans);
+        setTastings(cachedTastings);
+        setLoaded(true);
+      }
+
+      // Network fetch (updates cache on success)
       const fetchData = async () => {
         try {
-          const [beansSnap, tastingsSnap] = await Promise.all([
-            getDocs(beansRef),
-            getDocs(tastingsRef),
-          ]);
-          setBeans(beansSnap.docs.map(normalizeBean));
-          setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          await fetchAndCache(beansRef, tastingsRef, beansCacheKey, tastingsCacheKey);
         } catch (err) {
           console.error('Firestore fetch error:', err);
         }
         setLoaded(true);
       };
       // Safety timeout: if fetch hangs, show app anyway after 5s
+      // (harmless if cache already set loaded=true above)
       const fetchTimeout = setTimeout(() => setLoaded(true), 5000);
       fetchData().finally(() => clearTimeout(fetchTimeout));
 
       // Poll every 60s to keep data fresh (replaces real-time listeners)
       const startPoll = () => {
         pollRef.current = setInterval(async () => {
-          // Skip if a mutation refetch just happened
           if (skipNextPoll.current) {
             skipNextPoll.current = false;
             return;
           }
           try {
-            const [beansSnap, tastingsSnap] = await Promise.all([
-              getDocs(beansRef),
-              getDocs(tastingsRef),
-            ]);
-            setBeans(beansSnap.docs.map(normalizeBean));
-            setTastings(tastingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            await fetchAndCache(beansRef, tastingsRef, beansCacheKey, tastingsCacheKey);
           } catch (err) { /* silent retry next interval */ }
         }, 60000);
       };

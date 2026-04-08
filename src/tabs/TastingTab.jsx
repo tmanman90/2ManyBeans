@@ -60,9 +60,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   const handleFormSubmit = async (formData) => {
     const tastingData = { date: today(), ...formData };
-    const tastingId = await onAddTasting(tastingData);
-    if (tastingId) convertScoresInBackground(tastingId, tastingData);
-    setMode('list');
+    try {
+      const tastingId = await onAddTasting(tastingData);
+      if (tastingId) convertScoresInBackground(tastingId, tastingData);
+      setMode('list');
+    } catch (err) {
+      alert("Couldn't save tasting. Check your connection and try again.");
+    }
   };
 
   const sorted = [...tastings].sort((a, b) => {
@@ -70,17 +74,22 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     return b.date > a.date ? 1 : -1;
   });
 
-  const updateRating = (id, rating) => {
-    onUpdateTasting(id, { rating });
+  const updateRating = async (id, rating) => {
+    try { await onUpdateTasting(id, { rating }); }
+    catch { alert("Couldn't update rating. Check your connection."); }
   };
 
   const startEdit = (t) => { setEditingId(t.id); setEditForm({ ...t }); };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editForm) return;
     const { id, createdAt, updatedAt, ...fields } = editForm;
-    onUpdateTasting(editingId, fields);
-    setEditingId(null);
-    setEditForm(null);
+    try {
+      await onUpdateTasting(editingId, fields);
+      setEditingId(null);
+      setEditForm(null);
+    } catch {
+      alert("Couldn't save changes. Check your connection and try again.");
+    }
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
 
@@ -152,11 +161,15 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const saveChatTasting = async () => {
     if (!chatExtracted || !sel) return;
     const tastingData = { beanId: sel, date: today(), ...chatExtracted, rating: chatExtracted.rating || null };
-    const tastingId = await onAddTasting(tastingData);
-    if (tastingId) convertScoresInBackground(tastingId, tastingData);
-    setChatExtracted(null);
-    setChatMessages([]);
-    setMode('list');
+    try {
+      const tastingId = await onAddTasting(tastingData);
+      if (tastingId) convertScoresInBackground(tastingId, tastingData);
+      setChatExtracted(null);
+      setChatMessages([]);
+      setMode('list');
+    } catch (err) {
+      alert("Couldn't save tasting. Check your connection and try again.");
+    }
   };
 
   // Share tasting state
@@ -274,7 +287,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 onChange={e => setChatInput(e.target.value)}
                 placeholder="Describe your cup..."
                 onKeyDown={e => e.key === 'Enter' && handleChatSend()}
-                onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350); }}
+                onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }}
                 style={{ ...inputStyle, flex: 1 }}
               />
               <Btn variant="primary" onClick={handleChatSend} disabled={chatLoading} style={{ padding: '8px 12px' }}>
@@ -343,7 +356,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Pencil size={14} />
                 </span>
-                <span onClick={() => { if (confirm('Delete this tasting?')) onDeleteTasting(t.id); }} style={{ cursor: 'pointer', color: C.red, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span onClick={async () => { if (confirm('Delete this tasting?')) try { await onDeleteTasting(t.id); } catch { alert("Couldn't delete. Check your connection."); } }} style={{ cursor: 'pointer', color: C.red, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Trash2 size={14} />
                 </span>
               </div>

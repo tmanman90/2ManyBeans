@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/global.css';
 import { Capacitor } from '@capacitor/core';
@@ -9,6 +9,7 @@ import { SignInScreen } from './components/SignInScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { App } from './App';
 import { AuthContext } from './contexts/AuthContext';
+import { cacheClear } from './lib/offlineCache';
 
 // Module-scope lazy load (must NOT be inside component body)
 const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
@@ -38,7 +39,16 @@ const Root = () => {
     loaded: dataLoaded,
   } = useAppData(user?.uid);
 
-  const authValue = useMemo(() => ({ user, logOut }), [user, logOut]);
+  // Track last known uid so cache clears even if auth state clears first
+  const lastUidRef = useRef(user?.uid);
+  useEffect(() => { if (user?.uid) lastUidRef.current = user.uid; }, [user?.uid]);
+
+  const handleLogOut = useCallback(() => {
+    if (lastUidRef.current) cacheClear(lastUidRef.current);
+    return logOut();
+  }, [logOut]);
+
+  const authValue = useMemo(() => ({ user, logOut: handleLogOut }), [user, handleLogOut]);
 
   // Gate 1: Auth loading
   if (authLoading) return <LoadingScreen />;
@@ -109,8 +119,24 @@ const Root = () => {
   );
 };
 
+// Dev-only test routes — hash-based, tree-shaken from prod builds
+const TestShareCardLazy = import.meta.env.DEV
+  ? React.lazy(() => import('./pages/TestShareCard').then(m => ({ default: m.TestShareCard })))
+  : null;
+
+const DevRouter = () => {
+  if (window.location.hash === '#/test-share-card' && TestShareCardLazy) {
+    return (
+      <React.Suspense fallback={<div style={{ color: '#fff', padding: 40 }}>Loading test page...</div>}>
+        <TestShareCardLazy />
+      </React.Suspense>
+    );
+  }
+  return <Root />;
+};
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Root />
+    {import.meta.env.DEV ? <DevRouter /> : <Root />}
   </React.StrictMode>
 );

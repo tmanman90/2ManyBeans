@@ -1,7 +1,7 @@
 // Loading spinner
 import { C, fonts } from '../styles/theme';
 
-export const LoadingScreen = () => (
+export const LoadingScreen = ({ message } = {}) => (
   <div style={{
     fontFamily: fonts.body,
     background: C.bg,
@@ -14,6 +14,6 @@ export const LoadingScreen = () => (
     gap: 12,
   }}>
     <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent }}>2manybeans</div>
-    <div style={{ fontSize: 14 }}>Loading your beans...</div>
+    <div style={{ fontSize: 14 }}>{message || 'Loading your beans...'}</div>
   </div>
 );

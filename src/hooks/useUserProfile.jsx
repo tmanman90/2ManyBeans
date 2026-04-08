@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, createContext, useContext, us
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
+import { cacheRead, cacheWrite } from '../lib/offlineCache';
 
 // Default preferences for new users and existing user migration
 const DEFAULT_PREFERENCES = {
@@ -46,11 +47,24 @@ export const useUserProfile = (uid) => {
     const profileRef = doc(db, 'users', uid);
 
     if (Capacitor.isNativePlatform()) {
-      // Native: single read at boot with retry on failure
+      // Native: load from localStorage cache first for instant render,
+      // then fetch from Firestore in background to get fresh data.
+      const cacheKey = `profile_${uid}`;
+      const cached = cacheRead(cacheKey);
+      let hadCache = false;
+      if (cached) {
+        setProfile(cached);
+        setLoaded(true);
+        hadCache = true;
+      }
+
+      // Network fetch with retry (updates cache on success)
       const loadProfile = (attempt = 1) => {
         getDoc(profileRef).then(snap => {
           if (snap.exists()) {
-            setProfile({ id: snap.id, ...snap.data() });
+            const fresh = { id: snap.id, ...snap.data() };
+            setProfile(fresh);
+            cacheWrite(cacheKey, fresh);
           } else {
             setProfile(null); // genuinely doesn't exist
           }
@@ -59,11 +73,12 @@ export const useUserProfile = (uid) => {
         }).catch(err => {
           console.error(`[Profile] Load attempt ${attempt} failed:`, err);
           if (attempt < 3) {
-            // Retry with backoff
             setTimeout(() => loadProfile(attempt + 1), 1000 * attempt);
           } else {
-            // After 3 attempts, mark as error (NOT as "profile doesn't exist")
-            setLoadError(true);
+            // Only show error if we have no cached data to fall back on
+            if (!hadCache) {
+              setLoadError(true);
+            }
             setLoaded(true);
           }
         });
@@ -108,8 +123,10 @@ export const useUserProfile = (uid) => {
       },
     };
     await setDoc(profileRef, profileData);
-    // Optimistic local update
-    setProfile({ id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() });
+    // Optimistic local update + cache
+    const localProfile = { id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() };
+    setProfile(localProfile);
+    cacheWrite(`profile_${uid}`, localProfile);
   }, [uid]);
 
   // Migrate an existing user (has beans but no profile doc)
@@ -141,7 +158,9 @@ export const useUserProfile = (uid) => {
       preferences: DEFAULT_PREFERENCES,
     };
     await setDoc(profileRef, profileData, { merge: true });
-    setProfile({ id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() });
+    const localProfile = { id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() };
+    setProfile(localProfile);
+    cacheWrite(`profile_${uid}`, localProfile);
   }, [uid]);
 
   // Update specific preferences using dot notation
@@ -153,11 +172,13 @@ export const useUserProfile = (uid) => {
       updates[`preferences.${key}`] = value;
     }
     await updateDoc(profileRef, updates);
-    // Optimistic local update
-    setProfile(prev => prev ? {
-      ...prev,
-      preferences: { ...prev.preferences, ...partialPrefs },
-    } : prev);
+    // Optimistic local update + cache
+    setProfile(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, preferences: { ...prev.preferences, ...partialPrefs } };
+      cacheWrite(`profile_${uid}`, updated);
+      return updated;
+    });
   }, [uid]);
 
   // Update profile fields (displayName, username, marketingConsent, etc.)
@@ -168,8 +189,13 @@ export const useUserProfile = (uid) => {
       const profileRef = doc(db, 'users', uid);
       await updateDoc(profileRef, partialProfile);
     }
-    // Optimistic local update
-    setProfile(prev => prev ? { ...prev, ...partialProfile } : prev);
+    // Optimistic local update + cache
+    setProfile(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...partialProfile };
+      cacheWrite(`profile_${uid}`, updated);
+      return updated;
+    });
   }, [uid]);
 
   // Complete onboarding
@@ -177,7 +203,12 @@ export const useUserProfile = (uid) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
     await updateDoc(profileRef, { onboardingComplete: true });
-    setProfile(prev => prev ? { ...prev, onboardingComplete: true } : prev);
+    setProfile(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, onboardingComplete: true };
+      cacheWrite(`profile_${uid}`, updated);
+      return updated;
+    });
   }, [uid]);
 
   // Stabilize preferences reference: only change when values actually differ

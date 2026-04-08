@@ -242,7 +242,13 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
     // Capture first photo before reset (for background product shot generation)
     const scanPhoto = photos.length > 0 ? photos[0] : null;
 
-    const beanId = await onAdd(beanData);
+    let beanId;
+    try {
+      beanId = await onAdd(beanData);
+    } catch (err) {
+      alert("Couldn't save bean. Check your connection and try again.");
+      return;
+    }
     reset();
     onClose();
 
