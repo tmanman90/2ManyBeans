@@ -14,7 +14,7 @@ import { Btn } from './Btn';
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
 
-export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
+export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData }) => {
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
     roastDate: '', bagSize: 100, bagNotes: '', producer: '',
@@ -29,6 +29,24 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const storyRef = useRef(null); // Background Professor Ruphus story
+
+  // Pre-fill from initialData (e.g. Quick Recipe save-to-inventory)
+  const initialRef = useRef(null);
+  useEffect(() => {
+    if (open && initialData && initialData !== initialRef.current) {
+      initialRef.current = initialData;
+      const prefill = { ...empty };
+      for (const key of Object.keys(prefill)) {
+        if (initialData[key] != null && initialData[key] !== '') prefill[key] = initialData[key];
+      }
+      setF(prefill);
+      // Include the photo if provided
+      if (initialData.photo) {
+        setPhotos([initialData.photo]);
+      }
+      setStep('review');
+    }
+  }, [open, initialData]);
 
   useEffect(() => {
     if (f.roaster.trim()) {
@@ -238,6 +256,13 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean }) => {
 
     // Include Professor Ruphus story if background generation finished
     if (storyRef.current) beanData.story = storyRef.current;
+
+    // Include Aiden recipe data if pre-filled from Quick Recipe
+    if (initialData?.aidenRecipe) {
+      beanData.aidenRecipe = { ...initialData.aidenRecipe, generatedAt: initialData.aidenRecipe.generatedAt || new Date().toISOString() };
+      if (initialData.aidenLink) beanData.aidenLink = initialData.aidenLink;
+      if (initialData.aidenGrind) beanData.aidenGrind = initialData.aidenGrind;
+    }
 
     // Capture first photo before reset (for background product shot generation)
     const scanPhoto = photos.length > 0 ? photos[0] : null;

@@ -51,7 +51,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, extraFooter }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
@@ -60,7 +60,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
     if (sharing || !shareCardRef.current) return;
     setSharing(true);
     try {
-      const dataUrl = await captureShareCard(shareCardRef);
+      const dataUrl = await captureShareCard(shareCardRef, { backgroundColor: '#2B5B4E' });
       if (!dataUrl) return;
       const text = result?.link
         ? `Check out my brew recipe for ${bean?.name || 'this coffee'}! ${result.link}`
@@ -270,6 +270,8 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
               <RefreshCw size={14} /> Regenerate Recipe
             </Btn>
           )}
+
+          {extraFooter}
         </div>
       )}
 

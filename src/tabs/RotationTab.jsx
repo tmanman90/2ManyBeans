@@ -1,6 +1,6 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useState } from 'react';
-import { Check, Plus, Star, X, Coffee, Undo2 } from 'lucide-react';
+import { Check, Plus, Star, X, Coffee, Undo2, Camera } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
@@ -15,13 +15,15 @@ import { Btn } from '../components/Btn';
 import { Modal } from '../components/Modal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
+import { QuickRecipeFlow } from '../components/QuickRecipeFlow';
+import { AddBeanForm } from '../components/AddBeanForm';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, addTasting, updateTasting }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, addBean, addTasting, updateTasting }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod === 'handbrew';
@@ -36,6 +38,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [recLoading, setRecLoading] = useState(false);
   const [slotPicker, setSlotPicker] = useState(null);
   const [brewMenuBean, setBrewMenuBean] = useState(null);
+  const [quickRecipeOpen, setQuickRecipeOpen] = useState(false);
+  const [quickRecipeSaveData, setQuickRecipeSaveData] = useState(null);
 
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
@@ -109,7 +113,20 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
 
   return (
     <div>
-      <div style={sectionTitle}>Active Rotation</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={sectionTitle}>Active Rotation</div>
+        <button
+          onClick={() => setQuickRecipeOpen(true)}
+          style={{
+            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: 10,
+            cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+          }}
+          aria-label="Quick Recipe"
+        >
+          <Camera size={18} color={C.accent} />
+        </button>
+      </div>
       <div style={accentBar} />
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>
 
@@ -300,6 +317,21 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         beans={beans}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
+      <QuickRecipeFlow
+        open={quickRecipeOpen}
+        onClose={() => setQuickRecipeOpen(false)}
+        onSaveToInventory={(data) => setQuickRecipeSaveData(data)}
+      />
+      {quickRecipeSaveData && (
+        <AddBeanForm
+          open={!!quickRecipeSaveData}
+          onClose={() => setQuickRecipeSaveData(null)}
+          onAdd={addBean}
+          uid={uid}
+          updateBean={updateBean}
+          initialData={quickRecipeSaveData}
+        />
+      )}
     </div>
   );
 };

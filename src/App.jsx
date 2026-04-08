@@ -129,6 +129,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             onReturnBean={returnBean}
             onOpenBean={handleOpenBean}
             updateBean={updateBean}
+            addBean={addBean}
             addTasting={addTasting}
             updateTasting={updateTasting}
           />
