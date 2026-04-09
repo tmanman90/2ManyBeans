@@ -58,7 +58,9 @@ async function fellowFetch(path, options = {}) {
       error.status = res.status;
       throw error;
     }
-    return res.json();
+    const text = (await res.text().catch(() => '')).trim();
+    if (!text) return {};
+    return JSON.parse(text);
   } finally {
     clearTimeout(timer);
   }

@@ -13,7 +13,7 @@ const ArchiveImage = ({ src, alt }) => {
   });
   return (
     <div style={{
-      width: '100%', height: 160, background: '#F0EBE3',
+      width: '100%', height: 160, background: C.card,
       position: 'relative', overflow: 'hidden',
     }}>
       {!loaded && (
@@ -35,9 +35,9 @@ const ArchiveImage = ({ src, alt }) => {
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         background: [
-          `linear-gradient(to right, ${C.card}, transparent 25%)`,
-          `linear-gradient(to left, ${C.card}, transparent 25%)`,
-          `linear-gradient(to top, ${C.card}, transparent 15%)`,
+          `linear-gradient(to right, ${C.card}, transparent 35%)`,
+          `linear-gradient(to left, ${C.card}, transparent 35%)`,
+          `linear-gradient(to top, ${C.card}, transparent 20%)`,
         ].join(', '),
       }} />
     </div>

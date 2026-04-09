@@ -11,7 +11,9 @@ import { C, fonts } from '../styles/theme';
 // --- Constants ---
 
 const CARD_WIDTH = 540; // CSS px, scale:2 = 1080px output
-const CARD_BG = C.bg;   // #FAF6F1 warm cream
+const CARD_HEIGHT = 540; // Fixed square for recipe card (matches 1:1 background image)
+const CARD_BG = C.bg;   // #FAF6F1 warm cream (tasting card)
+export const RECIPE_CARD_BG = '#2B5B4E'; // Dark green fallback matching chalkboard
 
 // Typography at 540px CSS (doubled to 1080px at scale:2)
 const type = {
@@ -21,6 +23,15 @@ const type = {
   body: { fontFamily: fonts.body, fontSize: 19, fontWeight: 600 },
   secondary: { fontFamily: fonts.body, fontSize: 16, fontWeight: 400 },
   watermark: { fontFamily: fonts.body, fontSize: 14, fontWeight: 400 },
+};
+
+// Chalk-style typography for recipe card (white on chalkboard)
+const chalk = {
+  beanName: { fontFamily: fonts.title, fontSize: 24, fontWeight: 700, color: '#fff', textShadow: '0 1px 1px rgba(0,0,0,0.3)' },
+  recipeTitle: { fontFamily: fonts.title, fontSize: 18, fontWeight: 400, fontStyle: 'italic', color: 'rgba(255,255,255,0.9)', textShadow: '0 0 1px rgba(0,0,0,0.2)' },
+  paramLabel: { fontFamily: fonts.title, fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 },
+  paramValue: { fontFamily: fonts.title, fontSize: 18, fontWeight: 700, color: '#fff', textShadow: '0 0 1px rgba(0,0,0,0.15)' },
+  watermark: { fontFamily: fonts.title, fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.6)' },
 };
 
 // --- Shared layout pieces ---
@@ -133,53 +144,154 @@ const CardStarRating = ({ value }) => (
   </div>
 );
 
-// --- Recipe Share Card ---
+// --- Recipe Share Card (Apothecary chalkboard background) ---
 
-const RecipeParamCell = ({ label, value }) => (
-  <div style={{
-    background: C.cream,
-    borderRadius: 12,
-    padding: '14px 10px',
-    textAlign: 'center',
-    flex: 1,
-  }}>
-    <div style={{ ...type.watermark, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-      {label}
+const ChalkParam = ({ label, value }) => {
+  if (!value) return null;
+  return (
+    <div style={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
+      <div style={{ ...chalk.paramLabel, marginBottom: 6 }}>{label}</div>
+      <div style={chalk.paramValue}>{value}</div>
     </div>
-    <div style={{ ...type.body, color: C.text }}>
-      {value}
-    </div>
-  </div>
-);
+  );
+};
 
 export const RecipeShareCard = forwardRef(({ bean, recipe }, ref) => {
-  // Explicit allow-list: only safe display fields
-  const { name, roaster, origin, process, photoUrl } = bean || {};
+  const { name, roaster, origin, process, bagNotes } = bean || {};
   const { ratio, bloom, grindSingleShot, grindBatch } = recipe || {};
 
+  const subtitle = [roaster, origin, process].filter(Boolean).join(' \u00B7 ');
+
   return (
-    <div ref={ref} style={cardStyle}>
-      <div style={{ ...type.cardTitle, color: C.accent, marginBottom: 16 }}>
-        Brew Recipe
-      </div>
+    <div ref={ref} style={{
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 20,
+      background: RECIPE_CARD_BG,
+    }}>
+      {/* Background image — absolute, behind all content */}
+      <img
+        src="/images/share-card-layout-half-v2.png"
+        alt=""
+        crossOrigin="anonymous"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      />
 
-      <BeanPhoto photoUrl={photoUrl} />
-      <BeanInfo name={name} roaster={roaster} origin={origin} process={process} />
-
+      {/* Easter egg — Tina on a jar label */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 10,
-        width: '100%',
-        marginTop: 8,
+        position: 'absolute',
+        bottom: 68,
+        left: 28,
+        fontSize: 6,
+        fontFamily: fonts.body,
+        fontWeight: 600,
+        color: '#5C3D2E',
+        opacity: 0.7,
+        letterSpacing: 0.5,
+        pointerEvents: 'none',
       }}>
-        {ratio && <RecipeParamCell label="Ratio" value={ratio} />}
-        {bloom && <RecipeParamCell label="Bloom" value={bloom} />}
-        {grindSingleShot && <RecipeParamCell label="Grind (SS)" value={grindSingleShot} />}
-        {grindBatch && <RecipeParamCell label="Grind (Batch)" value={grindBatch} />}
+        Tina
       </div>
 
-      <CardFooter />
+      {/* Chalkboard text zone — centered on the board area */}
+      <div style={{
+        position: 'absolute',
+        top: 40,
+        left: 45,
+        right: 60,
+        bottom: 175,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        overflow: 'hidden',
+      }}>
+        {/* Bean name — single line, ellipsis on overflow */}
+        <div style={{
+          ...chalk.beanName,
+          textAlign: 'center',
+          lineHeight: 1.2,
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {name}
+        </div>
+
+        {/* Roaster / Origin / Process */}
+        {subtitle && (
+          <div style={{
+            ...chalk.recipeTitle,
+            textAlign: 'center',
+            lineHeight: 1.3,
+            maxWidth: '100%',
+          }}>
+            {subtitle}
+          </div>
+        )}
+
+        {/* Bag tasting notes — wraps to 2 lines max */}
+        {bagNotes && bagNotes !== '(not logged)' && (
+          <div style={{
+            fontFamily: fonts.title,
+            fontSize: 12,
+            fontWeight: 400,
+            fontStyle: 'italic',
+            color: 'rgba(255,255,255,0.55)',
+            textAlign: 'center',
+            maxWidth: '85%',
+            lineHeight: 1.4,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            letterSpacing: 0.3,
+          }}>
+            {bagNotes}
+          </div>
+        )}
+
+        {/* Divider line */}
+        <div style={{
+          width: 60,
+          height: 1,
+          background: 'rgba(255,255,255,0.3)',
+          margin: '2px 0',
+        }} />
+
+        {/* Recipe params — 2x2 grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px 20px',
+          width: '100%',
+          maxWidth: 360,
+        }}>
+          <ChalkParam label="Ratio" value={ratio} />
+          <ChalkParam label="Bloom" value={bloom} />
+          <ChalkParam label="Grind (SS)" value={grindSingleShot} />
+          <ChalkParam label="Grind (Batch)" value={grindBatch} />
+        </div>
+
+        {/* Watermark */}
+        <div style={{
+          ...chalk.watermark,
+          marginTop: 6,
+        }}>
+          2manybeans
+        </div>
+      </div>
     </div>
   );
 });
@@ -255,8 +367,11 @@ let capturing = false;
 /**
  * Capture a share card ref as a PNG data URL.
  * Guards against concurrent captures. iOS-safe settings.
+ * @param {object} ref - React ref to the card element
+ * @param {object} [opts] - Options
+ * @param {string} [opts.backgroundColor] - Override background color (e.g. dark green for recipe card)
  */
-export async function captureShareCard(ref) {
+export async function captureShareCard(ref, opts = {}) {
   if (capturing) return null;
   capturing = true;
   try {
@@ -269,7 +384,7 @@ export async function captureShareCard(ref) {
 
     const dataUrl = await domToPng(ref.current, {
       scale: 2,
-      backgroundColor: CARD_BG,
+      backgroundColor: opts.backgroundColor || CARD_BG,
       drawImageInterval: 200, // iOS needs more time for image rendering
       fetch: {
         bypassingCache: true,
@@ -283,7 +398,7 @@ export async function captureShareCard(ref) {
       await new Promise(r => setTimeout(r, 300));
       const retry = await domToPng(ref.current, {
         scale: 2,
-        backgroundColor: CARD_BG,
+        backgroundColor: opts.backgroundColor || CARD_BG,
         drawImageInterval: 400,
         fetch: {
           bypassingCache: true,

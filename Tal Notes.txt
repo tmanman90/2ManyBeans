@@ -1,3 +1,161 @@
+
+⏺ Deployed. v1.1.62 is live on both Vercel and Capgo (production channel).
+                                                                                                                                    
+  Changes deployed:                                                                                                                 
+  1. Image container bg matched to C.card (#FFF8F0) + stronger gradients (35% sides, 20% bottom) on BeanCard, ArchiveImage          
+  2. Image gen prompt updated from #F0EBE3 to #FFF8F0 so future product shots match the card bg natively                            
+  3. Chat placeholder: "Ask Professor Ruphus..."                                                                                    
+  4. Keyboard: scrollIntoView changed to block: 'center' in TastingTab + TastingForm (ensures input scrolls above keyboard)         
+  5. Settings: maxWidth: '55%' on selects for consistent alignment                                                                  
+                                                                                                                                    
+  Kill the app, reopen twice to pick up the Capgo bundle. Note: existing product photos will still have the old #F0EBE3 bg, but the 
+  stronger gradients + matched container color should blend better. New beans will get the matching #FFF8F0 bg from the updated     
+  prompt.                                                                                                                           
+                                                                                                                                    
+✻ Baked for 3m 10s                                                
+                         
+
+⏺ Build succeeds. Here's a summary of all changes:                                                                                  
+     
+⏺ Much better. All 3 cards now:
+
+  1. Full - Everything fits cleanly within the chalkboard, no clipping
+  2. Minimal - Centered nicely with breathing room
+  3. Long name - The full name wraps onto 2 lines ("Guatemala Huehuetenango La Libertad Finca El Injerto Bourbon"), subtitle + all 4
+   params + watermark all fit within bounds
+
+  Your browser should have auto-reloaded with HMR. How does it look to you now?
+
+✻ Brewed for 2m 15s
+                                                                                                                               
+  
+  
+  
+  1. Image blending (BeanCard + ArchiveImage):                                                                                      
+  - Container background changed from #F0EBE3 to C.card (#FFF8F0) so it matches the card seamlessly                                 
+  - Gradient overlays strengthened: 25% → 35% on sides, 15% → 20% on bottom                                                         
+                                                                                                                                    
+  2. Chat placeholder: "Ask about your brew..." → "Ask Professor Ruphus..."                                                         
+                                                                                                                                    
+  3. Keyboard handling (TastingTab + TastingForm): Changed scrollIntoView from block: 'nearest' to block: 'center'. The problem was 
+  nearest doesn't scroll if the input appears "visible" before the keyboard finishes animating.                                     
+                                                                                                                                    
+  4. Settings alignment: Added maxWidth: '55%' to selectStyle so longer values like "Fellow Ode Gen 2" don't push labels off-screen,
+   and all chevrons line up consistently.
+                                                                                                                                    
+  Re: your prompt question - yes, updating the image generation prompt to specify #FFF8F0 (warm cream) background would make        
+  blending near-perfect. The gradient overlays can only do so much when the photo background is a different color from the card.
+  Want me to find and update the image gen prompt?                                                                                  
+                                                                  
+  Ready to deploy when you say go.
+
+Bugs i noticed to fix: 
+In the chat tab, the default greyed out ""Ask professor ruphus about..." gets cut off u cant actually see it. What do u suggest? Shrink the message i guess? 
+The archive tab (screenshot attached), it's not showing up as clean as inventory tab. Notice how the image gets cut off. 
+The next screen shot (with notes, one word score etc) shows another bug that happens across the app. if im selecting a bar to type thats low on the screen, the keyboard covers it.. 
+In the settings tab, you can see not everything snap alligns right. Fellow Ode Gen 2 has padding to the right unlike Aiden Brew and Grinder Steps.. 
+If i replace it to Microns, Microns also doesnt align right. Look for any other cases of that. 
+In image 11 screenshot, i believe the entire top panel should be frozen in place. the scrolling should occur under the "search beans" part so you always have the search bar and add bean buttons visible. How should i think about that? 
+Share button on the recipe so that it shares a card with the photo of bean, info on bean along w the recipe and button to open the brew link
+Share button for coffee reviews too
+the share buttons i should be able to share via text card or socials / ig?
+need a way to show hand brew recipe if i want even if default is aidan. maybe its 3d touch and a hard press? What do u suggest?
+                                                                                             
+
+
+Step-by-Step: Google Stitch for Coffee Hub                                                                                        
+                                                                                                                                    
+  Phase 1: Set Up Stitch MCP (one-time, ~10 min)                  
+                                                                                                                                    
+  1. Run the init wizard in your terminal:                                                                                          
+  npx @_davideast/stitch-mcp init                                                                                                   
+  1. It handles gcloud auth, OAuth, credentials, and project setup automatically.                                                   
+  2. Add to your Claude Code MCP config (if the wizard doesn't do it):                                                              
+  {                                                                                                                                 
+    "mcpServers": {                                                                                                                 
+      "stitch": {                                                                                                                   
+        "command": "npx",                                         
+        "args": ["-y", "@_davideast/stitch-mcp"]                                                                                    
+      }
+    }                                                                                                                               
+  }                                                               
+  2. I can run /update-config to wire this into your settings.json if you want.
+  3. Restart Claude Code to load the MCP server.                                                                                    
+  
+  Phase 2: Extract Your Existing Design System (~5 min)                                                                             
+                                                                  
+  4. Go to stitch.withgoogle.com and create a new project.                                                                          
+  5. Feed it your production URL (https://2manybeans.vercel.app). Stitch can analyze a live site and extract the color palette, type
+   scale, and spacing patterns automatically. This becomes your baseline design system.                                             
+  6. Export the DESIGN.md. This captures Coffee Hub's current visual identity (your warm coffee tones, card layouts, etc.) in a
+  portable markdown file that Claude Code can read.                                                                                 
+  7. Drop DESIGN.md in your project root (next to CLAUDE.md). Claude Code will reference it for all UI work going forward.
+                                                                                                                                    
+  Phase 3: Redesign a Screen in Stitch (~15-30 min)                                                                                 
+                                                                                                                                    
+  8. Screenshot the tab you want to redesign (e.g., RotationTab, InventoryTab, or a new feature screen).                            
+  9. Use Stitch's Redesign mode: Upload your screenshot and prompt something like:
+    - "Redesign this coffee inventory screen. Keep the warm palette. Make it feel more premium and less cluttered. Mobile-first     
+  layout."                                                                                                                          
+    - Or use Voice Canvas to talk through what you want changed in real-time.                                                       
+  10. Iterate on the canvas. Stitch generates an editable layout. Tweak colors, spacing, component arrangement until you like it.   
+  This is the "vibe designing" part, no code involved.                                                                              
+  11. For a new tab/feature: Start fresh in Stitch with a prompt like "Design a coffee brewing timer tab for a specialty coffee app.
+   Use this design system:" and reference your DESIGN.md. Generate multiple screens and connect them with interaction hotspots.     
+                                                                  
+  Phase 4: Build It in Claude Code (~30-60 min)                                                                                     
+                                                                  
+  12. Pull the design into Claude Code via the MCP server, or export the HTML and drop it in your project.                          
+  13. Ask Claude Code to implement it: "Convert this Stitch design into a React component for [TabName], following DESIGN.md and
+  matching our existing component patterns."                                                                                        
+  14. Invoke /ios-design before touching any layout. Stitch outputs web-first HTML/CSS, so you'll need to layer on:
+    - Safe area insets (status bar, home indicator)                                                                                 
+    - Touch target sizing (44pt minimum)                                                                                            
+    - Capacitor-specific patterns (keyboard handling, haptics)                                                                      
+    - Platform-conditional styles from your existing isNative checks                                                                
+  15. Deploy with your normal Vercel + Capgo OTA flow.                                                                              
+                                                                                                                                    
+  ---                                                                                                                               
+  Skills to use along the way:                                                                                                      
+                                                                                                                                    
+  - /update-config to wire stitch-mcp into your settings.json
+  - /ios-design before any UI implementation (mandatory per your lessons)                                                           
+  - /deploy when ready to ship                                                                                                      
+  
+  My recommendation for first experiment:                                                                                           
+                                                                  
+  Design a new feature tab rather than redesigning an existing one. Lower risk, cleaner test of the workflow. If you have a feature 
+  in mind from your PRDs, that's a perfect candidate. If the workflow clicks, then circle back and use Redesign mode on your
+  existing tabs.                                                                                                                    
+                                                                  
+  Want me to set up the stitch-mcp config now, or do you want to play with Stitch in the browser first?                             
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  Options that balance knowledge depth with cost:                                                                                 
+                                                                     
+    1. Expand the distilled constants -- Pull more key facts from the book intake into coffeeKnowledge.js. Add maybe 500-1,000 more 
+    tokens of the highest-value content (more origin profiles, more variety details, more processing nuances). Moderate cost      
+    increase, meaningful knowledge gain.                             
+    2. Dynamic context injection -- Only inject the relevant book sections based on the bean being discussed. If tasting a Kenya,
+    inject the Kenya origin profile + SL28 variety section. This keeps token counts low while giving deep, relevant knowledge. The 
+    getOriginContext() function already does a basic version of this.
+    3. Prompt caching makes this cheaper -- Once we ship prompt caching (Optimization #1), the static knowledge base is cached at
+    90% discount. That means we could afford to make the knowledge base 2-3x larger with minimal cost impact, since it only costs  
+    full price on the first message of a conversation.
+                                                                                                                                    
+    The smart move: ship prompt caching first, then expand the knowledge constants with more from the book, knowing the cached cost
+    is negligible. Best of both worlds.   
+
+
+
 The Real Cost Problem: Chat
 
   Your tasting coach and general chat use Claude Sonnet at $3/$15 per 1M tokens, called on EVERY message. A 10-message tasting

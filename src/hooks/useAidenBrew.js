@@ -16,17 +16,22 @@ export function useAidenBrew(updateBean) {
   const [aidenResearch, setAidenResearch] = useState(null);
   const [aidenPhase, setAidenPhase] = useState(null);
 
-  const handlePushToAiden = async (recipe) => {
+  const handlePushToAiden = async (recipe, beanOverride = null) => {
     setAidenError(null);
     setAidenResult(null);
     setAidenLoading(true);
     try {
       const result = await pushToAiden(recipe);
       if (!mountedRef.current) return;
-      // Pass through usedRelay and fellowCredentialsInvalid for the modal
       setAidenResult(result);
       if (result.grindRecommendation) {
         setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));
+      }
+      // Persist the brew.link so we don't push again next time (non-blocking, don't hide push success)
+      const targetBean = beanOverride || aidenBean;
+      if (result.link && targetBean?.id) {
+        updateBean(targetBean.id, { aidenLink: result.link, aidenUsedRelay: result.usedRelay || false })
+          .catch(err => console.warn('Failed to persist aidenLink:', err.message));
       }
     } catch (fellowErr) {
       if (!mountedRef.current) return;
@@ -41,28 +46,22 @@ export function useAidenBrew(updateBean) {
     setAidenError(null);
     setAidenModal(true);
 
-    // Show cached recipe immediately if available (skip generation), then auto-push
+    // Show cached recipe immediately if available (skip generation)
     if (!forceRegenerate && bean.aidenRecipe) {
-      // Set recipe + loading in the SAME batch so "Send to Aiden" button never renders
       setAidenRecipe(bean.aidenRecipe);
-      setAidenLoading(true);
-      setAidenPhase('push');
-      // Push directly instead of calling handlePushToAiden (which would re-set loading)
-      try {
-        const result = await pushToAiden(bean.aidenRecipe);
-        if (!mountedRef.current) return;
-        setAidenResult(result);
-        if (result.grindRecommendation) {
-          setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));
-        }
-      } catch (fellowErr) {
-        if (!mountedRef.current) return;
-        setAidenError(fellowErr.message || "Couldn't push to Aiden");
-      }
-      if (mountedRef.current) {
+
+      // If we already have a brew.link for this bean, show it directly (no re-push)
+      if (bean.aidenLink) {
+        setAidenResult({ link: bean.aidenLink, usedRelay: bean.aidenUsedRelay || false });
         setAidenLoading(false);
         setAidenPhase(null);
+        return;
       }
+
+      // No link yet, push to Fellow (handlePushToAiden persists the link)
+      setAidenPhase('push');
+      await handlePushToAiden(bean.aidenRecipe, bean);
+      if (mountedRef.current) setAidenPhase(null);
       return;
     }
 
@@ -91,15 +90,18 @@ export function useAidenBrew(updateBean) {
       if (!mountedRef.current) return;
       setAidenRecipe(recipe);
       setAidenError(null);
-      // Persist full recipe + grind recommendation to the bean
+      // Persist full recipe + grind recommendation, clear old link (new recipe = new push needed)
       if (bean.id) {
-        const persist = { aidenRecipe: { ...recipe, generatedAt: new Date().toISOString() } };
+        const persist = {
+          aidenRecipe: { ...recipe, generatedAt: new Date().toISOString() },
+          aidenLink: null, aidenUsedRelay: null,
+        };
         if (recipe.grindRecommendation) persist.aidenGrind = recipe.grindRecommendation;
         await updateBean(bean.id, persist);
       }
-      // Step 3: Push to Fellow
+      // Step 3: Push to Fellow (pass bean explicitly to avoid stale closure)
       setAidenPhase('push');
-      await handlePushToAiden(recipe);
+      await handlePushToAiden(recipe, bean);
     } catch (err) {
       if (!mountedRef.current) return;
       setAidenError(err.message || "Couldn't generate a recipe");
