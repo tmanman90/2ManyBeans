@@ -169,10 +169,10 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
 // --- Product shot generation (server-side: generate + convert + upload + write to Firestore) ---
 // Returns { photoUrl } string. Server handles everything including Firebase Storage upload.
 
-export async function generateProductShot(photo, beanId) {
+export async function generateProductShot(photo, beanId, { skipFirestoreWrite = false } = {}) {
   const data = await fetchWithRetry({
     url: `${API_BASE}/api/product-shot`,
-    body: { photo: { base64: photo.base64, mimeType: photo.mediaType }, beanId },
+    body: { photo: { base64: photo.base64, mimeType: photo.mediaType }, beanId, skipFirestoreWrite },
     serviceName: 'Product Shot',
     retries: 0,
     timeout: 90000, // server has 90s maxDuration
@@ -183,6 +183,17 @@ export async function generateProductShot(photo, beanId) {
   }
 
   return data.photoUrl;
+}
+
+// Delete an orphaned product shot from Storage (for cancel/rescan cleanup)
+export async function deleteProductShot(beanId) {
+  return fetchWithRetry({
+    url: `${API_BASE}/api/product-shot`,
+    body: { action: 'delete', beanId },
+    serviceName: 'Product Shot Cleanup',
+    retries: 0,
+    timeout: 10000,
+  }).catch(() => {}); // best-effort, silent on failure
 }
 
 // --- Vision description for chat image routing ---

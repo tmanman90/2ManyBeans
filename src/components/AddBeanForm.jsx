@@ -6,9 +6,11 @@ import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
-import { scanBeanLabel, researchBeanOnline, generateProductShot } from '../lib/gemini';
+import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot } from '../lib/gemini';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { scrollOnFocus } from '../lib/formHelpers';
+import { collection, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 
@@ -29,7 +31,10 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const storyRef = useRef(null); // Background Professor Ruphus story
-  const genCounter = useRef(0); // Monotonic counter: invalidates stale story on rescan
+  const genCounter = useRef(0); // Monotonic counter: invalidates stale story + product shot on rescan
+  const pendingBeanIdRef = useRef(null); // Pre-allocated Firestore doc ID for product shot
+  const productShotUrlRef = useRef(null); // Holds photoUrl from pre-generated product shot
+  const [productShotStatus, setProductShotStatus] = useState('idle'); // idle | generating | ready | failed
 
   // Pre-fill from initialData (e.g. Quick Recipe save-to-inventory)
   const initialRef = useRef(null);
@@ -60,6 +65,10 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   const reset = () => {
     photos.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+    // Clean up orphaned product shot if user canceled (best-effort)
+    if (pendingBeanIdRef.current) {
+      deleteProductShot(pendingBeanIdRef.current);
+    }
     setF(empty);
     setStep('photo');
     setScanError(null);
@@ -67,6 +76,9 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setProfileInfo(null);
     setAiFilling(false);
     storyRef.current = null;
+    pendingBeanIdRef.current = null;
+    productShotUrlRef.current = null;
+    setProductShotStatus('idle');
     genCounter.current++;
   };
 
@@ -158,6 +170,26 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         roastedIn: parsed.roastedIn || '',
       };
       setF(scanData);
+
+      // Pre-allocate a Firestore doc ID and start product shot generation in background
+      // Server uploads to Storage with this ID. Client holds the photoUrl for save time.
+      if (uid && photos.length > 0) {
+        const preId = doc(collection(db, 'users', uid, 'beans')).id;
+        pendingBeanIdRef.current = preId;
+        productShotUrlRef.current = null;
+        setProductShotStatus('generating');
+        generateProductShot(photos[0], preId, { skipFirestoreWrite: true })
+          .then(photoUrl => {
+            if (thisGen === genCounter.current) {
+              productShotUrlRef.current = photoUrl;
+              setProductShotStatus('ready');
+            }
+          })
+          .catch(err => {
+            console.log('Product shot pre-generation skipped:', err.message);
+            if (thisGen === genCounter.current) setProductShotStatus('failed');
+          });
+      }
 
       // Auto-trigger research
       setStep('researching');
@@ -279,25 +311,34 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     }
 
     const scanPhoto = photos.length > 0 ? photos[0] : null;
+    const preAllocId = pendingBeanIdRef.current;
+    const preGenPhotoUrl = productShotUrlRef.current;
+
+    // Include pre-generated product shot URL if available
+    if (preGenPhotoUrl) beanData.photoUrl = preGenPhotoUrl;
 
     let beanId;
     try {
-      beanId = await onAdd(beanData);
+      // Use pre-allocated ID if available (product shot already uploaded to this path)
+      beanId = await onAdd(beanData, preAllocId || null);
     } catch (err) {
       alert("Couldn't save bean. Check your connection and try again.");
       return;
     }
 
+    // Clear refs WITHOUT triggering cleanup (we're saving, not canceling)
+    pendingBeanIdRef.current = null;
+    productShotUrlRef.current = null;
+    setProductShotStatus('idle');
+
     reset();
     onClose();
 
-    // Fire-and-forget: server generates product shot, converts to JPEG, uploads to
-    // Firebase Storage, and writes photoUrl to Firestore. Toast provides feedback.
-    if (beanId && scanPhoto) {
+    // If product shot was NOT ready at save time, fire-and-forget with toast
+    if (!preGenPhotoUrl && beanId && scanPhoto) {
       if (onToast) onToast('Generating product shot...');
       generateProductShot(scanPhoto, beanId)
         .then(photoUrl => {
-          // On native, trigger immediate UI update (bypasses 60s Firestore poll)
           if (Capacitor.isNativePlatform() && updateBean) {
             updateBean(beanId, { photoUrl });
           }
@@ -306,6 +347,8 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         .catch(() => {
           if (onToast) onToast('Product shot failed');
         });
+    } else if (preGenPhotoUrl && onToast) {
+      onToast('Product shot ready!');
     }
   };
 
@@ -496,6 +539,12 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
                     style={{ height: 80, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 ))}
               </div>
+              {productShotStatus === 'generating' && (
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Generating product shot...</div>
+              )}
+              {productShotStatus === 'ready' && (
+                <div style={{ fontSize: 11, color: C.green, marginTop: 4 }}>Product shot ready</div>
+              )}
             </div>
           )}
           {scanError && (

@@ -34,7 +34,18 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
   if (!uid) return res.status(401).json({ error: 'Authentication required' });
 
-  const { photo, beanId } = req.body;
+  const { photo, beanId, skipFirestoreWrite, action } = req.body;
+
+  // Delete action: clean up orphaned Storage file (for cancel/rescan cleanup)
+  if (action === 'delete') {
+    if (!beanId) return res.status(400).json({ error: 'beanId required' });
+    try {
+      const bucket = getStorageBucket();
+      await bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`).delete();
+    } catch (err) { /* silent on not-found */ }
+    return res.status(200).json({ ok: true });
+  }
+
   if (!photo?.base64 || !photo?.mimeType) {
     return res.status(400).json({ error: 'photo with base64 and mimeType is required' });
   }
@@ -91,12 +102,14 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     });
     const photoUrl = await adminGetDownloadURL(file);
 
-    // Step 4: Write photoUrl to Firestore bean doc
-    const db = getDb();
-    await db.collection('users').doc(uid).collection('beans').doc(beanId).update({
-      photoUrl,
-      updatedAt: new Date(),
-    });
+    // Step 4: Write photoUrl to Firestore bean doc (skip for pre-generation, bean may not exist yet)
+    if (!skipFirestoreWrite) {
+      const db = getDb();
+      await db.collection('users').doc(uid).collection('beans').doc(beanId).update({
+        photoUrl,
+        updatedAt: new Date(),
+      });
+    }
 
     return res.status(200).json({ photoUrl });
   } catch (error) {

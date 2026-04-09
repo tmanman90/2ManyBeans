@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch,
+  collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, writeBatch,
   serverTimestamp, query, orderBy, getDocs, limit, deleteField
 } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -151,14 +151,18 @@ export const useAppData = (uid) => {
     };
   }, [uid]);
 
-  const addBean = useCallback(async (beanData) => {
+  const addBean = useCallback(async (beanData, existingId = null) => {
     if (!uid) return;
+    if (existingId) {
+      // Use pre-allocated ID (from product shot pre-generation)
+      const beanRef = doc(db, 'users', uid, 'beans', existingId);
+      await setDoc(beanRef, { ...beanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await refetch();
+      return existingId;
+    }
+    // Default: auto-generate ID
     const beansRef = collection(db, 'users', uid, 'beans');
-    const docRef = await addDoc(beansRef, {
-      ...beanData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    const docRef = await addDoc(beansRef, { ...beanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     await refetch();
     return docRef.id;
   }, [uid, refetch]);
