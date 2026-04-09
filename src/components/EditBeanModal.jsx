@@ -40,10 +40,14 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         brewingRec: bean.brewingRec || '',
         sourcedBy: bean.sourcedBy || '',
       });
-      setPhotoGenerating(false);
-      setPhotoError(false);
+      // Only reset photo state if no generation is in flight
+      if (!photoInFlight.current) {
+        setPhotoGenerating(false);
+        setPhotoError(false);
+      }
       setConfirmDelete(false);
-      photoInFlight.current = false;
+      // NOTE: photoInFlight.current is NOT reset here.
+      // It is only reset in fireProductShot's .then()/.catch() and handleDelete.
     }
   }, [bean, open]);
 
@@ -64,9 +68,22 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     photoInFlight.current = true;
     setPhotoGenerating(true);
     setPhotoError(false);
-    generateProductShot(photo, bean.id)
-      .then(() => { setPhotoGenerating(false); photoInFlight.current = false; })
+    const capturedBeanId = bean.id;
+    generateProductShot(photo, capturedBeanId)
+      .then(photoUrl => {
+        if (!photoInFlight.current) return; // canceled (bean deleted)
+        setPhotoGenerating(false);
+        // On native, updateBean triggers refetch (bypasses 60s poll).
+        // On web, onSnapshot already delivered the update, skip redundant write.
+        if (Capacitor.isNativePlatform() && updateBean) {
+          updateBean(capturedBeanId, { photoUrl })
+            .finally(() => { photoInFlight.current = false; });
+        } else {
+          photoInFlight.current = false;
+        }
+      })
       .catch(err => {
+        if (!photoInFlight.current) return; // canceled
         alert('Photo generation failed: ' + err.message);
         setPhotoGenerating(false);
         setPhotoError(true);

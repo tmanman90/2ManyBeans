@@ -172,7 +172,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         )}
       </div>
 
-      <AddBeanForm open={showAdd} onClose={() => setShowAdd(false)} onAdd={onAddBean} uid={uid} updateBean={updateBean} />
+      <AddBeanForm open={showAdd} onClose={() => setShowAdd(false)} onAdd={onAddBean} uid={uid} updateBean={updateBean} onToast={setToast} />
       <AidenModal
         open={aiden.aidenModal}
         onClose={aiden.closeAidenModal}

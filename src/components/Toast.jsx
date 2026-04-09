@@ -8,7 +8,7 @@ export const Toast = ({ message, open, onClose }) => {
     if (!open) return;
     const timer = setTimeout(onClose, 2500);
     return () => clearTimeout(timer);
-  }, [open, onClose]);
+  }, [open, onClose, message]);
 
   if (!open || !message) return null;
 

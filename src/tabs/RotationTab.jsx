@@ -325,6 +325,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           uid={uid}
           updateBean={updateBean}
           initialData={quickRecipeSaveData}
+          onToast={setToast}
         />
       )}
     </div>

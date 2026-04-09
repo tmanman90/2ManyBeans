@@ -14,7 +14,7 @@ import { Btn } from './Btn';
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer', 'roastedIn'];
 
-export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData }) => {
+export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData, onToast }) => {
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
     roastDate: '', bagSize: 100, bagNotes: '', producer: '',
@@ -292,11 +292,20 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     onClose();
 
     // Fire-and-forget: server generates product shot, converts to JPEG, uploads to
-    // Firebase Storage, and writes photoUrl to Firestore. Photo appears on bean card
-    // via Firestore listener when done. No client-side upload needed.
+    // Firebase Storage, and writes photoUrl to Firestore. Toast provides feedback.
     if (beanId && scanPhoto) {
+      if (onToast) onToast('Generating product shot...');
       generateProductShot(scanPhoto, beanId)
-        .catch(err => alert('Product shot failed: ' + err.message));
+        .then(photoUrl => {
+          // On native, trigger immediate UI update (bypasses 60s Firestore poll)
+          if (Capacitor.isNativePlatform() && updateBean) {
+            updateBean(beanId, { photoUrl });
+          }
+          if (onToast) onToast('Product shot ready!');
+        })
+        .catch(() => {
+          if (onToast) onToast('Product shot failed');
+        });
     }
   };
 
