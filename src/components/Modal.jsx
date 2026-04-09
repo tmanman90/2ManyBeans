@@ -83,10 +83,11 @@ export const Modal = ({ open, onClose, title, children, footer, centered }) => {
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Fixed header */}
+        {/* Fixed header — add safe-area-inset-top for bottom-sheet modals that reach the status bar */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '20px 20px 0', marginBottom: 16, flexShrink: 0,
+          padding: centered ? '20px 20px 0' : `calc(20px + env(safe-area-inset-top, 0px)) 20px 0`,
+          marginBottom: 16, flexShrink: 0,
         }}>
           <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 10 }}>

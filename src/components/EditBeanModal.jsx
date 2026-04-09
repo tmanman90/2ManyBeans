@@ -203,8 +203,8 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
               src={bean.photoUrl}
               alt={`${bean.name} bag`}
               style={{
-                width: '100%', height: 160, objectFit: 'cover', objectPosition: 'center',
-                borderRadius: 10, border: `1px solid ${C.borderLight}`,
+                width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',
+                borderRadius: 10, border: `1px solid ${C.borderLight}`, background: C.card,
               }}
             />
             <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
