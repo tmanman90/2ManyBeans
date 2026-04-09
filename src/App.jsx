@@ -169,7 +169,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             updateTasting={updateTasting}
           />
         )}
-        {tab === 'archive' && <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} />}
+        {tab === 'archive' && <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} uid={uid} />}
       </div>
 
       {/* Bottom Tab Bar */}

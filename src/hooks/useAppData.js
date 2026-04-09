@@ -177,8 +177,15 @@ export const useAppData = (uid) => {
     if (!uid) return;
     // Clean up Storage photo (non-blocking)
     try { await deleteBeanPhoto(uid, beanId); } catch (e) { /* silent */ }
-    const beanRef = doc(db, 'users', uid, 'beans', beanId);
-    await deleteDoc(beanRef);
+    // Cascade-delete all tastings for this bean
+    const tastingsRef = collection(db, 'users', uid, 'tastings');
+    const tastingsSnap = await getDocs(tastingsRef);
+    const batch = writeBatch(db);
+    tastingsSnap.docs.forEach(d => {
+      if (d.data().beanId === beanId) batch.delete(d.ref);
+    });
+    batch.delete(doc(db, 'users', uid, 'beans', beanId));
+    await batch.commit();
     await refetch();
   }, [uid, refetch]);
 

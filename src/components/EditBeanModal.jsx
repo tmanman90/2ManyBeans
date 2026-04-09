@@ -51,6 +51,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
   const handleDelete = async () => {
     if (!deleteBean || !bean.id) return;
+    // Cancel any in-flight product shot to prevent orphaned storage writes
+    photoInFlight.current = false;
+    setPhotoGenerating(false);
     await deleteBean(bean.id);
     onClose();
   };

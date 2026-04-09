@@ -1,6 +1,6 @@
 // Archive tab — ported from prototype lines 897-917
 import { useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 
 // Inline image component with shimmer + gradient treatment (matches BeanCard)
@@ -47,7 +47,7 @@ import { StarRating } from '../components/StarRating';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 
-export const ArchiveTab = ({ beans, tastings = [], updateBean }) => {
+export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean }) => {
   const finished = beans
     .filter(b => b.status === 'FINISHED')
     .sort((a, b) => (b.finishDate || '').localeCompare(a.finishDate || ''));
@@ -124,6 +124,14 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean }) => {
             >
               <RotateCcw size={12} /> Restore to Inventory
             </span>
+            {deleteBean && (
+              <span
+                onClick={() => { if (confirm(`Delete ${bean.name}? This will also remove all its tastings and cannot be undone.`)) deleteBean(bean.id); }}
+                style={{ fontSize: 12, color: C.red, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 16 }}
+              >
+                <Trash2 size={12} /> Delete
+              </span>
+            )}
           </div>
           </div>
         </div>
