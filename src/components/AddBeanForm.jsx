@@ -8,8 +8,6 @@ import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot } from '../lib/gemini';
 import { generateRuphusStory } from '../lib/professorRuphus';
-import { uploadBeanPhoto } from '../lib/storage';
-import { generateAndUploadProductShot } from '../lib/productShot';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
@@ -31,9 +29,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const storyRef = useRef(null); // Background Professor Ruphus story
-  const genCounter = useRef(0); // Monotonic counter: invalidates stale product shot + story on rescan
-  const productShotResultRef = useRef(null); // Holds pre-generated product shot { base64, mimeType }
-  const [productShotStatus, setProductShotStatus] = useState('idle'); // idle | generating | ready | failed
+  const genCounter = useRef(0); // Monotonic counter: invalidates stale story on rescan
 
   // Pre-fill from initialData (e.g. Quick Recipe save-to-inventory)
   const initialRef = useRef(null);
@@ -71,8 +67,6 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setProfileInfo(null);
     setAiFilling(false);
     storyRef.current = null;
-    productShotResultRef.current = null;
-    setProductShotStatus('idle');
     genCounter.current++;
   };
 
@@ -136,14 +130,13 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setStep('scanning');
 
     const thisGen = ++genCounter.current;
-    productShotResultRef.current = null;
 
     try {
       // Scan first (user-blocking, prioritize bandwidth on cellular)
       const parsed = await scanBeanLabel(photos);
       // If user reset/rescanned while scan was in flight, discard stale results
       if (thisGen !== genCounter.current) return;
-      // Save scan results immediately — safe even if research fails
+      // Save scan results immediately -- safe even if research fails
       const scanData = {
         roaster: parsed.roaster || '',
         name: parsed.name || '',
@@ -166,21 +159,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       };
       setF(scanData);
 
-      // Now start product shot in background (scan done, bandwidth free)
-      setProductShotStatus('generating');
-      generateProductShot(photos[0])
-        .then(result => {
-          if (thisGen === genCounter.current && result?.base64) {
-            productShotResultRef.current = result;
-            setProductShotStatus('ready');
-          }
-        })
-        .catch(err => {
-          console.log('Product shot generation skipped:', err.message);
-          if (thisGen === genCounter.current) setProductShotStatus('failed');
-        });
-
-      // Auto-trigger research (runs while product shot generates in background)
+      // Auto-trigger research
       setStep('researching');
       let enrichedData = scanData;
       try {
@@ -299,8 +278,6 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       if (initialData.aidenGrind) beanData.aidenGrind = initialData.aidenGrind;
     }
 
-    // Capture pre-generated product shot result before reset
-    const shotResult = productShotResultRef.current;
     const scanPhoto = photos.length > 0 ? photos[0] : null;
 
     let beanId;
@@ -311,29 +288,16 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       return;
     }
 
-    // Upload product shot BEFORE closing modal (inline, not fire-and-forget)
-    if (beanId && uid && updateBean) {
-      if (shotResult?.base64) {
-        try {
-          setProductShotStatus('uploading');
-          const photoUrl = await uploadBeanPhoto(uid, beanId, shotResult.base64, shotResult.mimeType);
-          await updateBean(beanId, { photoUrl });
-        } catch (err) {
-          alert('Product shot upload failed: ' + err.message);
-        }
-      } else if (scanPhoto) {
-        // Fallback: generate + upload inline
-        try {
-          setProductShotStatus('uploading');
-          await generateAndUploadProductShot(scanPhoto, uid, beanId, updateBean);
-        } catch (err) {
-          alert('Product shot failed: ' + err.message);
-        }
-      }
-    }
-
     reset();
     onClose();
+
+    // Fire-and-forget: server generates product shot, converts to JPEG, uploads to
+    // Firebase Storage, and writes photoUrl to Firestore. Photo appears on bean card
+    // via Firestore listener when done. No client-side upload needed.
+    if (beanId && scanPhoto) {
+      generateProductShot(scanPhoto, beanId)
+        .catch(err => alert('Product shot failed: ' + err.message));
+    }
   };
 
   const hasSearchableData = f.roaster.trim() || f.name.trim();
@@ -523,15 +487,6 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
                     style={{ height: 80, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 ))}
               </div>
-              {productShotStatus === 'generating' && (
-                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Generating product shot...</div>
-              )}
-              {productShotStatus === 'ready' && (
-                <div style={{ fontSize: 11, color: C.green, marginTop: 4 }}>Product shot ready</div>
-              )}
-              {productShotStatus === 'uploading' && (
-                <div style={{ fontSize: 11, color: C.accent, marginTop: 4 }}>Uploading product shot...</div>
-              )}
             </div>
           )}
           {scanError && (

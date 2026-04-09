@@ -11,6 +11,9 @@
     },
     "api/aiden.js": {
       "maxDuration": 30
+    },
+    "api/product-shot.js": {
+      "maxDuration": 90
     }
   }
 }

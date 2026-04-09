@@ -2,13 +2,17 @@
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage, getDownloadURL as adminGetDownloadURL } from 'firebase-admin/storage';
 
 // Lazy-init Firebase Admin
 function getFirebaseAdmin() {
   if (getApps().length === 0) {
     const sa = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (sa) {
-      initializeApp({ credential: cert(JSON.parse(sa)) });
+      initializeApp({
+        credential: cert(JSON.parse(sa)),
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      });
     } else {
       console.warn('FIREBASE_SERVICE_ACCOUNT not set -- API auth is DISABLED. Set this env var in production.');
       return null;
@@ -70,6 +74,14 @@ export function getDb() {
   getFirebaseAdmin(); // ensure app is initialized
   return getFirestore();
 }
+
+// Get Storage bucket from the existing admin singleton
+export function getStorageBucket() {
+  getFirebaseAdmin(); // ensure app is initialized
+  return getStorage().bucket();
+}
+
+export { adminGetDownloadURL };
 
 export function withCorsAuth(handler) {
   return async (req, res) => {

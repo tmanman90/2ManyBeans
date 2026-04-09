@@ -166,22 +166,23 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   return JSON.parse(jsonMatch[0]);
 }
 
-// --- Product shot generation (image-to-image via Gemini) ---
+// --- Product shot generation (server-side: generate + convert + upload + write to Firestore) ---
+// Returns { photoUrl } string. Server handles everything including Firebase Storage upload.
 
-export async function generateProductShot(photo) {
+export async function generateProductShot(photo, beanId) {
   const data = await fetchWithRetry({
-    url: PROXY_URL,
-    body: { action: 'productShot', photo: { base64: photo.base64, mimeType: photo.mediaType } },
-    serviceName: 'Gemini',
-    retries: 0, // no retries — one 60s attempt, don't hang for 3 min
-    timeout: 60000,
+    url: `${API_BASE}/api/product-shot`,
+    body: { photo: { base64: photo.base64, mimeType: photo.mediaType }, beanId },
+    serviceName: 'Product Shot',
+    retries: 0,
+    timeout: 90000, // server has 90s maxDuration
   });
 
-  if (!data.image) {
-    throw new Error('No image in product shot response');
+  if (!data.photoUrl) {
+    throw new Error('No photo URL returned');
   }
 
-  return { base64: data.image, mimeType: data.mimeType || 'image/png' };
+  return data.photoUrl;
 }
 
 // --- Vision description for chat image routing ---

@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Save, Camera, Trash2 } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
-import { generateAndUploadProductShot } from '../lib/productShot';
+import { generateProductShot } from '../lib/gemini';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { scrollOnFocus } from '../lib/formHelpers';
@@ -58,14 +58,13 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     onClose();
   };
 
-  // Fire-and-forget product shot generation (non-blocking)
+  // Server-side product shot: generate + convert + upload + write to Firestore
   const fireProductShot = (photo) => {
-    if (photoInFlight.current || !uid || !bean.id) return;
+    if (photoInFlight.current || !bean.id) return;
     photoInFlight.current = true;
     setPhotoGenerating(true);
     setPhotoError(false);
-    const capturedBeanId = bean.id;
-    generateAndUploadProductShot(photo, uid, capturedBeanId, updateBean)
+    generateProductShot(photo, bean.id)
       .then(() => { setPhotoGenerating(false); photoInFlight.current = false; })
       .catch(err => {
         alert('Photo generation failed: ' + err.message);
