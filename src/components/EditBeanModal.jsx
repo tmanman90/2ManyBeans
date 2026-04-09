@@ -1,7 +1,7 @@
 // Edit Bean Modal — edit any bean field + grind settings + enriched details + photo
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Save, Camera } from 'lucide-react';
+import { Save, Camera, Trash2 } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { generateAndUploadProductShot } from '../lib/productShot';
@@ -9,9 +9,10 @@ import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { scrollOnFocus } from '../lib/formHelpers';
 
-export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
+export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid }) => {
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [photoGenerating, setPhotoGenerating] = useState(false);
   const [photoError, setPhotoError] = useState(false);
   const fileRef = useRef(null);
@@ -39,12 +40,20 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
         brewingRec: bean.brewingRec || '',
         sourcedBy: bean.sourcedBy || '',
       });
+      setPhotoGenerating(false);
       setPhotoError(false);
+      setConfirmDelete(false);
       photoInFlight.current = false;
     }
   }, [bean, open]);
 
   if (!bean) return null;
+
+  const handleDelete = async () => {
+    if (!deleteBean || !bean.id) return;
+    await deleteBean(bean.id);
+    onClose();
+  };
 
   // Fire-and-forget product shot generation (non-blocking)
   const fireProductShot = (photo) => {
@@ -251,13 +260,13 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, overflow: 'hidden' }}>
           <label style={labelStyle}>Roast Date</label>
-          <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, overflow: 'hidden' }} onFocus={scrollOnFocus} />
+          <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, minWidth: 0, overflow: 'hidden' }} onFocus={scrollOnFocus} />
         </div>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, overflow: 'hidden' }}>
           <label style={labelStyle}>Producer</label>
-          <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
+          <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
         </div>
       </div>
 
@@ -346,6 +355,39 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, uid }) => {
           </div>
         </div>
       </div>
+
+      {/* Delete bean */}
+      {deleteBean && (
+        <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 16, marginBottom: 8 }}>
+          {!confirmDelete ? (
+            <Btn
+              variant="ghost"
+              onClick={() => setConfirmDelete(true)}
+              style={{ width: '100%', justifyContent: 'center', color: C.red }}
+            >
+              <Trash2 size={14} /> Delete Bean
+            </Btn>
+          ) : (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: C.text, marginBottom: 10 }}>
+                Delete <strong>{bean.name}</strong>? This cannot be undone.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn variant="secondary" onClick={() => setConfirmDelete(false)} style={{ flex: 1, justifyContent: 'center' }}>
+                  Cancel
+                </Btn>
+                <Btn
+                  variant="primary"
+                  onClick={handleDelete}
+                  style={{ flex: 1, justifyContent: 'center', background: C.red }}
+                >
+                  <Trash2 size={14} /> Delete
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
     </Modal>
   );

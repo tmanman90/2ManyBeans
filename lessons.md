@@ -19,6 +19,8 @@ Format: `- **[Topic]**: [What went wrong] → [What to do instead]`
 - **[Xcode DerivedData]**: Never delete DerivedData to "fix" issues, it wipes SPM packages and causes "No such module" build failures → Use `Product > Clean Build Folder` (Cmd+Shift+K) instead
 - **[Capacitor Node Version]**: Capacitor 8 requires Node 22+. Use `nvm alias default 22` to make it permanent.
 - **[Debug before deploy]**: Never tell the user a fix works without verifying. Add visible debug alerts, check bundle contents, verify timestamps. Guessing wastes hours.
+- **[fetch() data URLs in WKWebView]**: `fetch('data:image/png;base64,...')` does NOT work reliably in iOS WKWebView. Use `atob()` + `Uint8Array` + `new Blob()` instead. This silently breaks any base64-to-Blob conversion on iOS native.
+- **[Modal keyboard on iOS]**: Capacitor `resize: 'body'` shrinks the body but `position: fixed` elements still fill the full viewport. Adjusting `maxHeight` shrinks from the top but leaves the bottom behind the keyboard. Fix: adjust the container's `bottom` inset to push the entire modal above the keyboard.
 - **[iOS Camera plist permissions]**: Capacitor Camera plugin requires ALL THREE plist keys: `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`, AND `NSPhotoLibraryAddUsageDescription`. Missing any one causes a runtime rejection with a clear error message. Also add explicit `Camera.checkPermissions()` + `Camera.requestPermissions()` before `Camera.getPhoto()` calls.
 
 ---

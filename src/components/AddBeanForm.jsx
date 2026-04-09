@@ -584,13 +584,13 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
               <label style={labelStyle}>Roast Date</label>
-              <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, overflow: 'hidden' }} onFocus={scrollOnFocus} />
+              <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, minWidth: 0, overflow: 'hidden' }} onFocus={scrollOnFocus} />
             </div>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
               <label style={labelStyle}>Producer</label>
-              <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
+              <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
             </div>
           </div>
 

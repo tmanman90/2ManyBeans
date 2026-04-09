@@ -23,7 +23,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, addBean, addTasting, updateTasting }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod === 'handbrew';
@@ -145,7 +145,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           </div>
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
-            <BeanCard bean={bean} updateBean={updateBean} onLearn={handleLearn} uid={uid} actions={<>
+            <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={handleLearn} uid={uid} actions={<>
               <BrewButton
                 bean={bean}
                 label={brewMethod.label}

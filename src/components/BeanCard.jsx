@@ -8,7 +8,7 @@ import { EditBeanModal } from './EditBeanModal';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, uid }) => {
+export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const [editOpen, setEditOpen] = useState(false);
@@ -211,6 +211,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, onLearn, 
           onClose={() => setEditOpen(false)}
           bean={bean}
           updateBean={updateBean}
+          deleteBean={deleteBean}
           uid={uid}
         />
       )}

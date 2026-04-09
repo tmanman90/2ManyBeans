@@ -173,7 +173,8 @@ export async function generateProductShot(photo) {
     url: PROXY_URL,
     body: { action: 'productShot', photo: { base64: photo.base64, mimeType: photo.mediaType } },
     serviceName: 'Gemini',
-    timeout: 60000, // product shot generation is slower
+    retries: 0, // no retries — one 60s attempt, don't hang for 3 min
+    timeout: 60000,
   });
 
   if (!data.image) {

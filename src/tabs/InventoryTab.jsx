@@ -18,7 +18,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, onFinishBean, addTasting, updateTasting }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod === 'handbrew';
@@ -133,6 +133,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                 bean={bean}
                 compact
                 updateBean={updateBean}
+                deleteBean={deleteBean}
                 onLearn={handleLearn}
                 uid={uid}
                 actions={

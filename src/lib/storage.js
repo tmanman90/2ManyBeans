@@ -6,10 +6,15 @@ function beanPhotoRef(uid, beanId) {
   return ref(storage, `users/${uid}/bean-photos/${beanId}.jpg`);
 }
 
-// Convert base64 string to Blob using native fetch (lower memory than manual decode)
-async function base64ToBlob(base64, mimeType = 'image/jpeg') {
-  const res = await fetch(`data:${mimeType};base64,${base64}`);
-  const blob = await res.blob();
+// Convert base64 string to Blob using atob + Uint8Array
+// NOTE: fetch('data:...') does NOT work in iOS WKWebView — use manual decode
+function base64ToBlob(base64, mimeType = 'image/jpeg') {
+  const byteChars = atob(base64);
+  const byteArray = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteArray[i] = byteChars.charCodeAt(i);
+  }
+  const blob = new Blob([byteArray], { type: mimeType });
   if (blob.size === 0) throw new Error('base64ToBlob produced empty blob');
   return blob;
 }
