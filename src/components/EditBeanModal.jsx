@@ -68,7 +68,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     generateAndUploadProductShot(photo, uid, capturedBeanId, updateBean)
       .then(() => { setPhotoGenerating(false); photoInFlight.current = false; })
       .catch(err => {
-        console.error('Photo generation failed:', err);
+        alert('Photo generation failed: ' + err.message);
         setPhotoGenerating(false);
         setPhotoError(true);
         photoInFlight.current = false;

@@ -319,11 +319,11 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         // Product shot already generated during scan, just upload
         uploadBeanPhoto(uid, beanId, shotResult.base64, shotResult.mimeType)
           .then(photoUrl => updateBean(beanId, { photoUrl }))
-          .catch(err => console.error('Product shot upload failed:', err.message));
+          .catch(err => alert('Product shot upload failed: ' + err.message));
       } else if (scanPhoto) {
         // Fallback: fire-and-forget generation (product shot failed or still pending during scan)
         generateAndUploadProductShot(scanPhoto, uid, beanId, updateBean)
-          .catch(err => console.error('Product shot failed:', err.message, err));
+          .catch(err => alert('Product shot failed: ' + err.message));
       }
     }
   };
