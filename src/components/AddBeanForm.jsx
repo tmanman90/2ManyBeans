@@ -310,22 +310,30 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       alert("Couldn't save bean. Check your connection and try again.");
       return;
     }
-    reset();
-    onClose();
 
-    // Upload product shot: use pre-generated result if available, else fire-and-forget
+    // Upload product shot BEFORE closing modal (inline, not fire-and-forget)
     if (beanId && uid && updateBean) {
       if (shotResult?.base64) {
-        // Product shot already generated during scan, just upload
-        uploadBeanPhoto(uid, beanId, shotResult.base64, shotResult.mimeType)
-          .then(photoUrl => updateBean(beanId, { photoUrl }))
-          .catch(err => alert('Product shot upload failed: ' + err.message));
+        try {
+          setProductShotStatus('uploading');
+          const photoUrl = await uploadBeanPhoto(uid, beanId, shotResult.base64, shotResult.mimeType);
+          await updateBean(beanId, { photoUrl });
+        } catch (err) {
+          alert('Product shot upload failed: ' + err.message);
+        }
       } else if (scanPhoto) {
-        // Fallback: fire-and-forget generation (product shot failed or still pending during scan)
-        generateAndUploadProductShot(scanPhoto, uid, beanId, updateBean)
-          .catch(err => alert('Product shot failed: ' + err.message));
+        // Fallback: generate + upload inline
+        try {
+          setProductShotStatus('uploading');
+          await generateAndUploadProductShot(scanPhoto, uid, beanId, updateBean);
+        } catch (err) {
+          alert('Product shot failed: ' + err.message);
+        }
       }
     }
+
+    reset();
+    onClose();
   };
 
   const hasSearchableData = f.roaster.trim() || f.name.trim();
@@ -520,6 +528,9 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
               )}
               {productShotStatus === 'ready' && (
                 <div style={{ fontSize: 11, color: C.green, marginTop: 4 }}>Product shot ready</div>
+              )}
+              {productShotStatus === 'uploading' && (
+                <div style={{ fontSize: 11, color: C.accent, marginTop: 4 }}>Uploading product shot...</div>
               )}
             </div>
           )}
