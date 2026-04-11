@@ -65,6 +65,25 @@ const Root = () => {
     // Clear RevenueCat session so the next user doesn't inherit this one's
     // entitlements on a shared device.
     try { await logOutRevenueCat(); } catch {}
+    // Clear the Google/Apple SDK sessions on native. Without this, the iOS
+    // Google Sign-In SDK silently re-uses the last-signed-in account on the
+    // next SocialLogin.login() call, skipping the account picker entirely.
+    // Sign out at the SDK level so a real picker appears for the next user.
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        await SocialLogin.logout({ provider: 'google' });
+      } catch (err) {
+        // Plugin may throw if user wasn't signed in via Google — safe to ignore.
+        console.warn('[main] SocialLogin google logout failed', err?.message || err);
+      }
+      try {
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        await SocialLogin.logout({ provider: 'apple' });
+      } catch {
+        // Apple sessions are managed by iOS, this is best-effort.
+      }
+    }
     return logOut();
   }, [logOut]);
 
