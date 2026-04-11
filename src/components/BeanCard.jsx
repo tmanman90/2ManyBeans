@@ -1,5 +1,5 @@
 // Bean display card -- journal-page treatment
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Pencil, Snowflake } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
@@ -8,7 +8,7 @@ import { EditBeanModal } from './EditBeanModal';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid }) => {
+const BeanCardInner = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const [editOpen, setEditOpen] = useState(false);
@@ -94,7 +94,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               }}
               title="Learn about this coffee"
             >
-              <img src="/images/professor-ruphus.png" alt="Learn"
+              <img src="/images/professor-ruphus.webp" alt="Learn"
                 style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
             </button>
           )}
@@ -219,3 +219,18 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
     </div>
   );
 };
+
+// Memoized export. `actions` is intentionally excluded from the comparator --
+// it's inline JSX in every parent callsite, so its reference changes every
+// parent render. But actions are derived from `bean` state, so if the bean
+// reference hasn't changed, the rendered action content hasn't either.
+// Without this, editing one tasting re-renders every BeanCard in the
+// inventory list because the parent tree re-renders on any Firestore tick.
+export const BeanCard = memo(BeanCardInner, (prev, next) => (
+  prev.bean === next.bean &&
+  prev.compact === next.compact &&
+  prev.updateBean === next.updateBean &&
+  prev.deleteBean === next.deleteBean &&
+  prev.onLearn === next.onLearn &&
+  prev.uid === next.uid
+));

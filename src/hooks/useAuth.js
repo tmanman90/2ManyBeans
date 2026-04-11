@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, signInWithPopup, signInWithCredential, getRedirectResult, signOut, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider, appleProvider } from '../firebase';
+import { cacheReadLastUid, cacheWriteLastUid } from '../lib/offlineCache';
 
 // Nonce utilities for Apple Sign-In
 function generateNonce(length = 32) {
@@ -22,26 +23,39 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    // If we had a signed-in user on a previous session (native only), hold the
+    // loading screen longer on cold start so an offline boot doesn't flash the
+    // sign-in screen before Firebase Auth restores the persisted session.
+    const hadLastUid = Capacitor.isNativePlatform() && Boolean(cacheReadLastUid());
 
-    // Safety timeout: if Firebase Auth hasn't responded in 3s, stop loading
-    // This prevents infinite loading screen on native where auth init can stall
-    const timeout = setTimeout(() => {
+    // Safety timeout fires only if onAuthStateChanged never responds. It's
+    // cleared inside the auth callback itself so a real auth event that
+    // resolves near the deadline can't race with the timeout, which would
+    // bounce the user from sign-in screen back to the app.
+    let timeout = setTimeout(() => {
       setLoading(prev => {
         if (prev) console.warn('[Auth] timeout - forcing past loading screen');
         return false;
       });
-    }, 3000);
+      timeout = null;
+    }, hadLastUid ? 15000 : 3000);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      setUser(user);
+      setLoading(false);
+      if (user?.uid) cacheWriteLastUid(user.uid);
+    });
 
     // Only check redirect result on web (hangs in Capacitor WKWebView)
     if (!Capacitor.isNativePlatform()) {
       getRedirectResult(auth).catch(() => {});
     }
 
-    return () => { unsubscribe(); clearTimeout(timeout); };
+    return () => { unsubscribe(); if (timeout) clearTimeout(timeout); };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {

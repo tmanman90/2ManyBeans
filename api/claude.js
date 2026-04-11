@@ -1,7 +1,7 @@
 // Vercel serverless proxy for Claude API
 // Keeps ANTHROPIC_API_KEY server-side only
 import Anthropic from '@anthropic-ai/sdk';
-import { withCorsAuth } from './lib/cors-auth.js';
+import { withCorsAuthMetered } from './lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
@@ -12,7 +12,9 @@ const client = new Anthropic({
   maxRetries: 2,
 });
 
-export default withCorsAuth(async (req, res) => {
+// Tasting coach + chat. Free users get 1 lifetime taste test; after that,
+// Pro or Ultra is required. See subscription-paywall-prd.md for full rationale.
+export default withCorsAuthMetered(async (req, res) => {
   try {
     const { system, messages, maxTokens = 1000, model: requestedModel = 'claude-sonnet-4-6' } = req.body;
 
@@ -54,4 +56,4 @@ export default withCorsAuth(async (req, res) => {
     const detail = error.error?.error?.message || error.message || 'Unknown error';
     return res.status(status).json({ error: detail });
   }
-});
+}, { feature: 'tasteTests', freeLimit: 1 });

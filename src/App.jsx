@@ -1,25 +1,36 @@
 // App shell — warm Ghibli-inspired coffee journal
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { C, fonts, shadows } from './styles/theme';
 import { haptic } from './lib/haptics';
 import { today } from './lib/peakStatus';
 import { useAuthContext } from './contexts/AuthContext';
+// Rotation is the landing tab -- keep it eagerly imported so first paint
+// doesn't wait on a dynamic chunk. The other four tabs lazy-load on first
+// select; the user can only be looking at one tab at a time anyway.
 import { RotationTab } from './tabs/RotationTab';
-import { InventoryTab } from './tabs/InventoryTab';
-import { TastingTab } from './tabs/TastingTab';
-import { ChatTab } from './tabs/ChatTab';
-import { ArchiveTab } from './tabs/ArchiveTab';
+const InventoryTab = lazy(() => import('./tabs/InventoryTab').then(m => ({ default: m.InventoryTab })));
+const TastingTab = lazy(() => import('./tabs/TastingTab').then(m => ({ default: m.TastingTab })));
+const ChatTab = lazy(() => import('./tabs/ChatTab').then(m => ({ default: m.ChatTab })));
+const ArchiveTab = lazy(() => import('./tabs/ArchiveTab').then(m => ({ default: m.ArchiveTab })));
 import { OpenBeanFlow } from './components/OpenBeanFlow';
 import { SettingsPage } from './components/SettingsPage';
 import { usePreferences } from './hooks/useUserProfile';
 
+// Minimal fallback while a lazy tab chunk is fetching. Matches the app
+// background so it doesn't flash white on iOS WKWebView.
+const TabFallback = () => (
+  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textMuted, fontSize: 14 }}>
+    Loading...
+  </div>
+);
+
 const tabs = [
-  { key: 'rotation', label: 'Rotation', img: '/images/nav-rotation.png' },
-  { key: 'inventory', label: 'Inventory', img: '/images/nav-inventory.png' },
-  { key: 'tasting', label: 'Tasting', img: '/images/nav-tasting.png' },
-  { key: 'chat', label: 'Chat', img: '/images/nav-chat.png' },
-  { key: 'archive', label: 'Archive', img: '/images/nav-archive.png' },
+  { key: 'rotation', label: 'Rotation', img: '/images/nav-rotation.webp' },
+  { key: 'inventory', label: 'Inventory', img: '/images/nav-inventory.webp' },
+  { key: 'tasting', label: 'Tasting', img: '/images/nav-tasting.webp' },
+  { key: 'chat', label: 'Chat', img: '/images/nav-chat.webp' },
+  { key: 'archive', label: 'Archive', img: '/images/nav-archive.webp' },
 ];
 
 export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, profile, updateProfile, refetchBeans }) => {
@@ -46,6 +57,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   };
 
   const isRotation = tab === 'rotation';
+  const firstName = profile?.displayName?.trim().split(/\s+/)[0] || '';
+  const greeting = firstName ? `Hi ${firstName}` : today();
 
   // Set html background to match header — covers WKWebView canvas gap at viewport edge
   useEffect(() => {
@@ -66,7 +79,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           background: '#5C6B4E',
         }}>
           <img
-            src="/images/rotation-header.png"
+            src="/images/rotation-header.webp"
             alt=""
             style={{
               position: 'absolute', top: -1, left: 0, right: 0,
@@ -89,7 +102,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           }}>
             <div>
               <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>2manybeans</div>
-              <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{today()}</div>
+              <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{greeting}</div>
             </div>
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Settings">
               <SettingsIcon size={20} color={C.textMuted} />
@@ -107,10 +120,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           zIndex: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
-              <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body }}>{today()}</div>
-            </div>
+            <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Settings">
               <SettingsIcon size={20} color={C.textMuted} />
             </button>
@@ -119,7 +129,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: tab === 'inventory' ? 'hidden' : 'auto', padding: tab === 'inventory' ? 0 : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, overflowY: (tab === 'inventory' || tab === 'rotation') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             uid={uid}
@@ -136,40 +146,50 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           />
         )}
         {tab === 'inventory' && (
-          <InventoryTab
-            uid={uid}
-            beans={beans}
-            tastings={tastings}
-            onOpenBean={handleOpenBean}
-            onAddBean={addBean}
-            updateBean={updateBean}
-            deleteBean={deleteBean}
-            onFinishBean={finishBean}
-            addTasting={addTasting}
-            updateTasting={updateTasting}
-          />
+          <Suspense fallback={<TabFallback />}>
+            <InventoryTab
+              uid={uid}
+              beans={beans}
+              tastings={tastings}
+              onOpenBean={handleOpenBean}
+              onAddBean={addBean}
+              updateBean={updateBean}
+              deleteBean={deleteBean}
+              onFinishBean={finishBean}
+              addTasting={addTasting}
+              updateTasting={updateTasting}
+            />
+          </Suspense>
         )}
         {tab === 'tasting' && (
-          <TastingTab
-            beans={beans}
-            tastings={tastings}
-            onAddTasting={addTasting}
-            onUpdateTasting={updateTasting}
-            onDeleteTasting={deleteTasting}
-            updateBean={updateBean}
-          />
+          <Suspense fallback={<TabFallback />}>
+            <TastingTab
+              beans={beans}
+              tastings={tastings}
+              onAddTasting={addTasting}
+              onUpdateTasting={updateTasting}
+              onDeleteTasting={deleteTasting}
+              updateBean={updateBean}
+            />
+          </Suspense>
         )}
         {tab === 'chat' && (
-          <ChatTab
-            beans={beans}
-            tastings={tastings}
-            addBean={addBean}
-            updateBean={updateBean}
-            addTasting={addTasting}
-            updateTasting={updateTasting}
-          />
+          <Suspense fallback={<TabFallback />}>
+            <ChatTab
+              beans={beans}
+              tastings={tastings}
+              addBean={addBean}
+              updateBean={updateBean}
+              addTasting={addTasting}
+              updateTasting={updateTasting}
+            />
+          </Suspense>
         )}
-        {tab === 'archive' && <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} uid={uid} />}
+        {tab === 'archive' && (
+          <Suspense fallback={<TabFallback />}>
+            <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} uid={uid} />
+          </Suspense>
+        )}
       </div>
 
       {/* Bottom Tab Bar */}

@@ -1,14 +1,26 @@
-// Hand brew hook — mirrors useAidenBrew pattern with mounted-ref guard
+// Hand brew hook — mirrors useAidenBrew request-token pattern.
+//
+// Each handleBrewHandBrew call generates a fresh requestId. If a later call
+// starts (different bean, regenerate, modal reopen) while an earlier one is
+// still awaiting research or recipe generation, the stale chain's `setX`
+// updates are ignored so recipe/error state from an abandoned brew can't land
+// on the bean currently displayed. Firestore writes use the closure-captured
+// bean.id so they always target the right doc regardless of render state.
 import { useState, useRef, useEffect } from 'react';
 import { researchBean } from '../lib/beanResearch';
 import { generateHandBrewRecipe } from '../lib/handbrew';
 import { usePreferences } from './useUserProfile';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from './usePaywall.jsx';
 
 export function useHandBrew(updateBean) {
   const mountedRef = useRef(true);
+  const activeRequestRef = useRef(null);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const { preferences } = usePreferences();
+  const { hasPro } = useSubscription();
+  const { openPaywall } = usePaywall();
   const [handBrewModal, setHandBrewModal] = useState(false);
   const [handBrewRecipe, setHandBrewRecipe] = useState(null);
   const [handBrewLoading, setHandBrewLoading] = useState(false);
@@ -17,19 +29,37 @@ export function useHandBrew(updateBean) {
   const [handBrewResearch, setHandBrewResearch] = useState(null);
   const [handBrewPhase, setHandBrewPhase] = useState(null);
 
-  const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false) => {
-    setHandBrewBean(bean);
-    setHandBrewError(null);
-    setHandBrewModal(true);
+  const isActive = (rid) => mountedRef.current && activeRequestRef.current === rid;
 
-    // Show cached recipe immediately if available (skip generation)
+  const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false) => {
+    // Show cached recipe immediately if available, even for free users.
+    // The cached recipe already exists — no API cost to display it.
     if (!forceRegenerate && bean.handBrewRecipe) {
+      const rid = Symbol('handbrew');
+      activeRequestRef.current = rid;
+      setHandBrewBean(bean);
+      setHandBrewError(null);
+      setHandBrewModal(true);
       setHandBrewRecipe(bean.handBrewRecipe);
       setHandBrewLoading(false);
       setHandBrewPhase(null);
       return;
     }
 
+    // Recipe generation costs AI tokens. Pro or Ultra required.
+    if (!hasPro) {
+      openPaywall({ feature: 'generic', promote: 'pro' });
+      return;
+    }
+
+    const rid = Symbol('handbrew');
+    activeRequestRef.current = rid;
+
+    setHandBrewBean(bean);
+    setHandBrewError(null);
+    setHandBrewModal(true);
+
+    if (!isActive(rid)) return;
     setHandBrewRecipe(null);
     setHandBrewLoading(true);
 
@@ -39,7 +69,7 @@ export function useHandBrew(updateBean) {
       setHandBrewPhase('research');
       try {
         research = await researchBean(bean);
-        if (!mountedRef.current) return;
+        if (!isActive(rid)) return;
         setHandBrewResearch(research);
         // Cache research on bean doc for future use
         if (bean.id) {
@@ -50,13 +80,13 @@ export function useHandBrew(updateBean) {
         research = null;
       }
     }
-    if (!mountedRef.current) return;
+    if (!isActive(rid)) return;
 
     // Step 2: Generate recipe
     setHandBrewPhase('recipe');
     try {
       const recipe = await generateHandBrewRecipe(bean, research, preferences);
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setHandBrewRecipe(recipe);
       setHandBrewError(null);
       // Persist recipe to bean doc (include grinder key for cache invalidation)
@@ -70,16 +100,20 @@ export function useHandBrew(updateBean) {
         });
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setHandBrewError(err.message || "Couldn't generate a recipe");
     }
-    if (mountedRef.current) {
+    if (isActive(rid)) {
       setHandBrewLoading(false);
       setHandBrewPhase(null);
     }
   };
 
-  const closeHandBrewModal = () => setHandBrewModal(false);
+  const closeHandBrewModal = () => {
+    // Cancel any in-flight request so tail effects don't repopulate state after close.
+    activeRequestRef.current = null;
+    setHandBrewModal(false);
+  };
 
   return {
     handBrewModal, handBrewRecipe, handBrewLoading, handBrewError,

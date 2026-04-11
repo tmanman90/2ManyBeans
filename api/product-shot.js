@@ -3,7 +3,7 @@
 // Bypasses CapacitorHttp XHR interception on iOS by keeping all Storage ops server-side.
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
-import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './lib/cors-auth.js';
+import { withCorsAuthPro, getStorageBucket, adminGetDownloadURL, getDb } from './lib/cors-auth.js';
 
 let genAI;
 function getClient() {
@@ -30,11 +30,22 @@ BAG APPEARANCE:
 
 OUTPUT: Square 1:1 composition, photorealistic studio product shot`;
 
-export default withCorsAuth(async (req, res, decodedToken) => {
+// Firestore doc IDs are URL-safe but we still want to forbid slashes,
+// dots, and anything that could mess with Storage object paths.
+const BEAN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+// AI product shot generation + Storage upload. Pro or Ultra required.
+export default withCorsAuthPro(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
   if (!uid) return res.status(401).json({ error: 'Authentication required' });
 
   const { photo, beanId, skipFirestoreWrite, action } = req.body;
+
+  // Validate beanId charset/length up-front. Applies to both delete and create
+  // actions since both paths use it in the Storage object path.
+  if (beanId && !BEAN_ID_PATTERN.test(beanId)) {
+    return res.status(400).json({ error: 'Invalid beanId format' });
+  }
 
   // Delete action: clean up orphaned Storage file (for cancel/rescan cleanup)
   if (action === 'delete') {

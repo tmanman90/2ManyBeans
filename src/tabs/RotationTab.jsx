@@ -112,19 +112,31 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={sectionTitle}>Active Rotation</div>
-        <Btn variant="primary" onClick={() => setQuickRecipeOpen(true)} style={{ padding: '8px 14px' }}>
-          <Camera size={14} /> Quick Recipe
-        </Btn>
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      position: 'absolute', inset: 0,
+    }}>
+      <div style={{
+        flexShrink: 0, background: C.bg,
+        padding: '12px 20px 8px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={sectionTitle}>Active Rotation</div>
+          <Btn variant="primary" onClick={() => setQuickRecipeOpen(true)} style={{ padding: '8px 14px' }}>
+            <Camera size={14} /> Quick Recipe
+          </Btn>
+        </div>
+        <div style={accentBar} />
+        <div style={{ fontSize: 13, color: C.textMuted }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>
       </div>
-      <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>
 
+      <div style={{
+        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        padding: `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
+      }}>
       {beans.length === 0 && (
         <div style={{ ...journalCard, textAlign: 'center', padding: 32 }}>
-          <img src="/images/empty-rotation.png" alt="Empty jar" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 16, marginBottom: 16 }} />
+          <img src="/images/empty-rotation.webp" alt="Empty jar" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 16, marginBottom: 16 }} />
           <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>Your rotation is empty</div>
           <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Add your first coffee bag to get started</div>
           <Btn variant="primary" onClick={() => onOpenBean(null, 1)}><Plus size={16} /> Add Bean</Btn>
@@ -135,7 +147,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         <div key={i}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <img
-              src={bean ? '/images/jar-full.png' : '/images/jar-empty.png'}
+              src={bean ? '/images/jar-full.webp' : '/images/jar-empty.webp'}
               alt={bean ? 'Full jar' : 'Empty jar'}
               style={{ width: 24, height: 24, objectFit: 'contain' }}
             />
@@ -259,6 +271,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           )}
         </div>
       )}
+      </div>
       <AidenModal
         open={aiden.aidenModal}
         onClose={aiden.closeAidenModal}

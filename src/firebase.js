@@ -1,7 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, initializeAuth, browserLocalPersistence, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+// firebase/storage is intentionally NOT statically imported -- it's only
+// needed when deleting a bean photo, and src/lib/storage.js dynamic-imports
+// it on demand so the Storage SDK stays out of the main bundle chunk.
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
@@ -34,4 +36,13 @@ const firestoreSettings = Capacitor.isNativePlatform()
   : { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
 
 export const db = initializeFirestore(app, firestoreSettings);
-export const storage = getStorage(app);
+
+// Storage singleton is lazy-initialized on first use (only needed when
+// deleting a bean photo). Keeps the Storage SDK out of the main bundle.
+let _storage = null;
+export async function getAppStorage() {
+  if (_storage) return _storage;
+  const [{ getStorage }] = await Promise.all([import('firebase/storage')]);
+  _storage = getStorage(app);
+  return _storage;
+}

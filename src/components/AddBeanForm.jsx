@@ -13,10 +13,17 @@ import { collection, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
+import { Toast } from './Toast';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from '../hooks/usePaywall.jsx';
+import { useErrorToast } from '../hooks/useErrorToast';
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer', 'roastedIn'];
 
 export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData, onToast }) => {
+  const { hasPro, freeUsage } = useSubscription();
+  const { openPaywall } = usePaywall();
+  const { errorMsg, showError, hideError } = useErrorToast();
   const empty = {
     roaster: '', name: '', origin: '', variety: '', process: 'Washed',
     roastDate: '', bagSize: 100, bagNotes: '', producer: '',
@@ -138,6 +145,12 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   const handleScan = async () => {
     if (photos.length === 0) return;
+    // Free users get 3 lifetime bean scans. Server also enforces this; the
+    // client-side check skips the round-trip and shows the paywall instantly.
+    if (!hasPro && (freeUsage?.aiScans ?? 0) >= 3) {
+      openPaywall({ feature: 'scan_cap', promote: 'pro' });
+      return;
+    }
     setScanError(null);
     setStep('scanning');
 
@@ -227,6 +240,12 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   const handleAiFill = async () => {
     if (aiFilling) return;
+    // AI Fill counts against the same free tier quota as bean scans because
+    // it routes through /api/gemini. Gate it consistently.
+    if (!hasPro && (freeUsage?.aiScans ?? 0) >= 3) {
+      openPaywall({ feature: 'scan_cap', promote: 'pro' });
+      return;
+    }
     setAiFilling(true);
     const thisGen = genCounter.current;
     try {
@@ -322,7 +341,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       // Use pre-allocated ID if available (product shot already uploaded to this path)
       beanId = await onAdd(beanData, preAllocId || null);
     } catch (err) {
-      alert("Couldn't save bean. Check your connection and try again.");
+      showError("Couldn't save bean. Check your connection and try again.");
       return;
     }
 
@@ -686,6 +705,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
         </>
       )}
+      <Toast message={errorMsg} open={!!errorMsg} onClose={hideError} variant="error" />
     </Modal>
   );
 };

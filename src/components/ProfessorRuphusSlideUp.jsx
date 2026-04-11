@@ -115,7 +115,7 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, er
           {/* Loading state */}
           {loading && (
             <div style={{ textAlign: 'center', paddingTop: 80 }}>
-              <img src="/images/professor-ruphus.png" alt="Professor Ruphus"
+              <img src="/images/professor-ruphus.webp" alt="Professor Ruphus"
                 style={{ width: 80, height: 80, borderRadius: '50%', opacity: 0.8, marginBottom: 16 }} />
               <div style={{ fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 8 }}>
                 Professor Ruphus is preparing your lesson...
@@ -127,7 +127,7 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, er
           {/* Error state */}
           {error && !loading && (
             <div style={{ textAlign: 'center', paddingTop: 80 }}>
-              <img src="/images/professor-ruphus.png" alt="Professor Ruphus"
+              <img src="/images/professor-ruphus.webp" alt="Professor Ruphus"
                 style={{ width: 64, height: 64, borderRadius: '50%', opacity: 0.5, marginBottom: 16 }} />
               <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
                 Couldn't load the lesson
@@ -152,7 +152,7 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, er
                 display: 'flex', alignItems: 'flex-start', gap: 12,
                 marginBottom: 20, marginTop: 16,
               }}>
-                <img src="/images/professor-ruphus.png" alt="Professor Ruphus"
+                <img src="/images/professor-ruphus.webp" alt="Professor Ruphus"
                   style={{
                     width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
                     border: `2px solid ${C.borderLight}`,

@@ -1,11 +1,26 @@
 // Shared Aiden brew hook — used by RotationTab, InventoryTab, ChatTab
+//
+// Re-entrancy model:
+// Every call to handleBrewWithAiden generates a fresh requestId and stores it in
+// activeRequestRef. If the user opens a new brew (different bean, regenerate, etc.)
+// while an earlier one is still awaiting the network, the earlier request's requestId
+// no longer matches activeRequestRef.current and every one of its `setX` calls bails
+// out. Same thing for handlePushToAiden. This prevents recipe/result state from an
+// abandoned async chain from landing on a bean the user has since moved on from, and
+// prevents a stale push from persisting aidenLink on the wrong Firestore doc.
 import { useState, useRef, useEffect } from 'react';
 import { generateAidenRecipe, pushToAiden } from '../lib/aiden';
 import { researchBean } from '../lib/beanResearch';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from './usePaywall.jsx';
 
 export function useAidenBrew(updateBean) {
   const mountedRef = useRef(true);
+  const activeRequestRef = useRef(null);
   useEffect(() => () => { mountedRef.current = false; }, []);
+
+  const { hasPro, hasUltra } = useSubscription();
+  const { openPaywall } = usePaywall();
 
   const [aidenModal, setAidenModal] = useState(false);
   const [aidenRecipe, setAidenRecipe] = useState(null);
@@ -16,31 +31,59 @@ export function useAidenBrew(updateBean) {
   const [aidenResearch, setAidenResearch] = useState(null);
   const [aidenPhase, setAidenPhase] = useState(null);
 
-  const handlePushToAiden = async (recipe, beanOverride = null) => {
+  // Returns true if this async chain should still be applying state updates.
+  const isActive = (requestId) => mountedRef.current && activeRequestRef.current === requestId;
+
+  const handlePushToAiden = async (recipe, beanOverride = null, requestId = null) => {
+    // Pushing to the Fellow Aiden account is an Ultra-only feature. Recipe
+    // generation (generateAidenRecipe, Pro-gated) produces a recipe that Pro
+    // users see in the modal; clicking the Push button is what requires Ultra.
+    if (!hasUltra) {
+      openPaywall({ feature: 'aiden', promote: 'ultra' });
+      return;
+    }
+
+    // If caller didn't pass a requestId, start a new chain (external retry button etc.).
+    const rid = requestId ?? Symbol('push');
+    if (!requestId) activeRequestRef.current = rid;
+
+    if (!isActive(rid)) return;
     setAidenError(null);
     setAidenResult(null);
     setAidenLoading(true);
+    const targetBean = beanOverride || aidenBean;
     try {
-      const result = await pushToAiden(recipe);
-      if (!mountedRef.current) return;
+      const result = await pushToAiden(recipe, targetBean);
+      if (!isActive(rid)) return;
       setAidenResult(result);
       if (result.grindRecommendation) {
         setAidenRecipe(prev => ({ ...prev, grindRecommendation: result.grindRecommendation }));
       }
-      // Persist the brew.link so we don't push again next time (non-blocking, don't hide push success)
-      const targetBean = beanOverride || aidenBean;
+      // Persist the brew.link so we don't push again next time (non-blocking, don't hide push success).
+      // targetBean.id is captured in closure so the Firestore write always lands on the correct bean
+      // even if the user has since moved on to a different one -- we just don't render A's result.
       if (result.link && targetBean?.id) {
         updateBean(targetBean.id, { aidenLink: result.link, aidenUsedRelay: result.usedRelay || false })
           .catch(err => console.warn('Failed to persist aidenLink:', err.message));
       }
     } catch (fellowErr) {
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setAidenError(fellowErr.message || "Couldn't push to Aiden");
     }
-    if (mountedRef.current) setAidenLoading(false);
+    if (isActive(rid)) setAidenLoading(false);
   };
 
   const handleBrewWithAiden = async (bean, cachedResearch = null, forceRegenerate = false) => {
+    // Cached recipe with no push pending: free to show (just displays stored data).
+    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && bean.aidenLink;
+    if (!hasCachedRecipeOnly && !hasPro) {
+      openPaywall({ feature: 'generic', promote: 'pro' });
+      return;
+    }
+
+    const rid = Symbol('brew');
+    activeRequestRef.current = rid;
+
     setAidenBean(bean);
     setAidenResult(null);
     setAidenError(null);
@@ -48,10 +91,12 @@ export function useAidenBrew(updateBean) {
 
     // Show cached recipe immediately if available (skip generation)
     if (!forceRegenerate && bean.aidenRecipe) {
+      if (!isActive(rid)) return;
       setAidenRecipe(bean.aidenRecipe);
 
       // If we already have a brew.link for this bean, show it directly (no re-push)
       if (bean.aidenLink) {
+        if (!isActive(rid)) return;
         setAidenResult({ link: bean.aidenLink, usedRelay: bean.aidenUsedRelay || false });
         setAidenLoading(false);
         setAidenPhase(null);
@@ -59,12 +104,14 @@ export function useAidenBrew(updateBean) {
       }
 
       // No link yet, push to Fellow (handlePushToAiden persists the link)
+      if (!isActive(rid)) return;
       setAidenPhase('push');
-      await handlePushToAiden(bean.aidenRecipe, bean);
-      if (mountedRef.current) setAidenPhase(null);
+      await handlePushToAiden(bean.aidenRecipe, bean, rid);
+      if (isActive(rid)) setAidenPhase(null);
       return;
     }
 
+    if (!isActive(rid)) return;
     setAidenRecipe(null);
     setAidenLoading(true);
 
@@ -74,23 +121,24 @@ export function useAidenBrew(updateBean) {
       setAidenPhase('research');
       try {
         research = await researchBean(bean);
-        if (!mountedRef.current) return;
+        if (!isActive(rid)) return;
         setAidenResearch(research);
       } catch (err) {
         console.warn('Bean research failed, continuing without enrichment:', err.message);
         research = null;
       }
     }
-    if (!mountedRef.current) return;
+    if (!isActive(rid)) return;
 
     // Step 2: Recipe
     setAidenPhase('recipe');
     try {
       const recipe = await generateAidenRecipe(bean, research);
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setAidenRecipe(recipe);
       setAidenError(null);
-      // Persist full recipe + grind recommendation, clear old link (new recipe = new push needed)
+      // Persist full recipe + grind recommendation, clear old link (new recipe = new push needed).
+      // bean.id is closure-captured so this write always targets the right doc.
       if (bean.id) {
         const persist = {
           aidenRecipe: { ...recipe, generatedAt: new Date().toISOString() },
@@ -99,18 +147,23 @@ export function useAidenBrew(updateBean) {
         if (recipe.grindRecommendation) persist.aidenGrind = recipe.grindRecommendation;
         await updateBean(bean.id, persist);
       }
+      if (!isActive(rid)) return;
       // Step 3: Push to Fellow (pass bean explicitly to avoid stale closure)
       setAidenPhase('push');
-      await handlePushToAiden(recipe, bean);
+      await handlePushToAiden(recipe, bean, rid);
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setAidenError(err.message || "Couldn't generate a recipe");
       setAidenLoading(false);
     }
-    if (mountedRef.current) setAidenPhase(null);
+    if (isActive(rid)) setAidenPhase(null);
   };
 
-  const closeAidenModal = () => setAidenModal(false);
+  const closeAidenModal = () => {
+    // Cancel any in-flight request so its tail doesn't re-populate state after close.
+    activeRequestRef.current = null;
+    setAidenModal(false);
+  };
 
   return {
     aidenModal, aidenRecipe, aidenResult, aidenLoading, aidenError,

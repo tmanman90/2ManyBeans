@@ -47,16 +47,21 @@ export const useUserProfile = (uid) => {
     const profileRef = doc(db, 'users', uid);
 
     if (Capacitor.isNativePlatform()) {
-      // Native: load from localStorage cache first for instant render,
-      // then fetch from Firestore in background to get fresh data.
+      // Native: load from IDB cache first for instant render, then fetch
+      // from Firestore in background to get fresh data. Cache reads are
+      // async (IDB) so we hydrate inside a cancellable async IIFE.
       const cacheKey = `profile_${uid}`;
-      const cached = cacheRead(cacheKey);
+      let hydrateCancelled = false;
       let hadCache = false;
-      if (cached) {
-        setProfile(cached);
-        setLoaded(true);
-        hadCache = true;
-      }
+      (async () => {
+        const cached = await cacheRead(cacheKey);
+        if (hydrateCancelled) return;
+        if (cached) {
+          setProfile(cached);
+          setLoaded(true);
+          hadCache = true;
+        }
+      })();
 
       // Network fetch with retry (updates cache on success)
       const loadProfile = (attempt = 1) => {
@@ -84,6 +89,7 @@ export const useUserProfile = (uid) => {
         });
       };
       loadProfile();
+      return () => { hydrateCancelled = true; };
     } else {
       // Web: real-time listener
       const unsub = onSnapshot(profileRef, (snap) => {

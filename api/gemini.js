@@ -1,7 +1,7 @@
 // Vercel serverless proxy for Gemini API
 // Keeps GEMINI_API_KEY server-side only
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { withCorsAuth } from './lib/cors-auth.js';
+import { withCorsAuthMetered } from './lib/cors-auth.js';
 
 let genAI;
 function getClient() {
@@ -108,7 +108,9 @@ async function handleText(req, res) {
   return res.status(200).json({ text, groundingMetadata });
 }
 
-export default withCorsAuth(async (req, res) => {
+// Bean scan + AI Fill + image analysis. Free users get 3 lifetime scans;
+// after that, Pro or Ultra is required. See subscription-paywall-prd.md.
+export default withCorsAuthMetered(async (req, res) => {
   try {
     const { action } = req.body;
 
@@ -123,4 +125,4 @@ export default withCorsAuth(async (req, res) => {
     const detail = error.message || 'Unknown Gemini error';
     return res.status(status).json({ error: detail });
   }
-});
+}, { feature: 'aiScans', freeLimit: 3 });

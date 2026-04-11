@@ -7,12 +7,15 @@ import { compressImage } from '../lib/claude';
 import { generateProductShot } from '../lib/gemini';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
+import { Toast } from './Toast';
 import { scrollOnFocus } from '../lib/formHelpers';
+import { useErrorToast } from '../hooks/useErrorToast';
 
 export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid }) => {
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { errorMsg, showError, hideError } = useErrorToast();
   const [photoGenerating, setPhotoGenerating] = useState(false);
   const [photoError, setPhotoError] = useState(false);
   const fileRef = useRef(null);
@@ -84,7 +87,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       })
       .catch(err => {
         if (!photoInFlight.current) return; // canceled
-        alert('Photo generation failed: ' + err.message);
+        showError('Photo generation failed: ' + err.message);
         setPhotoGenerating(false);
         setPhotoError(true);
         photoInFlight.current = false;
@@ -408,6 +411,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         </div>
       )}
 
+      <Toast message={errorMsg} open={!!errorMsg} onClose={hideError} variant="error" />
     </Modal>
   );
 };

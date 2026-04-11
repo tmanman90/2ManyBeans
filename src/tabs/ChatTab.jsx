@@ -1,5 +1,5 @@
 // Chat tab -- with photo scanning, Aiden brew, and save-to-inventory
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Send, Camera, X, Coffee, BookOpen, Save } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
@@ -10,9 +10,12 @@ import { Toast } from '../components/Toast';
 import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
+import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { getBrewMethod } from '../lib/brewMethods';
 import { getProfileForRoaster } from '../lib/roasterProfiles';
 import { usePreferences } from '../hooks/useUserProfile';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from '../hooks/usePaywall.jsx';
 
 // Parse ---BEAN_SCAN---{json}---END_SCAN--- from assistant text
 function parseBeanScan(text) {
@@ -47,9 +50,148 @@ function trimApiMessages(messages, keepRecent = 6) {
 
 const MAX_API_MESSAGES = 20;
 
+// Isolated input bar -- owns its own `input` state so keystrokes never
+// re-render the parent ChatTab (which re-renders the full message list).
+// Memoized on its props so even parent re-renders don't cascade here unless
+// something relevant (photos list, loading flag, keyboard) actually changed.
+const ChatInputBar = memo(function ChatInputBar({
+  loading,
+  photos,
+  keyboardHeight,
+  onSend,
+  onPickPhoto,
+  onRemovePhoto,
+  fileInputRef,
+  onFileSelect,
+}) {
+  const [input, setInput] = useState('');
+  const inputRef = useRef(null);
+
+  const send = () => {
+    const trimmed = input.trim();
+    if (!trimmed && photos.length === 0) return;
+    onSend(trimmed);
+    setInput('');
+    // Let the input keep focus so the keyboard stays up for multi-turn chat,
+    // but blur on Enter so iOS dismisses after explicit send.
+  };
+
+  return (
+    <>
+      {/* Photo preview strip */}
+      {photos.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {photos.map((p, i) => (
+            <div key={i} style={{ position: 'relative' }}>
+              <img
+                src={p.previewUrl}
+                alt="Preview"
+                style={{
+                  width: 52, height: 52, borderRadius: 8,
+                  objectFit: 'cover', border: `1px solid ${C.borderLight}`,
+                }}
+              />
+              <button
+                onClick={() => onRemovePhoto(i)}
+                style={{
+                  position: 'absolute', top: -10, right: -10,
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: C.accent, color: C.card, border: 'none',
+                  cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, padding: 8,
+                }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{
+        position: 'fixed',
+        bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
+        left: 0, right: 0,
+        display: 'flex', gap: 8, alignItems: 'center',
+        padding: '8px 20px',
+        paddingBottom: keyboardHeight > 0 ? 8 : 8,
+        background: C.bg,
+        borderTop: `1px solid ${C.borderLight}`,
+        zIndex: 50,
+      }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={onFileSelect}
+          style={{ display: 'none' }}
+        />
+        <button
+          onClick={onPickPhoto}
+          disabled={photos.length >= 3}
+          style={{
+            background: 'none', border: `1px solid ${C.border}`,
+            borderRadius: 12, width: 44, height: 44, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: photos.length >= 3 ? 0.4 : 1,
+            flexShrink: 0,
+          }}
+        >
+          <Camera size={20} color={C.accent} />
+        </button>
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { send(); inputRef.current?.blur(); } }}
+          placeholder={photos.length > 0 ? 'Add a note or just send...' : 'Ask Professor Ruphus...'}
+          enterKeyHint="send"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '12px 14px',
+            borderRadius: 12,
+            border: `1px solid ${C.border}`,
+            fontFamily: fonts.body,
+            fontSize: 16,
+            background: C.card,
+            color: C.text,
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+        <button
+          onClick={send}
+          disabled={loading || (!input.trim() && photos.length === 0)}
+          style={{
+            background: C.accent,
+            color: C.card,
+            border: 'none',
+            borderRadius: 12,
+            width: 44,
+            height: 44,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: loading || (!input.trim() && photos.length === 0) ? 0.5 : 1,
+            flexShrink: 0,
+          }}
+        >
+          <Send size={18} />
+        </button>
+      </div>
+    </>
+  );
+});
+
 export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
+  const { hasPro, freeUsage } = useSubscription();
+  const { openPaywall } = usePaywall();
   const [messages, setMessages] = useState([
     { role: 'assistant', content: "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you." },
   ]);
@@ -57,47 +199,42 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const apiMessages = useRef([
     { role: 'assistant', content: messages[0].content },
   ]);
-  const [input, setInput] = useState('');
+  // Input state lives in the ChatInputBar child so keystrokes don't
+  // re-render the parent's message list on every character.
   const [loading, setLoading] = useState(false);
   const [photos, setPhotos] = useState([]); // { base64, mediaType, previewUrl }
   const [scannedBean, setScannedBean] = useState(null);
   const [toast, setToast] = useState(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardHeight = useNativeKeyboard();
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
-  const inputRef = useRef(null);
-  const blobUrlsRef = useRef([]); // Track all created blob URLs for cleanup
+  // Synchronous guard against double-send. `loading` state is async and both
+  // calls can slip past it on rapid Enter+Send. This ref blocks the second
+  // call immediately in the same event loop tick.
+  const sendingRef = useRef(false);
+  // Blob URLs only (never DataURL strings). DataURL strings don't need
+  // revoking and pushing them here would pin huge base64 payloads for the
+  // entire session, which is a real memory leak on native.
+  const blobUrlsRef = useRef([]);
 
-  // Track keyboard open/close on iOS native
+  // Revokes a URL if it's a blob: URL. No-op for data: URLs and anything else.
+  const safeRevokeBlobUrl = (url) => {
+    if (typeof url === 'string' && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // Scroll chat to bottom when the keyboard opens. Tab-bar hiding is now
+  // handled centrally by useNativeKeyboard so ChatTab + TastingTab can't
+  // race to toggle .app-tab-bar.style.display.
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    let canceled = false;
-    let cleanup;
-    import('@capacitor/keyboard').then(({ Keyboard }) => {
-      if (canceled) return;
-      const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
-        setKeyboardHeight(info.keyboardHeight);
-        // Hide tab bar when keyboard is open
-        const tabBar = document.querySelector('.app-tab-bar');
-        if (tabBar) tabBar.style.display = 'none';
-        setTimeout(() => {
-          const el = scrollRef.current;
-          if (el) el.scrollTop = el.scrollHeight;
-        }, 50);
-      });
-      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
-        setKeyboardHeight(0);
-        // Show tab bar again
-        const tabBar = document.querySelector('.app-tab-bar');
-        if (tabBar) tabBar.style.display = 'flex';
-      });
-      cleanup = () => {
-        showListener.then(h => h.remove());
-        hideListener.then(h => h.remove());
-      };
-    });
-    return () => { canceled = true; if (cleanup) cleanup(); };
-  }, []);
+    if (keyboardHeight > 0 && scrollRef.current) {
+      setTimeout(() => {
+        const el = scrollRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 50);
+    }
+  }, [keyboardHeight]);
 
   // No-op updateBean wrapper for ephemeral beans (no id to persist to)
   const ephemeralUpdateBean = async (beanId, updates) => {
@@ -115,7 +252,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   // Cleanup all tracked blob URLs on unmount
   useEffect(() => {
     return () => {
-      blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      blobUrlsRef.current.forEach(safeRevokeBlobUrl);
     };
   }, []);
 
@@ -137,7 +274,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       const mediaType = 'image/jpeg';
       const base64 = image.dataUrl.split(',')[1];
       const previewUrl = image.dataUrl;
-      blobUrlsRef.current.push(previewUrl);
+      // DataURL strings are not blob URLs; don't push them into blobUrlsRef
+      // (would pin ~500KB of base64 per photo for the whole session).
       setPhotos(prev => [...prev, { base64, mediaType, previewUrl }].slice(0, 3));
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
@@ -165,16 +303,32 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
   const removePhoto = (idx) => {
     setPhotos(prev => {
-      // Revoke blob URL for the removed photo
-      if (prev[idx]?.previewUrl) URL.revokeObjectURL(prev[idx].previewUrl);
+      // Revoke blob URL for the removed photo (no-op for data: URLs).
+      if (prev[idx]?.previewUrl) safeRevokeBlobUrl(prev[idx].previewUrl);
       return prev.filter((_, i) => i !== idx);
     });
   };
 
-  const handleSend = async () => {
-    if ((!input.trim() && photos.length === 0) || loading) return;
+  // Text comes from ChatInputBar (child owns the input state).
+  const handleSend = async (text) => {
+    // Synchronous guard: blocks the second call in the same event loop tick
+    // before React has flushed `loading` state. Without this, a fast Enter+Send
+    // double-press can slip both calls through, each appending to
+    // apiMessages.current with stale snapshots and interleaving transcripts.
+    if (sendingRef.current) return;
+    if (!text && photos.length === 0) return;
 
-    const text = input.trim();
+    // Subscription gate: chat is the same metered feature as tasting coach
+    // (both route through /api/claude). Free tier gets 1 lifetime session.
+    // The server side also enforces this; the client-side check just avoids
+    // wasting a round-trip and gives instant paywall feedback.
+    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= 1) {
+      openPaywall({ feature: 'taste_cap', promote: 'pro' });
+      return;
+    }
+
+    sendingRef.current = true;
+
     const currentPhotos = [...photos];
 
     // Build display message
@@ -205,6 +359,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     apiMessages.current = [...apiMessages.current, apiMsg];
 
     setInput('');
+    // Clearing `photos` state drops the display thumbnails, but the preview URLs
+    // for sent photos stay referenced via the message log. Revoke the blob URLs
+    // explicitly: the thumbnails are already persisted into displayMsg.photos
+    // above, so revocation doesn't affect rendering. (Data URLs skip safely.)
+    currentPhotos.forEach(p => safeRevokeBlobUrl(p.previewUrl));
     setPhotos([]);
     setLoading(true);
 
@@ -227,11 +386,14 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       }
       apiMessages.current = trimApiMessages(apiMessages.current);
     } catch {
+      // Error bubbles are for the user only. Do NOT inject them into
+      // apiMessages.current -- otherwise the model reads "Couldn't reach the AI..."
+      // as canonical assistant history on the next retry, which mangles context.
       const errMsg = { role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." };
       setMessages(prev => [...prev, errMsg]);
-      apiMessages.current = [...apiMessages.current, errMsg];
     }
     setLoading(false);
+    sendingRef.current = false;
   };
 
   const handleBrewScanned = () => {
@@ -285,8 +447,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     if (!scannedBean) return;
     const beanName = scannedBean.name || 'this coffee';
     const prompt = `Let's do a guided tasting of ${beanName} by ${scannedBean.roaster || 'the roaster'}. Walk me through it step by step.`;
-    setInput(prompt);
     setScannedBean(null);
+    // Send the prompt directly instead of pre-filling the input box.
+    handleSend(prompt);
   };
 
   const accentBar = {
@@ -377,112 +540,16 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         </div>
       )}
 
-      {/* Photo preview strip */}
-      {photos.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {photos.map((p, i) => (
-            <div key={i} style={{ position: 'relative' }}>
-              <img
-                src={p.previewUrl}
-                alt="Preview"
-                style={{
-                  width: 52, height: 52, borderRadius: 8,
-                  objectFit: 'cover', border: `1px solid ${C.borderLight}`,
-                }}
-              />
-              <button
-                onClick={() => removePhoto(i)}
-                style={{
-                  position: 'absolute', top: -10, right: -10,
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: C.accent, color: C.card, border: 'none',
-                  cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, padding: 8,
-                }}
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Input bar - fixed above tab bar, moves up with keyboard */}
-      <div style={{
-        position: 'fixed',
-        bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
-        left: 0, right: 0,
-        display: 'flex', gap: 8, alignItems: 'center',
-        padding: '8px 20px',
-        paddingBottom: keyboardHeight > 0 ? 8 : 8,
-        background: C.bg,
-        borderTop: `1px solid ${C.borderLight}`,
-        zIndex: 50,
-      }}>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handlePhotoSelect}
-          style={{ display: 'none' }}
-        />
-        <button
-          onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
-          disabled={photos.length >= 3}
-          style={{
-            background: 'none', border: `1px solid ${C.border}`,
-            borderRadius: 12, width: 44, height: 44, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: photos.length >= 3 ? 0.4 : 1,
-            flexShrink: 0,
-          }}
-        >
-          <Camera size={20} color={C.accent} />
-        </button>
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { handleSend(); inputRef.current?.blur(); } }}
-          placeholder={photos.length > 0 ? 'Add a note or just send...' : 'Ask Professor Ruphus...'}
-          enterKeyHint="send"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            padding: '12px 14px',
-            borderRadius: 12,
-            border: `1px solid ${C.border}`,
-            fontFamily: fonts.body,
-            fontSize: 16,
-            background: C.card,
-            color: C.text,
-            outline: 'none',
-            boxSizing: 'border-box',
-          }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={loading || (!input.trim() && photos.length === 0)}
-          style={{
-            background: C.accent,
-            color: C.card,
-            border: 'none',
-            borderRadius: 12,
-            width: 44,
-            height: 44,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: loading || (!input.trim() && photos.length === 0) ? 0.5 : 1,
-            flexShrink: 0,
-          }}
-        >
-          <Send size={18} />
-        </button>
-      </div>
+      <ChatInputBar
+        loading={loading}
+        photos={photos}
+        keyboardHeight={keyboardHeight}
+        onSend={handleSend}
+        onPickPhoto={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
+        onRemovePhoto={removePhoto}
+        fileInputRef={fileRef}
+        onFileSelect={handlePhotoSelect}
+      />
 
       <AidenModal
         open={aiden.aidenModal}

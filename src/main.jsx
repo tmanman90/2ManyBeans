@@ -9,10 +9,26 @@ import { SignInScreen } from './components/SignInScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { App } from './App';
 import { AuthContext } from './contexts/AuthContext';
-import { cacheClear } from './lib/offlineCache';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
+import { cacheClear, cacheClearLastUid } from './lib/offlineCache';
+import { logInRevenueCat, logOutRevenueCat } from './lib/revenuecat';
 
 // Module-scope lazy load (must NOT be inside component body)
 const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
+const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
+
+// Mounts the actual paywall UI. Kept out of <Root> so it can read the
+// PaywallContext without triggering extra renders of the app shell.
+function PaywallMount() {
+  const { paywallContext, close } = usePaywall();
+  const open = paywallContext !== null;
+  return (
+    <React.Suspense fallback={null}>
+      <PaywallSheet open={open} context={paywallContext} onClose={close} />
+    </React.Suspense>
+  );
+}
 
 // Notify Capgo that the app loaded successfully (prevents rollback)
 if (Capacitor.isNativePlatform()) {
@@ -43,10 +59,23 @@ const Root = () => {
   const lastUidRef = useRef(user?.uid);
   useEffect(() => { if (user?.uid) lastUidRef.current = user.uid; }, [user?.uid]);
 
-  const handleLogOut = useCallback(() => {
+  const handleLogOut = useCallback(async () => {
     if (lastUidRef.current) cacheClear(lastUidRef.current);
+    cacheClearLastUid();
+    // Clear RevenueCat session so the next user doesn't inherit this one's
+    // entitlements on a shared device.
+    try { await logOutRevenueCat(); } catch {}
     return logOut();
   }, [logOut]);
+
+  // Tie the RevenueCat subscriber to the Firebase UID. Runs every time the
+  // authed user changes; RC SDK is idempotent on repeat logIn calls.
+  useEffect(() => {
+    if (!user?.uid) return;
+    logInRevenueCat(user.uid).catch((err) => {
+      console.error('[main] RevenueCat logIn failed', err);
+    });
+  }, [user?.uid]);
 
   const authValue = useMemo(() => ({ user, logOut: handleLogOut }), [user, handleLogOut]);
 
@@ -96,25 +125,30 @@ const Root = () => {
 
   return (
     <AuthContext value={authValue}>
-      <UserPreferencesProvider value={contextValue}>
-        <App
-          uid={user.uid}
-          beans={beans}
-          tastings={tastings}
-          addBean={addBean}
-          updateBean={updateBean}
-          deleteBean={deleteBean}
-          addTasting={addTasting}
-          updateTasting={updateTasting}
-          deleteTasting={deleteTasting}
-          openBean={openBean}
-          finishBean={finishBean}
-          returnBean={returnBean}
-          profile={profile}
-          updateProfile={updateProfile}
-          refetchBeans={refetch}
-        />
-      </UserPreferencesProvider>
+      <SubscriptionProvider uid={user.uid}>
+        <PaywallProvider>
+          <UserPreferencesProvider value={contextValue}>
+            <App
+              uid={user.uid}
+              beans={beans}
+              tastings={tastings}
+              addBean={addBean}
+              updateBean={updateBean}
+              deleteBean={deleteBean}
+              addTasting={addTasting}
+              updateTasting={updateTasting}
+              deleteTasting={deleteTasting}
+              openBean={openBean}
+              finishBean={finishBean}
+              returnBean={returnBean}
+              profile={profile}
+              updateProfile={updateProfile}
+              refetchBeans={refetch}
+            />
+            <PaywallMount />
+          </UserPreferencesProvider>
+        </PaywallProvider>
+      </SubscriptionProvider>
     </AuthContext>
   );
 };

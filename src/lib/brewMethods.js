@@ -55,7 +55,7 @@ export const BREW_METHODS = {
   },
   handbrew: {
     label: 'Hand Brew Recipe',
-    icon: '/images/handbrew-icon.png',
+    icon: '/images/handbrew-icon.webp',
     grindLabel: (bean, preferences) => {
       if (bean.handBrewRecipe?.grindSize) {
         return formatHandBrewGrind(bean.handBrewRecipe.grindSize, preferences);

@@ -658,14 +658,9 @@ function repairRecipe(bean, recipe, research) {
   enforceDeterministicGrind(repaired, bean, research);
   enforceClarityRules(repaired, bean);
 
-  // Unique title: #{jarSlot} {origin} {name} - {roaster} + short timestamp
-  // Timestamp prevents Fellow "name already exists" collisions from leftover temp profiles
-  const slot = bean.jarSlot ? `#${bean.jarSlot} ` : '';
-  const ts = Date.now().toString(36).slice(-4);
-  const base = `${slot}${bean.origin || ''} ${bean.name || ''} - ${bean.roaster || ''}`.trim();
-  const maxBase = 50 - 5; // leave room for " xxxx" suffix
-  const trimmed = base.length > maxBase ? base.slice(0, maxBase) : base;
-  repaired.title = `${trimmed} ${ts}`;
+  // Title is stamped at push time from the current bean (see buildAidenTitle),
+  // so a cached recipe always reflects the bean's current jar slot.
+  delete repaired.title;
 
   // Log changed fields for debugging
   const changes = {};
@@ -732,9 +727,52 @@ export async function generateAidenRecipe(bean, research = null) {
   return repairRecipe(bean, parsed, research);
 }
 
-export async function pushToAiden(recipe) {
+// Build the Fellow profile title from the current bean state.
+// Fellow caps profile titles at 50 chars (see api/aiden.js validateProfile).
+// Preferred format: "#{jarSlot} {origin} {name} - {roaster} {nonce}".
+// If too long, drop fields in reverse priority: roaster → origin → (truncate name).
+//
+// The 4-char random nonce ensures two concurrent pushes never generate the
+// same title, even for the same bean. This sidesteps the TOCTOU cleanup path
+// in api/aiden.js:186-205 entirely -- the "already exists" branch only fires
+// if a prior push crashed before deleting its temp profile, which becomes
+// vanishingly rare. (We reserve 5 chars of budget for " xxxx".)
+function randomNonce() {
+  return Math.random().toString(36).slice(2, 6);
+}
+
+export function buildAidenTitle(bean) {
+  const MAX = 50;
+  const NONCE_BUDGET = 5; // " xxxx"
+  const BASE_MAX = MAX - NONCE_BUDGET;
+  const nonce = randomNonce();
+
+  const slot = bean?.jarSlot ? `#${bean.jarSlot} ` : '';
+  const name = (bean?.name || '').trim();
+  const origin = (bean?.origin || '').trim();
+  const roaster = (bean?.roaster || '').trim();
+
+  const withAll = `${slot}${origin ? origin + ' ' : ''}${name}${roaster ? ' - ' + roaster : ''}`.trim();
+  if (withAll.length <= BASE_MAX) return `${withAll} ${nonce}`;
+
+  const withoutRoaster = `${slot}${origin ? origin + ' ' : ''}${name}`.trim();
+  if (withoutRoaster.length <= BASE_MAX) return `${withoutRoaster} ${nonce}`;
+
+  const withoutOrigin = `${slot}${name}`.trim();
+  if (withoutOrigin.length <= BASE_MAX) return `${withoutOrigin} ${nonce}`;
+
+  // Still too long: truncate the name, preserving slot prefix + nonce.
+  const budget = BASE_MAX - slot.length;
+  return `${slot}${name.slice(0, budget).trim()} ${nonce}`;
+}
+
+export async function pushToAiden(recipe, bean = null) {
   // Strip fields not in Fellow schema
-  const { grindRecommendation, generatedAt, ...profile } = recipe;
+  const { grindRecommendation, generatedAt, title: _staleTitle, ...profile } = recipe;
+
+  // Always stamp the title fresh from the current bean so cached recipes pick
+  // up the current jar slot instead of shipping whatever was baked in at gen time.
+  profile.title = bean ? buildAidenTitle(bean) : (recipe.title || '');
 
   const result = await fetchWithRetry({
     url: `${API_BASE}/api/aiden`,

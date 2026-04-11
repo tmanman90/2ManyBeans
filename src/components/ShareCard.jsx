@@ -1,10 +1,14 @@
-// Share card components — rendered off-screen, captured as images via modern-screenshot
+// Share card components — rendered off-screen, captured as images via modern-screenshot.
 // RecipeShareCard: Aiden brew recipe card
 // TastingShareCard: tasting review card
 // captureShareCard(): DOM-to-PNG with iOS-safe settings
+//
+// modern-screenshot is dynamic-imported inside captureShareCard() only -- not
+// statically at module top -- so the ~24KB DOM-to-PNG library stays out of
+// the main bundle and only loads when the user actually taps Share. Callsites
+// that only render the card (e.g. off-screen in JSX) never pay the cost.
 
 import { forwardRef } from 'react';
-import { domToPng } from 'modern-screenshot';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts } from '../styles/theme';
 
@@ -101,7 +105,7 @@ const CardFooter = () => (
     borderTop: `1px solid ${C.borderLight}`,
   }}>
     <img
-      src="/images/professor-ruphus.png"
+      src="/images/professor-ruphus.webp"
       alt=""
       style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 8 }}
     />
@@ -381,6 +385,10 @@ export async function captureShareCard(ref, opts = {}) {
     }
     // WKWebView paint delay
     await new Promise(r => setTimeout(r, 100));
+
+    // Lazy-load modern-screenshot. Only pulled into the bundle when the
+    // user actually taps Share.
+    const { domToPng } = await import('modern-screenshot');
 
     const dataUrl = await domToPng(ref.current, {
       scale: 2,

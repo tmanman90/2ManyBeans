@@ -22,7 +22,10 @@ export function compressImage(file) {
 
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const MAX_DIM = 1500;
+      // 1024px is enough for Gemini OCR on bean bag labels. Previously 1500,
+      // which decoded to ~9MB of RGBA canvas memory per photo and didn't
+      // measurably improve scan quality.
+      const MAX_DIM = 1024;
       let { width, height } = img;
 
       if (width > MAX_DIM || height > MAX_DIM) {
@@ -39,6 +42,9 @@ export function compressImage(file) {
 
       canvas.toBlob(
         (blob) => {
+          // Nudge WebKit to release the backing store sooner on iOS.
+          canvas.width = 0;
+          canvas.height = 0;
           if (!blob) return reject(new Error('Compression failed'));
           const reader = new FileReader();
           reader.onload = () => resolve({
@@ -78,6 +84,33 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
     ? `\n\nAVAILABLE BEANS:\n${allBeans.map(b => `- "${b.name}" by ${b.roaster}`).join('\n')}`
     : '';
 
+  // Current brew recipe on the bean (Aiden Opus or hand-brew). Surfaces so the
+  // coach never re-asks what's already attached. Try hand-brew first but fall
+  // through to Aiden if hand-brew produced no usable fields. Numeric grind
+  // values may arrive as strings from persisted data, so coerce before check.
+  let currentBrewLine = null;
+  const hbr = selectedBean?.handBrewRecipe;
+  if (hbr) {
+    const parts = [
+      hbr.method && `method ${hbr.method}`,
+      hbr.ratio && `ratio ${hbr.ratio}`,
+      hbr.waterTemp?.celsius && `${hbr.waterTemp.celsius}C`,
+      hbr.grindSize?.setting && `grind ${hbr.grindSize.setting}${hbr.grindSize.description ? ` (${hbr.grindSize.description})` : ''}`,
+      hbr.totalBrewTime && `time ${hbr.totalBrewTime}`,
+    ].filter(Boolean).join(', ');
+    if (parts) currentBrewLine = `Current hand-brew recipe: ${parts}`;
+  }
+  if (!currentBrewLine && selectedBean?.aidenGrind) {
+    const g = selectedBean.aidenGrind;
+    const ss = Number(g.singleServe);
+    const batch = Number(g.batch);
+    if (Number.isFinite(ss)) {
+      const bits = [`Single-Serve ${ss}`];
+      if (Number.isFinite(batch)) bits.push(`Batch ${batch}`);
+      currentBrewLine = `Current Fellow Aiden / Opus grind: ${bits.join(' / ')} (Opus scale: LOWER number = FINER grind)`;
+    }
+  }
+
   // BEAN PROFILE block
   const beanProfile = selectedBean ? [
     selectedBean.roaster && `Roaster: ${selectedBean.roaster}`,
@@ -93,6 +126,7 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
     selectedBean.roastLevel && `Roast Level: ${selectedBean.roastLevel}`,
     selectedBean.cupScore && `Cup Score: ${selectedBean.cupScore}`,
     selectedBean.brewingRec && `Brewing Rec: ${selectedBean.brewingRec}`,
+    currentBrewLine,
   ].filter(Boolean).join('\n- ') : '';
   const beanSection = beanProfile
     ? `\nBEAN PROFILE (the coffee being tasted right now):\n- ${beanProfile}\n`
@@ -129,11 +163,31 @@ CRITICAL RULES:
 - If Tal mentions a DIFFERENT bean name than the pre-selected one, use that bean instead for the extraction
 - No emojis in your responses
 
+FORMATTING RULES (strict):
+- Plain text only. NO markdown whatsoever.
+- NEVER use asterisks (*). No **bold**, no *italic*, no bullet stars.
+- NEVER use pound signs (#) for headers.
+- Use line breaks between thoughts. Use dashes (-) for lists only when presenting multiple-choice options.
+- Your output is rendered in a mobile chat bubble as literal text; any markdown syntax shows up as garbage.
+
+NEVER RE-ASK WHAT YOU ALREADY KNOW:
+- BEAN PROFILE above already contains the user's current brew recipe (Aiden grind, hand-brew method, etc.) when one exists.
+- Do NOT ask "what's your brew method / grind / ratio" if BEAN PROFILE lists them.
+- Instead, confirm briefly in ONE sentence: "You're on Aiden Opus at SS 4.2 -- sound right, or did you change it?" and move on.
+- Only ask for brew details if BEAN PROFILE has no current brew recipe at all.
+
 BREW TROUBLESHOOTING (use these exact rules):
 - Sour/bright/sharp = grind finer OR use hotter water
 - Bitter/harsh/astringent = grind coarser OR use cooler water
 - Weak/watery/thin = use more coffee (higher dose)
 - Good as-is = keep current recipe
+
+GRINDER DIRECTION (critical to avoid inverted advice):
+- Fellow Opus: scale roughly 1-11. LOWER number = FINER grind. To go finer from 4.2, move to 3.5 or 3.0. To go coarser, move to 5.0 or higher.
+- Fellow Ode Gen 2: same -- LOWER number = FINER.
+- Baratza Encore: LOWER number = FINER.
+- Comandante C40: measured in CLICKS from zero. MORE clicks = COARSER. Fewer clicks = finer.
+- When advising a grind change, state BOTH the direction in words (finer/coarser) AND the new number for their specific grinder. Double-check direction before writing the number. Never invert.
 
 WITHHOLD-THEN-REVEAL COACHING:
 - You have the bean profile and bag notes internally. Do NOT reveal bag notes or expected flavors BEFORE the taster gives their answer.
@@ -150,9 +204,9 @@ GUIDED FLOW (follow this order across your turns):
 3. BODY & FINISH - "How heavy does it feel in your mouth? Light like tea, medium like juice, or thick like milk? And after you swallow, does the taste disappear quickly or linger?"
 4. SWEETNESS - "How sweet is it? Barely there, noticeable, or really present?"
 5. ONE WORD - "If you had to describe this whole cup in one word, what would it be?"
-6. BREW DIAL-IN - Don't ask "what would you change?" Instead, run a quick diagnostic:
+6. BREW DIAL-IN - Don't ask "what would you change?" and don't ask what their current grind is (you already know it from BEAN PROFILE). Instead, run a quick diagnostic:
    "Quick check: was the cup (a) too sour/bright, (b) too bitter/harsh, (c) too weak/watery, or (d) pretty good as-is?"
-   Then TELL them the fix using the BREW TROUBLESHOOTING rules above.
+   Then TELL them the fix using the BREW TROUBLESHOOTING rules above, expressed as a specific number change on THEIR grinder (see GRINDER DIRECTION). Example: "Bump Opus SS from 4.2 down to 3.5 -- that's finer, which pulls more out and kills the sour edge."
 
 EXTRACTION (mandatory on final turn):
 After covering these areas (typically 3-4 exchanges), you MUST end your message with EXACTLY:

@@ -89,7 +89,7 @@ const OnboardingWizard = ({ user, profile, createProfile, updateProfile }) => {
     }}>
       {/* Hero */}
       <img
-        src="/images/onboarding-welcome.png"
+        src="/images/onboarding-welcome.webp"
         alt="Welcome"
         style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 20, marginBottom: 16 }}
       />
@@ -187,8 +187,8 @@ const OnboardingWizard = ({ user, profile, createProfile, updateProfile }) => {
           </label>
           <div style={{ display: 'flex', gap: 12 }}>
             {[
-              { key: 'aiden', label: 'Fellow Aiden', img: '/images/brew-aiden.png' },
-              { key: 'handbrew', label: 'Hand Brew', img: '/images/brew-handbrew.png' },
+              { key: 'aiden', label: 'Fellow Aiden', img: '/images/brew-aiden.webp' },
+              { key: 'handbrew', label: 'Hand Brew', img: '/images/brew-handbrew.webp' },
             ].map(method => (
               <button
                 key={method.key}

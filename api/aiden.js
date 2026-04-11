@@ -2,7 +2,7 @@
 // Multi-user: reads per-user credentials from Firestore secrets, falls back to relay
 // Flow: auth -> device -> create profile -> share (brew.link) -> delete temp profile
 // NEVER touches existing profiles -- if device is full, returns error gracefully
-import { withCorsAuth, getDb } from './lib/cors-auth.js';
+import { withCorsAuthUltra, getDb } from './lib/cors-auth.js';
 import { decrypt } from './lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -66,11 +66,22 @@ async function fellowFetch(path, options = {}) {
   }
 }
 
-// Get Fellow credentials: try per-user secrets first, then relay env vars
+// Is this uid allowed to use the shared FELLOW_EMAIL/FELLOW_PASSWORD relay?
+// Relay access means pushing profiles to the owner's personal Aiden brewer.
+// Only the uid in FELLOW_RELAY_ALLOWED_UID may use it (typically: set to Tal's
+// own uid in Vercel env vars). If unset, NOBODY can use the relay -- safe
+// default for any new deployment.
+function isRelayAllowed(uid) {
+  const allowed = process.env.FELLOW_RELAY_ALLOWED_UID;
+  return Boolean(allowed && uid && allowed === uid);
+}
+
+// Get Fellow credentials: try per-user secrets first, then relay env vars.
+// Relay is only returned if the caller's uid is on the allowlist.
 async function getFellowCredentials(uid) {
   const db = getDb();
   if (!db) {
-    // Dev mode: no Firebase Admin, use relay
+    // Dev mode: no Firebase Admin, use relay (dev machines only)
     return { email: process.env.FELLOW_EMAIL, password: process.env.FELLOW_PASSWORD, source: 'relay' };
   }
 
@@ -104,7 +115,12 @@ async function getFellowCredentials(uid) {
     }
   }
 
-  // No user credentials: use relay
+  // No user credentials: use relay only if this uid is allowlisted.
+  if (!isRelayAllowed(uid)) {
+    const err = new Error('No Fellow credentials connected. Please connect in Settings.');
+    err.status = 400;
+    throw err;
+  }
   const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
   if (!FELLOW_EMAIL || !FELLOW_PASSWORD) {
     throw new Error('Fellow relay credentials not configured');
@@ -143,8 +159,11 @@ async function pushWithCredentials(profile, creds) {
   let token = null;
   let deviceId = creds.cachedDeviceId || null;
 
-  // Try cached token first
-  if (creds.cachedToken && creds.cachedTokenExpiry && Date.now() < creds.cachedTokenExpiry) {
+  // Try cached token first. Use a 60s safety margin so a token that expires
+  // seconds from now doesn't get used then immediately 401 -- forcing a
+  // fresh auth in that case is cheaper than eating a round-trip failure.
+  const TOKEN_SAFETY_MARGIN_MS = 60_000;
+  if (creds.cachedToken && creds.cachedTokenExpiry && (Date.now() + TOKEN_SAFETY_MARGIN_MS) < creds.cachedTokenExpiry) {
     token = creds.cachedToken;
   }
 
@@ -232,7 +251,13 @@ async function pushWithCredentials(profile, creds) {
   return { link, profileId, title: profile.title };
 }
 
-export default withCorsAuth(async (req, res, decodedToken) => {
+// Push a pre-generated brew profile directly to the user's Fellow Aiden
+// account via Fellow's API. Recipe GENERATION (which produces the profile
+// this endpoint receives) runs through api/openai.js and is Pro-gated.
+// This endpoint handles only the push/share-link step, which requires the
+// Ultra tier because it consumes Fellow API quota and is the hardware-
+// integration feature that differentiates Ultra from Pro.
+export default withCorsAuthUltra(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
 
   try {
@@ -243,20 +268,31 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     }
 
     // Get credentials (per-user or relay)
-    const creds = await getFellowCredentials(uid);
+    let creds;
+    try {
+      creds = await getFellowCredentials(uid);
+    } catch (credsErr) {
+      if (credsErr.status === 400) {
+        return res.status(400).json({ error: credsErr.message });
+      }
+      throw credsErr;
+    }
 
-    // Decryption failed: return error + try relay fallback for brew.link
+    // Decryption failed: return error + try relay fallback ONLY for the
+    // allowlisted relay uid. For everyone else, the relay would push to the
+    // owner's personal Aiden -- refuse and surface a reconnect prompt.
     if (creds.source === 'decrypt_failed') {
-      // Try relay so user isn't completely blocked
-      try {
-        const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
-        if (FELLOW_EMAIL && FELLOW_PASSWORD) {
-          const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
-          const result = await pushWithCredentials(profile, relayCreds);
-          return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
+      if (isRelayAllowed(uid)) {
+        try {
+          const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
+          if (FELLOW_EMAIL && FELLOW_PASSWORD) {
+            const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
+            const result = await pushWithCredentials(profile, relayCreds);
+            return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
+          }
+        } catch {
+          // Relay also failed
         }
-      } catch {
-        // Relay also failed
       }
       return res.status(500).json({ error: 'Your Fellow credentials could not be read. Please reconnect in Settings.' });
     }
@@ -266,22 +302,25 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       const result = await pushWithCredentials(profile, creds);
       return res.status(200).json({ ...result, usedRelay: creds.source === 'relay' });
     } catch (pushErr) {
-      // If user credentials failed with 401/403, try relay fallback
+      // If user credentials failed with 401/403, try relay fallback -- again,
+      // only for the allowlisted uid. Everyone else gets a reconnect prompt.
       if (creds.source === 'user' && (pushErr.status === 401 || pushErr.status === 403)) {
-        console.warn(`Fellow auth failed for uid=${uid}, falling back to relay`);
+        console.warn(`Fellow auth failed for uid=${uid}, clearing token cache`);
         clearTokenCache(creds.secretsRef);
 
-        const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
-        if (FELLOW_EMAIL && FELLOW_PASSWORD) {
-          try {
-            const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
-            const result = await pushWithCredentials(profile, relayCreds);
-            return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
-          } catch (relayErr) {
-            console.error('Relay fallback also failed:', relayErr.message);
+        if (isRelayAllowed(uid)) {
+          const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
+          if (FELLOW_EMAIL && FELLOW_PASSWORD) {
+            try {
+              const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
+              const result = await pushWithCredentials(profile, relayCreds);
+              return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
+            } catch (relayErr) {
+              console.error('Relay fallback also failed:', relayErr.message);
+            }
           }
         }
-        return res.status(502).json({ error: 'Your Fellow credentials are invalid and the relay is unavailable. Please reconnect in Settings.' });
+        return res.status(401).json({ error: 'Your Fellow credentials are invalid. Please reconnect in Settings.' });
       }
 
       // Surface specific errors

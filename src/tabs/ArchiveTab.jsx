@@ -99,7 +99,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean }) => 
                 }}
                 title="Learn about this coffee"
               >
-                <img src="/images/professor-ruphus.png" alt="Learn"
+                <img src="/images/professor-ruphus.webp" alt="Learn"
                   style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
               </button>
               {bean.finishDate && (

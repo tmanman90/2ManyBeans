@@ -8,14 +8,30 @@ import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { convertTastingScores } from '../lib/professorRuphus';
 import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
+import { Toast } from '../components/Toast';
 import { scrollOnFocus } from '../lib/formHelpers';
+import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
+import { useErrorToast } from '../hooks/useErrorToast';
 import { TastingForm } from '../components/TastingForm';
 import { TastingShareCard, captureShareCard, offScreenStyle } from '../components/ShareCard';
 import { shareImage } from '../lib/share';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from '../hooks/usePaywall.jsx';
+
+// Strip markdown bold/italic markers so chat bubbles never show literal "**".
+// Claude occasionally emits them despite the prompt forbidding it.
+// Only strips paired markers with content between them -- never touches lone
+// asterisks or unpaired `**`, so plain prose like "2**2" or "foo * bar" stays intact.
+const stripMarkdown = (t = '') => t
+  .replace(/\*\*([^*\n]+?)\*\*/g, '$1')
+  .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1$2');
 
 export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const [sel, setSel] = useState(active[0]?.id || '');
+  const { hasPro, freeUsage } = useSubscription();
+  const { openPaywall } = usePaywall();
+  const { errorMsg, showError, hideError } = useErrorToast();
   // Background tasting score conversion for spider chart overlay
   const convertScoresInBackground = (tastingId, tastingData) => {
     const bean = beans.find(b => b.id === tastingData.beanId);
@@ -39,6 +55,30 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [chatLoading, setChatLoading] = useState(false);
   const [chatExtracted, setChatExtracted] = useState(null);
   const chatScrollRef = useRef(null);
+  const chatInputRef = useRef(null);
+
+  // Only track keyboard when we're in chat mode, so form/edit mode keyboards
+  // don't hide the global tab bar unexpectedly. useNativeKeyboard centralizes
+  // the listener and ref-counts tab-bar visibility across ChatTab/TastingTab.
+  const keyboardHeight = useNativeKeyboard({ enabled: mode === 'chat' });
+
+  // Scroll chat to bottom when the keyboard opens.
+  useEffect(() => {
+    if (keyboardHeight > 0 && chatScrollRef.current) {
+      setTimeout(() => {
+        const el = chatScrollRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 50);
+    }
+  }, [keyboardHeight]);
+
+  // Auto-grow the textarea as the user types. Caps at 5 lines then scrolls.
+  useEffect(() => {
+    const el = chatInputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, [chatInput]);
 
   const tastingFields = {
     aroma: 'Aroma', firstSip: 'First sip', acidity: 'Acidity', sweetness: 'Sweetness',
@@ -66,7 +106,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       if (tastingId) convertScoresInBackground(tastingId, tastingData);
       setMode('list');
     } catch (err) {
-      alert("Couldn't save tasting. Check your connection and try again.");
+      showError("Couldn't save tasting. Check your connection and try again.");
     }
   };
 
@@ -77,7 +117,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   const updateRating = async (id, rating) => {
     try { await onUpdateTasting(id, { rating }); }
-    catch { alert("Couldn't update rating. Check your connection."); }
+    catch { showError("Couldn't update rating. Check your connection."); }
   };
 
   const startEdit = (t) => { setEditingId(t.id); setEditForm({ ...t }); };
@@ -89,7 +129,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       setEditingId(null);
       setEditForm(null);
     } catch {
-      alert("Couldn't save changes. Check your connection and try again.");
+      showError("Couldn't save changes. Check your connection and try again.");
     }
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
@@ -106,6 +146,12 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   // Chat tasting flow
   const startChat = () => {
+    // Free users get 1 lifetime tasting coach session. After that, Pro required.
+    // Server also enforces this; this is for instant UX feedback.
+    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= 1) {
+      openPaywall({ feature: 'taste_cap', promote: 'pro' });
+      return;
+    }
     const bean = beans.find(b => b.id === sel);
     setMode('chat');
     setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
@@ -123,26 +169,55 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   const handleChatSend = async () => {
     if (!chatInput.trim() || chatLoading) return;
+    // Bind this send to the bean that was selected at call time. If the user
+    // switches the bean dropdown mid-flight, we drop the response instead of
+    // appending it to the new bean's transcript.
+    const beanIdAtSend = sel;
     const userMsg = { role: 'user', content: chatInput.trim() };
     setChatMessages(prev => [...prev, userMsg]);
     setChatInput('');
     setChatLoading(true);
 
     try {
-      const selectedBean = beans.find(b => b.id === sel);
-      const beanName = sel ? getBeanName(sel) : 'unknown bean';
+      const selectedBean = beans.find(b => b.id === beanIdAtSend);
+      const beanName = beanIdAtSend ? getBeanName(beanIdAtSend) : 'unknown bean';
       const systemPrompt = buildTastingSystemPrompt(beanName, beans, selectedBean, tastings);
       const history = [...chatMessages.filter(m => m.role !== 'system'), userMsg];
       const text = await sendTastingMessage(systemPrompt, history);
+
+      // If the user switched beans while we were waiting, silently drop this
+      // response. The new bean's opening message is already rendered by the
+      // `sel` reset effect; appending here would splice two conversations.
+      if (sel !== beanIdAtSend) {
+        setChatLoading(false);
+        return;
+      }
 
       const extractMatch = text.match(/---EXTRACT---\s*([\s\S]*?)\s*---END---/);
       if (extractMatch) {
         try {
           const extracted = JSON.parse(extractMatch[1].trim());
-          // Auto-match bean if AI extracted a beanName
+          // Auto-match bean if AI extracted a beanName. We DON'T setSel here --
+          // that would fire the "bean changed" reset effect and wipe the review
+          // card. Instead, stash the matched id on `extracted` so saveChatTasting
+          // can prefer it over `sel`.
           if (extracted.beanName) {
-            const match = beans.find(b => b.name.toLowerCase() === extracted.beanName.toLowerCase());
-            if (match) setSel(match.id);
+            // Strip quotes, trim, lowercase, and strip any trailing " by <roaster>" the model may have included.
+            const cleaned = String(extracted.beanName)
+              .replace(/["'"]/g, '')
+              .replace(/\s+by\s+.+$/i, '')
+              .trim()
+              .toLowerCase();
+            // Prefer name-only match; if multiple beans share a name, disambiguate by roaster substring.
+            const candidates = beans.filter(b => (b.name || '').toLowerCase() === cleaned);
+            let match = null;
+            if (candidates.length === 1) {
+              match = candidates[0];
+            } else if (candidates.length > 1) {
+              const roasterHint = String(extracted.beanName).toLowerCase();
+              match = candidates.find(b => roasterHint.includes((b.roaster || '').toLowerCase())) || candidates[0];
+            }
+            if (match) extracted.matchedBeanId = match.id;
           }
           setChatExtracted(extracted);
           const cleanText = text.replace(/---EXTRACT---[\s\S]*?---END---/, '').trim();
@@ -161,7 +236,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   const saveChatTasting = async () => {
     if (!chatExtracted || !sel) return;
-    const tastingData = { beanId: sel, date: today(), ...chatExtracted, rating: chatExtracted.rating || null };
+    // Prefer a match the AI surfaced, but never send `matchedBeanId` to the db.
+    const { matchedBeanId, ...extractedFields } = chatExtracted;
+    const beanId = matchedBeanId || sel;
+    const tastingData = { beanId, date: today(), ...extractedFields, rating: chatExtracted.rating || null };
     try {
       const tastingId = await onAddTasting(tastingData);
       if (tastingId) convertScoresInBackground(tastingId, tastingData);
@@ -169,7 +247,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       setChatMessages([]);
       setMode('list');
     } catch (err) {
-      alert("Couldn't save tasting. Check your connection and try again.");
+      showError("Couldn't save tasting. Check your connection and try again.");
     }
   };
 
@@ -183,8 +261,12 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     const bean = beans.find(b => b.id === tasting.beanId);
     shareDataRef.current = { tasting, bean };
     setSharingId(tasting.id);
-    // Wait for render of off-screen card
-    await new Promise(r => setTimeout(r, 50));
+    // Wait for React to commit the off-screen card AND for the browser to
+    // paint it. Double rAF is the minimum correct wait on iOS WKWebView:
+    // first frame = commit, second frame = guaranteed-painted. The old 50ms
+    // setTimeout sometimes fired before commit on slow devices, producing
+    // blank share cards.
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       const dataUrl = await captureShareCard(shareCardRef);
       if (!dataUrl) return;
@@ -242,8 +324,20 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
       {/* Chat Mode */}
       {mode === 'chat' && (
-        <div style={{ ...journalCard, padding: 0, overflow: 'hidden' }}>
-          <div ref={chatScrollRef} style={{ maxHeight: 320, overflowY: 'auto', padding: 16 }}>
+        <>
+          <div
+            ref={chatScrollRef}
+            style={{
+              ...journalCard,
+              padding: 16,
+              overflowY: 'auto',
+              paddingBottom: keyboardHeight > 0 ? 80 : 140,
+              height: keyboardHeight > 0
+                ? `calc(100dvh - ${keyboardHeight + 260}px)`
+                : 'calc(100dvh - 360px)',
+              marginBottom: 12,
+            }}
+          >
             {chatMessages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                 <div style={{
@@ -253,8 +347,9 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   borderBottomRightRadius: m.role === 'user' ? 4 : 14,
                   borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
                   whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
                 }}>
-                  {m.content}
+                  {m.role === 'assistant' ? stripMarkdown(m.content) : m.content}
                 </div>
               </div>
             ))}
@@ -262,7 +357,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           </div>
 
           {chatExtracted && (
-            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, background: C.greenBg }}>
+            <div style={{ ...journalCard, padding: '12px 16px', background: C.greenBg, marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: C.green, marginBottom: 8 }}>✓ Tasting captured — review & save</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <StarRating value={chatExtracted.rating || 0} onChange={r => setChatExtracted(p => ({ ...p, rating: r }))} size={22} />
@@ -282,21 +377,75 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           )}
 
           {!chatExtracted && (
-            <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderTop: `1px solid ${C.border}` }}>
-              <input
+            <div style={{
+              position: 'fixed',
+              bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
+              left: 0, right: 0,
+              display: 'flex', gap: 8, alignItems: 'flex-end',
+              padding: '8px 20px',
+              background: C.bg,
+              borderTop: `1px solid ${C.borderLight}`,
+              // Must sit above .app-tab-bar (zIndex 100 in App.jsx) so it can
+              // never end up visually trapped behind nav on devices where the
+              // tab bar is taller than expected.
+              zIndex: 110,
+            }}>
+              <textarea
+                ref={chatInputRef}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 placeholder="Describe your cup..."
-                onKeyDown={e => e.key === 'Enter' && handleChatSend()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleChatSend();
+                    chatInputRef.current?.blur();
+                  }
+                }}
                 onFocus={scrollOnFocus}
-                style={{ ...inputStyle, flex: 1 }}
+                rows={1}
+                enterKeyHint="send"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: fonts.body,
+                  fontSize: 16,
+                  lineHeight: 1.4,
+                  background: C.card,
+                  color: C.text,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  resize: 'none',
+                  overflowY: 'auto',
+                  maxHeight: 120,
+                }}
               />
-              <Btn variant="primary" onClick={handleChatSend} disabled={chatLoading} style={{ padding: '8px 12px' }}>
-                <Send size={14} />
-              </Btn>
+              <button
+                onClick={handleChatSend}
+                disabled={chatLoading || !chatInput.trim()}
+                style={{
+                  background: C.accent,
+                  color: C.card,
+                  border: 'none',
+                  borderRadius: 12,
+                  width: 44,
+                  height: 44,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: chatLoading || !chatInput.trim() ? 0.5 : 1,
+                  flexShrink: 0,
+                }}
+              >
+                <Send size={18} />
+              </button>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Sort Controls */}
@@ -357,7 +506,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Pencil size={14} />
                 </span>
-                <span onClick={async () => { if (confirm('Delete this tasting?')) try { await onDeleteTasting(t.id); } catch { alert("Couldn't delete. Check your connection."); } }} style={{ cursor: 'pointer', color: C.red, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span onClick={async () => { if (confirm('Delete this tasting?')) try { await onDeleteTasting(t.id); } catch { showError("Couldn't delete. Check your connection."); } }} style={{ cursor: 'pointer', color: C.red, padding: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Trash2 size={14} />
                 </span>
               </div>
@@ -391,6 +540,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           />
         </div>
       )}
+
+      <Toast message={errorMsg} open={!!errorMsg} onClose={hideError} variant="error" />
     </div>
   );
 };
