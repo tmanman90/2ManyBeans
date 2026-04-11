@@ -39,7 +39,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
+  // When the user lands in the empty-inventory state and taps "Add a Bean",
+  // we switch to the Inventory tab and signal it to open AddBeanForm.
+  // InventoryTab consumes this flag and clears it via onPendingAddBeanConsumed.
+  const [pendingAddBean, setPendingAddBean] = useState(false);
 
   const handleOpenBean = (preselectedBeanId, slot) => {
     if (preselectedBeanId) {
@@ -48,6 +51,13 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       setTargetSlot(slot);
       setOpenModal(true);
     }
+  };
+
+  const handleAddNewBeanFromOpenFlow = () => {
+    // Switch to Inventory tab and queue up the AddBeanForm. InventoryTab
+    // already owns the AddBeanForm component and its state.
+    setTab('inventory');
+    setPendingAddBean(true);
   };
 
   const handleModalOpen = (beanId, slot) => {
@@ -158,6 +168,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               onFinishBean={finishBean}
               addTasting={addTasting}
               updateTasting={updateTasting}
+              pendingAddBean={pendingAddBean}
+              onPendingAddBeanConsumed={() => setPendingAddBean(false)}
             />
           </Suspense>
         )}
@@ -263,6 +275,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         onClose={() => { setOpenModal(false); setTargetSlot(null); }}
         beans={beans}
         onOpenBean={handleModalOpen}
+        onAddNewBean={handleAddNewBeanFromOpenFlow}
         targetSlot={targetSlot}
         canisterCount={preferences.canisterCount || 3}
       />

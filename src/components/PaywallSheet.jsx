@@ -147,13 +147,37 @@ export function PaywallSheet({ open, context, onClose }) {
     getOfferings()
       .then((o) => {
         if (cancelled) return;
+        if (!o) {
+          // RevenueCat returned no current offering. Most likely the dashboard
+          // doesn't have a `default` offering marked as Current, OR the user's
+          // RC subscriber isn't fully provisioned yet (right after signIn).
+          console.error('[PaywallSheet] getOfferings returned null — RC dashboard may have no current offering');
+          setError('Subscription options not available yet. Please try again in a moment.');
+          setLoading(false);
+          return;
+        }
+        if (!o.availablePackages || o.availablePackages.length === 0) {
+          console.error('[PaywallSheet] getOfferings returned offering with no packages', o);
+          setError('No subscription plans available. Please try again or contact support.');
+          setLoading(false);
+          return;
+        }
         setOffering(o);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('[PaywallSheet] getOfferings failed', err);
+        // Log full diagnostic so we can see RC plugin errors in the device console
+        console.error('[PaywallSheet] getOfferings failed', {
+          message: err?.message,
+          code: err?.code,
+          underlying: err?.underlyingErrorMessage,
+          stack: err?.stack,
+        });
         if (!cancelled) {
-          setError('Could not load subscription options. Please try again.');
+          const msg = err?.message?.toLowerCase().includes('configure')
+            ? 'Subscription service is still starting up. Tap Try Again in a moment.'
+            : 'Could not load subscription options. Please try again.';
+          setError(msg);
           setLoading(false);
         }
       });
@@ -246,15 +270,32 @@ export function PaywallSheet({ open, context, onClose }) {
 
   const isWeb = !Capacitor.isNativePlatform();
 
+  // Suppress the marketing copy when we're in an error/loading state — it's
+  // confusing to see "You've used your free scans, unlock unlimited..." right
+  // above an error message about not being able to load options.
+  const showMarketing = !loading && !error && offering;
+  const isErrorState = !isWeb && error && !offering;
+
   return (
     <div style={styles.backdrop} onClick={onClose}>
       <div style={styles.sheet} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <button style={styles.close} onClick={onClose} aria-label="Close">×</button>
 
-        <div style={styles.header}>
-          <h2 style={styles.headline}>{copy.headline}</h2>
-          <p style={styles.sub}>{copy.subtext}</p>
-        </div>
+        {showMarketing ? (
+          <div style={styles.header}>
+            <h2 style={styles.headline}>{copy.headline}</h2>
+            <p style={styles.sub}>{copy.subtext}</p>
+          </div>
+        ) : isErrorState ? (
+          <div style={styles.header}>
+            <h2 style={styles.headline}>Hmm, that didn't work</h2>
+          </div>
+        ) : (
+          <div style={styles.header}>
+            <h2 style={styles.headline}>{copy.headline}</h2>
+            <p style={styles.sub}>{copy.subtext}</p>
+          </div>
+        )}
 
         {isWeb ? (
           <div style={styles.webNotice}>
@@ -403,7 +444,10 @@ const styles = {
     position: 'fixed',
     inset: 0,
     background: 'rgba(43,27,14,0.55)',
-    zIndex: 1000,
+    // Above any in-app modal (Modal.jsx uses zIndex 1000). The paywall must
+    // always be on top because it can be triggered from inside another modal
+    // (e.g. AddBeanForm scan flow → free tier exhausted).
+    zIndex: 2000,
     display: 'flex',
     alignItems: 'flex-end',
     justifyContent: 'center',

@@ -1,5 +1,5 @@
 // Inventory tab — ported from prototype lines 438-481
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Coffee, Check } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
@@ -18,7 +18,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, pendingAddBean, onPendingAddBeanConsumed }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod === 'handbrew';
@@ -27,6 +27,16 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
   const [showAdd, setShowAdd] = useState(false);
+
+  // External trigger: another tab (e.g. RotationTab empty state Add Bean
+  // button) can request that we open the AddBeanForm by setting
+  // pendingAddBean to true. We consume the flag here.
+  useEffect(() => {
+    if (pendingAddBean) {
+      setShowAdd(true);
+      onPendingAddBeanConsumed?.();
+    }
+  }, [pendingAddBean, onPendingAddBeanConsumed]);
   const [search, setSearch] = useState('');
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [toast, setToast] = useState(null);

@@ -1,13 +1,13 @@
 // Open Bean Modal — ported from prototype lines 1153-1191
 import { useState, useEffect } from 'react';
-import { Check, Search } from 'lucide-react';
+import { Check, Plus, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { Btn } from './Btn';
 
-export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, targetSlot, canisterCount = 3 }) => {
+export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, onAddNewBean, targetSlot, canisterCount = 3 }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState('');
   const sealed = beans.filter(b => b.status === 'SEALED');
@@ -36,6 +36,31 @@ export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, targetSlot, can
     onClose();
     setSelectedId(null);
   };
+
+  // Empty sealed inventory: short-circuit the bean picker entirely and show
+  // an Add Bean CTA. Otherwise the user sees an empty list with a disabled
+  // Open button and no obvious next step.
+  if (open && sealed.length === 0) {
+    return (
+      <Modal open={open} onClose={onClose} title="Add Your First Bean">
+        <div style={{ textAlign: 'center', padding: '8px 4px 12px' }}>
+          <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 18, lineHeight: 1.5 }}>
+            You don't have any sealed beans yet. Add your first coffee bag to start brewing.
+          </div>
+          <Btn
+            variant="primary"
+            onClick={() => {
+              onClose();
+              if (onAddNewBean) onAddNewBean();
+            }}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            <Plus size={14} /> Add a Bean
+          </Btn>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal open={open} onClose={onClose} title="Open a Bean">

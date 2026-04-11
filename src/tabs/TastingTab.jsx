@@ -22,7 +22,12 @@ import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
 export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
-  const [sel, setSel] = useState(active[0]?.id || '');
+  const sealed = beans.filter(b => b.status === 'SEALED');
+  // Tasting picker shows all non-finished beans. Active (in-jar) beans get
+  // priority — they're listed first AND the dropdown defaults to one of them
+  // — but a user with no jars filled can still pick a sealed bean to taste.
+  const tastable = [...active, ...sealed];
+  const [sel, setSel] = useState(active[0]?.id || sealed[0]?.id || '');
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
   const { errorMsg, showError, hideError } = useErrorToast();
@@ -326,14 +331,27 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>Bean</label>
           <select value={sel} onChange={e => setSel(e.target.value)} style={inputStyle}>
-            {active.map(b => <option key={b.id} value={b.id}>{b.name} (#{b.jarSlot})</option>)}
+            {active.length > 0 && (
+              <optgroup label="In Jars">
+                {active.map(b => (
+                  <option key={b.id} value={b.id}>{b.name} (#{b.jarSlot})</option>
+                ))}
+              </optgroup>
+            )}
+            {sealed.length > 0 && (
+              <optgroup label="Sealed">
+                {sealed.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
       )}
 
       {/* Form Mode */}
       {mode === 'form' && (
-        <TastingForm beans={active} onSubmit={handleFormSubmit} submitLabel="Save Tasting" />
+        <TastingForm beans={tastable} onSubmit={handleFormSubmit} submitLabel="Save Tasting" />
       )}
 
       {/* Chat Mode */}
