@@ -4,6 +4,7 @@ import { today, getPeakStatus, daysOpen } from './peakStatus';
 import { TASTING_KNOWLEDGE, BREWING_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
+import { stripMarkdown } from './textFormat';
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
@@ -72,11 +73,15 @@ export function compressImage(file) {
 
 export async function getRecBlurb(activeDesc, recDesc) {
   const data = await callClaude({
-    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated. No headers or bullets -- just a flowing paragraph.`,
+    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated.
+
+FORMATTING: Plain text only. NO markdown. NEVER use asterisks (*), pound signs (#), or any markdown formatting -- your output renders as literal text in a mobile card and markdown syntax shows up as garbage. Write in flowing sentences, no headers, no bullets, no bold, no italic.`,
     messages: [{ role: 'user', content: `Current rotation:\n${activeDesc || "(empty)"}\n\nTop candidates:\n${recDesc}\n\nWhy would each be a good pick?` }],
     maxTokens: 400,
   });
-  return data.content?.map(c => c.text || '').join('') || '';
+  const raw = data.content?.map(c => c.text || '').join('') || '';
+  // Belt-and-suspenders: strip any markdown that slipped through the prompt.
+  return stripMarkdown(raw);
 }
 
 export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, tastings) {
@@ -235,7 +240,11 @@ export async function sendTastingMessage(systemPrompt, history) {
     messages: history.slice(-8),
     maxTokens: 1000,
   });
-  return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
+  const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
+  // Strip markdown at the API boundary so every caller gets clean plain text.
+  // Must preserve the ---EXTRACT---...---END--- marker, which doesn't contain
+  // markdown anyway, and stripMarkdown leaves those lines untouched.
+  return stripMarkdown(raw);
 }
 
 function sanitize(str, maxLen = 100) {
@@ -364,5 +373,8 @@ export async function sendChatMessage(systemPrompt, history) {
     messages: recentMessages,
     maxTokens: 800,
   });
-  return data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
+  const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
+  // Preserve the ---BEAN_SCAN---...---END_SCAN--- marker (it's plain JSON, no
+  // markdown) and strip any stray bold/italic from the conversational text.
+  return stripMarkdown(raw);
 }

@@ -15,16 +15,9 @@ import { useErrorToast } from '../hooks/useErrorToast';
 import { TastingForm } from '../components/TastingForm';
 import { TastingShareCard, captureShareCard, offScreenStyle } from '../components/ShareCard';
 import { shareImage } from '../lib/share';
+import { stripMarkdown } from '../lib/textFormat';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
-
-// Strip markdown bold/italic markers so chat bubbles never show literal "**".
-// Claude occasionally emits them despite the prompt forbidding it.
-// Only strips paired markers with content between them -- never touches lone
-// asterisks or unpaired `**`, so plain prose like "2**2" or "foo * bar" stays intact.
-const stripMarkdown = (t = '') => t
-  .replace(/\*\*([^*\n]+?)\*\*/g, '$1')
-  .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1$2');
 
 export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');

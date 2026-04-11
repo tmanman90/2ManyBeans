@@ -78,6 +78,16 @@ export function SubscriptionProvider({ uid, children }) {
   }, [uid]);
 
   // Source 2: RevenueCat SDK on native — real-time entitlement state.
+  //
+  // This is an ADDITIVE source. The SDK can UNLOCK entitlements (e.g. right
+  // after a purchase, before the webhook has written to Firestore) but it
+  // must NEVER downgrade them. Firestore is authoritative; the webhook is
+  // the canonical source of truth for cancellation/expiry.
+  //
+  // Why this matters: on a TestFlight build archived before the plugin was
+  // installed, or on any cold-start where the SDK returns empty before RC
+  // has seen the user, a destructive overwrite would wipe out the Firestore
+  // entitlement and lock paying users out of the app until re-login.
   useEffect(() => {
     if (!uid || !isRevenueCatAvailable() || !Capacitor.isNativePlatform()) return;
 
@@ -87,15 +97,26 @@ export function SubscriptionProvider({ uid, children }) {
       .then((info) => {
         if (cancelled || !info) return;
         const { hasPro, hasUltra } = deriveEntitlements(info);
-        setState((prev) => ({ ...prev, hasPro, hasUltra, loading: false }));
+        setState((prev) => ({
+          ...prev,
+          hasPro: prev.hasPro || hasPro,
+          hasUltra: prev.hasUltra || hasUltra,
+          loading: false,
+        }));
       })
       .catch((err) => {
+        // Plugin missing (old TF build) or SDK init failed. Don't touch
+        // state -- Firestore remains the source of truth.
         console.error('[SubscriptionContext] getCustomerInfo failed', err);
       });
 
     const unsub = onCustomerInfoUpdate((info) => {
       const { hasPro, hasUltra } = deriveEntitlements(info);
-      setState((prev) => ({ ...prev, hasPro, hasUltra }));
+      setState((prev) => ({
+        ...prev,
+        hasPro: prev.hasPro || hasPro,
+        hasUltra: prev.hasUltra || hasUltra,
+      }));
     });
 
     return () => {

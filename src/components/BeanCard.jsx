@@ -1,5 +1,5 @@
 // Bean display card -- journal-page treatment
-import { memo, useState } from 'react';
+import { useState } from 'react';
 import { Pencil, Snowflake } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
@@ -8,7 +8,16 @@ import { EditBeanModal } from './EditBeanModal';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-const BeanCardInner = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid }) => {
+// NOTE: intentionally NOT wrapped in React.memo. A previous memo with a
+// custom comparator that skipped the `actions` prop (because it's inline JSX
+// and changes every render) introduced a correctness bug: when preferences
+// like brewMethod changed, RotationTab correctly rebuilt the `actions` JSX
+// with a new BrewButton label, but the memo skipped the re-render because
+// the comparator didn't see `actions` as different, leaving the old button
+// visible. React's default rendering is fast enough here -- BeanCard has
+// no heavy work inside it and the visible list is short (3 active beans
+// + a few inventory rows at a time).
+export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const [editOpen, setEditOpen] = useState(false);
@@ -219,18 +228,3 @@ const BeanCardInner = ({ bean, actions, compact = false, updateBean, deleteBean,
     </div>
   );
 };
-
-// Memoized export. `actions` is intentionally excluded from the comparator --
-// it's inline JSX in every parent callsite, so its reference changes every
-// parent render. But actions are derived from `bean` state, so if the bean
-// reference hasn't changed, the rendered action content hasn't either.
-// Without this, editing one tasting re-renders every BeanCard in the
-// inventory list because the parent tree re-renders on any Firestore tick.
-export const BeanCard = memo(BeanCardInner, (prev, next) => (
-  prev.bean === next.bean &&
-  prev.compact === next.compact &&
-  prev.updateBean === next.updateBean &&
-  prev.deleteBean === next.deleteBean &&
-  prev.onLearn === next.onLearn &&
-  prev.uid === next.uid
-));

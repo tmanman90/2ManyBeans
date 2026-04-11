@@ -9,7 +9,7 @@ service cloud.firestore {
           'displayName', 'email', 'photoURL', 'signUpProvider',
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
           'marketingConsent', 'marketingConsentDate', 'preferences',
-          'fellow'
+          'fellow', 'subscription'
         ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100
@@ -18,8 +18,13 @@ service cloud.firestore {
                 && request.resource.data.username.size() >= 3
                 && request.resource.data.username.size() <= 30
                 && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')))
-        // Client cannot modify fellow.* (managed by Admin SDK only)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fellow']));
+        // Client cannot modify fellow.* or subscription.* fields -- both are
+        // managed exclusively by the server (Admin SDK via the Fellow encrypt
+        // flow and the RevenueCat webhook + metered gate). Listing them in
+        // the whitelist above means CLIENT writes can safely PASS THROUGH
+        // existing values, but this diff check prevents clients from
+        // MUTATING them (self-upgrading to Pro, disconnecting Fellow, etc).
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fellow', 'subscription']));
     }
 
     // Fellow secrets: Admin SDK only, client cannot read or write

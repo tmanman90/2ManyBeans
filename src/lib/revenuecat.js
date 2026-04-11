@@ -28,8 +28,19 @@ async function loadSdk() {
   return sdkModule;
 }
 
+// Whether the RevenueCat Capacitor plugin is ACTUALLY available in the
+// current native binary. Just checking `isNativePlatform()` isn't enough
+// because a TestFlight build archived before the plugin was installed is
+// still native but will throw when the plugin bridge is invoked. We use
+// Capacitor's `isPluginAvailable` to probe the registry.
 export function isRevenueCatAvailable() {
-  return Capacitor.isNativePlatform();
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    // Plugin name used when registered by the RevenueCat SDK wrapper.
+    return Capacitor.isPluginAvailable?.('Purchases') ?? false;
+  } catch {
+    return false;
+  }
 }
 
 /** Initialize the SDK. Idempotent — safe to call multiple times. */

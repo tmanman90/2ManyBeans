@@ -358,7 +358,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     const apiMsg = { role: 'user', content: apiContent };
     apiMessages.current = [...apiMessages.current, apiMsg];
 
-    setInput('');
+    // NOTE: input state lives in ChatInputBar child; it clears its own field
+    // after onSend(text) resolves, so no setInput call here.
     // Clearing `photos` state drops the display thumbnails, but the preview URLs
     // for sent photos stay referenced via the message log. Revoke the blob URLs
     // explicitly: the thumbnails are already persisted into displayMsg.photos

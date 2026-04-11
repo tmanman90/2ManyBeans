@@ -1,15 +1,22 @@
-// Server-side entitlement check via RevenueCat REST API v2.
-// Checks whether a given Firebase UID has `pro` or `ultra` entitlements.
+// Server-side entitlement check.
 //
-// Ultra is a strict superset of Pro at the application level. A user with the
-// Ultra entitlement passes any Pro gate, and separately passes Ultra-only gates.
+// Two sources of truth, checked in order:
+//   1. Firestore users/{uid}.subscription (written by the RevenueCat webhook
+//      when it fires on purchase/renewal/cancel, or manually set for dev).
+//      If subscription.status === 'active', we trust the plan string and skip
+//      the RC API call entirely. This is the fast/canonical path once the
+//      webhook is live.
+//   2. RevenueCat REST API v2 (fallback). Called when the Firestore doc has
+//      no explicit active subscription -- e.g. during the brief window
+//      between a user's purchase completing on-device and the webhook firing,
+//      or if we ever get out of sync with RC.
 //
-// Performance: results are cached in memory per warm function instance for
-// 5 minutes. Webhook-driven invalidation is a future optimization; for now,
-// a 5-minute stale window is acceptable (a cancelled user gets up to 5 extra
-// minutes of access; a newly subscribed user may wait up to 5 minutes for
-// the server check to refresh, though the client-side SDK listener unlocks
-// the UI immediately and the server check is a defense-in-depth layer).
+// Ultra is a strict superset of Pro at the application level.
+//
+// Performance: results cached in memory per warm function instance for 5 min.
+// The webhook calls invalidateEntitlementCache(uid) on each event so a
+// newly-purchased subscription reflects immediately without waiting for TTL.
+import { getFirestore } from 'firebase-admin/firestore';
 
 const RC_PROJECT_ID = 'f33ec0ef'; // 2manybeans project in RevenueCat
 const RC_BASE = 'https://api.revenuecat.com/v2';
@@ -17,6 +24,34 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // uid -> { pro, ultra, expiresAt }
 const cache = new Map();
+
+// Derives { pro, ultra } from a plan string. Any 'ultra*' plan grants both
+// Pro and Ultra since Ultra is a superset. Any 'pro*' plan grants only Pro.
+function entitlementsFromPlan(plan) {
+  if (!plan || typeof plan !== 'string') return { pro: false, ultra: false };
+  const normalized = plan.toLowerCase();
+  if (normalized.startsWith('ultra')) return { pro: true, ultra: true };
+  if (normalized.startsWith('pro')) return { pro: true, ultra: false };
+  return { pro: false, ultra: false };
+}
+
+// Try the Firestore-backed path. Returns null if the user has no explicit
+// subscription doc or the status isn't active -- in that case we fall back
+// to the RC API. Swallows errors (Firestore down, etc.) and returns null.
+async function checkFirestoreSubscription(uid) {
+  try {
+    const db = getFirestore();
+    const snap = await db.doc(`users/${uid}`).get();
+    if (!snap.exists) return null;
+    const sub = snap.data()?.subscription;
+    if (!sub) return null;
+    if (sub.status !== 'active' && sub.status !== 'trial') return null;
+    return entitlementsFromPlan(sub.plan);
+  } catch (err) {
+    console.warn('[checkEntitlement] Firestore lookup failed, falling back to RC API:', err?.message || err);
+    return null;
+  }
+}
 
 /**
  * Check which entitlements a user has.
@@ -31,6 +66,14 @@ export async function checkEntitlement(uid) {
     return { pro: cached.pro, ultra: cached.ultra };
   }
 
+  // 1. Firestore-first (webhook-driven cache or manual dev override).
+  const fsResult = await checkFirestoreSubscription(uid);
+  if (fsResult) {
+    cache.set(uid, { ...fsResult, expiresAt: Date.now() + CACHE_TTL_MS });
+    return fsResult;
+  }
+
+  // 2. RC API fallback.
   const apiKey = process.env.REVENUECAT_API_KEY;
   if (!apiKey) {
     console.warn('[checkEntitlement] REVENUECAT_API_KEY not set — fail-open');
