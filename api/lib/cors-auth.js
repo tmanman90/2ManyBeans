@@ -1,7 +1,7 @@
 // Shared CORS + Firebase Auth for all API proxies
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage, getDownloadURL as adminGetDownloadURL } from 'firebase-admin/storage';
 import { checkEntitlement } from './checkEntitlement.js';
 
@@ -128,19 +128,37 @@ export function withCorsAuth(handler) {
   };
 }
 
+// Map a checkEntitlement result into either an early 403/503 response, or
+// `null` if the user is allowed to proceed. Used by every gate wrapper so
+// the "RC unavailable → 503" path is consistent across endpoints.
+function rejectFromEntitlement(result, requiredTier, res) {
+  if (result.unavailable) {
+    return res.status(503).json({
+      error: 'entitlement_check_unavailable',
+      message: 'Subscription service temporarily unavailable. Please try again in a moment.',
+    });
+  }
+  const has = requiredTier === 'ultra' ? result.ultra : result.pro;
+  if (!has) {
+    return res.status(403).json({
+      error: 'subscription_required',
+      tier: requiredTier,
+      message: requiredTier === 'ultra'
+        ? 'This feature requires a Coffee Hub Ultra subscription.'
+        : 'This feature requires a Coffee Hub Pro subscription.',
+    });
+  }
+  return null;
+}
+
 // Gate: require an active Pro or Ultra entitlement.
 // Use for AI features that are Pro+ (no free tier).
 export function withCorsAuthPro(handler) {
   return withCorsAuth(async (req, res, decodedToken) => {
     if (decodedToken?.uid) {
-      const { pro } = await checkEntitlement(decodedToken.uid);
-      if (!pro) {
-        return res.status(403).json({
-          error: 'subscription_required',
-          tier: 'pro',
-          message: 'This feature requires a Coffee Hub Pro subscription.',
-        });
-      }
+      const result = await checkEntitlement(decodedToken.uid);
+      const reject = rejectFromEntitlement(result, 'pro', res);
+      if (reject) return reject;
     }
     return handler(req, res, decodedToken);
   });
@@ -151,14 +169,9 @@ export function withCorsAuthPro(handler) {
 export function withCorsAuthUltra(handler) {
   return withCorsAuth(async (req, res, decodedToken) => {
     if (decodedToken?.uid) {
-      const { ultra } = await checkEntitlement(decodedToken.uid);
-      if (!ultra) {
-        return res.status(403).json({
-          error: 'subscription_required',
-          tier: 'ultra',
-          message: 'This feature requires a Coffee Hub Ultra subscription.',
-        });
-      }
+      const result = await checkEntitlement(decodedToken.uid);
+      const reject = rejectFromEntitlement(result, 'ultra', res);
+      if (reject) return reject;
     }
     return handler(req, res, decodedToken);
   });
@@ -168,10 +181,14 @@ export function withCorsAuthUltra(handler) {
 // invocations of `feature`. After that, they must subscribe to Pro/Ultra.
 // Pro and Ultra users bypass the meter entirely.
 //
-// The counter is incremented atomically BEFORE the handler runs so that
-// retries on a failing AI call don't cost the user multiple credits. If
-// the handler errors after increment, the caller has been charged anyway —
-// this is intentional to prevent retry abuse of the free tier.
+// IMPORTANT: the meter is OPT-IN per request. Callers MUST set
+// `req.body.metered = true` to charge a credit. This is so a single proxy
+// route (e.g. /api/claude) can be used for both metered actions (tasting
+// coach session start) and unmetered actions (multi-turn chat replies)
+// without burning a credit on every call.
+//
+// The counter is incremented inside a Firestore transaction so concurrent
+// requests can't both pass an under-cap check and double-spend.
 export function withCorsAuthMetered(handler, { feature, freeLimit }) {
   if (!feature) throw new Error('withCorsAuthMetered: feature is required');
   if (typeof freeLimit !== 'number') throw new Error('withCorsAuthMetered: freeLimit is required');
@@ -179,33 +196,61 @@ export function withCorsAuthMetered(handler, { feature, freeLimit }) {
   return withCorsAuth(async (req, res, decodedToken) => {
     if (!decodedToken?.uid) return handler(req, res, decodedToken);
 
-    const { pro } = await checkEntitlement(decodedToken.uid);
-    if (pro) return handler(req, res, decodedToken);
+    const result = await checkEntitlement(decodedToken.uid);
+    if (result.unavailable) {
+      return res.status(503).json({
+        error: 'entitlement_check_unavailable',
+        message: 'Subscription service temporarily unavailable. Please try again in a moment.',
+      });
+    }
+    if (result.pro) return handler(req, res, decodedToken);
 
-    // Free user: check quota in Firestore, atomic increment if under limit.
+    // Opt-in metering: callers explicitly mark metered requests so chat
+    // replies, retries, and sub-calls don't burn credits unintentionally.
+    const isMetered = req.body?.metered === true;
+    if (!isMetered) {
+      // Free user calling an unmetered action on a Pro feature → 403.
+      return res.status(403).json({
+        error: 'subscription_required',
+        tier: 'pro',
+        message: 'This feature requires a Coffee Hub Pro subscription.',
+      });
+    }
+
+    // Free user metered action: atomic transaction prevents TOCTOU race.
     const db = getDb();
     const userRef = db.collection('users').doc(decodedToken.uid);
-    const path = `subscription.freeUsage.${feature}`;
 
     try {
-      const snap = await userRef.get();
-      const used = snap.data()?.subscription?.freeUsage?.[feature] ?? 0;
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(userRef);
+        const used = snap.data()?.subscription?.freeUsage?.[feature] ?? 0;
 
-      if (used >= freeLimit) {
+        if (used >= freeLimit) {
+          const err = new Error('free_tier_exhausted');
+          err.code = 'free_tier_exhausted';
+          err.used = used;
+          throw err;
+        }
+
+        // Use literal value (not FieldValue.increment) so the transaction
+        // retries cleanly on contention.
+        tx.set(
+          userRef,
+          { subscription: { freeUsage: { [feature]: used + 1 } } },
+          { merge: true }
+        );
+      });
+    } catch (err) {
+      if (err?.code === 'free_tier_exhausted') {
         return res.status(403).json({
           error: 'free_tier_exhausted',
           feature,
-          used,
+          used: err.used,
           limit: freeLimit,
           message: `You've used all ${freeLimit} free ${feature}. Upgrade to Pro for unlimited access.`,
         });
       }
-
-      await userRef.set(
-        { subscription: { freeUsage: { [feature]: FieldValue.increment(1) } } },
-        { merge: true }
-      );
-    } catch (err) {
       console.error('[withCorsAuthMetered] Firestore error', err?.message || err);
       // Fail-closed: if we can't track usage, don't let free users call paid APIs.
       return res.status(500).json({ error: 'Failed to check usage quota' });

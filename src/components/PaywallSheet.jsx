@@ -14,7 +14,7 @@
 // the copy emphasizes Fellow integration. Otherwise Pro Annual is the
 // default to maximize LTV.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts, shadows, radius } from '../styles/theme';
 import {
@@ -36,10 +36,6 @@ const CONTEXT_COPY = {
   aiden: {
     headline: 'Send recipes straight to your Aiden',
     subtext: 'Ultra unlocks direct Fellow Aiden push and multi-brewer support.',
-  },
-  multi_brewer: {
-    headline: 'Brew on any setup',
-    subtext: 'Ultra adds V60, Chemex, and AeroPress recipes to your tool kit.',
   },
   generic: {
     headline: 'Unlock AI-powered brewing',
@@ -105,17 +101,40 @@ export function PaywallSheet({ open, context, onClose }) {
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Track open transitions so we only reset state on a fresh open, not on
+  // every re-render where `context.promote` happens to be a new object
+  // reference (usePaywall creates a new context object on every openPaywall).
+  const wasOpenRef = useRef(false);
+
+  // Hold the close-after-purchase timer so we can clear it on unmount or
+  // on close. Without this, a tap-to-close during the 600ms window can
+  // close a freshly-reopened paywall instance.
+  const closeTimerRef = useRef(null);
+
+  // mounted ref for safe cross-async setState
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Pre-select Ultra when the paywall was opened by an Ultra-only feature.
+  // Only reset on the open false→true transition so the user's manual
+  // tier/cycle picks aren't blown away by an unrelated re-render.
   useEffect(() => {
-    if (!open) return;
-    setError(null);
-    if (context?.promote === 'ultra') setTier('ultra');
-    else setTier('pro');
-    setCycle('annual');
+    if (open && !wasOpenRef.current) {
+      setError(null);
+      setTier(context?.promote === 'ultra' ? 'ultra' : 'pro');
+      setCycle('annual');
+    }
+    wasOpenRef.current = open;
+    if (!open && closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
   }, [open, context?.promote]);
 
-  // Fetch offerings on open (native only).
+  // Fetch offerings on open (native only). `retryCount` is in the deps so
+  // tapping the retry button re-runs the effect.
   useEffect(() => {
     if (!open) return;
     if (!isRevenueCatAvailable()) {
@@ -124,6 +143,7 @@ export function PaywallSheet({ open, context, onClose }) {
     }
     let cancelled = false;
     setLoading(true);
+    setError(null);
     getOfferings()
       .then((o) => {
         if (cancelled) return;
@@ -138,7 +158,7 @@ export function PaywallSheet({ open, context, onClose }) {
         }
       });
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, retryCount]);
 
   const proMonthly = useMemo(() => findPackage(offering, matchProMonthly), [offering]);
   const proAnnual = useMemo(() => findPackage(offering, matchProAnnual), [offering]);
@@ -171,6 +191,7 @@ export function PaywallSheet({ open, context, onClose }) {
     setError(null);
     try {
       const result = await purchasePackage(selectedPackage);
+      if (!mountedRef.current) return;
       if (result.userCancelled) {
         setPurchasing(false);
         return;
@@ -178,13 +199,16 @@ export function PaywallSheet({ open, context, onClose }) {
       // Success — the SubscriptionContext listener will unlock the UI.
       // Close the paywall after a short delay so the user sees the state flip.
       setToast('Subscription active');
-      setTimeout(() => {
+      closeTimerRef.current = setTimeout(() => {
+        if (!mountedRef.current) return;
         setPurchasing(false);
         setToast(null);
         onClose?.();
+        closeTimerRef.current = null;
       }, 600);
     } catch (err) {
       console.error('[PaywallSheet] purchase failed', err);
+      if (!mountedRef.current) return;
       setError(err?.message || 'Purchase failed. Please try again.');
       setPurchasing(false);
     }
@@ -194,17 +218,28 @@ export function PaywallSheet({ open, context, onClose }) {
     setError(null);
     try {
       const info = await restorePurchases();
+      if (!mountedRef.current) return;
       const active = info?.entitlements?.active || {};
       if (active.pro || active.ultra) {
         setToast('Subscription restored');
-        setTimeout(() => { setToast(null); onClose?.(); }, 800);
+        closeTimerRef.current = setTimeout(() => {
+          if (!mountedRef.current) return;
+          setToast(null);
+          onClose?.();
+          closeTimerRef.current = null;
+        }, 800);
       } else {
         setToast('No active subscription found');
-        setTimeout(() => setToast(null), 1800);
+        setTimeout(() => { if (mountedRef.current) setToast(null); }, 1800);
       }
     } catch (err) {
+      if (!mountedRef.current) return;
       setError('Could not restore purchases. Please try again.');
     }
+  }
+
+  function handleRetryOfferings() {
+    setRetryCount((c) => c + 1);
   }
 
   if (!open) return null;
@@ -228,7 +263,12 @@ export function PaywallSheet({ open, context, onClose }) {
         ) : loading ? (
           <div style={styles.loading}>Loading subscription options...</div>
         ) : error && !offering ? (
-          <div style={styles.error}>{error}</div>
+          <div style={styles.errorWithRetry}>
+            <div style={styles.error}>{error}</div>
+            <button style={styles.retryBtn} onClick={handleRetryOfferings}>
+              Try Again
+            </button>
+          </div>
         ) : (
           <>
             <div style={styles.cards}>
@@ -487,6 +527,24 @@ const styles = {
     fontSize: 13,
     marginTop: 12,
     textAlign: 'center',
+  },
+  errorWithRetry: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+    padding: '20px 0',
+  },
+  retryBtn: {
+    background: C.accent,
+    color: '#FFF',
+    border: 'none',
+    borderRadius: radius.md,
+    padding: '12px 24px',
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
   },
   webNotice: {
     padding: '20px',

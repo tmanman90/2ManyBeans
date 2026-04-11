@@ -48,6 +48,9 @@ export function useHandBrew(updateBean) {
 
     // Recipe generation costs AI tokens. Pro or Ultra required.
     if (!hasPro) {
+      // Cancel any in-flight chain so its tail effects don't land on the
+      // wrong bean after the paywall opens.
+      activeRequestRef.current = null;
       openPaywall({ feature: 'generic', promote: 'pro' });
       return;
     }

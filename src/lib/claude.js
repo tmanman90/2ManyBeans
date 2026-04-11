@@ -8,9 +8,14 @@ import { stripMarkdown } from './textFormat';
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
-export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools }) {
+export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools, metered = false }) {
   const body = { system, messages, maxTokens, model };
   if (tools) body.tools = tools;
+  // `metered: true` opts in to the free-tier quota counter on the server.
+  // Only the FIRST message of a guided tasting coach session sets this —
+  // multi-turn replies and ChatTab messages do NOT count against the
+  // user's free taste-test quota. See review todo 005.
+  if (metered) body.metered = true;
   return fetchWithRetry({ url: PROXY_URL, body, serviceName: 'Claude' });
 }
 
@@ -234,8 +239,12 @@ ${beanSection}${originSection}${pastSection}`;
   ];
 }
 
-export async function sendTastingMessage(systemPrompt, history) {
+// Send a tasting coach message. Pass `firstMessage: true` for the first
+// message in a new session to charge the free-tier credit; subsequent
+// turns in the same session pass `firstMessage: false` and don't charge.
+export async function sendTastingMessage(systemPrompt, history, { firstMessage = false } = {}) {
   const data = await callClaude({
+    metered: firstMessage,
     system: systemPrompt,
     messages: history.slice(-8),
     maxTokens: 1000,

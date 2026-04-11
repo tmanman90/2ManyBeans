@@ -9,22 +9,37 @@
 // for the 5-minute TTL.
 //
 // Auth: RevenueCat sends a shared secret in the `Authorization` header. It
-// must match REVENUECAT_WEBHOOK_AUTH_KEY in Vercel env. This is configured
-// in the RevenueCat dashboard under Integrations > Webhooks.
+// must match REVENUECAT_WEBHOOK_AUTH_KEY in Vercel env. Comparison is done
+// with timingSafeEqual to avoid leaking the secret via timing oracles. This
+// is configured in the RC dashboard under Integrations > Webhooks.
 
+import { timingSafeEqual } from 'crypto';
 import { getDb } from './lib/cors-auth.js';
 import { invalidateEntitlementCache } from './lib/checkEntitlement.js';
 
+// Strict allowlist of known product IDs. Any unknown ID on a purchase-like
+// event triggers a 500 so RC retries the webhook (and we get a loud log).
+// This prevents fragile substring matches from silently writing the wrong
+// plan when Apple/RC changes id format.
+const PLAN_MAP = {
+  'com.talmeltzer.coffeehub.pro.monthly': 'pro_monthly',
+  'com.talmeltzer.coffeehub.pro.annual': 'pro_annual',
+  'com.talmeltzer.coffeehub.ultra.monthly': 'ultra_monthly',
+  'com.talmeltzer.coffeehub.ultra.annual': 'ultra_annual',
+};
+
+// Firebase Auth UID format: alphanumeric, underscore, hyphen, max 128 chars.
+// Reject anything else to prevent path injection into Firestore doc paths.
+const UID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
 function mapPlan(productId) {
-  if (!productId) return null;
-  if (productId.includes('ultra.annual')) return 'ultra_annual';
-  if (productId.includes('ultra.monthly')) return 'ultra_monthly';
-  if (productId.includes('pro.annual')) return 'pro_annual';
-  if (productId.includes('pro.monthly')) return 'pro_monthly';
-  return null;
+  return PLAN_MAP[productId] ?? null;
 }
 
 // Map RevenueCat event types to our internal subscription.status values.
+// CANCELLATION keeps status='active' until the period ends — we set
+// cancelAtPeriodEnd: true so the UI can show "Your subscription ends on…".
+// EXPIRATION is the actual downgrade event.
 // null means "do not update status on this event".
 const STATUS_MAP = {
   INITIAL_PURCHASE: 'active',
@@ -33,28 +48,39 @@ const STATUS_MAP = {
   UNCANCELLATION: 'active',
   TRIAL_STARTED: 'trial',
   TRIAL_CONVERTED: 'active',
-  TRIAL_CANCELLED: 'cancelled',
-  CANCELLATION: 'cancelled', // still active until expires_at
+  TRIAL_CANCELLED: 'active', // still active until trial ends
+  CANCELLATION: 'active', // still active until expiresAt
   EXPIRATION: 'expired',
-  BILLING_ISSUE: 'active', // grace period — still active
+  BILLING_ISSUE: 'active', // grace period
   BILLING_ISSUE_DETECTED: 'active',
   SUBSCRIBER_ALIAS: null,
   TRANSFER: null,
   TEST: null,
 };
 
+// Constant-time comparison of two strings of any length.
+function timingSafeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return timingSafeEqual(aBuf, bBuf);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const authHeader = req.headers.authorization;
   const expected = process.env.REVENUECAT_WEBHOOK_AUTH_KEY;
   if (!expected) {
     console.error('[RC webhook] REVENUECAT_WEBHOOK_AUTH_KEY not set');
     return res.status(500).json({ error: 'Webhook auth not configured' });
   }
-  if (authHeader !== `Bearer ${expected}` && authHeader !== expected) {
+
+  const authHeader = req.headers.authorization || '';
+  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  if (!timingSafeCompare(provided, expected)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -72,6 +98,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: 'no app_user_id' });
   }
 
+  // Validate uid against Firebase Auth charset to prevent path injection
+  // (e.g. an attacker-controlled forwarded id with `/` would otherwise
+  // split the Firestore doc path into subcollections).
+  if (!UID_PATTERN.test(uid)) {
+    console.error('[RC webhook] invalid app_user_id format:', uid);
+    return res.status(400).json({ error: 'Invalid app_user_id' });
+  }
+
   const newStatus = STATUS_MAP[type];
   if (newStatus === undefined) {
     // Unknown event type — ack so RC doesn't retry.
@@ -83,33 +117,52 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: type });
   }
 
+  // For purchase-like events, the product_id MUST resolve to a known plan.
+  // Anything else is a revenue-integrity failure (RC may have changed format
+  // or we have a typo). Return 500 so RC retries and we see it in logs.
+  const plan = mapPlan(event.product_id);
+  const isPurchaseLike = type === 'INITIAL_PURCHASE' || type === 'RENEWAL'
+    || type === 'PRODUCT_CHANGE' || type === 'UNCANCELLATION'
+    || type === 'TRIAL_STARTED' || type === 'TRIAL_CONVERTED';
+  if (!plan && isPurchaseLike) {
+    console.error('[RC webhook] unknown product_id on purchase event:', event.product_id, 'type:', type);
+    return res.status(500).json({ error: 'unknown_product' });
+  }
+
   try {
     const db = getDb();
     const userRef = db.collection('users').doc(uid);
 
-    const update = {
-      'subscription.status': newStatus,
-      'subscription.lastEventType': type,
-      'subscription.lastEventAt': new Date().toISOString(),
+    // Single atomic write — `set` with merge:true creates the parent doc if
+    // missing AND updates the nested subscription field in one round-trip.
+    const subFields = {
+      status: newStatus,
+      lastEventType: type,
+      lastEventAt: new Date().toISOString(),
     };
-
-    const plan = mapPlan(event.product_id);
-    if (plan) update['subscription.plan'] = plan;
-
+    if (plan) subFields.plan = plan;
     if (event.expiration_at_ms) {
-      update['subscription.expiresAt'] = new Date(event.expiration_at_ms).toISOString();
+      subFields.expiresAt = new Date(event.expiration_at_ms).toISOString();
     }
     if (event.purchased_at_ms && type === 'INITIAL_PURCHASE') {
-      update['subscription.originalPurchaseDate'] = new Date(event.purchased_at_ms).toISOString();
+      subFields.originalPurchaseDate = new Date(event.purchased_at_ms).toISOString();
     }
     if (event.store) {
-      update['subscription.store'] = String(event.store).toLowerCase();
+      subFields.store = String(event.store).toLowerCase();
     }
 
-    await userRef.set({ subscription: {} }, { merge: true }); // ensure parent exists
-    await userRef.update(update);
+    // Cancellation flag for UI — user keeps access until expiry but we
+    // can show "Your subscription ends on…" in Settings.
+    if (type === 'CANCELLATION' || type === 'TRIAL_CANCELLED') {
+      subFields.cancelAtPeriodEnd = true;
+    }
+    if (type === 'UNCANCELLATION') {
+      subFields.cancelAtPeriodEnd = false;
+    }
 
-    // Force next server-side check to refetch from RC.
+    await userRef.set({ subscription: subFields }, { merge: true });
+
+    // Force next server-side check to refetch from RC/Firestore.
     invalidateEntitlementCache(uid);
 
     return res.status(200).json({ ok: true, type, newStatus, plan: plan || undefined });

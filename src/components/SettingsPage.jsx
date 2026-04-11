@@ -1,7 +1,7 @@
 // Settings page — iOS grouped table style, full-screen page sheet modal
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, LogOut } from 'lucide-react';
+import { ChevronRight, LogOut, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
 import { doc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts, shadows } from '../styles/theme';
@@ -9,6 +9,11 @@ import { haptic } from '../lib/haptics';
 import { Toast } from './Toast';
 import { usePreferences } from '../hooks/useUserProfile';
 import { useAuthContext } from '../contexts/AuthContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from '../hooks/usePaywall.jsx';
+import { restorePurchases, isRevenueCatAvailable } from '../lib/revenuecat';
+import { PLAN_LABELS } from '../lib/subscriptionConfig';
+import { auth } from '../firebase';
 import { db } from '../firebase';
 import { fetchWithRetry } from '../lib/fetchWithRetry';
 import { API_BASE } from '../lib/apiBase';
@@ -96,11 +101,18 @@ const selectStyle = {
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
   const { preferences, updatePreferences } = usePreferences();
   const { logOut } = useAuthContext();
+  const { hasPro, hasUltra, plan, status } = useSubscription();
+  const { openPaywall } = usePaywall();
 
   const [toast, setToast] = useState(null);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameValue, setUsernameValue] = useState('');
   const [canisterConfirm, setCanisterConfirm] = useState(null); // { newCount, overflowBeans }
+  const [restoring, setRestoring] = useState(false);
+  // Delete Account flow: 'warn' → user reads consequences, 'confirm' → types
+  // DELETE, 'deleting' → API in flight. null = modal closed.
+  const [deleteStep, setDeleteStep] = useState(null);
+  const [deleteInput, setDeleteInput] = useState('');
 
   // Fellow account connection
   const fellowConnected = profile?.fellow?.connected ?? false;
@@ -325,6 +337,96 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     await logOut();
     onClose();
   };
+
+  // Subscription actions
+  const handleRestore = async () => {
+    if (!isRevenueCatAvailable()) {
+      setToast('Subscriptions are managed in the iOS app');
+      return;
+    }
+    haptic.light();
+    setRestoring(true);
+    try {
+      const info = await restorePurchases();
+      const active = info?.entitlements?.active || {};
+      if (active.pro || active.ultra) {
+        setToast('Subscription restored');
+      } else {
+        setToast('No active subscription found');
+      }
+    } catch (err) {
+      console.error('[Settings] Restore failed:', err);
+      setToast('Could not restore purchases. Please try again.');
+    }
+    setRestoring(false);
+  };
+
+  const handleManageSubscription = () => {
+    haptic.light();
+    // Apple deep link to the user's subscription management page. Works on
+    // native (opens iOS Settings > [Apple ID] > Subscriptions) and web
+    // (opens the App Store web page).
+    window.open('https://apps.apple.com/account/subscriptions', '_blank');
+  };
+
+  const handleOpenPaywall = () => {
+    haptic.light();
+    openPaywall({ feature: 'generic', promote: 'pro' });
+  };
+
+  // Delete Account flow
+  const resetDeleteFlow = () => {
+    setDeleteStep(null);
+    setDeleteInput('');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteInput !== 'DELETE') return;
+    haptic.medium();
+    setDeleteStep('deleting');
+    try {
+      // Force-refresh the Firebase ID token so the server's reauth check
+      // (auth_time within 5 minutes) sees a fresh timestamp. Without this,
+      // the cached token from sign-in 30+ minutes ago would be rejected as
+      // 'reauth_required'.
+      //
+      // NOTE: this only refreshes the token, it does NOT trigger a fresh
+      // OAuth reauth. For full security parity with banking-grade flows,
+      // we should call reauthenticateWithCredential first. For V1 we accept
+      // that the 1-hour token lifetime is the worst-case replay window —
+      // the auth_time check still rejects tokens from prior sessions.
+      await auth.currentUser?.getIdToken(true);
+
+      const res = await fetchWithRetry({
+        url: `${API_BASE}/api/delete-account`,
+        body: { confirmation: 'DELETE' },
+        retries: 0,
+        timeout: 30000,
+        serviceName: 'Delete account',
+      });
+      if (!res?.ok) throw new Error('Delete failed');
+      // Clear local state and sign out. The auth record is gone server-side
+      // and refresh tokens have been revoked.
+      await logOut();
+      onClose();
+    } catch (err) {
+      console.error('[Settings] Delete account failed:', err);
+      // The server returns 401 reauth_required when the token's auth_time
+      // is too old. Surface a clearer message in that case.
+      if (err?.message?.includes('reauth_required') || err?.message?.toLowerCase().includes('re-sign')) {
+        setToast('Please sign out and sign back in, then try again.');
+      } else {
+        setToast('Could not delete account. Please try again or contact support.');
+      }
+      resetDeleteFlow();
+    }
+  };
+
+  // Human-readable subscription summary
+  const planLabel = plan ? (PLAN_LABELS[plan] || plan) : null;
+  const subscriptionStatusLabel = hasPro
+    ? (status === 'trial' ? `${planLabel || 'Pro'} (Trial)` : (planLabel || 'Pro'))
+    : 'Free';
 
   if (!open) return null;
 
@@ -651,6 +753,72 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             </>
           )}
 
+          {/* --- Subscription Section --- */}
+          <div style={sectionHeaderStyle}>Subscription</div>
+          <div style={groupStyle}>
+            <div style={rowStyle}>
+              <span style={rowLabelStyle}>Current Plan</span>
+              <span style={rowValueStyle}>{subscriptionStatusLabel}</span>
+            </div>
+
+            {!hasPro && (
+              <>
+                <div style={separatorStyle} />
+                <button
+                  onClick={handleOpenPaywall}
+                  style={{ ...rowStyle, color: C.accent, fontWeight: 600 }}
+                >
+                  <span style={{ ...rowLabelStyle, color: C.accent }}>Upgrade to Pro</span>
+                  <ChevronRight size={18} color={C.accent} />
+                </button>
+              </>
+            )}
+
+            {hasPro && (
+              <>
+                <div style={separatorStyle} />
+                <button onClick={handleManageSubscription} style={rowStyle}>
+                  <span style={rowLabelStyle}>Manage Subscription</span>
+                  <ExternalLink size={16} color={C.textMuted} />
+                </button>
+              </>
+            )}
+
+            <div style={separatorStyle} />
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              style={{ ...rowStyle, opacity: restoring ? 0.5 : 1 }}
+            >
+              <span style={rowLabelStyle}>Restore Purchases</span>
+              <RefreshCw size={16} color={C.textMuted} />
+            </button>
+          </div>
+
+          {/* --- Legal Section --- */}
+          <div style={sectionHeaderStyle}>Legal</div>
+          <div style={groupStyle}>
+            <a
+              href="https://2manybeans.vercel.app/privacy-policy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...rowStyle, textDecoration: 'none', color: C.text }}
+            >
+              <span style={rowLabelStyle}>Privacy Policy</span>
+              <ExternalLink size={16} color={C.textMuted} />
+            </a>
+            <div style={separatorStyle} />
+            <a
+              href="https://2manybeans.vercel.app/terms.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...rowStyle, textDecoration: 'none', color: C.text }}
+            >
+              <span style={rowLabelStyle}>Terms of Service</span>
+              <ExternalLink size={16} color={C.textMuted} />
+            </a>
+          </div>
+
           {/* --- Notifications Section --- */}
           <div style={sectionHeaderStyle}>Notifications</div>
           <div style={groupStyle}>
@@ -692,11 +860,181 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               <LogOut size={18} color={C.red} style={{ marginRight: 8 }} />
               Sign Out
             </button>
+            <div style={separatorStyle} />
+            <button
+              onClick={() => setDeleteStep('warn')}
+              style={{
+                ...rowStyle,
+                justifyContent: 'center',
+                color: C.red,
+                fontWeight: 600,
+              }}
+            >
+              <Trash2 size={18} color={C.red} style={{ marginRight: 8 }} />
+              Delete Account
+            </button>
           </div>
 
         </div>
       </div>
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
+
+      {/* Delete Account: step 1 (warning) and step 2 (type DELETE) */}
+      {deleteStep && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1200,
+            background: 'rgba(44,24,16,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={() => {
+            if (deleteStep !== 'deleting') resetDeleteFlow();
+          }}
+        >
+          <div
+            style={{
+              background: C.bg, borderRadius: 16, padding: 24,
+              maxWidth: 360, width: '100%',
+              boxShadow: shadows.modal,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {deleteStep === 'warn' && (
+              <>
+                <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 12 }}>
+                  Delete your account?
+                </div>
+                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
+                  This will permanently delete your account and all your data:
+                  <ul style={{ paddingLeft: 18, marginTop: 8 }}>
+                    <li>All beans, tastings, and photos</li>
+                    <li>Your preferences and profile</li>
+                    <li>Your Fellow Aiden connection</li>
+                  </ul>
+                  This cannot be undone.
+                </div>
+                {hasPro && (
+                  <div
+                    style={{
+                      background: C.amberBg,
+                      border: `1px solid ${C.amber}`,
+                      borderRadius: 10,
+                      padding: 12,
+                      fontSize: 13,
+                      color: C.text,
+                      lineHeight: 1.5,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <strong>You have an active subscription.</strong> Deleting your account does NOT cancel
+                    your Apple subscription. Cancel it first in{' '}
+                    <a
+                      href="https://apps.apple.com/account/subscriptions"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: C.accent, fontWeight: 600 }}
+                    >
+                      iOS Settings
+                    </a>
+                    {' '}or you'll keep getting billed.
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={resetDeleteFlow}
+                    style={{
+                      flex: 1, padding: '12px 16px', borderRadius: 10,
+                      border: `1px solid ${C.border}`, background: C.bg,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                      color: C.text, cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setDeleteStep('confirm')}
+                    style={{
+                      flex: 1, padding: '12px 16px', borderRadius: 10,
+                      border: 'none', background: C.red,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                      color: '#fff', cursor: 'pointer',
+                    }}
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            )}
+
+            {deleteStep === 'confirm' && (
+              <>
+                <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 12 }}>
+                  Confirm deletion
+                </div>
+                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
+                  Type <strong>DELETE</strong> to permanently remove your account and all data.
+                </div>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder="DELETE"
+                  autoFocus
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck="false"
+                  onFocus={scrollOnFocus}
+                  style={{
+                    width: '100%', padding: '12px 14px',
+                    borderRadius: 10, border: `1px solid ${C.border}`,
+                    fontFamily: fonts.body, fontSize: 16,
+                    marginBottom: 16, background: '#fff', color: C.text,
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={resetDeleteFlow}
+                    style={{
+                      flex: 1, padding: '12px 16px', borderRadius: 10,
+                      border: `1px solid ${C.border}`, background: C.bg,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                      color: C.text, cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteInput !== 'DELETE'}
+                    style={{
+                      flex: 1, padding: '12px 16px', borderRadius: 10,
+                      border: 'none',
+                      background: deleteInput === 'DELETE' ? C.red : C.borderLight,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                      color: deleteInput === 'DELETE' ? '#fff' : C.textMuted,
+                      cursor: deleteInput === 'DELETE' ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    Delete Account
+                  </button>
+                </div>
+              </>
+            )}
+
+            {deleteStep === 'deleting' && (
+              <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 12 }}>
+                  Deleting your account...
+                </div>
+                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted }}>
+                  This may take a few seconds. Please don't close the app.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Canister decrease confirmation */}
       {canisterConfirm && (

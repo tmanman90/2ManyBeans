@@ -18,6 +18,7 @@ import { shareImage } from '../lib/share';
 import { stripMarkdown } from '../lib/textFormat';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
+import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
 export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
@@ -139,9 +140,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   // Chat tasting flow
   const startChat = () => {
-    // Free users get 1 lifetime tasting coach session. After that, Pro required.
-    // Server also enforces this; this is for instant UX feedback.
-    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= 1) {
+    // Free users get FREE_LIMITS.tasteTests lifetime tasting coach sessions.
+    // Server enforces this atomically when the FIRST message is sent (the
+    // sendTastingMessage call passes firstMessage:true to opt into metering).
+    // This local check skips the round-trip and shows the paywall instantly.
+    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= FREE_LIMITS.tasteTests) {
       openPaywall({ feature: 'taste_cap', promote: 'pro' });
       return;
     }
@@ -176,7 +179,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       const beanName = beanIdAtSend ? getBeanName(beanIdAtSend) : 'unknown bean';
       const systemPrompt = buildTastingSystemPrompt(beanName, beans, selectedBean, tastings);
       const history = [...chatMessages.filter(m => m.role !== 'system'), userMsg];
-      const text = await sendTastingMessage(systemPrompt, history);
+      // Only the FIRST user message in a session burns a free credit.
+      // chatMessages starts with one assistant opening message, so the
+      // first user turn means there's exactly 1 prior message in state.
+      const isFirstUserMessage = chatMessages.length === 1;
+      const text = await sendTastingMessage(systemPrompt, history, { firstMessage: isFirstUserMessage });
 
       // If the user switched beans while we were waiting, silently drop this
       // response. The new bean's opening message is already rendered by the
@@ -221,8 +228,22 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       } else {
         setChatMessages(prev => [...prev, { role: 'assistant', content: text }]);
       }
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: "Couldn't reach the AI. Try again." }]);
+    } catch (err) {
+      // Server-side quota race or subscription gate. Surface paywall instead
+      // of a confusing "couldn't reach the AI" message. Drop the user message
+      // since it never got a real response.
+      if (err?.code === 'free_tier_exhausted') {
+        setChatMessages(prev => prev.slice(0, -1));
+        openPaywall({ feature: 'taste_cap', promote: 'pro' });
+      } else if (err?.code === 'subscription_required') {
+        setChatMessages(prev => prev.slice(0, -1));
+        openPaywall({
+          feature: 'generic',
+          promote: err.tier === 'ultra' ? 'ultra' : 'pro',
+        });
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: "Couldn't reach the AI. Try again." }]);
+      }
     }
     setChatLoading(false);
   };

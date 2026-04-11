@@ -39,6 +39,9 @@ export function useAidenBrew(updateBean) {
     // generation (generateAidenRecipe, Pro-gated) produces a recipe that Pro
     // users see in the modal; clicking the Push button is what requires Ultra.
     if (!hasUltra) {
+      // Reset loading/phase so the modal isn't stuck spinning behind the paywall.
+      setAidenLoading(false);
+      setAidenPhase(null);
       openPaywall({ feature: 'aiden', promote: 'ultra' });
       return;
     }
@@ -77,6 +80,10 @@ export function useAidenBrew(updateBean) {
     // Cached recipe with no push pending: free to show (just displays stored data).
     const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && bean.aidenLink;
     if (!hasCachedRecipeOnly && !hasPro) {
+      // Cancel any in-flight chain so its tail effects don't land after
+      // the paywall opens (and possibly persist a Pro-gated recipe to a
+      // user who no longer has Pro).
+      activeRequestRef.current = null;
       openPaywall({ feature: 'generic', promote: 'pro' });
       return;
     }

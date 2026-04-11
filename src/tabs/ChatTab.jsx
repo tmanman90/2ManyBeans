@@ -318,12 +318,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     if (sendingRef.current) return;
     if (!text && photos.length === 0) return;
 
-    // Subscription gate: chat is the same metered feature as tasting coach
-    // (both route through /api/claude). Free tier gets 1 lifetime session.
-    // The server side also enforces this; the client-side check just avoids
-    // wasting a round-trip and gives instant paywall feedback.
-    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= 1) {
-      openPaywall({ feature: 'taste_cap', promote: 'pro' });
+    // Chat is Pro-only (no free tier). Server enforces via withCorsAuthMetered
+    // — chat messages don't pass `metered: true` so the server returns 403
+    // subscription_required for free users. Catch that error below and open
+    // the paywall instead of a generic toast.
+    if (!hasPro) {
+      openPaywall({ feature: 'generic', promote: 'pro' });
       return;
     }
 
@@ -386,7 +386,21 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         apiMessages.current = apiMessages.current.slice(-MAX_API_MESSAGES);
       }
       apiMessages.current = trimApiMessages(apiMessages.current);
-    } catch {
+    } catch (err) {
+      // Server-side gate: chat is Pro-only. If a free user somehow bypassed
+      // the local check (race, stale context), surface the paywall and
+      // strip the optimistic user message.
+      if (err?.code === 'subscription_required' || err?.code === 'free_tier_exhausted') {
+        setMessages(prev => prev.slice(0, -1));
+        apiMessages.current = apiMessages.current.slice(0, -1);
+        openPaywall({
+          feature: 'generic',
+          promote: err.tier === 'ultra' ? 'ultra' : 'pro',
+        });
+        setLoading(false);
+        sendingRef.current = false;
+        return;
+      }
       // Error bubbles are for the user only. Do NOT inject them into
       // apiMessages.current -- otherwise the model reads "Couldn't reach the AI..."
       // as canonical assistant history on the next retry, which mangles context.

@@ -17,6 +17,25 @@ import { Toast } from './Toast';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { useErrorToast } from '../hooks/useErrorToast';
+import { FREE_LIMITS } from '../lib/subscriptionConfig';
+
+// Catch a paywall-triggering error from any AI call and route it to the
+// global paywall sheet instead of showing a generic toast. Returns true if
+// the error was a paywall trigger and was handled, false otherwise.
+function handlePaywallError(err, openPaywall) {
+  if (err?.code === 'free_tier_exhausted') {
+    openPaywall({ feature: 'scan_cap', promote: 'pro' });
+    return true;
+  }
+  if (err?.code === 'subscription_required') {
+    openPaywall({
+      feature: 'generic',
+      promote: err.tier === 'ultra' ? 'ultra' : 'pro',
+    });
+    return true;
+  }
+  return false;
+}
 
 const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer', 'roastedIn'];
 
@@ -145,9 +164,10 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   const handleScan = async () => {
     if (photos.length === 0) return;
-    // Free users get 3 lifetime bean scans. Server also enforces this; the
-    // client-side check skips the round-trip and shows the paywall instantly.
-    if (!hasPro && (freeUsage?.aiScans ?? 0) >= 3) {
+    // Free users get FREE_LIMITS.aiScans lifetime bean scans. Client-side
+    // pre-check skips the round-trip and shows the paywall instantly. The
+    // server still enforces the cap atomically via withCorsAuthMetered.
+    if (!hasPro && (freeUsage?.aiScans ?? 0) >= FREE_LIMITS.aiScans) {
       openPaywall({ feature: 'scan_cap', promote: 'pro' });
       return;
     }
@@ -184,9 +204,11 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       };
       setF(scanData);
 
-      // Pre-allocate a Firestore doc ID and start product shot generation in background
+      // Pre-allocate a Firestore doc ID and start product shot generation in background.
       // Server uploads to Storage with this ID. Client holds the photoUrl for save time.
-      if (uid && photos.length > 0) {
+      // Skip for free users — product shots are Pro-only and the server would
+      // 403 with no useful UI signal (just noisy logs).
+      if (hasPro && uid && photos.length > 0) {
         const preId = doc(collection(db, 'users', uid, 'beans')).id;
         pendingBeanIdRef.current = preId;
         productShotUrlRef.current = null;
@@ -232,6 +254,12 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       setStep('review');
     } catch (err) {
       if (thisGen !== genCounter.current) return; // stale guard
+      // Server-side quota race: client passed the local check but server
+      // rejected. Surface the paywall instead of a confusing scan error.
+      if (handlePaywallError(err, openPaywall)) {
+        setStep('photos'); // back to photo step
+        return;
+      }
       console.error('Scan error:', err);
       setScanError(err.message || "Couldn't read the label. You can fill in details manually.");
       setStep('review');
@@ -240,16 +268,18 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   const handleAiFill = async () => {
     if (aiFilling) return;
-    // AI Fill counts against the same free tier quota as bean scans because
-    // it routes through /api/gemini. Gate it consistently.
-    if (!hasPro && (freeUsage?.aiScans ?? 0) >= 3) {
+    // AI Fill counts against the same free-tier quota as bean scans because
+    // it's the chargeable action when there's no scan happening first.
+    if (!hasPro && (freeUsage?.aiScans ?? 0) >= FREE_LIMITS.aiScans) {
       openPaywall({ feature: 'scan_cap', promote: 'pro' });
       return;
     }
     setAiFilling(true);
     const thisGen = genCounter.current;
     try {
-      const research = await researchBeanOnline(f);
+      // Pass metered: true because this is the standalone use of research,
+      // not the post-scan enrichment chain.
+      const research = await researchBeanOnline(f, { metered: true });
       const merged = { ...f };
       for (const field of ENRICHABLE_FIELDS) {
         if (!merged[field] && research[field]) {
@@ -263,6 +293,10 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         .then(story => { if (thisGen === genCounter.current) storyRef.current = story; })
         .catch(err => console.log('Background story gen skipped:', err.message));
     } catch (err) {
+      if (handlePaywallError(err, openPaywall)) {
+        setAiFilling(false);
+        return;
+      }
       console.log('AI Fill failed:', err.message);
     }
     setAiFilling(false);

@@ -5,9 +5,14 @@ import { fetchWithRetry } from './fetchWithRetry';
 
 const PROXY_URL = `${API_BASE}/api/gemini`;
 
-export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2 }) {
+export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false }) {
   const body = { model, contents, systemInstruction, maxTokens };
   if (tools) body.tools = tools;
+  // `metered: true` opts in to the free-tier quota counter on the server.
+  // Only the bean-scan call site sets this flag — research enrichment,
+  // chat image analysis, and other Gemini calls do NOT count against the
+  // user's free scan quota. See review todo 005.
+  if (metered) body.metered = true;
   return fetchWithRetry({ url: PROXY_URL, body, retries, serviceName: 'Gemini' });
 }
 
@@ -82,11 +87,15 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
 
 If a field is not visible, use an empty string (or 100 for bagSize). For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
 
+  // Bean scan IS the metered action for the aiScans free-tier counter.
+  // This call burns one credit. Research enrichment + image analysis are
+  // separate calls that don't pass `metered: true`.
   const data = await callGemini({
     contents: [{
       parts: [...imageParts, { text: scanPrompt }],
     }],
     maxTokens: 2500,
+    metered: true,
   });
 
   const text = data.text || '';
@@ -106,7 +115,11 @@ If a field is not visible, use an empty string (or 100 for bagSize). For roastDa
 
 // --- Web search + Reddit research for bean enrichment via Gemini search grounding ---
 
-export async function researchBeanOnline(extractedData) {
+// `metered` defaults to false because this function is most often called
+// as the post-scan enrichment step (already charged). Set `metered: true`
+// when called standalone from the AI Fill manual-entry flow, where it IS
+// the chargeable action.
+export async function researchBeanOnline(extractedData, { metered = false } = {}) {
   const { roaster, name, origin, variety, sourcedBy } = extractedData;
   const searchParts = [roaster, name, origin, variety, sourcedBy].filter(Boolean);
   if (searchParts.length < 2) {
@@ -125,6 +138,7 @@ CRITICAL RULES:
 - If you find conflicting information, prefer the roaster's own website
 - Include any Reddit community tasting notes or reviews you find in the redditNotes field
 - Return ONLY a valid JSON object (no markdown, no backticks)`,
+    metered,
     contents: [{
       parts: [{ text: `Search online for this specialty coffee and find additional details:
 

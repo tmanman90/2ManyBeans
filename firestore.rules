@@ -1,10 +1,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profile document
+    // User profile document.
+    //
+    // Split into create vs update because `resource.data` is null on create
+    // and the diff() guard blows up. The create rule must explicitly forbid
+    // any client-supplied `subscription` or `fellow` field; otherwise a fresh
+    // sign-in could inject `subscription.status = 'active'` and bypass the
+    // entire RC entitlement check.
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId
+
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'displayName', 'email', 'photoURL', 'signUpProvider',
+          'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
+          'marketingConsent', 'marketingConsentDate', 'preferences'
+        ])
+        // Belt-and-suspenders: even if the keys() check above changes,
+        // the create path can never include subscription or fellow.
+        && !request.resource.data.keys().hasAny(['fellow', 'subscription'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100
+        && (request.resource.data.username == null
+            || (request.resource.data.username is string
+                && request.resource.data.username.size() >= 3
+                && request.resource.data.username.size() <= 30
+                && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')));
+
+      allow update: if request.auth != null && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
           'displayName', 'email', 'photoURL', 'signUpProvider',
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
@@ -18,12 +42,9 @@ service cloud.firestore {
                 && request.resource.data.username.size() >= 3
                 && request.resource.data.username.size() <= 30
                 && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')))
-        // Client cannot modify fellow.* or subscription.* fields -- both are
-        // managed exclusively by the server (Admin SDK via the Fellow encrypt
-        // flow and the RevenueCat webhook + metered gate). Listing them in
-        // the whitelist above means CLIENT writes can safely PASS THROUGH
-        // existing values, but this diff check prevents clients from
-        // MUTATING them (self-upgrading to Pro, disconnecting Fellow, etc).
+        // Client cannot modify fellow.* or subscription.* on update either.
+        // affectedKeys() reports the top-level key for any nested mutation,
+        // so this catches `subscription.freeUsage` resets too.
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fellow', 'subscription']));
     }
 
@@ -51,17 +72,10 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Any other user-scoped subcollection (usage counters, preferences, etc.)
-    // -- owner-only, excludes secrets via the more-specific rule above.
-    match /users/{userId}/{collection}/{document} {
-      allow read, write: if request.auth != null && request.auth.uid == userId
-        && collection != 'secrets';
-    }
-    // Deeper nesting fallback for any future nested subcollections.
-    match /users/{userId}/{collection}/{document}/{rest=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId
-        && collection != 'secrets';
-    }
+    // No catch-all subcollection rule. Any future server-managed collection
+    // (e.g. usage ledgers, audit logs) is reachable only via Admin SDK and
+    // explicitly denied to clients by default. If a new client-writable
+    // subcollection is added, declare an explicit `match` block above.
 
     // Email subscriber list for marketing
     match /emailList/{userId} {

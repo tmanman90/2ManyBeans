@@ -17,8 +17,9 @@ import { Capacitor } from '@capacitor/core';
 // Found in RevenueCat dashboard > Project Settings > API Keys.
 const PUBLIC_IOS_KEY = 'appl_YsjXhHMAtUIVshbIHDUuxZHWlFD';
 
-let configured = false;
 let sdkModule = null;
+let configurePromise = null;
+let nativeListenerHandle = null;
 const listeners = new Set();
 
 // Lazy-load the native module so web builds don't pay the cost.
@@ -43,22 +44,44 @@ export function isRevenueCatAvailable() {
   }
 }
 
-/** Initialize the SDK. Idempotent — safe to call multiple times. */
+/**
+ * Initialize the SDK. Idempotent + race-safe.
+ *
+ * Uses a cached in-flight promise so concurrent callers (e.g. React 19
+ * StrictMode double-effect, or rapid sign-in/sign-out) all await the same
+ * underlying configure() call. Without this, two listeners could be
+ * registered with the native bridge, causing every customer update to
+ * fire JS subscribers twice.
+ *
+ * Failure recovery: if any step throws, the cached promise is cleared so
+ * the next caller can re-attempt. Without this, a single transient failure
+ * during init would permanently wedge RC for the session.
+ */
 export async function initRevenueCat() {
   if (!isRevenueCatAvailable()) return;
-  if (configured) return;
+  if (configurePromise) return configurePromise;
 
-  const { Purchases, LOG_LEVEL } = await loadSdk();
-  await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
-  await Purchases.configure({ apiKey: PUBLIC_IOS_KEY });
-  configured = true;
+  configurePromise = (async () => {
+    try {
+      const { Purchases, LOG_LEVEL } = await loadSdk();
+      await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
+      await Purchases.configure({ apiKey: PUBLIC_IOS_KEY });
 
-  // Wire up the listener once. We re-broadcast to our own subscribers.
-  await Purchases.addCustomerInfoUpdateListener((result) => {
-    for (const fn of listeners) {
-      try { fn(result.customerInfo); } catch (e) { console.error('[RC listener]', e); }
+      // Register the native listener exactly once. Retain the handle so
+      // we can remove it later if needed (e.g. during teardown).
+      nativeListenerHandle = await Purchases.addCustomerInfoUpdateListener((result) => {
+        for (const fn of listeners) {
+          try { fn(result.customerInfo); } catch (e) { console.error('[RC listener]', e); }
+        }
+      });
+    } catch (err) {
+      // Allow next caller to retry from scratch.
+      configurePromise = null;
+      throw err;
     }
-  });
+  })();
+
+  return configurePromise;
 }
 
 /**

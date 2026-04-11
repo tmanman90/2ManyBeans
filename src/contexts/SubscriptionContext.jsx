@@ -2,17 +2,16 @@
 //
 // Two sources of truth, merged:
 //   1. Firestore `users/{uid}.subscription` — written by the RevenueCat
-//      webhook. Works on web + native, persists across app restarts,
-//      authoritative for server-side checks.
+//      webhook. Authoritative for status changes (active, cancelled,
+//      expired) and works on web + native. CAN UPGRADE OR DOWNGRADE.
 //   2. RevenueCat SDK customer info — native only, updated in real-time
-//      after purchase/restore/renewal. Unlocks the UI instantly without
-//      waiting for the webhook round-trip.
+//      after purchase/restore/renewal. ADDITIVE ONLY (can unlock but never
+//      downgrade) so an empty SDK response on a TestFlight build that
+//      predates the plugin install can't wipe out a Firestore-confirmed
+//      paying user.
 //
-// The context exposes:
-//   - hasPro / hasUltra  (boolean entitlement flags)
-//   - plan / status      (from Firestore, e.g. "pro_annual" / "active")
-//   - freeUsage          ({ aiScans, tasteTests } counters for metered gates)
-//   - loading            (true until first read resolves)
+// State is reset to INITIAL on every uid change so a previous user's
+// entitlements never leak into a new user's session on a shared device.
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -32,19 +31,23 @@ const INITIAL_STATE = {
   hasUltra: false,
   plan: null,
   status: null,
+  cancelAtPeriodEnd: false,
   freeUsage: { aiScans: 0, tasteTests: 0 },
   loading: true,
+  firestoreLoaded: false,
 };
 
 export function SubscriptionProvider({ uid, children }) {
   const [state, setState] = useState(INITIAL_STATE);
 
-  // Source 1: Firestore listener for subscription data (works everywhere).
+  // Source 1: Firestore listener (authoritative — can upgrade and downgrade).
   useEffect(() => {
-    if (!uid) {
-      setState(INITIAL_STATE);
-      return;
-    }
+    // Reset on every uid change so a previous user's state can't leak into
+    // the new user's session. Without this, a paying user signing out and
+    // a free user signing in on the same device would inherit hasPro=true.
+    setState(INITIAL_STATE);
+
+    if (!uid) return;
 
     const unsub = onSnapshot(
       doc(db, 'users', uid),
@@ -55,17 +58,23 @@ export function SubscriptionProvider({ uid, children }) {
         const isUltraPlan = typeof plan === 'string' && plan.startsWith('ultra');
         const isProPlan = typeof plan === 'string' && (plan.startsWith('pro') || isUltraPlan);
 
+        // Direct assignment from Firestore — this is the canonical source
+        // of truth. A cancellation or expiration event flipping `active` to
+        // false MUST be reflected here, otherwise the UI keeps showing Pro
+        // for the lifetime of the mount.
         setState((prev) => ({
           ...prev,
-          hasPro: prev.hasPro || (active && isProPlan),
-          hasUltra: prev.hasUltra || (active && isUltraPlan),
+          hasPro: active && isProPlan,
+          hasUltra: active && isUltraPlan,
           plan,
           status: sub.status ?? null,
+          cancelAtPeriodEnd: !!sub.cancelAtPeriodEnd,
           freeUsage: {
             aiScans: sub.freeUsage?.aiScans ?? 0,
             tasteTests: sub.freeUsage?.tasteTests ?? 0,
           },
           loading: false,
+          firestoreLoaded: true,
         }));
       },
       (err) => {
@@ -77,17 +86,13 @@ export function SubscriptionProvider({ uid, children }) {
     return unsub;
   }, [uid]);
 
-  // Source 2: RevenueCat SDK on native — real-time entitlement state.
+  // Source 2: RevenueCat SDK on native — additive ONLY.
   //
-  // This is an ADDITIVE source. The SDK can UNLOCK entitlements (e.g. right
-  // after a purchase, before the webhook has written to Firestore) but it
-  // must NEVER downgrade them. Firestore is authoritative; the webhook is
-  // the canonical source of truth for cancellation/expiry.
-  //
-  // Why this matters: on a TestFlight build archived before the plugin was
-  // installed, or on any cold-start where the SDK returns empty before RC
-  // has seen the user, a destructive overwrite would wipe out the Firestore
-  // entitlement and lock paying users out of the app until re-login.
+  // The SDK can UNLOCK entitlements (right after a purchase, before the
+  // webhook has written to Firestore) but it must NEVER downgrade them.
+  // Firestore is authoritative for cancellation/expiry. This is the
+  // critical asymmetry that makes the merge correct: SDK refreshes can
+  // unlock instantly, while cancellations always come from Firestore.
   useEffect(() => {
     if (!uid || !isRevenueCatAvailable() || !Capacitor.isNativePlatform()) return;
 
