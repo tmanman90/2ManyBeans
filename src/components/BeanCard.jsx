@@ -37,19 +37,19 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
       padding: 0,
       overflow: 'hidden',
     }}>
-      {/* Product shot photo — tonal surface shift instead of gradient blending */}
+      {/* Product shot photo — framed with rounded corners on tonal surface */}
       {bean.photoUrl && (
         <div style={{
           width: '100%',
-          height: photoHeight,
+          padding: 14,
           background: C.cardMuted,
           position: 'relative',
-          overflow: 'hidden',
         }}>
           {!imgLoaded && (
             <div style={{
-              position: 'absolute', inset: 0,
-              background: `linear-gradient(110deg, ${C.cardMuted} 30%, ${C.borderLight} 50%, ${C.cardMuted} 70%)`,
+              position: 'absolute', inset: 14,
+              borderRadius: 12,
+              background: `linear-gradient(110deg, ${C.borderLight} 30%, ${C.card} 50%, ${C.borderLight} 70%)`,
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.5s infinite',
             }} />
@@ -61,10 +61,10 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
             onLoad={() => setImgLoaded(true)}
             style={{
               width: '100%',
-              height: photoHeight,
+              height: compact ? 160 : 210,
               objectFit: 'contain',
               objectPosition: 'center',
-              display: imgLoaded ? 'block' : 'block',
+              borderRadius: 12,
               opacity: imgLoaded ? 1 : 0,
               transition: 'opacity 0.3s ease',
             }}

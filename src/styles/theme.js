@@ -3,7 +3,7 @@ export const C = {
   bg: "#FAF6F1",
   cream: "#FFF8F0",
   card: "#FFF8F0",
-  cardMuted: "#EFEAE2",
+  cardMuted: "#EDE6DC",
   text: "#3B2417",
   textMuted: "#8B7B6F",
   textLight: "#A89888",
