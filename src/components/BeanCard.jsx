@@ -105,16 +105,20 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
       )}
 
       <div style={{ padding: compact ? 16 : 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: fonts.heading, fontSize: compact ? 17 : 20, color: C.text, lineHeight: 1.2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {bean.roaster && (
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+              {bean.roaster}
+            </div>
+          )}
+          <div style={{
+            fontFamily: fonts.heading, fontSize: compact ? 18 : 22, color: C.text, lineHeight: 1.2,
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            wordBreak: 'break-word',
+          }}>
             {bean.name}
-          </div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-            <span style={{ display: 'flex', gap: 8 }}>
-              <span>{bean.roaster || 'Unknown'}</span>
-              <span>{bean.origin || 'Unknown'}</span>
-            </span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -176,10 +180,10 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
         </div>
       </div>
       {/* Specs grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 6 : 8, marginTop: 10, marginBottom: 8 }}>
-        {/* Row 1: Region + Process - skip if both empty */}
-        {(bean.region || bean.origin || bean.process) && <>
-          <SpecCell label="Region" value={bean.region || bean.origin} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 8 : 10, marginTop: 12, marginBottom: 10 }}>
+        {/* Row 1: Origin + Process - skip if both empty */}
+        {(bean.origin || bean.process) && <>
+          <SpecCell label="Origin" value={bean.origin} />
           <SpecCell label="Process" value={bean.process} />
         </>}
 
@@ -191,9 +195,9 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Notes</div>
               <div style={{
-                fontSize: 13, color: C.text,
+                fontSize: 13, color: C.text, lineHeight: 1.35,
                 overflow: 'hidden', display: '-webkit-box',
-                WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
               }}>
                 {displayNotes || '--'}
               </div>
@@ -212,9 +216,9 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Notes</div>
             <div style={{
-              fontSize: 13, color: C.text,
+              fontSize: 13, color: C.text, lineHeight: 1.35,
               overflow: 'hidden', display: '-webkit-box',
-              WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
             }}>
               {displayNotes || '--'}
             </div>
