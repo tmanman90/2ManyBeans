@@ -299,15 +299,22 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
             )}
           </div>
         ) : bean.photoUrl ? (
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', width: '100%', height: 180, background: C.card, overflow: 'hidden', borderRadius: 10 }}>
             <img
               src={bean.photoUrl}
               alt={`${bean.name} bag`}
               style={{
                 width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',
-                borderRadius: 10, border: `1px solid ${C.borderLight}`, background: C.card,
               }}
             />
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: [
+                `linear-gradient(to right, ${C.card}, transparent 35%)`,
+                `linear-gradient(to left, ${C.card}, transparent 35%)`,
+                `linear-gradient(to top, ${C.card}, transparent 20%)`,
+              ].join(', '),
+            }} />
             <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 4 }}>
               <Btn
                 variant="ghost"
