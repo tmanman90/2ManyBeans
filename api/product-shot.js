@@ -11,6 +11,9 @@ import sharp from 'sharp';
 import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './lib/cors-auth.js';
 import { checkEntitlement } from './lib/checkEntitlement.js';
 
+// Free users get 1 product shot. Keep in sync with src/lib/subscriptionConfig.js
+const FREE_PRODUCT_SHOTS = 1;
+
 let genAI;
 function getClient() {
   if (!genAI) genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -130,20 +133,46 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     return handleUploadOriginal(req, res, uid);
   }
 
-  // All other actions require Pro subscription
+  // All other actions (generate, delete) are metered: Pro users get unlimited,
+  // free users get FREE_PRODUCT_SHOTS before the paywall kicks in.
   const result = await checkEntitlement(uid);
-  if (!result.pro && !result.unavailable) {
-    return res.status(403).json({
-      error: 'subscription_required',
-      code: 'subscription_required',
-      tier: 'pro',
-    });
-  }
   if (result.unavailable) {
     return res.status(503).json({
       error: 'entitlement_check_unavailable',
       code: 'entitlement_check_unavailable',
     });
+  }
+
+  // Free user metered gate for product shot generation (not delete)
+  if (!result.pro && action !== 'delete') {
+    const db = getDb();
+    const userRef = db.collection('users').doc(uid);
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(userRef);
+        const used = snap.data()?.subscription?.freeUsage?.productShots ?? 0;
+        if (used >= FREE_PRODUCT_SHOTS) {
+          const err = new Error('free_tier_exhausted');
+          err.code = 'free_tier_exhausted';
+          err.used = used;
+          throw err;
+        }
+        tx.set(userRef, { subscription: { freeUsage: { productShots: used + 1 } } }, { merge: true });
+      });
+    } catch (err) {
+      if (err?.code === 'free_tier_exhausted') {
+        return res.status(403).json({
+          error: 'free_tier_exhausted',
+          code: 'free_tier_exhausted',
+          feature: 'productShots',
+          used: err.used,
+          limit: FREE_PRODUCT_SHOTS,
+          tier: 'pro',
+        });
+      }
+      console.error('[product-shot] Metering error:', err?.message || err);
+      return res.status(500).json({ error: 'Failed to check usage quota' });
+    }
   }
 
   const { photo, beanId, skipFirestoreWrite } = req.body;

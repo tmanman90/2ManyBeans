@@ -289,9 +289,15 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setAiFilling(false);
   };
 
-  // Triggered by the "Generate Product Shot" button on review screen (Pro only)
+  // Triggered by the "Generate Product Shot" button on review screen.
+  // Pro users get unlimited; free users get 1 free (metered server-side).
   const handleGenerateProductShot = async () => {
-    if (!hasPro || !uid || photos.length === 0 || productShotStatus === 'generating') return;
+    if (!uid || photos.length === 0 || productShotStatus === 'generating') return;
+    // Client-side pre-check: if free user has already used their free product shot
+    if (!hasPro && (freeUsage?.productShots ?? 0) >= FREE_LIMITS.productShots) {
+      openPaywall({ feature: 'product_shot', promote: 'pro' });
+      return;
+    }
     const thisGen = genCounter.current;
     const preId = pendingBeanIdRef.current || doc(collection(db, 'users', uid, 'beans')).id;
     pendingBeanIdRef.current = preId;
@@ -305,6 +311,13 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         setProductShotStatus('ready');
       }
     } catch (err) {
+      if (handlePaywallError(err, openPaywall)) {
+        if (thisGen === genCounter.current) {
+          setProductShotStatus('idle');
+          setPhotoChoice('original');
+        }
+        return;
+      }
       console.log('Product shot generation failed:', err.message);
       if (thisGen === genCounter.current) {
         setProductShotStatus('failed');
@@ -631,29 +644,27 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
                 >
                   Use This Photo
                 </button>
-                {hasPro && (
-                  <button
-                    onClick={handleGenerateProductShot}
-                    disabled={productShotStatus === 'generating'}
-                    style={{
-                      flex: 1, padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
-                      fontSize: 12, fontFamily: fonts.body, fontWeight: 600,
-                      border: `1.5px solid ${photoChoice === 'productShot' ? C.accent : C.border}`,
-                      background: photoChoice === 'productShot' ? C.amberBg : C.card,
-                      color: photoChoice === 'productShot' ? C.accent : C.textMuted,
-                      opacity: productShotStatus === 'generating' ? 0.6 : 1,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {productShotStatus === 'generating' ? (
-                      <>{spinner} Generating...</>
-                    ) : productShotStatus === 'ready' ? (
-                      'Product Shot Ready'
-                    ) : (
-                      'Generate Product Shot'
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={handleGenerateProductShot}
+                  disabled={productShotStatus === 'generating'}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
+                    fontSize: 12, fontFamily: fonts.body, fontWeight: 600,
+                    border: `1.5px solid ${photoChoice === 'productShot' ? C.accent : C.border}`,
+                    background: photoChoice === 'productShot' ? C.amberBg : C.card,
+                    color: photoChoice === 'productShot' ? C.accent : C.textMuted,
+                    opacity: productShotStatus === 'generating' ? 0.6 : 1,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {productShotStatus === 'generating' ? (
+                    <>{spinner} Generating...</>
+                  ) : productShotStatus === 'ready' ? (
+                    'Product Shot Ready'
+                  ) : (
+                    'Product Shot'
+                  )}
+                </button>
               </div>
             </div>
           )}

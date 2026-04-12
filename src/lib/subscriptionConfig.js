@@ -17,6 +17,10 @@ export const FREE_LIMITS = {
   // session, not individual turns. Multi-turn replies inside the same
   // session don't burn additional credits.
   tasteTests: 1,
+
+  // AI product shots (Gemini image generation). Free users get 1 to
+  // experience the feature, then require Pro for unlimited.
+  productShots: 1,
 };
 
 // Display labels for plan identifiers, shared between PaywallSheet and
