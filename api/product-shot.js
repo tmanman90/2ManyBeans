@@ -1,9 +1,15 @@
-// Vercel serverless endpoint: generate product shot + convert to JPEG + upload to Firebase Storage
+// Vercel serverless endpoint: product shot generation + original photo upload.
 // All-in-one server-side pipeline. Client sends photo + beanId, receives photoUrl.
 // Bypasses CapacitorHttp XHR interception on iOS by keeping all Storage ops server-side.
+//
+// Actions:
+//   (default)        -- Generate AI product shot (Pro required)
+//   upload-original  -- Upload user's original photo (any authenticated user)
+//   delete           -- Clean up orphaned Storage file (Pro required)
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
-import { withCorsAuthPro, getStorageBucket, adminGetDownloadURL, getDb } from './lib/cors-auth.js';
+import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './lib/cors-auth.js';
+import { checkEntitlement } from './lib/checkEntitlement.js';
 
 let genAI;
 function getClient() {
@@ -34,12 +40,113 @@ OUTPUT: Square 1:1 composition, photorealistic studio product shot`;
 // dots, and anything that could mess with Storage object paths.
 const BEAN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
-// AI product shot generation + Storage upload. Pro or Ultra required.
-export default withCorsAuthPro(async (req, res, decodedToken) => {
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB decoded
+
+// Normalize a user-uploaded photo: EXIF auto-orient, resize, progressive mozjpeg.
+// Strips all metadata (GPS, camera info). Returns a clean JPEG buffer.
+async function normalizeUserPhoto(base64Input) {
+  const buffer = Buffer.from(base64Input, 'base64');
+
+  if (buffer.length > MAX_PHOTO_BYTES) {
+    const err = new Error('Photo exceeds 5MB limit');
+    err.statusCode = 413;
+    throw err;
+  }
+
+  // Validate via sharp metadata (rejects non-image content)
+  const metadata = await sharp(buffer).metadata();
+  if (!['jpeg', 'png', 'webp', 'heif'].includes(metadata.format)) {
+    const err = new Error('Unsupported image format');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return sharp(buffer)
+    .rotate()                         // EXIF auto-orient (critical for phone photos)
+    .resize(1200, 1200, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({
+      quality: 80,
+      progressive: true,
+      mozjpeg: true,
+    })
+    .toBuffer();
+}
+
+// Upload user's original photo. Any authenticated user (no Pro gate).
+async function handleUploadOriginal(req, res, uid) {
+  const { photo, beanId, skipFirestoreWrite } = req.body;
+
+  if (!beanId) return res.status(400).json({ error: 'beanId is required' });
+  if (!BEAN_ID_PATTERN.test(beanId)) {
+    return res.status(400).json({ error: 'Invalid beanId format' });
+  }
+  if (!photo?.base64 || !photo?.mimeType) {
+    return res.status(400).json({ error: 'photo with base64 and mimeType is required' });
+  }
+  if (!ALLOWED_MIME.includes(photo.mimeType)) {
+    return res.status(400).json({ error: 'Unsupported image type' });
+  }
+
+  try {
+    const jpegBuffer = await normalizeUserPhoto(photo.base64);
+
+    const bucket = getStorageBucket();
+    const file = bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`);
+    await file.save(jpegBuffer, { metadata: { contentType: 'image/jpeg' } });
+    const photoUrl = await adminGetDownloadURL(file);
+
+    // Always write Firestore for upload-original (unless explicitly skipped
+    // for pre-save uploads where the bean doc doesn't exist yet)
+    if (!skipFirestoreWrite) {
+      const db = getDb();
+      await db.collection('users').doc(uid).collection('beans').doc(beanId).update({
+        photoUrl,
+        updatedAt: new Date(),
+      });
+    }
+
+    return res.status(200).json({ photoUrl });
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    const status = error.statusCode || 500;
+    return res.status(status).json({ error: 'Photo upload failed' });
+  }
+}
+
+// Base auth wrapper: any authenticated user. Actions that need Pro
+// check entitlement inside the handler.
+export default withCorsAuth(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
   if (!uid) return res.status(401).json({ error: 'Authentication required' });
 
-  const { photo, beanId, skipFirestoreWrite, action } = req.body;
+  const { action } = req.body;
+
+  // Upload-original: any authenticated user (no Pro check)
+  if (action === 'upload-original') {
+    return handleUploadOriginal(req, res, uid);
+  }
+
+  // All other actions require Pro subscription
+  const result = await checkEntitlement(uid);
+  if (!result.pro && !result.unavailable) {
+    return res.status(403).json({
+      error: 'subscription_required',
+      code: 'subscription_required',
+      tier: 'pro',
+    });
+  }
+  if (result.unavailable) {
+    return res.status(503).json({
+      error: 'entitlement_check_unavailable',
+      code: 'entitlement_check_unavailable',
+    });
+  }
+
+  const { photo, beanId, skipFirestoreWrite } = req.body;
 
   // Validate beanId charset/length up-front. Applies to both delete and create
   // actions since both paths use it in the Storage object path.
@@ -72,7 +179,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
       generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
     });
 
-    const result = await model.generateContent({
+    const result2 = await model.generateContent({
       contents: [{
         role: 'user',
         parts: [
@@ -84,7 +191,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
 
     // Extract image from response
     let imageBase64;
-    for (const candidate of result.response.candidates || []) {
+    for (const candidate of result2.response.candidates || []) {
       for (const part of candidate.content?.parts || []) {
         if (part.inlineData) {
           imageBase64 = part.inlineData.data;
@@ -95,7 +202,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     }
 
     if (!imageBase64) {
-      const blockReason = result.response.promptFeedback?.blockReason;
+      const blockReason = result2.response.promptFeedback?.blockReason;
       return res.status(500).json({
         error: blockReason ? `Image blocked: ${blockReason}` : 'No image generated',
       });

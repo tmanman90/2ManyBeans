@@ -39,6 +39,11 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Track which tabs have been visited so we can keep ChatTab mounted after
+  // first visit. Chat holds ephemeral conversation state (messages, API
+  // history, blob URLs) that only exists in-component, unlike other tabs
+  // whose data comes from Firestore props.
+  const [visitedTabs, setVisitedTabs] = useState(new Set(['rotation']));
   // When the user lands in the empty-inventory state and taps "Add a Bean",
   // we switch to the Inventory tab and signal it to open AddBeanForm.
   // InventoryTab consumes this flag and clears it via onPendingAddBeanConsumed.
@@ -69,6 +74,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   const isRotation = tab === 'rotation';
   const firstName = profile?.displayName?.trim().split(/\s+/)[0] || '';
   const greeting = firstName ? `Hi ${firstName}` : today();
+
+  useEffect(() => {
+    setVisitedTabs(prev => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+  }, [tab]);
 
   // Set html background to match header — covers WKWebView canvas gap at viewport edge
   useEffect(() => {
@@ -185,17 +199,23 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             />
           </Suspense>
         )}
-        {tab === 'chat' && (
-          <Suspense fallback={<TabFallback />}>
-            <ChatTab
-              beans={beans}
-              tastings={tastings}
-              addBean={addBean}
-              updateBean={updateBean}
-              addTasting={addTasting}
-              updateTasting={updateTasting}
-            />
-          </Suspense>
+        {/* ChatTab stays mounted after first visit so tab switches don't
+            destroy the conversation. Other tabs derive state from Firestore
+            props and don't need this treatment. */}
+        {visitedTabs.has('chat') && (
+          <div style={{ display: tab === 'chat' ? 'contents' : 'none' }}>
+            <Suspense fallback={<TabFallback />}>
+              <ChatTab
+                beans={beans}
+                tastings={tastings}
+                addBean={addBean}
+                updateBean={updateBean}
+                addTasting={addTasting}
+                updateTasting={updateTasting}
+                isActive={tab === 'chat'}
+              />
+            </Suspense>
+          </div>
         )}
         {tab === 'archive' && (
           <Suspense fallback={<TabFallback />}>

@@ -7,6 +7,7 @@ import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot } from '../lib/gemini';
+import { uploadOriginalPhoto } from '../lib/storage';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { collection, doc } from 'firebase/firestore';
@@ -61,6 +62,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
   const pendingBeanIdRef = useRef(null); // Pre-allocated Firestore doc ID for product shot
   const productShotUrlRef = useRef(null); // Holds photoUrl from pre-generated product shot
   const [productShotStatus, setProductShotStatus] = useState('idle'); // idle | generating | ready | failed
+  const [photoChoice, setPhotoChoice] = useState('original'); // original | productShot
 
   // Pre-fill from initialData (e.g. Quick Recipe save-to-inventory)
   const initialRef = useRef(null);
@@ -105,6 +107,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     pendingBeanIdRef.current = null;
     productShotUrlRef.current = null;
     setProductShotStatus('idle');
+    setPhotoChoice('original');
     genCounter.current++;
   };
 
@@ -204,26 +207,10 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
       };
       setF(scanData);
 
-      // Pre-allocate a Firestore doc ID and start product shot generation in background.
-      // Server uploads to Storage with this ID. Client holds the photoUrl for save time.
-      // Skip for free users — product shots are Pro-only and the server would
-      // 403 with no useful UI signal (just noisy logs).
-      if (hasPro && uid && photos.length > 0) {
-        const preId = doc(collection(db, 'users', uid, 'beans')).id;
-        pendingBeanIdRef.current = preId;
-        productShotUrlRef.current = null;
-        setProductShotStatus('generating');
-        generateProductShot(photos[0], preId, { skipFirestoreWrite: true })
-          .then(photoUrl => {
-            if (thisGen === genCounter.current) {
-              productShotUrlRef.current = photoUrl;
-              setProductShotStatus('ready');
-            }
-          })
-          .catch(err => {
-            console.log('Product shot pre-generation skipped:', err.message);
-            if (thisGen === genCounter.current) setProductShotStatus('failed');
-          });
+      // Pre-allocate a Firestore doc ID for the bean. Used by both original
+      // photo upload and product shot generation at save time.
+      if (uid) {
+        pendingBeanIdRef.current = doc(collection(db, 'users', uid, 'beans')).id;
       }
 
       // Auto-trigger research
@@ -302,6 +289,30 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     setAiFilling(false);
   };
 
+  // Triggered by the "Generate Product Shot" button on review screen (Pro only)
+  const handleGenerateProductShot = async () => {
+    if (!hasPro || !uid || photos.length === 0 || productShotStatus === 'generating') return;
+    const thisGen = genCounter.current;
+    const preId = pendingBeanIdRef.current || doc(collection(db, 'users', uid, 'beans')).id;
+    pendingBeanIdRef.current = preId;
+    productShotUrlRef.current = null;
+    setProductShotStatus('generating');
+    setPhotoChoice('productShot');
+    try {
+      const photoUrl = await generateProductShot(photos[0], preId, { skipFirestoreWrite: true });
+      if (thisGen === genCounter.current) {
+        productShotUrlRef.current = photoUrl;
+        setProductShotStatus('ready');
+      }
+    } catch (err) {
+      console.log('Product shot generation failed:', err.message);
+      if (thisGen === genCounter.current) {
+        setProductShotStatus('failed');
+        setPhotoChoice('original');
+      }
+    }
+  };
+
   const parseShelfLifeDays = (str) => {
     if (!str) return null;
     const s = str.toLowerCase();
@@ -367,13 +378,34 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     const preAllocId = pendingBeanIdRef.current;
     const preGenPhotoUrl = productShotUrlRef.current;
 
-    // Include pre-generated product shot URL if available
-    if (preGenPhotoUrl) beanData.photoUrl = preGenPhotoUrl;
+    // If product shot was chosen and is ready, include the URL directly
+    if (photoChoice === 'productShot' && preGenPhotoUrl) {
+      beanData.photoUrl = preGenPhotoUrl;
+    }
 
     let beanId;
     try {
-      // Use pre-allocated ID if available (product shot already uploaded to this path)
-      beanId = await onAdd(beanData, preAllocId || null);
+      // Save bean + upload original photo in parallel.
+      // Use pre-allocated ID so both operations target the same doc.
+      const savePromise = onAdd(beanData, preAllocId || null);
+
+      // Upload original photo if that's the user's choice and we have a photo
+      let uploadPromise = Promise.resolve(null);
+      if (photoChoice === 'original' && scanPhoto && preAllocId) {
+        uploadPromise = uploadOriginalPhoto(preAllocId, scanPhoto, { skipFirestoreWrite: true })
+          .catch(err => {
+            console.log('Original photo upload failed:', err.message);
+            return null;
+          });
+      }
+
+      const [savedBeanId, uploadResult] = await Promise.all([savePromise, uploadPromise]);
+      beanId = savedBeanId;
+
+      // Write photoUrl to bean doc after both operations complete
+      if (uploadResult?.photoUrl && beanId && updateBean) {
+        await updateBean(beanId, { photoUrl: uploadResult.photoUrl });
+      }
     } catch (err) {
       showError("Couldn't save bean. Check your connection and try again.");
       return;
@@ -383,25 +415,15 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     pendingBeanIdRef.current = null;
     productShotUrlRef.current = null;
     setProductShotStatus('idle');
+    setPhotoChoice('original');
 
     reset();
     onClose();
 
-    // If product shot was NOT ready at save time, fire-and-forget with toast
-    if (!preGenPhotoUrl && beanId && scanPhoto) {
-      if (onToast) onToast('Generating product shot...');
-      generateProductShot(scanPhoto, beanId)
-        .then(photoUrl => {
-          if (Capacitor.isNativePlatform() && updateBean) {
-            updateBean(beanId, { photoUrl });
-          }
-          if (onToast) onToast('Product shot ready!');
-        })
-        .catch(() => {
-          if (onToast) onToast('Product shot failed');
-        });
-    } else if (preGenPhotoUrl && onToast) {
+    if (photoChoice === 'productShot' && preGenPhotoUrl && onToast) {
       onToast('Product shot ready!');
+    } else if (photoChoice === 'original' && scanPhoto && onToast) {
+      onToast('Bean saved!');
     }
   };
 
@@ -583,6 +605,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         <>
           {photos.length > 0 && (
             <div style={{ marginBottom: 12 }}>
+              {/* Photo preview */}
               <div style={{
                 display: 'flex', gap: 6, overflowX: 'auto',
                 borderRadius: 12, border: `1px solid ${C.border}`, padding: 6,
@@ -592,12 +615,46 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
                     style={{ height: 80, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 ))}
               </div>
-              {productShotStatus === 'generating' && (
-                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Generating product shot...</div>
-              )}
-              {productShotStatus === 'ready' && (
-                <div style={{ fontSize: 11, color: C.green, marginTop: 4 }}>Product shot ready</div>
-              )}
+
+              {/* Photo choice: Use This Photo vs Generate Product Shot */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  onClick={() => { setPhotoChoice('original'); setProductShotStatus('idle'); }}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
+                    fontSize: 12, fontFamily: fonts.body, fontWeight: 600,
+                    border: `1.5px solid ${photoChoice === 'original' ? C.accent : C.border}`,
+                    background: photoChoice === 'original' ? C.amberBg : C.card,
+                    color: photoChoice === 'original' ? C.accent : C.textMuted,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  Use This Photo
+                </button>
+                {hasPro && (
+                  <button
+                    onClick={handleGenerateProductShot}
+                    disabled={productShotStatus === 'generating'}
+                    style={{
+                      flex: 1, padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
+                      fontSize: 12, fontFamily: fonts.body, fontWeight: 600,
+                      border: `1.5px solid ${photoChoice === 'productShot' ? C.accent : C.border}`,
+                      background: photoChoice === 'productShot' ? C.amberBg : C.card,
+                      color: photoChoice === 'productShot' ? C.accent : C.textMuted,
+                      opacity: productShotStatus === 'generating' ? 0.6 : 1,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {productShotStatus === 'generating' ? (
+                      <>{spinner} Generating...</>
+                    ) : productShotStatus === 'ready' ? (
+                      'Product Shot Ready'
+                    ) : (
+                      'Generate Product Shot'
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {scanError && (

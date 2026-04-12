@@ -49,6 +49,7 @@ function trimApiMessages(messages, keepRecent = 6) {
 }
 
 const MAX_API_MESSAGES = 20;
+const MAX_DISPLAY_MESSAGES = 50;
 
 // Isolated input bar -- owns its own `input` state so keystrokes never
 // re-render the parent ChatTab (which re-renders the full message list).
@@ -187,7 +188,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const { hasPro, freeUsage } = useSubscription();
@@ -205,7 +206,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const [photos, setPhotos] = useState([]); // { base64, mediaType, previewUrl }
   const [scannedBean, setScannedBean] = useState(null);
   const [toast, setToast] = useState(null);
-  const keyboardHeight = useNativeKeyboard();
+  // Disable keyboard hook when tab is hidden to prevent double-counting
+  // keyboard events and corrupting the shared tab bar hide counter.
+  const keyboardHeight = useNativeKeyboard({ enabled: isActive });
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
   // Synchronous guard against double-send. `loading` state is async and both
@@ -248,6 +251,19 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  // Scroll to bottom when tab becomes visible again. display:none elements
+  // can lose scroll position in WebKit (bug 72852). requestAnimationFrame
+  // ensures layout has settled after the display toggle.
+  useEffect(() => {
+    if (isActive && scrollRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [isActive]);
 
   // Cleanup all tracked blob URLs on unmount
   useEffect(() => {
@@ -360,11 +376,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
     // NOTE: input state lives in ChatInputBar child; it clears its own field
     // after onSend(text) resolves, so no setInput call here.
-    // Clearing `photos` state drops the display thumbnails, but the preview URLs
-    // for sent photos stay referenced via the message log. Revoke the blob URLs
-    // explicitly: the thumbnails are already persisted into displayMsg.photos
-    // above, so revocation doesn't affect rendering. (Data URLs skip safely.)
-    currentPhotos.forEach(p => safeRevokeBlobUrl(p.previewUrl));
+    // Clear pending photos from the input bar. Do NOT revoke blob URLs here:
+    // sent photo preview URLs are still referenced by messages in the display
+    // list (displayMsg.photos). Revoking them would cause broken image
+    // thumbnails. Blob URLs are cleaned up on full page unload via the
+    // unmount effect (blobUrlsRef). Data URLs (native camera) need no cleanup.
     setPhotos([]);
     setLoading(true);
 
@@ -378,7 +394,16 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       if (parsed) setScannedBean(parsed);
 
       const assistantMsg = { role: 'assistant', content: cleanText };
-      setMessages(prev => [...prev, assistantMsg]);
+      setMessages(prev => {
+        const updated = [...prev, assistantMsg];
+        if (updated.length > MAX_DISPLAY_MESSAGES) {
+          // Revoke blob URLs from pruned messages before discarding
+          const pruned = updated.slice(0, updated.length - MAX_DISPLAY_MESSAGES);
+          pruned.forEach(m => m.photos?.forEach(url => safeRevokeBlobUrl(url)));
+          return updated.slice(-MAX_DISPLAY_MESSAGES);
+        }
+        return updated;
+      });
       apiMessages.current = [...apiMessages.current, { role: 'assistant', content: rawText }];
 
       // Cap and trim apiMessages to prevent unbounded memory growth
