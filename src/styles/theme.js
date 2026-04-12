@@ -3,6 +3,7 @@ export const C = {
   bg: "#FAF6F1",
   cream: "#FFF8F0",
   card: "#FFF8F0",
+  cardMuted: "#EDE6DC",
   text: "#3B2417",
   textMuted: "#8B7B6F",
   textLight: "#A89888",
@@ -49,7 +50,6 @@ export const radius = {
 export const cardBase = {
   background: C.card,
   borderRadius: 14,
-  border: `1px solid ${C.borderLight}`,
   boxShadow: shadows.card,
 };
 

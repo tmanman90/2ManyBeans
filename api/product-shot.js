@@ -16,7 +16,7 @@ const PRODUCT_SHOT_PROMPT = `You are a product photography AI. Generate a NEW st
 IMPORTANT: Do NOT reproduce or collage the input photo. Instead, GENERATE a completely new image showing this coffee bag as if photographed in a professional studio.
 
 SCENE:
-- Show the full coffee bag standing upright on a seamless warm cream background (#FFF8F0)
+- Show the full coffee bag standing upright on a seamless warm neutral background (#EDE6DC)
 - The bag fills 60-70% of the frame, centered with 15-20% padding on all sides
 - Camera angle: straight-on with a very slight angle for depth
 - Soft diffused studio lighting from upper-left

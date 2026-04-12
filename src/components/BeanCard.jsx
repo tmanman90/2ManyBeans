@@ -37,19 +37,19 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
       padding: 0,
       overflow: 'hidden',
     }}>
-      {/* Product shot photo */}
+      {/* Product shot photo — tonal surface shift instead of gradient blending */}
       {bean.photoUrl && (
         <div style={{
           width: '100%',
           height: photoHeight,
-          background: C.card,
+          background: C.cardMuted,
           position: 'relative',
           overflow: 'hidden',
         }}>
           {!imgLoaded && (
             <div style={{
               position: 'absolute', inset: 0,
-              background: `linear-gradient(110deg, ${C.bg} 30%, ${C.borderLight} 50%, ${C.bg} 70%)`,
+              background: `linear-gradient(110deg, ${C.cardMuted} 30%, ${C.borderLight} 50%, ${C.cardMuted} 70%)`,
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.5s infinite',
             }} />
@@ -69,17 +69,6 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               transition: 'opacity 0.3s ease',
             }}
           />
-          {/* Edge gradients: blend image background into card on all visible edges */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: [
-              `linear-gradient(to right, ${C.card}, transparent 35%)`,
-              `linear-gradient(to left, ${C.card}, transparent 35%)`,
-              `linear-gradient(to top, ${C.card}, transparent 20%)`,
-            ].join(', '),
-            pointerEvents: 'none',
-          }} />
         </div>
       )}
 
