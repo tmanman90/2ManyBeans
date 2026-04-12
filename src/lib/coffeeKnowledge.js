@@ -12,6 +12,7 @@ HOW TASTING WORKS:
 - Key technique: focus on one attribute at a time, don't try to process everything at once
 - Most important skill-building method: COMPARATIVE TASTING (two coffees side by side makes differences obvious)
 - Flavors are easier to discern in warm coffee, not hot
+- Home tasting method: brew two different coffees side by side (small French presses work well). Let cool. Taste alternately, a few sips each. Focus on TEXTURES first (mouthfeel, sweetness, acidity), don't worry about naming specific flavors initially. Compare your notes to the roaster's description on the packet.
 
 TASTING ATTRIBUTES:
 - Sweetness: Highly desirable. More = better. Does not come from residual sugars (destroyed in roasting) but from aromatic compounds created by caramelization and Maillard reactions.
@@ -19,6 +20,7 @@ TASTING ATTRIBUTES:
 - Mouthfeel/Body: Physical weight and texture. Light/tea-like to rich/creamy/heavy. Metal-filtered methods (French press) = heavier body. Paper-filtered = cleaner/lighter.
 - Balance: Are all tastes harmonious? No single element dominates.
 - Finish/Aftertaste: How long flavors linger. Clean, pleasant, lingering = good. Flat, woody, cardboard = stale/low quality.
+- Cleanliness: Absence of negative flavors, off-tastes, or unusual harshness/astringency. A distinct quality attribute separate from the others.
 
 FLAVOR DESCRIPTOR CATEGORIES:
 - Fruity: berry (blueberry, strawberry, raspberry), stone fruit (peach, apricot), citrus (lemon, orange, grapefruit), tropical (mango, passionfruit), dried fruit (raisin, date)
@@ -84,10 +86,13 @@ PROCESSING METHODS:
 - Semi-washed/Giling Basah: hulled at high moisture (Indonesia). Low acidity, heavy body, earthy/woody/spice.
 
 ROASTING:
+- Five stages: (1) Drying (7-11% water burns off, no browning yet), (2) Yellowing (first browning, basmati rice aroma), (3) First Crack (CO2 builds up, bean pops open, nearly doubles in volume), (4) Development (roaster controls acidity vs bitterness balance), (5) Second Crack (oils to surface, most acidity lost, "generic roast flavor" takes over).
+- Chemistry: Maillard reactions (sugars + proteins = browning + aromatics), caramelization (sugars create caramel notes, then bitterness), Strecker degradation (more aromatics). Over 800 volatile aromatic compounds can be created. By end of first crack, few simple sugars remain.
 - Acidity decreases with longer/darker roast. Bitterness increases. Sweetness peaks in between.
 - Light (after first crack): high acidity, origin preserved, complex aromatics.
 - Medium (past first, before second crack): balanced, sweetness often peaks.
 - Dark (at/past second crack): generic roast flavors dominate, origin lost.
+- Roast level affects brewing: darker roasts are more porous and brittle, so they extract easier. Grind slightly coarser for dark roasts. Lighter roasts need hotter water and finer grind. Darker roasts also stale faster (more porous = oxygen penetrates easier).
 - Freshness: use within 1 month of roast. Espresso needs 5-20 days rest. Filter: 2-3 days.
 
 HARVESTING:
@@ -174,6 +179,7 @@ METHOD GUIDANCE:
 - Pour-Over: 60g/L, medium grind, rinse paper filter, bloom 2x coffee weight 30 sec, pour slowly. Clean, clear cup.
 - AeroPress: 75-100g/L, steep 1 min then press. Versatile. Easy clean, portable.
 - Espresso: 18g in, ~36g out, 27-29 sec, 9 bars. Invest in grinder before machine. Always adjust grind first.
+- Electric Drip: 60g/L, medium grind. Most home machines don't heat water to correct temperature. Buy SCAA or ECBC certified machines. Avoid machines with hot plates (cooks the coffee). Use thermal carafe instead. Brew at least 500ml for best results.
 
 STORAGE:
 - Airtight, dark, never refrigerate
@@ -186,6 +192,79 @@ MILK:
 - Steam to 60-68C max. Above this, proteins denature.
 - Whole milk recommended (fat adds texture, makes flavors linger)
 - Microfoam = tiny invisible bubbles, elastic, pourable
+`;
+
+// --- BREWER KNOWLEDGE (chat + tasting coach) ---
+// Teaches Ruphus what the user's brewer actually is so advice is grounded in
+// the right set of adjustable levers. Both blocks always ship in the cached
+// static prompt; the dynamic USER SETUP block names which one is active.
+
+export const FELLOW_AIDEN_KNOWLEDGE = `
+FELLOW AIDEN (automatic pulse-pour-over brewer):
+The Aiden takes pre-ground coffee and automates bloom, pulse count, pulse
+interval, pulse temperatures, and total brew time. The user grinds on a
+separate grinder (see GRINDERS below) and pours the grounds into the Aiden.
+The user cannot manually control pour schedule; those parameters are stored
+as a recipe the app generates and pushes to the device via the Brew button.
+Adjustable parameters: ratio, bloom ratio, bloom temperature, bloom duration,
+pulse count (single-serve and batch), pulse interval, pulse temperatures, and
+the external grind. Do not ask for brew time or pour technique; the Aiden
+handles those. Aiden recipes are generated per bean and stored on the bean as
+aidenRecipe.
+`;
+
+export const HANDBREW_BREWER_KNOWLEDGE = `
+HAND-BREW (manual pour-over, V60 / Kalita / Chemex):
+The user pours water by hand and controls ratio, grind, water temperature,
+bloom, pour schedule, and total brew time directly. The app stores a recipe
+per bean with those parameters plus step-by-step pour times. When dialing in,
+any of these are adjustable. The app's Brew button regenerates the recipe
+with fresh research.
+`;
+
+// --- GRINDER KNOWLEDGE ---
+// Human-prose blurbs for each supported grinder. Consumed by chat + tasting
+// coach system prompts. Keep in sync with GRINDER_POUROVER_STARTS in
+// src/lib/handbrew.js (machine data). Both must enumerate the same grinder
+// keys. Dynamic USER SETUP block names which blurb is active.
+export const GRINDER_KNOWLEDGE = `
+GRINDERS:
+Fellow Ode Gen 2: scale 1-11 with 0.1/0.2 sub-steps (e.g. 4.1, 4.2). Lower
+  number = finer grind. Pour-over range roughly 4-8; light roast starts
+  around 4.5. Note: Aiden light-roast recipes use 3.1-4.0 on the Ode, which
+  is too fine for manual pour-over.
+Fellow Opus: scale 1-6 with 10 clicks per whole number (e.g. 4.0 base, 4.5
+  is five clicks coarser). Lower number = finer grind. Pour-over range
+  about 3-6.5; light roast starts around 4.0.
+Baratza Encore ESP: 40-step scale, 1-40. Lower number = finer grind.
+  Pour-over range 10-32; light roast around 15, medium 20, dark 25.
+Comandante C40 MK4: around 40 clicks from zero. More clicks = coarser
+  grind. Pour-over range 18-38; light roast around 22, medium 28, dark 32.
+1Zpresso JX-Pro: around 200 clicks from zero. More clicks = coarser grind.
+  Pour-over range 70-150; light roast around 90, medium 110, dark 130.
+Baratza Virtuoso+: 40-step scale, 1-40. Lower number = finer grind.
+  Pour-over range 10-32; light roast around 15, medium 20, dark 25.
+Other or custom grinder: most electric burr grinders use lower number =
+  finer; most manual hand grinders use more clicks = coarser. If advising a
+  numeric change, first confirm the user's direction convention, then give
+  the change in words (finer/coarser) along with the number.
+`;
+
+// --- BREW TROUBLESHOOTING RULES ---
+// Shared by chat + tasting coach. Replaces the inline rules previously
+// hardcoded in buildTastingSystemPrompt.
+export const BREW_TROUBLESHOOTING_RULES = `
+Brew troubleshooting (apply per brewer):
+- Sour / bright / sharp: grind finer; or on Aiden, raise bloom temperature or
+  add a pulse; on hand-brew, raise water temp or extend bloom.
+- Bitter / harsh / astringent: grind coarser; or on Aiden, lower the final
+  pulse temperatures 1-2C; on hand-brew, lower water temp or shorten
+  contact.
+- Weak / watery / thin: higher dose (stronger ratio, e.g. 1:16 instead of
+  1:17).
+- Cup is fine: keep the current recipe.
+Always cite the direction in words (finer/coarser) AND the new number on the
+user's specific grinder from the GRINDERS block. Never invert direction.
 `;
 
 // Helper to get origin context for a bean

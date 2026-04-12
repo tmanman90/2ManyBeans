@@ -385,7 +385,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     setLoading(true);
 
     try {
-      const systemPrompt = buildChatContext(beans, tastings);
+      const systemPrompt = buildChatContext(beans, tastings, preferences);
       const history = apiMessages.current.filter(m => m.role !== 'system');
       const rawText = await sendChatMessage(systemPrompt, history);
 

@@ -1,10 +1,41 @@
 // Claude API helpers -- all calls go through /api/claude serverless proxy
 // No Anthropic SDK in the browser. No API key in client code.
 import { today, getPeakStatus, daysOpen } from './peakStatus';
-import { TASTING_KNOWLEDGE, BREWING_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
+import {
+  TASTING_KNOWLEDGE,
+  BREWING_KNOWLEDGE,
+  FELLOW_AIDEN_KNOWLEDGE,
+  HANDBREW_BREWER_KNOWLEDGE,
+  GRINDER_KNOWLEDGE,
+  BREW_TROUBLESHOOTING_RULES,
+  getOriginContext,
+} from './coffeeKnowledge';
+import { GRINDER_LABELS } from './brewMethods';
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { stripMarkdown } from './textFormat';
+
+// Preference enum whitelists. Firestore does not enforce types, so a tampered
+// doc could put any string in preferences.brewMethod / preferences.grinder.
+// These hard-validate before interpolation.
+const VALID_BREW_METHODS = new Set(['aiden', 'handbrew']);
+const VALID_GRINDER_KEYS = new Set([
+  'fellow-ode-gen2',
+  'fellow-opus',
+  'baratza-encore-esp',
+  'comandante-c40',
+  '1zpresso-jx-pro',
+  'baratza-virtuoso-plus',
+  'other',
+]);
+
+function validateBrewMethod(x) {
+  return VALID_BREW_METHODS.has(x) ? x : 'aiden';
+}
+
+function validateGrinderKey(x) {
+  return VALID_GRINDER_KEYS.has(x) ? x : 'fellow-ode-gen2';
+}
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
@@ -186,18 +217,8 @@ NEVER RE-ASK WHAT YOU ALREADY KNOW:
 - Instead, confirm briefly in ONE sentence: "You're on Aiden Opus at SS 4.2 -- sound right, or did you change it?" and move on.
 - Only ask for brew details if BEAN PROFILE has no current brew recipe at all.
 
-BREW TROUBLESHOOTING (use these exact rules):
-- Sour/bright/sharp = grind finer OR use hotter water
-- Bitter/harsh/astringent = grind coarser OR use cooler water
-- Weak/watery/thin = use more coffee (higher dose)
-- Good as-is = keep current recipe
-
-GRINDER DIRECTION (critical to avoid inverted advice):
-- Fellow Opus: scale roughly 1-11. LOWER number = FINER grind. To go finer from 4.2, move to 3.5 or 3.0. To go coarser, move to 5.0 or higher.
-- Fellow Ode Gen 2: same -- LOWER number = FINER.
-- Baratza Encore: LOWER number = FINER.
-- Comandante C40: measured in CLICKS from zero. MORE clicks = COARSER. Fewer clicks = finer.
-- When advising a grind change, state BOTH the direction in words (finer/coarser) AND the new number for their specific grinder. Double-check direction before writing the number. Never invert.
+${BREW_TROUBLESHOOTING_RULES}
+${GRINDER_KNOWLEDGE}
 
 WITHHOLD-THEN-REVEAL COACHING:
 - You have the bean profile and bag notes internally. Do NOT reveal bag notes or expected flavors BEFORE the taster gives their answer.
@@ -256,26 +277,143 @@ export async function sendTastingMessage(systemPrompt, history, { firstMessage =
   return stripMarkdown(raw);
 }
 
+// Sanitize a string before interpolating it into a Claude system prompt.
+// - Strips anything outside the whitelist (blocks control chars, newlines,
+//   angle brackets, curly braces, backticks, most punctuation).
+// - Collapses runs of 3+ dashes to "--" so a malicious bag note cannot
+//   inject a fake ---BEAN_SCAN--- / ---EXTRACT--- / ---END--- marker that
+//   parseBeanScan in ChatTab.jsx:22 or the tasting extraction regex would
+//   match. The character-class alone is not sufficient because `-` is in
+//   the whitelist.
 function sanitize(str, maxLen = 100) {
-  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'.,()\/]/g, '');
+  const base = (str || '').slice(0, maxLen).replace(/[^\w .\-',()/]/g, '');
+  return base.replace(/-{3,}/g, '--');
 }
 
-export function buildChatContext(beans, tastings) {
-  const active = beans.filter(b => b.status === 'ACTIVE').map(b => {
-    const ps = getPeakStatus(b);
-    let line = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
-    // Recipe context: handBrewRecipe or aidenGrind if available
-    if (b.handBrewRecipe) {
-      const r = b.handBrewRecipe;
-      const grind = r.grindSize ? `grind ${sanitize(r.grindSize.setting, 50)} ${sanitize(r.grindSize.description, 50)}` : '';
-      const temp = r.waterTemp?.celsius ? `${r.waterTemp.celsius}C` : '';
-      line += ` | Brew: ${sanitize(r.method, 50)}, ${sanitize(r.ratio, 20)}, ${temp}, ${grind}, ${sanitize(r.totalBrewTime, 20)}`;
-    } else if (b.aidenGrind && typeof b.aidenGrind.singleServe === 'number') {
-      line += ` | Aiden grind: SS ${b.aidenGrind.singleServe}`;
-      if (typeof b.aidenGrind.batch === 'number') line += ` / Batch ${b.aidenGrind.batch}`;
-    }
-    return line;
-  }).join('\n');
+// Format a number-or-string field as a clean display number, or return null
+// if it isn't a finite value. Coerces the legacy string-typed aidenGrind
+// values that may still live on old bean docs.
+function numOrNull(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Format an array of pulse temperatures as "95/94/93", with defensive bounds
+// and per-element finite-ness checks.
+function formatPulseTemps(arr) {
+  if (!Array.isArray(arr)) return '';
+  return arr
+    .slice(0, 10)
+    .map(numOrNull)
+    .filter(n => n !== null)
+    .join('/');
+}
+
+// Build the full Aiden recipe line for an active bean. Returns a string or
+// null (when no recipe exists). Field whitelist + sanitize + Number.isFinite
+// guards match the deepened plan.
+function formatAidenRecipeLine(bean) {
+  const r = bean?.aidenRecipe;
+  const hasFull = r && numOrNull(r.ratio) !== null;
+
+  // Legacy fallback: aidenGrind numbers exist but no full recipe yet.
+  if (!hasFull) {
+    const ss = numOrNull(bean?.aidenGrind?.singleServe);
+    const batch = numOrNull(bean?.aidenGrind?.batch);
+    if (ss === null) return null;
+    return `    Aiden grind: SS ${ss}${batch !== null ? ` / Batch ${batch}` : ''}. (Full recipe not generated yet; tap Brew to generate.)`;
+  }
+
+  const title = sanitize(r.title, 60);
+  const ratio = numOrNull(r.ratio);
+  const bloomRatio = numOrNull(r.bloomRatio);
+  const bloomTemp = numOrNull(r.bloomTemperature);
+  const bloomDur = numOrNull(r.bloomDuration);
+  const ssCount = numOrNull(r.ssPulsesNumber);
+  const ssInterval = numOrNull(r.ssPulsesInterval);
+  const ssTemps = formatPulseTemps(r.ssPulseTemperatures);
+  const batchCount = numOrNull(r.batchPulsesNumber);
+  const batchInterval = numOrNull(r.batchPulsesInterval);
+  const batchTemps = formatPulseTemps(r.batchPulseTemperatures);
+  const gSS = numOrNull(r.grindRecommendation?.singleServe);
+  const gBatch = numOrNull(r.grindRecommendation?.batch);
+
+  const parts = [];
+  if (title) parts.push(`"${title}"`);
+  if (ratio !== null) parts.push(`1:${ratio}`);
+  if (bloomRatio !== null && bloomTemp !== null && bloomDur !== null) {
+    parts.push(`bloom ${bloomRatio}x ${bloomTemp}C ${bloomDur}s`);
+  }
+  if (ssCount !== null && ssInterval !== null && ssTemps) {
+    parts.push(`SS ${ssCount} pulses [${ssTemps}]C ${ssInterval}s intervals`);
+  }
+  if (batchCount !== null && batchInterval !== null && batchTemps) {
+    parts.push(`Batch ${batchCount} pulses [${batchTemps}]C ${batchInterval}s intervals`);
+  }
+  if (gSS !== null) {
+    parts.push(`Ode grind SS ${gSS}${gBatch !== null ? ` / Batch ${gBatch}` : ''}`);
+  }
+
+  return `    Aiden recipe: ${parts.join(', ')}.`;
+}
+
+// Build the full hand-brew recipe line for an active bean. Returns a string
+// or null (when no recipe exists). R14 mismatch marker intentionally cut
+// from v2 per the deepen-plan simplicity review.
+function formatHandBrewRecipeLine(bean) {
+  const r = bean?.handBrewRecipe;
+  if (!r) return null;
+
+  const title = sanitize(r.title, 60);
+  const technique = sanitize(r.technique, 30);
+  const ratio = sanitize(r.ratio, 20); // hand-brew ratio is a string like "1:15.5"
+  const celsius = numOrNull(r.waterTemp?.celsius);
+  const grindSetting = sanitize(r.grindSize?.setting, 30);
+  const grindDesc = sanitize(r.grindSize?.description, 50);
+  const microns = numOrNull(r.grindSize?.microns);
+  const totalTime = sanitize(r.totalBrewTime, 20);
+  const reasoning = sanitize(r.reasoning, 200);
+
+  const parts = [];
+  if (title) parts.push(`"${title}"`);
+  if (technique) parts.push(`${technique} technique`);
+  if (ratio) parts.push(ratio);
+  if (celsius !== null) parts.push(`${celsius}C`);
+  if (grindSetting) {
+    const grindBits = [grindSetting];
+    if (grindDesc) grindBits.push(`(${grindDesc}${microns !== null ? `, ${microns}um` : ''})`);
+    parts.push(`grind ${grindBits.join(' ')}`);
+  }
+  if (totalTime) parts.push(`${totalTime} total`);
+
+  const line = `    Hand-brew recipe: ${parts.join(', ')}.`;
+  return reasoning ? `${line} Reasoning: ${reasoning}` : line;
+}
+
+export function buildChatContext(beans, tastings, preferences) {
+  // Null-safe preference resolution with enum validation. Firestore is
+  // free-form, so validate before any interpolation.
+  const prefs = preferences || {};
+  const brewMethod = validateBrewMethod(prefs.brewMethod);
+  const grinderKey = validateGrinderKey(prefs.grinder);
+  const canisterCount = numOrNull(prefs.canisterCount) ?? 3;
+  const grinderLabel =
+    grinderKey === 'other'
+      ? sanitize(prefs.grinderCustomName, 50) || 'Custom grinder'
+      : GRINDER_LABELS[grinderKey] || 'Fellow Ode Gen 2';
+  const brewerLabel = brewMethod === 'handbrew' ? 'Hand-brew (manual pour-over)' : 'Fellow Aiden';
+  const brewerRef = brewMethod === 'handbrew' ? 'HAND-BREW' : 'FELLOW AIDEN';
+
+  const active = beans
+    .filter(b => b.status === 'ACTIVE')
+    .map(b => {
+      const ps = getPeakStatus(b);
+      const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
+      const recipeLine =
+        brewMethod === 'handbrew' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
+      return recipeLine ? `${summary}\n${recipeLine}` : summary;
+    })
+    .join('\n');
 
   const sealed = beans.filter(b => b.status === 'SEALED').map(b => {
     const ps = getPeakStatus(b);
@@ -291,12 +429,18 @@ export function buildChatContext(beans, tastings) {
     return `  ${t.date}: ${sanitize(bean?.name) || '?'} -- ${sanitize(t.oneWord, 50)} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${sanitize(t.notes, 200)}`;
   }).join('\n');
 
-  // Static block: brewing knowledge + rotation rules + photo handling (cached)
-  const staticBlock = `You are Professor Ruphus, Tal's friendly and knowledgeable coffee guide. You're warm but concise, opinionated about good coffee, and always helpful. You have access to his REAL, CURRENT coffee data.
+  // Static block: persona + shared knowledge + brewer/grinder references +
+  // rules + photo handling. User-agnostic so the prompt cache hits across
+  // all users and preference changes. DO NOT interpolate preferences here.
+  const staticBlock = `You are Professor Ruphus, Tal's friendly and knowledgeable coffee guide. You're warm but concise, opinionated about good coffee, and always helpful. You have access to his real, current coffee data.
 
 Your responses render in a mobile chat bubble as plain text. Write in conversational paragraphs. Do not use markdown formatting: no bold, italic, headers, or bullet lists. Use line breaks to separate thoughts.
 
 ${BREWING_KNOWLEDGE}
+${FELLOW_AIDEN_KNOWLEDGE}
+${HANDBREW_BREWER_KNOWLEDGE}
+${GRINDER_KNOWLEDGE}
+${BREW_TROUBLESHOOTING_RULES}
 
 Rotation rules:
 - Keep 3 beans active (Jar #1-#3)
@@ -307,7 +451,13 @@ Rotation rules:
 - Bag-stated guidance always overrides defaults
 - Do not suggest beans that are already finished or opened. Only recommend from sealed inventory.
 
-When the user asks about brewing, reference their bean's stored recipe if one is listed above.
+User setup: the dynamic USER SETUP block below names the user's brewer and grinder. Read the matching FELLOW AIDEN or HAND-BREW entry and the matching GRINDERS entry above before giving any brew advice.
+
+Recipe recall and action handoff: when the user asks about "my recipe" or "the current brew" for an active jar, cite the full stored recipe verbatim by parameter (not paraphrased). Example: "your Aiden profile for jar 2 is 1:17, 2.5x bloom at 94C for 45s, three SS pulses at 95/94/93C every 22s, Ode grind SS 4.5." Ruphus is advisory; any suggested change is applied by tapping the Brew button on the bean card to regenerate, or by editing the Aiden manually. Do not imply you can write recipes to the device.
+
+Aiden grind recommendations are in Ode Gen 2 units: aidenRecipe.grindRecommendation values are always on the Fellow Ode Gen 2 scale. If the user's grinder is not Fellow Ode Gen 2, give grind advice as a direction word (finer or coarser) and tell the user to read the absolute number from their own grinder's entry under GRINDERS. Do not invent Opus or Comandante numbers from an Ode number.
+
+Past tastings: if RECENT TASTINGS below shows prior tastings of an active bean, reference them for continuity when dialing in. Example: "you got muddled last time at 5.2 and liked it coarser."
 
 Be concise, warm, and opinionated. If recommending a bean, explain why based on timing and variety.
 
@@ -327,8 +477,14 @@ Rules for photo scanning:
 - If photos are too blurry, ask for clearer photos
 - After the scan data, briefly summarize what you found and offer next steps`;
 
-  // Dynamic block: current inventory + tastings (uncached, changes per session)
-  const dynamicBlock = `TODAY: ${today()}
+  // Dynamic block: user-specific. USER SETUP FIRST so every later block is
+  // read through the lens of the user's actual brewer/grinder.
+  const dynamicBlock = `USER SETUP:
+  Brewer: ${brewerLabel} -- read the ${brewerRef} entry in the static block above.
+  Grinder: ${grinderLabel} -- read the matching entry under GRINDERS above.
+  Canister count: ${canisterCount}
+
+TODAY: ${today()}
 
 ACTIVE ROTATION (Jars):
 ${active || '  (none)'}

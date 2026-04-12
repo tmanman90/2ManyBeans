@@ -49,6 +49,15 @@ export default withCorsAuthMetered(async (req, res) => {
       }
     }
 
+    // Cache observability headers — visible in DevTools Network tab without
+    // pulling logs. Permanent (no revert step) per deepen-plan finding #6.
+    // cache_read_input_tokens > 0 on consecutive requests proves the static
+    // prefix is hitting Anthropic's prompt cache. If this is consistently 0
+    // the static block is either below the model's cache floor or being
+    // invalidated by a silent upstream change.
+    res.setHeader('x-cache-read', response.usage?.cache_read_input_tokens ?? 0);
+    res.setHeader('x-cache-create', response.usage?.cache_creation_input_tokens ?? 0);
+    res.setHeader('x-input-tokens', response.usage?.input_tokens ?? 0);
     return res.status(200).json({ content: response.content, stop_reason: response.stop_reason, usage: response.usage });
   } catch (error) {
     console.error('Claude API error:', error);
