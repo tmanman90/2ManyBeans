@@ -239,13 +239,23 @@ export async function summarizeNotes(bagNotes) {
     const data = await callGemini({
       contents: [{
         role: 'user',
-        parts: [{ text: `Summarize these coffee tasting notes into a concise phrase under 40 characters. Return ONLY the summary, no quotes or explanation: ${bagNotes}` }],
+        parts: [{ text: `Summarize these coffee tasting notes into a single phrase of 3-5 words (max 40 chars). Output only the phrase, nothing else. Notes: ${bagNotes}` }],
       }],
+      systemInstruction: 'You return ONLY a final short phrase. Never show reasoning, thinking, or explanation. Never use prefixes like THINK:, THOUGHTS:, ANSWER:. Output the answer directly.',
       metered: false,
-      maxTokens: 100,
+      maxTokens: 500,
     });
 
-    return (data.text || '').trim() || null;
+    let text = (data.text || '').trim();
+    text = text.replace(/^(THINK|THOUGHTS?|ANSWER|REASONING)[:\s]*/i, '').trim();
+    text = text.split('\n')[0].trim();
+    if (text.length > 40) {
+      const cut = text.slice(0, 40);
+      const lastSpace = cut.lastIndexOf(' ');
+      text = lastSpace > 20 ? cut.slice(0, lastSpace) : cut;
+    }
+    if (text.length < 4) return null;
+    return text || null;
   } catch {
     return null;
   }

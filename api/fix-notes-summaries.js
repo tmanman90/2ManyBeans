@@ -11,16 +11,31 @@ function getClient() {
 
 async function summarize(bagNotes) {
   const client = getClient();
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = client.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction: 'You return ONLY a final short phrase. Never show reasoning, thinking, or explanation. Never use prefixes like THINK:, THOUGHTS:, ANSWER:. Output the answer directly.',
+  });
   const result = await model.generateContent({
     contents: [{
       role: 'user',
-      parts: [{ text: `Summarize these coffee tasting notes into a concise phrase under 40 characters. Return ONLY the summary, no quotes or explanation: ${bagNotes}` }],
+      parts: [{ text: `Summarize these coffee tasting notes into a single phrase of 3-5 words (max 40 chars). Output only the phrase, nothing else. Notes: ${bagNotes}` }],
     }],
-    generationConfig: { maxOutputTokens: 100 },
+    generationConfig: { maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } },
   });
-  const text = result.response.text?.() || '';
-  return text.trim() || null;
+  let text = (result.response.text?.() || '').trim();
+  // Strip any leaked reasoning prefixes
+  text = text.replace(/^(THINK|THOUGHTS?|ANSWER|REASONING)[:\s]*/i, '').trim();
+  // Take only the first line (in case multi-line response)
+  text = text.split('\n')[0].trim();
+  // Truncate at 40 chars, break at word boundary
+  if (text.length > 40) {
+    const cut = text.slice(0, 40);
+    const lastSpace = cut.lastIndexOf(' ');
+    text = lastSpace > 20 ? cut.slice(0, lastSpace) : cut;
+  }
+  // Reject too-short results (likely truncated garbage)
+  if (text.length < 4) return null;
+  return text || null;
 }
 
 export default withCorsAuth(async (req, res, decodedToken) => {
@@ -39,10 +54,8 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       continue;
     }
 
-    if (bean.notesSummary) {
-      results.push({ id: doc.id, name: bean.name, status: 'skipped (already has summary)' });
-      continue;
-    }
+    // Note: this migration re-processes all beans with notes to overwrite any
+    // broken summaries from earlier migration runs.
 
     try {
       const summary = await summarize(bean.bagNotes);
