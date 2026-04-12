@@ -239,7 +239,7 @@ export async function summarizeNotes(bagNotes) {
     const data = await callGemini({
       contents: [{
         role: 'user',
-        parts: [{ text: `Summarize these coffee tasting notes into a single phrase of 3-5 words (max 40 chars). Output only the phrase, nothing else. Notes: ${bagNotes}` }],
+        parts: [{ text: `Summarize these coffee tasting notes as 3-4 comma-separated descriptors (max 40 chars total). Format: "word, word, word" - always use commas between descriptors, lowercase, no period. Output only the phrase. Notes: ${bagNotes}` }],
       }],
       systemInstruction: 'You return ONLY a final short phrase. Never show reasoning, thinking, or explanation. Never use prefixes like THINK:, THOUGHTS:, ANSWER:. Output the answer directly.',
       metered: false,

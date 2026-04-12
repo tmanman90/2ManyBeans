@@ -25,6 +25,15 @@ export const daysSinceRoast = (roastDate, bean = {}) => {
 
 export const daysOpen = (openDate) => openDate ? daysBetween(openDate, today()) : null;
 
+// Format ISO date (YYYY-MM-DD) as "Oct 24, 2026" for display
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const formatDate = (isoDate) => {
+  if (!isoDate) return null;
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+};
+
 export const getPeakStatus = (bean) => {
   const days = daysSinceRoast(bean.roastDate, bean);
   const frozen = !!bean.frozenAt;

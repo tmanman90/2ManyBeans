@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Pencil, Snowflake, ChevronDown } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
-import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
+import { getPeakStatus, daysOpen, today, daysBetween, formatDate } from '../lib/peakStatus';
 import { Badge } from './Badge';
 import { EditBeanModal } from './EditBeanModal';
 import { getBrewMethod } from '../lib/brewMethods';
@@ -191,7 +191,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
         {compact ? (
           /* Compact: Roast Date + Notes */
           (bean.roastDate || displayNotes) ? <>
-            <SpecCell label="Roast Date" value={bean.roastDate} />
+            <SpecCell label="Roast Date" value={formatDate(bean.roastDate)} />
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Notes</div>
               <div style={{
@@ -206,7 +206,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
         ) : (
           /* Full: Roast Date + Weight */
           (bean.roastDate || bean.bagSize) ? <>
-            <SpecCell label="Roast Date" value={bean.roastDate} />
+            <SpecCell label="Roast Date" value={formatDate(bean.roastDate)} />
             <SpecCell label="Weight" value={bean.bagSize ? `${bean.bagSize}g` : null} />
           </> : null
         )}
