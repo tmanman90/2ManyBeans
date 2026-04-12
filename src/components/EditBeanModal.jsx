@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Save, Camera, Trash2, X } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
-import { generateProductShot } from '../lib/gemini';
+import { generateProductShot, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
@@ -225,6 +225,20 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
     if (Object.keys(changes).length > 0) {
       await updateBean(bean.id, changes);
+    }
+
+    // Fire-and-forget: regenerate notesSummary if bagNotes changed
+    const newBagNotes = f.bagNotes.trim();
+    const oldBagNotes = bean.bagNotes || '';
+    if (newBagNotes !== oldBagNotes && newBagNotes && newBagNotes !== '(not logged)') {
+      const capturedId = bean.id;
+      summarizeNotes(newBagNotes)
+        .then(result => {
+          if (result != null && updateBean) {
+            updateBean(capturedId, { notesSummary: result });
+          }
+        })
+        .catch(() => {});
     }
 
     setSaving(false);

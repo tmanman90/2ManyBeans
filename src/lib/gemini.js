@@ -229,3 +229,24 @@ export async function describeImage(photos) {
 
   return data.text || '';
 }
+
+// --- Summarize bag tasting notes into a short phrase ---
+
+export async function summarizeNotes(bagNotes) {
+  if (!bagNotes || bagNotes === '(not logged)') return null;
+
+  try {
+    const data = await callGemini({
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Summarize these coffee tasting notes into a concise phrase under 40 characters. Return ONLY the summary, no quotes or explanation: ${bagNotes}` }],
+      }],
+      metered: false,
+      maxTokens: 100,
+    });
+
+    return (data.text || '').trim() || null;
+  } catch {
+    return null;
+  }
+}

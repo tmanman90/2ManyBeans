@@ -1,6 +1,6 @@
 // Bean display card -- journal-page treatment
 import { useState } from 'react';
-import { Pencil, Snowflake } from 'lucide-react';
+import { Pencil, Snowflake, ChevronDown } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
 import { Badge } from './Badge';
@@ -27,9 +27,22 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
   const ps = getPeakStatus(bean);
   const dOpen = daysOpen(bean.openDate);
 
-  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn;
+  const grindText = brewMethod.grindLabel(bean, preferences);
+
+  const displayNotes = bean.bagNotes && bean.bagNotes !== '(not logged)'
+    ? (bean.notesSummary || bean.bagNotes)
+    : null;
+
+  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || grindText || (bean.handBrewRecipe && preferences.brewMethod === 'handbrew');
 
   const photoHeight = compact ? 180 : 240;
+
+  const SpecCell = ({ label, value }) => (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, color: C.text }}>{value || '--'}</div>
+    </div>
+  );
 
   return (
     <div style={{
@@ -78,17 +91,30 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
             ].join(', '),
             pointerEvents: 'none',
           }} />
+          {/* Status badge overlay */}
+          <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 2 }}>
+            <span style={{
+              background: ps.bg, color: ps.color,
+              fontSize: 11, fontWeight: 600, padding: '3px 10px',
+              borderRadius: 99, whiteSpace: 'nowrap', letterSpacing: 0.3,
+            }}>
+              {ps.label}
+            </span>
+          </div>
         </div>
       )}
 
       <div style={{ padding: compact ? 16 : 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: fonts.heading, fontSize: compact ? 16 : 18, color: C.text, lineHeight: 1.2 }}>
+          <div style={{ fontFamily: fonts.heading, fontSize: compact ? 17 : 20, color: C.text, lineHeight: 1.2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {bean.name}
           </div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-            {bean.roaster || 'Unknown'} · {bean.origin || 'Unknown'}
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            <span style={{ display: 'flex', gap: 8 }}>
+              <span>{bean.roaster || 'Unknown'}</span>
+              <span>{bean.origin || 'Unknown'}</span>
+            </span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -146,55 +172,95 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               <Pencil size={14} color={C.textMuted} />
             </button>
           )}
-          <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>
+          {!bean.photoUrl && <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>}
         </div>
       </div>
-      <div style={{ fontSize: 12, color: C.textMuted, display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginBottom: bean.bagNotes ? 6 : 0 }}>
-        <span>{bean.variety} · {bean.process}</span>
-        {bean.bagSize && <span>{bean.bagSize}g</span>}
-        {bean.roastDate && <span>Roasted {bean.roastDate}</span>}
-        {ps.days !== undefined && <span>{ps.days}d post-roast</span>}
-        {bean.frozenAt && <span style={{ color: C.blue }}>Frozen {bean.frozenAt} ({daysBetween(bean.frozenAt, today())}d frozen)</span>}
-        {dOpen !== null && <span style={{ color: C.accent }}>{dOpen}d open</span>}
+      {/* Specs grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 6 : 8, marginTop: 10, marginBottom: 8 }}>
+        {/* Row 1: Region + Process - skip if both empty */}
+        {(bean.region || bean.origin || bean.process) && <>
+          <SpecCell label="Region" value={bean.region || bean.origin} />
+          <SpecCell label="Process" value={bean.process} />
+        </>}
+
+        {/* Row 2: varies by mode */}
+        {compact ? (
+          /* Compact: Roast Date + Notes */
+          (bean.roastDate || displayNotes) ? <>
+            <SpecCell label="Roast Date" value={bean.roastDate} />
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Notes</div>
+              <div style={{
+                fontSize: 13, color: C.text,
+                overflow: 'hidden', display: '-webkit-box',
+                WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+              }}>
+                {displayNotes || '--'}
+              </div>
+            </div>
+          </> : null
+        ) : (
+          /* Full: Roast Date + Weight */
+          (bean.roastDate || bean.bagSize) ? <>
+            <SpecCell label="Roast Date" value={bean.roastDate} />
+            <SpecCell label="Weight" value={bean.bagSize ? `${bean.bagSize}g` : null} />
+          </> : null
+        )}
+
+        {/* Row 3: Notes + Grind (full mode only) */}
+        {!compact && (displayNotes || grindText) && <>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Notes</div>
+            <div style={{
+              fontSize: 13, color: C.text,
+              overflow: 'hidden', display: '-webkit-box',
+              WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+            }}>
+              {displayNotes || '--'}
+            </div>
+          </div>
+          <SpecCell label="Grind" value={grindText} />
+        </>}
       </div>
-      {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
-        <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginBottom: (bean.aidenGrind || hasDetails || actions) ? 6 : 0 }}>
-          ☕ {bean.bagNotes}
-        </div>
-      )}
-      {brewMethod.grindLabel(bean, preferences) && (
-        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (bean.handBrewRecipe && preferences.brewMethod === 'handbrew') ? 4 : (hasDetails || actions) ? 10 : 0 }}>
-          ⚙ {brewMethod.grindLabel(bean, preferences)}
-        </div>
-      )}
-      {bean.handBrewRecipe && preferences.brewMethod === 'handbrew' && (
-        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: (hasDetails || actions) ? 10 : 0 }}>
-          ☕ Last brew: {bean.handBrewRecipe.method || 'Pour-over'}, {bean.handBrewRecipe.coffeeGrams}g / {bean.handBrewRecipe.waterGrams}g
-        </div>
-      )}
 
       {/* Expandable details */}
       {hasDetails && (
         <>
           <button
             onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              padding: '12px 0', fontSize: 11, color: C.accent,
-              fontFamily: fonts.body, marginBottom: expanded ? 8 : (actions ? 10 : 0),
+              padding: '10px 0', fontSize: 11, color: C.accent,
+              fontFamily: fonts.body,
+              display: 'flex', alignItems: 'center', gap: 4,
             }}
           >
             {expanded ? 'Hide details' : 'Show details'}
+            <ChevronDown size={12} color={C.accent} style={{
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
+              transition: 'transform 0.25s ease-out',
+            }} />
           </button>
 
-          {expanded && (
+          <div style={{
+            maxHeight: expanded ? 300 : 0,
+            overflow: 'hidden',
+            transition: 'max-height 0.25s ease-out, opacity 0.2s ease-out',
+            opacity: expanded ? 1 : 0,
+          }}>
             <div style={{
               fontSize: 12, color: C.textMuted,
               padding: '8px 10px', borderRadius: 8,
-              background: C.bg, border: `1px solid ${C.borderLight}`,
-              marginBottom: actions ? 10 : 0,
+              background: C.bg,
               display: 'flex', flexDirection: 'column', gap: 3,
+              marginBottom: actions ? 10 : 0,
             }}>
+              {bean.variety && <span><strong>Variety:</strong> {bean.variety}</span>}
+              {bean.process && <span><strong>Process:</strong> {bean.process}</span>}
+              {ps.days !== undefined && <span><strong>Post-roast:</strong> {ps.days}d</span>}
+              {dOpen !== null && <span><strong>Days open:</strong> {dOpen}d</span>}
+              {bean.frozenAt && <span><strong>Frozen:</strong> {bean.frozenAt} ({daysBetween(bean.frozenAt, today())}d)</span>}
               {bean.region && <span><strong>Region:</strong> {bean.region}</span>}
               {bean.farm && <span><strong>Farm:</strong> {bean.farm}</span>}
               {bean.altitude && <span><strong>Altitude:</strong> {bean.altitude}</span>}
@@ -202,11 +268,14 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               {bean.cupScore && <span><strong>Accolades:</strong> {bean.cupScore}</span>}
               {bean.roastedIn && <span><strong>Roasted In:</strong> {bean.roastedIn}</span>}
               {bean.sourcedBy && <span><strong>Sourced By:</strong> {bean.sourcedBy}</span>}
-              {bean.brewingRec && (
-                <span style={{ marginTop: 2 }}><strong>Brewing Rec:</strong> {bean.brewingRec}</span>
+              {bean.brewingRec && <span><strong>Brewing Rec:</strong> {bean.brewingRec}</span>}
+              {bean.bagNotes && bean.bagNotes !== '(not logged)' && <span><strong>Full Notes:</strong> {bean.bagNotes}</span>}
+              {grindText && <span><strong>Grind:</strong> {grindText}</span>}
+              {bean.handBrewRecipe && preferences.brewMethod === 'handbrew' && (
+                <span><strong>Last Brew:</strong> {bean.handBrewRecipe.method || 'Pour-over'}, {bean.handBrewRecipe.coffeeGrams}g / {bean.handBrewRecipe.waterGrams}g</span>
               )}
             </div>
-          )}
+          </div>
         </>
       )}
 

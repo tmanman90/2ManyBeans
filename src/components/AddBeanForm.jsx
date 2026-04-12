@@ -6,7 +6,7 @@ import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
 import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
-import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot } from '../lib/gemini';
+import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { scrollOnFocus } from '../lib/formHelpers';
@@ -422,6 +422,13 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
     } catch (err) {
       showError("Couldn't save bean. Check your connection and try again.");
       return;
+    }
+
+    // Fire-and-forget: generate notesSummary from bag notes (nice-to-have, non-blocking)
+    if (beanId && updateBean && beanData.bagNotes && beanData.bagNotes !== '(not logged)') {
+      summarizeNotes(beanData.bagNotes)
+        .then(result => { if (result) return updateBean(beanId, { notesSummary: result }); })
+        .catch(() => {}); // silent — notesSummary is optional
     }
 
     // Clear refs WITHOUT triggering cleanup (we're saving, not canceling)
