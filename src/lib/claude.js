@@ -280,13 +280,16 @@ export async function sendTastingMessage(systemPrompt, history, { firstMessage =
 // Sanitize a string before interpolating it into a Claude system prompt.
 // - Strips anything outside the whitelist (blocks control chars, newlines,
 //   angle brackets, curly braces, backticks, most punctuation).
+// - The colon is whitelisted because recipe fields use it heavily:
+//   handBrewRecipe.ratio is "1:15.5", totalBrewTime is "2:45", etc. None
+//   of the extraction markers we care about (---BEAN_SCAN---, ---EXTRACT---,
+//   ---END---) contain a colon, so it is safe to allow.
 // - Collapses runs of 3+ dashes to "--" so a malicious bag note cannot
-//   inject a fake ---BEAN_SCAN--- / ---EXTRACT--- / ---END--- marker that
-//   parseBeanScan in ChatTab.jsx:22 or the tasting extraction regex would
-//   match. The character-class alone is not sufficient because `-` is in
-//   the whitelist.
+//   inject a fake marker that parseBeanScan in ChatTab.jsx:22 or the
+//   tasting extraction regex would match. The character class alone is
+//   not sufficient because `-` is in the whitelist.
 function sanitize(str, maxLen = 100) {
-  const base = (str || '').slice(0, maxLen).replace(/[^\w .\-',()/]/g, '');
+  const base = (str || '').slice(0, maxLen).replace(/[^\w .\-',():/]/g, '');
   return base.replace(/-{3,}/g, '--');
 }
 
@@ -408,7 +411,7 @@ export function buildChatContext(beans, tastings, preferences) {
     .filter(b => b.status === 'ACTIVE')
     .map(b => {
       const ps = getPeakStatus(b);
-      const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${b.openDate} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
+      const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${sanitize(b.openDate, 20)} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
       const recipeLine =
         brewMethod === 'handbrew' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
       return recipeLine ? `${summary}\n${recipeLine}` : summary;
@@ -421,12 +424,16 @@ export function buildChatContext(beans, tastings, preferences) {
   }).join('\n');
 
   const finished = beans.filter(b => b.status === 'FINISHED').slice(0, 5).map(b =>
-    `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | Finished: ${b.finishDate}`
+    `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | Finished: ${sanitize(b.finishDate, 20)}`
   ).join('\n');
 
   const recentTastings = tastings.slice(0, 5).map(t => {
     const bean = beans.find(x => x.id === t.beanId);
-    return `  ${t.date}: ${sanitize(bean?.name) || '?'} -- ${sanitize(t.oneWord, 50)} ${t.rating ? '\u2605'.repeat(t.rating) : ''} -- ${sanitize(t.notes, 200)}`;
+    // Clamp rating to [0,5] integer before String.repeat — tampered Firestore
+    // data could set it negative or infinite and trigger a RangeError.
+    const ratingN = numOrNull(t.rating);
+    const stars = ratingN !== null ? '\u2605'.repeat(Math.max(0, Math.min(5, Math.floor(ratingN)))) : '';
+    return `  ${sanitize(t.date, 20)}: ${sanitize(bean?.name) || '?'} -- ${sanitize(t.oneWord, 50)} ${stars} -- ${sanitize(t.notes, 200)}`;
   }).join('\n');
 
   // Static block: persona + shared knowledge + brewer/grinder references +
