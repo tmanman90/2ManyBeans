@@ -37,19 +37,19 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
       padding: 0,
       overflow: 'hidden',
     }}>
-      {/* Product shot photo — framed with rounded corners on tonal surface */}
+      {/* Product shot photo — edge gradients blend into card */}
       {bean.photoUrl && (
         <div style={{
           width: '100%',
-          padding: 14,
-          background: C.cardMuted,
+          height: photoHeight,
+          background: C.card,
           position: 'relative',
+          overflow: 'hidden',
         }}>
           {!imgLoaded && (
             <div style={{
-              position: 'absolute', inset: 14,
-              borderRadius: 12,
-              background: `linear-gradient(110deg, ${C.borderLight} 30%, ${C.card} 50%, ${C.borderLight} 70%)`,
+              position: 'absolute', inset: 0,
+              background: `linear-gradient(110deg, ${C.bg} 30%, ${C.borderLight} 50%, ${C.bg} 70%)`,
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.5s infinite',
             }} />
@@ -61,14 +61,23 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
             onLoad={() => setImgLoaded(true)}
             style={{
               width: '100%',
-              height: compact ? 160 : 210,
+              height: photoHeight,
               objectFit: 'contain',
               objectPosition: 'center',
-              borderRadius: 12,
               opacity: imgLoaded ? 1 : 0,
               transition: 'opacity 0.3s ease',
             }}
           />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: [
+              `linear-gradient(to right, ${C.card}, transparent 35%)`,
+              `linear-gradient(to left, ${C.card}, transparent 35%)`,
+              `linear-gradient(to top, ${C.card}, transparent 20%)`,
+            ].join(', '),
+            pointerEvents: 'none',
+          }} />
         </div>
       )}
 

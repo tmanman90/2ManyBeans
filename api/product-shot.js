@@ -39,6 +39,55 @@ BAG APPEARANCE:
 
 OUTPUT: Square 1:1 composition, photorealistic studio product shot`;
 
+// Post-process: replace the AI-generated background with the exact app
+// card color so product shots blend seamlessly regardless of what Gemini
+// produces. Detects background via corner sampling, then smoothly replaces
+// pixels close to it with the target.
+const TARGET_BG = { r: 255, g: 248, b: 240 }; // #FFF8F0 — matches C.card
+async function normalizeProductShotBg(pngBuffer) {
+  const { data, info } = await sharp(pngBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const { width, height } = info;
+  const px = (x, y) => (y * width + x) * 4;
+
+  // Sample 10px inset from each corner to detect background color
+  const m = 10;
+  const corners = [
+    [m, m], [width - m - 1, m],
+    [m, height - m - 1], [width - m - 1, height - m - 1],
+  ];
+  let bgR = 0, bgG = 0, bgB = 0;
+  for (const [x, y] of corners) {
+    const i = px(x, y);
+    bgR += data[i]; bgG += data[i + 1]; bgB += data[i + 2];
+  }
+  bgR = Math.round(bgR / 4);
+  bgG = Math.round(bgG / 4);
+  bgB = Math.round(bgB / 4);
+
+  const threshold = 40;
+  for (let i = 0; i < data.length; i += 4) {
+    const dr = data[i] - bgR;
+    const dg = data[i + 1] - bgG;
+    const db = data[i + 2] - bgB;
+    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+    if (dist < threshold) {
+      const blend = Math.pow(1 - dist / threshold, 2);
+      data[i]     = Math.round(data[i]     + (TARGET_BG.r - data[i])     * blend);
+      data[i + 1] = Math.round(data[i + 1] + (TARGET_BG.g - data[i + 1]) * blend);
+      data[i + 2] = Math.round(data[i + 2] + (TARGET_BG.b - data[i + 2]) * blend);
+    }
+  }
+
+  return sharp(data, { raw: { width, height, channels: 4 } })
+    .removeAlpha()
+    .png()
+    .toBuffer();
+}
+
 // Firestore doc IDs are URL-safe but we still want to forbid slashes,
 // dots, and anything that could mess with Storage object paths.
 const BEAN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -237,9 +286,10 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       });
     }
 
-    // Step 2: Convert PNG to JPEG via sharp (~2MB PNG -> ~300KB JPEG)
+    // Step 2: Normalize background to card color, then convert to JPEG
     const pngBuffer = Buffer.from(imageBase64, 'base64');
-    const jpegBuffer = await sharp(pngBuffer).jpeg({ quality: 80 }).toBuffer();
+    const normalizedPng = await normalizeProductShotBg(pngBuffer);
+    const jpegBuffer = await sharp(normalizedPng).jpeg({ quality: 80 }).toBuffer();
 
     // Step 3: Upload to Firebase Storage via Admin SDK
     const bucket = getStorageBucket();
