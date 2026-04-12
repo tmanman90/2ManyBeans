@@ -62,21 +62,24 @@ function findPackage(offering, match) {
   return offering.availablePackages.find(match) || null;
 }
 
+// Match by the StoreKit product identifier, not the RC package identifier.
+// Package identifiers like `$rc_monthly` are ambiguous when an offering
+// contains both Pro and Ultra tiers — we must look at the real product ID.
 function matchProMonthly(pkg) {
-  const id = pkg.identifier || pkg.product?.identifier || '';
-  return id === '$rc_monthly' || id.includes('pro.monthly');
+  const productId = pkg.product?.identifier || '';
+  return productId.includes('pro.monthly');
 }
 function matchProAnnual(pkg) {
-  const id = pkg.identifier || pkg.product?.identifier || '';
-  return id === '$rc_annual' || id.includes('pro.annual');
+  const productId = pkg.product?.identifier || '';
+  return productId.includes('pro.annual');
 }
 function matchUltraMonthly(pkg) {
-  const id = pkg.identifier || pkg.product?.identifier || '';
-  return id === 'ultra_monthly' || id.includes('ultra.monthly');
+  const productId = pkg.product?.identifier || '';
+  return productId.includes('ultra.monthly');
 }
 function matchUltraAnnual(pkg) {
-  const id = pkg.identifier || pkg.product?.identifier || '';
-  return id === 'ultra_annual' || id.includes('ultra.annual');
+  const productId = pkg.product?.identifier || '';
+  return productId.includes('ultra.annual');
 }
 
 function introTrialLabel(pkg) {
@@ -148,17 +151,24 @@ export function PaywallSheet({ open, context, onClose }) {
       .then((o) => {
         if (cancelled) return;
         if (!o) {
-          // RevenueCat returned no current offering. Most likely the dashboard
-          // doesn't have a `default` offering marked as Current, OR the user's
-          // RC subscriber isn't fully provisioned yet (right after signIn).
-          console.error('[PaywallSheet] getOfferings returned null — RC dashboard may have no current offering');
+          // RC has no offerings at all (dashboard misconfig).
+          console.error('[PaywallSheet] getOfferings returned null — RC dashboard has no offerings');
           setError('Subscription options not available yet. Please try again in a moment.');
           setLoading(false);
           return;
         }
         if (!o.availablePackages || o.availablePackages.length === 0) {
-          console.error('[PaywallSheet] getOfferings returned offering with no packages', o);
-          setError('No subscription plans available. Please try again or contact support.');
+          // RC returned the offering but StoreKit couldn't load any products.
+          // This is ALWAYS an App Store Connect issue (Paid Apps Agreement
+          // not signed, products still in Missing Metadata, bundle ID
+          // mismatch, or no sandbox account signed in on device).
+          console.error('[PaywallSheet] Offering has zero packages — App Store Connect / StoreKit issue', {
+            offeringId: o.identifier,
+            metadata: o.metadata,
+            serverDescription: o.serverDescription,
+            rawPackagesLength: o.availablePackages?.length,
+          });
+          setError('Subscription options not available yet. Please try again in a moment.');
           setLoading(false);
           return;
         }
@@ -166,18 +176,13 @@ export function PaywallSheet({ open, context, onClose }) {
         setLoading(false);
       })
       .catch((err) => {
-        // Log full diagnostic so we can see RC plugin errors in the device console
         console.error('[PaywallSheet] getOfferings failed', {
           message: err?.message,
           code: err?.code,
           underlying: err?.underlyingErrorMessage,
-          stack: err?.stack,
         });
         if (!cancelled) {
-          const msg = err?.message?.toLowerCase().includes('configure')
-            ? 'Subscription service is still starting up. Tap Try Again in a moment.'
-            : 'Could not load subscription options. Please try again.';
-          setError(msg);
+          setError('Could not load subscription options. Please try again.');
           setLoading(false);
         }
       });

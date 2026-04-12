@@ -107,13 +107,31 @@ export async function logOutRevenueCat() {
   }
 }
 
-/** Fetch the current offering (packages with prices from App Store). */
+/** Fetch the current offering (packages with prices from App Store).
+ *
+ * Falls back to the first offering in `all` if no offering is marked
+ * Current in the RC dashboard — a common misconfiguration that would
+ * otherwise wedge the paywall with "no subscription options available".
+ */
 export async function getOfferings() {
   if (!isRevenueCatAvailable()) return null;
   await initRevenueCat();
   const { Purchases } = await loadSdk();
-  const { current } = await Purchases.getOfferings();
-  return current ?? null;
+  const result = await Purchases.getOfferings();
+  const { current, all } = result || {};
+  if (current) return current;
+  // Fallback: pick the first offering that has packages. Useful when the
+  // RC dashboard has offerings defined but none marked "Current".
+  if (all && typeof all === 'object') {
+    for (const key of Object.keys(all)) {
+      const offering = all[key];
+      if (offering?.availablePackages?.length) {
+        console.warn('[RC] No current offering, falling back to', key);
+        return offering;
+      }
+    }
+  }
+  return null;
 }
 
 /** Fetch current customer info (entitlements, active subscriptions). */

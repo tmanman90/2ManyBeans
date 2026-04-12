@@ -10,8 +10,12 @@ import { Btn } from './Btn';
 import { Toast } from './Toast';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { useErrorToast } from '../hooks/useErrorToast';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { usePaywall } from '../hooks/usePaywall';
 
 export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid }) => {
+  const { hasPro } = useSubscription();
+  const { openPaywall } = usePaywall();
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -65,9 +69,14 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     onClose();
   };
 
-  // Server-side product shot: generate + convert + upload + write to Firestore
+  // Server-side product shot: generate + convert + upload + write to Firestore.
+  // Product shots are a Pro-only feature. Free users see the paywall instead.
   const fireProductShot = (photo) => {
     if (photoInFlight.current || !bean.id) return;
+    if (!hasPro) {
+      openPaywall({ feature: 'generic', promote: 'pro' });
+      return;
+    }
     photoInFlight.current = true;
     setPhotoGenerating(true);
     setPhotoError(false);
@@ -87,10 +96,17 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       })
       .catch(err => {
         if (!photoInFlight.current) return; // canceled
-        showError('Photo generation failed: ' + err.message);
-        setPhotoGenerating(false);
-        setPhotoError(true);
         photoInFlight.current = false;
+        setPhotoGenerating(false);
+        // Server rejected with subscription gate — route to paywall instead
+        // of a confusing "photo generation failed" toast.
+        const msg = err?.message || '';
+        if (msg.includes('subscription_required') || msg.includes('free_tier_exhausted') || msg.toLowerCase().includes('pro subscription')) {
+          openPaywall({ feature: 'generic', promote: 'pro' });
+          return;
+        }
+        showError('Photo generation failed: ' + msg);
+        setPhotoError(true);
       });
   };
 
