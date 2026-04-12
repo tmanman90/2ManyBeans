@@ -1,7 +1,7 @@
 // Edit Bean Modal — edit any bean field + grind settings + enriched details + photo
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Save, Camera, Trash2 } from 'lucide-react';
+import { Save, Camera, Trash2, X } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { generateProductShot } from '../lib/gemini';
@@ -168,6 +168,21 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       });
   };
 
+  // Remove the current photo from the bean entirely.
+  const handleRemovePhoto = async () => {
+    if (!bean.id || !updateBean) return;
+    setPhotoGenerating(true);
+    try {
+      await updateBean(bean.id, { photoUrl: null });
+      // Best-effort Storage cleanup (deleteBeanPhoto is already imported lazily in storage.js)
+      const { deleteBeanPhoto } = await import('../lib/storage');
+      deleteBeanPhoto(uid, bean.id).catch(() => {});
+    } catch (err) {
+      showError('Failed to remove photo');
+    }
+    setPhotoGenerating(false);
+  };
+
   const handleSave = async () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
     setSaving(true);
@@ -293,14 +308,24 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 borderRadius: 10, border: `1px solid ${C.borderLight}`, background: C.card,
               }}
             />
-            <Btn
-              variant="ghost"
-              onClick={() => { setPhotoError(false); Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click(); }}
-              disabled={photoGenerating}
-              style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
-            >
-              {photoError ? 'Failed. Retry?' : <><Camera size={12} /> Change Photo</>}
-            </Btn>
+            <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 4 }}>
+              <Btn
+                variant="ghost"
+                onClick={handleRemovePhoto}
+                disabled={photoGenerating}
+                style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
+              >
+                <X size={12} /> Remove
+              </Btn>
+              <Btn
+                variant="ghost"
+                onClick={() => { setPhotoError(false); Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click(); }}
+                disabled={photoGenerating}
+                style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
+              >
+                {photoError ? 'Failed. Retry?' : <><Camera size={12} /> Change</>}
+              </Btn>
+            </div>
           </div>
         ) : (
           <>
