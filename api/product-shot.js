@@ -242,6 +242,37 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     return res.status(200).json({ ok: true });
   }
 
+  // Reprocess: download existing product shot, normalize background, re-upload.
+  // No Gemini call — just fixes the background color on existing photos.
+  if (action === 'reprocess') {
+    if (!beanId) return res.status(400).json({ error: 'beanId required' });
+    try {
+      const bucket = getStorageBucket();
+      const file = bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`);
+      const [exists] = await file.exists();
+      if (!exists) return res.status(404).json({ error: 'No photo found for this bean' });
+
+      const [imageBuffer] = await file.download();
+      const pngBuffer = await sharp(imageBuffer).png().toBuffer();
+      const normalized = await normalizeProductShotBg(pngBuffer);
+      const jpegBuffer = await sharp(normalized).jpeg({ quality: 80 }).toBuffer();
+
+      await file.save(jpegBuffer, { metadata: { contentType: 'image/jpeg' } });
+      const photoUrl = await adminGetDownloadURL(file);
+
+      const db = getDb();
+      await db.collection('users').doc(uid).collection('beans').doc(beanId).update({
+        photoUrl,
+        updatedAt: new Date(),
+      });
+
+      return res.status(200).json({ photoUrl });
+    } catch (err) {
+      console.error('[product-shot] Reprocess error:', err);
+      return res.status(500).json({ error: 'Reprocess failed' });
+    }
+  }
+
   if (!photo?.base64 || !photo?.mimeType) {
     return res.status(400).json({ error: 'photo with base64 and mimeType is required' });
   }
