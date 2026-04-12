@@ -5,6 +5,7 @@ import { Save, Camera, Trash2 } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { generateProductShot } from '../lib/gemini';
+import { uploadOriginalPhoto } from '../lib/storage';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
@@ -12,9 +13,10 @@ import { scrollOnFocus } from '../lib/formHelpers';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall';
+import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
 export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid }) => {
-  const { hasPro } = useSubscription();
+  const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
@@ -22,6 +24,8 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const { errorMsg, showError, hideError } = useErrorToast();
   const [photoGenerating, setPhotoGenerating] = useState(false);
   const [photoError, setPhotoError] = useState(false);
+  // Pending photo: captured but not yet committed. User chooses original vs product shot.
+  const [pendingPhoto, setPendingPhoto] = useState(null); // { base64, mediaType, previewUrl }
   const fileRef = useRef(null);
   const photoInFlight = useRef(false);
 
@@ -51,6 +55,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       if (!photoInFlight.current) {
         setPhotoGenerating(false);
         setPhotoError(false);
+        setPendingPhoto(null);
       }
       setConfirmDelete(false);
       // NOTE: photoInFlight.current is NOT reset here.
@@ -69,51 +74,13 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     onClose();
   };
 
-  // Server-side product shot: generate + convert + upload + write to Firestore.
-  // Product shots are a Pro-only feature. Free users see the paywall instead.
-  const fireProductShot = (photo) => {
-    if (photoInFlight.current || !bean.id) return;
-    if (!hasPro) {
-      openPaywall({ feature: 'generic', promote: 'pro' });
-      return;
-    }
-    photoInFlight.current = true;
-    setPhotoGenerating(true);
-    setPhotoError(false);
-    const capturedBeanId = bean.id;
-    generateProductShot(photo, capturedBeanId)
-      .then(photoUrl => {
-        if (!photoInFlight.current) return; // canceled (bean deleted)
-        setPhotoGenerating(false);
-        // On native, updateBean triggers refetch (bypasses 60s poll).
-        // On web, onSnapshot already delivered the update, skip redundant write.
-        if (Capacitor.isNativePlatform() && updateBean) {
-          updateBean(capturedBeanId, { photoUrl })
-            .finally(() => { photoInFlight.current = false; });
-        } else {
-          photoInFlight.current = false;
-        }
-      })
-      .catch(err => {
-        if (!photoInFlight.current) return; // canceled
-        photoInFlight.current = false;
-        setPhotoGenerating(false);
-        // Server rejected with subscription gate — route to paywall instead
-        // of a confusing "photo generation failed" toast.
-        const msg = err?.message || '';
-        if (msg.includes('subscription_required') || msg.includes('free_tier_exhausted') || msg.toLowerCase().includes('pro subscription')) {
-          openPaywall({ feature: 'generic', promote: 'pro' });
-          return;
-        }
-        showError('Photo generation failed: ' + msg);
-        setPhotoError(true);
-      });
-  };
-
+  // Capture a photo and hold it as pending. User then chooses "Use This Photo"
+  // or "Generate Product Shot" before it's committed.
   const handlePhotoCapture = async (file) => {
     try {
       const compressed = await compressImage(file);
-      fireProductShot(compressed);
+      setPendingPhoto(compressed);
+      setPhotoError(false);
     } catch (err) {
       console.error('Image compression failed:', err);
       setPhotoError(true);
@@ -136,12 +103,69 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         height: 1200,
       });
       const base64 = image.dataUrl.split(',')[1];
-      fireProductShot({ base64, mediaType: 'image/jpeg' });
+      setPendingPhoto({ base64, mediaType: 'image/jpeg', previewUrl: image.dataUrl });
+      setPhotoError(false);
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
         console.error('Camera error:', err);
       }
     }
+  };
+
+  // Upload the user's original photo as the bean image (any user).
+  const handleUseOriginal = async () => {
+    if (!pendingPhoto || !bean.id) return;
+    setPhotoGenerating(true);
+    setPhotoError(false);
+    try {
+      const result = await uploadOriginalPhoto(bean.id, pendingPhoto);
+      if (result?.photoUrl && updateBean) {
+        await updateBean(bean.id, { photoUrl: result.photoUrl });
+      }
+      setPendingPhoto(null);
+    } catch (err) {
+      showError('Photo upload failed');
+      setPhotoError(true);
+    }
+    setPhotoGenerating(false);
+  };
+
+  // Generate an AI product shot from the pending photo.
+  // Metered: free users get 1 free, then paywall.
+  const handleProductShot = () => {
+    if (!pendingPhoto || photoInFlight.current || !bean.id) return;
+    if (!hasPro && (freeUsage?.productShots ?? 0) >= FREE_LIMITS.productShots) {
+      openPaywall({ feature: 'product_shot', promote: 'pro' });
+      return;
+    }
+    photoInFlight.current = true;
+    setPhotoGenerating(true);
+    setPhotoError(false);
+    const capturedBeanId = bean.id;
+    generateProductShot(pendingPhoto, capturedBeanId)
+      .then(photoUrl => {
+        if (!photoInFlight.current) return;
+        setPhotoGenerating(false);
+        setPendingPhoto(null);
+        if (Capacitor.isNativePlatform() && updateBean) {
+          updateBean(capturedBeanId, { photoUrl })
+            .finally(() => { photoInFlight.current = false; });
+        } else {
+          photoInFlight.current = false;
+        }
+      })
+      .catch(err => {
+        if (!photoInFlight.current) return;
+        photoInFlight.current = false;
+        setPhotoGenerating(false);
+        const msg = err?.message || '';
+        if (msg.includes('subscription_required') || msg.includes('free_tier_exhausted') || msg.toLowerCase().includes('pro subscription')) {
+          openPaywall({ feature: 'product_shot', promote: 'pro' });
+          return;
+        }
+        showError('Photo generation failed');
+        setPhotoError(true);
+      });
   };
 
   const handleSave = async () => {
@@ -216,7 +240,50 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     }>
       {/* Photo section */}
       <div style={{ marginBottom: 16 }}>
-        {bean.photoUrl ? (
+        <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
+
+        {/* Pending photo: show preview with choice buttons */}
+        {pendingPhoto ? (
+          <div>
+            <img
+              src={pendingPhoto.previewUrl || `data:${pendingPhoto.mediaType};base64,${pendingPhoto.base64}`}
+              alt="New photo"
+              style={{
+                width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',
+                borderRadius: 10, border: `1px solid ${C.borderLight}`, background: C.card,
+              }}
+            />
+            {photoGenerating ? (
+              <div style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginTop: 8 }}>Processing...</div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <Btn
+                  variant="primary"
+                  onClick={handleUseOriginal}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                >
+                  Use This Photo
+                </Btn>
+                <Btn
+                  variant="secondary"
+                  onClick={handleProductShot}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                >
+                  Product Shot
+                </Btn>
+              </div>
+            )}
+            {!photoGenerating && (
+              <Btn
+                variant="ghost"
+                onClick={() => setPendingPhoto(null)}
+                style={{ width: '100%', justifyContent: 'center', fontSize: 11, marginTop: 4 }}
+              >
+                Cancel
+              </Btn>
+            )}
+          </div>
+        ) : bean.photoUrl ? (
           <div style={{ position: 'relative' }}>
             <img
               src={bean.photoUrl}
@@ -226,26 +293,24 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 borderRadius: 10, border: `1px solid ${C.borderLight}`, background: C.card,
               }}
             />
-            <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
             <Btn
               variant="ghost"
               onClick={() => { setPhotoError(false); Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click(); }}
               disabled={photoGenerating}
               style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
             >
-              {photoError ? 'Failed. Retry?' : photoGenerating ? 'Generating...' : <><Camera size={12} /> Change Photo</>}
+              {photoError ? 'Failed. Retry?' : <><Camera size={12} /> Change Photo</>}
             </Btn>
           </div>
         ) : (
           <>
-            <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
             {photoError ? (
               <Btn
                 variant="ghost"
                 onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
                 style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10, color: C.amber }}
               >
-                Photo generation failed. Tap to retry.
+                Failed. Tap to retry.
               </Btn>
             ) : (
               <Btn
@@ -254,7 +319,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 disabled={photoGenerating}
                 style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10 }}
               >
-                {photoGenerating ? 'Generating product shot...' : <><Camera size={14} /> Add Photo</>}
+                {photoGenerating ? 'Processing...' : <><Camera size={14} /> Add Photo</>}
               </Btn>
             )}
           </>
