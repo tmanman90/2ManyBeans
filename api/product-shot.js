@@ -39,6 +39,55 @@ BAG APPEARANCE:
 
 OUTPUT: Square 1:1 composition, photorealistic studio product shot`;
 
+// Post-process: normalize the AI-generated background to the exact CSS
+// container color so it blends seamlessly in the app. Samples corners to
+// detect the background, then smoothly replaces similar pixels.
+const TARGET_BG = { r: 239, g: 234, b: 226 }; // #EFEAE2 — matches C.cardMuted
+async function normalizeProductShotBg(pngBuffer) {
+  const { data, info } = await sharp(pngBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const { width, height } = info;
+  const px = (x, y) => (y * width + x) * 4;
+
+  // Sample 10px inset from each corner to detect background color
+  const margin = 10;
+  const cornerCoords = [
+    [margin, margin], [width - margin - 1, margin],
+    [margin, height - margin - 1], [width - margin - 1, height - margin - 1],
+  ];
+  let bgR = 0, bgG = 0, bgB = 0;
+  for (const [x, y] of cornerCoords) {
+    const i = px(x, y);
+    bgR += data[i]; bgG += data[i + 1]; bgB += data[i + 2];
+  }
+  bgR = Math.round(bgR / 4);
+  bgG = Math.round(bgG / 4);
+  bgB = Math.round(bgB / 4);
+
+  // Replace pixels close to detected background with target color
+  const threshold = 35;
+  for (let i = 0; i < data.length; i += 4) {
+    const dr = data[i] - bgR;
+    const dg = data[i + 1] - bgG;
+    const db = data[i + 2] - bgB;
+    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+    if (dist < threshold) {
+      const blend = Math.pow(1 - dist / threshold, 2); // smooth falloff
+      data[i]     = Math.round(data[i]     + (TARGET_BG.r - data[i])     * blend);
+      data[i + 1] = Math.round(data[i + 1] + (TARGET_BG.g - data[i + 1]) * blend);
+      data[i + 2] = Math.round(data[i + 2] + (TARGET_BG.b - data[i + 2]) * blend);
+    }
+  }
+
+  return sharp(data, { raw: { width, height, channels: 4 } })
+    .removeAlpha()
+    .png()
+    .toBuffer();
+}
+
 // Firestore doc IDs are URL-safe but we still want to forbid slashes,
 // dots, and anything that could mess with Storage object paths.
 const BEAN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -237,9 +286,10 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       });
     }
 
-    // Step 2: Convert PNG to JPEG via sharp (~2MB PNG -> ~300KB JPEG)
+    // Step 2: Normalize background color + convert to JPEG
     const pngBuffer = Buffer.from(imageBase64, 'base64');
-    const jpegBuffer = await sharp(pngBuffer).jpeg({ quality: 80 }).toBuffer();
+    const normalizedBuffer = await normalizeProductShotBg(pngBuffer);
+    const jpegBuffer = await sharp(normalizedBuffer).jpeg({ quality: 80 }).toBuffer();
 
     // Step 3: Upload to Firebase Storage via Admin SDK
     const bucket = getStorageBucket();
