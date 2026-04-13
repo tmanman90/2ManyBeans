@@ -281,16 +281,6 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
     }
   }, [finishing, profile, createProfile, completeOnboarding, uid, user]);
 
-  // Log a resume when hydration restored a non-r1 step. Useful for
-  // post-ship debugging without being noisy during normal flows.
-  const resumeLoggedRef = useRef(false);
-  useEffect(() => {
-    if (hydrated && !resumeLoggedRef.current && state.step !== 'r1') {
-      resumeLoggedRef.current = true;
-      logOnboardingEvent('onboarding_resumed', { screen: state.step });
-    }
-  }, [hydrated, state.step]);
-
   const ctxValue = useMemo(() => ({
     state,
     answers: state.answers,

@@ -62,6 +62,7 @@ src/
 - Add Bean flow: multi-photo gallery (1-3) → Gemini vision scan → search grounding enrichment → review. Alt path: manual entry → AI Fill triggers same research.
 - Bean data model includes enriched fields: altitude, region, farm, roastLevel, cupScore, brewingRec, sourcedBy (all optional, filled by scan + research)
 - The user (Tal) is a novice taster — all AI tasting interactions must use step-by-step coaching with scaffolded options, never vague open-ended questions
+- Onboarding is a 13-screen flow in `src/components/onboarding/` (OnboardingFlow state machine + screens/R01..R13b). Gate 5 in `main.jsx` mounts it via a single lazy chunk. User answers live on `profile.onboardingAnswers` (Firestore field, additive), with `completedVia` ∈ {paywall|maybe_later|skipped_paywall} and `postCompleteAction` ∈ {scan|manual_add|none}. Live prefs still live on `profile.preferences` — never duplicated. Terminal commit is a single atomic `setDoc(merge:true)` via `completeOnboarding(answers)` or `createProfile` for fresh users
 - See `.claude/rules/` for path-scoped details on API proxies, AI model routing, and iOS layout
 
 ## Reference Files
