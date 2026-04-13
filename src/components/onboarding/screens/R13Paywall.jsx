@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { C, fonts } from '../../../styles/theme';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { C, fonts, radius, shadows } from '../../../styles/theme';
 import { useOnboarding } from '../OnboardingContext';
 import { useOnboardingPaywall } from '../useOnboardingPaywall';
 import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
@@ -33,6 +33,28 @@ export default function R13Paywall() {
     flowCompletedRef,
   } = useOnboardingPaywall();
 
+  // Local error state for finalize failures. When non-null, R13
+  // renders an error + retry UI so the purchased user isn't stranded
+  // on a blank screen.
+  const [finalizeError, setFinalizeError] = useState(null);
+
+  // Wraps finish() for the purchase path: logs telemetry, handles
+  // write failure by clearing the flowCompletedRef latch (so the
+  // retry button can re-enter) and surfacing an error.
+  const finalizePurchase = useCallback(async () => {
+    try {
+      setFinalizeError(null);
+      await finish?.({ completedVia: 'paywall' });
+      // Happy path unmounts R13 as soon as profile.onboardingComplete
+      // flips — nothing else to do here.
+    } catch (err) {
+      // Clear the latch so either retry button or a late second
+      // signal can re-enter cleanly.
+      flowCompletedRef.current = false;
+      setFinalizeError(err?.message || 'Could not finish setting up your account.');
+    }
+  }, [finish, flowCompletedRef]);
+
   // Open the paywall exactly once, on the first render where status
   // transitions to 'ready'. StrictMode guarded via openedRef.
   const openedRef = useRef(false);
@@ -61,15 +83,10 @@ export default function R13Paywall() {
   }, [status]);
 
   // Detect a successful purchase via hasPro / hasUltra transition.
-  // The PaywallSheet itself will close after a short success toast,
-  // which fires the dismiss-vs-purchase effect below. But we ALSO
-  // watch hasPro here because the RC listener can flip before the
-  // paywall close callback fires — the first signal wins, and
-  // flowCompletedRef stops a double-commit.
-  //
-  // Purchased path: skip R13b entirely. Call finish() directly with
-  // completedVia='paywall' — Gate 5 will re-render into the main app
-  // as soon as profile.onboardingComplete flips true.
+  // PaywallSheet will close on its own after a success toast, which
+  // fires the dismiss/purchase effect below. But we ALSO watch hasPro
+  // here because the RC listener can flip before the paywall close
+  // callback fires — whichever signal wins first locks the latch.
   const prevHasSubRef = useRef(false);
   useEffect(() => {
     const hasSub = hasPro || hasUltra;
@@ -79,31 +96,26 @@ export default function R13Paywall() {
       logOnboardingEvent('onboarding_paywall_trial_started', {
         tier: hasUltra ? 'ultra' : 'pro',
       });
-      finish?.({ completedVia: 'paywall' });
+      finalizePurchase();
     }
     prevHasSubRef.current = hasSub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPro, hasUltra]);
 
   // Wire PaywallSheet's own close signal through the disambig timer.
-  // We piggyback on the same global paywall state: when paywallContext
-  // goes null (the sheet is closed), we trigger the dismiss flow.
+  // When paywallContext goes null (the sheet closed), we trigger the
+  // dismiss/purchase fork.
   const wasOpenRef = useRef(false);
   useEffect(() => {
     const nowOpen = paywallContext !== null;
     if (wasOpenRef.current && !nowOpen) {
       // Sheet just closed — could be purchase OR dismiss. The hook
-      // owns the flowCompletedRef latch: it only calls one of these
-      // callbacks (at most), so we don't re-check or re-assign the
-      // ref here. The callbacks are guaranteed single-fire per
-      // disambig window.
+      // owns the single-fire latch: it only calls one of these
+      // callbacks (at most).
       handleDismissOrPurchase(
         () => {
-          // onPurchased — late-propagating hasPro signal. The
-          // purchase transition effect above may have already fired
-          // finish() first; the OnboardingFlow.finish() `finishing`
-          // guard makes the second call a no-op.
-          finish?.({ completedVia: 'paywall' });
+          // onPurchased — late-propagating hasPro signal.
+          finalizePurchase();
         },
         () => {
           // onDismissed — user closed without buying within the
@@ -117,9 +129,9 @@ export default function R13Paywall() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paywallContext]);
 
-  // Non-blocking fallback UI — shows during hydration, skip paths, or
-  // behind the paywall sheet. Always mounted so the reducer
-  // transitions have somewhere to land.
+  // Non-blocking fallback UI — shows during hydration, skip paths,
+  // or behind the paywall sheet. Surfaces a retry UI if the final
+  // commit write failed after a successful purchase.
   return (
     <div
       style={{
@@ -134,7 +146,56 @@ export default function R13Paywall() {
         textAlign: 'center',
       }}
     >
-      {status === 'hydrating' ? (
+      {finalizeError ? (
+        <>
+          <div style={{
+            fontFamily: fonts.title,
+            fontSize: 30,
+            color: C.accent,
+            marginBottom: 10,
+          }}>
+            Almost there.
+          </div>
+          <div style={{
+            fontSize: 15,
+            color: C.textMuted,
+            marginBottom: 20,
+            maxWidth: 320,
+            lineHeight: 1.45,
+          }}>
+            Your subscription is active, but I couldn't save your setup
+            yet. Tap below to try again — you won't be charged twice.
+          </div>
+          <button
+            onClick={finalizePurchase}
+            style={{
+              minHeight: 52,
+              padding: '14px 28px',
+              fontSize: 16,
+              fontWeight: 700,
+              fontFamily: fonts.body,
+              background: C.accent,
+              color: '#fff',
+              border: 'none',
+              borderRadius: radius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.button,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Finish setting up
+          </button>
+          <div style={{
+            fontSize: 12,
+            color: C.textLight,
+            marginTop: 12,
+            maxWidth: 260,
+            lineHeight: 1.4,
+          }}>
+            {finalizeError}
+          </div>
+        </>
+      ) : status === 'hydrating' ? (
         <>
           <div style={{
             width: 36,
@@ -156,11 +217,8 @@ export default function R13Paywall() {
           </div>
         </>
       ) : (
-        <div style={{ fontSize: 14, color: C.textMuted }}>
-          &nbsp;
-        </div>
+        <div style={{ fontSize: 14, color: C.textMuted }}>&nbsp;</div>
       )}
     </div>
   );
 }
-
