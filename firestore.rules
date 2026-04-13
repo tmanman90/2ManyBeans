@@ -15,7 +15,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'displayName', 'email', 'photoURL', 'signUpProvider',
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
-          'marketingConsent', 'marketingConsentDate', 'preferences'
+          'marketingConsent', 'marketingConsentDate', 'preferences',
+          'onboardingAnswers', 'onboardingCompletedAt'
         ])
         // Belt-and-suspenders: even if the keys() check above changes,
         // the create path can never include subscription or fellow.
@@ -33,7 +34,8 @@ service cloud.firestore {
           'displayName', 'email', 'photoURL', 'signUpProvider',
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
           'marketingConsent', 'marketingConsentDate', 'preferences',
-          'fellow', 'subscription'
+          'fellow', 'subscription',
+          'onboardingAnswers', 'onboardingCompletedAt'
         ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100
@@ -70,6 +72,20 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.data.size() <= 100;  // max 100 top-level fields
       allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Onboarding analytics events. Immutable funnel telemetry — create only,
+    // no updates, no deletes. Size-capped, field-validated, name-validated.
+    // Firestore Analytics is NOT installed (unreliable on WKWebView) so the
+    // onboarding flow writes its per-screen events here instead.
+    match /users/{userId}/onboarding_events/{eventId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['name', 'screen', 'timestamp', 'meta'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.size() <= 10;
+      allow update, delete: if false;
     }
 
     // No catch-all subcollection rule. Any future server-managed collection

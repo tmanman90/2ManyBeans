@@ -125,48 +125,51 @@ const Root = () => {
     if (!dataLoaded) return <LoadingScreen />;
   }
 
-  // Gate 5: Onboarding not complete
-  if (!isOnboarded) {
-    return (
-      <React.Suspense fallback={<LoadingScreen />}>
-        <OnboardingWizard
-          user={user}
-          profile={profile}
-          createProfile={createProfile}
-          updateProfile={updateProfile}
-        />
-      </React.Suspense>
-    );
-  }
-
-  // Gate 6: Waiting for Firestore data
-  if (!dataLoaded) return <LoadingScreen />;
-
+  // Gates 5 and 6 are rendered INSIDE the provider stack so the onboarding
+  // flow (gate 5) can call usePaywall() and useSubscription() just like the
+  // main app (gate 6). The providers were previously mounted only around
+  // gate 6, which made them out-of-scope for the onboarding component tree.
   return (
     <AuthContext value={authValue}>
       <SubscriptionProvider uid={user.uid}>
         <PaywallProvider>
-          <UserPreferencesProvider value={contextValue}>
-            <App
-              uid={user.uid}
-              beans={beans}
-              tastings={tastings}
-              addBean={addBean}
-              updateBean={updateBean}
-              deleteBean={deleteBean}
-              addTasting={addTasting}
-              updateTasting={updateTasting}
-              deleteTasting={deleteTasting}
-              openBean={openBean}
-              finishBean={finishBean}
-              returnBean={returnBean}
-              getBeanById={getBeanById}
-              profile={profile}
-              updateProfile={updateProfile}
-              refetchBeans={refetch}
-            />
-            <PaywallMount />
-          </UserPreferencesProvider>
+          {!isOnboarded ? (
+            // Gate 5: Onboarding not complete
+            <React.Suspense fallback={<LoadingScreen />}>
+              <OnboardingWizard
+                user={user}
+                profile={profile}
+                createProfile={createProfile}
+                updateProfile={updateProfile}
+              />
+            </React.Suspense>
+          ) : !dataLoaded ? (
+            // Gate 6a: Waiting for Firestore data
+            <LoadingScreen />
+          ) : (
+            // Gate 6b: Main app
+            <UserPreferencesProvider value={contextValue}>
+              <App
+                uid={user.uid}
+                beans={beans}
+                tastings={tastings}
+                addBean={addBean}
+                updateBean={updateBean}
+                deleteBean={deleteBean}
+                addTasting={addTasting}
+                updateTasting={updateTasting}
+                deleteTasting={deleteTasting}
+                openBean={openBean}
+                finishBean={finishBean}
+                returnBean={returnBean}
+                getBeanById={getBeanById}
+                profile={profile}
+                updateProfile={updateProfile}
+                refetchBeans={refetch}
+              />
+              <PaywallMount />
+            </UserPreferencesProvider>
+          )}
         </PaywallProvider>
       </SubscriptionProvider>
     </AuthContext>

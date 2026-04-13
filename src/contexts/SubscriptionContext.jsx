@@ -35,6 +35,13 @@ const INITIAL_STATE = {
   freeUsage: { aiScans: 0, tasteTests: 0 },
   loading: true,
   firestoreLoaded: false,
+  // rcHydrated flips true once the RC side has "tried" at least once:
+  // first getCustomerInfo() resolution (success OR failure), first
+  // onCustomerInfoUpdate callback, OR immediately on platforms where RC
+  // won't run (web, missing plugin). Consumers gating on subscription
+  // status (e.g. onboarding R13 skip-already-subscribed check) should
+  // wait for BOTH firestoreLoaded AND rcHydrated before reading hasPro.
+  rcHydrated: false,
 };
 
 export function SubscriptionProvider({ uid, children }) {
@@ -94,25 +101,39 @@ export function SubscriptionProvider({ uid, children }) {
   // critical asymmetry that makes the merge correct: SDK refreshes can
   // unlock instantly, while cancellations always come from Firestore.
   useEffect(() => {
-    if (!uid || !isRevenueCatAvailable() || !Capacitor.isNativePlatform()) return;
+    // On platforms where RC will never run (web, missing plugin, non-native),
+    // mark hydrated immediately so consumers gating on rcHydrated don't hang.
+    if (!uid || !isRevenueCatAvailable() || !Capacitor.isNativePlatform()) {
+      if (uid) setState((prev) => ({ ...prev, rcHydrated: true }));
+      return;
+    }
 
     let cancelled = false;
 
     getCustomerInfo()
       .then((info) => {
-        if (cancelled || !info) return;
+        if (cancelled) return;
+        if (!info) {
+          // Still count this as hydrated — we asked and got nothing.
+          setState((prev) => ({ ...prev, rcHydrated: true }));
+          return;
+        }
         const { hasPro, hasUltra } = deriveEntitlements(info);
         setState((prev) => ({
           ...prev,
           hasPro: prev.hasPro || hasPro,
           hasUltra: prev.hasUltra || hasUltra,
           loading: false,
+          rcHydrated: true,
         }));
       })
       .catch((err) => {
         // Plugin missing (old TF build) or SDK init failed. Don't touch
-        // state -- Firestore remains the source of truth.
+        // entitlement state -- Firestore remains the source of truth --
+        // but DO mark rcHydrated so gates don't hang waiting for a
+        // response that will never come.
         console.error('[SubscriptionContext] getCustomerInfo failed', err);
+        if (!cancelled) setState((prev) => ({ ...prev, rcHydrated: true }));
       });
 
     const unsub = onCustomerInfoUpdate((info) => {
@@ -121,6 +142,7 @@ export function SubscriptionProvider({ uid, children }) {
         ...prev,
         hasPro: prev.hasPro || hasPro,
         hasUltra: prev.hasUltra || hasUltra,
+        rcHydrated: true,
       }));
     });
 
