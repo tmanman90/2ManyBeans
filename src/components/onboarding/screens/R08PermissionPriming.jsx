@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CameraIcon } from 'lucide-react';
 import { C, fonts } from '../../../styles/theme';
@@ -29,7 +29,24 @@ export default function R08PermissionPriming() {
   const [requesting, setRequesting] = useState(false);
   const [deniedMessage, setDeniedMessage] = useState(null);
 
+  // Canceled flag + timer ref so that navigating away (back button) or
+  // unmounting during the 800ms "denied" follow-up window doesn't strand
+  // a stale setTimeout that later force-advances the reducer.
+  const canceledRef = useRef(false);
+  const deniedTimerRef = useRef(null);
+  useEffect(() => {
+    canceledRef.current = false;
+    return () => {
+      canceledRef.current = true;
+      if (deniedTimerRef.current) {
+        clearTimeout(deniedTimerRef.current);
+        deniedTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const advance = (cameraPermission) => {
+    if (canceledRef.current) return;
     dispatch({
       type: 'ADVANCE',
       next: 'r9',
@@ -72,7 +89,10 @@ export default function R08PermissionPriming() {
         setDeniedMessage(
           "No worries — you can still add bags manually, and you can turn the camera on later from Settings."
         );
-        setTimeout(() => advance('denied'), 800);
+        deniedTimerRef.current = setTimeout(() => {
+          deniedTimerRef.current = null;
+          advance('denied');
+        }, 800);
       }
     } catch (err) {
       logOnboardingEvent('onboarding_permission_failed', {
