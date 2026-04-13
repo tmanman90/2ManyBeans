@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { C, fonts, radius, shadows } from '../../../styles/theme';
 import { haptic } from '../../../lib/haptics';
 import { OnboardingScreenShell } from './OnboardingScreenShell';
@@ -32,23 +32,26 @@ const SWIPE_OFFSCREEN = 520; // px — flyoff distance on commit
 
 export default function R05Tinder() {
   const { dispatch, answers } = useOnboarding();
+  const alreadyComplete =
+    Array.isArray(answers?.tinderCards) && answers.tinderCards.length === 5;
+
   const [cardIndex, setCardIndex] = useState(0);
   const [swipes, setSwipes] = useState([]);
+  const committedRef = useRef(false); // guards against double-commit on final card
 
-  // Guard: resume into a completed R5. This runs before the first paint
-  // so the user never sees a stale cardIndex=0 flash.
-  useEffect(() => {
-    if (Array.isArray(answers?.tinderCards) && answers.tinderCards.length === 5) {
-      dispatch({ type: 'ADVANCE', next: 'r6' });
-    }
-    // Partial (<5) state = local reset, no action needed — the defaults
-    // already start at cardIndex=0 with an empty swipes array.
+  // If we land here with a completed 5-card state (hydrated from
+  // localStorage), render NOTHING and advance synchronously in a layout
+  // effect. useLayoutEffect fires after DOM mutations but before the
+  // browser paints, so the user never sees the first card flash.
+  useLayoutEffect(() => {
+    if (alreadyComplete) dispatch({ type: 'ADVANCE', next: 'r6' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (alreadyComplete) return null;
+
   const card = TINDER_CARDS[cardIndex];
   const isLast = cardIndex === TINDER_CARDS.length - 1;
-  const committedRef = useRef(false); // guards against double-commit on final card
 
   const commitSwipe = (direction) => {
     if (committedRef.current) return;

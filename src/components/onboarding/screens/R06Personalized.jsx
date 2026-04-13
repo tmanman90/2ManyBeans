@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { C, fonts, radius } from '../../../styles/theme';
 import { OnboardingScreenShell } from './OnboardingScreenShell';
 import { useOnboarding } from '../OnboardingContext';
@@ -62,19 +62,20 @@ const DEFAULT_FEATURES = ['rotation', 'tasting', 'scan'];
 export default function R06Personalized() {
   const { dispatch, answers } = useOnboarding();
 
+  const hasPalate =
+    Array.isArray(answers?.tinderCards) &&
+    answers.tinderCards.length === 5 &&
+    !!answers?.palateChart;
+
   // Guard per plan: if we somehow land here without a full palate result,
-  // send the user back to R5 to finish it. This prevents a resume into a
-  // half-state from crashing R11's spider chart later.
-  useEffect(() => {
-    const hasPalate =
-      Array.isArray(answers?.tinderCards) &&
-      answers.tinderCards.length === 5 &&
-      answers?.palateChart;
-    if (!hasPalate) {
-      dispatch({ type: 'ADVANCE', next: 'r5' });
-    }
+  // bounce back to R5 to finish it. useLayoutEffect + a render-time null
+  // return keep the stale R6 content from flashing on screen.
+  useLayoutEffect(() => {
+    if (!hasPalate) dispatch({ type: 'ADVANCE', next: 'r5' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (!hasPalate) return null;
 
   const featureKeys = GOAL_FEATURE_MAP[answers?.goal] || DEFAULT_FEATURES;
   const features = featureKeys.map((k) => FEATURE_LIBRARY[k]).filter(Boolean);
