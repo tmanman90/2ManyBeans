@@ -12,6 +12,11 @@ export const haptic = {
     const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
     await Haptics.impact({ style: ImpactStyle.Medium });
   },
+  async heavy() {
+    if (!Capacitor.isNativePlatform()) return;
+    const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+    await Haptics.impact({ style: ImpactStyle.Heavy });
+  },
   async success() {
     if (!Capacitor.isNativePlatform()) return;
     const { Haptics, NotificationType } = await import('@capacitor/haptics');

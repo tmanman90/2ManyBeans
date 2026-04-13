@@ -23,7 +23,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod === 'handbrew';
@@ -295,6 +295,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        bean={handBrew.handBrewBean}
+        onStartTasting={onStartTastingSession}
+        userCoffeeGrams={handBrew.userCoffeeGrams}
+        onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
+        onPersistDose={handBrew.persistDose}
       />
       <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
         {returnConfirm && (
@@ -329,6 +334,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         addBean={addBean}
         addTasting={addTasting}
         uid={uid}
+        onStartTastingSession={onStartTastingSession}
       />
       {quickRecipeSaveData && (
         <AddBeanForm

@@ -28,7 +28,7 @@ const toEphemeralBean = (data) => {
   return bean;
 };
 
-export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, uid }) => {
+export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, uid, onStartTastingSession }) => {
   const { preferences } = usePreferences();
   const isHandBrew = preferences.brewMethod === 'handbrew';
 
@@ -213,12 +213,20 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
 
   const handleSave = () => {
     if (!scanData || !onSaveToInventory) return;
+    const handBrewForSave = handBrew.handBrewRecipe
+      ? {
+          ...handBrew.handBrewRecipe,
+          ...(typeof handBrew.userCoffeeGrams === 'number'
+            ? { userCoffeeGrams: handBrew.userCoffeeGrams }
+            : {}),
+        }
+      : null;
     const saveData = {
       ...scanData,
       aidenRecipe: aiden.aidenRecipe,
       aidenLink: aiden.aidenResult?.link || null,
       aidenGrind: aiden.aidenRecipe?.grindRecommendation || null,
-      handBrewRecipe: handBrew.handBrewRecipe || null,
+      handBrewRecipe: handBrewForSave,
       photo,
     };
     onClose();
@@ -246,6 +254,13 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         }
         if (handBrew.handBrewRecipe) {
           beanData.handBrewRecipe = { ...handBrew.handBrewRecipe, generatedAt: new Date().toISOString() };
+          // Carry the user's dose override through to the persisted bean.
+          // The override lives in the hook's lifted state for ephemeral beans
+          // (no Firestore id to write to mid-session), so we merge it here
+          // when the bean is finally saved.
+          if (typeof handBrew.userCoffeeGrams === 'number') {
+            beanData.handBrewRecipe.userCoffeeGrams = handBrew.userCoffeeGrams;
+          }
         }
         const newId = await addBean(beanData);
         setSavedBeanId(newId);
@@ -279,6 +294,16 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     if (beanId) {
       setToast(`${scanData?.name || 'Bean'} saved. Start a tasting from the Tasting tab.`);
     }
+  };
+
+  // Called from BrewTimer completion screen. The "bean" at this point is the
+  // ephemeral scanData, so we auto-save it to Firestore first (if not already),
+  // then fire the App-level tasting bridge with the real Firestore id.
+  const handleBrewTimerStartTasting = async () => {
+    const beanId = await handleAutoSave();
+    if (!beanId) return;
+    onClose?.();
+    onStartTastingSession?.(beanId);
   };
 
   const handleLearnPress = () => {
@@ -372,6 +397,11 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onRetry={handBrew.onRetry}
             onRegenerate={handBrew.onRegenerate}
             extraFooter={actionButtons}
+            bean={handBrew.handBrewBean}
+            onStartTasting={handleBrewTimerStartTasting}
+            userCoffeeGrams={handBrew.userCoffeeGrams}
+            onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
+            onPersistDose={handBrew.persistDose}
           />
         )}
         <ProfessorRuphusSlideUp {...ruphusProps} />

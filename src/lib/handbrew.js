@@ -140,11 +140,74 @@ function roastToGrindTier(roastLevel) {
   return 'light'; // ultra-light, light, or unknown default to light
 }
 
+// Parse a free-form time string into seconds. Accepts "M:SS", "MM:SS",
+// ranges like "2:30-3:00" (midpoint), and descriptive values like
+// "about 3 minutes". Returns null if nothing parseable is found.
+//
+// Strict bounds: minutes 0-99, seconds 0-59. "120:00", "1:99", and
+// "1:234" all return null rather than silently misparsing. A pour-over
+// brew is never over 99 minutes, and GPT typos that push past this
+// range should fail validation loudly, not produce wrong numbers.
+export function parseTimeString(str) {
+  if (str == null) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+
+  // Bounded MM:SS fragment: 1-2 minute digits, exactly 2 second digits.
+  // `(?!\d)` prevents matching "1:234" as "1:23". Lookbehind `(?<!\d)`
+  // prevents matching "120:00" as "20:00".
+  const frag = /(?<!\d)(\d{1,2}):(\d{2})(?!\d)/;
+
+  // Range: "M:SS-M:SS" → midpoint
+  const rangeMatch = s.match(new RegExp(frag.source + String.raw`\s*[-–—]\s*` + frag.source));
+  if (rangeMatch) {
+    const m1 = parseInt(rangeMatch[1], 10);
+    const s1 = parseInt(rangeMatch[2], 10);
+    const m2 = parseInt(rangeMatch[3], 10);
+    const s2 = parseInt(rangeMatch[4], 10);
+    if (s1 >= 60 || s2 >= 60) return null;
+    const a = m1 * 60 + s1;
+    const b = m2 * 60 + s2;
+    return Math.round((a + b) / 2);
+  }
+
+  // Preflight: if any two time-like tokens (digit+colon+digit) flank a range
+  // separator but the strict range regex didn't match, the input is malformed
+  // (e.g. "2:30-120:00", "120:00-2:30", "2:3-3:00"). Reject rather than
+  // silently parsing only the valid half.
+  if (/\d+:\d+\s*[-–—]\s*\d+:\d+/.test(s)) return null;
+
+  // Plain M:SS or MM:SS
+  const mmss = s.match(frag);
+  if (mmss) {
+    const mins = parseInt(mmss[1], 10);
+    const secs = parseInt(mmss[2], 10);
+    if (secs >= 60) return null;
+    return mins * 60 + secs;
+  }
+
+  // "3 minutes", "about 3 min", "3.5 minutes"
+  const minsMatch = s.match(/([\d.]+)\s*(?:minutes?|mins?|m)\b/i);
+  if (minsMatch) {
+    const val = parseFloat(minsMatch[1]);
+    if (!isNaN(val) && val >= 0 && val <= 99) return Math.round(val * 60);
+  }
+
+  // "90 seconds", "90s"
+  const secsMatch = s.match(/([\d.]+)\s*(?:seconds?|secs?|s)\b/i);
+  if (secsMatch) {
+    const val = parseFloat(secsMatch[1]);
+    if (!isNaN(val) && val >= 0 && val <= 99 * 60) return Math.round(val);
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Post-generation enforcement (mirrors Aiden's repairRecipe pattern)
 // Clamps GPT output to valid ranges. Logs warnings but never rejects.
 // ---------------------------------------------------------------------------
-function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel) {
+export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   const defaults = FAMILY_POUROVER_DEFAULTS[family] || FAMILY_POUROVER_DEFAULTS[DEFAULT_POUROVER_FAMILY];
   const repairs = [];
@@ -195,7 +258,89 @@ function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel) {
     }
   }
 
-  // 5. Default optional fields
+  // 5. Parse step.time → step.timeSeconds and enforce STRICTLY ascending order.
+  // Timer consumers need a numeric field; GPT gives us free-form strings.
+  // If a step's time is unparseable or not strictly greater than the previous,
+  // null that step's timeSeconds and mark the whole recipe as not timer-ready.
+  // Duplicate timestamps produce zero-length steps downstream, so reject them.
+  recipe.timerReady = true;
+  let lastStepSeconds = null;
+  if (Array.isArray(recipe.steps)) {
+    let lastSeconds = -1;
+    for (let i = 0; i < recipe.steps.length; i++) {
+      const step = recipe.steps[i];
+      const parsed = parseTimeString(step.time);
+      if (parsed == null) {
+        recipe.timerReady = false;
+        repairs.push(`Step ${i} has unparseable time "${step.time}"`);
+        step.timeSeconds = null;
+        continue;
+      }
+      // STRICTLY increasing: `<=` rejects duplicates and out-of-order.
+      if (parsed <= lastSeconds) {
+        recipe.timerReady = false;
+        repairs.push(`Step ${i} time ${step.time} is not strictly after previous (${lastSeconds}s)`);
+        step.timeSeconds = null;
+        continue;
+      }
+      step.timeSeconds = parsed;
+      lastSeconds = parsed;
+      lastStepSeconds = parsed;
+    }
+  }
+
+  // 6. Normalize totalBrewTime → totalBrewTimeSeconds.
+  // GPT returns free-form strings: "3:00", "2:30-3:00", "about 3 minutes".
+  // Parse first; if unparseable, compute from the last step + average step duration.
+  // Must be strictly AFTER the last valid step — otherwise the final step would
+  // have a zero or negative duration, which breaks timer math.
+  const totalParsed = parseTimeString(recipe.totalBrewTime);
+  if (totalParsed != null) {
+    recipe.totalBrewTimeSeconds = totalParsed;
+  } else if (Array.isArray(recipe.steps) && recipe.steps.length > 0) {
+    const validSeconds = recipe.steps
+      .map((s) => s.timeSeconds)
+      .filter((v) => v != null && v >= 0);
+    if (validSeconds.length > 0) {
+      const lastStep = validSeconds[validSeconds.length - 1];
+      const avgStepDuration = validSeconds.length > 1
+        ? (validSeconds[validSeconds.length - 1] - validSeconds[0]) / (validSeconds.length - 1)
+        : 30;
+      recipe.totalBrewTimeSeconds = Math.round(lastStep + avgStepDuration);
+      repairs.push(`totalBrewTime "${recipe.totalBrewTime}" unparseable; derived ${recipe.totalBrewTimeSeconds}s from steps`);
+    } else {
+      recipe.totalBrewTimeSeconds = null;
+      recipe.timerReady = false;
+      repairs.push(`totalBrewTime "${recipe.totalBrewTime}" unparseable and no step times available`);
+    }
+  } else {
+    recipe.totalBrewTimeSeconds = null;
+    recipe.timerReady = false;
+  }
+
+  // 6b. Cross-check: totalBrewTimeSeconds must be strictly greater than the
+  // last valid step's timeSeconds. If it isn't, derive a safe total from the
+  // last step + avg step duration and log the repair. This protects Phase 1
+  // timer math from negative final-step durations.
+  if (
+    lastStepSeconds != null &&
+    recipe.totalBrewTimeSeconds != null &&
+    recipe.totalBrewTimeSeconds <= lastStepSeconds
+  ) {
+    const validSeconds = recipe.steps
+      .map((s) => s.timeSeconds)
+      .filter((v) => v != null && v >= 0);
+    const avgStepDuration = validSeconds.length > 1
+      ? (validSeconds[validSeconds.length - 1] - validSeconds[0]) / (validSeconds.length - 1)
+      : 30;
+    const derived = Math.round(lastStepSeconds + Math.max(avgStepDuration, 10));
+    repairs.push(
+      `totalBrewTime ${recipe.totalBrewTimeSeconds}s is not after last step ${lastStepSeconds}s; derived ${derived}s`
+    );
+    recipe.totalBrewTimeSeconds = derived;
+  }
+
+  // 7. Default optional fields
   recipe.reasoning = recipe.reasoning || '';
   recipe.technique = recipe.technique || 'hoffmann';
 

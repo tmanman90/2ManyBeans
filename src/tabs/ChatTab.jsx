@@ -188,7 +188,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive, onStartTastingSession }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const { hasPro, freeUsage } = useSubscription();
@@ -614,6 +614,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        bean={handBrew.handBrewBean}
+        onStartTasting={onStartTastingSession}
+        userCoffeeGrams={handBrew.userCoffeeGrams}
+        onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
+        onPersistDose={handBrew.persistDose}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>

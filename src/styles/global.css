@@ -6,9 +6,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-button {
+/* Suppress the iOS long-press Copy/Look-Up callout ONLY on interactive
+   control surfaces — never on text inputs, images, or regular content.
+   Users need the native callout on <input>, <textarea>, chat bubbles,
+   and bean photos (save image, translate, etc.). */
+button,
+[role="button"] {
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 body {

@@ -20,7 +20,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, pendingTastingBeanId, onPendingTastingConsumed }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -167,6 +167,31 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       setChatExtracted(null);
     }
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only resets on selection change, not data changes
+
+  // Cross-tab bridge: BrewTimer completion sets pendingTastingBeanId in App.
+  // Here we consume it — pre-select the bean, open chat mode, and clear the
+  // flag. The effect re-runs whenever beans updates, so if the pending bean
+  // isn't in the list yet (e.g. a Firestore round-trip is pending), we keep
+  // the flag set and retry on the next beans update. The paywall path still
+  // clears the flag since that's a terminal outcome.
+  useEffect(() => {
+    if (!pendingTastingBeanId) return;
+    const bean = beans.find(b => b.id === pendingTastingBeanId);
+    if (!bean) {
+      // Don't clear — wait for beans to include this id on a future render.
+      return;
+    }
+    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= FREE_LIMITS.tasteTests) {
+      openPaywall({ feature: 'taste_cap', promote: 'pro' });
+      onPendingTastingConsumed?.();
+      return;
+    }
+    setSel(pendingTastingBeanId);
+    setMode('chat');
+    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
+    setChatExtracted(null);
+    onPendingTastingConsumed?.();
+  }, [pendingTastingBeanId, beans, hasPro, freeUsage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChatSend = async () => {
     if (!chatInput.trim() || chatLoading) return;

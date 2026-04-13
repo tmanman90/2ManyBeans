@@ -1,10 +1,14 @@
 // Hand brew recipe modal — step-by-step pour-over guide with Ghibli-warm aesthetic
+import { useState, useMemo, useCallback } from 'react';
 import { C, fonts } from '../styles/theme';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
-import { Coffee, Droplets, Thermometer, RefreshCw } from 'lucide-react';
+import { BrewTimer } from './BrewTimer';
+import { DoseStepperCard } from './DoseStepperCard';
+import { Coffee, Droplets, Thermometer, RefreshCw, Play, Scale } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
+import { scaleRecipeForDose } from '../lib/recipeScaling';
 
 const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
   <div style={{
@@ -38,14 +42,58 @@ const phaseMessages = {
   },
 };
 
-export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, onRetry, onRegenerate, extraFooter }) => {
+export const HandBrewModal = ({
+  open, onClose, recipe, loading, error, phase, onRetry, onRegenerate,
+  extraFooter, bean, onStartTasting,
+  userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
+}) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
   const grinderName = GRINDER_LABELS[grinderKey] || preferences?.grinderCustomName || 'Grinder';
   const msg = phaseMessages[phase] || phaseMessages.recipe;
+  const [timerOpen, setTimerOpen] = useState(false);
+  const timerReady = recipe?.timerReady === true;
+
+  // Effective dose: controlled prop if set, else the recipe's AI-generated dose.
+  const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
+    ? userCoffeeGrams
+    : recipe?.coffeeGrams;
+
+  // Scaled recipe for display + BrewTimer. Everything the user sees (coffee,
+  // water, per-step water totals) flows from this derived object. The original
+  // AI recipe stays pristine.
+  const displayRecipe = useMemo(
+    () => scaleRecipeForDose(recipe, effectiveDose),
+    [recipe, effectiveDose]
+  );
+
+  // Stepper onChange — forwards directly to the parent's useState setter,
+  // which natively supports both value and functional-updater forms.
+
+  // Persist-and-close: fire the persist callback (parent writes Firestore),
+  // then close the modal. Fires only if dose changed from what's persisted.
+  const persistIfChanged = useCallback(() => {
+    if (onPersistDose && typeof effectiveDose === 'number') {
+      const stored = recipe?.userCoffeeGrams;
+      if (effectiveDose !== stored) {
+        onPersistDose(effectiveDose);
+      }
+    }
+  }, [onPersistDose, effectiveDose, recipe?.userCoffeeGrams]);
+
+  const handleClose = useCallback(() => {
+    persistIfChanged();
+    onClose?.();
+  }, [persistIfChanged, onClose]);
+
+  const handleStartBrew = useCallback(() => {
+    persistIfChanged();
+    setTimerOpen(true);
+  }, [persistIfChanged]);
 
   return (
-    <Modal open={open} onClose={onClose} title="Hand Brew Recipe">
+    <>
+    <Modal open={open && !timerOpen} onClose={handleClose} title="Hand Brew Recipe">
       {/* Loading state */}
       {loading && !recipe && (
         <div style={{ textAlign: 'center', padding: '32px 0' }}>
@@ -88,11 +136,14 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
             </div>
           )}
 
-          {/* Param grid: coffee, water, ratio */}
+          {/* Param grid: coffee (interactive stepper), water, ratio */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <ParamCard label="Coffee" value={`${recipe.coffeeGrams}g`} icon={Coffee} />
-            <ParamCard label="Water" value={`${recipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
-            <ParamCard label="Ratio" value={recipe.ratio} />
+            <DoseStepperCard
+              dose={displayRecipe.coffeeGrams}
+              onChange={onCoffeeGramsChange}
+            />
+            <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
+            <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
 
           {/* Grind card */}
@@ -167,10 +218,10 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
                 borderRadius: 1,
               }} />
 
-              {(recipe.steps || []).map((step, i) => (
+              {(displayRecipe.steps || []).map((step, i) => (
                 <div key={i} style={{
                   position: 'relative',
-                  marginBottom: i < recipe.steps.length - 1 ? 16 : 0,
+                  marginBottom: i < displayRecipe.steps.length - 1 ? 16 : 0,
                 }}>
                   {/* Timeline dot */}
                   <div style={{
@@ -246,6 +297,33 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
             </div>
           )}
 
+          {/* Start Brew button — only when recipe is timer-ready */}
+          {timerReady && (
+            <button
+              onClick={handleStartBrew}
+              aria-label="Start brew timer"
+              style={{
+                width: '100%',
+                padding: '14px 20px',
+                borderRadius: 14,
+                background: C.accent,
+                color: '#fff',
+                border: 'none',
+                fontSize: 15,
+                fontWeight: 700,
+                fontFamily: fonts.body,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <Play size={16} fill="#fff" strokeWidth={0} /> Start Brew
+            </button>
+          )}
+
           {/* Regenerate button */}
           {onRegenerate && (
             <Btn variant="ghost" onClick={onRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate hand brew recipe">
@@ -257,5 +335,17 @@ export const HandBrewModal = ({ open, onClose, recipe, loading, error, phase, on
         </div>
       )}
     </Modal>
+    <BrewTimer
+      open={timerOpen}
+      recipe={displayRecipe}
+      bean={bean}
+      onClose={() => setTimerOpen(false)}
+      onStartTasting={(beanId) => {
+        setTimerOpen(false);
+        handleClose();
+        onStartTasting?.(beanId);
+      }}
+    />
+    </>
   );
 };

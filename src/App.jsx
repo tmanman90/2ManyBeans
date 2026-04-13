@@ -48,6 +48,16 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // we switch to the Inventory tab and signal it to open AddBeanForm.
   // InventoryTab consumes this flag and clears it via onPendingAddBeanConsumed.
   const [pendingAddBean, setPendingAddBean] = useState(false);
+  // Cross-tab bridge from BrewTimer completion → TastingTab coach.
+  // Mirrors pendingAddBean: set here, consumed by TastingTab which
+  // pre-selects the bean and starts chat mode, then clears the flag.
+  const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
+
+  const handleStartTastingSession = (beanId) => {
+    if (!beanId) return;
+    setPendingTastingBeanId(beanId);
+    setTab('tasting');
+  };
 
   const handleOpenBean = (preselectedBeanId, slot) => {
     if (preselectedBeanId) {
@@ -168,6 +178,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             addTasting={addTasting}
             updateTasting={updateTasting}
             getBeanById={getBeanById}
+            onStartTastingSession={handleStartTastingSession}
           />
         )}
         {tab === 'inventory' && (
@@ -186,6 +197,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               getBeanById={getBeanById}
               pendingAddBean={pendingAddBean}
               onPendingAddBeanConsumed={() => setPendingAddBean(false)}
+              onStartTastingSession={handleStartTastingSession}
             />
           </Suspense>
         )}
@@ -198,6 +210,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               onUpdateTasting={updateTasting}
               onDeleteTasting={deleteTasting}
               updateBean={updateBean}
+              pendingTastingBeanId={pendingTastingBeanId}
+              onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
             />
           </Suspense>
         )}
@@ -215,6 +229,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
                 addTasting={addTasting}
                 updateTasting={updateTasting}
                 isActive={tab === 'chat'}
+                onStartTastingSession={handleStartTastingSession}
               />
             </Suspense>
           </div>

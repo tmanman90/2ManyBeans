@@ -18,7 +18,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBean, onPendingAddBeanConsumed }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBean, onPendingAddBeanConsumed, onStartTastingSession }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod === 'handbrew';
@@ -206,6 +206,11 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        bean={handBrew.handBrewBean}
+        onStartTasting={onStartTastingSession}
+        userCoffeeGrams={handBrew.userCoffeeGrams}
+        onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
+        onPersistDose={handBrew.persistDose}
       />
       <FinishBagPrompt
         open={!!finishPrompt}

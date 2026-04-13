@@ -6,7 +6,7 @@
 // updates are ignored so recipe/error state from an abandoned brew can't land
 // on the bean currently displayed. Firestore writes use the closure-captured
 // bean.id so they always target the right doc regardless of render state.
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { researchBean } from '../lib/beanResearch';
 import { generateHandBrewRecipe } from '../lib/handbrew';
 import { usePreferences } from './useUserProfile';
@@ -28,6 +28,17 @@ export function useHandBrew(updateBean) {
   const [handBrewBean, setHandBrewBean] = useState(null);
   const [handBrewResearch, setHandBrewResearch] = useState(null);
   const [handBrewPhase, setHandBrewPhase] = useState(null);
+  // Lifted dose override. Hydrated from the recipe on every NON-NULL recipe
+  // identity change (cached load, regenerate success). We intentionally do
+  // NOT clear when `handBrewRecipe` goes null mid-regeneration — otherwise
+  // the stepper briefly falls back to `min` (10g) while the loading spinner
+  // takes over, producing a visible "dose dropped to 10" flash. When the
+  // new recipe arrives, we hydrate from its (possibly absent) userCoffeeGrams.
+  const [userCoffeeGrams, setUserCoffeeGrams] = useState(undefined);
+  useEffect(() => {
+    if (handBrewRecipe == null) return;
+    setUserCoffeeGrams(handBrewRecipe.userCoffeeGrams);
+  }, [handBrewRecipe]);
 
   const isActive = (rid) => mountedRef.current && activeRequestRef.current === rid;
 
@@ -118,10 +129,43 @@ export function useHandBrew(updateBean) {
     setHandBrewModal(false);
   };
 
+  // Persist the user's dose override to Firestore. Called by HandBrewModal
+  // on modal close and on Start Brew press (via onPersistDose prop). Updates
+  // local recipe state AND writes to the bean doc via dot-path merge so
+  // the change survives reopening. Skipped for ephemeral beans (no id) —
+  // QuickRecipeFlow.handleAutoSave persists those on the initial save.
+  //
+  // Race guard: a concurrent useAppData onSnapshot firing between the local
+  // merge and the Firestore ack can stomp the merged override. We re-assert
+  // after the write resolves, gated on mountedRef, to stomp any intermediate
+  // snapshot churn.
+  const persistDose = useCallback(async (newDose) => {
+    if (typeof newDose !== 'number' || newDose <= 0) return;
+    setHandBrewRecipe((prev) =>
+      prev ? { ...prev, userCoffeeGrams: newDose } : prev
+    );
+    if (!handBrewBean?.id) return;
+    try {
+      await updateBean(handBrewBean.id, {
+        'handBrewRecipe.userCoffeeGrams': newDose,
+      });
+      if (mountedRef.current) {
+        setHandBrewRecipe((prev) =>
+          prev ? { ...prev, userCoffeeGrams: newDose } : prev
+        );
+      }
+    } catch (err) {
+      console.warn('[handBrew] persistDose failed:', err?.message || err);
+    }
+  }, [handBrewBean, updateBean]);
+
   return {
     handBrewModal, handBrewRecipe, handBrewLoading, handBrewError,
     handBrewPhase, handBrewBean, handBrewResearch,
     handleBrewHandBrew, closeHandBrewModal,
+    userCoffeeGrams,
+    setUserCoffeeGrams,
+    persistDose,
     onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch) : undefined,
     onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true) : undefined,
   };
