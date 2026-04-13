@@ -108,7 +108,15 @@ export const useUserProfile = (uid) => {
     }
   }, [uid]);
 
-  // Create profile for a brand new user (from onboarding)
+  // Create profile for a brand new user (from onboarding).
+  //
+  // Optionally accepts `onboardingAnswers` and a marker to land the
+  // onboardingCompletedAt server timestamp on the same create. The create
+  // path is the ONLY way to include those fields for a fresh user, since
+  // firestore.rules `allow create` uses a strict hasOnly() allowlist — any
+  // subsequent setDoc(merge:true) that targets a nonexistent doc fires the
+  // create rule, not the update rule, and a payload missing `displayName`
+  // gets rejected.
   const createProfile = useCallback(async (userData) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
@@ -128,6 +136,12 @@ export const useUserProfile = (uid) => {
         ...(userData.preferences || {}),
       },
     };
+    if (userData.onboardingAnswers && typeof userData.onboardingAnswers === 'object') {
+      profileData.onboardingAnswers = userData.onboardingAnswers;
+    }
+    if (userData.onboardingComplete) {
+      profileData.onboardingCompletedAt = serverTimestamp();
+    }
     await setDoc(profileRef, profileData);
     // Optimistic local update + cache
     const localProfile = { id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() };
@@ -226,7 +240,15 @@ export const useUserProfile = (uid) => {
       const { preferences: answerPrefs, ...rest } = answers;
       payload.onboardingAnswers = rest;
       if (answerPrefs && typeof answerPrefs === 'object') {
-        payload.preferences = { ...(profile?.preferences || DEFAULT_PREFERENCES), ...answerPrefs };
+        // Drop null/undefined/empty entries so unanswered fields don't
+        // clobber existing live preferences with blanks.
+        const cleanPrefs = {};
+        for (const [k, v] of Object.entries(answerPrefs)) {
+          if (v !== null && v !== undefined && v !== '') cleanPrefs[k] = v;
+        }
+        if (Object.keys(cleanPrefs).length) {
+          payload.preferences = { ...(profile?.preferences || DEFAULT_PREFERENCES), ...cleanPrefs };
+        }
       }
     }
     await setDoc(profileRef, payload, { merge: true });

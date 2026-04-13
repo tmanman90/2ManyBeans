@@ -130,7 +130,7 @@ function onboardingReducer(state, action) {
   }
 }
 
-export default function OnboardingFlow({ user, profile, completeOnboarding }) {
+export default function OnboardingFlow({ user, profile, createProfile, completeOnboarding }) {
   const uid = user?.uid;
   const [state, rawDispatch] = useReducer(onboardingReducer, INITIAL_STATE);
   const [hydrated, setHydrated] = useState(false);
@@ -179,21 +179,54 @@ export default function OnboardingFlow({ user, profile, completeOnboarding }) {
     });
   }, [uid]);
 
-  // Terminal completion — Phase 1 wires the minimal path so fresh users can
-  // actually reach the main app via placeholder screens. Phase 4 replaces the
-  // R13b onClick with the real scan-CTA handoff and attaches a full answers
-  // blob. We pass the current answers to completeOnboarding so once it gets
-  // extended to accept them, everything already flows through.
+  // Terminal completion — branches on whether a profile doc already exists.
+  //
+  // - Existing profile → completeOnboarding(answers) does a single atomic
+  //   setDoc(merge:true) against the already-created doc.
+  // - Fresh user (profile === null) → createProfile() is the FIRST write
+  //   to /users/{uid} and fires Firestore's `allow create` rule, which
+  //   strictly requires displayName and uses a hasOnly() allowlist. A
+  //   merge-write without those fields would be rejected, trapping fresh
+  //   users at Gate 5 forever. createProfile includes all the required
+  //   create fields plus onboardingAnswers/onboardingCompletedAt in one
+  //   atomic write.
+  //
+  // Phase 4 swaps R13b's onClick to attach a full answers blob; this
+  // branch logic doesn't change.
   const finish = useCallback(async () => {
     if (finishing) return;
     setFinishing(true);
     try {
-      if (completeOnboarding) {
-        await completeOnboarding(stateRef.current.answers);
+      const answers = stateRef.current.answers;
+      // Live prefs live on profile.preferences only — never duplicated
+      // inside onboardingAnswers. Strip the subfield out before persisting.
+      // Also drop null/undefined/empty picks so unanswered fields don't
+      // clobber the defaults with blanks.
+      const { preferences: answerPrefs, ...answersWithoutPrefs } = answers || {};
+      const prefsPatch = {};
+      if (answerPrefs && typeof answerPrefs === 'object') {
+        for (const [k, v] of Object.entries(answerPrefs)) {
+          if (v !== null && v !== undefined && v !== '') prefsPatch[k] = v;
+        }
+      }
+      if (!profile) {
+        if (!createProfile) throw new Error('createProfile not provided');
+        await createProfile({
+          displayName: user?.displayName || answerPrefs?.displayName || '',
+          email: user?.email || null,
+          photoURL: user?.photoURL || null,
+          signUpProvider: user?.providerData?.[0]?.providerId || 'unknown',
+          onboardingComplete: true,
+          onboardingAnswers: answersWithoutPrefs,
+          marketingConsent: !!answers?.marketingConsent,
+          preferences: Object.keys(prefsPatch).length ? prefsPatch : undefined,
+        });
+      } else if (completeOnboarding) {
+        await completeOnboarding(answers);
       }
       if (uid) clearState(uid);
       logOnboardingEvent('onboarding_completed', {
-        completedVia: stateRef.current.answers?.completedVia || 'skipped_paywall',
+        completedVia: answers?.completedVia || 'skipped_paywall',
       });
     } catch (err) {
       logOnboardingEvent('onboarding_complete_write_failed', {
@@ -201,7 +234,7 @@ export default function OnboardingFlow({ user, profile, completeOnboarding }) {
       });
       setFinishing(false);
     }
-  }, [finishing, completeOnboarding, uid]);
+  }, [finishing, profile, createProfile, completeOnboarding, uid, user]);
 
   // Log a resume when hydration restored a non-r1 step. Useful for
   // post-ship debugging without being noisy during normal flows.
