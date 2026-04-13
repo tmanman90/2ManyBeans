@@ -1,18 +1,31 @@
-// Phase 1 placeholder — real single-select brew-goal question ships in Phase 2.
 import { OnboardingScreenShell } from './OnboardingScreenShell';
+import { SingleSelectList } from './SingleSelectList';
 import { useOnboarding } from '../OnboardingContext';
 
+const GOAL_OPTIONS = [
+  { key: 'v60', label: 'V60 / Pour Over', emoji: '☕' },
+  { key: 'aeropress', label: 'Aeropress', emoji: '🧪' },
+  { key: 'french_press', label: 'French Press', emoji: '🫖' },
+  { key: 'espresso', label: 'Espresso', emoji: '⚡' },
+  { key: 'all', label: 'All of them', emoji: '🌟' },
+];
+
 export default function R02Goal() {
-  const { dispatch } = useOnboarding();
+  const { dispatch, answers } = useOnboarding();
   return (
     <OnboardingScreenShell
-      title="Goal"
-      subtitle="R2 placeholder — brew-goal picker ships in Phase 2."
-      ruphusLine="What are you chasing in the cup?"
-      primaryCta={{
-        label: 'Continue',
-        onClick: () => dispatch({ type: 'ADVANCE', next: 'r3' }),
-      }}
-    />
+      title="What do you want to brew better?"
+      ruphusLine="Right — tell me what you're chasing. I'll tailor everything after this around it."
+    >
+      <SingleSelectList
+        options={GOAL_OPTIONS}
+        value={answers?.goal}
+        onSelect={(key) => dispatch({
+          type: 'ADVANCE',
+          next: 'r3',
+          answersPatch: { goal: key },
+        })}
+      />
+    </OnboardingScreenShell>
   );
 }
