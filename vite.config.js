@@ -16,13 +16,22 @@ export default defineConfig({
         // src/components/ShareCard.js respectively) so they get their own
         // lazy chunks that only load on demand. Forcing them into a static
         // group here would defeat those splits.
-        manualChunks: {
-          firebase: [
-            'firebase/app',
-            'firebase/auth',
-            'firebase/firestore',
-          ],
-          react: ['react', 'react-dom'],
+        manualChunks(id) {
+          // Force all 14 onboarding screen files + shared state/shell/hook
+          // into a single `onboarding` chunk. Keeps the lazy-loaded entry
+          // honest: one fetch on Gate 5 → entire flow is ready. Budget
+          // (<120KB gzip) is verified in Phase 5.
+          if (id.includes('/src/components/onboarding/')) return 'onboarding';
+          if (
+            id.includes('/node_modules/firebase/app') ||
+            id.includes('/node_modules/firebase/auth') ||
+            id.includes('/node_modules/firebase/firestore')
+          ) return 'firebase';
+          if (
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/scheduler/')
+          ) return 'react';
         },
       },
     },

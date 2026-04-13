@@ -99,7 +99,7 @@ const selectStyle = {
 };
 
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
-  const { preferences, updatePreferences } = usePreferences();
+  const { preferences, updatePreferences, resetOnboarding } = usePreferences();
   const { logOut } = useAuthContext();
   const { hasPro, hasUltra, plan, status } = useSubscription();
   const { openPaywall } = usePaywall();
@@ -844,6 +844,35 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               </div>
             </div>
           </div>
+
+          {/* --- Dev Section (DEV-only, tree-shaken from prod) --- */}
+          {import.meta.env.DEV && (
+            <>
+              <div style={sectionHeaderStyle}>Dev</div>
+              <div style={groupStyle}>
+                <button
+                  style={{ ...rowStyle, color: C.accent, fontWeight: 600 }}
+                  onClick={async () => {
+                    try {
+                      await resetOnboarding?.();
+                      // Clear the uid-scoped onboarding localStorage blob so
+                      // the flow restarts from R1 on reload. Import is lazy
+                      // so the prod bundle never pulls in the helper.
+                      try {
+                        const mod = await import('../components/onboarding/onboardingState');
+                        mod.clearState?.(uid);
+                      } catch { /* ignore */ }
+                      window.location.reload();
+                    } catch (err) {
+                      console.error('[Dev] Replay onboarding failed', err);
+                    }
+                  }}
+                >
+                  <span style={rowLabelStyle}>Replay onboarding</span>
+                </button>
+              </div>
+            </>
+          )}
 
           {/* --- Account Section --- */}
           <div style={sectionHeaderStyle}>Account</div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from 'react';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, deleteField } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
@@ -204,14 +204,55 @@ export const useUserProfile = (uid) => {
     });
   }, [uid]);
 
-  // Complete onboarding
-  const completeOnboarding = useCallback(async () => {
+  // Complete onboarding — single atomic `setDoc(merge:true)` that lands
+  // onboardingComplete + onboardingAnswers + onboardingCompletedAt + the
+  // R7 prefs in one document write. Firestore guarantees atomicity within
+  // a single doc, so there's no "flag set but answers missing" state to
+  // recover from. On rules rejection the caller stays at Gate 5 and
+  // re-enters the flow on next open.
+  //
+  // `answers` is optional — older call sites that just want to mark the
+  // flag keep working without passing anything.
+  const completeOnboarding = useCallback(async (answers) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
-    await updateDoc(profileRef, { onboardingComplete: true });
+    const payload = {
+      onboardingComplete: true,
+      onboardingCompletedAt: serverTimestamp(),
+    };
+    if (answers && typeof answers === 'object') {
+      // Keep preferences on the top-level `preferences` field, never
+      // duplicated inside onboardingAnswers — live prefs live in one place.
+      const { preferences: answerPrefs, ...rest } = answers;
+      payload.onboardingAnswers = rest;
+      if (answerPrefs && typeof answerPrefs === 'object') {
+        payload.preferences = { ...(profile?.preferences || DEFAULT_PREFERENCES), ...answerPrefs };
+      }
+    }
+    await setDoc(profileRef, payload, { merge: true });
     setProfile(prev => {
       if (!prev) return prev;
-      const updated = { ...prev, onboardingComplete: true };
+      const updated = { ...prev, ...payload, onboardingCompletedAt: new Date() };
+      cacheWrite(`profile_${uid}`, updated);
+      return updated;
+    });
+  }, [uid, profile]);
+
+  // Dev-only replay helper — flips the flag back to false and wipes any
+  // previously-committed answers so the flow re-enters cleanly from R1.
+  // Called by the SettingsPage dev replay button (tree-shaken from prod).
+  const resetOnboarding = useCallback(async () => {
+    if (!uid) return;
+    const profileRef = doc(db, 'users', uid);
+    await setDoc(profileRef, {
+      onboardingComplete: false,
+      onboardingAnswers: deleteField(),
+      onboardingCompletedAt: deleteField(),
+    }, { merge: true });
+    setProfile(prev => {
+      if (!prev) return prev;
+      const { onboardingAnswers: _a, onboardingCompletedAt: _c, ...rest } = prev;
+      const updated = { ...rest, onboardingComplete: false };
       cacheWrite(`profile_${uid}`, updated);
       return updated;
     });
@@ -233,12 +274,16 @@ export const useUserProfile = (uid) => {
   // Fellow connection status (primitive to avoid re-render cascades)
   const fellowConnected = profile?.fellow?.connected ?? false;
 
-  // Memoize context value to prevent unnecessary re-renders
+  // Memoize context value to prevent unnecessary re-renders. `resetOnboarding`
+  // piggybacks on this context so SettingsPage's dev replay button can reach
+  // it without another prop drill. The button is DEV-only and tree-shaken
+  // from production, so this has no prod surface area.
   const contextValue = useMemo(() => ({
     preferences,
     updatePreferences,
     fellowConnected,
-  }), [preferences, updatePreferences, fellowConnected]);
+    resetOnboarding,
+  }), [preferences, updatePreferences, fellowConnected, resetOnboarding]);
 
   return {
     profile,
@@ -251,6 +296,7 @@ export const useUserProfile = (uid) => {
     updatePreferences,
     updateProfile,
     completeOnboarding,
+    resetOnboarding,
     contextValue,
   };
 };

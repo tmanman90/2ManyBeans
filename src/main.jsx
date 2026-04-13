@@ -14,8 +14,12 @@ import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
 import { cacheClear, cacheClearLastUid } from './lib/offlineCache';
 import { logInRevenueCat, logOutRevenueCat } from './lib/revenuecat';
 
-// Module-scope lazy load (must NOT be inside component body)
-const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
+// Module-scope lazy load (must NOT be inside component body). The new
+// onboarding flow replaces the single-page wizard — see docs/plans/
+// 2026-04-12-009-feat-onboarding-13-screen-rebuild-plan.md. Keeping the
+// `OnboardingWizard` chunk reference would prevent tree-shaking; the old
+// file is deleted in Phase 5 once the new flow is verified on TestFlight.
+const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'));
 const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
 
 // Mounts the actual paywall UI. Kept out of <Root> so it can read the
@@ -44,7 +48,7 @@ const Root = () => {
   const {
     profile, profileLoaded, profileLoadError, preferences, isOnboarded,
     createProfile, migrateExistingUser, updatePreferences,
-    updateProfile, completeOnboarding, contextValue,
+    updateProfile, completeOnboarding, resetOnboarding, contextValue,
   } = useUserProfile(user?.uid);
 
   const {
@@ -134,13 +138,13 @@ const Root = () => {
       <SubscriptionProvider uid={user.uid}>
         <PaywallProvider>
           {!isOnboarded ? (
-            // Gate 5: Onboarding not complete
+            // Gate 5: Onboarding not complete — 13-screen rebuild
             <React.Suspense fallback={<LoadingScreen />}>
-              <OnboardingWizard
+              <OnboardingFlow
                 user={user}
                 profile={profile}
                 createProfile={createProfile}
-                updateProfile={updateProfile}
+                completeOnboarding={completeOnboarding}
               />
             </React.Suspense>
           ) : !dataLoaded ? (
