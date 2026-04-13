@@ -12,6 +12,8 @@
 //   screen can't white-screen the app
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { OnboardingContext } from './OnboardingContext';
 import { OnboardingErrorBoundary } from './OnboardingErrorBoundary';
 import { clearState, loadState, saveState } from './onboardingState';
@@ -179,36 +181,46 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
     });
   }, [uid]);
 
-  // Terminal completion — branches on whether a profile doc already exists.
+  // Terminal completion — branches on whether a profile doc already
+  // exists:
   //
-  // - Existing profile → completeOnboarding(answers) does a single atomic
-  //   setDoc(merge:true) against the already-created doc.
-  // - Fresh user (profile === null) → createProfile() is the FIRST write
-  //   to /users/{uid} and fires Firestore's `allow create` rule, which
-  //   strictly requires displayName and uses a hasOnly() allowlist. A
-  //   merge-write without those fields would be rejected, trapping fresh
-  //   users at Gate 5 forever. createProfile includes all the required
-  //   create fields plus onboardingAnswers/onboardingCompletedAt in one
-  //   atomic write.
+  // - Existing profile → completeOnboarding(answers) does a single
+  //   atomic setDoc(merge:true) against the already-created doc.
+  // - Fresh user (profile === null) → createProfile() is the FIRST
+  //   write to /users/{uid} and fires Firestore's `allow create` rule,
+  //   which strictly requires displayName and uses a hasOnly()
+  //   allowlist. A merge-write without those fields would be rejected,
+  //   trapping fresh users at Gate 5 forever. createProfile includes
+  //   all the required create fields plus onboardingAnswers /
+  //   onboardingCompletedAt in one atomic write.
   //
-  // Phase 4 swaps R13b's onClick to attach a full answers blob; this
-  // branch logic doesn't change.
-  const finish = useCallback(async () => {
+  // Optional `overrides` patch is merged into answers immediately
+  // before persisting (used by R13b to set postCompleteAction in the
+  // same atomic write). If marketingConsent is true on the final
+  // blob, we also mirror to /emailList/{uid} in a follow-up write
+  // (separate rule block, different doc).
+  const finish = useCallback(async (overrides) => {
     if (finishing) return;
     setFinishing(true);
     try {
-      const answers = stateRef.current.answers;
+      const baseAnswers = stateRef.current.answers || {};
+      const answers =
+        overrides && typeof overrides === 'object'
+          ? { ...baseAnswers, ...overrides }
+          : baseAnswers;
+
       // Live prefs live on profile.preferences only — never duplicated
-      // inside onboardingAnswers. Strip the subfield out before persisting.
-      // Also drop null/undefined/empty picks so unanswered fields don't
-      // clobber the defaults with blanks.
-      const { preferences: answerPrefs, ...answersWithoutPrefs } = answers || {};
+      // inside onboardingAnswers. Strip the subfield out before
+      // persisting. Also drop null/undefined/empty picks so unanswered
+      // fields don't clobber the defaults with blanks.
+      const { preferences: answerPrefs, ...answersWithoutPrefs } = answers;
       const prefsPatch = {};
       if (answerPrefs && typeof answerPrefs === 'object') {
         for (const [k, v] of Object.entries(answerPrefs)) {
           if (v !== null && v !== undefined && v !== '') prefsPatch[k] = v;
         }
       }
+
       if (!profile) {
         if (!createProfile) throw new Error('createProfile not provided');
         await createProfile({
@@ -218,15 +230,43 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
           signUpProvider: user?.providerData?.[0]?.providerId || 'unknown',
           onboardingComplete: true,
           onboardingAnswers: answersWithoutPrefs,
-          marketingConsent: !!answers?.marketingConsent,
+          marketingConsent: !!answers.marketingConsent,
           preferences: Object.keys(prefsPatch).length ? prefsPatch : undefined,
         });
       } else if (completeOnboarding) {
         await completeOnboarding(answers);
       }
+
+      // Marketing consent → mirror to /emailList/{uid}. Matches the
+      // existing emailList rule block (hasOnly email/displayName/
+      // signUpDate/source, strings required). Separate write because
+      // it's a different doc path, not a nested field.
+      if (answers.marketingConsent && uid && user?.email) {
+        try {
+          const emailRef = doc(db, 'emailList', uid);
+          await setDoc(
+            emailRef,
+            {
+              email: user.email,
+              displayName: user.displayName || answerPrefs?.displayName || '',
+              signUpDate: serverTimestamp(),
+              source: 'onboarding',
+            },
+            { merge: true }
+          );
+        } catch (err) {
+          // Non-fatal. The primary user doc write already succeeded,
+          // and we never want an email list sync failure to strand
+          // the user at Gate 5.
+          logOnboardingEvent('onboarding_email_list_write_failed', {
+            error: String(err?.message || err || '').slice(0, 200),
+          });
+        }
+      }
+
       if (uid) clearState(uid);
       logOnboardingEvent('onboarding_completed', {
-        completedVia: answers?.completedVia || 'skipped_paywall',
+        completedVia: answers.completedVia || 'skipped_paywall',
       });
     } catch (err) {
       logOnboardingEvent('onboarding_complete_write_failed', {

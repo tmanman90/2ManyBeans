@@ -41,6 +41,11 @@ const CONTEXT_COPY = {
     headline: 'Unlock AI-powered brewing',
     subtext: 'Get AI tasting coach, bean scanning, and personalized recipes.',
   },
+  onboarding: {
+    headline: "Want me to guide you all the way?",
+    subtext:
+      "Unlimited scans, the tasting coach, Aiden recipes — this is where we shake on it.",
+  },
 };
 
 const FEATURES_PRO = [
