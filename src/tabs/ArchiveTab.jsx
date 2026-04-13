@@ -47,12 +47,12 @@ import { StarRating } from '../components/StarRating';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 
-export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean }) => {
+export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBeanById }) => {
   const finished = beans
     .filter(b => b.status === 'FINISHED')
     .sort((a, b) => (b.finishDate || '').localeCompare(a.finishDate || ''));
 
-  const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings);
+  const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
 
   // Compute best rating per bean
   const bestRating = {};

@@ -33,7 +33,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.webp' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, profile, updateProfile, refetchBeans }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
@@ -167,6 +167,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             addBean={addBean}
             addTasting={addTasting}
             updateTasting={updateTasting}
+            getBeanById={getBeanById}
           />
         )}
         {tab === 'inventory' && (
@@ -182,6 +183,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               onFinishBean={finishBean}
               addTasting={addTasting}
               updateTasting={updateTasting}
+              getBeanById={getBeanById}
               pendingAddBean={pendingAddBean}
               onPendingAddBeanConsumed={() => setPendingAddBean(false)}
             />
@@ -219,7 +221,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         )}
         {tab === 'archive' && (
           <Suspense fallback={<TabFallback />}>
-            <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} uid={uid} />
+            <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} getBeanById={getBeanById} uid={uid} />
           </Suspense>
         )}
       </div>

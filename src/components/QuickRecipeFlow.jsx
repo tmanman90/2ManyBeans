@@ -5,6 +5,7 @@ import { Camera as CameraIcon, X, Search, RotateCcw, Save, Coffee, Star, BookOpe
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
+import { ENRICHABLE_FIELDS } from '../lib/beanFields';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
@@ -16,8 +17,6 @@ import { QuickRateForm } from './QuickRateForm';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
-
-const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer'];
 
 const noop = () => {};
 

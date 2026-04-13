@@ -1,8 +1,60 @@
 // Shared hook for Professor Ruphus Learn flow — used across Rotation, Inventory, Archive tabs
 import { useState, useCallback } from 'react';
 import { generateRuphusStory } from '../lib/professorRuphus';
+import { researchBeanOnline, summarizeNotes } from '../lib/gemini';
+import { ENRICHABLE_FIELDS, isBagNotesEmpty, beanNeedsRuphusEnrichment } from '../lib/beanFields';
 
-export const useProfessorRuphus = (updateBean, tastings = []) => {
+// Silent background enrichment fired alongside the Ruphus story.
+// Reuses the same Gemini search-grounding path as Add Bean / AI Fill, with
+// metered:false because this is a background convenience, not a user-initiated
+// research action. Re-reads bean state at write time so concurrent user edits
+// are never clobbered. Fails silently per the spec.
+async function runSilentEnrichment(bean, getBeanById, updateBean) {
+  if (!updateBean || !getBeanById) return;
+  if (!beanNeedsRuphusEnrichment(bean)) return;
+
+  try {
+    const research = await researchBeanOnline(bean, { metered: false });
+
+    // Re-read latest bean state — user may have edited fields while the slide-up
+    // was open, or a concurrent refetch may have filled some fields.
+    const current = getBeanById(bean.id);
+    if (!current) return; // bean was deleted mid-flight
+
+    const updates = {};
+    for (const field of ENRICHABLE_FIELDS) {
+      if (!current[field] && research[field]) {
+        updates[field] = research[field];
+      }
+    }
+
+    // bagNotes is special: researchBeanOnline returns redditNotes (community
+    // reviews), not a comma-separated descriptor phrase. Pipe through
+    // summarizeNotes to produce the "blueberry, chocolate, stone fruit" shape
+    // the NOTES card field expects.
+    if (isBagNotesEmpty(current) && research.redditNotes) {
+      const summary = await summarizeNotes(research.redditNotes);
+      if (summary) updates.bagNotes = summary;
+    }
+
+    // Only write if we actually have new data. Always stamp enrichedAt on
+    // success so subsequent Ruphus presses on this bean skip the call.
+    if (Object.keys(updates).length > 0) {
+      updates.enrichedAt = new Date().toISOString();
+      await updateBean(bean.id, updates);
+    } else {
+      // Research succeeded but returned nothing usable. Still cache so we
+      // don't keep calling Gemini for a bean with no public information.
+      await updateBean(bean.id, { enrichedAt: new Date().toISOString() });
+    }
+  } catch (err) {
+    // R7: swallow silently. Do NOT write enrichedAt on error so the next
+    // Ruphus press retries.
+    console.log('Silent Ruphus enrichment skipped:', err.message);
+  }
+}
+
+export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null) => {
   const [ruphusOpen, setRuphusOpen] = useState(false);
   const [ruphusBean, setRuphusBean] = useState(null);
   const [ruphusStory, setRuphusStory] = useState(null);
@@ -31,6 +83,10 @@ export const useProfessorRuphus = (updateBean, tastings = []) => {
     setRuphusOpen(true);
     setRuphusError(null);
 
+    // Fire silent enrichment in parallel with the story. No await — the story
+    // UI does not wait on enrichment, and enrichment errors don't affect it.
+    runSilentEnrichment(bean, getBeanById, updateBean);
+
     if (bean.story) {
       // Cached — show immediately
       setRuphusStory(bean.story);
@@ -40,7 +96,7 @@ export const useProfessorRuphus = (updateBean, tastings = []) => {
       setRuphusStory(null);
       generateStory(bean, true);
     }
-  }, [generateStory]);
+  }, [generateStory, getBeanById, updateBean]);
 
   const handleRefresh = useCallback(() => {
     if (!ruphusBean) return;

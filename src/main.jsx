@@ -51,7 +51,7 @@ const Root = () => {
     beans, tastings,
     addBean, updateBean, deleteBean,
     addTasting, updateTasting, deleteTasting,
-    openBean, finishBean, returnBean, seedTalData, refetch,
+    openBean, finishBean, returnBean, getBeanById, seedTalData, refetch,
     loaded: dataLoaded,
   } = useAppData(user?.uid);
 
@@ -160,6 +160,7 @@ const Root = () => {
               openBean={openBean}
               finishBean={finishBean}
               returnBean={returnBean}
+              getBeanById={getBeanById}
               profile={profile}
               updateProfile={updateProfile}
               refetchBeans={refetch}

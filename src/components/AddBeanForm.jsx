@@ -19,6 +19,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+import { ENRICHABLE_FIELDS } from '../lib/beanFields';
 
 // Catch a paywall-triggering error from any AI call and route it to the
 // global paywall sheet instead of showing a generic toast. Returns true if
@@ -37,8 +38,6 @@ function handlePaywallError(err, openPaywall) {
   }
   return false;
 }
-
-const ENRICHABLE_FIELDS = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore', 'brewingRec', 'sourcedBy', 'variety', 'process', 'producer', 'roastedIn'];
 
 export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData, onToast }) => {
   const { hasPro, freeUsage } = useSubscription();

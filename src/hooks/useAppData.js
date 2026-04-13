@@ -327,6 +327,14 @@ export const useAppData = (uid) => {
     });
   }, [updateBean]);
 
+  // Stable getter that reads the latest bean state synchronously via the
+  // beansStateRef mirror. Used by silent background enrichment in
+  // useProfessorRuphus so the "only fill empty fields" merge checks the
+  // current bean state at write time, not at call time.
+  const getBeanById = useCallback((beanId) => {
+    return beansStateRef.current.find(b => b.id === beanId) || null;
+  }, []);
+
   // Seed Tal's initial data into Firestore
   const seedTalData = useCallback(async () => {
     if (!uid) return;
@@ -380,6 +388,7 @@ export const useAppData = (uid) => {
     openBean,
     finishBean,
     returnBean,
+    getBeanById,
     seedTalData,
     loaded,
     refetch,
