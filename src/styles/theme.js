@@ -1,36 +1,57 @@
-// Color palette — Ghibli-inspired warm coffee journal aesthetic
+// Color palette — 2manybeans brand system
+// Brand tokens: oat (bg), latte (cards), caramel (accent), espresso (text), sage (peak/fresh)
 export const C = {
-  bg: "#FAF6F1",
-  cream: "#FFF8F0",
-  card: "#FFF8F0",
-  cardMuted: "#EDE6DC",
-  text: "#3B2417",
-  textMuted: "#8B7B6F",
-  textLight: "#A89888",
-  accent: "#A0714B",
-  accentLight: "#C9A87C",
-  accentDark: "#5C3D2E",
+  // Backgrounds
+  bg: "#FAF6F1",           // oat / parchment — main background
+  cream: "#FFF8F0",        // latte — cards, soft surfaces
+  card: "#FFF8F0",         // latte — card fill
+  cardMuted: "#EDE6DC",    // warm gray — muted cards, disabled surfaces
+
+  // Text
+  text: "#3B2417",         // espresso — primary text, strong contrast
+  textMuted: "#8B7B6F",    // mocha — secondary text
+  textLight: "#A89888",    // taupe — helper text, placeholders
+
+  // Brand accent (caramel)
+  accent: "#B07540",       // caramel — brand actions, selected states, icon bg
+  accentLight: "#C9A87C",  // light caramel — borders, subtle highlights
+  accentDark: "#5C3D2E",   // dark roast — pressed states
+
+  // Borders
   border: "#E8DDD3",
   borderLight: "#F0E8DF",
-  green: "#5B8A6A",
+
+  // Status: peak / freshness
+  green: "#5B8A6A",        // sage — peak window, fresh, alive
   greenBg: "#EBF2ED",
-  amber: "#C4943A",
+
+  // Status: warning / aging
+  amber: "#C4943A",        // muted amber — aging, needs attention
   amberBg: "#FDF6E3",
-  red: "#A0522D",
+
+  // Status: error / problem
+  red: "#B5634B",          // soft terracotta — errors, destructive
   redBg: "#FDF0EB",
+
+  // Status: archive / inactive
   purple: "#6B5B95",
   purpleBg: "#F0EDF5",
+
+  // Info / links
   blue: "#3B82F6",
   blueBg: "#DBEAFE",
+
+  // Navigation
   navBg: "#FFF8F0",
   navText: "#8B7B6F",
-  navActive: "#A0714B",
+  navActive: "#B07540",    // caramel — matches brand accent
 };
 
+// Typography — 3 roles: script (wordmark/titles), serif (display), sans (UI)
 export const fonts = {
-  title: "'Caveat', cursive",
-  heading: "'Playfair Display', serif",
-  body: "'Nunito', sans-serif",
+  title: "'Caveat', cursive",              // script — wordmark, page titles, display only
+  heading: "'Playfair Display', serif",    // serif — bean names, section emphasis, premium moments
+  body: "'Nunito', sans-serif",            // sans — all UI: metadata, buttons, tabs, chat, recipes
 };
 
 export const shadows = {

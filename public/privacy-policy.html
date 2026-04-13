@@ -30,11 +30,22 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="subtitle">Effective Date: April 11, 2026 · Last Updated: April 11, 2026</p>
+  <p class="subtitle">Effective Date: April 12, 2026</p>
 
   <h2>Introduction</h2>
-  <p>2manybeans ("Coffee Hub," "the App," "we," "us," or "our") is a specialty coffee inventory and tasting tracker developed by Tal Meltzer. This Privacy Policy explains how we collect, use, store, and protect your information when you use the 2manybeans mobile app and web application at <a href="https://2manybeans.vercel.app">https://2manybeans.vercel.app</a>.</p>
-  <p>By using 2manybeans, you agree to the collection and use of information as described in this policy. If you do not agree, please do not use the App.</p>
+  <p>2manybeans ("the App," "we," "us," or "our") is a specialty coffee inventory and AI tasting coach developed by Super X LLC, a California limited liability company. This Privacy Policy explains how we collect, use, store, and protect your information when you use the 2manybeans iOS app and web application at <a href="https://2manybeans.vercel.app">2manybeans.vercel.app</a>.</p>
+  <p>By using 2manybeans, you agree to the practices described in this policy. If you do not agree, please do not use the App.</p>
+
+  <h2>What We Do Not Collect</h2>
+  <p>We want to be clear about what we do not do:</p>
+  <ul>
+    <li>No advertising SDKs or ad tracking</li>
+    <li>No behavioral analytics or usage profiling</li>
+    <li>No device advertising identifiers</li>
+    <li>No location data (GPS or IP-based geolocation)</li>
+    <li>No sale, rental, or trading of your personal information to third parties</li>
+    <li>No cookies or web tracking pixels</li>
+  </ul>
 
   <h2>Information We Collect</h2>
 
@@ -43,60 +54,69 @@
   <ul>
     <li>Your email address</li>
     <li>Your display name</li>
-    <li>Your profile photo URL</li>
+    <li>Your profile photo URL (if provided by Google; Apple sign-in may use a relay address)</li>
     <li>A unique user identifier (Firebase UID)</li>
   </ul>
-  <p>We use Firebase Authentication to manage sign-in. We do not store your Google or Apple password.</p>
+  <p>We use Firebase Authentication to manage sign-in. We never receive or store your Google or Apple password.</p>
 
   <h3>Content You Create</h3>
   <p>Everything you add to the App is stored in your account:</p>
   <ul>
-    <li>Coffee bean entries (roaster name, origin, variety, process method, roast date, tasting notes, ratings, and scores)</li>
+    <li>Coffee bean entries (roaster, origin, variety, process, roast date, tasting notes, ratings, scores)</li>
     <li>Bean photos you upload or capture with your camera</li>
     <li>AI-generated product images of your beans</li>
     <li>Share card images you create</li>
-    <li>Your preferences (grinder model, brew method, canister count)</li>
+    <li>Preferences (grinder model, brew method, canister count)</li>
     <li>Chat messages with AI features</li>
     <li>Marketing email consent preference</li>
   </ul>
 
   <h3>Automatically Collected Information</h3>
   <ul>
-    <li>Device information and app version (collected by our update service, Capgo, to deliver over-the-air updates)</li>
-    <li>Subscription status and purchase history (collected by RevenueCat for managing in-app subscriptions)</li>
+    <li><strong>Device and app version:</strong> Collected by Capgo to deliver over-the-air updates to the iOS app. This is limited to device type, OS version, and app version.</li>
+    <li><strong>Subscription status and purchase history:</strong> Collected by RevenueCat for managing in-app subscriptions. RevenueCat receives purchase transaction data and, if you are signed in, your Apple ID identifier.</li>
   </ul>
 
   <h3>Information Processed by AI Services</h3>
   <p>When you use AI-powered features (tasting coach, brew recipes, bean scanning, chat), relevant data from your request is sent to our server-side AI providers for processing:</p>
   <ul>
-    <li><strong>Anthropic (Claude):</strong> tasting notes, bean details, chat messages</li>
-    <li><strong>OpenAI (GPT):</strong> brew recipe generation, tasting score extraction, story content</li>
-    <li><strong>Google (Gemini):</strong> bean photo analysis, web search enrichment for bean information, image analysis in chat</li>
+    <li><strong>Anthropic (Claude):</strong> Tasting notes, bean details, chat messages</li>
+    <li><strong>OpenAI (GPT):</strong> Brew recipe generation, tasting score extraction, story content</li>
+    <li><strong>Google (Gemini):</strong> Bean photo analysis, web search enrichment for bean information, image analysis in chat</li>
   </ul>
-  <p>This data is sent through our secure server-side proxies hosted on Vercel. We do not send your full account data to these services, only the specific information needed to process your request.</p>
+  <p>All AI requests are routed through our secure server-side proxies hosted on Vercel. We send only the specific information needed to process your request, never your full account data. Your API keys and credentials are never exposed on your device.</p>
+  <p>AI providers may process your data according to their respective policies. We do not use your data to train AI models, and our API agreements with these providers are configured for zero-retention where available.</p>
+
+  <h2>Device Permissions</h2>
+  <p>The App may request the following device permissions:</p>
+  <ul>
+    <li><strong>Camera:</strong> Used to photograph coffee bean bags for AI scanning and identification. Photos are uploaded to Firebase Storage for your account and sent to Gemini for analysis. You can deny camera access and still use all other features.</li>
+    <li><strong>Photo Library:</strong> Used to select existing photos of coffee beans. Same processing as camera photos.</li>
+  </ul>
+  <p>Permissions are requested at the time of use and can be revoked at any time in your device settings.</p>
 
   <h2>How We Use Your Information</h2>
-  <p>We use your information to:</p>
   <ul>
     <li>Provide and maintain the App's core features (inventory tracking, tasting notes, AI recommendations)</li>
     <li>Authenticate your identity and secure your account</li>
     <li>Process your subscription and manage billing through Apple and RevenueCat</li>
-    <li>Deliver over-the-air app updates</li>
+    <li>Deliver over-the-air app updates via Capgo</li>
     <li>Send marketing emails (only if you have opted in)</li>
-    <li>Improve the App based on usage patterns</li>
+    <li>Improve the App and fix bugs</li>
   </ul>
 
   <h2>How We Store and Protect Your Data</h2>
   <ul>
     <li>Account data and content are stored in Google Firebase (Firestore database and Firebase Storage), hosted in the United States</li>
     <li>All data transmission uses HTTPS/TLS encryption</li>
-    <li>AI requests are routed through server-side proxies on Vercel, so your API keys and sensitive credentials are never exposed on-device</li>
+    <li>AI requests are routed through server-side proxies on Vercel, so credentials are never exposed on-device</li>
     <li>Access to production systems is restricted to the developer</li>
+    <li>Firebase security rules enforce per-user data isolation (you can only access your own data)</li>
   </ul>
   <p>We take reasonable measures to protect your data, but no method of electronic storage or transmission is 100% secure.</p>
 
   <h2>Third-Party Services</h2>
-  <p>We use the following third-party services, each with their own privacy policies:</p>
+  <p>We use the following third-party services, each governed by their own privacy policies:</p>
   <table>
     <thead>
       <tr>
@@ -107,7 +127,7 @@
     </thead>
     <tbody>
       <tr>
-        <td>Google Firebase (Authentication, Firestore, Storage)</td>
+        <td>Google Firebase (Auth, Firestore, Storage)</td>
         <td>Account management, data storage, file storage</td>
         <td><a href="https://firebase.google.com/support/privacy">View</a></td>
       </tr>
@@ -118,7 +138,7 @@
       </tr>
       <tr>
         <td>OpenAI (GPT)</td>
-        <td>AI brew recipes, scores, stories</td>
+        <td>AI brew recipes, score extraction, stories</td>
         <td><a href="https://openai.com/privacy">View</a></td>
       </tr>
       <tr>
@@ -128,12 +148,12 @@
       </tr>
       <tr>
         <td>RevenueCat</td>
-        <td>Subscription management</td>
+        <td>Subscription management, purchase validation</td>
         <td><a href="https://www.revenuecat.com/privacy">View</a></td>
       </tr>
       <tr>
         <td>Capgo</td>
-        <td>Over-the-air app updates</td>
+        <td>Over-the-air app updates (iOS)</td>
         <td><a href="https://capgo.app/privacy">View</a></td>
       </tr>
       <tr>
@@ -153,7 +173,6 @@
       </tr>
     </tbody>
   </table>
-  <p>We do not sell your data to any third party. We do not use advertising SDKs or tracking pixels.</p>
 
   <h2>Data Retention</h2>
   <ul>
@@ -163,50 +182,54 @@
     <li><strong>Update delivery data:</strong> Capgo retains device information per their retention policy.</li>
   </ul>
 
-  <h2>Your Rights</h2>
+  <h2>Your Rights and Choices</h2>
 
   <h3>All Users</h3>
-  <p>You have the right to:</p>
   <ul>
-    <li><strong>Access</strong> your data: all your content is visible within the App at any time</li>
-    <li><strong>Export</strong> your data: contact us to request a full export of your account data</li>
-    <li><strong>Delete</strong> your data: use the Delete Account option in Settings, or contact us</li>
-    <li><strong>Opt out of marketing:</strong> toggle marketing email consent off in the App's settings, or contact us</li>
+    <li><strong>Access:</strong> All your content is visible within the App at any time.</li>
+    <li><strong>Export:</strong> Contact us to request a full export of your account data in a machine-readable format.</li>
+    <li><strong>Delete:</strong> Use the "Delete Account" option in Settings, or contact us. Deletion is completed within 30 days.</li>
+    <li><strong>Opt out of marketing:</strong> Toggle marketing email consent off in Settings, or contact us.</li>
+    <li><strong>Revoke permissions:</strong> Camera and photo library access can be revoked in your device settings at any time.</li>
   </ul>
+
+  <h3>California Residents (CCPA/CPRA)</h3>
+  <p>If you are a California resident, the California Consumer Privacy Act and California Privacy Rights Act provide you with specific rights:</p>
+  <ul>
+    <li><strong>Right to know:</strong> Request disclosure of what personal information we collect, use, and share.</li>
+    <li><strong>Right to delete:</strong> Request deletion of your personal information.</li>
+    <li><strong>Right to correct:</strong> Request correction of inaccurate personal information.</li>
+    <li><strong>Right to opt out of sale or sharing:</strong> We do NOT sell or share your personal information for cross-context behavioral advertising.</li>
+    <li><strong>Right to non-discrimination:</strong> We will not discriminate against you for exercising your rights.</li>
+  </ul>
+  <p>To exercise any right, contact us at the email below. We will respond within 45 days.</p>
 
   <h3>European Economic Area (GDPR)</h3>
-  <p>If you are located in the EEA, you have additional rights under the General Data Protection Regulation:</p>
+  <p>If you are in the EEA, the General Data Protection Regulation provides additional rights:</p>
   <ul>
-    <li><strong>Right to access:</strong> request a copy of all personal data we hold about you</li>
-    <li><strong>Right to rectification:</strong> request correction of inaccurate personal data</li>
-    <li><strong>Right to erasure</strong> ("right to be forgotten"): request deletion of your personal data</li>
-    <li><strong>Right to data portability:</strong> receive your data in a structured, machine-readable format</li>
-    <li><strong>Right to restrict processing:</strong> request that we limit how we use your data</li>
-    <li><strong>Right to object:</strong> object to our processing of your personal data</li>
-    <li><strong>Right to withdraw consent:</strong> withdraw consent for any processing based on consent at any time</li>
+    <li><strong>Access:</strong> Request a copy of all personal data we hold about you.</li>
+    <li><strong>Rectification:</strong> Request correction of inaccurate personal data.</li>
+    <li><strong>Erasure:</strong> Request deletion of your personal data.</li>
+    <li><strong>Data portability:</strong> Receive your data in a structured, machine-readable format.</li>
+    <li><strong>Restrict processing:</strong> Request that we limit how we use your data.</li>
+    <li><strong>Object:</strong> Object to our processing of your personal data.</li>
+    <li><strong>Withdraw consent:</strong> Withdraw consent for any consent-based processing at any time.</li>
   </ul>
-  <p>Our legal basis for processing your data is: (a) performance of a contract (providing the App's services), (b) your consent (marketing emails), and (c) legitimate interests (improving the App, security).</p>
+  <p>Legal bases for processing: (a) performance of a contract (providing the App's services), (b) your consent (marketing emails), and (c) legitimate interests (improving the App, security).</p>
   <p>To exercise any GDPR right, contact us at the email below. We will respond within 30 days.</p>
 
-  <h3>California Residents (CCPA)</h3>
-  <p>If you are a California resident, the California Consumer Privacy Act provides you with specific rights:</p>
-  <ul>
-    <li><strong>Right to know:</strong> request disclosure of what personal information we collect, use, and share</li>
-    <li><strong>Right to delete:</strong> request deletion of your personal information</li>
-    <li><strong>Right to opt-out of sale:</strong> we do NOT sell your personal information to third parties</li>
-    <li><strong>Right to non-discrimination:</strong> we will not discriminate against you for exercising your CCPA rights</li>
-  </ul>
-  <p>To exercise any CCPA right, contact us at the email below.</p>
+  <h2>International Data Transfers</h2>
+  <p>Your information may be processed, stored, and used in the United States, where our servers and service providers are located. Data privacy laws vary across jurisdictions. By using the App, you consent to the transfer of your information to the United States and processing there.</p>
 
   <h2>Children's Privacy</h2>
   <p>2manybeans is not directed at children under the age of 13 (or 16 in the EEA). We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us and we will delete it promptly.</p>
 
   <h2>Changes to This Policy</h2>
-  <p>We may update this Privacy Policy from time to time. When we make changes, we will update the "Last Updated" date at the top of this page. For significant changes, we will notify you through the App or via email if you have opted in to marketing communications.</p>
-  <p>Your continued use of the App after changes are posted constitutes your acceptance of the updated policy.</p>
+  <p>We may update this Privacy Policy from time to time. When we do, we will update the date at the top of this page. For significant changes, we will notify you through the App. Your continued use of the App after changes are posted constitutes your acceptance of the updated policy.</p>
 
   <h2>Contact Us</h2>
-  <p>If you have questions about this Privacy Policy, want to exercise your data rights, or need to request data deletion:</p>
-  <p><strong>Email:</strong> <a href="mailto:tal@2manybeans.com">tal@2manybeans.com</a></p>
+  <p>If you have questions about this Privacy Policy, want to exercise your data rights, or need to report a concern:</p>
+  <p><strong>Super X LLC</strong><br>
+  Email: <a href="mailto:admin@superxmusic.com">admin@superxmusic.com</a></p>
 </body>
 </html>

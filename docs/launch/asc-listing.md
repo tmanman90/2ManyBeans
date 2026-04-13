@@ -185,10 +185,7 @@ Answer this way in App Store Connect → Age Rating:
 The app supports both Google Sign-In and Sign in with Apple. For review, either method works. No demo account required.
 
 If you prefer a demo account, use:
-Email: apple-review@2manybeans.app
-Password: (provided separately via App Store Connect "App Review Information" password field)
-
-This account is pre-populated with several beans and tasting notes so you can exercise every feature without scanning a physical bag first.
+The app supports Sign in with Apple and Google Sign-In. No demo account is needed. The reviewer can create an account using Sign in with Apple.
 ```
 
 ### Notes to Reviewer
