@@ -1,5 +1,5 @@
 // App shell — warm Ghibli-inspired coffee journal
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { C, fonts, shadows } from './styles/theme';
 import { haptic } from './lib/haptics';
@@ -98,6 +98,31 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   useEffect(() => {
     document.documentElement.style.background = isRotation ? '#5C6B4E' : C.bg;
   }, [isRotation]);
+
+  // Onboarding → home screen handoff. R11 and R13b write
+  // `profile.onboardingAnswers.postCompleteAction` as part of the
+  // final atomic setDoc, so by the time App.jsx mounts the field is
+  // readable. One-shot: consume + clear so a later profile refresh
+  // or navigation doesn't re-trigger. Mirrors the `pendingAddBean`
+  // bridge but Firestore-backed so it survives a cross-device hand-off.
+  const handoffConsumedRef = useRef(false);
+  useEffect(() => {
+    if (handoffConsumedRef.current) return;
+    const action = profile?.onboardingAnswers?.postCompleteAction;
+    if (!action || action === 'none') return;
+    handoffConsumedRef.current = true;
+    if (action === 'scan' || action === 'manual_add') {
+      setTab('inventory');
+      setPendingAddBean(true);
+    }
+    // Clear the field so re-mounts don't re-trigger. Non-fatal on
+    // failure — worst case the next mount hits the guard ref above.
+    updateProfile?.({
+      onboardingAnswers: { ...profile.onboardingAnswers, postCompleteAction: 'none' },
+    }).catch((err) => {
+      console.warn('[App] Failed to clear postCompleteAction', err);
+    });
+  }, [profile, updateProfile]);
 
   return (
     <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
