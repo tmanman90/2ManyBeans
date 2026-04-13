@@ -272,7 +272,12 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
       logOnboardingEvent('onboarding_complete_write_failed', {
         error: String(err?.message || err || '').slice(0, 200),
       });
+      // Reset the in-flight guard AND rethrow so the caller (R13b's
+      // Yes/Maybe Later buttons) can clear its local busy state and
+      // re-offer the action. Without the rethrow the caller would see
+      // finish() resolve successfully after a silent failure.
       setFinishing(false);
+      throw err;
     }
   }, [finishing, profile, createProfile, completeOnboarding, uid, user]);
 

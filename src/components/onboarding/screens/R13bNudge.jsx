@@ -22,21 +22,32 @@ export default function R13bNudge() {
   const canScan = answers?.cameraPermission === 'granted';
   const primaryLabel = canScan ? "Yes, let's scan" : 'Add a bag manually';
 
+  // `finish` in OnboardingFlow writes the final atomic setDoc and
+  // mirrors marketingConsent to /emailList if set. It THROWS on
+  // failure so the caller can reset the busy state and re-offer the
+  // action — otherwise the user would be stranded on R13b with both
+  // buttons stuck in the spinner state.
   const handlePrimary = async () => {
     if (busy) return;
     setBusy(true);
-    logOnboardingEvent('onboarding_nudge_accepted', {});
-    // `finish` in OnboardingFlow writes the final atomic setDoc with
-    // whatever answers we've accumulated. We overwrite
-    // postCompleteAction right before calling so App.jsx knows what
-    // to do on mount.
-    await finish?.({ postCompleteAction: canScan ? 'scan' : 'manual_add' });
+    try {
+      logOnboardingEvent('onboarding_nudge_accepted', {});
+      await finish?.({ postCompleteAction: canScan ? 'scan' : 'manual_add' });
+      // On success the main app renders and this component unmounts,
+      // so there's no need to clear busy.
+    } catch {
+      setBusy(false);
+    }
   };
 
   const handleMaybeLater = async () => {
     if (busy) return;
     setBusy(true);
-    await finish?.({ postCompleteAction: 'none' });
+    try {
+      await finish?.({ postCompleteAction: 'none' });
+    } catch {
+      setBusy(false);
+    }
   };
 
   return (

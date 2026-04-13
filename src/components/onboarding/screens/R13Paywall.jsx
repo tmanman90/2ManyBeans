@@ -92,21 +92,22 @@ export default function R13Paywall() {
   useEffect(() => {
     const nowOpen = paywallContext !== null;
     if (wasOpenRef.current && !nowOpen) {
-      // Sheet just closed — could be purchase OR dismiss.
+      // Sheet just closed — could be purchase OR dismiss. The hook
+      // owns the flowCompletedRef latch: it only calls one of these
+      // callbacks (at most), so we don't re-check or re-assign the
+      // ref here. The callbacks are guaranteed single-fire per
+      // disambig window.
       handleDismissOrPurchase(
         () => {
-          // onPurchased — typically we got here already via the
-          // hasPro transition effect above. Idempotent because
-          // flowCompletedRef is already true by then.
-          if (flowCompletedRef.current) return;
-          flowCompletedRef.current = true;
+          // onPurchased — late-propagating hasPro signal. The
+          // purchase transition effect above may have already fired
+          // finish() first; the OnboardingFlow.finish() `finishing`
+          // guard makes the second call a no-op.
           finish?.({ completedVia: 'paywall' });
         },
         () => {
-          // onDismissed — user dismissed without buying. Fall through
-          // to R13b with via='maybe_later'.
-          if (flowCompletedRef.current) return;
-          flowCompletedRef.current = true;
+          // onDismissed — user closed without buying within the
+          // 500ms propagation window. Fall through to R13b.
           logOnboardingEvent('onboarding_paywall_dismissed', {});
           dispatch({ type: 'COMPLETE', via: 'maybe_later' });
         }
