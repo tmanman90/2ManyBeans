@@ -32,8 +32,13 @@ const SWIPE_OFFSCREEN = 520; // px — flyoff distance on commit
 
 export default function R05Tinder() {
   const { dispatch, answers } = useOnboarding();
+  // Completion requires BOTH 5 cards AND a palate chart. Without the
+  // chart guard, a corrupt hydrated blob (length===5 but palateChart
+  // null) would ping-pong R5 ↔ R6 and dead-end on R5's null return.
   const alreadyComplete =
-    Array.isArray(answers?.tinderCards) && answers.tinderCards.length === 5;
+    Array.isArray(answers?.tinderCards) &&
+    answers.tinderCards.length === 5 &&
+    !!answers?.palateChart;
 
   const [cardIndex, setCardIndex] = useState(0);
   const [swipes, setSwipes] = useState([]);

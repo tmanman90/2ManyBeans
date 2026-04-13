@@ -250,6 +250,17 @@ export const useUserProfile = (uid) => {
           payload.preferences = { ...(profile?.preferences || DEFAULT_PREFERENCES), ...cleanPrefs };
         }
       }
+      // Mirror marketing consent to the top-level profile fields
+      // (separate from onboardingAnswers) so SettingsPage's toggle
+      // reflects the choice the user just made at R12. Fresh-user
+      // create path already writes these via createProfile; this
+      // branch handles replayed/existing-profile completions.
+      if (typeof answers.marketingConsent === 'boolean') {
+        payload.marketingConsent = answers.marketingConsent;
+        payload.marketingConsentDate = answers.marketingConsent
+          ? serverTimestamp()
+          : null;
+      }
     }
     await setDoc(profileRef, payload, { merge: true });
     setProfile(prev => {

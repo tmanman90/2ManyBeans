@@ -138,8 +138,12 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
   const [hydrated, setHydrated] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
-  // Keep a ref of the latest state so the dispatch wrapper can persist the
-  // post-action result without depending on React's render cycle.
+  // Keep a ref of the latest committed state so the dispatch wrapper can
+  // persist the post-action result without depending on React's render
+  // cycle. Updated BOTH inside the wrapper (synchronous path, so
+  // queueMicrotask sees the new state) AND via an effect (backstop for
+  // state changes that come from rawDispatch outside the wrapper — e.g.
+  // the one-shot HYDRATE in the mount effect below).
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -163,19 +167,32 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
     logOnboardingEvent('onboarding_screen_view', { screen: state.step });
   }, [hydrated, uid, state.step]);
 
-  // Dispatch wrapper — the ONE place saveState runs. queueMicrotask waits
-  // for React to commit the reducer before we snapshot stateRef.
+  // Dispatch wrapper — the ONE place saveState runs.
+  //
+  // We compute the next state SYNCHRONOUSLY from the reducer rather
+  // than reading stateRef.current inside a queueMicrotask. The sync
+  // approach guarantees we save exactly the state the user just
+  // transitioned to, even when the backstop effect that mirrors
+  // committed state into stateRef hasn't run yet. (The effect runs
+  // after React commits, which is always later than our microtask.)
+  //
+  // The reducer is pure, so running it here AND inside React's
+  // rawDispatch is safe. Saves become fire-and-forget: we update
+  // stateRef, kick off the microtask persistence, then let React
+  // handle the actual re-render via rawDispatch.
   const advancingRef = useRef(false);
   const dispatch = useCallback((action) => {
     if (!action || !action.type) return;
     if (advancingRef.current && action.type === 'ADVANCE') return;
     if (action.type === 'ADVANCE') advancingRef.current = true;
 
+    const nextState = onboardingReducer(stateRef.current, action);
+    stateRef.current = nextState;
     rawDispatch(action);
 
     queueMicrotask(() => {
       try {
-        if (uid) saveState(uid, stateRef.current);
+        if (uid) saveState(uid, nextState);
       } catch { /* swallow — see quota handling */ }
       advancingRef.current = false;
     });
