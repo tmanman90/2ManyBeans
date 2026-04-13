@@ -4,21 +4,32 @@ import { generateRuphusStory } from '../lib/professorRuphus';
 import { researchBeanOnline, summarizeNotes } from '../lib/gemini';
 import { ENRICHABLE_FIELDS, isBagNotesEmpty, beanNeedsRuphusEnrichment } from '../lib/beanFields';
 
+// Module-level set of bean IDs currently being enriched. Prevents a
+// double-tap on the Ruphus button from firing two concurrent Gemini calls
+// before the enrichedAt cache lands in Firestore.
+const inflightEnrichmentIds = new Set();
+
 // Silent background enrichment fired alongside the Ruphus story.
-// Reuses the same Gemini search-grounding path as Add Bean / AI Fill, with
-// metered:false because this is a background convenience, not a user-initiated
-// research action. Re-reads bean state at write time so concurrent user edits
-// are never clobbered. Fails silently per the spec.
+// Reuses the same Gemini search-grounding path as Add Bean / AI Fill.
+// Passes metered:true because the /api/gemini proxy rejects non-metered
+// requests from free-tier users with 403. Pro users bypass the meter at
+// the server, so this is a no-op for them. Free users spend one of their
+// aiScans per first-time Ruphus press on an under-populated bean, which
+// matches the semantic: it IS an AI research action. At-cap errors are
+// swallowed silently so the paywall never surfaces on a Ruphus press.
 async function runSilentEnrichment(bean, getBeanById, updateBean) {
   if (!updateBean || !getBeanById) return;
   if (!beanNeedsRuphusEnrichment(bean)) return;
+  if (inflightEnrichmentIds.has(bean.id)) return;
 
+  inflightEnrichmentIds.add(bean.id);
   try {
-    const research = await researchBeanOnline(bean, { metered: false });
+    const research = await researchBeanOnline(bean, { metered: true });
 
-    // Re-read latest bean state — user may have edited fields while the slide-up
-    // was open, or a concurrent refetch may have filled some fields.
-    const current = getBeanById(bean.id);
+    // Re-read the bean from Firestore (not from local state) so a
+    // concurrent user edit during the in-flight window is never clobbered.
+    // Local state can lag several seconds on native due to polling refetch.
+    const current = await getBeanById(bean.id);
     if (!current) return; // bean was deleted mid-flight
 
     const updates = {};
@@ -37,20 +48,20 @@ async function runSilentEnrichment(bean, getBeanById, updateBean) {
       if (summary) updates.bagNotes = summary;
     }
 
-    // Only write if we actually have new data. Always stamp enrichedAt on
-    // success so subsequent Ruphus presses on this bean skip the call.
+    // Only stamp enrichedAt when we actually filled at least one field.
+    // Empty-success (research returned nothing usable) is treated as a
+    // no-op so the next Ruphus press retries — better than permanently
+    // stranding a bean on a transient low-quality Gemini response.
     if (Object.keys(updates).length > 0) {
       updates.enrichedAt = new Date().toISOString();
       await updateBean(bean.id, updates);
-    } else {
-      // Research succeeded but returned nothing usable. Still cache so we
-      // don't keep calling Gemini for a bean with no public information.
-      await updateBean(bean.id, { enrichedAt: new Date().toISOString() });
     }
   } catch (err) {
     // R7: swallow silently. Do NOT write enrichedAt on error so the next
     // Ruphus press retries.
     console.log('Silent Ruphus enrichment skipped:', err.message);
+  } finally {
+    inflightEnrichmentIds.delete(bean.id);
   }
 }
 

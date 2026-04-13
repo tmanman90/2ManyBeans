@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, writeBatch,
-  serverTimestamp, query, where, orderBy, getDocs, limit, deleteField
+  serverTimestamp, query, where, orderBy, getDoc, getDocs, limit, deleteField
 } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
@@ -327,13 +327,23 @@ export const useAppData = (uid) => {
     });
   }, [updateBean]);
 
-  // Stable getter that reads the latest bean state synchronously via the
-  // beansStateRef mirror. Used by silent background enrichment in
-  // useProfessorRuphus so the "only fill empty fields" merge checks the
-  // current bean state at write time, not at call time.
-  const getBeanById = useCallback((beanId) => {
-    return beansStateRef.current.find(b => b.id === beanId) || null;
-  }, []);
+  // Async fresh-fetch getter used by silent background enrichment in
+  // useProfessorRuphus. Does a one-shot getDoc against Firestore rather
+  // than reading the beansStateRef mirror, because on native (polling
+  // refetch, 5-10s window) the local state can be seconds behind the
+  // server. The enrichment merge needs truly-latest state so a
+  // concurrent user edit is never clobbered.
+  const getBeanById = useCallback(async (beanId) => {
+    if (!uid || !beanId) return null;
+    try {
+      const beanRef = doc(db, 'users', uid, 'beans', beanId);
+      const snap = await getDoc(beanRef);
+      if (!snap.exists()) return null;
+      return normalizeBean(snap);
+    } catch {
+      return null;
+    }
+  }, [uid]);
 
   // Seed Tal's initial data into Firestore
   const seedTalData = useCallback(async () => {
