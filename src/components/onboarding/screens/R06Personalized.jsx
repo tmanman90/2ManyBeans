@@ -4,11 +4,14 @@ import { OnboardingScreenShell } from './OnboardingScreenShell';
 import { useOnboarding } from '../OnboardingContext';
 
 // R6 — mirror the user's r2+r3 answers back at them and tee up 3 real
-// feature cards (no fabricated statistics). The feature pick is a
-// dispatch table keyed on (goal, pain) — if the user's combo isn't in
-// the table, we fall back to a sensible default set.
+// feature cards (no fabricated statistics). Features are picked from
+// a goal+pain dispatch table; if the combo isn't in the table, we
+// fall back to a sensible default set that leads with the recipe
+// engine and the bean-tracking angle — the two lines Tal flagged as
+// the core pitch.
 
 const GOAL_COPY = {
+  aiden: 'your Fellow Aiden',
   v60: 'V60 / pour over',
   aeropress: 'the Aeropress',
   french_press: 'French press',
@@ -17,47 +20,73 @@ const GOAL_COPY = {
 };
 
 const PAIN_COPY = {
-  inconsistent: "chasing consistency",
-  forget_freshness: "tracking freshness",
+  inconsistent:
+    "chasing consistency",
+  forget_freshness:
+    "tracking freshness",
+  too_many_beans:
+    "taming your bean collection",
   taste_more: 'actually tasting your coffee',
   brew_like_pro: 'brewing like a pro',
 };
 
-// Small, honest feature cards. Keep descriptions grounded — no claims
-// like "used by 50,000 brewers." These are all real Coffee Hub features.
+// Small, honest feature cards. Two are load-bearing per Tal's feedback:
+//   - `recipes`: Hoffmann-trained AI that tunes recipes to YOUR bean
+//     and YOUR grinder (not generic ratios)
+//   - `rotation`: bean library that replaces whiteboards / spreadsheets
+// Everything else is secondary and gets swapped in based on goal.
 const FEATURE_LIBRARY = {
+  recipes: {
+    title: 'Recipes tuned to you',
+    body:
+      "I've read every coffee book worth reading — Hoffmann, Perger, Rao — " +
+      "and I use all of it to pull a brew recipe tuned to the bean on your " +
+      "counter and the grinder you actually own. No generic ratios.",
+  },
   rotation: {
-    title: 'Peak rotation',
-    body: "I'll tell you which jar is in its window so you're drinking beans at their best.",
+    title: 'Finally a home for every bag',
+    body:
+      "No whiteboards. No Excel. No Notes app graveyard. I track every bag — " +
+      "roast date, peak window, origin, tasting notes — and I tell you which " +
+      "jar to grab this morning.",
   },
   tasting: {
-    title: 'Guided tasting',
-    body: "Step-by-step tasting coach that meets you where you are. No vague questions.",
+    title: 'Guided tasting coach',
+    body:
+      "Step-by-step coaching that meets you where you are. No vague \"what do " +
+      "you taste?\" questions — real scaffolded notes you can act on.",
   },
   scan: {
-    title: 'Bag scanner',
-    body: "Snap the back label and I'll pull origin, altitude, and brew recs.",
+    title: 'Snap the bag, get the whole story',
+    body:
+      "Point at the back label. I'll read the origin, process, altitude, and " +
+      "roast level, then turn all of it into a recipe.",
   },
   ruphus: {
     title: 'Professor Ruphus',
-    body: "Stories and brewing lessons tied to the beans actually in your rotation.",
+    body:
+      "Stories and brewing lessons tied to the beans actually in your rotation.",
   },
   aiden: {
-    title: 'Fellow Aiden recipes',
-    body: "I'll hand your Aiden a custom profile for every bag, based on origin and roast level.",
+    title: 'Fellow Aiden profiles',
+    body:
+      "Every bag gets a custom Aiden profile pushed straight to your brewer — " +
+      "origin-aware, roast-aware, one tap away from your cup.",
   },
 };
 
-// Dispatch table: goal → 3 feature keys. Pain adds a nudge at the end.
+// Goal → ordered feature keys. `recipes` and `rotation` lead nearly
+// every combination because they're the two strongest selling points.
 const GOAL_FEATURE_MAP = {
-  v60: ['rotation', 'tasting', 'scan'],
-  aeropress: ['rotation', 'tasting', 'scan'],
-  french_press: ['rotation', 'scan', 'ruphus'],
-  espresso: ['scan', 'aiden', 'rotation'],
-  all: ['rotation', 'tasting', 'scan'],
+  aiden:        ['aiden', 'recipes', 'rotation'],
+  v60:          ['recipes', 'rotation', 'tasting'],
+  aeropress:    ['recipes', 'rotation', 'tasting'],
+  french_press: ['recipes', 'rotation', 'ruphus'],
+  espresso:     ['recipes', 'scan', 'rotation'],
+  all:          ['recipes', 'rotation', 'tasting'],
 };
 
-const DEFAULT_FEATURES = ['rotation', 'tasting', 'scan'];
+const DEFAULT_FEATURES = ['recipes', 'rotation', 'tasting'];
 
 export default function R06Personalized() {
   const { dispatch, answers } = useOnboarding();

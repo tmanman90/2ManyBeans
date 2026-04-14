@@ -174,7 +174,7 @@ export default function R12TrialTimeline() {
             Occasional emails about new features and coffee tips. Unsubscribe
             anytime. See our{' '}
             <a
-              href="https://2manybeans.vercel.app/privacy"
+              href="https://2manybeans.vercel.app/privacy-policy.html"
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: C.accent, textDecoration: 'underline' }}

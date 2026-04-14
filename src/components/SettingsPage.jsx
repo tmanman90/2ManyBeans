@@ -99,7 +99,7 @@ const selectStyle = {
 };
 
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
-  const { preferences, updatePreferences, resetOnboarding } = usePreferences();
+  const { preferences, updatePreferences } = usePreferences();
   const { logOut } = useAuthContext();
   const { hasPro, hasUltra, plan, status } = useSubscription();
   const { openPaywall } = usePaywall();
@@ -845,7 +845,11 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             </div>
           </div>
 
-          {/* --- Dev Section (DEV-only, tree-shaken from prod) --- */}
+          {/* --- Dev Section (DEV-only, tree-shaken from prod) ---
+              Replay is LOCAL-ONLY now. It sets a localStorage flag that
+              Gate 5 in main.jsx reads and clears the uid-scoped state
+              blob. It does NOT mutate Firestore — a prior version did,
+              which caused the "dev replay strands user in prod" bug. */}
           {import.meta.env.DEV && (
             <>
               <div style={sectionHeaderStyle}>Dev</div>
@@ -854,14 +858,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   style={{ ...rowStyle, color: C.accent, fontWeight: 600 }}
                   onClick={async () => {
                     try {
-                      await resetOnboarding?.();
-                      // Clear the uid-scoped onboarding localStorage blob so
-                      // the flow restarts from R1 on reload. Import is lazy
-                      // so the prod bundle never pulls in the helper.
-                      try {
-                        const mod = await import('../components/onboarding/onboardingState');
-                        mod.clearState?.(uid);
-                      } catch { /* ignore */ }
+                      const mod = await import('../components/onboarding/onboardingState');
+                      mod.setDevForceOnboarding?.(true);
+                      mod.clearState?.(uid);
                       window.location.reload();
                     } catch (err) {
                       console.error('[Dev] Replay onboarding failed', err);

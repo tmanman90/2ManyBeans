@@ -16,7 +16,7 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { OnboardingContext } from './OnboardingContext';
 import { OnboardingErrorBoundary } from './OnboardingErrorBoundary';
-import { clearState, loadState, saveState } from './onboardingState';
+import { clearState, loadState, saveState, setDevForceOnboarding } from './onboardingState';
 import { logOnboardingEvent } from '../../lib/onboardingAnalytics';
 import { LoadingScreen } from '../LoadingScreen';
 
@@ -282,6 +282,10 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
       }
 
       if (uid) clearState(uid);
+      // Clear the DEV replay flag (no-op in prod builds — the helper
+      // just tries/catches localStorage). This lets Gate 5 drop the
+      // user back into the main app on the next render.
+      setDevForceOnboarding(false);
       logOnboardingEvent('onboarding_completed', {
         completedVia: answers.completedVia || 'skipped_paywall',
       });

@@ -48,8 +48,26 @@ const Root = () => {
   const {
     profile, profileLoaded, profileLoadError, preferences, isOnboarded,
     createProfile, migrateExistingUser, updatePreferences,
-    updateProfile, completeOnboarding, resetOnboarding, contextValue,
+    updateProfile, completeOnboarding, contextValue,
   } = useUserProfile(user?.uid);
+
+  // DEV-only: force onboarding re-entry via a local flag that the
+  // Settings "Replay onboarding" button toggles. Never writes to
+  // Firestore — the old `resetOnboarding` approach bled the flag
+  // across devices because profile docs are shared, so a dev-mode
+  // replay on localhost could strand the same user in onboarding on
+  // their production phone. The flag is evaluated every render, but
+  // it only ever reads localStorage once per mount so repeated
+  // renders are cheap.
+  const devForceOnboarding = useMemo(() => {
+    if (!import.meta.env.DEV) return false;
+    try {
+      return localStorage.getItem('__dev_force_onboarding_v1') === '1';
+    } catch {
+      return false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     beans, tastings,
@@ -137,8 +155,9 @@ const Root = () => {
     <AuthContext value={authValue}>
       <SubscriptionProvider uid={user.uid}>
         <PaywallProvider>
-          {!isOnboarded ? (
-            // Gate 5: Onboarding not complete — 13-screen rebuild
+          {(!isOnboarded || devForceOnboarding) ? (
+            // Gate 5: Onboarding not complete — 13-screen rebuild.
+            // Also enters here when the DEV replay flag is set.
             <React.Suspense fallback={<LoadingScreen />}>
               <OnboardingFlow
                 user={user}

@@ -1,13 +1,19 @@
+import { Cpu, Droplets, FlaskConical, Coffee, Zap, Sparkles } from 'lucide-react';
 import { OnboardingScreenShell } from './OnboardingScreenShell';
 import { SingleSelectList } from './SingleSelectList';
 import { useOnboarding } from '../OnboardingContext';
 
+// Options are ordered by Coffee Hub's actual strength: Fellow Aiden
+// first (first-class integration, automatic profile push), then hand
+// brew methods, then "all of them" as a catch-all. The icons come from
+// lucide-react so they inherit the selected/unselected color state.
 const GOAL_OPTIONS = [
-  { key: 'v60', label: 'V60 / Pour Over', emoji: '☕' },
-  { key: 'aeropress', label: 'Aeropress', emoji: '🧪' },
-  { key: 'french_press', label: 'French Press', emoji: '🫖' },
-  { key: 'espresso', label: 'Espresso', emoji: '⚡' },
-  { key: 'all', label: 'All of them', emoji: '🌟' },
+  { key: 'aiden', label: 'Fellow Aiden', icon: Cpu },
+  { key: 'v60', label: 'V60 / Pour Over', icon: Droplets },
+  { key: 'aeropress', label: 'Aeropress', icon: FlaskConical },
+  { key: 'french_press', label: 'French Press', icon: Coffee },
+  { key: 'espresso', label: 'Espresso', icon: Zap },
+  { key: 'all', label: 'All of them', icon: Sparkles },
 ];
 
 export default function R02Goal() {

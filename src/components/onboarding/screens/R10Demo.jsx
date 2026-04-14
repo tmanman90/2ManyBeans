@@ -49,23 +49,36 @@ export default function R10Demo() {
             display: 'block',
           }}
         />
-        {/* Fill-in sweep overlay — hints at the scanner reading the
-            label top-to-bottom without actually running one. */}
+        {/* Scanner beam — a thin accent-colored line that glides from
+            top to bottom like a barcode scanner reading the label.
+            Much more obvious than the old translucent sweep gradient
+            (which Tal flagged as unclear). */}
         <div
           aria-hidden
           style={{
             position: 'absolute',
             inset: 0,
-            background: `linear-gradient(180deg, ${C.accent}00 0%, ${C.accent}25 50%, ${C.accent}00 100%)`,
-            animation: 'onboarding-demo-sweep 2.4s ease-in-out infinite',
+            overflow: 'hidden',
             pointerEvents: 'none',
           }}
-        />
+        >
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            height: 3,
+            background: C.accent,
+            boxShadow: `0 0 14px ${C.accent}, 0 0 28px ${C.accent}aa`,
+            animation: 'onboarding-demo-scanline 2.6s ease-in-out infinite',
+            top: 0,
+          }} />
+        </div>
         <style>{`
-          @keyframes onboarding-demo-sweep {
-            0%   { transform: translateY(-100%); }
-            50%  { transform: translateY(100%); }
-            100% { transform: translateY(100%); }
+          @keyframes onboarding-demo-scanline {
+            0%   { top: 0%;   opacity: 0;   }
+            8%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { top: 100%; opacity: 0;   }
           }
         `}</style>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from 'react';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
@@ -271,25 +271,13 @@ export const useUserProfile = (uid) => {
     });
   }, [uid, profile]);
 
-  // Dev-only replay helper — flips the flag back to false and wipes any
-  // previously-committed answers so the flow re-enters cleanly from R1.
-  // Called by the SettingsPage dev replay button (tree-shaken from prod).
-  const resetOnboarding = useCallback(async () => {
-    if (!uid) return;
-    const profileRef = doc(db, 'users', uid);
-    await setDoc(profileRef, {
-      onboardingComplete: false,
-      onboardingAnswers: deleteField(),
-      onboardingCompletedAt: deleteField(),
-    }, { merge: true });
-    setProfile(prev => {
-      if (!prev) return prev;
-      const { onboardingAnswers: _a, onboardingCompletedAt: _c, ...rest } = prev;
-      const updated = { ...rest, onboardingComplete: false };
-      cacheWrite(`profile_${uid}`, updated);
-      return updated;
-    });
-  }, [uid]);
+  // NOTE: the previous `resetOnboarding` helper was removed because it
+  // wrote `onboardingComplete: false` directly to Firestore, which bled
+  // across devices and environments. A dev toggling the Replay button
+  // on localhost could strand themselves in onboarding on their
+  // production phone (shared Firestore doc). The SettingsPage dev
+  // button now writes a local-only `DEV_FORCE_ONBOARDING_KEY` flag
+  // that Gate 5 checks in DEV builds only; Firestore is never touched.
 
   // Stabilize preferences reference: only change when values actually differ
   const prevPrefsRef = useRef(null);
@@ -307,16 +295,12 @@ export const useUserProfile = (uid) => {
   // Fellow connection status (primitive to avoid re-render cascades)
   const fellowConnected = profile?.fellow?.connected ?? false;
 
-  // Memoize context value to prevent unnecessary re-renders. `resetOnboarding`
-  // piggybacks on this context so SettingsPage's dev replay button can reach
-  // it without another prop drill. The button is DEV-only and tree-shaken
-  // from production, so this has no prod surface area.
+  // Memoize context value to prevent unnecessary re-renders.
   const contextValue = useMemo(() => ({
     preferences,
     updatePreferences,
     fellowConnected,
-    resetOnboarding,
-  }), [preferences, updatePreferences, fellowConnected, resetOnboarding]);
+  }), [preferences, updatePreferences, fellowConnected]);
 
   return {
     profile,
@@ -329,7 +313,6 @@ export const useUserProfile = (uid) => {
     updatePreferences,
     updateProfile,
     completeOnboarding,
-    resetOnboarding,
     contextValue,
   };
 };
