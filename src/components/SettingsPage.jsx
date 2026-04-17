@@ -1,5 +1,5 @@
 // Settings page — iOS grouped table style, full-screen page sheet modal
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, LogOut, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
 import { doc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
@@ -18,6 +18,22 @@ import { db } from '../firebase';
 import { fetchWithRetry } from '../lib/fetchWithRetry';
 import { API_BASE } from '../lib/apiBase';
 import { scrollOnFocus } from '../lib/formHelpers';
+import { redeemCode } from '../lib/redeemCode';
+
+// Reason-code -> user copy for the inline redeem row. Unknown codes fall
+// back to a generic message. Kept here (consumer) instead of the helper
+// so the copy lives next to the UI that renders it.
+// KEEP IN SYNC with: api/redeem-code.js STATUS,
+// src/lib/fetchWithRetry.js REDEMPTION_REASONS.
+const REDEEM_COPY = {
+  invalid_input: "That code doesn't look right. Check it and try again.",
+  invalid_code: "That code isn't valid. Double-check it and try again.",
+  already_redeemed: "You've already redeemed a code on this account.",
+  has_active_subscription: 'You already have Pro. Nothing to redeem.',
+  email_not_verified: 'Please verify your email address before redeeming.',
+  rate_limited: 'Too many attempts. Please wait an hour and try again.',
+};
+const REDEEM_GENERIC_ERROR = 'Something went wrong. Please try again in a moment.';
 
 // --- Grinder options ---
 const GRINDERS = [
@@ -113,6 +129,32 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   // DELETE, 'deleting' → API in flight. null = modal closed.
   const [deleteStep, setDeleteStep] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
+
+  // Redeem-code inline expand row (Subscription section, !hasPro only).
+  // Success state is derived from the Firestore listener flipping hasPro
+  // true; this local state is only for the form lifecycle and error copy.
+  const [redeemOpen, setRedeemOpen] = useState(false);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [redeemError, setRedeemError] = useState(null);
+  const [redeemSuccess, setRedeemSuccess] = useState(null); // { expiresAt }
+
+  // Reset redeem state when Settings closes or when the signed-in user
+  // changes — without this the component-local state would leak a typed
+  // code, error, or success panel into a different session.
+  useEffect(() => {
+    if (open) return;
+    setRedeemOpen(false);
+    setRedeemInput('');
+    setRedeemError(null);
+    setRedeemSuccess(null);
+  }, [open]);
+  useEffect(() => {
+    setRedeemOpen(false);
+    setRedeemInput('');
+    setRedeemError(null);
+    setRedeemSuccess(null);
+  }, [uid]);
 
   // Fellow account connection
   const fellowConnected = profile?.fellow?.connected ?? false;
@@ -372,6 +414,36 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const handleOpenPaywall = () => {
     haptic.light();
     openPaywall({ feature: 'generic', promote: 'pro' });
+  };
+
+  const handleRedeemSubmit = async () => {
+    const code = redeemInput.trim().toUpperCase();
+    if (!code) {
+      setRedeemError(REDEEM_COPY.invalid_input);
+      return;
+    }
+    setRedeemError(null);
+    setRedeemLoading(true);
+    try {
+      const result = await redeemCode(code);
+      haptic.light();
+      setRedeemSuccess({ expiresAt: result.expiresAt });
+      // Firestore listener will flip hasPro true shortly; the row hides
+      // once it does. Keep the success panel visible until then so the
+      // user sees confirmation.
+    } catch (err) {
+      const copy = REDEEM_COPY[err?.code] || REDEEM_GENERIC_ERROR;
+      setRedeemError(copy);
+    } finally {
+      setRedeemLoading(false);
+    }
+  };
+
+  const resetRedeemForm = () => {
+    setRedeemOpen(false);
+    setRedeemInput('');
+    setRedeemError(null);
+    setRedeemSuccess(null);
   };
 
   // Delete Account flow
@@ -781,6 +853,108 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   <span style={rowLabelStyle}>Manage Subscription</span>
                   <ExternalLink size={16} color={C.textMuted} />
                 </button>
+              </>
+            )}
+
+            {!hasPro && (
+              <>
+                <div style={separatorStyle} />
+                {redeemSuccess ? (
+                  <div style={{ padding: 16 }}>
+                    <div style={{ fontSize: 14, color: C.text, marginBottom: 8, fontWeight: 600 }}>
+                      Pro unlocked
+                    </div>
+                    <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
+                      Active until {new Date(redeemSuccess.expiresAt).toLocaleDateString()}
+                    </div>
+                    <button
+                      onClick={resetRedeemForm}
+                      style={{
+                        padding: '10px 16px', borderRadius: 10,
+                        border: `1px solid ${C.border}`, background: C.bg,
+                        fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                        color: C.text, cursor: 'pointer',
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : redeemOpen ? (
+                  <div style={{ padding: 16 }}>
+                    <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
+                      Enter your redemption code
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="CODE"
+                      value={redeemInput}
+                      onChange={(e) => {
+                        // Auto-uppercase + strip anything that can't be in a code
+                        // so the input mirrors the server-side regex exactly.
+                        const cleaned = e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z0-9-]/g, '')
+                          .slice(0, 20);
+                        setRedeemInput(cleaned);
+                        if (redeemError) setRedeemError(null);
+                      }}
+                      onKeyDown={(e) => e.key === 'Enter' && !redeemLoading && handleRedeemSubmit()}
+                      onFocus={scrollOnFocus}
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      maxLength={20}
+                      style={{
+                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                        border: `1px solid ${C.border}`, fontFamily: fonts.body,
+                        fontSize: 16, background: C.bg, color: C.text,
+                        boxSizing: 'border-box',
+                        marginBottom: redeemError ? 8 : 12,
+                        letterSpacing: 1,
+                        textTransform: 'uppercase',
+                      }}
+                    />
+                    {redeemError && (
+                      <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+                        {redeemError}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={resetRedeemForm}
+                        style={{
+                          flex: 1, padding: '10px 16px', borderRadius: 10,
+                          border: `1px solid ${C.border}`, background: C.bg,
+                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                          color: C.text, cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleRedeemSubmit}
+                        disabled={redeemLoading || !redeemInput.trim()}
+                        style={{
+                          flex: 1, padding: '10px 16px', borderRadius: 10,
+                          border: 'none', background: C.accent,
+                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                          color: '#fff', cursor: 'pointer',
+                          opacity: (redeemLoading || !redeemInput.trim()) ? 0.5 : 1,
+                        }}
+                      >
+                        {redeemLoading ? 'Redeeming...' : 'Redeem'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { haptic.light(); setRedeemOpen(true); }}
+                    style={rowStyle}
+                  >
+                    <span style={rowLabelStyle}>Redeem Code</span>
+                    <ChevronRight size={18} color={C.textMuted} />
+                  </button>
+                )}
               </>
             )}
 

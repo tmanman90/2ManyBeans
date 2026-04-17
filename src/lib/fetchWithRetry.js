@@ -1,6 +1,19 @@
 // Shared fetch utility with retry, timeout, and auth token injection
 import { auth } from '../firebase';
 
+// Redemption-code reason codes. When any of these land in a 403/429
+// response body, surface them as typed err.code so the Settings redeem
+// row can render per-reason copy inline.
+// Keep in sync with: api/redeem-code.js STATUS, SettingsPage.jsx REDEEM_COPY.
+const REDEMPTION_REASONS = new Set([
+  'invalid_code',
+  'invalid_input',
+  'already_redeemed',
+  'has_active_subscription',
+  'email_not_verified',
+  'rate_limited',
+]);
+
 const FRIENDLY_ERRORS = {
   400: 'Invalid request. Try again, or contact support if it keeps happening.',
   401: 'Your session expired. Please sign in again.',
@@ -69,7 +82,30 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
           err.limit = data.limit;
           throw err;
         }
+        // Redemption reason codes (403 variants). Thin passthrough —
+        // friendly copy lives in the consumer (SettingsPage redeem row).
+        if (data?.error && REDEMPTION_REASONS.has(data.error)) {
+          const err = new Error(data.error);
+          err.code = data.error;
+          throw err;
+        }
         throw new Error(data?.error || `${serviceName} API error: 403`);
+      }
+
+      // Rate-limit reason code (429). Peek at the body before the retry
+      // block so typed redemption 429s surface as err.code instead of
+      // falling through to the generic "AI is rate-limited" copy. AI
+      // proxy 429s never have { error: 'rate_limited' } in the body so
+      // they fall through safely to the retry/FRIENDLY_ERRORS path.
+      if (response.status === 429) {
+        let data = null;
+        try { data = await response.json(); } catch {}
+        if (data?.error && REDEMPTION_REASONS.has(data.error)) {
+          const err = new Error(data.error);
+          err.code = data.error;
+          throw err;
+        }
+        // Fall through to retry or FRIENDLY_ERRORS below.
       }
 
       // Retry on transient errors

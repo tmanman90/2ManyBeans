@@ -19,8 +19,9 @@ service cloud.firestore {
           'onboardingAnswers', 'onboardingCompletedAt'
         ])
         // Belt-and-suspenders: even if the keys() check above changes,
-        // the create path can never include subscription or fellow.
-        && !request.resource.data.keys().hasAny(['fellow', 'subscription'])
+        // the create path can never include subscription, fellow, or
+        // redemption fields (all server-managed via Admin SDK).
+        && !request.resource.data.keys().hasAny(['fellow', 'subscription', 'redeemedCode', 'redeemedAt', 'redemptionAttempts'])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100
         && (request.resource.data.username == null
@@ -35,7 +36,8 @@ service cloud.firestore {
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
           'marketingConsent', 'marketingConsentDate', 'preferences',
           'fellow', 'subscription',
-          'onboardingAnswers', 'onboardingCompletedAt'
+          'onboardingAnswers', 'onboardingCompletedAt',
+          'redeemedCode', 'redeemedAt', 'redemptionAttempts'
         ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100
@@ -44,10 +46,11 @@ service cloud.firestore {
                 && request.resource.data.username.size() >= 3
                 && request.resource.data.username.size() <= 30
                 && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')))
-        // Client cannot modify fellow.* or subscription.* on update either.
-        // affectedKeys() reports the top-level key for any nested mutation,
-        // so this catches `subscription.freeUsage` resets too.
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fellow', 'subscription']));
+        // Client cannot modify fellow.*, subscription.*, redemption, or
+        // rate-limit fields on update. affectedKeys() reports the top-level
+        // key for any nested mutation, so this catches `subscription.freeUsage`
+        // resets and `redemptionAttempts.count` spoofing too.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fellow', 'subscription', 'redeemedCode', 'redeemedAt', 'redemptionAttempts']));
     }
 
     // Fellow secrets: Admin SDK only, client cannot read or write
@@ -86,6 +89,17 @@ service cloud.firestore {
         && request.resource.data.name.size() <= 80
         && request.resource.data.size() <= 10;
       allow update, delete: if false;
+    }
+
+    // Redemption codes & ledger: Admin SDK only. Default-deny would already
+    // cover these in rules_version 2, but declaring explicit blocks makes the
+    // intent grep-able and protects against a future catch-all rule being
+    // added higher in the file.
+    match /redemptionCodes/{code} {
+      allow read, write: if false;
+    }
+    match /redemptionLedger/{hash} {
+      allow read, write: if false;
     }
 
     // No catch-all subcollection rule. Any future server-managed collection

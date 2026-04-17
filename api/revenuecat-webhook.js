@@ -133,8 +133,13 @@ export default async function handler(req, res) {
     const db = getDb();
     const userRef = db.collection('users').doc(uid);
 
-    // Single atomic write — `set` with merge:true creates the parent doc if
+    // Single atomic write -- `set` with merge:true creates the parent doc if
     // missing AND updates the nested subscription field in one round-trip.
+    //
+    // KEEP IN SYNC with api/lib/redemption.js (the other writer of
+    // users/{uid}.subscription). Both must write the same field shape so
+    // api/lib/checkEntitlement.js and src/contexts/SubscriptionContext.jsx
+    // can read either source identically.
     const subFields = {
       status: newStatus,
       lastEventType: type,

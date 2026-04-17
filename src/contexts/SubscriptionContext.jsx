@@ -60,7 +60,18 @@ export function SubscriptionProvider({ uid, children }) {
       doc(db, 'users', uid),
       (snap) => {
         const sub = snap.data()?.subscription ?? {};
-        const active = sub.status === 'active' || sub.status === 'trial';
+        // Defensive expiresAt check: if a webhook (RC cancel/expire) or a
+        // redemption grant never fires a follow-up "no longer active"
+        // event, the stale status=active would otherwise grant Pro forever
+        // on the client. Mirrors api/lib/checkEntitlement.js:79-86.
+        const notExpired =
+          !sub.expiresAt ||
+          (() => {
+            const t = new Date(sub.expiresAt);
+            return isNaN(t.getTime()) || t > new Date();
+          })();
+        const active =
+          notExpired && (sub.status === 'active' || sub.status === 'trial');
         const plan = sub.plan ?? null;
         const isUltraPlan = typeof plan === 'string' && plan.startsWith('ultra');
         const isProPlan = typeof plan === 'string' && (plan.startsWith('pro') || isUltraPlan);
