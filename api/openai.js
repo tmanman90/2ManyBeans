@@ -1,7 +1,7 @@
 // Vercel serverless proxy for OpenAI API
 // Keeps OPENAI_API_KEY server-side only
 import OpenAI from 'openai';
-import { withCorsAuthPro } from './lib/cors-auth.js';
+import { withCorsAuthPro } from './_lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'gpt-5.4-mini';
 const ALLOWED_MODELS = ['gpt-5.4', 'gpt-5.4-mini'];

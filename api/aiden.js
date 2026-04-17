@@ -2,8 +2,8 @@
 // Multi-user: reads per-user credentials from Firestore secrets, falls back to relay
 // Flow: auth -> device -> create profile -> share (brew.link) -> delete temp profile
 // NEVER touches existing profiles -- if device is full, returns error gracefully
-import { withCorsAuthUltra, getDb } from './lib/cors-auth.js';
-import { decrypt } from './lib/crypto.js';
+import { withCorsAuthUltra, getDb } from './_lib/cors-auth.js';
+import { decrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';

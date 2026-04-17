@@ -1,4 +1,4 @@
-// Redemption code endpoint. Thin shell over api/lib/redemption.js.
+// Redemption code endpoint. Thin shell over api/_lib/redemption.js.
 //
 // Wraps withCorsAuth so CORS, method check, and Firebase ID token
 // verification match every other proxy. Hard-checks email_verified on
@@ -17,9 +17,9 @@
 // the HTTP response so a guesser can't tell "code exists but is used up"
 // from "code doesn't exist." The real reason is logged server-side.
 
-import { withCorsAuth, getDb } from './lib/cors-auth.js';
-import { invalidateEntitlementCache } from './lib/checkEntitlement.js';
-import { runRedemption, RedeemError } from './lib/redemption.js';
+import { withCorsAuth, getDb } from './_lib/cors-auth.js';
+import { invalidateEntitlementCache } from './_lib/checkEntitlement.js';
+import { runRedemption, RedeemError } from './_lib/redemption.js';
 
 // Codes are stored uppercase, 4-20 chars, alphanum + hyphen only. This
 // pre-check kills brute-force garbage before it hits Firestore.

@@ -12,7 +12,7 @@
 // so a Firestore dump can't be rainbow-tabled, per EDPS/AEPD 2025 guidance.
 //
 // The transaction writes to users/{uid}.subscription.* in the same shape the
-// RC webhook uses, so api/lib/checkEntitlement.js picks up the grant with no
+// RC webhook uses, so api/_lib/checkEntitlement.js picks up the grant with no
 // changes. Caller is responsible for calling invalidateEntitlementCache(uid)
 // after a successful commit.
 
@@ -75,7 +75,7 @@ export function hmacEmailHash(normalizedEmail) {
 // Main transaction. Reads-before-writes per Firestore requirement.
 // Uses literal `c.useCount + 1` (not FieldValue.increment) so retries on
 // contention re-read the fresh value cleanly — matches the precedent at
-// api/lib/cors-auth.js inside withCorsAuthMetered.
+// api/_lib/cors-auth.js inside withCorsAuthMetered.
 export async function runRedemption({ db, uid, email, code }) {
   const normalized = normalizeEmail(email);
   if (!normalized) throw new RedeemError('invalid_input');
@@ -132,7 +132,7 @@ export async function runRedemption({ db, uid, email, code }) {
     //
     // Stale-status guard: if a webhook missed firing, the user doc could
     // hold status:'active' with a past expiresAt. Mirror the expiry check
-    // in api/lib/checkEntitlement.js so a legitimate redeemer with a
+    // in api/_lib/checkEntitlement.js so a legitimate redeemer with a
     // genuinely-expired sub is NOT permanently locked out.
     const existingSub = userSnap.exists ? userSnap.data()?.subscription : null;
     if (existingSub?.status === 'active' || existingSub?.status === 'trial') {
@@ -171,7 +171,7 @@ export async function runRedemption({ db, uid, email, code }) {
     //
     // KEEP IN SYNC with api/revenuecat-webhook.js (the other writer of
     // users/{uid}.subscription). Both must write the same field shape so
-    // api/lib/checkEntitlement.js and src/contexts/SubscriptionContext.jsx
+    // api/_lib/checkEntitlement.js and src/contexts/SubscriptionContext.jsx
     // can read either source identically. If you add a field here, check
     // whether the webhook needs it too, and vice versa.
     tx.set(

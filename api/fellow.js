@@ -2,8 +2,8 @@
 // Actions: connect (validate + encrypt + store) and disconnect (delete)
 // Credentials stored encrypted in users/{uid}/secrets/fellow via Admin SDK
 // Profile doc gets fellow.connected + fellow.email for client-side reads
-import { withCorsAuth, getDb } from './lib/cors-auth.js';
-import { encrypt } from './lib/crypto.js';
+import { withCorsAuth, getDb } from './_lib/cors-auth.js';
+import { encrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';

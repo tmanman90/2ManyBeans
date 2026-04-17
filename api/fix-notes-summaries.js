@@ -1,7 +1,7 @@
 // One-off migration: generate notesSummary for all existing beans.
 // Hit once while authenticated, then delete this file.
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { withCorsAuth, getDb } from './lib/cors-auth.js';
+import { withCorsAuth, getDb } from './_lib/cors-auth.js';
 
 let genAI;
 function getClient() {

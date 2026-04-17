@@ -29,7 +29,7 @@
 // Safety: the request body must include { confirmation: "DELETE" } to
 // prevent accidental deletion via a stray POST.
 
-import { withCorsAuth, getDb, getStorageBucket } from './lib/cors-auth.js';
+import { withCorsAuth, getDb, getStorageBucket } from './_lib/cors-auth.js';
 import { getAuth } from 'firebase-admin/auth';
 
 // Vercel function timeout — large accounts can take a few seconds to purge.

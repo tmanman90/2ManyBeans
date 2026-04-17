@@ -1,7 +1,7 @@
 // Vercel serverless proxy for Gemini API
 // Keeps GEMINI_API_KEY server-side only
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { withCorsAuthMetered } from './lib/cors-auth.js';
+import { withCorsAuthMetered } from './_lib/cors-auth.js';
 
 let genAI;
 function getClient() {

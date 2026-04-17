@@ -14,8 +14,8 @@
 // is configured in the RC dashboard under Integrations > Webhooks.
 
 import { timingSafeEqual } from 'crypto';
-import { getDb } from './lib/cors-auth.js';
-import { invalidateEntitlementCache } from './lib/checkEntitlement.js';
+import { getDb } from './_lib/cors-auth.js';
+import { invalidateEntitlementCache } from './_lib/checkEntitlement.js';
 
 // Strict allowlist of known product IDs. Any unknown ID on a purchase-like
 // event triggers a 500 so RC retries the webhook (and we get a loud log).
@@ -136,9 +136,9 @@ export default async function handler(req, res) {
     // Single atomic write -- `set` with merge:true creates the parent doc if
     // missing AND updates the nested subscription field in one round-trip.
     //
-    // KEEP IN SYNC with api/lib/redemption.js (the other writer of
+    // KEEP IN SYNC with api/_lib/redemption.js (the other writer of
     // users/{uid}.subscription). Both must write the same field shape so
-    // api/lib/checkEntitlement.js and src/contexts/SubscriptionContext.jsx
+    // api/_lib/checkEntitlement.js and src/contexts/SubscriptionContext.jsx
     // can read either source identically.
     const subFields = {
       status: newStatus,

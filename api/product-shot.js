@@ -8,8 +8,8 @@
 //   delete           -- Clean up orphaned Storage file (Pro required)
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
-import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './lib/cors-auth.js';
-import { checkEntitlement } from './lib/checkEntitlement.js';
+import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './_lib/cors-auth.js';
+import { checkEntitlement } from './_lib/checkEntitlement.js';
 
 // Free users get 1 product shot. Keep in sync with src/lib/subscriptionConfig.js
 const FREE_PRODUCT_SHOTS = 1;

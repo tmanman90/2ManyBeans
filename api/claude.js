@@ -1,7 +1,7 @@
 // Vercel serverless proxy for Claude API
 // Keeps ANTHROPIC_API_KEY server-side only
 import Anthropic from '@anthropic-ai/sdk';
-import { withCorsAuthMetered } from './lib/cors-auth.js';
+import { withCorsAuthMetered } from './_lib/cors-auth.js';
 
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
