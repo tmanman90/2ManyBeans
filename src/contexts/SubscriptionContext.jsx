@@ -97,7 +97,11 @@ export function SubscriptionProvider({ uid, children }) {
       },
       (err) => {
         console.error('[SubscriptionContext] Firestore listener error', err);
-        setState((prev) => ({ ...prev, loading: false }));
+        // Flip firestoreLoaded even on error so downstream gates (R13
+        // paywall hydration check) don't trap the user in a forever
+        // spinner. Default subscription state is already "no sub",
+        // which is the safe fallback.
+        setState((prev) => ({ ...prev, loading: false, firestoreLoaded: true }));
       }
     );
 

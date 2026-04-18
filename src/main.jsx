@@ -190,9 +190,14 @@ const Root = () => {
                 updateProfile={updateProfile}
                 refetchBeans={refetch}
               />
-              <PaywallMount />
             </UserPreferencesProvider>
           )}
+          {/* PaywallMount lives inside PaywallProvider but outside the gate
+              ternary so the RevenueCat sheet renders during BOTH onboarding
+              (R13 paywall) and the main app. Previously it was only mounted
+              in Gate 6b, which left R13 white-screened because openPaywall
+              set context but nothing rendered the sheet. */}
+          <PaywallMount />
         </PaywallProvider>
       </SubscriptionProvider>
     </AuthContext>
