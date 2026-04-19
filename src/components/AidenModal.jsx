@@ -287,8 +287,8 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
       const dataUrl = await captureShareCard(shareCardRef, { backgroundColor: '#2B5B4E' });
       if (!dataUrl) return;
       const text = result?.link
-        ? `Check out my brew recipe for ${bean?.name || 'this coffee'}! ${result.link}`
-        : `Check out my brew recipe for ${bean?.name || 'this coffee'}!`;
+        ? `Check out my brew recipe for ${bean?.name || 'this coffee'} brought to you by 2manybeans! ${result.link}`
+        : `Check out my brew recipe for ${bean?.name || 'this coffee'} brought to you by 2manybeans!`;
       await shareImage(dataUrl, text);
     } catch (e) {
       if (e.name !== 'AbortError') console.error('Share failed:', e);

@@ -157,11 +157,10 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
     if (!step) return;
     const el = document.querySelector(`[data-tour="${step.target}"]`);
     if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'center', behavior: 'instant' });
       const measure = () => setTargetRect(el.getBoundingClientRect());
-      measure();
       requestAnimationFrame(() => requestAnimationFrame(measure));
-      setTimeout(measure, 350);
+      setTimeout(measure, 100);
       if (resizeObRef.current) resizeObRef.current.disconnect();
       resizeObRef.current = new ResizeObserver(measure);
       resizeObRef.current.observe(el);
