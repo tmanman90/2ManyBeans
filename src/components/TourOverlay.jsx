@@ -404,8 +404,25 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
             ))}
           </div>
 
-          {/* Footer: progress dots + button */}
+          {/* Footer: skip + dots + button */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={handleSkip}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px 0',
+                fontFamily: fonts.body,
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.textMuted,
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                flexShrink: 0,
+              }}
+            >
+              Skip tour
+            </button>
             <div style={{ display: 'flex', gap: 4 }}>
               {steps.map((_, i) => (
                 <div key={i} style={{
@@ -443,30 +460,6 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
         </div>
       </div>
 
-      {/* Skip tour pill */}
-      <button
-        onClick={handleSkip}
-        style={{
-          position: 'fixed',
-          bottom: `calc(${TAB_BAR_H + 10}px + env(safe-area-inset-bottom, 0px))`,
-          left: 16,
-          zIndex: 920,
-          background: 'rgba(255,248,240,0.85)',
-          border: `1px solid ${C.border}`,
-          borderRadius: 999,
-          padding: '6px 12px',
-          fontFamily: fonts.body,
-          fontSize: 12,
-          fontWeight: 600,
-          color: C.textMuted,
-          cursor: 'pointer',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        Skip tour
-      </button>
 
       {/* Focus trap sentinel (end) */}
       <div tabIndex={0} onFocus={() => gotItRef.current?.focus()} style={{ position: 'fixed', opacity: 0, width: 0, height: 0 }} />
