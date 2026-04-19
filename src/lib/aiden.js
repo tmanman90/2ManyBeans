@@ -23,7 +23,7 @@ const ODE_GEN2_STEPS = [
 const FAMILY_GRIND_BANDS = {
   'washed-floral-clarity':    { ssMin: 3.2, ssMax: 3.2, batchMin: 5,   batchMax: 6.2 },
   'washed-kenya-clarity':     { ssMin: 3,   ssMax: 3.2, batchMin: 5.1, batchMax: 6.2 },
-  'washed-ethiopia-clarity':  { ssMin: 3.2, ssMax: 3.2, batchMin: 5,   batchMax: 6.2 },
+  'washed-ethiopia-clarity':  { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
   'clean-natural-fruit':      { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
   'processed-clarity':        { ssMin: 4.2, ssMax: 5,   batchMin: 6.2, batchMax: 7.1 },
   'medium-washed':            { ssMin: 5,   ssMax: 5.2, batchMin: 6,   batchMax: 8 },
