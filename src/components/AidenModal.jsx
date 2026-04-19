@@ -1,43 +1,267 @@
-// Aiden brew recipe modal — shows recipe, grind, and "Open in Fellow" link
+// Aiden brew recipe modal — editorial journal entry for the generated recipe
 import { useState, useRef } from 'react';
 import { C, fonts } from '../styles/theme';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
-import { Badge } from './Badge';
-import { ExternalLink, Coffee, Thermometer, Droplets, RefreshCw, AlertTriangle, Share2 } from 'lucide-react';
+import { ExternalLink, Coffee, RefreshCw, AlertTriangle, Share2 } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
 import { Capacitor } from '@capacitor/core';
 import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
 import { shareImage } from '../lib/share';
 
-const TempChain = ({ temps, label }) => (
-  <div style={{ marginBottom: 8 }}>
-    <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-      {label}
+// Local design tokens specific to this panel
+const RULE = '#EADFD0';
+const RULE_SOFT = '#F0E6D4';
+const PAPER_GRAD = 'linear-gradient(180deg, #FBF1DF 0%, #F5E6D3 100%)';
+const GRIND_BORDER = '#E8D5A0';
+const GRIND_DIVIDER = '#D4B878';
+const TILE_BG = '#EADFCB';
+
+const SectionLabel = ({ children, style }) => (
+  <div style={{
+    fontFamily: fonts.body,
+    fontSize: 10, fontWeight: 700,
+    color: C.textMuted,
+    textTransform: 'uppercase', letterSpacing: 1.2,
+    ...style,
+  }}>{children}</div>
+);
+
+const IconBean = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+    <ellipse cx="12" cy="12" rx="7" ry="9" fill={C.text} transform="rotate(-18 12 12)" />
+    <path d="M9 5 Q12 12 15 19" stroke="#FBF1DF" strokeWidth="1.4" fill="none" strokeLinecap="round" transform="rotate(-18 12 12)" />
+  </svg>
+);
+
+const BeanChip = ({ bean }) => {
+  if (!bean) return null;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 12px',
+      background: PAPER_GRAD,
+      borderRadius: 12,
+      border: `1px solid ${RULE}`,
+      marginBottom: 14,
+    }}>
+      <div style={{
+        width: 40, height: 40, borderRadius: 10,
+        background: TILE_BG,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <IconBean />
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{
+          fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.2,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{bean.name}</div>
+        {bean.roaster && (
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, letterSpacing: 0.3 }}>{bean.roaster}</div>
+        )}
+      </div>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', fontSize: 13, color: C.text }}>
-      {temps.map((t, i) => (
-        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontWeight: 600 }}>{t}°</span>
-          {i < temps.length - 1 && <span style={{ color: C.textLight }}>→</span>}
-        </span>
-      ))}
+  );
+};
+
+const RecipeTitleRow = ({ title, note }) => (
+  <div style={{ marginBottom: 18 }}>
+    <div style={{
+      display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
+      paddingBottom: 10,
+      borderBottom: `1px dashed ${RULE}`,
+    }}>
+      <SectionLabel>Recipe</SectionLabel>
+      <span style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, lineHeight: 0.9 }}>
+        {title}
+      </span>
+    </div>
+    {note && (
+      <div style={{
+        fontFamily: fonts.title, fontSize: 17, color: C.accent,
+        marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 6,
+        lineHeight: 1.1,
+      }}>
+        <span style={{ fontSize: 13, color: C.textMuted, fontFamily: fonts.body, fontStyle: 'italic' }}>— Aiden:</span>
+        <span>{note}</span>
+      </div>
+    )}
+  </div>
+);
+
+const DialCell = ({ label, value, sub, borderRight, borderBottom }) => (
+  <div style={{
+    padding: '16px 14px 18px',
+    borderRight: borderRight ? `1px dashed ${RULE}` : 'none',
+    borderBottom: borderBottom ? `1px dashed ${RULE}` : 'none',
+    textAlign: 'center',
+  }}>
+    <SectionLabel style={{ marginBottom: 6 }}>{label}</SectionLabel>
+    <div style={{
+      fontFamily: fonts.heading, fontSize: 28, color: C.text,
+      lineHeight: 0.95, fontWeight: 500,
+    }}>{value}</div>
+    {sub && (
+      <div style={{ fontSize: 11, color: C.textLight, marginTop: 4, fontFeatureSettings: "'tnum'" }}>{sub}</div>
+    )}
+  </div>
+);
+
+const DialCard = ({ recipe }) => (
+  <div style={{
+    background: C.card,
+    borderRadius: 14,
+    border: `1px solid ${RULE}`,
+    boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+    overflow: 'hidden',
+    marginBottom: 14,
+    display: 'grid', gridTemplateColumns: '1fr 1fr',
+  }}>
+    <DialCell label="Ratio" value={`1:${recipe.ratio}`} borderRight borderBottom />
+    <DialCell label="Bloom" value={`${recipe.bloomRatio}×`} sub={`${recipe.bloomDuration}s`} borderBottom />
+    <DialCell label="Single pulses" value={recipe.ssPulsesNumber} sub={`@ ${recipe.ssPulsesInterval}s`} borderRight />
+    <DialCell label="Batch pulses" value={recipe.batchPulsesNumber} sub={`@ ${recipe.batchPulsesInterval}s`} />
+  </div>
+);
+
+const TempRow = ({ label, temps }) => (
+  <div style={{
+    display: 'grid', gridTemplateColumns: '78px 1fr', alignItems: 'center', gap: 10,
+    padding: '10px 0',
+  }}>
+    <div style={{
+      fontFamily: fonts.title, fontSize: 17, color: C.text, lineHeight: 1,
+      textAlign: 'right', paddingRight: 2,
+    }}>{label}</div>
+    <div style={{ position: 'relative', height: 32 }}>
+      <div style={{
+        position: 'absolute', left: 10, right: 10, top: 15, height: 1,
+        borderTop: `1px dashed ${RULE}`,
+      }} />
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: 0, height: 32,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        {temps.map((t, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 32 }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: C.text,
+              boxShadow: `0 0 0 3px ${C.card}`,
+              marginBottom: 3,
+            }} />
+            <span style={{
+              fontFamily: fonts.heading, fontSize: 13, fontWeight: 500,
+              color: C.text, fontFeatureSettings: "'tnum'", lineHeight: 1,
+            }}>{t}°</span>
+          </div>
+        ))}
+      </div>
     </div>
   </div>
 );
 
-const ParamCell = ({ label, value, unit }) => (
-  <div style={{
-    background: C.bg,
-    borderRadius: 10,
-    padding: '10px 12px',
-    textAlign: 'center',
-  }}>
-    <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
-    <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{value}</div>
-    {unit && <div style={{ fontSize: 11, color: C.textLight }}>{unit}</div>}
+const TempCard = ({ recipe }) => {
+  const rows = [
+    { label: 'Bloom', temps: [recipe.bloomTemperature] },
+    recipe.ssPulseTemperatures && { label: 'Single', temps: recipe.ssPulseTemperatures },
+    recipe.batchPulseTemperatures && { label: 'Batch', temps: recipe.batchPulseTemperatures },
+  ].filter(Boolean);
+  return (
+    <div style={{
+      background: C.card,
+      borderRadius: 14,
+      padding: '14px 18px 16px',
+      border: `1px solid ${RULE}`,
+      boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+      marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+        <SectionLabel>Temperature curve</SectionLabel>
+        <div style={{ fontSize: 10, color: C.textLight, fontFeatureSettings: "'tnum'" }}>°C</div>
+      </div>
+      {rows.map((r, i) => (
+        <div key={r.label}>
+          {i > 0 && <div style={{ borderTop: `1px dashed ${RULE_SOFT}` }} />}
+          <TempRow label={r.label} temps={r.temps} />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const GrindColumn = ({ label, value, divider }) => (
+  <div style={{ borderLeft: divider ? `1px dashed ${GRIND_DIVIDER}` : 'none', paddingLeft: divider ? 14 : 0 }}>
+    <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.text, lineHeight: 1 }}>{label}</div>
+    <div style={{
+      fontFamily: fonts.heading, fontSize: 42, color: C.accent,
+      lineHeight: 0.9, fontWeight: 500, fontFeatureSettings: "'tnum'",
+    }}>{value}</div>
   </div>
+);
+
+const GrindCard = ({ recipe, grinderName }) => (
+  <div style={{
+    background: PAPER_GRAD,
+    borderRadius: 14,
+    padding: '14px 18px 16px',
+    border: `1px solid ${GRIND_BORDER}`,
+    marginBottom: 20,
+    position: 'relative',
+  }}>
+    <SectionLabel style={{ marginBottom: 4 }}>Grind · {grinderName}</SectionLabel>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12, marginTop: 4 }}>
+      <GrindColumn label="single" value={recipe.grindRecommendation.singleServe} />
+      <GrindColumn label="batch" value={recipe.grindRecommendation.batch} divider />
+    </div>
+  </div>
+);
+
+const AidenPrimaryButton = ({ onClick, leading, children }) => (
+  <button
+    onClick={onClick}
+    style={{
+      width: '100%',
+      background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
+      color: '#FFF8F0', border: 'none',
+      padding: '15px 18px', borderRadius: 12,
+      fontFamily: fonts.body, fontWeight: 700, fontSize: 15, cursor: 'pointer',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      boxShadow: '0 1px 0 rgba(255,255,255,0.28) inset, 0 -1px 0 rgba(0,0,0,0.08) inset, 0 1px 2px rgba(92,61,46,0.15), 0 4px 12px rgba(160,113,75,0.18)',
+      marginBottom: 10,
+      WebkitTapHighlightColor: 'transparent',
+    }}
+  >
+    {leading}
+    {children}
+  </button>
+);
+
+const AidenScript = ({ children = 'Aiden' }) => (
+  <span style={{ fontFamily: fonts.title, fontSize: 26, lineHeight: 0.85, marginLeft: -2 }}>
+    {children}
+  </span>
+);
+
+const IconActionButton = ({ onClick, disabled, icon, children, ariaLabel }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={ariaLabel}
+    style={{
+      flex: 1, background: 'transparent', color: C.accent, border: 'none',
+      padding: 12, fontFamily: fonts.body, fontWeight: 600, fontSize: 13,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      cursor: disabled ? 'default' : 'pointer', borderRadius: 10,
+      opacity: disabled ? 0.55 : 1,
+      WebkitTapHighlightColor: 'transparent',
+    }}
+  >
+    {icon} {children}
+  </button>
 );
 
 const phaseMessages = {
@@ -107,63 +331,16 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
       {/* Recipe success */}
       {recipe && (
         <div>
-          {/* Title */}
-          <div style={{ fontFamily: fonts.title, fontSize: 18, color: C.text, marginBottom: 12 }}>
-            {recipe.title}
-          </div>
+          <BeanChip bean={bean} />
 
-          {/* 2x2 Param Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <ParamCell label="Ratio" value={`1:${recipe.ratio}`} />
-            <ParamCell label="Bloom" value={recipe.bloomRatio} unit={`× · ${recipe.bloomDuration}s`} />
-            <ParamCell label="SS Pulses" value={recipe.ssPulsesNumber} unit={`@ ${recipe.ssPulsesInterval}s`} />
-            <ParamCell label="Batch Pulses" value={recipe.batchPulsesNumber} unit={`@ ${recipe.batchPulsesInterval}s`} />
-          </div>
+          <RecipeTitleRow title={recipe.title} note={recipe.note} />
 
-          {/* Temperature profiles */}
-          <div style={{
-            background: C.bg,
-            borderRadius: 14,
-            padding: 14,
-            marginBottom: 14,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <Thermometer size={14} color={C.accent} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Temperature Profiles</span>
-            </div>
-            <TempChain label="Bloom" temps={[recipe.bloomTemperature]} />
-            {recipe.ssPulseTemperatures && (
-              <TempChain label="Single Serve" temps={recipe.ssPulseTemperatures} />
-            )}
-            {recipe.batchPulseTemperatures && (
-              <TempChain label="Batch" temps={recipe.batchPulseTemperatures} />
-            )}
-          </div>
+          <DialCard recipe={recipe} />
 
-          {/* Grind recommendation */}
+          <TempCard recipe={recipe} />
+
           {recipe.grindRecommendation && (
-            <div style={{
-              background: C.amberBg,
-              borderRadius: 14,
-              padding: 14,
-              marginBottom: 14,
-              border: `1px solid #E8D5A0`,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <Droplets size={14} color={C.amber} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{grinderName} Grind</span>
-              </div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Single</div>
-                  <div style={{ fontFamily: fonts.title, fontSize: 22, color: C.amber }}>{recipe.grindRecommendation.singleServe}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Batch</div>
-                  <div style={{ fontFamily: fonts.title, fontSize: 22, color: C.amber }}>{recipe.grindRecommendation.batch}</div>
-                </div>
-              </div>
-            </div>
+            <GrindCard recipe={recipe} grinderName={grinderName} />
           )}
 
           {/* Fellow push state */}
@@ -230,45 +407,69 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
             </div>
           )}
 
-          {/* Open in Fellow / Open on Aiden button */}
+          {/* Primary action: Open in Fellow / Open on Aiden / Send to Aiden */}
           {result?.link && (
-            <Btn variant="primary" onClick={() => {
-              if (Capacitor.isNativePlatform()) {
-                // Native: use a temp anchor to let iOS handle the deep link
-                const a = document.createElement('a');
-                a.href = result.link;
-                a.target = '_blank';
-                a.rel = 'noopener noreferrer';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => document.body.removeChild(a), 100);
-              } else {
-                window.open(result.link, '_blank');
-              }
-            }} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px' }}>
-              <ExternalLink size={16} /> {fellowConnected && !result.usedRelay ? 'Open in Fellow' : 'Open on Aiden'}
-            </Btn>
+            <AidenPrimaryButton
+              leading={<ExternalLink size={14} />}
+              onClick={() => {
+                if (Capacitor.isNativePlatform()) {
+                  const a = document.createElement('a');
+                  a.href = result.link;
+                  a.target = '_blank';
+                  a.rel = 'noopener noreferrer';
+                  document.body.appendChild(a);
+                  a.click();
+                  setTimeout(() => document.body.removeChild(a), 100);
+                } else {
+                  window.open(result.link, '_blank');
+                }
+              }}
+            >
+              {fellowConnected && !result.usedRelay ? (
+                <span>Open in Fellow</span>
+              ) : (
+                <>
+                  <span>Open on</span>
+                  <AidenScript />
+                </>
+              )}
+            </AidenPrimaryButton>
           )}
 
-          {/* Push cached recipe to Aiden (when viewing saved recipe, no push yet) */}
           {!result && !loading && !error && onPushCached && (
-            <Btn variant="primary" onClick={() => onPushCached(recipe)} style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '14px 18px', marginBottom: 8 }}>
-              <ExternalLink size={16} /> {fellowConnected ? 'Send to Aiden' : 'Push to Aiden'}
-            </Btn>
+            <AidenPrimaryButton
+              leading={<ExternalLink size={14} />}
+              onClick={() => onPushCached(recipe)}
+            >
+              <span>{fellowConnected ? 'Send to' : 'Push to'}</span>
+              <AidenScript />
+            </AidenPrimaryButton>
           )}
 
-          {/* Share Recipe button */}
+          {/* Secondary icon row: Share | Regenerate */}
           {!loading && (
-            <Btn variant="ghost" onClick={handleShareRecipe} disabled={sharing} style={{ width: '100%', justifyContent: 'center' }}>
-              <Share2 size={14} /> {sharing ? 'Generating...' : 'Share Recipe'}
-            </Btn>
-          )}
-
-          {/* Regenerate button */}
-          {onRegenerate && !loading && (
-            <Btn variant="ghost" onClick={onRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate Aiden recipe">
-              <RefreshCw size={14} /> Regenerate Recipe
-            </Btn>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <IconActionButton
+                onClick={handleShareRecipe}
+                disabled={sharing}
+                icon={<Share2 size={14} />}
+                ariaLabel="Share recipe"
+              >
+                {sharing ? 'Generating...' : 'Share'}
+              </IconActionButton>
+              {onRegenerate && (
+                <>
+                  <div style={{ width: 1, height: 16, background: RULE }} />
+                  <IconActionButton
+                    onClick={onRegenerate}
+                    icon={<RefreshCw size={14} />}
+                    ariaLabel="Regenerate Aiden recipe"
+                  >
+                    Regenerate
+                  </IconActionButton>
+                </>
+              )}
+            </div>
           )}
 
           {extraFooter}

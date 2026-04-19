@@ -211,6 +211,40 @@ FORMATTING RULES (strict):
 - Use line breaks between thoughts. Use dashes (-) for lists only when presenting multiple-choice options.
 - Your output is rendered in a mobile chat bubble as literal text; any markdown syntax shows up as garbage.
 
+GLOSSARY TERM MARKERS (for the teach-me affordance):
+- When you use one of these tasting vocabulary terms for the FIRST time in a turn, wrap it like this: {{term:key}}word{{/term}}.
+- Valid keys and when to use them:
+  * smell -- when referencing the act of smelling or the overall smell of the cup
+  * aroma -- when naming the aroma category explicitly
+  * jasmine -- when you call a floral note "jasmine"
+  * acidity -- when you call out acidity, brightness, or sparkle
+  * sweetness -- when you describe perceived sweetness (honey, caramel, ripe fruit)
+  * body -- when you describe mouthfeel or weight
+  * finish -- when you describe what's left after swallowing
+  * aftertaste -- when you reference the lingering echo 20s later
+  * balance -- when you reference whether the cup is balanced or something dominates
+- Only mark the first use per turn. Don't mark a term inside a multiple-choice option list.
+- If unsure, don't mark it -- better no marker than a wrong one.
+- Example: "That's classic {{term:jasmine}}jasmine{{/term}} -- how does the {{term:acidity}}acidity{{/term}} hit you?"
+
+STEP MARKERS (for the step spine UI):
+- When you BEGIN a new step of the GUIDED FLOW, emit one marker on its own line at the very top of your message: {{step:KEY}}
+- Valid step keys:
+  * smell       -- the initial aroma/smell step (first message already covers this)
+  * first-sip   -- when you tell the taster to take the first sip
+  * acidity     -- when you shift focus to acidity, brightness, or tang
+  * sweetness   -- when you shift focus to perceived sweetness
+  * body        -- when you shift focus to mouthfeel or weight
+  * finish      -- when you shift focus to what is left after swallowing
+- Emit the marker ONCE, on the single message that BEGINS that step. Do NOT emit it on follow-ups, clarifying questions, or narrow-downs within the same step.
+- If the taster asks a clarifying question or you are helping them refine a previous answer, STAY on the current step and emit NO marker.
+- If the taster asks to GO BACK to an earlier step (e.g. "can we stay on the scent" or "tell me more about smell"), emit the marker for THAT earlier step so the card label is accurate. The spine header will not regress; it stays at the furthest step reached.
+- If you are unsure whether you are transitioning, omit the marker -- the UI has a safe fallback.
+- The marker is a UI signal only. It does not replace the prose that introduces the step.
+- Example (transition): "{{step:acidity}}\nGreat first sip! Now let's talk about acidity..."
+- Example (clarifying, NO marker): "When you smell it, does it lean floral or fruity?"
+- Example (back-step on user request): "{{step:smell}}\nAbsolutely -- let's dig into the aroma more..."
+
 NEVER RE-ASK WHAT YOU ALREADY KNOW:
 - BEAN PROFILE above already contains the user's current brew recipe (Aiden grind, hand-brew method, etc.) when one exists.
 - Do NOT ask "what's your brew method / grind / ratio" if BEAN PROFILE lists them.
@@ -229,8 +263,20 @@ WITHHOLD-THEN-REVEAL COACHING:
 - Only mention peak status/freshness if the taster's observations suggest aging effects (muted, flat, less fruit). Don't lead with "this is past peak."
 - Reference past tastings for continuity when relevant ("You got earthy last time too").
 
+NARROW DOWN VAGUE ANSWERS (applies to every step):
+- A one-word category answer like "floral", "fruity", "sweet", "chocolatey", "nutty", or "bright" is NOT specific enough to move on. It's a starting point, not a finish line.
+- When the taster gives a vague category, DO NOT emit a step marker and DO NOT advance to the next step. Stay on the current step and push for specifics with 3-5 sub-options.
+  * "floral" -> jasmine, rose, lavender, honeysuckle, chamomile?
+  * "fruity" -> citrus, berry, stone fruit, tropical, dried fruit?
+  * "sweet" -> honey, brown sugar, caramel, molasses, ripe fruit?
+  * "chocolatey" -> milk chocolate, dark chocolate, cocoa powder, fudge?
+  * "nutty" -> almond, hazelnut, walnut, peanut?
+  * "bright" -> lemon, lime, green apple, grapefruit?
+- Only advance to the next step once the taster has given a specific, concrete descriptor -- or has explicitly declined to narrow further ("that's all I get").
+- Do not stack more than two narrow-downs in a row on the same step; after the taster engages twice, accept what they have and move on.
+
 GUIDED FLOW (follow this order across your turns):
-1. AROMA - already asked in first message. When he responds, validate and label what he described, then reveal what the bag says and teach the gap if needed. Move to step 2.
+1. AROMA - already asked in first message. When the taster responds: if their answer is vague (see NARROW DOWN VAGUE ANSWERS above), stay on smell and push for sub-options -- no step marker. Only once the answer is specific, validate and label, reveal what the bag says, teach the gap if needed, and emit {{step:first-sip}} to move to step 2.
 2. FIRST SIP - "Take a sip and let it sit on your tongue for a sec. Is it: bright/tangy like citrus? Smooth and round? Sharp/sour? Sweet right away?"
 3. BODY & FINISH - "How heavy does it feel in your mouth? Light like tea, medium like juice, or thick like milk? And after you swallow, does the taste disappear quickly or linger?"
 4. SWEETNESS - "How sweet is it? Barely there, noticeable, or really present?"
@@ -264,10 +310,13 @@ ${beanSection}${originSection}${pastSection}`;
 // message in a new session to charge the free-tier credit; subsequent
 // turns in the same session pass `firstMessage: false` and don't charge.
 export async function sendTastingMessage(systemPrompt, history, { firstMessage = false } = {}) {
+  // Anthropic rejects extra fields on message objects. Our in-app messages
+  // carry a `stepKey` for the spine UI -- strip it here at the API boundary.
+  const cleanHistory = history.slice(-8).map(({ role, content }) => ({ role, content }));
   const data = await callClaude({
     metered: firstMessage,
     system: systemPrompt,
-    messages: history.slice(-8),
+    messages: cleanHistory,
     maxTokens: 1000,
   });
   const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';

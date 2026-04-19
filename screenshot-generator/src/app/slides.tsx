@@ -315,6 +315,58 @@ export function Slide3() {
 
 // ---------- Slide 4: Coffee chat ----------------------------------------
 
+// ---------- Slide 5: Brew timer ------------------------------------------
+
+export function Slide5() {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        background: `linear-gradient(160deg, ${BRAND.bgDeep} 0%, #2e1a10 100%)`,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        paddingTop: 180,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 200,
+          left: -140,
+          width: 800,
+          height: 800,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(closest-side, rgba(212,165,116,0.3), rgba(212,165,116,0))",
+          filter: "blur(12px)",
+        }}
+      />
+      <Kicker color={BRAND.highlight}>Step-by-step timer</Kicker>
+      <Headline color={BRAND.textOnDark}>
+        Brew with<br />precision.
+      </Headline>
+      <Subtext color="rgba(246,241,233,0.72)">
+        Guided pour-over with haptic<br />cues and live countdown.
+      </Subtext>
+      <Phone
+        src="/screenshots/en/05-timer.png"
+        alt="Brew timer"
+        style={{
+          position: "absolute",
+          bottom: -160,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "78%",
+        }}
+      />
+    </div>
+  );
+}
+
 export function Slide4() {
   return (
     <div

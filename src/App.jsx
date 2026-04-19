@@ -15,6 +15,7 @@ const ChatTab = lazy(() => import('./tabs/ChatTab').then(m => ({ default: m.Chat
 const ArchiveTab = lazy(() => import('./tabs/ArchiveTab').then(m => ({ default: m.ArchiveTab })));
 import { OpenBeanFlow } from './components/OpenBeanFlow';
 import { SettingsPage } from './components/SettingsPage';
+import { TourOverlay } from './components/TourOverlay';
 import { usePreferences } from './hooks/useUserProfile';
 
 // Minimal fallback while a lazy tab chunk is fetching. Matches the app
@@ -52,6 +53,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // Mirrors pendingAddBean: set here, consumed by TastingTab which
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
+  const [tourActive, setTourActive] = useState(() => {
+    if (new URLSearchParams(window.location.search).has('tour')) return true;
+    return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
+  });
 
   const handleStartTastingSession = (beanId) => {
     if (!beanId) return;
@@ -108,6 +113,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   const handoffConsumedRef = useRef(false);
   useEffect(() => {
     if (handoffConsumedRef.current) return;
+    if (tourActive) return;
     const action = profile?.onboardingAnswers?.postCompleteAction;
     if (!action || action === 'none') return;
     handoffConsumedRef.current = true;
@@ -122,7 +128,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
     }).catch((err) => {
       console.warn('[App] Failed to clear postCompleteAction', err);
     });
-  }, [profile, updateProfile]);
+  }, [profile, updateProfile, tourActive]);
 
   return (
     <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -352,6 +358,17 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         beans={beans}
         refetchBeans={refetchBeans}
       />
+
+      {/* Coach marks tour — runs once after onboarding */}
+      {tourActive && (
+        <TourOverlay
+          setTab={setTab}
+          beans={beans}
+          profile={profile}
+          updateProfile={updateProfile}
+          onComplete={() => setTourActive(false)}
+        />
+      )}
     </div>
   );
 };

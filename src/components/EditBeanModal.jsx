@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Save, Camera, Trash2, X } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
+import { getPeakStatus, daysSinceRoast } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { generateProductShot, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
@@ -14,6 +15,92 @@ import { useErrorToast } from '../hooks/useErrorToast';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+
+const SprigDivider = ({ color = C.accentLight, size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+    <path d="M7 12 Q7 7 7 2" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
+    <path d="M7 5 Q4 4 2.5 5.5" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
+    <path d="M7 5 Q10 4 11.5 5.5" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
+    <path d="M7 8 Q4.5 7.5 3 9" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
+    <path d="M7 8 Q9.5 7.5 11 9" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
+    <ellipse cx="2.5" cy="5.5" rx="1.2" ry="0.6" fill={color} opacity="0.55"/>
+    <ellipse cx="11.5" cy="5.5" rx="1.2" ry="0.6" fill={color} opacity="0.55"/>
+    <ellipse cx="3" cy="9" rx="1" ry="0.5" fill={color} opacity="0.55"/>
+    <ellipse cx="11" cy="9" rx="1" ry="0.5" fill={color} opacity="0.55"/>
+  </svg>
+);
+
+const ChapterHeader = ({ number, title, subtitle, collapsible, open, onToggle }) => (
+  <div
+    onClick={collapsible ? onToggle : undefined}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 10, margin: '22px 0 12px',
+      cursor: collapsible ? 'pointer' : 'default',
+    }}
+  >
+    <div style={{
+      width: 22, height: 22, borderRadius: '50%', border: `1px solid ${C.accentLight}`,
+      color: C.accent, fontFamily: fonts.heading, fontSize: 12, fontWeight: 500,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      background: C.card,
+    }}>{number}</div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontFamily: fonts.heading, fontSize: 15, color: C.text, lineHeight: 1.1 }}>
+        {title}
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{subtitle}</div>
+      )}
+    </div>
+    <SprigDivider />
+    <div style={{ flex: '0 1 80px', height: 1, background: `repeating-linear-gradient(to right, ${C.accentLight} 0, ${C.accentLight} 2px, transparent 2px, transparent 5px)` }} />
+    {collapsible && (
+      <div style={{ color: C.textLight, fontSize: 11, fontFamily: fonts.body, width: 14, textAlign: 'right' }}>
+        {open ? '\u2212' : '+'}
+      </div>
+    )}
+  </div>
+);
+
+const PeakTimeline = ({ bean }) => {
+  if (!bean.peakStart || !bean.peakEnd) return null;
+  const ps = getPeakStatus(bean);
+  const days = daysSinceRoast(bean.roastDate, bean);
+  const totalRange = bean.peakEnd + 14;
+  const pct = Math.max(0, Math.min(1, (days ?? 0) / totalRange));
+  const peakStartPct = bean.peakStart / totalRange;
+  const peakEndPct = bean.peakEnd / totalRange;
+  const degasPct = (bean.degasMin || 0) / totalRange;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ fontFamily: fonts.heading, fontSize: 22, color: ps.color, lineHeight: 1 }}>
+            {days != null ? `Day ${days}` : '\u2014'}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: ps.color, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            {ps.label}
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: C.textLight, fontFamily: fonts.body }}>
+          Peak {bean.peakStart}{'\u2013'}{bean.peakEnd}d
+        </div>
+      </div>
+      <div style={{ position: 'relative', height: 46, marginBottom: 4 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 18, height: 10, borderRadius: 5, background: C.cardMuted }} />
+        <div style={{ position: 'absolute', left: 0, top: 18, height: 10, borderRadius: '5px 0 0 5px', width: `${degasPct*100}%`, background: '#6B5B95', opacity: 0.18 }} />
+        <div style={{ position: 'absolute', top: 14, height: 18, borderRadius: 9, left: `${peakStartPct*100}%`, width: `${(peakEndPct-peakStartPct)*100}%`, background: C.green, opacity: 0.25, border: `1px solid ${C.green}` }} />
+        <div style={{ position: 'absolute', top: 18, height: 10, left: `${peakStartPct*100}%`, width: `${(peakEndPct-peakStartPct)*100}%`, background: `linear-gradient(90deg, ${C.green}, ${C.accentLight})`, opacity: 0.85, borderRadius: 5 }} />
+        <div style={{ position: 'absolute', top: 0, left: `${peakStartPct*100}%`, transform: 'translateX(-50%)', fontSize: 9, color: C.green, fontWeight: 700 }}>{bean.peakStart}d</div>
+        <div style={{ position: 'absolute', top: 0, left: `${peakEndPct*100}%`, transform: 'translateX(-50%)', fontSize: 9, color: C.green, fontWeight: 700 }}>{bean.peakEnd}d</div>
+        <div style={{ position: 'absolute', top: 8, left: `${pct*100}%`, transform: 'translateX(-50%)', width: 2, height: 30, background: ps.color, borderRadius: 1 }} />
+        <div style={{ position: 'absolute', top: 2, left: `${pct*100}%`, transform: 'translateX(-50%)', width: 12, height: 12, borderRadius: '50%', background: C.card, border: `2px solid ${ps.color}`, boxShadow: '0 1px 3px rgba(59,36,23,0.15)' }} />
+        <div style={{ position: 'absolute', top: 34, right: 0, fontSize: 9, color: C.textLight }}>+14d</div>
+      </div>
+    </div>
+  );
+};
 
 export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid }) => {
   const { hasPro, freeUsage } = useSubscription();
@@ -28,6 +115,8 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const [pendingPhoto, setPendingPhoto] = useState(null); // { base64, mediaType, previewUrl }
   const fileRef = useRef(null);
   const photoInFlight = useRef(false);
+  const [enrichedOpen, setEnrichedOpen] = useState(false);
+  const [grindOpen, setGrindOpen] = useState(false);
 
   useEffect(() => {
     if (bean && open) {
@@ -58,12 +147,23 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         setPendingPhoto(null);
       }
       setConfirmDelete(false);
+      setEnrichedOpen(false);
+      setGrindOpen(false);
       // NOTE: photoInFlight.current is NOT reset here.
       // It is only reset in fireProductShot's .then()/.catch() and handleDelete.
     }
   }, [bean, open]);
 
   if (!bean) return null;
+
+  const NOTE_CHIPS = ['Floral','Citrus','Stonefruit','Chocolate','Nutty','Berry','Caramel','Spice'];
+  const addChip = (chip) => {
+    const notes = (f.bagNotes || '').trim();
+    if (!notes) setF(p => ({ ...p, bagNotes: chip }));
+    else if (!notes.toLowerCase().includes(chip.toLowerCase())) {
+      setF(p => ({ ...p, bagNotes: notes + (notes.endsWith(',') ? ' ' : ', ') + chip.toLowerCase() }));
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteBean || !bean.id) return;
@@ -246,25 +346,47 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   };
 
   const inputStyle = {
-    width: '100%', padding: '8px 10px', borderRadius: 8,
+    width: '100%', padding: '9px 12px', borderRadius: 10,
     border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
+    fontSize: 16, background: C.card, color: C.text, boxSizing: 'border-box',
+    outline: 'none',
   };
-  const labelStyle = { fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' };
+  const labelStyle = {
+    fontSize: 10, fontWeight: 700, color: C.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.8,
+    marginBottom: 5, display: 'block',
+  };
   const rowStyle = { marginBottom: 12 };
+  const filled = [f.roaster, f.name, f.origin, f.variety, f.process, f.bagSize, f.roastDate, f.bagNotes].filter(v => v && String(v).trim()).length;
+  const total = 8;
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit Bean" footer={
-      <div style={{ display: 'flex', gap: 8 }}>
-        <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
-        <Btn
-          variant="primary"
-          onClick={handleSave}
-          disabled={saving || !f.roaster?.trim() || !f.name?.trim()}
-          style={{ flex: 1, justifyContent: 'center' }}
-        >
-          <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
-        </Btn>
+    <Modal open={open} onClose={onClose} title={
+      <div>
+        <span style={{ fontFamily: fonts.title, fontSize: 28, color: C.accentDark }}>Editing</span>
+        <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700, fontFamily: fonts.body }}>
+          {bean.roaster} {'\u00B7'} {bean.name.length > 28 ? bean.name.slice(0,28) + '\u2026' : bean.name}
+        </div>
+      </div>
+    } footer={
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10, color: C.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 700 }}>
+          <div style={{ flex: 1, height: 3, background: C.cardMuted, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ width: `${(filled/total)*100}%`, height: '100%', background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})` }} />
+          </div>
+          <span>{filled}/{total} filled</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+          <Btn
+            variant="primary"
+            onClick={handleSave}
+            disabled={saving || !f.roaster?.trim() || !f.name?.trim()}
+            style={{ flex: 1, justifyContent: 'center' }}
+          >
+            <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+          </Btn>
+        </div>
       </div>
     }>
       {/* Photo section */}
@@ -372,6 +494,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         )}
       </div>
 
+      <ChapterHeader number="1" title="Identity" />
       <div style={rowStyle}>
         <label style={labelStyle}>Roaster *</label>
         <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
@@ -382,6 +505,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
       </div>
 
+      <ChapterHeader number="2" title="Origin Story" subtitle="Where this coffee comes from" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
         <div>
           <label style={labelStyle}>Origin</label>
@@ -408,122 +532,200 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
-        <div style={{ minWidth: 0, overflow: 'hidden' }}>
-          <label style={labelStyle}>Roast Date</label>
-          <input value={f.roastDate} onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))} type="date" style={{ ...inputStyle, minWidth: 0, overflow: 'hidden' }} onFocus={scrollOnFocus} />
+      <ChapterHeader number="3" title="On the Shelf" subtitle="Roast date sets the peak window" />
+      <div style={{ background: C.card, borderRadius: 14, padding: '14px 14px 10px', border: `1px solid ${C.borderLight}`, marginBottom: 12, boxShadow: '0 1px 2px rgba(92,61,46,0.04)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Roast Date</label>
+            <div style={{
+              ...inputStyle,
+              padding: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              background: C.bg,
+            }}>
+              <input
+                value={f.roastDate}
+                onChange={e => setF(p => ({ ...p, roastDate: e.target.value }))}
+                type="date"
+                style={{
+                  width: '100%', border: 'none', background: 'transparent',
+                  padding: '9px 12px', fontFamily: fonts.body, fontSize: 16,
+                  color: C.text, outline: 'none', minWidth: 0,
+                }}
+                onFocus={scrollOnFocus}
+              />
+            </div>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Producer</label>
+            <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, minWidth: 0, textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
+          </div>
         </div>
-        <div style={{ minWidth: 0, overflow: 'hidden' }}>
-          <label style={labelStyle}>Producer</label>
-          <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
-        </div>
+        <PeakTimeline bean={{ ...bean, roastDate: f.roastDate }} />
       </div>
 
-      <div style={rowStyle}>
-        <label style={labelStyle}>Tasting Notes</label>
-        <input value={f.bagNotes} onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))} placeholder="e.g. peach / floral / citrus" style={inputStyle} onFocus={scrollOnFocus} />
+      <ChapterHeader number="4" title="Tasting Notes" subtitle="From the bag or what you're finding" />
+      <div style={{ marginBottom: 10 }}>
+        <textarea
+          value={f.bagNotes}
+          onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))}
+          placeholder="e.g. nectarine, honeysuckle, lavender finish..."
+          rows={3}
+          style={{
+            width: '100%', padding: '12px 14px', borderRadius: 12,
+            border: `1px solid ${C.border}`,
+            background: `repeating-linear-gradient(to bottom, #FDF8EF 0px, #FDF8EF 27px, ${C.borderLight} 27px, ${C.borderLight} 28px)`,
+            fontFamily: fonts.heading, fontSize: 16, color: C.text, lineHeight: '28px',
+            boxSizing: 'border-box', resize: 'vertical', outline: 'none',
+            fontStyle: f.bagNotes ? 'normal' : 'italic',
+          }}
+          onFocus={scrollOnFocus}
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+        {NOTE_CHIPS.map(chip => (
+          <button
+            key={chip}
+            onClick={() => addChip(chip)}
+            style={{
+              padding: '5px 11px', borderRadius: 99,
+              border: `1px solid ${C.borderLight}`, background: C.card,
+              fontFamily: fonts.body, fontSize: 11, fontWeight: 600, color: C.textMuted,
+              cursor: 'pointer',
+            }}
+          >+ {chip}</button>
+        ))}
       </div>
 
-      {/* Enriched Details */}
-      <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 12, ...rowStyle }}>
-        <label style={{ ...labelStyle, fontSize: 13, color: C.accent }}>Enriched Details</label>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Region</label>
-            <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} onFocus={scrollOnFocus} />
+      <ChapterHeader
+        number="5" title="Deeper Details"
+        subtitle={enrichedOpen ? 'Region, farm, altitude, cup score' : 'Region, farm, altitude...'}
+        collapsible open={enrichedOpen}
+        onToggle={() => setEnrichedOpen(o => !o)}
+      />
+      {enrichedOpen && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={labelStyle}>Region</label>
+              <input value={f.region} onChange={e => setF(p => ({ ...p, region: e.target.value }))} placeholder="e.g. Huila" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
+            <div>
+              <label style={labelStyle}>Farm</label>
+              <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
           </div>
-          <div>
-            <label style={labelStyle}>Farm</label>
-            <input value={f.farm} onChange={e => setF(p => ({ ...p, farm: e.target.value }))} placeholder="e.g. Finca La Palma" style={inputStyle} onFocus={scrollOnFocus} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={labelStyle}>Altitude</label>
+              <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800 masl" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
+            <div>
+              <label style={labelStyle}>Roast Level</label>
+              <select value={f.roastLevel} onChange={e => setF(p => ({ ...p, roastLevel: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
+                <option value="">--</option>
+                {['light', 'medium-light', 'medium', 'medium-dark', 'dark'].map(l => (
+                  <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Altitude</label>
-            <input value={f.altitude} onChange={e => setF(p => ({ ...p, altitude: e.target.value }))} placeholder="e.g. 1800 masl" style={inputStyle} onFocus={scrollOnFocus} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={labelStyle}>Cup Score</label>
+              <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
+            <div>
+              <label style={labelStyle}>Sourced By</label>
+              <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
           </div>
-          <div>
-            <label style={labelStyle}>Roast Level</label>
-            <select value={f.roastLevel} onChange={e => setF(p => ({ ...p, roastLevel: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
-              <option value="">—</option>
-              {['light', 'medium-light', 'medium', 'medium-dark', 'dark'].map(l => (
-                <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Cup Score</label>
-            <input value={f.cupScore} onChange={e => setF(p => ({ ...p, cupScore: e.target.value }))} placeholder="e.g. 87.5" style={inputStyle} onFocus={scrollOnFocus} />
-          </div>
-          <div>
-            <label style={labelStyle}>Sourced By</label>
-            <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} onFocus={scrollOnFocus} />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          <label style={labelStyle}>Brewing Recommendations</label>
-          <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} onFocus={scrollOnFocus} />
-        </div>
-      </div>
-
-      {/* Grind Settings */}
-      <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 12, ...rowStyle }}>
-        <label style={{ ...labelStyle, fontSize: 13, color: C.accent }}>Grind Settings (Ode Gen 2)</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <div>
-            <label style={labelStyle}>SS Grind</label>
-            <input
-              value={f.ssGrind}
-              onChange={e => setF(p => ({ ...p, ssGrind: e.target.value }))}
-              type="number"
-              step={0.1}
-              min={0}
-              placeholder="e.g. 4.0"
-              style={inputStyle}
-              onFocus={scrollOnFocus}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Batch Grind</label>
-            <input
-              value={f.batchGrind}
-              onChange={e => setF(p => ({ ...p, batchGrind: e.target.value }))}
-              type="number"
-              step={0.1}
-              min={0}
-              placeholder="e.g. 6.2"
-              style={inputStyle}
-              onFocus={scrollOnFocus}
-            />
+          <div style={{ marginBottom: 10 }}>
+            <label style={labelStyle}>Brewing Recommendations</label>
+            <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} onFocus={scrollOnFocus} />
           </div>
         </div>
-      </div>
+      )}
+
+      <ChapterHeader
+        number="6" title="Grind Settings" subtitle="Ode Gen 2"
+        collapsible open={grindOpen}
+        onToggle={() => setGrindOpen(o => !o)}
+      />
+      {grindOpen && (
+        <div style={{
+          background: `linear-gradient(145deg, ${C.card}, #FDF8EF)`,
+          borderRadius: 14, padding: 14, border: `1px solid ${C.borderLight}`,
+          position: 'relative', overflow: 'hidden', marginBottom: 12,
+        }}>
+          <div style={{ position: 'absolute', top: -6, right: -6, opacity: 0.1 }}>
+            <svg width="70" height="70" viewBox="0 0 70 70">
+              <circle cx="35" cy="35" r="26" fill="none" stroke={C.accent} strokeWidth="1"/>
+              <circle cx="35" cy="35" r="18" fill="none" stroke={C.accent} strokeWidth="1"/>
+              <circle cx="35" cy="35" r="10" fill="none" stroke={C.accent} strokeWidth="1"/>
+              <line x1="35" y1="4" x2="35" y2="12" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, position: 'relative' }}>
+            <div>
+              <label style={labelStyle}>Single Serve</label>
+              <input
+                value={f.ssGrind}
+                onChange={e => setF(p => ({ ...p, ssGrind: e.target.value }))}
+                type="number"
+                step={0.1}
+                min={0}
+                placeholder="4.0"
+                style={{ ...inputStyle, fontFamily: fonts.heading, fontSize: 20, textAlign: 'center' }}
+                onFocus={scrollOnFocus}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Batch</label>
+              <input
+                value={f.batchGrind}
+                onChange={e => setF(p => ({ ...p, batchGrind: e.target.value }))}
+                type="number"
+                step={0.1}
+                min={0}
+                placeholder="6.2"
+                style={{ ...inputStyle, fontFamily: fonts.heading, fontSize: 20, textAlign: 'center' }}
+                onFocus={scrollOnFocus}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete bean */}
       {deleteBean && (
-        <div style={{ borderTop: `1px solid ${C.borderLight}`, paddingTop: 16, marginBottom: 8 }}>
+        <div style={{ marginTop: 24, marginBottom: 4 }}>
           {!confirmDelete ? (
-            <Btn
-              variant="ghost"
+            <button
               onClick={() => setConfirmDelete(true)}
-              style={{ width: '100%', justifyContent: 'center', color: C.red }}
+              style={{
+                width: '100%', padding: 10, borderRadius: 10,
+                background: 'transparent', border: `1px dashed ${C.border}`,
+                color: C.red, fontFamily: fonts.body, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', gap: 6,
+              }}
             >
-              <Trash2 size={14} /> Delete Bean
-            </Btn>
+              <Trash2 size={14} /> Delete this bean
+            </button>
           ) : (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: C.text, marginBottom: 10 }}>
+            <div style={{
+              padding: 14, borderRadius: 12, background: '#FDF0EB',
+              border: `1px solid ${C.red}`, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 12, color: C.text, marginBottom: 10 }}>
                 Delete <strong>{bean.name}</strong>? This cannot be undone.
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <Btn variant="secondary" onClick={() => setConfirmDelete(false)} style={{ flex: 1, justifyContent: 'center' }}>
-                  Cancel
+                  Keep
                 </Btn>
                 <Btn
                   variant="primary"

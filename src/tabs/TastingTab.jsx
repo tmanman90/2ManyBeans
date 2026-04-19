@@ -1,6 +1,7 @@
 // Tasting tab — ported from prototype lines 500-789
 // 3 modes: list, form, chat
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2 } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
 import { today } from '../lib/peakStatus';
@@ -13,12 +14,435 @@ import { scrollOnFocus } from '../lib/formHelpers';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { TastingForm } from '../components/TastingForm';
+import { Modal } from '../components/Modal';
 import { TastingShareCard, captureShareCard, offScreenStyle } from '../components/ShareCard';
 import { shareImage } from '../lib/share';
 import { stripMarkdown } from '../lib/textFormat';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+import { TASTING_GLOSSARY, parseTermMarkers, autoLinkTerms, scanScorecard, parseStepMarker, STEP_KEY_TO_INDEX } from '../lib/tastingGlossary';
+
+// Six-step tasting spine shown in the coach header.
+const TASTING_STEPS = ['Smell', 'First Sip', 'Acidity', 'Sweetness', 'Body', 'Finish'];
+
+// Drag-down-to-dismiss handle for bottom sheets. Tap also closes. Touch
+// handlers are scoped to the handle so the sheet's inner scroll container
+// isn't hijacked when the user scrolls content.
+const SwipeDownHandle = ({ onClose }) => {
+  const startY = useRef(null);
+  const [dy, setDy] = useState(0);
+  return (
+    <div
+      onClick={onClose}
+      onTouchStart={e => { startY.current = e.touches[0].clientY; setDy(0); }}
+      onTouchMove={e => {
+        if (startY.current == null) return;
+        const delta = e.touches[0].clientY - startY.current;
+        if (delta > 0) setDy(Math.min(delta, 200));
+      }}
+      onTouchEnd={() => {
+        if (dy > 70) onClose();
+        else setDy(0);
+        startY.current = null;
+      }}
+      style={{
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        padding: '8px 0 6px', cursor: 'pointer',
+        // Expand the hit area for easier grabbing without visually changing layout.
+        touchAction: 'none',
+      }}
+    >
+      <div style={{
+        width: 40, height: 4, borderRadius: 2, background: '#D9CBB8',
+        transform: dy ? `translateY(${dy * 0.25}px)` : 'none',
+        transition: dy ? 'none' : 'transform 0.18s',
+      }} />
+    </div>
+  );
+};
+
+// Map a step name to the scorecard axis it's exploring. "Smell" and "First
+// Sip" both feed aroma — the rest map 1:1.
+const STEP_TO_AXIS = {
+  'Smell': 'aroma',
+  'First Sip': 'aroma',
+  'Acidity': 'acidity',
+  'Sweetness': 'sweet',
+  'Body': 'body',
+  'Finish': 'finish',
+};
+
+// Render one Ruphus message body with {{term:key}} markers parsed into
+// tappable underlined spans. Falls back to auto-linking known terms when
+// Ruphus forgets the markers.
+const RuphusContent = ({ text, onTerm }) => {
+  const primary = parseTermMarkers(text);
+  // If the parser found no terms, try the fallback auto-linker.
+  const hasTerm = primary.some(p => p.type === 'term');
+  const parts = hasTerm ? primary : autoLinkTerms(text);
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (p.type === 'term') {
+          return (
+            <span
+              key={i}
+              onClick={() => onTerm(p.termKey)}
+              style={{
+                color: C.accent, fontWeight: 600, cursor: 'pointer',
+                textDecoration: 'underline', textDecorationStyle: 'dotted',
+                textDecorationColor: C.accent, textUnderlineOffset: '3px',
+              }}
+            >{p.text}</span>
+          );
+        }
+        // stripMarkdown belt-and-suspenders in case Ruphus leaks ** or * despite prompt rules.
+        return <span key={i}>{stripMarkdown(p.text)}</span>;
+      })}
+    </>
+  );
+};
+
+const RuphusJournalCard = ({ step, stepName, content, onTerm }) => (
+  <div style={{ marginBottom: 14 }}>
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase',
+      marginBottom: 6, paddingLeft: 2,
+    }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 18, height: 18, borderRadius: '50%', background: C.accent, color: C.cream,
+        fontFamily: fonts.heading, fontSize: 11, fontWeight: 600, letterSpacing: 0,
+      }}>{step}</span>
+      Step {step} · {stepName}
+    </div>
+    <div style={{
+      background: C.card, borderRadius: 12,
+      border: `1px solid ${C.border}`, padding: '12px 14px',
+      fontSize: 14, lineHeight: 1.55, color: C.text,
+      boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    }}>
+      <RuphusContent text={content} onTerm={onTerm} />
+    </div>
+  </div>
+);
+
+const UserHandwrittenBubble = ({ children }) => (
+  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+    <div style={{
+      maxWidth: '78%',
+      background: '#EFE2CC', color: C.text,
+      borderRadius: '14px 14px 2px 14px',
+      padding: '10px 13px',
+      fontFamily: fonts.title, fontSize: 18, lineHeight: 1.25,
+      boxShadow: '0 1px 2px rgba(92,61,46,0.06)',
+      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    }}>
+      {children}
+    </div>
+  </div>
+);
+
+const RuphusTyping = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 2px 8px', color: C.textMuted, fontSize: 12 }}>
+    <span style={{ fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Ruphus is writing</span>
+    <span style={{ display: 'inline-flex', gap: 3 }}>
+      {[0, 1, 2].map(i => (
+        <span
+          key={i}
+          style={{
+            width: 4, height: 4, borderRadius: '50%', background: C.textMuted,
+            opacity: 0.7, animation: `tchat-dot 1.2s ${i * 0.15}s infinite ease-in-out`,
+          }}
+        />
+      ))}
+    </span>
+    <style>{`@keyframes tchat-dot { 0%, 80%, 100% { opacity: 0.2 } 40% { opacity: 0.9 } }`}</style>
+  </div>
+);
+
+const ScorecardPeekLine = ({ scorecard, stepName }) => {
+  const axes = [
+    { key: 'aroma', label: 'aroma' },
+    { key: 'acidity', label: 'acidity' },
+    { key: 'sweet', label: 'sweetness' },
+    { key: 'body', label: 'body' },
+    { key: 'finish', label: 'finish' },
+  ];
+  const activeKey = STEP_TO_AXIS[stepName];
+  const filled = axes.filter(a => scorecard[a.key]);
+  const active = axes.find(a => a.key === activeKey && !scorecard[a.key]);
+  if (filled.length === 0 && !active) {
+    return <span style={{ color: C.textLight }}>smell it first, then tap here to see the portrait build.</span>;
+  }
+  const bits = [];
+  filled.slice(0, 2).forEach(a => {
+    bits.push(
+      <span key={a.key}>
+        <span style={{ color: C.green }}>● </span>
+        {a.label}: {scorecard[a.key]}
+      </span>
+    );
+  });
+  if (active) {
+    bits.push(
+      <span key={active.key} style={{ color: C.textLight }}>
+        {active.label}: tasting now…
+      </span>
+    );
+  }
+  return (
+    <>
+      {bits.map((b, i) => (
+        <span key={i}>
+          {b}
+          {i < bits.length - 1 && <span style={{ color: C.textLight }}> · </span>}
+        </span>
+      ))}
+    </>
+  );
+};
+
+const TeachSheet = ({ entry, onClose }) => (
+  <div
+    onClick={onClose}
+    style={{
+      // Fixed to viewport (not absolute) so the backdrop covers the bottom
+      // tab bar too. zIndex > 100 beats the tab bar's stacking context.
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(59,36,23,0.35)',
+      display: 'flex', alignItems: 'flex-end',
+      animation: 'tchat-fade-in 180ms ease-out',
+    }}
+  >
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        width: '100%',
+        background: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+        padding: `10px 18px calc(28px + env(safe-area-inset-bottom, 0px))`,
+        boxShadow: '0 -8px 28px rgba(59,36,23,0.18)',
+        animation: 'tchat-slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+      }}
+    >
+      <SwipeDownHandle onClose={onClose} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10, marginTop: 4 }}>
+        <img
+          src="/images/ruphus-portrait.png"
+          alt="Professor Ruphus"
+          style={{
+            width: 62, height: 72, borderRadius: 14,
+            objectFit: 'cover', objectPosition: 'center top',
+            background: C.cream, flexShrink: 0,
+            border: `1px solid ${C.border}`,
+            boxShadow: '0 2px 6px rgba(92,61,46,0.08)',
+          }}
+        />
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, color: C.accent, textTransform: 'uppercase', marginBottom: 2 }}>
+            Prof. Ruphus · Teach me
+          </div>
+          <div style={{ fontFamily: fonts.heading, fontSize: 22, color: C.text, lineHeight: 1.1, marginBottom: 4 }}>{entry.title}</div>
+          <div style={{ fontFamily: fonts.title, fontSize: 18, color: C.accentDark, lineHeight: 1.2 }}>{entry.tagline}</div>
+        </div>
+      </div>
+      <div style={{ fontSize: 14, lineHeight: 1.55, color: C.text, marginBottom: 14 }}>{entry.body}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>
+        Try these words
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+        {(entry.examples || []).map(e => (
+          <span
+            key={e}
+            style={{
+              background: C.cream, border: `1px solid ${C.border}`, borderRadius: 999,
+              padding: '6px 12px', fontSize: 12, fontWeight: 600, color: C.text,
+            }}
+          >{e}</span>
+        ))}
+      </div>
+      <button
+        onClick={onClose}
+        style={{
+          width: '100%', padding: 12, borderRadius: 14, border: 'none',
+          background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
+          color: C.cream, fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
+          cursor: 'pointer', boxShadow: '0 2px 6px rgba(92,61,46,0.18)',
+        }}
+      >Got it</button>
+    </div>
+  </div>
+);
+
+const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
+  const activeAxisKey = STEP_TO_AXIS[TASTING_STEPS[currentStep] || 'Finish'];
+  const axes = [
+    { key: 'aroma', label: 'Aroma' },
+    { key: 'acidity', label: 'Acidity' },
+    { key: 'sweet', label: 'Sweet' },
+    { key: 'body', label: 'Body' },
+    { key: 'finish', label: 'Finish' },
+  ].map(a => ({
+    ...a,
+    value: scorecard[a.key] ? 0.65 : 0,
+    status: scorecard[a.key] || (a.key === activeAxisKey ? 'tasting now…' : '—'),
+    color: scorecard[a.key] ? C.green : a.key === activeAxisKey ? C.accent : C.textLight,
+    active: a.key === activeAxisKey && !scorecard[a.key],
+  }));
+
+  const cx = 110, cy = 110, r = 72, n = axes.length;
+  const toXY = (i, val) => {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return {
+      x: cx + Math.cos(angle) * r * val,
+      y: cy + Math.sin(angle) * r * val,
+      lx: cx + Math.cos(angle) * (r + 20),
+      ly: cy + Math.sin(angle) * (r + 20),
+    };
+  };
+  const pts = axes.map((a, i) => toXY(i, Math.max(a.value, 0.02)));
+  const poly = pts.map(p => `${p.x},${p.y}`).join(' ');
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        // Fixed to viewport so the backdrop covers the bottom tab bar too.
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(59,36,23,0.35)',
+        display: 'flex', alignItems: 'flex-end',
+        animation: 'tchat-fade-in 180ms ease-out',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%',
+          background: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+          boxShadow: '0 -8px 28px rgba(59,36,23,0.18)',
+          animation: 'tchat-slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+          maxHeight: 'min(80vh, 620px)',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        <SwipeDownHandle onClose={onClose} />
+        <div style={{
+          padding: `0 18px calc(24px + env(safe-area-inset-bottom, 0px))`,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          flex: 1,
+        }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 2, marginTop: 4 }}>
+          <div style={{ fontFamily: fonts.heading, fontSize: 22, color: C.text, lineHeight: 1.1 }}>Your cup so far</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase' }}>
+            Step {Math.min(currentStep + 1, stepCount)} / {stepCount}
+          </div>
+        </div>
+        <div style={{ fontFamily: fonts.title, fontSize: 17, color: C.accentDark, marginBottom: 10 }}>
+          {bean?.name || 'your coffee'} · a portrait in progress
+        </div>
+
+        <svg width="100%" height="240" viewBox="0 0 220 220" style={{ display: 'block', margin: '0 auto 10px' }}>
+          {[0.33, 0.66, 1].map((ff, i) => (
+            <polygon
+              key={i}
+              points={axes.map((_, j) => {
+                const { x, y } = toXY(j, ff);
+                return `${x},${y}`;
+              }).join(' ')}
+              fill="none"
+              stroke="#EADFD0"
+              strokeWidth="1"
+              strokeDasharray={i === 2 ? 'none' : '2,3'}
+            />
+          ))}
+          {axes.map((_, i) => {
+            const { lx, ly } = toXY(i, 1);
+            return (
+              <line
+                key={i}
+                x1={cx} y1={cy}
+                x2={lx - (lx - cx) * 0.15}
+                y2={ly - (ly - cy) * 0.15}
+                stroke="#EADFD0"
+                strokeWidth="1"
+              />
+            );
+          })}
+          <polygon
+            points={poly}
+            fill="rgba(176,117,64,0.18)"
+            stroke={C.accent}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          {pts.map((p, i) => axes[i].value > 0 ? (
+            <circle key={i} cx={p.x} cy={p.y} r="4" fill={axes[i].color} stroke={C.card} strokeWidth="2" />
+          ) : null)}
+          {axes.map((a, i) => {
+            const { lx, ly } = toXY(i, 1);
+            const filled = a.value > 0;
+            return (
+              <text
+                key={a.key}
+                x={lx}
+                y={ly + 4}
+                textAnchor="middle"
+                fontFamily={fonts.body}
+                fontSize="11"
+                fontWeight={filled ? 700 : 500}
+                fill={filled ? C.text : C.textLight}
+              >{a.label}</text>
+            );
+          })}
+        </svg>
+
+        <div style={{ borderTop: `1px solid ${C.border}` }}>
+          {axes.map(a => (
+            <div
+              key={a.key}
+              style={{
+                padding: '10px 0', borderBottom: `1px solid ${C.borderLight}`,
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}
+            >
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: a.value > 0 ? a.color : '#E2D5C1', flexShrink: 0,
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: a.value > 0 ? C.text : C.textLight }}>{a.label}</div>
+                <div style={{
+                  color: a.value > 0 ? C.textMuted : C.textLight,
+                  fontFamily: a.active ? fonts.title : fonts.body,
+                  fontSize: a.active ? 15 : 12,
+                  fontStyle: a.active ? 'italic' : 'normal',
+                  lineHeight: 1.2,
+                }}>{a.status}</div>
+              </div>
+              {a.active && (
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: C.accent, textTransform: 'uppercase' }}>Now</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', marginTop: 14, padding: 12, borderRadius: 14, border: `1px solid ${C.border}`,
+            background: C.cream, color: C.text, fontFamily: fonts.body, fontSize: 13, fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >Keep tasting</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, pendingTastingBeanId, onPendingTastingConsumed }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
@@ -55,6 +479,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [chatExtracted, setChatExtracted] = useState(null);
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
+
+  // Coach UI state: teach-me sheet (glossary key) and expanded scorecard sheet.
+  const [teachKey, setTeachKey] = useState(null);
+  const [cupOpen, setCupOpen] = useState(false);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
   // Only track keyboard when we're in chat mode, so form/edit mode keyboards
   // don't hide the global tab bar unexpectedly. useNativeKeyboard centralizes
@@ -155,7 +584,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     }
     const bean = beans.find(b => b.id === sel);
     setMode('chat');
-    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
+    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean), stepKey: 'smell' }]);
     setChatExtracted(null);
   };
 
@@ -163,7 +592,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   useEffect(() => {
     if (mode === 'chat' && sel && chatMessages.length > 0) {
       const bean = beans.find(b => b.id === sel);
-      setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
+      setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean), stepKey: 'smell' }]);
       setChatExtracted(null);
     }
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only resets on selection change, not data changes
@@ -188,7 +617,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     }
     setSel(pendingTastingBeanId);
     setMode('chat');
-    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean) }]);
+    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean), stepKey: 'smell' }]);
     setChatExtracted(null);
     onPendingTastingConsumed?.();
   }, [pendingTastingBeanId, beans, hasPro, freeUsage]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -223,6 +652,19 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         return;
       }
 
+      // Strip {{step:KEY}} at receive time and stash the parsed key on the
+      // message object. Storing clean text keeps scanScorecard and RuphusContent
+      // simple (they never see raw markers) and lets stepWalk read m.stepKey
+      // directly without re-parsing every render.
+      const appendAssistant = (rawText, fallback = "Couldn't reach the AI. Try again.") => {
+        const { stepKey, strippedText } = parseStepMarker(rawText);
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: strippedText || fallback,
+          stepKey,
+        }]);
+      };
+
       const extractMatch = text.match(/---EXTRACT---\s*([\s\S]*?)\s*---END---/);
       if (extractMatch) {
         try {
@@ -251,12 +693,12 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           }
           setChatExtracted(extracted);
           const cleanText = text.replace(/---EXTRACT---[\s\S]*?---END---/, '').trim();
-          setChatMessages(prev => [...prev, { role: 'assistant', content: cleanText || 'Great session! Review below and save when ready.' }]);
+          appendAssistant(cleanText, 'Great session! Review below and save when ready.');
         } catch {
-          setChatMessages(prev => [...prev, { role: 'assistant', content: text.replace(/---EXTRACT---[\s\S]*?---END---/, '').trim() }]);
+          appendAssistant(text.replace(/---EXTRACT---[\s\S]*?---END---/, '').trim());
         }
       } else {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: text }]);
+        appendAssistant(text);
       }
     } catch (err) {
       // Server-side quota race or subscription gate. Surface paywall instead
@@ -328,50 +770,107 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
   };
 
+  // Walk the message array in order. Two outputs:
+  //   - perMessage: the step each assistant card should LABEL. Reflects
+  //     literal marker value, so an explicit backstep (e.g. user asked to
+  //     revisit smell) labels the card correctly. Clarifying messages with
+  //     no marker inherit the prior card's label (step continuation).
+  //   - maxIdx: the furthest step reached across the whole session. Drives
+  //     the spine header, which stays monotonic -- backsteps don't regress
+  //     the header, only the per-card label.
+  //
+  // Three session shapes handled:
+  //   1. Fresh session (opener seeded with stepKey='smell'): markered mode
+  //      from the start. Markers drive labels, inheritance fills the gaps.
+  //   2. Legacy session with no markers (started before this fix): fall back
+  //      to the old count-based heuristic per assistant message.
+  //   3. Legacy session that transitions (first marker arrives mid-session):
+  //      heuristic until the first marker, then latches into markered mode.
+  const stepWalk = useMemo(() => {
+    let maxIdx = 0;
+    let lastCardIdx = 0;
+    // null until we see the first assistant message, then latches sticky:
+    // true = fresh/markered session, false = legacy. Legacy can flip to true
+    // later when its first marker arrives.
+    let sessionIsMarkered = null;
+    let assistantSeen = 0;
+    const perMessage = new Map();
+    for (let i = 0; i < chatMessages.length; i++) {
+      const m = chatMessages[i];
+      if (m.role !== 'assistant') continue;
+      const markerIdx = m.stepKey && STEP_KEY_TO_INDEX[m.stepKey] != null
+        ? STEP_KEY_TO_INDEX[m.stepKey]
+        : null;
+      if (sessionIsMarkered === null) sessionIsMarkered = markerIdx !== null;
+      let thisCardIdx;
+      if (sessionIsMarkered) {
+        // Markered mode -- explicit marker relabels (may backstep). No marker
+        // means "continuation of prior step" -- inherit.
+        thisCardIdx = markerIdx !== null ? markerIdx : lastCardIdx;
+      } else {
+        // Legacy mode. If a marker finally arrives, latch into markered mode.
+        if (markerIdx !== null) {
+          thisCardIdx = markerIdx;
+          sessionIsMarkered = true;
+        } else {
+          thisCardIdx = Math.min(assistantSeen, TASTING_STEPS.length - 1);
+        }
+      }
+      perMessage.set(i, thisCardIdx);
+      lastCardIdx = thisCardIdx;
+      if (thisCardIdx > maxIdx) maxIdx = thisCardIdx;
+      assistantSeen++;
+    }
+    return { perMessage, maxIdx };
+  }, [chatMessages]);
+
+  const currentStep = chatExtracted ? TASTING_STEPS.length : stepWalk.maxIdx;
+  const scorecard = scanScorecard(chatMessages);
+  const selectedBean = beans.find(b => b.id === sel);
+
+  const exitChat = () => {
+    setMode('list');
+    setChatMessages([]);
+    setChatExtracted(null);
+    setTeachKey(null);
+    setCupOpen(false);
+    setExitConfirmOpen(false);
+  };
+
+  const requestExitChat = () => {
+    const hasProgress = chatMessages.length > 1 || !!chatExtracted;
+    if (hasProgress) {
+      setExitConfirmOpen(true);
+    } else {
+      exitChat();
+    }
+  };
+
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div>
-          <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Tasting Log</div>
-        </div>
-        {mode === 'list' ? (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Btn variant="ghost" onClick={startChat} style={{ fontSize: 12, padding: '6px 10px' }}>
-              <MessageCircle size={13} /> Chat It
-            </Btn>
-            <Btn variant="primary" onClick={() => setMode('form')} style={{ fontSize: 12, padding: '6px 10px' }}>
-              <Plus size={13} /> Log
-            </Btn>
+      {/* Header + list chrome hidden during chat takeover */}
+      {mode !== 'chat' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <div>
+              <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Tasting Log</div>
+            </div>
+            {mode === 'list' ? (
+              <div data-tour="new-tasting" style={{ display: 'flex', gap: 6 }}>
+                <Btn variant="ghost" onClick={startChat} style={{ fontSize: 12, padding: '6px 10px' }}>
+                  <MessageCircle size={13} /> Chat It
+                </Btn>
+                <Btn variant="primary" onClick={() => setMode('form')} style={{ fontSize: 12, padding: '6px 10px' }}>
+                  <Plus size={13} /> Log
+                </Btn>
+              </div>
+            ) : (
+              <Btn variant="ghost" onClick={() => setMode('list')}>Cancel</Btn>
+            )}
           </div>
-        ) : (
-          <Btn variant="ghost" onClick={() => { setMode('list'); setChatMessages([]); setChatExtracted(null); }}>Cancel</Btn>
-        )}
-      </div>
-      <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>{tastings.length} tastings logged</div>
-
-      {/* Bean selector for chat mode */}
-      {mode === 'chat' && (
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>Bean</label>
-          <select value={sel} onChange={e => setSel(e.target.value)} style={inputStyle}>
-            {active.length > 0 && (
-              <optgroup label="In Jars">
-                {active.map(b => (
-                  <option key={b.id} value={b.id}>{b.name} (#{b.jarSlot})</option>
-                ))}
-              </optgroup>
-            )}
-            {sealed.length > 0 && (
-              <optgroup label="Sealed">
-                {sealed.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </div>
+          <div style={accentBar} />
+          <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>{tastings.length} tastings logged</div>
+        </>
       )}
 
       {/* Form Mode */}
@@ -379,79 +878,238 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         <TastingForm beans={tastable} onSubmit={handleFormSubmit} submitLabel="Save Tasting" />
       )}
 
-      {/* Chat Mode */}
-      {mode === 'chat' && (
-        <>
-          <div
-            ref={chatScrollRef}
-            style={{
-              ...journalCard,
-              padding: 16,
-              overflowY: 'auto',
-              paddingBottom: keyboardHeight > 0 ? 80 : 140,
-              height: keyboardHeight > 0
-                ? `calc(100dvh - ${keyboardHeight + 260}px)`
-                : 'calc(100dvh - 360px)',
-              marginBottom: 12,
-            }}
-          >
-            {chatMessages.map((m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+      {/* Chat Mode — full-screen coach takeover.
+          Portaled to document.body so position:fixed escapes the app-header's
+          stacking context (content div has zIndex:1 which otherwise caps us
+          below the sticky app-header at zIndex:10). */}
+      {mode === 'chat' && createPortal((
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0,
+          // Sit flush above the bottom tab bar when the keyboard is closed
+          // (tab bar is ~80px + safe-area-bottom). useNativeKeyboard hides the
+          // tab bar while the keyboard is up, so we switch the reserved space
+          // to the keyboard height instead.
+          bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
+          zIndex: 150,
+          background: C.bg,
+          display: 'flex', flexDirection: 'column',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        }}>
+          <style>{`
+            @keyframes tchat-fade-in { from { opacity: 0 } to { opacity: 1 } }
+            @keyframes tchat-slide-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
+          `}</style>
+
+          {/* Bean header with Ruphus avatar + step spine */}
+          <div style={{ background: C.card, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+            <div style={{ padding: '10px 14px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* Ruphus avatar — "your coach" */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <img
+                  src="/images/ruphus-avatar.png"
+                  alt="Professor Ruphus"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    objectFit: 'cover', objectPosition: 'center top',
+                    border: `2px solid ${C.card}`,
+                    boxShadow: `0 0 0 1px ${C.border}, 0 1px 3px rgba(92,61,46,0.12)`,
+                    background: C.cream,
+                  }}
+                />
+                {/* Bean marker dot — signals the bean in play */}
                 <div style={{
-                  maxWidth: '80%', padding: '10px 14px', borderRadius: 14, fontSize: 14, lineHeight: 1.5,
-                  background: m.role === 'user' ? C.accent : C.cream,
-                  color: m.role === 'user' ? '#fff' : C.text,
-                  borderBottomRightRadius: m.role === 'user' ? 4 : 14,
-                  borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
+                  position: 'absolute', right: -3, bottom: -3,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: C.cream, border: `1.5px solid ${C.card}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 1px 2px rgba(92,61,46,0.15)',
                 }}>
-                  {m.role === 'assistant' ? stripMarkdown(m.content) : m.content}
+                  <svg width="11" height="11" viewBox="0 0 24 24">
+                    <ellipse cx="12" cy="12" rx="7" ry="9" fill="#5C3D2E" transform="rotate(-18 12 12)" />
+                    <path d="M9 5 Q12 12 15 19" stroke="#FBF1DF" strokeWidth="1.6" fill="none" strokeLinecap="round" transform="rotate(-18 12 12)" />
+                  </svg>
                 </div>
               </div>
-            ))}
-            {chatLoading && <div style={{ fontSize: 13, color: C.textMuted, padding: '4px 0' }}>Thinking...</div>}
+
+              {/* Bean name + hidden native select for switching */}
+              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                  Tasting with Ruphus{selectedBean?.jarSlot ? ` · Jar #${selectedBean.jarSlot}` : ''}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                  <span style={{
+                    fontFamily: fonts.heading, fontSize: 17, color: C.text, lineHeight: 1.1,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{selectedBean ? selectedBean.name : 'Select a bean'}</span>
+                  <span style={{ color: C.textMuted, fontSize: 13, flexShrink: 0 }}>⌄</span>
+                </div>
+                <select
+                  value={sel}
+                  onChange={e => setSel(e.target.value)}
+                  aria-label="Select bean"
+                  style={{
+                    position: 'absolute', inset: 0, width: '100%', height: '100%',
+                    opacity: 0, appearance: 'none', WebkitAppearance: 'none',
+                    background: 'transparent', border: 'none', fontSize: 16,
+                    color: 'transparent',
+                  }}
+                >
+                  {active.length > 0 && (
+                    <optgroup label="In Jars">
+                      {active.map(b => <option key={b.id} value={b.id}>{b.name} (#{b.jarSlot})</option>)}
+                    </optgroup>
+                  )}
+                  {sealed.length > 0 && (
+                    <optgroup label="Sealed">
+                      {sealed.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              <button
+                onClick={requestExitChat}
+                style={{
+                  background: 'transparent', border: 'none', color: C.accent,
+                  fontFamily: fonts.body, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  padding: '8px 4px',
+                }}
+              >End</button>
+            </div>
+
+            {/* Step spine */}
+            <div style={{ padding: '4px 14px 12px', display: 'flex', alignItems: 'center', gap: 0 }}>
+              {TASTING_STEPS.map((s, i) => {
+                const done = i < currentStep;
+                const active = i === currentStep && !chatExtracted;
+                return (
+                  <div key={s} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0, minWidth: 0 }}>
+                      <div style={{
+                        width: active ? 9 : 7, height: active ? 9 : 7, borderRadius: '50%',
+                        background: done || active ? C.accent : '#D9CBB8',
+                        boxShadow: active ? `0 0 0 3px ${C.cream}` : 'none',
+                        transition: 'all 0.2s',
+                      }} />
+                      <div style={{
+                        fontSize: 9, fontWeight: active ? 700 : 500,
+                        color: active ? C.text : done ? C.textMuted : C.textLight,
+                        textAlign: 'center', lineHeight: 1, letterSpacing: 0.2,
+                      }}>{s}</div>
+                    </div>
+                    {i < TASTING_STEPS.length - 1 && (
+                      <div style={{
+                        flex: 1, height: 1, marginTop: -14,
+                        borderTop: done ? `1px solid ${C.accent}` : `1px dashed ${C.border}`,
+                      }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {chatExtracted && (
-            <div style={{ ...journalCard, padding: '12px 16px', background: C.greenBg, marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.green, marginBottom: 8 }}>✓ Tasting captured — review & save</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <StarRating value={chatExtracted.rating || 0} onChange={r => setChatExtracted(p => ({ ...p, rating: r }))} size={22} />
-                {chatExtracted.oneWord && <span style={{ fontSize: 13, color: C.text }}>"{chatExtracted.oneWord}"</span>}
+          {/* Conversation feed */}
+          <div
+            ref={chatScrollRef}
+            style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 8px', WebkitOverflowScrolling: 'touch' }}
+          >
+            {chatMessages.map((m, i) => {
+              if (m.role === 'user') return <UserHandwrittenBubble key={i}>{m.content}</UserHandwrittenBubble>;
+              // Per-card step: monotonic walk handles fresh, legacy, and
+              // transitioning sessions uniformly (see stepWalk comment above).
+              const msgStepIdx = stepWalk.perMessage.get(i) ?? 0;
+              const stepNum = msgStepIdx + 1;
+              const stepName = TASTING_STEPS[msgStepIdx];
+              return (
+                <RuphusJournalCard
+                  key={i}
+                  step={stepNum}
+                  stepName={stepName}
+                  content={m.content}
+                  onTerm={setTeachKey}
+                />
+              );
+            })}
+            {chatLoading && <RuphusTyping />}
+            {chatExtracted && (
+              <div style={{
+                marginTop: 6, marginBottom: 14,
+                background: C.greenBg, border: `1px solid #BFDDC4`,
+                borderRadius: 14, padding: '12px 14px',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.green, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
+                  Tasting captured — review & save
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <StarRating value={chatExtracted.rating || 0} onChange={r => setChatExtracted(p => ({ ...p, rating: r }))} size={22} />
+                  {chatExtracted.oneWord && <span style={{ fontSize: 13, color: C.text }}>"{chatExtracted.oneWord}"</span>}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+                  {chatExtracted.aroma && <span>Aroma: {chatExtracted.aroma}</span>}
+                  {chatExtracted.acidity && <span>Acidity: {chatExtracted.acidity}</span>}
+                  {chatExtracted.body && <span>Body: {chatExtracted.body}</span>}
+                  {chatExtracted.finish && <span>Finish: {chatExtracted.finish}</span>}
+                </div>
+                {chatExtracted.notes && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>{chatExtracted.notes}</div>}
+                <Btn variant="primary" onClick={saveChatTasting} style={{ width: '100%', justifyContent: 'center' }}>
+                  <Check size={14} /> Save Tasting
+                </Btn>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
-                {chatExtracted.aroma && <span>Aroma: {chatExtracted.aroma}</span>}
-                {chatExtracted.acidity && <span>Acidity: {chatExtracted.acidity}</span>}
-                {chatExtracted.body && <span>Body: {chatExtracted.body}</span>}
-                {chatExtracted.finish && <span>Finish: {chatExtracted.finish}</span>}
+            )}
+          </div>
+
+          {/* Scorecard peek — hidden once the extract card owns the save flow */}
+          {!chatExtracted && (
+            <button
+              onClick={() => setCupOpen(true)}
+              style={{
+                flexShrink: 0, width: '100%', textAlign: 'left', cursor: 'pointer', border: 'none',
+                background: 'linear-gradient(180deg, #FBF1DF 0%, #F5E6D3 100%)',
+                borderTop: `1px solid ${C.border}`,
+                padding: '10px 14px',
+                display: 'flex', alignItems: 'center', gap: 10, fontFamily: fonts.body,
+              }}
+            >
+              <div style={{
+                width: 28, height: 28, borderRadius: 8, background: C.card,
+                border: `1px solid ${C.border}`, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4 h12 l4 4 v12 a2 2 0 0 1 -2 2 h-14 a2 2 0 0 1 -2 -2 V6 a2 2 0 0 1 2 -2 z" stroke={C.accent} strokeWidth="1.5" fill="none" />
+                  <path d="M16 4 v4 h4" stroke={C.accent} strokeWidth="1.5" fill="none" />
+                </svg>
               </div>
-              {chatExtracted.notes && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>{chatExtracted.notes}</div>}
-              <Btn variant="primary" onClick={saveChatTasting} style={{ width: '100%', justifyContent: 'center' }}>
-                <Check size={14} /> Save Tasting
-              </Btn>
-            </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 9.5, fontWeight: 700, color: C.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                  Your cup so far — tap to expand
+                </div>
+                <div style={{
+                  fontSize: 12, color: C.text, lineHeight: 1.2, marginTop: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  <ScorecardPeekLine scorecard={scorecard} stepName={TASTING_STEPS[currentStep] || 'Finish'} />
+                </div>
+              </div>
+              <span style={{ color: C.accent, fontSize: 18, lineHeight: 1 }}>⌃</span>
+            </button>
           )}
 
+          {/* Input row — hidden when extract card takes over */}
           {!chatExtracted && (
             <div style={{
-              position: 'fixed',
-              bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
-              left: 0, right: 0,
-              display: 'flex', gap: 8, alignItems: 'flex-end',
-              padding: '8px 20px',
-              background: C.bg,
-              borderTop: `1px solid ${C.borderLight}`,
-              // Must sit above .app-tab-bar (zIndex 100 in App.jsx) so it can
-              // never end up visually trapped behind nav on devices where the
-              // tab bar is taller than expected.
-              zIndex: 110,
+              flexShrink: 0,
+              background: C.card, borderTop: `1px solid ${C.border}`,
+              padding: `10px 12px calc(10px + env(safe-area-inset-bottom, 0px))`,
+              display: 'flex', alignItems: 'flex-end', gap: 8,
             }}>
               <textarea
                 ref={chatInputRef}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                placeholder="Describe your cup..."
+                placeholder="Describe what you taste..."
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -463,47 +1121,51 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 rows={1}
                 enterKeyHint="send"
                 style={{
-                  flex: 1,
-                  minWidth: 0,
-                  padding: '10px 14px',
-                  borderRadius: 12,
-                  border: `1px solid ${C.border}`,
-                  fontFamily: fonts.body,
-                  fontSize: 16,
-                  lineHeight: 1.4,
-                  background: C.card,
-                  color: C.text,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  resize: 'none',
-                  overflowY: 'auto',
-                  maxHeight: 120,
+                  flex: 1, minWidth: 0,
+                  padding: '10px 16px', borderRadius: 22,
+                  border: `1px solid ${C.border}`, fontFamily: fonts.body,
+                  fontSize: 16, lineHeight: 1.4,
+                  background: '#FAF6F1', color: C.text,
+                  outline: 'none', boxSizing: 'border-box',
+                  resize: 'none', overflowY: 'auto', maxHeight: 120,
                 }}
               />
               <button
                 onClick={handleChatSend}
                 disabled={chatLoading || !chatInput.trim()}
+                aria-label="Send"
                 style={{
-                  background: C.accent,
-                  color: C.card,
-                  border: 'none',
-                  borderRadius: 12,
-                  width: 44,
-                  height: 44,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  width: 40, height: 40, borderRadius: '50%', border: 'none',
+                  background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
+                  color: C.cream, cursor: 'pointer', flexShrink: 0,
+                  boxShadow: '0 1px 4px rgba(92,61,46,0.18)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   opacity: chatLoading || !chatInput.trim() ? 0.5 : 1,
-                  flexShrink: 0,
+                  transition: 'opacity 0.15s',
                 }}
               >
-                <Send size={18} />
+                <Send size={16} color={C.cream} />
               </button>
             </div>
           )}
-        </>
-      )}
+
+          {/* Teach-me bottom sheet */}
+          {teachKey && TASTING_GLOSSARY[teachKey] && (
+            <TeachSheet entry={TASTING_GLOSSARY[teachKey]} onClose={() => setTeachKey(null)} />
+          )}
+
+          {/* Expanded scorecard sheet */}
+          {cupOpen && (
+            <CupSheet
+              scorecard={scorecard}
+              currentStep={currentStep}
+              stepCount={TASTING_STEPS.length}
+              bean={selectedBean}
+              onClose={() => setCupOpen(false)}
+            />
+          )}
+        </div>
+      ), document.body)}
 
       {/* Sort Controls */}
       {mode === 'list' && tastings.length > 0 && (
@@ -599,6 +1261,20 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       )}
 
       <Toast message={errorMsg} open={!!errorMsg} onClose={hideError} variant="error" />
+
+      <Modal open={exitConfirmOpen} onClose={() => setExitConfirmOpen(false)} title="Discard tasting?" centered>
+        <div>
+          <div style={{ fontSize: 14, color: C.text, marginBottom: 16, lineHeight: 1.5 }}>
+            Ending now will discard this tasting conversation. You&apos;ll lose any notes you&apos;ve shared so far.
+          </div>
+          <Btn variant="danger" onClick={exitChat} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>
+            Discard &amp; Exit
+          </Btn>
+          <Btn variant="ghost" onClick={() => setExitConfirmOpen(false)} style={{ width: '100%', justifyContent: 'center' }}>
+            Keep Tasting
+          </Btn>
+        </div>
+      </Modal>
     </div>
   );
 };

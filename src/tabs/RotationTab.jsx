@@ -1,6 +1,6 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useState } from 'react';
-import { Check, Plus, Star, X, Coffee, Undo2, Camera } from 'lucide-react';
+import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
@@ -22,6 +22,27 @@ import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
+
+const PillButton = ({ color, icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      background: 'transparent',
+      border: `1px solid ${C.border}`,
+      borderRadius: 12,
+      padding: '8px 6px',
+      fontFamily: fonts.body, fontWeight: 600, fontSize: 11, letterSpacing: 0.2,
+      color,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+      cursor: 'pointer',
+      WebkitTapHighlightColor: 'transparent',
+      minWidth: 0,
+    }}
+  >
+    <span style={{ color, display: 'inline-flex' }}>{icon}</span>
+    <span>{label}</span>
+  </button>
+);
 
 export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession }) => {
   const { preferences } = usePreferences();
@@ -108,7 +129,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4,
   };
   const accentBar = {
-    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
+    width: 56, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
   };
 
   return (
@@ -144,7 +165,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       )}
 
       {slots.map((bean, i) => (
-        <div key={i}>
+        <div key={i} {...(i === 0 ? { 'data-tour': 'jar-slots' } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <img
               src={bean ? '/images/jar-full.webp' : '/images/jar-empty.webp'}
@@ -157,23 +178,34 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           </div>
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
-            <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={handleLearn} uid={uid} actions={<>
-              <BrewButton
-                bean={bean}
-                label={brewMethod.label}
-                isHandBrew={isHandBrew}
-                brewMenuBean={brewMenuBean}
-                setBrewMenuBean={setBrewMenuBean}
-                onAiden={aiden.handleBrewWithAiden}
-                onHandBrew={handBrew.handleBrewHandBrew}
-              />
-              <Btn variant="small" onClick={() => setReturnConfirm(bean)}>
-                <Undo2 size={12} /> Return
-              </Btn>
-              <Btn variant="danger" onClick={() => handleFinishBag(bean)}>
-                <Check size={14} /> Finish Bag
-              </Btn>
-            </>} />
+            <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={handleLearn} uid={uid} tourTag={i === 0 ? 'bean-actions' : undefined} actions={
+              <div style={{ paddingTop: 14 }}>
+                <div style={{ borderTop: `1px dashed ${C.border}`, margin: '0 16px' }} />
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr 1fr 1fr',
+                  gap: 8,
+                  padding: '14px 16px 16px',
+                  alignItems: 'stretch',
+                }}>
+                  <div {...(i === 0 ? { 'data-tour': 'brew-button' } : {})}>
+                    <BrewButton
+                      bean={bean}
+                      label={brewMethod.label}
+                      isHandBrew={isHandBrew}
+                      brewMenuBean={brewMenuBean}
+                      setBrewMenuBean={setBrewMenuBean}
+                      onAiden={aiden.handleBrewWithAiden}
+                      onHandBrew={handBrew.handleBrewHandBrew}
+                      compact={false}
+                    />
+                  </div>
+                  <PillButton color={C.green} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
+                  <PillButton color={C.textMuted} icon={<Undo2 size={18} />} label="Return" onClick={() => setReturnConfirm(bean)} />
+                  <PillButton color={C.red} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
+                </div>
+              </div>
+            } />
           ) : (
             <div style={{
               ...journalCard,

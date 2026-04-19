@@ -1,0 +1,79 @@
+{
+  "full": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clear and readable against the chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained entirely within the green chalkboard area."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name \"Ethiopia Yirgacheffe Kochere\" is the most prominent text, with the subtitle and recipe parameters clearly secondary."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "There is an excessive vertical gap between the subtitle (\"Onyx Coffee Lab...\") and the main recipe parameters (RATIO, BLOOM, etc.), making the recipe details appear disconnected and too low."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The overall composition feels vertically unbalanced; the top section (bean name, subtitle) is well-placed, but the recipe parameters are positioned too low on the chalkboard, leaving a large empty space above them."
+    },
+    "score": "3/5",
+    "suggestions": [
+      "Move the entire block of recipe parameters (containing \"RATIO\", \"BLOOM\", \"GRIND (SS)\", \"GRIND (BATCH)\" and their values) upwards by 35px. This will reduce the top vertical gap and improve overall vertical balance. For example, if the recipe block uses a `top` property for positioning, set `top: calc(current_top_value - 35px);`. If it uses `margin-top`, reduce `margin-top` by 35px."
+    ],
+    "raw": "LEGIBILITY: YES - All text is clear and readable against the chalkboard background.\nBOUNDS: YES - All text is contained entirely within the green chalkboard area.\nHIERARCHY: YES - The bean name \"Ethiopia Yirgacheffe Kochere\" is the most prominent text, with the subtitle and recipe parameters clearly secondary.\nSPACING: NO - There is an excessive vertical gap between the subtitle (\"Onyx Coffee Lab...\") and the main recipe parameters (RATIO, BLOOM, etc.), making the recipe details appear disconnected and too low.\nBALANCE: NO - The overall composition feels vertically unbalanced; the top section (bean name, subtitle) is well-placed, but the recipe parameters are positioned too low on the chalkboard, leaving a large empty space above them.\n\nSCORE: 3/5\nSUGGESTIONS:\n- Move the entire block of recipe parameters (containing \"RATIO\", \"BLOOM\", \"GRIND (SS)\", \"GRIND (BATCH)\" and their values) upwards by 35px. This will reduce the top vertical gap and improve overall vertical balance. For example, if the recipe block uses a `top` property for positioning, set `top: calc(current_top_value - 35px);`. If it uses `margin-top`, reduce `margin-top` by 35px."
+  },
+  "minimal": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is crisp, clear, and has excellent contrast against the dark green chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is confined within the boundaries of the chalkboard, with no overlap onto the wooden frame, shelves, character (Ruphus), or counter."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "\"Colombia Huila\" is the most prominent, followed by \"Counter Culture · Colombia · Natural\". The recipe parameters are secondary, and the \"2manybeans\" watermark is appropriately subtle."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The horizontal gap between the \"RATIO\" column and the \"BLOOM\" column for the recipe parameters is excessively wide, making the central part of the chalkboard appear sparse and disconnected."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The overall composition feels slightly unbalanced due to"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: YES - All text is crisp, clear, and has excellent contrast against the dark green chalkboard background.\nBOUNDS: YES - All text is confined within the boundaries of the chalkboard, with no overlap onto the wooden frame, shelves, character (Ruphus), or counter.\nHIERARCHY: YES - \"Colombia Huila\" is the most prominent, followed by \"Counter Culture · Colombia · Natural\". The recipe parameters are secondary, and the \"2manybeans\" watermark is appropriately subtle.\nSPACING: NO - The horizontal gap between the \"RATIO\" column and the \"BLOOM\" column for the recipe parameters is excessively wide, making the central part of the chalkboard appear sparse and disconnected.\nBALANCE: NO - The overall composition feels slightly unbalanced due to"
+  },
+  "longname": {
+    "legibility": {
+      "pass": false,
+      "note": "The chalk-style font for the main title, subtitle (\"George Howell Coffee Company · Guatemala · Honey\"), and the signature (\"2manybeans\") is a bit thin and faint, making it slightly difficult to read clearly, especially \"La Libertad\" which almost blends in."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is clearly contained within the green chalkboard area without overlapping any other elements or the wooden frame."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name is the largest and most prominent, followed by the company/origin, then the recipe parameters, and finally the signature, establishing a clear visual hierarchy."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "There is an excessive vertical gap between the subtitle (\"George Howell Coffee Company...\") and the recipe parameters block (RATIO, BLOOM,"
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: NO - The chalk-style font for the main title, subtitle (\"George Howell Coffee Company · Guatemala · Honey\"), and the signature (\"2manybeans\") is a bit thin and faint, making it slightly difficult to read clearly, especially \"La Libertad\" which almost blends in.\nBOUNDS: YES - All text is clearly contained within the green chalkboard area without overlapping any other elements or the wooden frame.\nHIERARCHY: YES - The bean name is the largest and most prominent, followed by the company/origin, then the recipe parameters, and finally the signature, establishing a clear visual hierarchy.\nSPACING: NO - There is an excessive vertical gap between the subtitle (\"George Howell Coffee Company...\") and the recipe parameters block (RATIO, BLOOM,"
+  }
+}

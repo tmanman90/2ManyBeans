@@ -1,0 +1,83 @@
+{
+  "full": {
+    "legibility": {
+      "pass": false,
+      "note": "The strong chalk texture applied to the white text reduces its crispness, causing some strokes to appear broken and impacting optimal readability, particularly for thinner fonts and smaller text like \"2manybeans\"."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text elements are clearly contained within the green chalkboard area and do not overlap with any surrounding elements like the wooden frame or the dog character."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name \"Ethiopia Yirgacheffe Kochere\" is the largest and most prominent, correctly establishing it as the primary information, with recipe parameters and the watermark appropriately sized as secondary and tertiary."
+    },
+    "spacing": {
+      "pass": true,
+      "note": "There is adequate and balanced spacing both vertically and horizontally between all text elements, preventing cramping and allowing for good visual flow."
+    },
+    "balance": {
+      "pass": true,
+      "note": "The overall composition feels intentional and aesthetically pleasing, with centrally aligned main text and well-distributed recipe parameters, creating a harmonious look with the illustration."
+    },
+    "score": "4/5",
+    "suggestions": [
+      "For improved crispness of the chalk text, reduce the `text-shadow` blur radius from, e.g., `2px` to `0.8px` for all text elements.",
+      "Increase the font size of the \"2manybeans\" text from an estimated `14px` to `18px` to enhance its readability and crispness."
+    ],
+    "raw": "LEGIBILITY: NO - The strong chalk texture applied to the white text reduces its crispness, causing some strokes to appear broken and impacting optimal readability, particularly for thinner fonts and smaller text like \"2manybeans\".\nBOUNDS: YES - All text elements are clearly contained within the green chalkboard area and do not overlap with any surrounding elements like the wooden frame or the dog character.\nHIERARCHY: YES - The bean name \"Ethiopia Yirgacheffe Kochere\" is the largest and most prominent, correctly establishing it as the primary information, with recipe parameters and the watermark appropriately sized as secondary and tertiary.\nSPACING: YES - There is adequate and balanced spacing both vertically and horizontally between all text elements, preventing cramping and allowing for good visual flow.\nBALANCE: YES - The overall composition feels intentional and aesthetically pleasing, with centrally aligned main text and well-distributed recipe parameters, creating a harmonious look with the illustration.\nSCORE: 4/5\nSUGGESTIONS:\n- For improved crispness of the chalk text, reduce the `text-shadow` blur radius from, e.g., `2px` to `0.8px` for all text elements.\n- Increase the font size of the \"2manybeans\" text from an estimated `14px` to `18px` to enhance its readability and crispness."
+  },
+  "minimal": {
+    "legibility": {
+      "pass": true,
+      "note": "All text, including the chalk-style font, is clear and easily readable against the dark green chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained entirely within the green chalkboard area, with no overlap onto the wooden frame, shelves, or the character."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "\"Colombia Huila\" is clearly the most prominent text, serving as the main title. The origin and processing details (\"Counter Culture · Colombia · Natural\") are secondary, and the brew recipe parameters (RATIO, BLOOM, values) are appropriately less prominent, serving as tertiary information. \"2manybeans\" functions as a subtle watermark."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between the recipe parameter labels (e.g., \"RATIO\") and their corresponding values (e.g., \"1:15\") is too tight. They appear somewhat cramped and could benefit from more vertical separation to improve readability."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The text content is concentrated in the upper portion of the chalkboard, leaving a significant empty space in the middle-bottom section of the chalkboard. This creates a top-heavy composition and an imbalanced feel for the chalkboard content."
+    },
+    "score": "3/5",
+    "suggestions": [
+      "For SPACING: Increase the vertical spacing between the recipe parameter labels and their values. For instance, if \"1:15\" and \"2.5x 45s\" are in separate elements below their labels, add `margin-top: 15px;` to those value elements to create more breathing room.",
+      "For BALANCE: Shift the entire recipe parameter section (including \"RATIO\", \"BLOOM\", \"1:15\", and \"2.5x 45s\") downwards on the chalkboard. If this section is positioned with `position: absolute; top: 250px;`, change it to `top: 290px;` to better distribute the content vertically and reduce the empty space below."
+    ],
+    "raw": "LEGIBILITY: YES - All text, including the chalk-style font, is clear and easily readable against the dark green chalkboard background.\nBOUNDS: YES - All text is contained entirely within the green chalkboard area, with no overlap onto the wooden frame, shelves, or the character.\nHIERARCHY: YES - \"Colombia Huila\" is clearly the most prominent text, serving as the main title. The origin and processing details (\"Counter Culture · Colombia · Natural\") are secondary, and the brew recipe parameters (RATIO, BLOOM, values) are appropriately less prominent, serving as tertiary information. \"2manybeans\" functions as a subtle watermark.\nSPACING: NO - The vertical spacing between the recipe parameter labels (e.g., \"RATIO\") and their corresponding values (e.g., \"1:15\") is too tight. They appear somewhat cramped and could benefit from more vertical separation to improve readability.\nBALANCE: NO - The text content is concentrated in the upper portion of the chalkboard, leaving a significant empty space in the middle-bottom section of the chalkboard. This creates a top-heavy composition and an imbalanced feel for the chalkboard content.\n\nSCORE: 3/5\n\nSUGGESTIONS:\n-   For SPACING: Increase the vertical spacing between the recipe parameter labels and their values. For instance, if \"1:15\" and \"2.5x 45s\" are in separate elements below their labels, add `margin-top: 15px;` to those value elements to create more breathing room.\n-   For BALANCE: Shift the entire recipe parameter section (including \"RATIO\", \"BLOOM\", \"1:15\", and \"2.5x 45s\") downwards on the chalkboard. If this section is positioned with `position: absolute; top: 250px;`, change it to `top: 290px;` to better distribute the content vertically and reduce the empty space below."
+  },
+  "longname": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is crisp and clear against the chalkboard background, making it easy to read."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained within the green chalkboard area, without any part overlapping the wooden frame, shelves, or other elements."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name (\"Guatemala Huehuetenango La Libertad Finca\") is the largest and most prominent text, followed by the secondary bean information, and then the recipe parameters which are consistently sized and less prominent."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between text elements is inconsistent. There are large gaps between the secondary bean info and the recipe parameters, and between each set of recipe parameters, as well as a very large gap before the \"2manybeans\" watermark. Conversely, the"
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: YES - All text is crisp and clear against the chalkboard background, making it easy to read.\nBOUNDS: YES - All text is contained within the green chalkboard area, without any part overlapping the wooden frame, shelves, or other elements.\nHIERARCHY: YES - The bean name (\"Guatemala Huehuetenango La Libertad Finca\") is the largest and most prominent text, followed by the secondary bean information, and then the recipe parameters which are consistently sized and less prominent.\nSPACING: NO - The vertical spacing between text elements is inconsistent. There are large gaps between the secondary bean info and the recipe parameters, and between each set of recipe parameters, as well as a very large gap before the \"2manybeans\" watermark. Conversely, the"
+  }
+}

@@ -26,6 +26,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const sealed = beans.filter(b => b.status === 'SEALED');
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
+  const peakCount = sealed.filter(b => getPeakStatus(b).label.startsWith('In Peak')).length;
   const [showAdd, setShowAdd] = useState(false);
 
   // External trigger: another tab (e.g. RotationTab empty state Add Bean
@@ -84,7 +85,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   });
 
   const accentBar = {
-    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
+    width: 56, height: 3, background: C.accentLight, borderRadius: 2, margin: '10px 0 12px',
   };
 
   return (
@@ -97,15 +98,27 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         flexShrink: 0, background: C.bg,
         padding: '12px 20px 8px',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-          <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text }}>Sealed Inventory</div>
-          <Btn variant="primary" onClick={() => setShowAdd(true)} style={{ padding: '8px 14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+          <div>
+            <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, lineHeight: 1 }}>Sealed Inventory</div>
+            <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.accent, marginTop: -2, opacity: 0.8 }}>
+              patiently waiting
+            </div>
+          </div>
+          <Btn variant="primary" onClick={() => setShowAdd(true)} style={{ padding: '8px 14px' }} data-tour="add-bean">
             <Plus size={14} /> Add Bean
           </Btn>
         </div>
         <div style={accentBar} />
-        <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 8 }}>
-          {sealed.length} bags waiting · {emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}
+        <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }} />
+            <strong style={{ color: C.text, fontWeight: 700 }}>{peakCount}</strong> in peak
+          </span>
+          <span style={{ color: C.textLight }}>{'\u00B7'}</span>
+          <span>{sealed.length} bags waiting</span>
+          <span style={{ color: C.textLight }}>{'\u00B7'}</span>
+          <span>{emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}</span>
         </div>
 
         {sealed.length > 5 && (
@@ -117,7 +130,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
-                width: '100%', padding: '8px 10px 8px 32px', borderRadius: 8,
+                width: '100%', padding: '9px 10px 9px 32px', borderRadius: 10,
                 border: `1px solid ${C.border}`, fontFamily: fonts.body,
                 fontSize: 16, background: C.cream, color: C.text,
                 boxSizing: 'border-box', outline: 'none',
@@ -128,14 +141,25 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
       </div>
 
       {/* Scrollable cards area */}
-      <div style={{
+      <div data-tour="sealed-beans" style={{
         flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         padding: `0 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
       }}>
         {Object.entries(grouped).map(([roaster, rBeans]) => (
           <div key={roaster} style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
-              {roaster}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <path d="M12 22V7" stroke={C.green} strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M12 13c-3 0-5-2-5-4 2 0 5 1 5 4z" fill={C.green} opacity="0.75"/>
+                <path d="M12 10c3 0 5-2 5-4-2 0-5 1-5 4z" fill={C.green} opacity="0.9"/>
+              </svg>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                {roaster}
+              </div>
+              <div style={{ flex: 1, borderBottom: `1px dotted ${C.accentLight}`, marginLeft: 2, marginBottom: 2 }} />
+              <div style={{ fontSize: 11, color: C.textLight }}>
+                {rBeans.length} bag{rBeans.length !== 1 ? 's' : ''}
+              </div>
             </div>
             {rBeans.map(bean => (
               <BeanCard
@@ -147,7 +171,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                 onLearn={handleLearn}
                 uid={uid}
                 actions={
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 16px 16px' }}>
                     {emptySlots.length > 0 && (
                       <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
                     )}

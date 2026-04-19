@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Coach Marks Tour — Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Nunito:wght@400;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Nunito', sans-serif; background: #FAF6F1; overflow: hidden; height: 100dvh; }
+
+  /* Fake app shell */
+  .app-shell { position: relative; height: 100dvh; display: flex; flex-direction: column; }
+  .app-header {
+    padding: 56px 20px 12px;
+    text-align: center;
+    font-family: 'Caveat', cursive;
+    font-size: 28px;
+    color: #3B2417;
+  }
+  .app-content { flex: 1; padding: 16px 20px; overflow-y: auto; }
+
+  /* Fake jar slots */
+  .jar-slots {
+    display: flex; gap: 12px; margin-bottom: 20px;
+  }
+  .jar-slot {
+    flex: 1;
+    background: #FFF8F0;
+    border: 2px dashed #E8DDD3;
+    border-radius: 14px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #A89888;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Fake bean card */
+  .bean-card {
+    background: #FFF8F0;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(92,61,46,0.06), 0 4px 12px rgba(92,61,46,0.04);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .bean-name { font-family: 'Playfair Display', serif; font-size: 17px; color: #3B2417; margin-bottom: 4px; }
+  .bean-meta { font-size: 13px; color: #8B7B6F; }
+
+  /* Fake tab bar */
+  .tab-bar {
+    display: flex;
+    background: #FFF8F0;
+    border-top: 1px solid #F0E8DF;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+  }
+  .tab-item {
+    flex: 1; text-align: center; font-size: 11px; color: #8B7B6F; padding: 4px 0;
+  }
+  .tab-item.active { color: #B07540; font-weight: 700; }
+  .tab-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+
+  /* ===== TOUR OVERLAY ===== */
+  .tour-svg {
+    position: fixed; inset: 0; z-index: 900;
+    pointer-events: none;
+    animation: tourFadeIn 0.3s ease-out;
+  }
+  .tour-svg path { pointer-events: auto; }
+
+  /* Tooltip */
+  .tour-tooltip {
+    position: fixed; z-index: 910;
+    background: #FFF8F0;
+    border: 1px solid #F0E8DF;
+    border-left: 3px solid #C9A87C;
+    border-radius: 16px;
+    box-shadow: 0 -4px 24px rgba(92,61,46,0.10);
+    padding: 18px 20px 16px;
+    max-width: 320px;
+    width: calc(100vw - 40px);
+    animation: tourTooltipIn 0.25s ease-out;
+  }
+  .tour-tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .tour-ruphus-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #F0E8DF;
+    flex-shrink: 0;
+  }
+  .tour-tooltip-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    color: #3B2417;
+    font-weight: 600;
+  }
+  .tour-tooltip-body {
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    color: #8B7B6F;
+    line-height: 1.45;
+    margin-bottom: 14px;
+  }
+  .tour-tooltip-body em {
+    font-style: normal;
+    font-family: 'Playfair Display', serif;
+    color: #3B2417;
+  }
+
+  /* Arrow (pointing up) */
+  .tour-arrow {
+    position: absolute;
+    width: 0; height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 10px solid #FFF8F0;
+    top: -9px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .tour-arrow-border {
+    position: absolute;
+    width: 0; height: 0;
+    border-left: 11px solid transparent;
+    border-right: 11px solid transparent;
+    border-bottom: 11px solid #F0E8DF;
+    top: -11px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* Arrow pointing down */
+  .tour-arrow-down {
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #FFF8F0;
+    border-bottom: none;
+    top: auto;
+    bottom: -9px;
+  }
+  .tour-arrow-border-down {
+    border-left: 11px solid transparent;
+    border-right: 11px solid transparent;
+    border-top: 11px solid #F0E8DF;
+    border-bottom: none;
+    top: auto;
+    bottom: -11px;
+  }
+
+  /* Got it button */
+  .tour-got-it {
+    display: block;
+    width: 100%;
+    padding: 12px 0;
+    background: #B07540;
+    color: #FFF8F0;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    min-height: 44px;
+    box-shadow: 0 1px 4px rgba(92,61,46,0.12);
+  }
+  .tour-got-it:active { background: #5C3D2E; }
+
+  /* Skip link */
+  .tour-skip {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 52px);
+    right: 20px;
+    z-index: 920;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    color: #A89888;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    animation: tourFadeIn 0.3s ease-out;
+  }
+
+  /* Controls bar */
+  .mockup-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    background: #3B2417;
+    color: #FFF8F0;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .mockup-controls button {
+    background: #B07540;
+    color: #FFF8F0;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mockup-controls button:disabled { opacity: 0.4; cursor: default; }
+  .mockup-label { font-family: 'Nunito', sans-serif; opacity: 0.7; }
+
+  @keyframes tourFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes tourTooltipIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Fake app shell -->
+<div class="app-shell" id="app">
+  <div class="app-header">2manybeans</div>
+  <div class="app-content">
+    <div class="jar-slots" id="jar-slots">
+      <div class="jar-slot">Open a Bean</div>
+      <div class="jar-slot">Open a Bean</div>
+      <div class="jar-slot">Open a Bean</div>
+    </div>
+    <div class="bean-card">
+      <div class="bean-name">Ethiopia Yirgacheffe</div>
+      <div class="bean-meta">Hario V60 &middot; Light Roast &middot; Peak: 3 days left</div>
+    </div>
+    <div class="bean-card">
+      <div class="bean-name">Colombia Huila</div>
+      <div class="bean-meta">Fellow Aiden &middot; Medium Roast &middot; Fresh</div>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item active"><span class="tab-icon">&#9737;</span>Rotation</div>
+    <div class="tab-item"><span class="tab-icon">&#9744;</span>Inventory</div>
+    <div class="tab-item"><span class="tab-icon">&#9733;</span>Tasting</div>
+    <div class="tab-item"><span class="tab-icon">&#9993;</span>Chat</div>
+    <div class="tab-item"><span class="tab-icon">&#9776;</span>Archive</div>
+  </div>
+</div>
+
+<!-- Tour overlay (SVG + tooltip) -->
+<svg class="tour-svg" id="tourSvg" width="100%" height="100%">
+  <path id="tourPath" fill-rule="evenodd" fill="rgba(44,24,16,0.55)" d="" />
+</svg>
+<button class="tour-skip" id="skipBtn">Skip tour</button>
+<div class="tour-tooltip" id="tourTooltip">
+  <div class="tour-arrow-border" id="arrowBorder"></div>
+  <div class="tour-arrow" id="arrow"></div>
+  <div class="tour-tooltip-header">
+    <img class="tour-ruphus-avatar" src="../../public/images/ruphus-avatar.png" alt="Professor Ruphus" />
+    <div class="tour-tooltip-title" id="tooltipTitle"></div>
+  </div>
+  <div class="tour-tooltip-body" id="tooltipBody"></div>
+  <button class="tour-got-it" id="gotItBtn">Got it</button>
+</div>
+
+<!-- Mockup step controls -->
+<div class="mockup-controls">
+  <button id="prevBtn" disabled>&larr; Prev</button>
+  <span class="mockup-label" id="stepLabel">Step 0 of 5</span>
+  <button id="nextBtn">Next &rarr;</button>
+</div>
+
+<script>
+const STEPS = [
+  {
+    target: 'jar-slots',
+    title: 'Your Rotation',
+    body: '<em>Hi Tal!</em> I\'m Professor Ruphus. Let me show you around. Tap a slot to open a new bag. You can keep up to 3 active at a time.',
+    arrowDir: 'up',
+  },
+  {
+    target: null,
+    title: 'Brew Recipe',
+    body: 'Get a custom brew recipe for your Aiden.',
+    arrowDir: 'up',
+    note: '(Skipped when no active beans)',
+  },
+  {
+    target: null,
+    title: 'Add a Bean',
+    body: 'Tap to scan your coffee bag or add one manually.',
+    arrowDir: 'up',
+    note: '(Inventory tab)',
+  },
+  {
+    target: null,
+    title: 'Your Stash',
+    body: 'Sealed bags wait here until you\'re ready to open one into your rotation.',
+    arrowDir: 'up',
+    note: '(Inventory tab)',
+  },
+  {
+    target: null,
+    title: 'Log a Tasting',
+    body: 'Tap to start a guided tasting session. Professor Ruphus will coach you through it step by step.',
+    arrowDir: 'up',
+    note: '(Tasting tab)',
+  },
+  {
+    target: null,
+    title: 'Ask Ruphus',
+    body: 'Type anything about coffee. Ruphus has read Hoffmann, Perger, and Rao so you don\'t have to.',
+    arrowDir: 'down',
+    note: '(Chat tab)',
+  },
+];
+
+let currentStep = 0;
+
+function buildPath(vw, vh, rect) {
+  if (!rect) {
+    return `M0,0 H${vw} V${vh} H0 Z`;
+  }
+  const pad = 8;
+  const r = 14;
+  const x = rect.left - pad;
+  const y = rect.top - pad;
+  const w = rect.width + pad * 2;
+  const h = rect.height + pad * 2;
+
+  return `M0,0 H${vw} V${vh} H0 Z ` +
+    `M${x + r},${y} ` +
+    `h${w - 2 * r} ` +
+    `a${r},${r} 0 0 1 ${r},${r} ` +
+    `v${h - 2 * r} ` +
+    `a${r},${r} 0 0 1 -${r},${r} ` +
+    `h${-(w - 2 * r)} ` +
+    `a${r},${r} 0 0 1 -${r},-${r} ` +
+    `v${-(h - 2 * r)} ` +
+    `a${r},${r} 0 0 1 ${r},-${r} Z`;
+}
+
+function renderStep(idx) {
+  const step = STEPS[idx];
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const tooltip = document.getElementById('tourTooltip');
+  const arrow = document.getElementById('arrow');
+  const arrowBorder = document.getElementById('arrowBorder');
+
+  // Target rect
+  let rect = null;
+  if (step.target) {
+    const el = document.getElementById(step.target);
+    if (el) rect = el.getBoundingClientRect();
+  }
+
+  // If no target on this step, simulate a centered rect
+  if (!rect) {
+    rect = { left: vw / 2 - 100, top: vh * 0.35, width: 200, height: 60 };
+  }
+
+  // SVG path
+  document.getElementById('tourPath').setAttribute('d', buildPath(vw, vh, rect));
+
+  // Tooltip content
+  document.getElementById('tooltipTitle').textContent = step.title;
+  document.getElementById('tooltipBody').innerHTML = step.body +
+    (step.note ? `<br><span style="font-size:12px;color:#A89888;margin-top:4px;display:inline-block">${step.note}</span>` : '');
+
+  // Position tooltip
+  const tooltipW = Math.min(320, vw - 40);
+  const pad = 8;
+  const targetCenterX = rect.left + rect.width / 2;
+  const targetBottom = rect.top + rect.height + pad;
+  const targetTop = rect.top - pad;
+
+  let tooltipLeft = targetCenterX - tooltipW / 2;
+  tooltipLeft = Math.max(20, Math.min(tooltipLeft, vw - tooltipW - 20));
+
+  // Arrow classes
+  arrow.className = 'tour-arrow';
+  arrowBorder.className = 'tour-arrow-border';
+
+  if (step.arrowDir === 'down' || targetBottom + 200 > vh * 0.7) {
+    // Tooltip above target
+    tooltip.style.top = 'auto';
+    tooltip.style.bottom = (vh - targetTop + 12) + 'px';
+    tooltip.style.left = tooltipLeft + 'px';
+    arrow.className = 'tour-arrow tour-arrow-down';
+    arrowBorder.className = 'tour-arrow-border tour-arrow-border-down';
+  } else {
+    // Tooltip below target
+    tooltip.style.bottom = 'auto';
+    tooltip.style.top = (targetBottom + 12) + 'px';
+    tooltip.style.left = tooltipLeft + 'px';
+    arrow.className = 'tour-arrow';
+    arrowBorder.className = 'tour-arrow-border';
+  }
+
+  // Arrow horizontal position (point at target center)
+  const arrowLeft = targetCenterX - tooltipLeft;
+  arrow.style.left = Math.max(20, Math.min(arrowLeft, tooltipW - 20)) + 'px';
+  arrowBorder.style.left = arrow.style.left;
+
+  // Controls
+  document.getElementById('stepLabel').textContent = `Step ${idx} of ${STEPS.length - 1}`;
+  document.getElementById('prevBtn').disabled = idx === 0;
+  document.getElementById('nextBtn').disabled = idx === STEPS.length - 1;
+
+  // Re-trigger animation
+  tooltip.style.animation = 'none';
+  tooltip.offsetHeight;
+  tooltip.style.animation = 'tourTooltipIn 0.25s ease-out';
+}
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (currentStep < STEPS.length - 1) { currentStep++; renderStep(currentStep); }
+});
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (currentStep > 0) { currentStep--; renderStep(currentStep); }
+});
+document.getElementById('gotItBtn').addEventListener('click', () => {
+  if (currentStep < STEPS.length - 1) { currentStep++; renderStep(currentStep); }
+});
+
+window.addEventListener('resize', () => renderStep(currentStep));
+renderStep(0);
+</script>
+</body>
+</html>

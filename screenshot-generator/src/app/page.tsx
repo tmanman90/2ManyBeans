@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Slide1, Slide2, Slide3, Slide4 } from "./slides";
+import { Slide1, Slide2, Slide3, Slide4, Slide5 } from "./slides";
 
 const W = 1320;
 const H = 2868;
@@ -22,6 +22,7 @@ const SLIDES: {
   { id: "02-scan-inventory", title: "Scan any bag, AI fills the rest", Component: Slide2 },
   { id: "03-tasting-coach", title: "Actually learn what you taste", Component: Slide3 },
   { id: "04-chat-professor", title: "Ask any coffee question", Component: Slide4 },
+  { id: "05-brew-timer", title: "Brew with precision", Component: Slide5 },
 ];
 
 export default function Page() {

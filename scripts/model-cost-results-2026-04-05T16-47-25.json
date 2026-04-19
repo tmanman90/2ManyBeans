@@ -1,0 +1,3323 @@
+{
+  "timestamp": "2026-04-05T16:47:25.812Z",
+  "models": [
+    {
+      "name": "GPT-5.4",
+      "model": "gpt-5.4",
+      "pricing": {
+        "input": 2.5,
+        "output": 10
+      }
+    },
+    {
+      "name": "GPT-5.4 Mini",
+      "model": "gpt-5.4-mini",
+      "pricing": {
+        "input": 0.4,
+        "output": 1.6
+      }
+    },
+    {
+      "name": "Gemini 2.5 Flash",
+      "model": "gemini-2.5-flash",
+      "pricing": {
+        "input": 0.15,
+        "output": 0.6
+      }
+    },
+    {
+      "name": "Haiku 4.5",
+      "model": "claude-haiku-4-5-20251001",
+      "pricing": {
+        "input": 0.8,
+        "output": 4
+      }
+    }
+  ],
+  "beans": [
+    {
+      "name": "El Placer",
+      "expectedFamily": "processed-clarity"
+    },
+    {
+      "name": "Finca La Fuente",
+      "expectedFamily": "washed-floral-clarity"
+    },
+    {
+      "name": "Mulish",
+      "expectedFamily": "washed-ethiopia-clarity"
+    },
+    {
+      "name": "Gichathaini AA",
+      "expectedFamily": "washed-kenya-clarity"
+    },
+    {
+      "name": "Worka Sakaro",
+      "expectedFamily": "clean-natural-fruit"
+    },
+    {
+      "name": "Antigua Pastores",
+      "expectedFamily": "medium-washed"
+    },
+    {
+      "name": "Intango Dark",
+      "expectedFamily": "dark-roast"
+    },
+    {
+      "name": "Huila Castillo",
+      "expectedFamily": "medium-washed"
+    }
+  ],
+  "handbrewResults": [
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "kasuya-46",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "4.7",
+            "description": "Fellow Ode Gen 2, slightly coarser than a typical washed-light pour-over to preserve clarity while controlling the extra extraction from anaerobic white honey processing",
+            "microns": 620
+          },
+          "waterTemp": {
+            "celsius": 97,
+            "fahrenheit": 207
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter thoroughly with hot water, discard rinse water, add 20g coffee, and level the bed.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:00-0:30",
+              "action": "Bloom with 40g water (2x coffee weight). Swirl or gently stir to fully wet all grounds, then wait.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:45",
+              "action": "Pour to 104g total water, aiming for a slow, even stream directly onto the coffee bed.",
+              "waterTotal": 104
+            },
+            {
+              "time": "1:30",
+              "action": "Pour to 168g total water. Keep the pour centered and even.",
+              "waterTotal": 168
+            },
+            {
+              "time": "2:15",
+              "action": "Pour to 224g total water. If the bed is starting to dome or expose dry edges, make small corrective pours toward those areas.",
+              "waterTotal": 224
+            },
+            {
+              "time": "3:00",
+              "action": "Pour to 272g total water.",
+              "waterTotal": 272
+            },
+            {
+              "time": "3:45",
+              "action": "Pour to 320g total water, then give one gentle swirl when the water level is 2-3 cm below the top of the brewer.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "4:15-4:45",
+          "tips": "Expect floral jasmine/gardenia aromatics, bergamot tea clarity, and a sweet honeyed finish. If it tastes sour, thin, or astringent, grind slightly finer or extend the brew a bit; if it tastes bitter, hollow, or drying, grind slightly coarser or reduce agitation. Aim for a flat, even bed at the end.",
+          "title": "El Placer Roaster Dayglow (Promethium) — Kasuya 4:6",
+          "reasoning": "This is a light-roast, processed-clarity Geisha with strong floral and tea-like notes, so Kasuya 4:6 helps preserve aroma and lets the white honey anaerobic process show sweetness without over-agitating. The hotter water and slightly coarser-than-washed grind balance clarity with enough extraction after 58 days off roast, when the coffee should be settled and ready to cup cleanly."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 4895,
+        "inputTokens": 1080,
+        "outputTokens": 694,
+        "cost": 0.0015424000000000002
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8446,
+        "inputTokens": 1137,
+        "outputTokens": 78,
+        "cost": 0.00021734999999999997
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "kasuya-46",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "4.8",
+            "description": "Medium-fine, slightly coarser than standard light roast pour-over to accommodate anaerobic honey process and prevent over-extraction of delicate florals",
+            "microns": 650
+          },
+          "waterTemp": {
+            "celsius": 96,
+            "fahrenheit": 205
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter with hot water. Add 20g ground coffee, level bed. Pour 40g water (2x coffee weight) for bloom.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Gently stir bloom with spoon or gooseneck, ensuring all grounds wet. Begin first pour phase (40% control sweetness/acidity).",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:45",
+              "action": "Pour to 88g total (48g added). Target medium extraction of bergamot and tea notes.",
+              "waterTotal": 88
+            },
+            {
+              "time": "1:30",
+              "action": "Pour to 136g total (48g added). Maintain even pour directly onto bed.",
+              "waterTotal": 136
+            },
+            {
+              "time": "2:15",
+              "action": "Begin second pour phase (60% control strength). Pour to 184g total (48g added).",
+              "waterTotal": 184
+            },
+            {
+              "time": "3:00",
+              "action": "Pour to 232g total (48g added).",
+              "waterTotal": 232
+            },
+            {
+              "time": "3:45",
+              "action": "Final pour to 320g total (88g added). Gentle swirl to level bed.",
+              "waterTotal": 320
+            },
+            {
+              "time": "4:30",
+              "action": "Brew complete. Expect flat, even bed with no channeling.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "4:30",
+          "tips": "Expect bright gardenia florals, Earl Grey tea structure, and subtle bergamot acidity with honeyed body. Anaerobic processing creates complex sweetness—use Kasuya 4:6 to dial in balance: if too acidic/sharp, reduce first two pours slightly; if muddled/flat, increase them. At 58 days post-roast (peak at 67), this bean is at optimal volatility. Use soft to moderately hard water to preserve delicate floral notes. If sour, grind to 5.0; if bitter, back to 4.6.",
+          "title": "El Placer Geisha Anaerobic White Honey – Kasuya 4:6",
+          "reasoning": "Anaerobic honey process demands slightly coarser grind and multi-pour method to control extraction of complex sugars and florals without astringency. Kasuya 4:6 excels here, letting you tune the balance of sweetness (pours 1–2) versus strength (pours 3–5). Light roast + peak freshness = hotter water (96°C) and extended bloom to maximize floral aromatics while managing the inherent brightness of Geisha."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 8644,
+        "inputTokens": 1260,
+        "outputTokens": 883,
+        "cost": 0.00454
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "kasuya-46",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "5.2",
+            "description": "medium-coarse, slightly coarser than a typical washed light roast to preserve clarity and manage the anaerobic honey process",
+            "microns": 850
+          },
+          "waterTemp": {
+            "celsius": 97,
+            "fahrenheit": 207
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the paper filter thoroughly with hot water, discard rinse water, add coffee, level the bed. Start bloom by pouring 40g water evenly onto the grounds, then gently swirl or stir to wet all grounds completely.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour to 80g total, staying centered on the coffee bed. This slightly larger second pour in the first 40% helps emphasize sweetness while keeping floral clarity.",
+              "waterTotal": 80
+            },
+            {
+              "time": "1:15",
+              "action": "Pour to 157g total slowly and evenly, avoiding the filter walls.",
+              "waterTotal": 157
+            },
+            {
+              "time": "2:00",
+              "action": "Pour to 233g total. When the slurry level drops 2-3cm below the top, give the brewer a gentle swirl.",
+              "waterTotal": 233
+            },
+            {
+              "time": "2:45",
+              "action": "Final pour to 310g total, slow and controlled over the bed only. Give one last gentle swirl to flatten the bed.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "3:30-4:00",
+          "tips": "Expect a highly aromatic cup with gardenia florals, Earl Grey-like tea structure, and bright bergamot lift, supported by a silky honeyed sweetness. If it tastes sharp, thin, or underdeveloped, go finer to 5.0 or extend drawdown slightly; if it turns bitter, muddled, or loses floral definition, go coarser to 5.4 or reduce agitation. Aim for a flat, even bed after brewing; a cratered or sloped bed suggests uneven pouring and possible channeling. Use soft to moderately mineralized water for best floral clarity.",
+          "title": "El Placer - Dayglow (Promethium) Geisha Anaerobic White Honey - Kasuya 4:6",
+          "reasoning": "This light-roasted anaerobic white honey Geisha sits in the processed-clarity family, so a slightly coarser grind and 4:6 style help preserve separation, florals, and tea-like elegance while controlling fermentation intensity. The hotter 97C water supports full extraction at 58 days off roast, and the 1:15.5 ratio maintains sweetness and structure without blurring delicate bergamot and gardenia notes."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 12400,
+        "inputTokens": 1080,
+        "outputTokens": 684,
+        "cost": 0.00954
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "4.6",
+            "description": "Fellow Ode Gen 2, slightly finer end of pour-over range for light washed coffee",
+            "microns": 550
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter thoroughly with hot water, discard rinse water, add 20g coffee, and level the bed. Start timer and begin bloom with 50g water, pouring evenly to wet all grounds. Swirl gently.",
+              "waterTotal": 50
+            },
+            {
+              "time": "0:30",
+              "action": "Pour to 160g total in a slow, steady spiral, keeping the stream on the coffee bed rather than the walls. Give one gentle swirl if needed.",
+              "waterTotal": 160
+            },
+            {
+              "time": "1:10",
+              "action": "Pour to 240g total, again evenly and without agitation beyond a light swirl if the bed looks uneven.",
+              "waterTotal": 240
+            },
+            {
+              "time": "1:50",
+              "action": "Pour to 320g total, finishing with a controlled center-to-outward spiral. When the slurry surface drops to about 2-3 cm below the top, give one gentle final swirl.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect tropical fruit sweetness, floral aromatics, and a clear but juicy cup. If it tastes sharp, thin, or underdeveloped, grind slightly finer or extend the brew a little; if it tastes bitter, dry, or astringent, grind slightly coarser or reduce agitation. Keep pours even and avoid hitting the filter walls to preserve clarity.",
+          "title": "Finca La Fuente - Hoffmann Classic",
+          "reasoning": "This is a light, washed Pink Bourbon with floral and tropical-fruit character, so a Hoffmann-style pour-over at a hot temperature and slightly finer pour-over grind will maximize clarity and sweetness. The longer bloom and full-boil water help extract enough from a light roast while keeping the cup clean and complex."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 3887,
+        "inputTokens": 1077,
+        "outputTokens": 548,
+        "cost": 0.0013076000000000001
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "4.8",
+            "description": "Medium-fine for washed light roast; promotes clarity and floral sweetness while maintaining clarity",
+            "microns": 680
+          },
+          "waterTemp": {
+            "celsius": 98,
+            "fahrenheit": 208
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse filter with hot water. Add 20g coffee, create small well in center.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:00–0:45",
+              "action": "Bloom: pour 40g water (2x coffee weight) in slow spiral, covering all grounds evenly. Stir gently at 0:15 and 0:30. Let sit until 0:45.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:45–1:30",
+              "action": "Pour 1: add 90g water slowly and directly onto coffee bed (not walls). Aim for even saturation. Stop at 130g total.",
+              "waterTotal": 130
+            },
+            {
+              "time": "1:30–2:15",
+              "action": "Pour 2: add 90g water in same controlled manner. Stop at 220g total. Gentle swirl after pour.",
+              "waterTotal": 220
+            },
+            {
+              "time": "2:15–3:00",
+              "action": "Pour 3 (finish): add remaining 90g water slowly. Stop at 310g total. Watch bed settle.",
+              "waterTotal": 310
+            },
+            {
+              "time": "3:00–3:45",
+              "action": "Allow final drainage. Coffee should drip-finish by 3:45–4:00. Bed should be flat and even.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "3:45–4:00",
+          "tips": "Expect vibrant tropical fruit (mango, passion fruit), delicate floral notes (jasmine), and clean sweetness with gentle complexity. At 66 days post-roast, this Pink Bourbon is at peak freshness—the extended bloom (45s) extracts the bean's nuanced florals while the medium-fine grind prevents under-extraction. If the cup tastes sour or sharp, grind slightly coarser (4.6–4.7). If bitter or astringent, grind finer (5.0–5.2). Soft-to-moderate hardness water will enhance floral clarity. Use fresh, filtered water just off boil.",
+          "title": "Finca La Fuente Pink Bourbon — Hoffmann Classic Pour-Over",
+          "reasoning": "Pink Bourbon is a washed, light-roast floral bean primed for clarity extraction. At peak (day 66), it rewards a longer bloom and medium-fine grind to coax out delicate tropical and floral complexity without channeling or under-extraction. Hoffmann's 3-pour method ensures even saturation and balanced sweetness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 7717,
+        "inputTokens": 1262,
+        "outputTokens": 816,
+        "cost": 0.004273600000000001
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8799,
+        "inputTokens": 1139,
+        "outputTokens": 538,
+        "cost": 0.00049365
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "4.4",
+            "description": "finer end of pour-over range, suited to a light washed Pink Bourbon and aimed at high clarity with good sweetness",
+            "microns": 675
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the paper filter thoroughly with hot water and discard rinse water. Add coffee, level the bed, then start bloom by pouring 50g of water evenly over all grounds. Pick up and gently swirl or stir to fully wet everything.",
+              "waterTotal": 50
+            },
+            {
+              "time": "0:30",
+              "action": "Begin the main pour slowly onto the coffee bed, not the walls, and bring the total to 180g.",
+              "waterTotal": 180
+            },
+            {
+              "time": "0:55",
+              "action": "Continue pouring steadily to 250g total.",
+              "waterTotal": 250
+            },
+            {
+              "time": "1:20",
+              "action": "Finish the final pour to 310g total. When the slurry level sits about 2-3cm below the rim, give the brewer a gentle swirl to flatten the bed and knock grounds from the walls.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect a clear, floral cup with tropical fruit, layered acidity, and a refined washed structure. If it tastes sour, sharp, or a little tea-like, go finer to 4.2 or extend contact slightly; if it turns bitter, drying, or loses floral definition, go coarser to 4.6. A flat, even bed indicates good flow; a cratered or sloped bed suggests channeling, so pour more evenly and keep agitation gentle.",
+          "title": "Finca La Fuente - Hoffmann Pour-Over",
+          "reasoning": "This is a light, washed Pink Bourbon in the washed-floral-clarity family, so a hotter brew temperature, tighter ratio, and finer pour-over grind help push extraction and highlight floral clarity and tropical complexity. Hoffmann's classic method best suits this bean's clean structure and should give an even, expressive cup."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 9608,
+        "inputTokens": 1077,
+        "outputTokens": 565,
+        "cost": 0.0083425
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "4.7",
+            "description": "Fellow Ode Gen 2, slightly finer end of pour-over range for a light washed Ethiopia to help recover sweetness and florals from a past-peak coffee",
+            "microns": 550
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter thoroughly with hot water, discard rinse water, add coffee, and start timer.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:00-0:35",
+              "action": "Bloom with 60g water (3x coffee weight). Make sure all grounds are wetted; gently swirl or stir once.",
+              "waterTotal": 60
+            },
+            {
+              "time": "0:35-1:05",
+              "action": "Pour steadily to 180g total, keeping the stream on the coffee bed only.",
+              "waterTotal": 180
+            },
+            {
+              "time": "1:05-1:35",
+              "action": "Continue pouring to 260g total. Give a gentle swirl if the bed starts sticking to the sides.",
+              "waterTotal": 260
+            },
+            {
+              "time": "1:35-2:05",
+              "action": "Finish pouring to 320g total, then give one very gentle final swirl to level the bed.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect nectarine, honeysuckle, and lavender with a lighter body and cleaner finish. Because this coffee is past peak, push extraction with near-boiling water and a slightly finer grind; if it tastes thin or sharply sour, go 0.1-0.2 finer next brew, and if it turns bitter or drying, go 0.1-0.2 coarser.",
+          "title": "MulishRoaster Apollon's Gold - Hoffmann Pour-Over",
+          "reasoning": "This is a light, washed Ethiopia, so Hoffmann Classic with hot water and a finer-end pour-over grind should best preserve clarity while maximizing sweetness and florals. The coffee is past peak, so slightly higher extraction helps recover vibrancy and roundness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true,
+          "H12": true
+        },
+        "total": 12,
+        "max": 12,
+        "applicable": 12,
+        "elapsed": 3881,
+        "inputTokens": 1077,
+        "outputTokens": 572,
+        "cost": 0.001346
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "4.8",
+            "description": "Medium-fine for pour-over; slightly coarser than espresso range to account for past-peak bean and maximize extraction of remaining aromatics",
+            "microns": 650
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter with hot water. Add 20g ground coffee, level bed. Begin bloom with 40g water (2x coffee weight).",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:45",
+              "action": "Bloom complete. Gently swirl or stir to ensure all grounds are wet. Begin main pour.",
+              "waterTotal": 40
+            },
+            {
+              "time": "1:15",
+              "action": "Pour steadily to 160g total water (add 120g). Keep pour centered on grounds, avoid walls.",
+              "waterTotal": 160
+            },
+            {
+              "time": "2:00",
+              "action": "Pour to 280g total water (add 120g). Maintain even saturation.",
+              "waterTotal": 280
+            },
+            {
+              "time": "2:45",
+              "action": "Final pour to 320g total water (add 40g). Gentle swirl to level any remaining mounds.",
+              "waterTotal": 320
+            },
+            {
+              "time": "3:30–4:00",
+              "action": "Water drains through bed. Drawdown complete when surface is nearly dry and no drips remain.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "3:30–4:00",
+          "tips": "Expect nectarine sweetness and honeysuckle florals to shine despite 118 days aging; lavender notes may be subtle. This bean is past peak, so hotter water (99°C) and extended bloom (45s) help extract remaining complexity. Grind at 4.8 to ensure sufficient contact time. If the cup tastes flat or muted, move grind finer to 5.0–5.2. If it's bitter or harsh, coarsen to 4.5–4.6. Pour evenly and watch for a flat, even bed—channeling will under-extract an aging bean. Aim for 3:30–4:00 total brew time.",
+          "title": "MulishRoaster Apollon's Gold (Hoffmann Classic Pour-Over)",
+          "reasoning": "Light washed Ethiopian heirloom demands hot water and fine-end grind to coax residual clarity and floral aromatics from a 118-day-old bean. Extended bloom and steady pour technique preserve the delicate nectarine and honeysuckle notes while compensating for post-peak staling."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true,
+          "H12": true
+        },
+        "total": 12,
+        "max": 12,
+        "applicable": 12,
+        "elapsed": 6964,
+        "inputTokens": 1257,
+        "outputTokens": 768,
+        "cost": 0.0040776
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8524,
+        "inputTokens": 1142,
+        "outputTokens": 78,
+        "cost": 0.00021809999999999996
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "4.4",
+            "description": "medium-fine for pour-over, slightly finer than a typical light-roast starting point to help an older washed Ethiopian maintain clarity and sweetness",
+            "microns": 650
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the bleached white paper filter thoroughly with hot water and discard rinse water. Add 20g coffee, level the bed.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:00-0:45",
+              "action": "Bloom with 50g water, making sure all grounds are saturated. Gently swirl or stir to wet every dry pocket, then wait until 0:45.",
+              "waterTotal": 50
+            },
+            {
+              "time": "0:45-1:20",
+              "action": "Pour slowly and evenly onto the coffee bed, not the walls, until you reach 180g total water.",
+              "waterTotal": 180
+            },
+            {
+              "time": "1:20",
+              "action": "When the slurry drops 2-3cm below the top, give the brewer a gentle swirl to keep grounds from sticking to the sides.",
+              "waterTotal": 180
+            },
+            {
+              "time": "1:20-1:55",
+              "action": "Continue the main pour steadily to 310g total water, keeping the flow centered and even.",
+              "waterTotal": 310
+            },
+            {
+              "time": "1:55",
+              "action": "Give one final gentle swirl and allow the coffee to draw down. Aim for a flat, even bed at the end.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "2:50-3:25",
+          "tips": "Expect a delicate, tea-like cup with floral aromatics, nectarine brightness, and a cleaner sweetness than heavier fruit-forward brews. Because this coffee is very far off roast, this recipe uses high heat and a slightly finer grind to recover extraction; if it tastes sour, thin, or woody, go finer to 4.3 or extend drawdown slightly, and if it turns bitter, dry, or loses the floral notes, go coarser to 4.5. Use soft to moderate water for the best clarity and sweetness, and change only one variable at a time.",
+          "title": "MulishRoaster Apollon's Gold - Hoffmann",
+          "reasoning": "This washed light-roast Ethiopian fits the clarity-focused family defaults, so the Hoffmann method is the best match for even extraction and clean florals. Since the coffee is well past peak, I kept the ratio in-family but used very hot water, a slightly longer bloom, and a slightly finer pour-over grind to help maintain sweetness and clarity."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true,
+          "H12": false
+        },
+        "total": 11,
+        "max": 12,
+        "applicable": 12,
+        "elapsed": 10814,
+        "inputTokens": 1077,
+        "outputTokens": 693,
+        "cost": 0.0096225
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "4.6",
+            "description": "Fine pour-over, slightly coarser than Aiden light roast start point; aimed at bright Kenyan clarity with a touch more sweetness and lower channeling risk.",
+            "microns": 560
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter thoroughly with hot water and discard rinse water. Add 20g coffee, level the bed, then start the timer with 40g bloom water. Swirl gently to fully wet all grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour slowly in a steady spiral up to 180g total, keeping water on the coffee bed and avoiding the filter walls. Give a gentle swirl.",
+              "waterTotal": 180
+            },
+            {
+              "time": "1:15",
+              "action": "Continue pouring slowly up to 320g total. Use controlled pours to maintain an even bed and steady drawdown.",
+              "waterTotal": 320
+            },
+            {
+              "time": "1:40",
+              "action": "When the slurry level drops and the surface is about 2-3cm below the top, give one final gentle swirl to level the bed.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect bright blackcurrant and grapefruit up front with pomelo-like citrus lift and brown sugar sweetness in the finish. If it tastes sharp, thin, or sour, grind slightly finer or extend the brew a little; if it turns bitter or dry/astringent, go a touch coarser or pour a little faster. Aim for a flat, even bed at the end.",
+          "title": "Gichathaini AARoaster Manhattan Coffee Roasters - Hoffmann Classic",
+          "reasoning": "This washed Kenyan is bright, juicy, and at peak development, so the Hoffmann classic gives the cleanest, most even extraction. The hotter water, fine-but-safe grind, and 30g bloom help bring out sweetness and clarity without muting the citrus and blackcurrant notes."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 3944,
+        "inputTokens": 1079,
+        "outputTokens": 555,
+        "cost": 0.0013196
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 312,
+          "ratio": "1:15.6",
+          "grindSize": {
+            "setting": "4.7",
+            "description": "Medium-fine pour-over grind. Finer end of range to maximize clarity and brightness from SL28/SL34 genetics.",
+            "microns": 720
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse filter with hot water. Add 20g coffee, level bed. Begin bloom with 40g water (2x coffee weight).",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Bloom complete. Gently swirl to break surface crust and ensure even wetting.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:45",
+              "action": "Begin main pour. Slowly add water to 130g total (targeting steady pour, ~90 seconds).",
+              "waterTotal": 130
+            },
+            {
+              "time": "2:00",
+              "action": "Second pour: add water to 220g total.",
+              "waterTotal": 220
+            },
+            {
+              "time": "3:15",
+              "action": "Final pour: add water to 312g total. Gentle swirl to level bed and finish drawdown.",
+              "waterTotal": 312
+            },
+            {
+              "time": "4:00",
+              "action": "Brew complete when water fully drains. Total brew time ~4 minutes.",
+              "waterTotal": 312
+            }
+          ],
+          "totalBrewTime": "3:45–4:15",
+          "tips": "Expect bright, juicy cup with pronounced blackcurrant and pomelo acidity balanced by brown sugar sweetness. SL28/SL34 clarity should shine. If cup tastes sour or sharp: grind coarser to 4.9 and reduce brew time. If bitter or flat: grind finer to 4.5 or increase water temp to 100°C. At 25 days post-roast, bean is in prime window—pouring evenly and swirling gently prevents channeling. Water quality matters: use soft to moderately hard water to preserve delicate grapefruit notes.",
+          "title": "Gichathaini AA (Kenya Nyeri) – Hoffmann Classic Pour-Over",
+          "reasoning": "Light washed Kenya requires hotter water (99°C) and finer grind (4.7) to extract bright fruit clarity without sourness. Hoffmann's measured pace suits SL28/SL34 complexity. Ratio 1:15.6 targets full sweetness development in the 3:45–4:15 window while the bean is at peak freshness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 7030,
+        "inputTokens": 1260,
+        "outputTokens": 749,
+        "cost": 0.004004
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 9363,
+        "inputTokens": 1142,
+        "outputTokens": 502,
+        "cost": 0.0004725
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "4.4",
+            "description": "finer end of the Ode Gen 2 pour-over range for a light washed Kenyan, aiming for high clarity and juicy acidity with good sweetness",
+            "microns": 625
+          },
+          "waterTemp": {
+            "celsius": 99,
+            "fahrenheit": 210
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the bleached white paper filter thoroughly with hot water and discard rinse water. Add coffee, level the bed, and start timer. Bloom with 40g water, making sure all grounds are saturated, then gently swirl or stir to wet everything evenly.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour slowly and evenly onto the coffee bed, not the walls, up to 170g total.",
+              "waterTotal": 170
+            },
+            {
+              "time": "1:00",
+              "action": "Continue pouring gently up to 240g total.",
+              "waterTotal": 240
+            },
+            {
+              "time": "1:25",
+              "action": "Finish the final pour to 310g total.",
+              "waterTotal": 310
+            },
+            {
+              "time": "1:35",
+              "action": "When the slurry level drops to about 2-3cm below the top, give the brewer a gentle swirl to flatten the bed and help prevent grounds sticking to the walls.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect a bright, articulate cup with blackcurrant and grapefruit-like acidity, pomelo citrus lift, and a brown sugar finish. If it tastes sour, sharp, or a bit thin, go slightly finer to 4.2-4.3 or extend brew time slightly; if it turns bitter, drying, or loses clarity, go coarser to 4.5-4.7. A flat, even bed indicates good extraction; a cratered or sloped bed suggests channeling, so pour more evenly and keep agitation gentle.",
+          "title": "Gichathaini AA – Hoffmann Pour-Over",
+          "reasoning": "This is a light, washed Kenyan in its peak window, so a hot brew temperature, tighter ratio, and finer-end pour-over grind help highlight its juicy acidity and layered sweetness. Hoffmann's classic method suits washed coffees well by promoting even extraction and clarity without overcomplicating the brew."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 10405,
+        "inputTokens": 1079,
+        "outputTokens": 612,
+        "cost": 0.0088175
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "kasuya-46",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "4.7",
+            "description": "Medium-fine, slightly coarser than a washed-light profile to preserve berry sweetness and reduce over-extraction from the natural process.",
+            "microns": 610
+          },
+          "waterTemp": {
+            "celsius": 97,
+            "fahrenheit": 207
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse filter thoroughly with hot water, discard rinse water, add coffee, and level the bed. Start the bloom with 40g water; gently swirl to fully wet grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour to 100g total in a steady spiral, keeping the stream on the coffee bed, not the walls.",
+              "waterTotal": 100
+            },
+            {
+              "time": "1:15",
+              "action": "Pour to 160g total, maintaining an even bed and moderate flow.",
+              "waterTotal": 160
+            },
+            {
+              "time": "2:00",
+              "action": "Pour to 220g total, using a slow, controlled spiral.",
+              "waterTotal": 220
+            },
+            {
+              "time": "2:45",
+              "action": "Pour to 265g total, then give one gentle swirl if the bed is uneven.",
+              "waterTotal": 265
+            },
+            {
+              "time": "3:30",
+              "action": "Pour to 310g total, finishing with a light swirl when the slurry level drops 2-3 cm below the top edge.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "4:15-4:45",
+          "tips": "Expect blueberry, strawberry jam, winey aromatics, and a dark chocolate finish. If it tastes sour or thin, go 0.1-0.2 finer or raise water temp 1-2°C; if it gets bitter, drying, or muddy, go 0.1-0.2 coarser or reduce agitation slightly. A flat, even bed indicates good extraction; a cratered or sloped bed means your pouring was too uneven.",
+          "title": "Worka Sakaro — Kasuya 4:6",
+          "reasoning": "This natural Ethiopia has fruit-forward sugars and winey complexity, so a slightly coarser grind and Kasuya 4:6 help tune sweetness and acidity while preserving clarity. The light roast and peak freshness benefit from hot water and a longer bloom to fully extract the berry/jam notes without flattening the cup."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 4010,
+        "inputTokens": 1075,
+        "outputTokens": 633,
+        "cost": 0.0014428000000000002
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "kasuya-46",
+          "coffeeGrams": 20,
+          "waterGrams": 300,
+          "ratio": "1:15",
+          "grindSize": {
+            "setting": "4.8",
+            "description": "Medium-fine for natural process; slightly coarser than washed to manage fruit sugar solubility and prevent over-extraction of berry/wine notes",
+            "microns": 420
+          },
+          "waterTemp": {
+            "celsius": 96,
+            "fahrenheit": 205
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse filter with hot water. Add 20g coffee, level bed. Bloom with 40g water (2x weight). Stir gently to saturate all grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:45",
+              "action": "Pour 1: 60g water (first pour of 4:6, controls sweetness). Bloom complete at 45s.",
+              "waterTotal": 100
+            },
+            {
+              "time": "1:30",
+              "action": "Pour 2: 60g water (second pour, balances acidity). Gentle swirl at end of pour.",
+              "waterTotal": 160
+            },
+            {
+              "time": "2:15",
+              "action": "Pour 3: 47g water (first of three strength pours).",
+              "waterTotal": 207
+            },
+            {
+              "time": "3:00",
+              "action": "Pour 4: 47g water. Gentle swirl to prevent channeling.",
+              "waterTotal": 254
+            },
+            {
+              "time": "3:45",
+              "action": "Pour 5: 46g water (final pour). Coffee bed should be even and flat.",
+              "waterTotal": 300
+            },
+            {
+              "time": "4:30",
+              "action": "Draw-down complete. Remove dripper and serve immediately.",
+              "waterTotal": 300
+            }
+          ],
+          "totalBrewTime": "4:30",
+          "tips": "Expect bright blueberry and strawberry jam notes with dark chocolate undertones and wine-like complexity. The Kasuya 4:6 method's two-stage approach lets you dial in the fruit-acid balance: if sour/sharp, reduce pours 1–2 slightly (less early water = less acidity extraction); if dull or cloying, increase pours 1–2 (more extraction of bright notes). The bean is in peak condition at 43 days, so this grind and temperature will highlight its natural fruit character without bitterness. Use soft to moderately hard water for best clarity. If brew tastes harsh or bitter, coarsen to 5.0. If thin or astringent, fine to 4.6.",
+          "title": "Worka Sakaro (April Coffee) – Kasuya 4:6",
+          "reasoning": "This light-roast Ethiopian natural deserves the Kasuya 4:6 technique to balance its delicate fruit-forward profile and higher sugar content. The slightly coarser grind (4.8) and 96°C water honor the natural process while the 5-pour method provides tuning flexibility for blueberry-wine complexity without over-extraction bitterness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 8077,
+        "inputTokens": 1261,
+        "outputTokens": 838,
+        "cost": 0.004360800000000001
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8486,
+        "inputTokens": 1133,
+        "outputTokens": 80,
+        "cost": 0.00021794999999999999
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "kasuya-46",
+          "coffeeGrams": 20,
+          "waterGrams": 310,
+          "ratio": "1:15.5",
+          "grindSize": {
+            "setting": "5.2",
+            "description": "medium-coarse, slightly coarser than a typical washed-light pour-over to suit the natural process and 4:6 style",
+            "microns": 850
+          },
+          "waterTemp": {
+            "celsius": 97,
+            "fahrenheit": 207
+          },
+          "steps": [
+            {
+              "time": "00:00",
+              "action": "Rinse the paper filter thoroughly with hot water and discard rinse water. Add coffee, level the bed, and start bloom with 40g water. Swirl or gently stir to fully wet all grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "00:30",
+              "action": "Pour to 70g total, keeping the stream centered on the coffee bed. This slightly smaller second pour helps emphasize sweetness and jammy fruit.",
+              "waterTotal": 70
+            },
+            {
+              "time": "01:15",
+              "action": "Pour to 150g total slowly and evenly, avoiding the filter walls.",
+              "waterTotal": 150
+            },
+            {
+              "time": "02:00",
+              "action": "Pour to 230g total. When the water level drops to 2-3cm below the top, give the brewer a gentle swirl.",
+              "waterTotal": 230
+            },
+            {
+              "time": "02:45",
+              "action": "Final pour to 310g total, slow and controlled onto the bed only. Give one last gentle swirl to flatten the bed.",
+              "waterTotal": 310
+            }
+          ],
+          "totalBrewTime": "03:30-04:00",
+          "tips": "Expect a sweet, expressive cup with blueberry, strawberry jam, winey fruit, and a dark chocolate finish. If it tastes sour or thin, go finer to 5.0 or extend drawdown slightly; if it tastes bitter, drying, or muddy, go coarser to 5.4. A flat, even bed indicates good extraction; a cratered or sloped bed suggests channeling from uneven pouring. Use soft to moderate mineral water for the clearest fruit.",
+          "title": "Worka Sakaro - Kasuya 4:6",
+          "reasoning": "This is a light-roasted Ethiopian natural in the clean-natural-fruit family, so Kasuya 4:6 suits its fruit-forward character and gives useful control over sweetness and acidity. The slightly coarser grind, hot water, and 1:15.5 ratio should highlight jammy berry notes while keeping the winey natural profile clean."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H11": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 9721,
+        "inputTokens": 1075,
+        "outputTokens": 624,
+        "cost": 0.0089275
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "5.5",
+            "description": "Medium grind, centered in the pour-over range for a medium-roast washed coffee",
+            "microns": 700
+          },
+          "waterTemp": {
+            "celsius": 94,
+            "fahrenheit": 201
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter with hot water, discard rinse water, add 20g coffee, level the bed, and start timer. Bloom with 40g water, fully wetting the grounds with a gentle swirl.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour slowly in a circular motion over the grounds, not the filter walls, up to 160g total. Give a gentle swirl if needed to keep the bed even.",
+              "waterTotal": 160
+            },
+            {
+              "time": "1:15",
+              "action": "Continue pouring to 240g total, maintaining a steady, even stream. Swirl gently when the slurry level drops to help prevent grounds from sticking to the walls.",
+              "waterTotal": 240
+            },
+            {
+              "time": "2:00",
+              "action": "Finish the pour to 320g total, then give one final gentle swirl to flatten the bed.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect a balanced cup with milk chocolate, caramel, orange brightness, and toasted almond sweetness. If it tastes sour, thin, or sharp, grind slightly finer; if it tastes bitter, harsh, or drying, grind slightly coarser. Aim for a flat, even bed at the end; if the bed is sloped or cratered, pour more evenly next time.",
+          "title": "Antigua Pastores - Hoffmann Classic",
+          "reasoning": "This washed Guatemalan with medium roast and classic sweet citrus/nut notes should shine with the Hoffmann method for clean, even extraction. A 1:16 ratio, 94C water, and a middle-of-range grind should highlight the coffee's chocolate-caramel body while preserving orange brightness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 3609,
+        "inputTokens": 1055,
+        "outputTokens": 539,
+        "cost": 0.0012844
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "5.5",
+            "description": "Medium grind, middle of pour-over range. Coarse sand texture, optimized for balanced extraction of washed medium roasts.",
+            "microns": 850
+          },
+          "waterTemp": {
+            "celsius": 94,
+            "fahrenheit": 201
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter with hot water, discard rinse water. Add 20g ground coffee to bed.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:30",
+              "action": "Bloom: pour 40g water (2x coffee weight) evenly. Swirl gently to wet all grounds. Wait 30 seconds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "1:00",
+              "action": "First pour: slowly pour 100g water onto coffee bed (not walls). Target even saturation.",
+              "waterTotal": 140
+            },
+            {
+              "time": "1:45",
+              "action": "Second pour: pour 90g water. When bed is 2-3cm below top, give gentle swirl to prevent channeling.",
+              "waterTotal": 230
+            },
+            {
+              "time": "2:30",
+              "action": "Final pour: pour remaining 90g water slowly until target weight (320g total) is reached. Coffee should drip through completely by 3:15–3:45.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "3:15–3:45",
+          "tips": "Expect a sweet, balanced cup with prominent milk chocolate and orange notes, underpinned by toasted almond and caramel. The bean is in peak freshness (48 days post-roast), so extraction should be clean and well-defined. Watch for a flat, even bed as water drips through—this indicates even extraction. If the cup tastes sour or sharp, grind slightly finer (5.7). If bitter or dry, grind coarser (5.3). Antigua washed Bourbon/Caturras are forgiving; small adjustments go a long way.",
+          "title": "Antigua Pastores (Counter Culture) – Hoffmann Classic",
+          "reasoning": "Medium washed bean at peak freshness (48 days) brews best with Hoffmann's all-rounder method. 5.5 grind sits squarely in the pour-over sweet spot for balanced extraction of chocolate, fruit, and sweetness. 94°C water is optimal for medium roasts—hot enough to extract the bean's natural sweetness without over-developing bitter notes. 1:16 ratio and gentle agitation align with the bean's washed-bean family defaults."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 6952,
+        "inputTokens": 1235,
+        "outputTokens": 743,
+        "cost": 0.00396
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "5.5",
+            "description": "medium pour-over grind, like coarse sand; a balanced starting point for a medium washed coffee",
+            "microns": 800
+          },
+          "waterTemp": {
+            "celsius": 94,
+            "fahrenheit": 201
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the bleached white paper filter thoroughly with hot water and discard the rinse water. Add 20g coffee, level the bed, and start the timer.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:00-0:10",
+              "action": "Bloom with 40g water, pouring evenly over all the grounds. Pick up the brewer and gently swirl or stir to fully wet everything.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Begin the main pour slowly onto the coffee bed, not the filter walls, bringing the total to 180g.",
+              "waterTotal": 180
+            },
+            {
+              "time": "0:55",
+              "action": "Continue the second pour to 260g, keeping the water level controlled and the bed even.",
+              "waterTotal": 260
+            },
+            {
+              "time": "1:20",
+              "action": "Finish the final pour to 320g. When the slurry drops 2-3cm below the top, give the brewer a gentle swirl to knock grounds from the walls and flatten the bed.",
+              "waterTotal": 320
+            },
+            {
+              "time": "2:45-3:15",
+              "action": "Let the coffee draw down fully. Check for a flat, even bed at the end.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect a balanced, sweet cup with milk chocolate and caramel depth, orange brightness, and a toasted almond finish. If it tastes bitter or heavy, go coarser to 5.7-6.0; if it tastes sour, thin, or slightly drying, go finer to 5.3-5.4. Use soft-to-moderate mineral water for better sweetness and clarity, and change only one variable at a time.",
+          "title": "Antigua Pastores - Hoffmann Pour-Over",
+          "reasoning": "This is a medium-roast washed Guatemala in the medium-washed family, so the Hoffmann classic with a 1:16 ratio and mid-range pour-over grind is the most reliable path to balanced extraction. A 94C brew temperature suits the roast level and should highlight chocolate-citrus sweetness without pushing bitterness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 8857,
+        "inputTokens": 1055,
+        "outputTokens": 650,
+        "cost": 0.0091375
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 8958,
+        "inputTokens": 1114,
+        "outputTokens": 226,
+        "cost": 0.0003027
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 340,
+          "ratio": "1:17",
+          "grindSize": {
+            "setting": "7.2",
+            "description": "Coarse pour-over grind, slightly finer than the dark-roast starting point to keep the washed Rwanda bright enough while softening smoky bitterness.",
+            "microns": 960
+          },
+          "waterTemp": {
+            "celsius": 91,
+            "fahrenheit": 196
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse filter with hot water, discard rinse water, add 20g coffee, level the bed. Start bloom with 40g water and gently swirl to fully wet all grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour slowly in circles, aiming directly on the coffee bed, up to 180g total. Gentle swirl when the slurry rises and grounds begin to cling to the sides.",
+              "waterTotal": 180
+            },
+            {
+              "time": "1:15",
+              "action": "Continue a steady pour to 280g total, keeping the water stream even and centered.",
+              "waterTotal": 280
+            },
+            {
+              "time": "1:55",
+              "action": "Final pour to 340g total. Give one gentle swirl to level the bed and promote even drawdown.",
+              "waterTotal": 340
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect dark chocolate, molasses, and dried cherry with a smoky edge. If it tastes bitter, dry, or overly smoky, grind coarser one step; if it tastes thin, sour, or sharp, grind finer one step. Keep pours calm and centered to preserve sweetness and avoid channeling.",
+          "title": "Intango DarkRoaster - Hoffmann Classic",
+          "reasoning": "This is a dark-roast washed coffee, so a Hoffmann-style pour-over with a cooler brew temperature, coarse grind, and 1:17 ratio should reduce bitterness while keeping sweetness and structure. The slight grind tweak helps balance the bean’s smoky depth with its dried cherry acidity."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": false
+        },
+        "total": 9,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 3203,
+        "inputTokens": 1072,
+        "outputTokens": 514,
+        "cost": 0.0012512
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 340,
+          "ratio": "1:17",
+          "grindSize": {
+            "setting": "6.8",
+            "description": "Medium-coarse, slightly coarser than standard dark roast start to accommodate high porosity and prevent over-extraction of smoky/bitter notes",
+            "microns": 780
+          },
+          "waterTemp": {
+            "celsius": 90,
+            "fahrenheit": 194
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter with hot water. Add 20g coffee, level bed. Begin bloom with 40g water (2x coffee weight).",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:25",
+              "action": "End bloom. Gently stir or swirl to ensure all grounds are wet and settle evenly.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour steadily onto coffee bed (not walls) to reach 140g total water. Pour over ~15 seconds.",
+              "waterTotal": 140
+            },
+            {
+              "time": "1:45",
+              "action": "Second pour: add water to reach 240g total. Pour over ~15 seconds.",
+              "waterTotal": 240
+            },
+            {
+              "time": "2:45",
+              "action": "Final pour: add remaining water to reach 340g total. Pour over ~20 seconds. Gentle swirl to even bed surface.",
+              "waterTotal": 340
+            },
+            {
+              "time": "3:30",
+              "action": "Brew complete. Flat, level bed indicates good extraction. Total brew time ~3:30.",
+              "waterTotal": 340
+            }
+          ],
+          "totalBrewTime": "3:30",
+          "tips": "Expect rich dark chocolate, molasses sweetness with dried cherry undertones and controlled smoke. The 1:17 ratio and coarse grind (6.8) prevent over-extraction of the already-porous dark roast. If cup tastes bitter or harsh, grind coarser to 7.0. If sour or thin, grind finer to 6.5. Water temperature at 90°C is ideal for dark roasts—cooler than light roasts to preserve delicate sweetness while taming harsh notes. At 30 days post-roast, this bean is in excellent peak window; brew within next 10 days for optimal flavor.",
+          "title": "Intango DarkRoaster (Rwanda Nyamasheke) – Hoffmann Classic",
+          "reasoning": "Dark washed Rwandan with high porosity demands coarser grind (6.8) and wider 1:17 ratio to avoid over-extraction of bitter smoky notes. Hoffmann Classic technique with slightly longer brew and cooler water (90°C) accentuates chocolate/molasses sweetness while controlling roast heaviness. Bloom extended to 25s to fully saturate porous grounds."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true
+        },
+        "total": 10,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 7519,
+        "inputTokens": 1257,
+        "outputTokens": 780,
+        "cost": 0.0041256
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 350,
+          "ratio": "1:17.5",
+          "grindSize": {
+            "setting": "7.2",
+            "description": "coarse side of pour-over, appropriate for a dark washed coffee to keep bitterness in check while maintaining clarity",
+            "microns": 950
+          },
+          "waterTemp": {
+            "celsius": 90,
+            "fahrenheit": 194
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the white paper filter thoroughly with hot water, discard rinse water, add 20g coffee, level the bed, and start bloom by pouring 40g water evenly over the grounds. Swirl or gently stir to fully wet all grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Pour slowly and evenly onto the coffee bed, not the filter walls, until you reach 200g total water.",
+              "waterTotal": 200
+            },
+            {
+              "time": "1:00",
+              "action": "Continue pouring gently to 350g total water. When the slurry sits 2-3cm below the top of the dripper, give the brewer a gentle swirl to flatten the bed.",
+              "waterTotal": 350
+            }
+          ],
+          "totalBrewTime": "2:30-3:00",
+          "tips": "Expect a low-acid, rounded cup with dark chocolate, molasses sweetness, a little dried cherry, and a soft smoky finish. If it tastes bitter, hollow, or ashy, go coarser to 7.4-7.6 or lower water temperature to 88-89C; if it tastes sour, thin, or astringent, go slightly finer to 7.0 or extend contact time a bit. A flat, even bed indicates good extraction; a sloped or cratered bed suggests channeling, so pour more evenly and keep agitation gentle.",
+          "title": "Intango DarkRoaster Counter Culture - Hoffmann",
+          "reasoning": "This is a dark-roast, washed Rwandan coffee, so a Hoffmann-style brew suits its need for even extraction and clarity while keeping the process simple. The coarse grind, cooler 90C water, and wider 1:17.5 ratio help manage the bean's high solubility and preserve sweetness without pushing smoky bitterness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": false
+        },
+        "total": 9,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 8475,
+        "inputTokens": 1072,
+        "outputTokens": 554,
+        "cost": 0.00822
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 350,
+          "ratio": "1:17.5",
+          "grindSize": {
+            "setting": "7.1",
+            "description": "On the coarser end of pour-over, specifically for dark roasts, allowing for a quicker draw-down and less bitterness.",
+            "microns": 980
+          },
+          "waterTemp": {
+            "celsius": 89,
+            "fahrenheit": 192
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Add 40g of water for the bloom. Gently swirl to ensure all grounds are saturated.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:25",
+              "action": "Start your first main pour. Pour slowly and evenly in concentric circles, avoiding the walls, until your scale reads 140g. Give a gentle swirl.",
+              "waterTotal": 140
+            },
+            {
+              "time": "1:00",
+              "action": "Start your second main pour. Continue pouring slowly and evenly until your scale reads 240g. Give a gentle swirl.",
+              "waterTotal": 240
+            },
+            {
+              "time": "1:45",
+              "action": "Start your final pour. Pour slowly and evenly until your scale reads 350g. Give a final gentle swirl.",
+              "waterTotal": 350
+            }
+          ],
+          "totalBrewTime": "3:00-3:30",
+          "tips": "Expect a rich, full-bodied cup with prominent notes of dark chocolate and molasses, complemented by a hint of dried cherry and a subtle smokiness. If your cup tastes overly bitter or astringent, try grinding slightly coarser (e.g., 7.2-7.3) or lowering the water temperature by 1-2 degrees Celsius. If it tastes weak, sour, or lacks sweetness, try grinding a touch finer (e.g., 6.9-7.0) or increasing the water temperature slightly.",
+          "title": "Intango DarkRoaster: Hoffmann Classic Pour-Over",
+          "reasoning": "This recipe utilizes a coarser grind, lower water temperature, and wider ratio, characteristic of dark roasts, to mitigate bitterness and highlight the bean's inherent sweetness and robust notes, aligning with its 'very porous' nature and washed process."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": false
+        },
+        "total": 9,
+        "max": 10,
+        "applicable": 10,
+        "elapsed": 8563,
+        "inputTokens": 1132,
+        "outputTokens": 606,
+        "cost": 0.0005334
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "5.7",
+            "description": "Medium-fine, slightly finer than the medium-roast starting point to help brighten a past-peak washed Colombia while keeping the cup smooth and sweet.",
+            "microns": 700
+          },
+          "waterTemp": {
+            "celsius": 95,
+            "fahrenheit": 203
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse a bleached white filter with hot water, then add 20 g coffee and level the bed.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:00-0:30",
+              "action": "Bloom with 40 g water (2x coffee weight). Swirl gently to fully wet all grounds, then wait 30 seconds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30-1:00",
+              "action": "Pour steadily to 160 g total water, aiming at the coffee bed only. Keep the pour even and controlled.",
+              "waterTotal": 160
+            },
+            {
+              "time": "1:00-1:30",
+              "action": "When the slurry begins to drop, pour to 240 g total water. Give a light swirl to settle the bed.",
+              "waterTotal": 240
+            },
+            {
+              "time": "1:30-2:00",
+              "action": "Pour to 320 g total water. Finish with a gentle swirl if the water line is still above the bed, then let draw down.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect brown sugar, red apple, and nutty notes with a smooth body. Because this coffee is past peak, a slightly hotter brew and a touch finer grind should help recover sweetness and clarity; if it tastes bitter or drying, go one step coarser, and if it tastes thin or sharp, go one step finer.",
+          "title": "Huila Castillo — Hoffmann Classic",
+          "reasoning": "This washed Colombian fits the medium-washed family best, so Hoffmann Classic should give the cleanest, most balanced extraction. At 74 days post-roast and past peak, a slightly hotter brew and modestly finer grind help lift sweetness and structure without over-agitating the cup."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 3539,
+        "inputTokens": 1060,
+        "outputTokens": 574,
+        "cost": 0.0013424
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "5.5",
+            "description": "Medium, slightly coarse for balanced extraction of past-peak bean",
+            "microns": 780
+          },
+          "waterTemp": {
+            "celsius": 94,
+            "fahrenheit": 201
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse paper filter with hot water. Add 20g ground coffee, level bed.",
+              "waterTotal": 0
+            },
+            {
+              "time": "0:05",
+              "action": "Bloom pour: 40g water (2x coffee weight). Swirl gently to saturate all grounds.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:35",
+              "action": "Pour slowly to 150g total water. Steady, concentric circles onto coffee bed, avoid walls.",
+              "waterTotal": 150
+            },
+            {
+              "time": "1:10",
+              "action": "Pour to 240g total water. Continue slow, even pour.",
+              "waterTotal": 240
+            },
+            {
+              "time": "1:50",
+              "action": "Final pour to 320g total water. Gentle swirl to level bed, prevent channeling.",
+              "waterTotal": 320
+            },
+            {
+              "time": "3:00",
+              "action": "Drawdown complete. Remove dripper.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "3:00",
+          "tips": "Expect: brown sugar sweetness, subtle red apple acidity, nutty body. Past-peak beans lose brightness, so slightly hotter water (94°C) and standard ratio help recover clarity. If cup tastes flat or lacks sweetness, grind finer (5.7) to extend extraction. If astringent or bitter, grind coarser (5.3). Smooth mouthfeel suggests stable extraction—maintain even pour and flat bed.",
+          "title": "Huila Castillo (Onyx) – Hoffmann Classic Pour-Over",
+          "reasoning": "Medium-washed Colombian at +74 days benefits from classic Hoffmann technique and standard 1:16 ratio. Past-peak status warrants slightly elevated water temp (94°C vs. typical 93°C for fresh medium roasts) to gently coax remaining complexity. Grind at 5.5 balances the bean's smoothness with accessible sweetness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 6299,
+        "inputTokens": 1241,
+        "outputTokens": 667,
+        "cost": 0.0036608
+      },
+      "GPT-5.4": {
+        "success": true,
+        "recipe": {
+          "method": "pour-over",
+          "technique": "hoffmann",
+          "coffeeGrams": 20,
+          "waterGrams": 320,
+          "ratio": "1:16",
+          "grindSize": {
+            "setting": "5.8",
+            "description": "medium pour-over grind, slightly coarser than a fresh medium roast to account for the bean being past peak and to keep the cup smooth",
+            "microns": 850
+          },
+          "waterTemp": {
+            "celsius": 94,
+            "fahrenheit": 201
+          },
+          "steps": [
+            {
+              "time": "0:00",
+              "action": "Rinse the bleached white paper filter with hot water and discard rinse water. Add 20g coffee. Pour 40g water for the bloom, then gently swirl or stir to wet all grounds evenly.",
+              "waterTotal": 40
+            },
+            {
+              "time": "0:30",
+              "action": "Begin the main pour slowly and evenly onto the coffee bed, avoiding the walls, until you reach 180g total water.",
+              "waterTotal": 180
+            },
+            {
+              "time": "1:00",
+              "action": "Continue pouring steadily to 260g total water.",
+              "waterTotal": 260
+            },
+            {
+              "time": "1:30",
+              "action": "Finish the final pour to 320g total water. When the water level sits 2-3cm below the top, give the brewer a gentle swirl to level the bed and knock grounds from the sides.",
+              "waterTotal": 320
+            }
+          ],
+          "totalBrewTime": "2:45-3:15",
+          "tips": "Expect a balanced, comforting cup with brown sugar sweetness, soft red apple acidity, and a nutty, smooth finish. Because this coffee is well past peak, this recipe aims for sweetness and body over maximum sparkle. If it tastes bitter or flat, go coarser to 6.0; if it tastes sour, thin, or papery, go finer to 5.6. A flat, even bed indicates good extraction; a sloped or cratered bed suggests uneven pouring and channeling. Use soft-to-moderate mineral water for the best sweetness and clarity.",
+          "title": "Huila Castillo - Hoffmann",
+          "reasoning": "This medium-roast washed Colombian fits the medium-washed family well, so the Hoffmann classic is the best starting point for balanced, even extraction. Since it is 74 days off roast and past peak, I nudged the grind slightly coarser and kept temperature moderate to preserve sweetness and avoid extracting stale, woody bitterness."
+        },
+        "scores": {
+          "H1": true,
+          "H2": true,
+          "H3": true,
+          "H4": true,
+          "H5": true,
+          "H6": true,
+          "H7": true,
+          "H8": true,
+          "H9": true,
+          "H10": true,
+          "H12": true
+        },
+        "total": 11,
+        "max": 11,
+        "applicable": 11,
+        "elapsed": 8996,
+        "inputTokens": 1060,
+        "outputTokens": 585,
+        "cost": 0.0085
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "recipe": null,
+        "scores": {
+          "H1": false
+        },
+        "total": 0,
+        "max": 1,
+        "applicable": 1,
+        "elapsed": 9055,
+        "inputTokens": 1116,
+        "outputTokens": 80,
+        "cost": 0.0002154
+      }
+    }
+  ],
+  "researchResults": [
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Dayglow/Promethium typically leans into transparent, high-definition roasting that preserves aromatic intensity and origin character while keeping enough development for sweetness and structure",
+          "processingNuance": "Anaerobic white honey suggests a controlled low-oxygen fermentation before drying with a honey-style mucilage retention, then a cleaner, likely more restrained finish than a fully red/yellow honey. Expect layered aromatics, amplified florals, and a tactile sweetness, but also some fermentation-derived complexity that can show as tropical-tinged citrus, spice, or subtle winey nuance if extracted too aggressively.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Prioritize jasmine/gardenia florals, bergamot, Earl Grey tea, lemon zest, white peach, cane sugar, and a silky, tea-like finish with a sweet aromatic lift.",
+          "extractionNotes": "Brew like a high-density Geisha but guard against over-extraction from the anaerobic processing. Use soft-to-medium-soft water, a relatively high temperature around 93-96 C for filter, and a moderately fine grind with a controlled, even drawdown. If flavors skew boozy or heavy, coarsen slightly or reduce contact time; if florals seem muted, increase temp or extraction incrementally. Best cups usually come from clean agitation and a ratio that emphasizes clarity over body.",
+          "cupStructureFamily": "processed-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha with a high-aromatic, delicate floral cup structure and refined acidity, closest in varietal expression even though the process differs."
+            },
+            {
+              "number": 21,
+              "name": "Equator Thailand Mae Chedi",
+              "why": "Anaerobic natural with aromatic intensity and fermentation complexity, useful as a reference for how processing can amplify florals and fruit."
+            },
+            {
+              "number": 22,
+              "name": "Special Guests Andres Cardona Purple Honey",
+              "why": "Honey-style processing with enhanced sweetness and layered complexity, similar in tactile sweetness and processing-influenced cup shaping."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3652,
+        "inputTokens": 1316,
+        "outputTokens": 499,
+        "cost": 0.0013248000000000001
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Dayglow (Promethium) focuses on single-origin specialty coffees with emphasis on processing innovation and floral complexity. Known for highlighting experimental and natural processing methods that amplify delicate aromatics and tea-like clarity.",
+          "processingNuance": "Anaerobic white honey processing combines controlled oxygen-deprivation fermentation with extended mucilage contact, amplifying volatile aromatics and creating layered sweetness. Geisha's naturally high lipid content and floral genetics are further enhanced by the anaerobic environment, which generates fruity esters and jasmine-like compounds. White honey (minimal mucilage) allows cleaner fermentation expression without heavy body.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Lead with gardenia, jasmine, and white florals; emphasize bergamot citrus brightness and Earl Grey tea character (tannin structure); pursue subtle honey sweetness and delicate stone fruit or peach undertones. Avoid overextraction which will muddy floral clarity.",
+          "extractionNotes": "Use 195-197°F water; Geisha's dense bean and anaerobic fermentation require precise grind control. Start at medium-fine; aim for 2:50-3:10 pour-over or 27-30s espresso. At 58 days post-roast, still in ideal peak window—expect crisp acidity and aromatic volatility. Slightly shorter contact time preserves floral top notes.",
+          "cupStructureFamily": "processed-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Geisha variety with specialty processing (semi-washed); similarly positioned to highlight floral and tea-like clarity with elevated complexity"
+            },
+            {
+              "number": 22,
+              "name": "Special Guests Andres Cardona Purple Honey",
+              "why": "Colombian honey co-ferment with anaerobic influence; similar processing innovation approach designed to amplify aromatic compounds"
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Light washed single-origin emphasizing floral notes and bergamot-forward clarity; complementary flavor profile approach"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7745,
+        "inputTokens": 1597,
+        "outputTokens": 601,
+        "cost": 0.0036816
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 9308,
+        "inputTokens": 1385,
+        "outputTokens": 298,
+        "cost": 0.00038654999999999994
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1750-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Dayglow's Promethium offerings tend to emphasize modern high-clarity specialty coffees with expressive processing, aiming for vivid aromatics and distinct flavor separation while keeping roasts light enough to preserve origin character.",
+          "processingNuance": "Anaerobic white honey on Geisha suggests a mucilage-retaining process with controlled oxygen-limited fermentation before or during drying. Compared with a fully washed Geisha, this usually adds slightly more texture, sweetness, and fermentation-derived aromatic intensity while still preserving floral and tea-like structure if executed cleanly. White honey typically leaves relatively little mucilage compared with yellow/red/black honey, so the cup should remain elegant rather than heavy, but the anaerobic step can amplify bergamot, floral lift, and candy-like citrus.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a highly aromatic cup centered on gardenia, jasmine-adjacent white florals, Earl Grey, bergamot, sweet lime or mandarin, and delicate honeyed sweetness. Because of the process, there may also be a faint tropical or creamy ferment accent underneath the otherwise Geisha-like tea clarity.",
+          "extractionNotes": "Treat as a dense light-roasted high-elevation Geisha with some process solubility boost from the anaerobic honey method. Use fairly hot water, around 94-97C, but avoid pushing too hard if the cup starts tasting perfume-forward or slightly boozy. Grind a touch finer than a classic washed Gesha if brews run thin, though likely not as fine as a fully washed Ethiopian. Prioritize even flow and moderate agitation to preserve aromatic definition. For pourover, aim for a clean, longer drawdown rather than aggressive turbulence; for immersion, shorter steeps can help keep florals crisp. At 58 days off roast it should be quite open aromatically, so watch for fast extraction and avoid overdeveloping bitterness in the finish.",
+          "cupStructureFamily": "processed-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Closest in floral Gesha architecture and tea-like elegance, though El Placer is more fermentation-influenced due to anaerobic white honey processing."
+            },
+            {
+              "number": 23,
+              "name": "Sightglass Guatemala Cuevitas",
+              "why": "Shares a structured, process-forward profile where anaerobic handling adds sweetness and aromatic lift without fully losing washed-like clarity."
+            },
+            {
+              "number": 25,
+              "name": "Onyx Honey Advent",
+              "why": "Relevant as a honey-processed reference emphasizing added sweetness and texture alongside preserved clarity, similar to the white honey component here."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 11136,
+        "inputTokens": 1316,
+        "outputTokens": 610,
+        "cost": 0.00939
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2050 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi typically roasts with a Nordic, clarity-driven approach: very light, precise development, and a strong emphasis on terroir, sweetness, and transparent cup structure.",
+          "processingNuance": "A washed Pink Bourbon from Huila usually means careful cherry selection, depulping, controlled fermentation in mucilage, thorough washing, and often high-elevation drying. Expect a clean cup with bright aromatics and layered acidity rather than heavy process-derived fruit. With Pink Bourbon, washed processing often preserves a floral top note and tea-like clarity while still showing tropical-fruit sweetness; if fermentation was extended at all, it may contribute extra complexity without obvious funk.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Aim for jasmine-like florals, bergamot or citrus blossom, tropical fruit sweetness such as pineapple or passion fruit, and a refined, silky acidity. At peak rest, expect a transparent but complex cup with clean finish, delicate sweetness, and medium-lively structure.",
+          "extractionNotes": "Use a relatively high brew temperature, around 93-96 C, to fully lift aromatics and sweetness. Grind slightly finer than you would for a softer washed Colombian if the cup seems underdeveloped, but avoid over-extraction that can mute florals and turn the cup drying. This coffee should reward shorter-to-moderate brew ratios and clean filtration; in espresso, favor modest yield and a slightly longer preinfusion if possible. Because it is 66 days off roast and marked at peak, it should be well-rested and stable, so prioritize clarity and sweetness over compensating for freshness.",
+          "cupStructureFamily": "washed-floral-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Colombian light washed profile with clean structure and sweet citrus/floral transparency."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Light washed Colombia with a similar balanced, clarified profile and approachable acidity."
+            },
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Likely similar washed Colombian elegance, sweetness, and refined cup structure."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3972,
+        "inputTokens": 1311,
+        "outputTokens": 518,
+        "cost": 0.0013532000000000001
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1950 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi is a Swedish specialty roaster known for precision light roasts that emphasize origin clarity and nuanced floral/fruit characteristics, with particular expertise in single-origin Colombian and East African coffees.",
+          "processingNuance": "Washed processing with likely 48-72 hour fermentation typical of Huila region practices. Pink Bourbon's natural sugars and floral compounds are accentuated by water processing, creating clean acidity and complex aromatics.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Pink Bourbon's signature floral sweetness (jasmine, rose, hibiscus) with tropical fruit notes (mango, stone fruit), balanced against crisp acidity and complex tea-like structure. Expect delicate body with refined clarity.",
+          "extractionNotes": "Target 195-197°C water temperature with medium-fine grind to extract floral aromatics without over-extracting. 2:36-2:45 pull for pour-over; consider slightly shorter espresso shots (25-27s) to preserve brightness. At 66 days post-roast, coffee is in peak window—aromatics stable, extraction forgiving.",
+          "cupStructureFamily": "washed-floral-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 8,
+              "name": "Flower Child El Nevado Decaf",
+              "why": "Colombian Caturra/Castillo/Pink Bourbon blend at light roast; shares regional Huila processing signature and floral-forward profile despite being decaf"
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Colombian light washed with field blend complexity; similar clean processing approach and tropical fruit/floral structure from Andean origin"
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Light roasted Bourbon/Caturra blend with washed processing; comparable altitude range and floral-tropical clarity profile"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6311,
+        "inputTokens": 1595,
+        "outputTokens": 544,
+        "cost": 0.003452
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi is renowned for their extremely light and transparent roasting style, prioritizing the inherent clarity, acidity, and delicate aromatics of high-quality, high-grown coffees. Their approach aims to showcase the unique terroir and varietal characteristics without introducing significant roast-derived flavors, often resulting in bright, complex, and sometimes challenging extractions that reward precision.",
+          "processingNuance": "This is a meticulously executed washed process for a Pink Bourbon variety. The washed method ensures a clean, vibrant cup profile by removing all mucilage before drying, highlighting the inherent floral and tropical fruit characteristics of the Pink Bourbon. For this specific varietal, the process will emphasize its often jasmine-like florality, bright acidity, and potential stone fruit or tropical notes, providing a very transparent canvas for its genetic potential.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect prominent notes of tropical fruits (passionfruit, mango, pineapple), intertwined with delicate florality (jasmine, rose, honeysuckle), and a complex, nuanced acidity. The high altitude and light roast will contribute to a sparkling brightness, often with a subtle honeyed sweetness and a very clean finish.",
+          "extractionNotes": "Due to the light roast and high density of Pink Bourbon, a higher brewing temperature (205-208°F / 96-98°C) is recommended to ensure adequate extraction. A finer grind setting than typical for a washed coffee, coupled with potentially longer brew times (3:30-4:30 minutes for pour-over), will help to fully develop flavors and sweetness. Consider a slightly higher brew ratio (e.g., 1:16-1:17) to balance intensity. A thorough pre-infusion is crucial for even saturation and to mitigate potential channeling.",
+          "cupStructureFamily": "washed-floral-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Both are high-grown, light-roasted, and processed for clarity, sharing a delicate floral, complex, and often tropical fruit-forward cup profile inherent to premium, aromatic varieties."
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "A light-roasted, washed Colombian coffee, it provides a general reference for the region's clean cup character and potential for nuanced acidity, though Pink Bourbon offers a more distinct floral-tropical profile."
+            },
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "This washed Ethiopian coffee shares the emphasis on floral notes, bright acidity, and overall clarity that is a hallmark of excellent washed-floral-clarity coffees, aligning with the aromatic aspects of Pink Bourbon."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 10303,
+        "inputTokens": 1380,
+        "outputTokens": 964,
+        "cost": 0.0007854
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2100 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Koppi typically roasts for high transparency, sweetness, and structure with a Nordic-style light approach that prioritizes origin character, precise acidity, and clean finish over roast development flavors.",
+          "processingNuance": "This is a washed Pink Bourbon from Tarqui, Huila, a profile often associated with very aromatic cups that can present floral and tropical qualities even under clean washed processing. Expect careful cherry selection, depulping, fermentation for mucilage removal, and a clean rinse/dry protocol that preserves clarity rather than overt fermentation character. In extraction, washed Pink Bourbon can behave like a highly articulate, high-acid Colombian lot with Gesha-adjacent florality but more stone/tropical sweetness and a slightly rounder mid-palate.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Aim for jasmine-like florals, orange blossom, ripe tropical fruit, white peach, mandarin, and possibly pineapple or passionfruit over a clear cane sugar or honey-like sweetness. The best brews should feel elegant, lifted, and complex rather than heavy, with tea-like structure and a polished acidity.",
+          "extractionNotes": "High-density light-roasted washed Pink Bourbon generally benefits from relatively high brew temperatures, around 95-98C depending on brewer and water chemistry. Use a fine-but-controlled grind to fully open sweetness and florals, but avoid over-agitation that can push the cup toward sharp citrus or slightly drying florals. Because the coffee is 66 days off roast and well-rested, it may extract more evenly and tolerate tighter grind settings than a fresher bag. For pourover, favor a restrained pulse structure and sufficient contact time to build sweetness; if the cup is too angular, grind slightly coarser or reduce agitation, and if it feels underdeveloped or hollow, push temperature and extraction slightly higher.",
+          "cupStructureFamily": "washed-floral-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Closest general match in origin, roast style, and clean light-roasted washed Colombian cup structure emphasizing clarity and acidity."
+            },
+            {
+              "number": 2,
+              "name": "Passenger Colombia Divino Nino",
+              "why": "Another light washed Colombia reference with transparent sweetness and structured acidity, though likely less floral than Pink Bourbon."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "A clean washed light Colombia profile that aligns on clarity and sweetness, even if this Pink Bourbon is likely more aromatic and floral."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 11730,
+        "inputTokens": 1311,
+        "outputTokens": 589,
+        "cost": 0.0091675
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold typically roasts very light and precision-focused, aiming for transparency, floral lift, and high-toned acidity with minimal roast imprint",
+          "processingNuance": "Washed Ethiopian heirloom coffee usually brings clean fruit, tea-like structure, and pronounced florals. At this age and given past-peak status, the crisp jasmine/bergamot edge likely has softened, while nectarine sweetness and lavender/honeysuckle aromatics may read a bit flatter unless brewed to emphasize clarity. Expect a relatively clean ferment profile with less body than naturals and a more delicate acid structure.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Nectarine, honeysuckle, lavender, white tea, lemon zest, stone fruit, subtle citrus blossom, with a sweet floral finish if extraction is well controlled",
+          "extractionNotes": "Use moderately hot water, around 94-96 C, to help pull floral aromatics and stone-fruit sweetness from a high-density washed Ethiopian. Grind slightly finer than you would for a very fresh bag, since the coffee is past peak and may need a touch more extraction to avoid hollow acidity. Aim for a clean, slightly longer brew with good agitation control; too much agitation can overemphasize dryness or mute florals. If using pour-over, a ratio around 1:16 to 1:17 often helps restore clarity and sweetness. Consider a slightly higher dose or shorter bloom only if the cup seems thin; otherwise prioritize even extraction over force.",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Washed Ethiopia with similar floral-citrus clarity, tea-like structure, and high-toned aromatics"
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Heirloom washed profile with bright florals and delicate fruit expression, close to this coffee's expected cup structure"
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Natural process differs, but the floral-fruit spectrum and Ethiopian heirloom character overlap in aromatic profile"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4000,
+        "inputTokens": 1309,
+        "outputTokens": 520,
+        "cost": 0.0013556
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold focuses on single-origin clarity with precise roast development that highlights origin characteristics and floral/fruit complexity, emphasizing clean extraction and delicate cup profiles",
+          "processingNuance": "Washed Ethiopian heirloom processing emphasizes clarity and removes fruit mucilage fully, allowing clean fermentation and enzyme development that yields floral and tea-like qualities. Likely extended drying to preserve delicate aromatics",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Nectarine stone fruit sweetness, honeysuckle florals with subtle jasmine undertones, lavender aromatics with potential white tea/bergamot body. Secondary notes of honey and light citrus brightness",
+          "extractionNotes": "Target 195-197°F water temperature to preserve floral volatiles. Medium-fine grind (similar to pour-over standard). Brew time 3:30-4:00 for immersion methods. At 118 days post-roast (past peak by ~15 days), expect slightly diminished aromatic intensity—consider slightly shorter contact times or slightly hotter water to compensate for fading bloom complexity. Best in pour-over or cupping to showcase remaining delicacy",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Light washed Ethiopian with similar altitude and heirloom varieties; shares floral-forward clarity and bergamot/tea structure"
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Light washed landrace Ethiopian emphasizing floral and nectarine-like stone fruit with similar aromatic delicacy"
+            },
+            {
+              "number": 20,
+              "name": "Proud Mary Ethiopia Yirg Adado",
+              "why": "Natural heirloom Ethiopian with honeysuckle/floral character, though roasted slightly darker—useful reference for flavor family"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6709,
+        "inputTokens": 1590,
+        "outputTokens": 544,
+        "cost": 0.003448
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 9929,
+        "inputTokens": 1377,
+        "outputTokens": 376,
+        "cost": 0.00043214999999999996
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Apollon's Gold typically pursues very light, high-clarity roasting with strong emphasis on transparency, florality, and precise sweetness rather than roast development or body-forward balance.",
+          "processingNuance": "This is likely a classic Ethiopian washed lot built around selective cherry picking, depulping, fermentation in water or dry tank, washing, and raised-bed drying. For extraction this usually means low fruit ferment, high aromatic lift, tea-like structure, and a narrow window where underextraction can mute florals while overextraction can turn the cup pithy or woody, especially this far past roast peak.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a delicate but articulate washed Ethiopia profile centered on nectarine, white stone fruit, honeysuckle, lavender, soft citrus, and black-tea sweetness. Optimized brews should highlight florals and silky sweetness over body, with a clean finish and gentle tea-like acidity.",
+          "extractionNotes": "Use relatively hot water to help recover aromatics and sweetness from a very light roast, around 94-97C depending on brewer and filter. Grind slightly finer than a medium-light washed coffee, but because the coffee is well past peak, avoid choking the brew chasing intensity. Favor brews with moderate contact time and high clarity: pourover ratios around 1:15.5 to 1:17, total times roughly 2:45-3:30 depending on dose and dripper. Agitation should be controlled; too much can flatten florals and pull woody late-roast notes from aged coffee. If espresso, expect a tighter, less forgiving shot window and consider slightly lower yield ratios than usual for florality preservation.",
+          "cupStructureFamily": "washed-ethiopia-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 5,
+              "name": "Sq Mile Ethiopia Telila Kecho",
+              "why": "Closest match in origin, washed Ethiopian structure, and expected bergamot-floral-tea clarity."
+            },
+            {
+              "number": 7,
+              "name": "Wonderstate Ethiopia Danche",
+              "why": "Another washed Ethiopia reference with delicate florals, citrus, and transparent body similar to this cup profile."
+            },
+            {
+              "number": 27,
+              "name": "Loquat Costa Rica Finca Ines Geisha",
+              "why": "Not origin-matched, but a useful structural comparison for honeysuckle-lavender florality and elegant light-roast extraction needs."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 11096,
+        "inputTokens": 1309,
+        "outputTokens": 565,
+        "cost": 0.0089225
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1900 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters typically roasts with a precise, clarity-forward Nordic-style approach that preserves origin character, high-toned acidity, and sweetness while avoiding heavy development",
+          "processingNuance": "Classic Kenyan washed preparation, likely fully depulped, fermented in water, thoroughly washed, and dried on raised beds. In cup, this usually yields very clean separation of acids and sugars, with pronounced juiciness and a structured blackcurrant/citrus profile. At peak rest, the acidity should read vivid rather than sharp, with better integration of grapefruit and pomelo into a sweeter brown-sugar core.",
+          "densityEstimate": "high",
+          "flavorExpectations": "optimize for blackcurrant, pink grapefruit, pomelo, and brown sugar, with secondary notes of hibiscus, red berry, and a syrupy citrus finish",
+          "extractionNotes": "Use fairly hot water, around 94-96C, to fully extract the dense Kenyan seed and unlock sweetness. A medium-fine grind with a longer contact time tends to work well; underextraction will emphasize sharp grapefruit peel and mute the blackcurrant. For filter brews, aim for a clean, high-clarity profile with controlled agitation. If espresso, expect it to prefer a slightly longer ratio or a touch higher yield to balance its bright acidity and pronounced structure.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Classic washed Kenya with SL28/SL34 and similar blackcurrant-citrus structure, emphasizing clarity and high-toned acidity"
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Kenyan washed profile with juicy fruit intensity, crisp citrus, and syrupy sweetness in a similar light roast style"
+            },
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Another washed Kenyan with pronounced berry, grapefruit, and transparent structure, closely matching the cup shape here"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3952,
+        "inputTokens": 1319,
+        "outputTokens": 495,
+        "cost": 0.0013196
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters are renowned for their meticulous approach to sourcing and roasting, consistently aiming for ultra-light to light roasts that accentuate the inherent clarity, sweetness, and complex acidity of high-quality, often exotic, single-origin coffees. They prioritize flavor transparency and dynamic range in the cup.",
+          "processingNuance": "Kenyan washed coffees, including this Gichathaini, typically undergo a 'double fermentation' process. This involves an initial dry fermentation, followed by a wet fermentation under water, and then soaking, before drying on raised beds. This method is crucial for developing the characteristic bright, complex acidity and clean fruit notes, particularly the renowned 'blackcurrant' profile often found in Nyeri coffees.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a vibrant and juicy cup dominated by tart, bright fruit notes like blackcurrant and grapefruit, balanced by the sweet, tangy bitterness of pomelo. A subtle foundation of brown sugar sweetness should provide balance and depth, leading to a complex, refreshing, and clean finish typical of high-quality Kenyan coffees.",
+          "extractionNotes": "Given the high density, light roast, and intense acidity, aim for a higher brew temperature (96-98°C) to facilitate full extraction without sacrificing clarity. A finer grind and slightly longer contact time will be necessary to achieve optimal extraction, mitigating potential sourness while developing the full sweetness and complex fruit notes. Be mindful of channeling with finer grinds; even distribution is key. High quality, low TDS water will accentuate the delicate fruit and clarity.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Both are exceptional washed Kenyan coffees (Nyeri region) with SL28/SL34, known for intense fruit and bright acidity, often featuring blackcurrant."
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Another light-roasted washed Kenyan, sharing similar varietals and profile characteristics of vivid fruit and clarity."
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Also a light-roasted, washed Kenyan with SL28/SL34, known for its pristine clarity and signature Kenyan fruit notes."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4669,
+        "inputTokens": 1390,
+        "outputTokens": 580,
+        "cost": 0.0005565
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2000 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters typically pursues clarity-forward light roasts that highlight origin character and varietal expression, with careful heat management to preserve acidity and complexity",
+          "processingNuance": "Washed Kenya SL28/SL34 from Nyeri region benefits from the double fermentation common in Kenya AA grades, enhancing brightness and berry-forward acidity while maintaining clean cup clarity",
+          "densityEstimate": "high",
+          "flavorExpectations": "Blackcurrant and pomelo lead with citrus brightness; grapefruit bitterness frames the cup; brown sugar adds subtle sweetness and body. Optimize for berry clarity and citrus acidity",
+          "extractionNotes": "Target 195-197°C water temperature to highlight grapefruit/citrus without over-extracting tannins. Medium-fine grind; 3:00-3:30 pour-over optimal to preserve delicate berry florals. At 25 days post-roast and 45% peak, this is in ideal drinking window—acidity is integrated, sweetness is developed",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Kenya SL28/SL34 washed double fermentation profile with pomelo, hibiscus, and berry clarity—near-identical processing and varietal signature"
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Kenya light washed K7/SL28/SL34 blend emphasizing citrus and blackcurrant with similar cup structure and brightness"
+            },
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Kenya SL28/SL34 washed from high altitude, expressing similar blackcurrant/grapefruit character with clean acidity"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 5841,
+        "inputTokens": 1604,
+        "outputTokens": 533,
+        "cost": 0.0034151999999999997
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1700-1900 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Manhattan Coffee Roasters generally pursues high-definition, competition-influenced light roasting focused on transparency, intense acidity, and articulate sweetness. They tend to roast to preserve origin character and processing detail rather than build roast-driven body.",
+          "processingNuance": "This is a classic Kenyan washed lot, likely factory-processed with careful hand sorting, pulping, fermentation, washing, grading, soaking, and raised-bed drying. For Nyeri AA lots of SL28/SL34, the washed process typically produces very high clarity, vivid phosphoric/citric acidity, and dark-fruit intensity rather than broad ferment character. Expect a structured cup with pronounced acidity, transparent sweetness, and a savory-sweet finish rather than heavy fruit saturation.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for blackcurrant, grapefruit, pomelo, red berry-toned acidity, hibiscus-like brightness, and a brown sugar sweetness in the finish. The best brews should show layered citrus over cassis-like fruit with a clean, juicy aftertaste.",
+          "extractionNotes": "High-density Kenyan AA plus a light Manhattan roast suggests good heat input is helpful. Use relatively high brew water temperature, around 94-96C, especially for filter. These coffees usually tolerate finer grinding than many washed Latin coffees, but channeling or over-agitation can make the acidity sharp and savory. Target strong, even extraction to develop brown sugar sweetness beneath the acidity. If the cup is too aggressive or tomato-like, coarsen slightly or reduce agitation; if it tastes thin or overly citrusy, push extraction with a finer grind, slightly hotter water, or a bit more contact time. At 25 days off roast it should be opening nicely, with aromatics and acidity well integrated.",
+          "cupStructureFamily": "washed-kenya-clarity",
+          "closestReferenceProfiles": [
+            {
+              "number": 11,
+              "name": "La Cabra Kiamugumo",
+              "why": "Direct Kenya washed SL28/SL34 comparison with similar Nyeri-style pomelo, berry, and high-clarity acidity structure."
+            },
+            {
+              "number": 10,
+              "name": "Wendelboe Kenya Kapsokiso",
+              "why": "Another light-roasted washed Kenyan profile emphasizing articulate acidity, blackcurrant-like fruit, and transparent sweetness."
+            },
+            {
+              "number": 3,
+              "name": "Coffee Collective Kenya Kieni AB",
+              "why": "Classic washed Kenya cup structure with vivid citrus, berry, and phosphoric clarity, very close in extraction behavior and flavor architecture."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 11441,
+        "inputTokens": 1319,
+        "outputTokens": 584,
+        "cost": 0.0091375
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1950-2300 masl",
+          "roastLevel": "light",
+          "roasterStyle": "Nordic-style precision roasting: very light, high clarity, clean articulation of origin character, minimal roast development, and a focus on sweet acidity over roast-driven flavor.",
+          "processingNuance": "This is a natural Ethiopian lot from Worka Sakaro in Gedeb/Yirgacheffe, likely slow-dried on raised beds with intact whole cherry fermentation. Expect fruit intensity from extended mucilage contact and drying concentration, but in a more polished, structured natural style rather than a rustic one. Blueberry/strawberry jam, wine-like aromatics, and dark-chocolate depth suggest a ripe, well-sorted lot with strong sweetness and some fermentation-derived complexity. Because it is 43 days off roast and at peak, the cup should be stabilized and expressive, with reduced CO2 and more open sweetness than at very fresh rest.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Aim for dense berry sweetness, strawberry and blueberry jam, red-wine acidity, cocoa/dark chocolate undertones, and a floral-fruit top note with a syrupy finish. Best brews will highlight vivid fruit without letting the winey character turn boozy or the chocolate read as roasty.",
+          "extractionNotes": "Use moderately high extraction but avoid over-aggression: 93-96 C water, medium-fine to medium grind depending on method, and a slightly longer bloom to fully wet the dense, rested natural. For filter methods, target even extraction and a clean drawdown; too fine can push it into fermenty/tannic territory, while too coarse will mute the jammy sweetness. A slightly higher ratio can help preserve clarity, but if the cup tastes thin, increase contact time before increasing dose. Best served with enough rest time already achieved; no need to wait further.",
+          "cupStructureFamily": "clean-natural-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Ethiopian natural with heirloom material and a fruit-forward, clean profile similar to this Worka Sakaro cup structure."
+            },
+            {
+              "number": 18,
+              "name": "Brandywine Felloween IV",
+              "why": "Natural Ethiopian profile with heirloom character and jammy berry sweetness plus wine-like complexity."
+            },
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "JARC/heirloom-style Ethiopian natural with concentrated fruit, sweetness, and a polished modern natural expression."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4099,
+        "inputTokens": 1316,
+        "outputTokens": 571,
+        "cost": 0.00144
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2150 masl",
+          "roastLevel": "light",
+          "roasterStyle": "April Coffee is known for precise, temperature-controlled light roasts that emphasize origin clarity and natural process fruit expression. They favor shorter development to preserve delicate aromatics and showcase single-origin character.",
+          "processingNuance": "Natural/dry processed Ethiopian heirloom from Gedeb microcommunity. Extended fermentation in fruit builds complex berry and wine notes. Fruit mucilage contact creates anthocyanin-rich cup structure with elevated sweetness and fruit-forward acidity.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Blueberry and strawberry jam (natural process fruit esters), dark chocolate (subtle roasted notes), wine-like fermentation character, floral florals undertone typical of Yirgacheffe terroir, red berry acidity.",
+          "extractionNotes": "At 43 days post-roast, peak extraction window. Target 200-202°F water temperature to preserve delicate fruit esters without overextraction of ferment tannins. Medium-fine grind. Immersion methods (cupping, French press 4min) highlight fruit jam; pour-over (3:00-3:30min contact) balances clarity with body. Avoid aggressive agitation which can sharpen ferment notes.",
+          "cupStructureFamily": "clean-natural-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Light natural Ethiopia from same origin zone, heirloom variety emphasis, similar stone fruit and jam-forward expression"
+            },
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "Light natural Ethiopian with comparable blueberry/berry focus and fermentation-driven complexity"
+            },
+            {
+              "number": 12,
+              "name": "April Ethiopia Regessa",
+              "why": "Same roaster profile; light natural Ethiopia with fruit jam characteristics and similar altitude/processing approach"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 7378,
+        "inputTokens": 1600,
+        "outputTokens": 528,
+        "cost": 0.003392
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "April Coffee is renowned for its Nordic-style, ultra-light roasting approach, emphasizing transparency and clarity to highlight the intrinsic characteristics of the coffee's origin, variety, and processing. Their goal is often to showcase delicate acidity, complex aromatics, and a clean finish.",
+          "processingNuance": "This natural processed coffee from Ethiopia typically involves careful sun-drying of intact coffee cherries on raised African beds for an extended period. The fruit pulp remains on the bean during drying, allowing sugars and flavors to infuse into the seed. The 'blueberry / strawberry jam' notes suggest well-managed fermentation and drying, leading to intense fruit sweetness. The 'dark chocolate / wine' notes indicate a balanced depth, possibly from controlled anaerobic phases or a slightly longer fermentation, providing complexity beyond simple fruitiness.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect an incredibly vibrant and fruit-forward cup, dominated by intense notes of ripe blueberry and sweet strawberry jam. The 'wine' characteristic suggests a complex, juicy acidity and a rich, syrupy body, while 'dark chocolate' will likely provide a grounding depth or a pleasant bittersweet finish, balancing the exuberant fruitiness.",
+          "extractionNotes": "For this light-roasted, high-density natural Ethiopian, use a higher brew temperature (93-96°C) to ensure full extraction of its complex sugars and acids. A medium-fine grind and a slightly longer brew time (e.g., 3:00-3:45 for pour-over) are recommended to achieve sweetness and body. Consider a higher agitation bloom or pulse pour technique to ensure even saturation and overcome the bean density. Given it's 43 days off roast, the coffee is perfectly degassed for optimal clarity and flavor integration.",
+          "cupStructureFamily": "clean-natural-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 12,
+              "name": "April Ethiopia Regessa",
+              "why": "This is from the same roaster and is a light-roasted natural Ethiopia, representing a very similar profile and roasting philosophy."
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "A light-roasted natural Ethiopia heirloom, likely to share the intense fruit characteristics expected from the Worka Sakaro."
+            },
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "Another light-roasted natural Ethiopian with JARC varieties, which often present similar vibrant fruit profiles to heirlooms in the Yirgacheffe region."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 8457,
+        "inputTokens": 1385,
+        "outputTokens": 613,
+        "cost": 0.00057555
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1900-2200 masl",
+          "roastLevel": "light",
+          "roasterStyle": "April typically roasts with a modern Nordic sensibility aimed at transparency, sweetness, and structured but accessible extractions—generally light, soluble enough for filter, and focused on clarity over roast-derived weight.",
+          "processingNuance": "This is a classic Ethiopia natural from Gedeb/Yirgacheffe, likely composed of carefully selected heirloom cherries dried whole on raised beds. Compared with heavily anaerobic naturals, the process expression is usually cleaner and more red/blue-fruited than boozy-fermenty, but the bag notes suggest a ripe, jammy lot with some winey depth and cocoa-toned finish. Expect uneven bean density and size typical of heirloom naturals, plus more chaff and a slightly broader extraction window than a washed Ethiopia, though still with high aromatic volatility.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Optimize for blueberry, strawberry compote, mixed berry jam, red wine-like acidity, cocoa nib or dark chocolate in the finish, and a sweet dried-fruit character rather than sharp citrus clarity. Best cups should show saturated fruit with a clean, tea-like lift rather than heavy ferment.",
+          "extractionNotes": "At 43 days off roast, the coffee should be well-settled and relatively easy to extract. Use moderately high water temperature, around 93-96C, to fully open the dense light roast, but avoid excessive agitation if you want cleaner fruit definition. Grind slightly finer than you would for a medium roast natural if the cup feels hollow, but coarsen if the winey notes turn muddy or overly dark. For pourover, aim for controlled flow and moderate contact time; too long can push the chocolate and fermenty tones over the berry clarity. This coffee should handle a slightly higher extraction than very fresh naturals, with sweetness improving as long as bitterness stays low.",
+          "cupStructureFamily": "clean-natural-fruit",
+          "closestReferenceProfiles": [
+            {
+              "number": 16,
+              "name": "Sq Mile Ethiopia Shoondhisa",
+              "why": "A light-roasted natural Ethiopia with classic jammy berry fruit and clean natural structure closest to this coffee's likely cup profile."
+            },
+            {
+              "number": 14,
+              "name": "Camber Ethiopia Tadesse Yonka",
+              "why": "Another light natural heirloom Ethiopia reference for blueberry-forward fruit, sweetness, and floral-fruit clarity."
+            },
+            {
+              "number": 15,
+              "name": "Camber Ethiopia Buliye",
+              "why": "Similar natural Ethiopian heirloom profile with ripe fruit, layered sweetness, and a clean rather than heavily processed natural expression."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 12741,
+        "inputTokens": 1316,
+        "outputTokens": 590,
+        "cost": 0.00919
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Counter Culture typically favors transparent, development-conscious roasting with clean sweetness, balanced acidity, and a profile that reads structured and approachable rather than aggressively bright",
+          "processingNuance": "Fully washed Guatemala from Antigua usually means a clean depulping and fermentation that emphasizes sweetness and caramelized notes over overt ferment character. In Antigua’s volcanic terroir, washed Bourbon/Caturra often cups with cocoa, citrus, toasted nuts, and mild stone-fruit acidity. At peak age this will be very stable, with acidity softened and sweetness more integrated, so brew to highlight roundness and chocolate-orange balance rather than chasing sharp florals.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "milk chocolate, orange zest, toasted almond, caramel, brown sugar, gentle red apple acidity, cocoa nib finish",
+          "extractionNotes": "Aim for a medium-fine grind and moderate extraction to preserve sweetness. Water around 92-94 C works well; cooler if you want more caramel and less citrus bite, hotter if you want to lift the orange and structure. Best as a filter brew with a slightly longer contact time than ultra-light Ethiopians. If espresso, use a somewhat longer ratio to emphasize caramel and almond, with a touch higher yield to keep the cup clear and avoid thinness. At 48 days post-roast, it may be slightly more muted aromatically, so a stronger brew ratio can help.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Medium washed Latin American profile with similar cocoa, caramel, and balanced acidity structure"
+            },
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Guatemala washed cup with sweet, round, cocoa-driven structure and approachable citrus"
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Medium washed profile emphasizing sweetness and body over high-toned clarity, comparable to Antigua washed coffees"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 3617,
+        "inputTokens": 1313,
+        "outputTokens": 480,
+        "cost": 0.0012932
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "medium",
+          "roasterStyle": "Counter Culture is known for precision roasting that balances origin clarity with approachable sweetness, emphasizing clean cup profiles and structured body without over-roasting",
+          "processingNuance": "Washed processing in Antigua's volcanic terroir produces clean, bright cups with good complexity. The double fermentation typical of highland Guatemalan washed coffees enhances clarity while Bourbon and Caturra varieties contribute natural sweetness and body",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Creamy milk chocolate foundation with bright citrus (orange) pop, toasted nut complexity (almond), and caramel sweetness from the roast development. Look for balance between origin fruit and roast character",
+          "extractionNotes": "Medium roast benefits from 195-200°F water temp, 1:16-1:17 ratio, 3-4min steep for pour-over or espresso at 9bar. The 48-day window shows coffee still has development potential; expect fuller body than light roasts with retained clarity. Slightly coarser grind than light roast to avoid over-extraction of chocolate/caramel notes",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Same roaster's Colombian washed light roast; comparable roasting philosophy and Caturra component, though this reference is lighter with more clarity emphasis"
+            },
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Guatemala origin, medium-light roast, Bourbon variety; similar altitude zone and washed processing with chocolate/sweetness balance"
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Colombian washed medium roast with Caturra; similar roast philosophy prioritizing body and chocolate sweetness over extraction brightness"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6707,
+        "inputTokens": 1596,
+        "outputTokens": 532,
+        "cost": 0.0034048000000000004
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Counter Culture is known for sourcing high-quality, traceable coffees and roasting to highlight origin characteristics while maintaining approachability. For a coffee like Antigua Pastores, they typically aim for a balanced, sweet, and clean cup that showcases classic Central American profiles with good body and developed sweetness.",
+          "processingNuance": "Standard washed processing for Guatemalan coffees. This involves de-pulping the cherries, often followed by a wet fermentation period (typically 12-36 hours) to break down mucilage, thorough washing to remove any remaining fruit material, and then drying on patios or raised beds. This method results in a very clean cup, emphasizing the varietal and terroir characteristics, and allowing the intrinsic sweetness and acidity to shine without interference from fermentation byproducts.",
+          "densityEstimate": "high",
+          "flavorExpectations": "Expect a comforting and balanced cup with prominent notes of sweet milk chocolate and creamy caramel, complemented by a vibrant, yet gentle orange acidity. The finish should carry a pleasant toasted almond nuance, contributing to a clean and lingering sweetness. The body will likely be medium and smooth.",
+          "extractionNotes": "Given the high density (typical for high-altitude Bourbon/Caturra) and light-medium roast, aim for a slightly finer grind than average and a moderately high brewing temperature (94-96°C or 201-205°F) to ensure thorough extraction of sugars and aromatics. A longer contact time might be beneficial to fully develop the chocolate and caramel notes. This coffee should be forgiving and brew well across various methods, but pour-over will best highlight its clarity and balanced acidity.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Shares the same origin (Guatemala), process (Washed), and key variety (Bourbon), likely roasted to a similar profile emphasizing sweetness and balance."
+            },
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "A washed coffee with similar varietals (Castillo/Caturra) and a 'medium' roast, suggesting a focus on developed sweetness and body comparable to what's expected from Antigua Pastores."
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Another 'medium' roasted washed Caturra from Colombia, which would likely present a similarly clean, sweet, and balanced cup with notes of chocolate and caramel."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 9571,
+        "inputTokens": 1382,
+        "outputTokens": 613,
+        "cost": 0.0005751
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1500-1800 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Counter Culture typically roasts for clarity, balance, and approachability rather than extreme underdevelopment or heavy roast character. Their washed Latin American coffees often emphasize sweetness, structure, and clean articulation of origin with a slightly more soluble, consumer-friendly development than the most ultra-light Nordic styles.",
+          "processingNuance": "This is a classic washed Antigua profile, likely involving depulping, fermentation to remove mucilage, washing, and patio or mechanical drying to stable moisture. Antigua's dry climate and volcanic soils often support very clean, orderly washed cups with restrained fruit, cocoa-toned sweetness, and nut structure. Compared with higher-acid East African washed coffees, this kind of lot usually presents lower fermentation intensity, moderate acidity, and a more straightforward caramelized sugar profile that benefits from even extraction rather than aggressive pushing.",
+          "densityEstimate": "medium-high",
+          "flavorExpectations": "Optimize for milk chocolate, caramel, toasted almond, orange zest or sweet orange, and a rounded brown-sugar finish. Expect more sweetness and nut-cocoa balance than sparkling acidity; the orange note will likely show as gentle citrus lift rather than sharp lemony brightness.",
+          "extractionNotes": "At 48 days off roast this should be quite rested and relatively easy to extract. Use near-boiling water only if chasing more citrus clarity; otherwise 92-95 C is a strong starting point. Because the coffee is washed and moderately dense but not ultra-light, it should tolerate a medium-fine grind without becoming hollow, though pushing too fine may flatten the cup into generic cocoa. Aim for even, moderate-to-high extraction to bring out caramel and orange together. For pour over, favor a controlled flow and total brew times around 2:45-3:30 depending on brewer size; for immersion, a slightly finer grind can help recover brightness. If the cup tastes woody or dull, raise extraction slightly; if it becomes drying or loses orange definition, back off grind fineness or temperature a touch.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 30,
+              "name": "Linea Guatemala La Esperanza",
+              "why": "Closest regional and structural match: Guatemala washed coffee with balanced sweetness, cocoa-nut tendencies, and medium-light roast presentation."
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Similar washed Bourbon/Caturra structure with chocolate-caramel sweetness and approachable acidity rather than highly floral or fruit-driven clarity."
+            },
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Comparable medium-leaning washed Latin American cup profile emphasizing body, caramelization, and everyday drinkability over high-toned acidity."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": false
+        },
+        "total": 5,
+        "max": 6,
+        "elapsed": 12127,
+        "inputTokens": 1313,
+        "outputTokens": 621,
+        "cost": 0.0094925
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1700-2100 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture typically roasts with a transparency-first, quality-control-driven approach, but their dark offerings are developed more for sweetness, comfort, and lower-acid balance than for origin clarity.",
+          "processingNuance": "Washed Rwanda lots from Nyamasheke are usually fully depulped, fermented, washed, and dried on raised beds, which can preserve a clean cocoa-fruit core even through a darker roast. With a dark roast, the processing character is largely masked by roast development, but the washed structure still supports a cleaner finish, less fermenty heaviness, and a more orderly chocolate-to-dried-fruit arc than a natural or honey lot would.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Expect dark chocolate, molasses, toasted sugar, dried cherry, and light smoky/woody roast tones. Best results will emphasize sweetness, round body, and a restrained fruit note rather than brightness or floral detail.",
+          "extractionNotes": "Brew to favor balance over clarity: use a slightly lower water temperature than for light roasts, around 90-93 C, and avoid very fine grinds that can overextract bitter roast notes. Medium-fine to medium grind, moderate brew ratios, and slightly shorter contact times usually help keep the cup sweet and smooth. In espresso, lower pressure or a slightly coarser grind can reduce ashy bitterness; in filter, aim for a steady but not aggressive extraction to highlight molasses and cherry without amplifying smoke.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "Direct match: same origin, process style, and roast intent, with the same dark-roast chocolate and dried-fruit profile."
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark",
+              "why": "Comparable dark-roast washed profile where sweetness, body, and roast-driven chocolate dominate over origin clarity."
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark",
+              "why": "Similar dark-roast structure with deep cocoa, low acidity, and a heavier finish, though from a different origin."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 4208,
+        "inputTokens": 1317,
+        "outputTokens": 513,
+        "cost": 0.0013476000000000002
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1800-2100 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture emphasizes full expression through careful roasting; their dark roasts prioritize body and sweetness while maintaining origin character. Known for precise roast management to avoid excessive bitterness.",
+          "processingNuance": "Washed Rwandan coffees from Nyamasheke benefit from the region's volcanic soil and careful wet fermentation. Washed processing removes fruit layers, emphasizing the bean's inherent sweetness and structured body—ideal for dark roast expression.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Dark chocolate, molasses, dried cherry, smoky undertones. At 30 days post-roast and in peak status, expect full body with caramelized sweetness. The multi-varietal blend (Bourbon/Mayaguez/Jackson) provides complexity: Bourbon contributes sweetness, Mayaguez adds body, Jackson brings structure.",
+          "extractionNotes": "Dark roasts are forgiving but benefit from slightly cooler water (200-202°F) to avoid over-extraction. Use medium-fine grind; aim for 27-30 second espresso pulls or 4-minute immersion brews. At 30 days, degassing is complete; expect stable, predictable extraction.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark",
+              "why": "Exact match—same roaster, same origin region, same dark roast profile with dark chocolate and molasses notes"
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark",
+              "why": "Similar dark roast approach with body-forward profile; natural process Brazil provides comparable molasses and chocolate structure"
+            },
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Medium roast washed coffee with similar varietal blend approach; provides reference for how Bourbon/Caturra express sweetness and body before dark roasting"
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6431,
+        "inputTokens": 1598,
+        "outputTokens": 540,
+        "cost": 0.0034384
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "dark",
+          "roasterStyle": "Counter Culture typically emphasizes transparency, origin character, and articulate roasting, but in darker offerings they aim for sweetness, structure, and drinkability while preserving more origin distinction than commodity-style dark roasts.",
+          "processingNuance": "Fully washed Rwanda coffee, likely wet-fermented and thoroughly cleaned before drying. At this roast level, process nuance is less about delicate acidity and more about the clean base it provides: lower ferment character, firmer cocoa-toned structure, and less overt fruit funk than a natural. The washed process should keep the cup relatively tidy even as roast-derived molasses, smoke, and bittersweet chocolate dominate.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Bittersweet dark chocolate, molasses, dried cherry, roast smoke, cocoa powder, and a heavy syrupy sweetness. Expect muted acidity, a broad body, and some lingering roast bitterness balanced by dried-fruit undertones.",
+          "extractionNotes": "Because this is a dark roast and already 30 days off roast, it should be relatively easy to extract. Use slightly lower brew temperatures, around 88-92C, to avoid pushing ashiness and harsh bitterness. Grind a bit coarser than for light roasts and avoid very long contact times. For filter, target moderate strength and a shorter overall brew if bitterness builds. For espresso, lower temperature and slightly shorter ratios can help emphasize chocolate and molasses over smoke. Degassing is no longer a major concern at this age.",
+          "cupStructureFamily": "dark-roast",
+          "closestReferenceProfiles": [
+            {
+              "number": 32,
+              "name": "Counter Culture Intango Dark — Rwanda, Dark, Washed, Bourbon/Mayaguez/Jackson",
+              "why": "Exact match in origin, roast style, process, and varieties."
+            },
+            {
+              "number": 34,
+              "name": "KOS Armando Leivas Dark — Guatemala, Med-Dark, Washed, Caturra",
+              "why": "Similar washed dark-roast structure with roast-driven sweetness, chocolate, and reduced acidity."
+            },
+            {
+              "number": 33,
+              "name": "Methodical Oscuro Dark — Brazil, Dark, Natural, Mundo Novo/Catuai",
+              "why": "Comparable dark-roast body and chocolate-forward profile, though Intango should be cleaner and less nutty due to washed Rwanda processing."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 9099,
+        "inputTokens": 1317,
+        "outputTokens": 537,
+        "cost": 0.0086625
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": null,
+        "scores": {
+          "R1": false
+        },
+        "total": 0,
+        "max": 6,
+        "elapsed": 9696,
+        "inputTokens": 1386,
+        "outputTokens": 308,
+        "cost": 0.0003927
+      }
+    },
+    {
+      "GPT-5.4 Mini": {
+        "success": true,
+        "research": {
+          "altitude": "1600-1900 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Onyx typically roasts with a precision-driven modern light approach: development is kept restrained, clarity is prioritized, and sweetness is highlighted without pushing into dark, smoky roast character.",
+          "processingNuance": "Washed Colombian coffees from Huila are usually fully depulped, fermented in tank or open vessel, then thoroughly washed and dried to preserve clarity and sweetness. Castillo and Caturra in this context often present a clean, balanced structure with apple-like acidity, brown sugar sweetness, and nutty, cocoa-adjacent depth. Because it is washed, extraction tends to reward evenness and clean water; there is less fruit-intensity from processing and more emphasis on caramelized sugars, orchard fruit, and structure. At 74 days post-roast and past peak, some aromatic top notes will have faded, leaving a rounder, softer cup with reduced sparkle.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "brown sugar, red apple, toasted nut, light caramel, gentle cocoa, smooth body, muted citrus or stone-fruit-like acidity if well extracted",
+          "extractionNotes": "Brew a touch hotter than you would for a dense Ethiopian or high-elevation Kenya if you want to recapture sweetness and structure: about 93-96 C for filter. Use a medium-fine grind and aim for a slightly longer contact time to pull out brown-sugar sweetness and apple acidity, but avoid over-extraction that can make the nutty notes bitter or papery, especially since the coffee is past peak. Expect less aromatic volatility now, so a slightly higher dose or a finer grind may help restore cup intensity. For espresso, consider a little longer ratio or slightly higher temp to maintain clarity and sweetness.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Same origin style and a washed Colombia profile with similar sweetness-forward structure, body, and approachable acidity."
+            },
+            {
+              "number": 9,
+              "name": "Heart Colombia Diomed Montano",
+              "why": "Colombian washed profile with balanced sweetness and smooth structure, likely similar in cup balance and clarity."
+            },
+            {
+              "number": 1,
+              "name": "Kiss the Hippo Peru El Morito",
+              "why": "Not the same origin, but similar washed, sweet, nutty, caramel-leaning profile with a rounded and clean structure."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 5021,
+        "inputTokens": 1317,
+        "outputTokens": 563,
+        "cost": 0.0014276000000000002
+      },
+      "Haiku 4.5": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "medium",
+          "roasterStyle": "Onyx Coffee Lab is known for precise, balanced roasting that emphasizes approachability and sweetness while maintaining origin clarity. They favor medium roasts that showcase versatility across brewing methods.",
+          "processingNuance": "Washed Colombian Castillo and Caturra blend. Castillo is a rust-resistant hybrid bred for altitude flexibility; Caturra contributes cleaner, brighter acidity. Washed processing removes fruit sugars, allowing structural clarity and balanced sweetness to emerge.",
+          "densityEstimate": "medium",
+          "flavorExpectations": "Brown sugar sweetness (caramel-forward), red apple acidity (bright but not sharp), nutty/toasted undertones (hazelnut, almond). Expect smooth body without astringency. This is a comfort-forward profile.",
+          "extractionNotes": "At 74 days post-roast, this coffee is past peak but still viable. Target 196-198°F water temperature; medium-fine grind; 1:17 ratio for filter (3.5-4 min), or 1:2 for espresso (26-28 sec). The nuttiness suggests slight over-extraction risk—dial in carefully. Sweetness will be more prominent than acidity.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Same origin, same varietals (Castillo/Caturra), medium roast profile. Direct match for expected cup structure."
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Colombian medium-roast washed with Caturra. Similar brown sugar/nutty emphasis and balanced sweetness."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Colombian washed (Caturra/Castillo) with clarity. While lighter roast, shares the foundational cup structure and varietal blend."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": true
+        },
+        "total": 6,
+        "max": 6,
+        "elapsed": 6312,
+        "inputTokens": 1600,
+        "outputTokens": 555,
+        "cost": 0.0035
+      },
+      "Gemini 2.5 Flash": {
+        "success": true,
+        "research": {
+          "altitude": "1500-2000 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Onyx is known for meticulous sourcing, often featuring experimental and high-scoring coffees, but also offering consistently excellent everyday drinkers. They emphasize data-driven roasting to highlight origin characteristics, aiming for clarity, sweetness, and balanced complexity across their range, even for more traditional profiles like this.",
+          "processingNuance": "Typical Colombian washed process involves depulping, followed by a wet fermentation stage (likely 12-36 hours) to break down mucilage, thorough washing to remove any remaining mucilage, and then drying on parabolic beds or patios. This method is designed to produce a clean, bright, and articulate cup profile, emphasizing the intrinsic flavors of the bean and terroir.",
+          "densityEstimate": "medium-high",
+          "flavorExpectations": "Expect a comforting and accessible cup. The brown sugar note points to a rich, caramel-like sweetness and good body. Red apple suggests a mellow, fruit-forward acidity rather than sharp citrus. The nutty aspect will add depth and a pleasant finish. Overall, a smooth, well-balanced, and approachable Colombian profile.",
+          "extractionNotes": "Given this coffee is 74 days off roast and past peak, it will be more challenging to extract optimally. You'll likely need to compensate by grinding finer than you would for a fresh roast and using a slightly higher water temperature (e.g., 205-208°F / 96-98°C) to encourage full extraction. Longer brew times might also be necessary. Aim for a slightly higher ratio (e.g., 1:16 to 1:17) to ensure adequate strength without over-extracting bitter notes. Be mindful of potential flatness due to age; agitation might need slight adjustment.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Matches origin (Huila, Colombia), varietals (Castillo/Caturra), process (Washed), and likely roast intention (Medium, focusing on classic Colombian sweetness and body)."
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "Similar origin (Colombia), varietal (Caturra), and intended roast level (Medium, for a balanced, approachable profile)."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Shares origin (Colombia), varietals (Caturra/Castillo), and process (Washed). While listed as 'Light', Counter Culture's approach for these coffees often delivers a profile similar to a lighter medium."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": false
+        },
+        "total": 5,
+        "max": 6,
+        "elapsed": 8885,
+        "inputTokens": 1384,
+        "outputTokens": 645,
+        "cost": 0.0005946
+      },
+      "GPT-5.4": {
+        "success": true,
+        "research": {
+          "altitude": "1600-2000 masl",
+          "roastLevel": "light-medium",
+          "roasterStyle": "Onyx typically roasts for high definition and sweetness with modern light-to-light-medium development, aiming for clarity and structure while keeping coffees approachable and expressive rather than aggressively underdeveloped.",
+          "processingNuance": "This is a conventional washed Huila profile, likely involving depulping, a fermentation period to remove mucilage, then full washing and careful drying. With Castillo and Caturra from Huila, washed processing usually emphasizes malic acidity, panela-like sweetness, red fruit, and a rounded cocoa or nut finish rather than intensely floral aromatics. At 74 days off roast and already marked past peak, the cup will likely present as more muted, with sweetness and nutty softness favored over sparkling acidity.",
+          "densityEstimate": "medium-high",
+          "flavorExpectations": "Expect a comforting, balanced cup centered on brown sugar, red apple, toasted almond or mixed nuts, light cocoa, and a smooth caramelized finish. Acidity should be gentle and malic rather than citrusy, with more sweetness and softness than overt floral or high-toned fruit character.",
+          "extractionNotes": "Because the coffee is past peak, push extraction slightly to recover sweetness and avoid a hollow cup. Use water around 94-96C, grind a touch finer than for a very fresh washed coffee, and aim for good contact time without stalling. For pour over, a 1:15.5 to 1:16 ratio works well, targeting enough extraction to bring out brown sugar and apple while controlling dryness from age. Expect reduced aromatics, so prioritize even flow, thorough saturation, and a slightly higher extraction yield. For immersion, longer steeping can help restore body and smoothness.",
+          "cupStructureFamily": "medium-washed",
+          "closestReferenceProfiles": [
+            {
+              "number": 29,
+              "name": "Asprotimana Colombia Huila",
+              "why": "Same region and similar classic Colombian washed structure with sweetness-forward, rounded body and approachable fruit."
+            },
+            {
+              "number": 31,
+              "name": "Olympia Amparo Pajoy",
+              "why": "A medium-style washed Colombia comparison that aligns with the smooth, brown-sugar, nutty, red-fruit leaning profile."
+            },
+            {
+              "number": 4,
+              "name": "Counter Culture Cueva de los Llanos",
+              "why": "Another washed Colombian Caturra/Castillo type reference with balanced sweetness and gentle fruit rather than floral or highly processed character."
+            }
+          ]
+        },
+        "scores": {
+          "R1": true,
+          "R2": true,
+          "R3": true,
+          "R4": true,
+          "R5": true,
+          "R6": false
+        },
+        "total": 5,
+        "max": 6,
+        "elapsed": 10401,
+        "inputTokens": 1317,
+        "outputTokens": 557,
+        "cost": 0.0088625
+      }
+    }
+  ],
+  "projections": {
+    "GPT-5.4": {
+      "avgHb": 0.008888437499999999,
+      "avgRes": 0.009103125,
+      "monthlyHb": 764.4056249999999,
+      "monthlyRes": 782.86875,
+      "total": 1547.274375
+    },
+    "GPT-5.4 Mini": {
+      "avgHb": 0.00135455,
+      "avgRes": 0.0013577000000000003,
+      "monthlyHb": 116.4913,
+      "monthlyRes": 116.76220000000002,
+      "total": 233.25350000000003
+    },
+    "Gemini 2.5 Flash": {
+      "avgHb": 0.00033388125,
+      "avgRes": 0.00053731875,
+      "monthlyHb": 28.7137875,
+      "monthlyRes": 46.2094125,
+      "total": 74.9232
+    },
+    "Haiku 4.5": {
+      "avgHb": 0.0041253,
+      "avgRes": 0.0034665,
+      "monthlyHb": 354.7758,
+      "monthlyRes": 298.11899999999997,
+      "total": 652.8948
+    }
+  }
+}

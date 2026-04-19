@@ -1,0 +1,77 @@
+{
+  "full": {
+    "legibility": {
+      "pass": false,
+      "note": "The main text is clear, but the \"2manybeans\" signature is very small and has low contrast against the dark green, making it difficult to read."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained neatly within the chalkboard area without overlapping any other elements."
+    },
+    "hierarchy": {
+      "pass": false,
+      "note": "not found"
+    },
+    "spacing": {
+      "pass": false,
+      "note": "not found"
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: NO - The main text is clear, but the \"2manybeans\" signature is very small and has low contrast against the dark green, making it difficult to read.\nBOUNDS: YES - All text is contained neatly within the chalkboard area without overlapping any other elements.\n"
+  },
+  "minimal": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clear and readable against the chalkboard background, and the chalk-style font is distinct."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The text \"Colombia Huila\" at the very top is slightly cut off by or overlaps the wooden frame above the chalkboard."
+    },
+    "hierarchy": {
+      "pass": false,
+      "note": "not found"
+    },
+    "spacing": {
+      "pass": false,
+      "note": "not found"
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: YES - All text is clear and readable against the chalkboard background, and the chalk-style font is distinct.\nBOUNDS: NO - The text \"Colombia Huila\" at the very top is slightly cut off by or overlaps the wooden frame above the chalkboard.\nHIERARCH"
+  },
+  "longname": {
+    "legibility": {
+      "pass": false,
+      "note": "The \"La Libertad\" portion of the bean name is noticeably faded compared to the rest of the text, making it less crisp and consistently easy to read."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is perfectly contained within the chalkboard area, without overlapping any other elements."
+    },
+    "hierarchy": {
+      "pass": false,
+      "note": "not found"
+    },
+    "spacing": {
+      "pass": false,
+      "note": "not found"
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: NO - The \"La Libertad\" portion of the bean name is noticeably faded compared to the rest of the text, making it less crisp and consistently easy to read.\nBOUNDS: YES - All text is perfectly contained within the chalkboard area, without overlapping any other elements.\n"
+  }
+}

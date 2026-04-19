@@ -20,7 +20,7 @@ import { createInterface } from 'readline';
 import { initializeApp, applicationDefault, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-const ALLOWED_PLANS = new Set(['pro_1week', 'pro_1year']);
+const ALLOWED_PLANS = new Set(['pro_1week', 'pro_1year', 'ultra_1week', 'ultra_1year']);
 const CODE_RE = /^[A-Z0-9-]{4,20}$/;
 
 function parseArgs(argv) {

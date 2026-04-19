@@ -1,0 +1,87 @@
+{
+  "full": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clearly readable against the chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained within the green chalkboard area, with no overlap onto the frame or surrounding elements."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name (\"Ethiopia Yirgacheffe Kochere\") is the most prominent, followed by descriptive information, and then the recipe parameters, which are clearly secondary."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between recipe parameter labels (e.g., GRIND (SS)) and their corresponding values (e.g., 4.2) feels a bit tight. Additionally, there's an excessive vertical gap between the main recipe block and the \"2manybeans\" signature, which is placed very low on the board."
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: YES - All text is clearly readable against the chalkboard background.\nBOUNDS: YES - All text is contained within the green chalkboard area, with no overlap onto the frame or surrounding elements.\nHIERARCHY: YES - The bean name (\"Ethiopia Yirgacheffe Kochere\") is the most prominent, followed by descriptive information, and then the recipe parameters, which are clearly secondary.\nSPACING: NO - The vertical spacing between recipe parameter labels (e.g., GRIND (SS)) and their corresponding values (e.g., 4.2) feels a bit tight. Additionally, there's an excessive vertical gap between the main recipe block and the \"2manybeans\" signature, which is placed very low on the board.\nBALANCE:"
+  },
+  "minimal": {
+    "legibility": {
+      "pass": false,
+      "note": "The \"Zmanybeans\" signature text is quite small and thin, making it less clear and harder to read quickly compared to the other text elements, especially on smaller screens."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is perfectly contained within the green chalkboard area and does not overlap any part of the wooden frame, shelves, the character Ruphus, or the counter."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The \"Colombia Huila\" bean name is the most prominent, followed by the secondary \"Counter Culture · Colombia · Natural\" details. The \"RATIO\" and \"BLOOM\" recipe parameters are clearly tertiary, and \"Zmanybeans\" is appropriately subtle."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "There are significant and uneven vertical gaps on the chalkboard. There's a large empty space between the horizontal divider and the \"RATIO\"/\"BLOOM\" parameters, and another substantial gap between the parameters and the \"Zmanybeans\" signature."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The text elements are vertically unbalanced on the chalkboard. The top section is relatively dense, but the large empty void in the middle makes the overall composition of the text within the chalkboard feel unharmonious and top-heavy."
+    },
+    "score": "2/5",
+    "suggestions": [
+      "Increase `font-size` for \"Zmanybeans\" from approximately 12px to 16px to improve legibility.",
+      "Move the text block containing \"RATIO\" and \"BLOOM\" up by 40px (e.g., if its `top` position is currently 320px, change to 280px) to reduce the gap after the horizontal divider.",
+      "Move the \"Zmanybeans\" text up by 50px (e.g., if its `top` position is currently 500px, change to 450px) to better distribute the text vertically on the chalkboard."
+    ],
+    "raw": "LEGIBILITY: NO - The \"Zmanybeans\" signature text is quite small and thin, making it less clear and harder to read quickly compared to the other text elements, especially on smaller screens.\nBOUNDS: YES - All text is perfectly contained within the green chalkboard area and does not overlap any part of the wooden frame, shelves, the character Ruphus, or the counter.\nHIERARCHY: YES - The \"Colombia Huila\" bean name is the most prominent, followed by the secondary \"Counter Culture · Colombia · Natural\" details. The \"RATIO\" and \"BLOOM\" recipe parameters are clearly tertiary, and \"Zmanybeans\" is appropriately subtle.\nSPACING: NO - There are significant and uneven vertical gaps on the chalkboard. There's a large empty space between the horizontal divider and the \"RATIO\"/\"BLOOM\" parameters, and another substantial gap between the parameters and the \"Zmanybeans\" signature.\nBALANCE: NO - The text elements are vertically unbalanced on the chalkboard. The top section is relatively dense, but the large empty void in the middle makes the overall composition of the text within the chalkboard feel unharmonious and top-heavy.\n\nSCORE: 2/5\nSUGGESTIONS:\n- Increase `font-size` for \"Zmanybeans\" from approximately 12px to 16px to improve legibility.\n- Move the text block containing \"RATIO\" and \"BLOOM\" up by 40px (e.g., if its `top` position is currently 320px, change to 280px) to reduce the gap after the horizontal divider.\n- Move the \"Zmanybeans\" text up by 50px (e.g., if its `top` position is currently 500px, change to 450px) to better distribute the text vertically on the chalkboard."
+  },
+  "longname": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clearly readable against the chalkboard background, despite the chalk-style font. The watermark text \"2manybeans\" is also legible."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The top line of text \"Guatemala Huehuetenango La Libertad Finca\" slightly overlaps the top wooden frame of the chalkboard."
+    },
+    "hierarchy": {
+      "pass": false,
+      "note": "While the first line is the largest, the visual difference in size between the first line (bean name) and the second line (company/origin/process) is not strong enough to establish clear hierarchy, making the primary name less prominent than it could be."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between the two main title lines is a bit tight. Also, the gap between the horizontal rule and the recipe parameters (RATIO/BLOOM) is excessively large, creating a disconnect."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The entire block of text is positioned too high on the chalkboard, leaving a disproportionately large empty space towards the bottom of the chalkboard above Ruphus, leading to poor vertical balance."
+    },
+    "score": "1/5",
+    "suggestions": [
+      "Adjust the 'top' CSS property of the main text content container on the chalkboard from its current position (e.g., 60px from the chalkboard top) to 85px to move the entire text block down by 25px.",
+      "Increase font-size of the primary title \"Guatemala Huehuetenango La Libertad Finca\" from its current size (e.g., 30px) to 38px.",
+      "Decrease font-size of the secondary title \"George Howell Coffee Company · Guatemala · Honey\" from its current size (e.g., 24px) to 20px.",
+      "Increase line-height for the top two title text elements (\"Guatemala Huehuetenango La Libertad Finca\" and \"George Howell Coffee Company · Guatemala · Honey\") from its current value (e.g., 1.2em) to 1.4em.",
+      "Decrease the margin-bottom of the horizontal rule from its current value (e.g., 30px) to 15px, to reduce the gap between the rule and the recipe parameters."
+    ],
+    "raw": "LEGIBILITY: YES - All text is clearly readable against the chalkboard background, despite the chalk-style font. The watermark text \"2manybeans\" is also legible.\nBOUNDS: NO - The top line of text \"Guatemala Huehuetenango La Libertad Finca\" slightly overlaps the top wooden frame of the chalkboard.\nHIERARCHY: NO - While the first line is the largest, the visual difference in size between the first line (bean name) and the second line (company/origin/process) is not strong enough to establish clear hierarchy, making the primary name less prominent than it could be.\nSPACING: NO - The vertical spacing between the two main title lines is a bit tight. Also, the gap between the horizontal rule and the recipe parameters (RATIO/BLOOM) is excessively large, creating a disconnect.\nBALANCE: NO - The entire block of text is positioned too high on the chalkboard, leaving a disproportionately large empty space towards the bottom of the chalkboard above Ruphus, leading to poor vertical balance.\n\nSCORE: 1/5\n\nSUGGESTIONS:\n- Adjust the 'top' CSS property of the main text content container on the chalkboard from its current position (e.g., 60px from the chalkboard top) to 85px to move the entire text block down by 25px.\n- Increase font-size of the primary title \"Guatemala Huehuetenango La Libertad Finca\" from its current size (e.g., 30px) to 38px.\n- Decrease font-size of the secondary title \"George Howell Coffee Company · Guatemala · Honey\" from its current size (e.g., 24px) to 20px.\n- Increase line-height for the top two title text elements (\"Guatemala Huehuetenango La Libertad Finca\" and \"George Howell Coffee Company · Guatemala · Honey\") from its current value (e.g., 1.2em) to 1.4em.\n- Decrease the margin-bottom of the horizontal rule from its current value (e.g., 30px) to 15px, to reduce the gap between the rule and the recipe parameters."
+  }
+}

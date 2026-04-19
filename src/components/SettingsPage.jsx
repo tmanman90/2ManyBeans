@@ -1,5 +1,5 @@
 // Settings page — iOS grouped table style, full-screen page sheet modal
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, LogOut, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
 import { doc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
@@ -129,6 +129,34 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   // DELETE, 'deleting' → API in flight. null = modal closed.
   const [deleteStep, setDeleteStep] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
+
+  // Grinder <select> width is pinned to the rendered width of the selected
+  // option. Native <select> on iOS WKWebView sizes its intrinsic width using
+  // the longest <option>, not the current value, which left a visible gap
+  // between "Fellow Ode Gen 2" and the chevron. Measuring the label with a
+  // hidden mirror span + setting an explicit width sidesteps WebKit's
+  // auto-size logic entirely.
+  const grinderMirrorRef = useRef(null);
+  const [grinderSelectWidth, setGrinderSelectWidth] = useState(null);
+  const grinderLabel =
+    (preferences.grinder === 'other'
+      ? 'Other / Manual Entry'
+      : GRINDERS.find(g => g.key === preferences.grinder)?.label) || 'Fellow Ode Gen 2';
+
+  const measureGrinder = () => {
+    if (!grinderMirrorRef.current) return;
+    const w = Math.ceil(grinderMirrorRef.current.getBoundingClientRect().width);
+    if (w > 0) setGrinderSelectWidth(w + 2);
+  };
+
+  useLayoutEffect(() => { measureGrinder(); }, [grinderLabel, open]);
+
+  useEffect(() => {
+    if (!document.fonts?.ready) return;
+    let cancelled = false;
+    document.fonts.ready.then(() => { if (!cancelled) measureGrinder(); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Redeem-code inline expand row (Subscription section, !hasPro only).
   // Success state is derived from the Firestore listener flipping hasPro
@@ -625,16 +653,32 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             {/* Grinder */}
             <div style={rowStyle}>
               <span style={rowLabelStyle}>Grinder</span>
-              <div style={rowValueStyle}>
+              <div style={{ ...rowValueStyle, position: 'relative' }}>
                 <select
                   value={preferences.grinder}
                   onChange={handleGrinderChange}
-                  style={selectStyle}
+                  style={{
+                    ...selectStyle,
+                    width: grinderSelectWidth != null ? grinderSelectWidth : undefined,
+                  }}
                 >
                   {GRINDERS.map(g => (
                     <option key={g.key} value={g.key}>{g.label}</option>
                   ))}
                 </select>
+                <span
+                  ref={grinderMirrorRef}
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', left: -9999, top: 0,
+                    visibility: 'hidden', pointerEvents: 'none',
+                    whiteSpace: 'pre',
+                    fontFamily: fonts.body, fontSize: 16,
+                    paddingLeft: 8, paddingRight: 0,
+                  }}
+                >
+                  {grinderLabel}
+                </span>
                 <ChevronRight size={16} color={C.textLight} />
               </div>
             </div>

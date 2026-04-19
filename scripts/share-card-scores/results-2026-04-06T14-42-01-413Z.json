@@ -1,0 +1,84 @@
+{
+  "full": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clearly readable against the chalkboard background. The white chalk-style text has good contrast."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained within the green chalkboard area and does not overlap with any surrounding elements like the wooden frame or Ruphus."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name (\"Ethiopia Yirgacheffe Kochere\") is the most prominent text, followed by the origin/processing details, and then the recipe parameters which are clearly secondary in prominence."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "There is an excessive vertical gap between the \"Onyx Coffee Lab · Ethiopia · Washed\" line and the \"RATIO\" / \"BLOOM\" recipe parameters, creating an empty void in the upper-middle section of the chalkboard."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The overall composition of the text on the chalkboard feels vertically imbalanced, being somewhat top-heavy due to the large gap mentioned in spacing. Additionally, the horizontal gap between the two columns of recipe parameters (\"RATIO / GRIND (SS)\" and \"BLOOM / GRIND (BATCH)\") is quite wide, contributing to a sense of emptiness in the center."
+    },
+    "score": "3/5",
+    "suggestions": [
+      "Reduce margin-top of the recipe parameters block (containing RATIO, GRIND (SS), BLOOM, GRIND (BATCH)) from its current value to (current_value - 60px).",
+      "Increase padding-top of the main text content wrapper (the container holding all text from \"Ethiopia Yirgacheffe Kochere\" down to \"5.8\") from its current value to (current_value + 30px).",
+      "Reduce margin-left of the right recipe column (containing BLOOM and GRIND (BATCH)) from its current value to (current_value - 50px)."
+    ],
+    "raw": "LEGIBILITY: YES - All text is clearly readable against the chalkboard background. The white chalk-style text has good contrast.\nBOUNDS: YES - All text is contained within the green chalkboard area and does not overlap with any surrounding elements like the wooden frame or Ruphus.\nHIERARCHY: YES - The bean name (\"Ethiopia Yirgacheffe Kochere\") is the most prominent text, followed by the origin/processing details, and then the recipe parameters which are clearly secondary in prominence.\nSPACING: NO - There is an excessive vertical gap between the \"Onyx Coffee Lab · Ethiopia · Washed\" line and the \"RATIO\" / \"BLOOM\" recipe parameters, creating an empty void in the upper-middle section of the chalkboard.\nBALANCE: NO - The overall composition of the text on the chalkboard feels vertically imbalanced, being somewhat top-heavy due to the large gap mentioned in spacing. Additionally, the horizontal gap between the two columns of recipe parameters (\"RATIO / GRIND (SS)\" and \"BLOOM / GRIND (BATCH)\") is quite wide, contributing to a sense of emptiness in the center.\n\nSCORE: 3/5\nSUGGESTIONS:\n- Reduce margin-top of the recipe parameters block (containing RATIO, GRIND (SS), BLOOM, GRIND (BATCH)) from its current value to (current_value - 60px).\n- Increase padding-top of the main text content wrapper (the container holding all text from \"Ethiopia Yirgacheffe Kochere\" down to \"5.8\") from its current value to (current_value + 30px).\n- Reduce margin-left of the right recipe column (containing BLOOM and GRIND (BATCH)) from its current value to (current_value - 50px)."
+  },
+  "minimal": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clearly readable against the chalkboard background, although the \"2manybeans\" watermark is subtle."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The text \"Colombia Huila\" at the very top slightly overlaps the wooden frame above the chalkboard."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name \"Colombia Huila\" is the largest and most prominent text, with the roaster/origin/process and recipe parameters appropriately scaled down."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between the parameter labels (RATIO, BLOOM) and their corresponding values (1:15, 2.5x 45s) is too tight."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The entire block of text is positioned too high within the chalkboard area, leading to the top title overlapping the frame and leaving a disproportionately large amount of empty space at the bottom of the chalkboard relative to the text."
+    },
+    "score": "2/5",
+    "suggestions": [
+      "Adjust the `top` position of the main text content block on the chalkboard from its current perceived `25px` (from the chalkboard's top edge) to `45px`. This will move the text down, resolving the overlap of \"Colombia Huila\" and improving the overall vertical balance of the text within the chalkboard.",
+      "For the recipe parameters, add `margin-top: 8px` to the elements containing the values ('1:15' and '2.5x 45s') to provide adequate vertical spacing from their respective labels."
+    ],
+    "raw": "LEGIBILITY: YES - All text is clearly readable against the chalkboard background, although the \"2manybeans\" watermark is subtle.\nBOUNDS: NO - The text \"Colombia Huila\" at the very top slightly overlaps the wooden frame above the chalkboard.\nHIERARCHY: YES - The bean name \"Colombia Huila\" is the largest and most prominent text, with the roaster/origin/process and recipe parameters appropriately scaled down.\nSPACING: NO - The vertical spacing between the parameter labels (RATIO, BLOOM) and their corresponding values (1:15, 2.5x 45s) is too tight.\nBALANCE: NO - The entire block of text is positioned too high within the chalkboard area, leading to the top title overlapping the frame and leaving a disproportionately large amount of empty space at the bottom of the chalkboard relative to the text.\n\nSCORE: 2/5\nSUGGESTIONS:\n- Adjust the `top` position of the main text content block on the chalkboard from its current perceived `25px` (from the chalkboard's top edge) to `45px`. This will move the text down, resolving the overlap of \"Colombia Huila\" and improving the overall vertical balance of the text within the chalkboard.\n- For the recipe parameters, add `margin-top: 8px` to the elements containing the values ('1:15' and '2.5x 45s') to provide adequate vertical spacing from their respective labels."
+  },
+  "longname": {
+    "legibility": {
+      "pass": false,
+      "note": "The text \"Guatemala Huehuetenango La Libertad\" is fuzzy, especially towards the right. The \"George Howell Coffee Company\" text appears thin and lacks the intended chalk-like crispness. The \"2manybeans\" signature at the bottom is very faint and difficult to read."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The text \"Guatemala Huehuetenango La Libertad\" is too close to the top and right wooden frame, with the 'd' in \"Libertad\" almost touching the frame."
+    },
+    "hierarchy": {
+      "pass": false,
+      "note": "The bean name \"Guatemala Huehuetenango La Libertad\" is not sufficiently prominent. While at the top, its faintness and similar size/weight to the \"George Howell Coffee Company\" line below it"
+    },
+    "spacing": {
+      "pass": false,
+      "note": "not found"
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: NO - The text \"Guatemala Huehuetenango La Libertad\" is fuzzy, especially towards the right. The \"George Howell Coffee Company\" text appears thin and lacks the intended chalk-like crispness. The \"2manybeans\" signature at the bottom is very faint and difficult to read.\nBOUNDS: NO - The text \"Guatemala Huehuetenango La Libertad\" is too close to the top and right wooden frame, with the 'd' in \"Libertad\" almost touching the frame.\nHIERARCHY: NO - The bean name \"Guatemala Huehuetenango La Libertad\" is not sufficiently prominent. While at the top, its faintness and similar size/weight to the \"George Howell Coffee Company\" line below it"
+  }
+}

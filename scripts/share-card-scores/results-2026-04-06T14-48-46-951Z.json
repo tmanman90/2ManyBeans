@@ -1,0 +1,87 @@
+{
+  "full": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is crisp and clear against the chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained within the green chalkboard area, without overlapping any frames or illustrations."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name \"Ethiopia Yirgacheffe Kochere\" is clearly the most prominent, followed by the source/process, and then the recipe parameters."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between the main content lines and the recipe parameters, and within the recipe parameters themselves, feels a bit compressed. The \"2manybeans\" text also feels isolated and a bit too far from the main content."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The text content is visually weighted towards the upper half of the chalkboard, leaving too much empty space below the recipe parameters and above \"2manybeans\", making the overall composition feel top-heavy and vertically unbalanced."
+    },
+    "score": "3/5",
+    "suggestions": [
+      "Increase the 'top' CSS property of the main text container from its current value (e.g., 80px) to 120px to shift all text down by 40px, improving vertical balance.",
+      "Increase the 'margin-bottom' of the 'Onyx Coffee Lab · Ethiopia · Washed' line from its current value (e.g., 20px) to 40px to create more separation from the recipe parameters.",
+      "Increase the 'line-height' for all recipe parameter text elements (e.g., 'RATIO', '1:16') from 1.3em to 1.6em to provide more vertical breathing room within the parameter block.",
+      "Decrease the 'margin-top' of the '2manybeans' text from its current value (e.g., 80px relative to the last parameter line) to 40px, bringing it closer to the main recipe content."
+    ],
+    "raw": "LEGIBILITY: YES - All text is crisp and clear against the chalkboard background.\nBOUNDS: YES - All text is contained within the green chalkboard area, without overlapping any frames or illustrations.\nHIERARCHY: YES - The bean name \"Ethiopia Yirgacheffe Kochere\" is clearly the most prominent, followed by the source/process, and then the recipe parameters.\nSPACING: NO - The vertical spacing between the main content lines and the recipe parameters, and within the recipe parameters themselves, feels a bit compressed. The \"2manybeans\" text also feels isolated and a bit too far from the main content.\nBALANCE: NO - The text content is visually weighted towards the upper half of the chalkboard, leaving too much empty space below the recipe parameters and above \"2manybeans\", making the overall composition feel top-heavy and vertically unbalanced.\n\nSCORE: 3/5\n\nSUGGESTIONS:\n- Increase the 'top' CSS property of the main text container from its current value (e.g., 80px) to 120px to shift all text down by 40px, improving vertical balance.\n- Increase the 'margin-bottom' of the 'Onyx Coffee Lab · Ethiopia · Washed' line from its current value (e.g., 20px) to 40px to create more separation from the recipe parameters.\n- Increase the 'line-height' for all recipe parameter text elements (e.g., 'RATIO', '1:16') from 1.3em to 1.6em to provide more vertical breathing room within the parameter block.\n- Decrease the 'margin-top' of the '2manybeans' text from its current value (e.g., 80px relative to the last parameter line) to 40px, bringing it closer to the main recipe content."
+  },
+  "minimal": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is crisp and clear against the dark green chalkboard background, with good contrast."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text content is comfortably contained within the green chalkboard area, with no overlap onto the wooden frame, shelves, or the character below."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "\"Colombia Huila\" is the most prominent text, followed by the origin and processing details, and then the recipe parameters, establishing a clear visual hierarchy. The \"2manybeans\" signature is appropriately subtle."
+    },
+    "spacing": {
+      "pass": true,
+      "note": "The spacing between individual lines of text and elements (e.g., between \"RATIO\" and \"1:15\", or between \"Colombia Huila\" and the line below it) is adequate, without cramping or excessive internal gaps."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The entire block of text content is positioned too high on the chalkboard, leaving a large empty vertical space below the recipe details and above the dog character. This makes the overall composition feel top-heavy and vertically unbalanced within the chalkboard frame."
+    },
+    "score": "4/5",
+    "suggestions": [
+      "Move the entire text content block (from \"Colombia Huila\" down to \"2manybeans\") downwards by 40px to better balance it vertically on the chalkboard. Assuming the text block is contained within a div with `position: absolute;`, this would be: `div.chalkboard-text-content { top: calc(current_top_value + 40px); }`"
+    ],
+    "raw": "LEGIBILITY: YES - All text is crisp and clear against the dark green chalkboard background, with good contrast.\nBOUNDS: YES - All text content is comfortably contained within the green chalkboard area, with no overlap onto the wooden frame, shelves, or the character below.\nHIERARCHY: YES - \"Colombia Huila\" is the most prominent text, followed by the origin and processing details, and then the recipe parameters, establishing a clear visual hierarchy. The \"2manybeans\" signature is appropriately subtle.\nSPACING: YES - The spacing between individual lines of text and elements (e.g., between \"RATIO\" and \"1:15\", or between \"Colombia Huila\" and the line below it) is adequate, without cramping or excessive internal gaps.\nBALANCE: NO - The entire block of text content is positioned too high on the chalkboard, leaving a large empty vertical space below the recipe details and above the dog character. This makes the overall composition feel top-heavy and vertically unbalanced within the chalkboard frame.\n\nSCORE: 4/5\nSUGGESTIONS:\n- Move the entire text content block (from \"Colombia Huila\" down to \"2manybeans\") downwards by 40px to better balance it vertically on the chalkboard. Assuming the text block is contained within a div with `position: absolute;`, this would be: `div.chalkboard-text-content { top: calc(current_top_value + 40px); }`"
+  },
+  "longname": {
+    "legibility": {
+      "pass": true,
+      "note": "The contrast between the white text and the dark green chalkboard is excellent, and while some text is stylized, it remains clear and readable."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The top line of text (\"Guatemala Huehuetenango La Libertad Finca\") slightly touches the top wooden frame on the left, and the text on both the first and second lines (specifically \"Finca\" and \"Honey\") is too close to the right wooden frame, lacking sufficient margin."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The \"Guatemala Huehuetenango La Libertad Finca\" is clearly the primary information, presented in a larger, more distinctive font, followed by secondary bean details and then the recipe parameters in a smaller, simpler font."
+    },
+    "spacing": {
+      "pass": true,
+      "note": "The internal spacing between the title lines, column headers, values, and the \"2manybeans\" signature is well-managed, avoiding cramping or excessive gaps."
+    },
+    "balance": {
+      "pass": true,
+      "note": "The overall composition is aesthetically pleasing, with the text centrally aligned horizontally and a good visual relationship between the text and the illustration. The minor issue with text bounds at the top does not significantly detract from the overall balance."
+    },
+    "score": "4/5",
+    "suggestions": [
+      "Move the main text block's top position from (e.g., 50px) to (e.g., 60px) relative to the chalkboard's top edge.",
+      "Increase left/right padding for the main text block from (e.g., 40px) to (e.g., 45px)."
+    ],
+    "raw": "LEGIBILITY: YES - The contrast between the white text and the dark green chalkboard is excellent, and while some text is stylized, it remains clear and readable.\nBOUNDS: NO - The top line of text (\"Guatemala Huehuetenango La Libertad Finca\") slightly touches the top wooden frame on the left, and the text on both the first and second lines (specifically \"Finca\" and \"Honey\") is too close to the right wooden frame, lacking sufficient margin.\nHIERARCHY: YES - The \"Guatemala Huehuetenango La Libertad Finca\" is clearly the primary information, presented in a larger, more distinctive font, followed by secondary bean details and then the recipe parameters in a smaller, simpler font.\nSPACING: YES - The internal spacing between the title lines, column headers, values, and the \"2manybeans\" signature is well-managed, avoiding cramping or excessive gaps.\nBALANCE: YES - The overall composition is aesthetically pleasing, with the text centrally aligned horizontally and a good visual relationship between the text and the illustration. The minor issue with text bounds at the top does not significantly detract from the overall balance.\nSCORE: 4/5\nSUGGESTIONS:\n- Move the main text block's top position from (e.g., 50px) to (e.g., 60px) relative to the chalkboard's top edge.\n- Increase left/right padding for the main text block from (e.g., 40px) to (e.g., 45px)."
+  }
+}

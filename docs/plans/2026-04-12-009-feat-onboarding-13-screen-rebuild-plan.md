@@ -8,6 +8,16 @@ origin: docs/brainstorms/2026-04-12-onboarding-14-screen-rebuild-requirements.md
 
 # feat: Onboarding 13-Screen Rebuild
 
+## ⚠️ Implementation Status (read first)
+
+- **Phase 0: ✅ COMPLETE** — shipped 2026-04-12 in commit `0142d82` on `feat/subscriptions`. Rules deployed. **Do not re-implement.**
+- **Phase 1: ⏳ NEXT** — foundation (state machine, error boundary, libs, dev replay, scaffolding). Start here.
+- **Phases 2-5: ⏳ PENDING** — screens, processing, paywall, rollout.
+
+Commit this phase's work on `feat/subscriptions`. Do NOT stage the unrelated dirty files already in the working tree (`HandBrewModal.jsx`, `ChatTab.jsx`, `QuickRecipeFlow.jsx`, etc.) — those are separate in-progress work.
+
+---
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-04-12
@@ -405,6 +415,8 @@ This is a structural edit but a LOCAL one — ~10 lines of JSX rearrangement. No
 ---
 
 #### Phase 0: Prerequisites (Provider Hoist + Rules Deploy)
+
+**STATUS: ✅ COMPLETE — shipped 2026-04-12 in commit `0142d82` on `feat/subscriptions`. Firestore rules deployed to `manybeans-7893c` via `firebase deploy --only firestore:rules`. Build verified passing. Skip this phase entirely — do NOT re-implement its tasks. Start directly at Phase 1.**
 
 **Deliverable:** `main.jsx` has the providers hoisted above Gate 5, the new Firestore rules are deployed to production, and a rule propagation window has passed before any client code rolls out.
 

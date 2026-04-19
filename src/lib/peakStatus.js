@@ -34,6 +34,12 @@ export const formatDate = (isoDate) => {
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 };
 
+export const lifePct = (bean) => {
+  const days = daysSinceRoast(bean.roastDate, bean);
+  if (days === null || !bean.peakEnd) return 0;
+  return Math.min(1, Math.max(0, days / bean.peakEnd));
+};
+
 export const getPeakStatus = (bean) => {
   const days = daysSinceRoast(bean.roastDate, bean);
   const frozen = !!bean.frozenAt;

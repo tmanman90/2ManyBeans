@@ -1,0 +1,86 @@
+{
+  "full": {
+    "legibility": {
+      "pass": false,
+      "note": "The \"2manybeans\" text is too faint and low-contrast against the chalkboard background, making it difficult to read."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The top line of text (\"Ethiopia Yirgacheffe Kochere\") is positioned too close to, and appears to slightly touch, the inside edge of the top wooden frame."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name (\"Ethiopia Yirgacheffe Kochere\") is the largest and most prominent, followed by the roaster/origin, and then the recipe parameters, establishing a clear visual hierarchy."
+    },
+    "spacing": {
+      "pass": true,
+      "note": "There is adequate and consistent spacing between all text elements, avoiding both cramping and excessive gaps."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The entire text block is positioned too high on the chalkboard, creating a top-heavy composition with a large, empty green space above Ruphus's head, leading to an unbalanced overall look."
+    },
+    "score": "2/5",
+    "suggestions": [
+      "Update the CSS for the \"2manybeans\" text element to `color: white; opacity: 1;` to significantly improve its legibility.",
+      "Move the entire chalkboard text content container (from \"Ethiopia Yirgacheffe Kochere\" to \"5.8\") downwards. If its current `top` position is `100px` relative to the chalkboard, change it to `130px` to clear the top frame and improve vertical balance."
+    ],
+    "raw": "LEGIBILITY: NO - The \"2manybeans\" text is too faint and low-contrast against the chalkboard background, making it difficult to read.\nBOUNDS: NO - The top line of text (\"Ethiopia Yirgacheffe Kochere\") is positioned too close to, and appears to slightly touch, the inside edge of the top wooden frame.\nHIERARCHY: YES - The bean name (\"Ethiopia Yirgacheffe Kochere\") is the largest and most prominent, followed by the roaster/origin, and then the recipe parameters, establishing a clear visual hierarchy.\nSPACING: YES - There is adequate and consistent spacing between all text elements, avoiding both cramping and excessive gaps.\nBALANCE: NO - The entire text block is positioned too high on the chalkboard, creating a top-heavy composition with a large, empty green space above Ruphus's head, leading to an unbalanced overall look.\n\nSCORE: 2/5\nSUGGESTIONS:\n- Update the CSS for the \"2manybeans\" text element to `color: white; opacity: 1;` to significantly improve its legibility.\n- Move the entire chalkboard text content container (from \"Ethiopia Yirgacheffe Kochere\" to \"5.8\") downwards. If its current `top` position is `100px` relative to the chalkboard, change it to `130px` to clear the top frame and improve vertical balance."
+  },
+  "minimal": {
+    "legibility": {
+      "pass": true,
+      "note": "All text is clearly legible against the chalkboard background; the white chalk-style text provides good contrast and is crisp."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is perfectly contained within the green chalkboard area, with no overlap onto the wooden frame, shelves, Ruphus, or the counter below."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name \"Colombia Huila\" is the most prominent text, followed by the origin details, with recipe parameters (\"RATIO\", \"BLOOM\") presented as secondary information, and the branding \"2manybeans\" as the smallest."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "There are noticeably large vertical gaps between the \"Counter Culture · Colombia · Natural\" line and the \"RATIO / BLOOM\" line, and also between the \"2.5x 45s\" line and the \"2manybeans\" branding. This creates excessive empty space in the middle of the text block."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The overall text composition on the chalkboard feels vertically stretched and somewhat top-heavy due to the overly generous internal vertical spacing. This detracts from the aesthetic balance of the text content within the chalkboard area."
+    },
+    "score": "3/5",
+    "suggestions": [
+      "Reduce the vertical spacing between the \"Counter Culture · Colombia · Natural\" line and the \"RATIO / BLOOM\" line. If the `margin-top` of the recipe parameters block (containing \"RATIO\", \"BLOOM\", \"1:15\", \"2.5x 45s\") is currently `70px`, change it to `40px`.",
+      "Reduce the vertical spacing between the recipe parameters values (\"1:15\", \"2.5x 45s\") and the \"2manybeans\" branding text. If the `margin-top` of the"
+    ],
+    "raw": "LEGIBILITY: YES - All text is clearly legible against the chalkboard background; the white chalk-style text provides good contrast and is crisp.\nBOUNDS: YES - All text is perfectly contained within the green chalkboard area, with no overlap onto the wooden frame, shelves, Ruphus, or the counter below.\nHIERARCHY: YES - The bean name \"Colombia Huila\" is the most prominent text, followed by the origin details, with recipe parameters (\"RATIO\", \"BLOOM\") presented as secondary information, and the branding \"2manybeans\" as the smallest.\nSPACING: NO - There are noticeably large vertical gaps between the \"Counter Culture · Colombia · Natural\" line and the \"RATIO / BLOOM\" line, and also between the \"2.5x 45s\" line and the \"2manybeans\" branding. This creates excessive empty space in the middle of the text block.\nBALANCE: NO - The overall text composition on the chalkboard feels vertically stretched and somewhat top-heavy due to the overly generous internal vertical spacing. This detracts from the aesthetic balance of the text content within the chalkboard area.\n\nSCORE: 3/5\nSUGGESTIONS:\n- Reduce the vertical spacing between the \"Counter Culture · Colombia · Natural\" line and the \"RATIO / BLOOM\" line. If the `margin-top` of the recipe parameters block (containing \"RATIO\", \"BLOOM\", \"1:15\", \"2.5x 45s\") is currently `70px`, change it to `40px`.\n- Reduce the vertical spacing between the recipe parameters values (\"1:15\", \"2.5x 45s\") and the \"2manybeans\" branding text. If the `margin-top` of the"
+  },
+  "longname": {
+    "legibility": {
+      "pass": false,
+      "note": "The text \"CIT.D.I\" under the main title is extremely faint and illegible against the chalkboard background."
+    },
+    "bounds": {
+      "pass": false,
+      "note": "The top two lines of text (\"Guatemala Huehuetenango La Libertad Finca\" and \"George Howell Coffee Company · Guatemala · Honey\") slightly overlap the top wooden frame of the chalkboard."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name and origin are clearly the largest and most prominent text, with recipe parameters secondary."
+    },
+    "spacing": {
+      "pass": true,
+      "note": "There is adequate and consistent spacing between text elements, preventing cramping and excessive gaps."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The text content is positioned too high, making the top portion of the chalkboard feel cramped and unbalanced compared to the ample space below. The illegible \"CIT.D.I\" text also detracts from the intentional aesthetic."
+    },
+    "score": "2/5",
+    "suggestions": [
+      "Remove the text element containing \"CIT.D.I\" for improved legibility and a cleaner design.",
+      "Increase the top offset of the main text container by 5px (e.g., adjust `top` property or `padding-top` on the text container by 5px) to move all text down and away from the wooden frame, improving bounds and overall balance."
+    ],
+    "raw": "LEGIBILITY: NO - The text \"CIT.D.I\" under the main title is extremely faint and illegible against the chalkboard background.\nBOUNDS: NO - The top two lines of text (\"Guatemala Huehuetenango La Libertad Finca\" and \"George Howell Coffee Company · Guatemala · Honey\") slightly overlap the top wooden frame of the chalkboard.\nHIERARCHY: YES - The bean name and origin are clearly the largest and most prominent text, with recipe parameters secondary.\nSPACING: YES - There is adequate and consistent spacing between text elements, preventing cramping and excessive gaps.\nBALANCE: NO - The text content is positioned too high, making the top portion of the chalkboard feel cramped and unbalanced compared to the ample space below. The illegible \"CIT.D.I\" text also detracts from the intentional aesthetic.\nSCORE: 2/5\nSUGGESTIONS:\n- Remove the text element containing \"CIT.D.I\" for improved legibility and a cleaner design.\n- Increase the top offset of the main text container by 5px (e.g., adjust `top` property or `padding-top` on the text container by 5px) to move all text down and away from the wooden frame, improving bounds and overall balance."
+  }
+}

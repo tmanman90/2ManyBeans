@@ -1,0 +1,89 @@
+{
+  "full": {
+    "legibility": {
+      "pass": true,
+      "note": "All text, presented in white chalk-style font, is crisp and clearly readable against the dark green chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained within the green chalkboard area, without overlapping the wooden frame, shelves, Ruphus, or the counter below."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The bean name \"Ethiopia Yirgacheffe Kochere\" is the most prominent text, using a larger and bolder font, with the secondary information and recipe parameters clearly less prominent."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "There are noticeable excessive vertical gaps. Specifically, the space between the second title line (\"Onyx Coffee Lab...\") and the recipe parameters (RATIO, BLOOM) is too large, and the gap between the recipe parameters and the \""
+    },
+    "balance": {
+      "pass": false,
+      "note": "not found"
+    },
+    "score": "0/5",
+    "suggestions": [],
+    "raw": "LEGIBILITY: YES - All text, presented in white chalk-style font, is crisp and clearly readable against the dark green chalkboard background.\nBOUNDS: YES - All text is contained within the green chalkboard area, without overlapping the wooden frame, shelves, Ruphus, or the counter below.\nHIERARCHY: YES - The bean name \"Ethiopia Yirgacheffe Kochere\" is the most prominent text, using a larger and bolder font, with the secondary information and recipe parameters clearly less prominent.\nSPACING: NO - There are noticeable excessive vertical gaps. Specifically, the space between the second title line (\"Onyx Coffee Lab...\") and the recipe parameters (RATIO, BLOOM) is too large, and the gap between the recipe parameters and the \""
+  },
+  "minimal": {
+    "legibility": {
+      "pass": false,
+      "note": "The text \"2manybeans\" is notably smaller and less distinct than the other text elements, making it harder to read clearly against the chalkboard background."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text is contained well within the green chalkboard area, without overlapping any frames, shelves, Ruphus, or the counter."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "\"Colombia Huila\" is the largest and most prominent, followed by the origin/process details, and then the recipe parameters, establishing a clear visual hierarchy."
+    },
+    "spacing": {
+      "pass": true,
+      "note": "There is adequate and balanced spacing between the primary text elements (bean name, details, ratio/bloom)."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The main text block is positioned too high on the chalkboard, leaving a significant empty space above the Ruphus character and making the overall composition feel vertically unbalanced."
+    },
+    "score": "3/5",
+    "suggestions": [
+      "Increase font-size of the \"2manybeans\" text from 18px to 24px.",
+      "Increase font-weight of the \"2manybeans\" text from `normal` to `bold`.",
+      "Adjust the `top` property of the main recipe text container (holding \"Colombia Huila\" down to \"2.5x 45s\") from its current 150px to 210px to lower the text block and improve vertical balance."
+    ],
+    "raw": "LEGIBILITY: NO - The text \"2manybeans\" is notably smaller and less distinct than the other text elements, making it harder to read clearly against the chalkboard background.\nBOUNDS: YES - All text is contained well within the green chalkboard area, without overlapping any frames, shelves, Ruphus, or the counter.\nHIERARCHY: YES - \"Colombia Huila\" is the largest and most prominent, followed by the origin/process details, and then the recipe parameters, establishing a clear visual hierarchy.\nSPACING: YES - There is adequate and balanced spacing between the primary text elements (bean name, details, ratio/bloom).\nBALANCE: NO - The main text block is positioned too high on the chalkboard, leaving a significant empty space above the Ruphus character and making the overall composition feel vertically unbalanced.\n\nSCORE: 3/5\nSUGGESTIONS:\n- Increase font-size of the \"2manybeans\" text from 18px to 24px.\n- Increase font-weight of the \"2manybeans\" text from `normal` to `bold`.\n- Adjust the `top` property of the main recipe text container (holding \"Colombia Huila\" down to \"2.5x 45s\") from its current 150px to 210px to lower the text block and improve vertical balance."
+  },
+  "longname": {
+    "legibility": {
+      "pass": false,
+      "note": "The primary title \"Guatemala Huehuetenango La Libertad Finca\" and secondary details \"George Howell Coffee Company...\" are quite thin and could be bolder or slightly larger for better readability. The \"2manybeans\" watermark is also very small."
+    },
+    "bounds": {
+      "pass": true,
+      "note": "All text elements are comfortably within the green chalkboard area, without overlapping any frames, shelves, or the character."
+    },
+    "hierarchy": {
+      "pass": true,
+      "note": "The main bean name is clearly the largest and most distinct font, making it the primary focus. Recipe parameters are secondary with a simpler, smaller font."
+    },
+    "spacing": {
+      "pass": false,
+      "note": "The vertical spacing between the first and second lines of the top text block is a bit cramped. The horizontal gap between the two columns of recipe parameters is quite wide, making the recipe section feel sparse."
+    },
+    "balance": {
+      "pass": false,
+      "note": "The \"2manybeans\" text is positioned quite low and feels somewhat isolated from the main recipe content. The overall text distribution could be slightly more harmonized."
+    },
+    "score": "2/5",
+    "suggestions": [
+      "Increase `font-size` for \"Guatemala Huehuetenango La Libertad Finca\" from `30px` to `34px`.",
+      "Increase `font-weight` for \"Guatemala Huehuetenango La Libertad Finca\" from `normal` to `600`.",
+      "Increase `font-weight` for \"George Howell Coffee Company · Guatemala · Honey\" from `normal` to `500`.",
+      "Increase `font-size` for \"2manybeans\" from `14px` to `18px`.",
+      "Increase `margin-bottom` of the element containing \"Guatemala Huehuetenango La Libertad Finca\" from `8px` to `12px`.",
+      "Reduce `gap` between the recipe parameter columns from `120px` to `90px` (assuming a flex container).",
+      "Move the `top` position of \"2manybeans\" from `480px` to `450px`."
+    ],
+    "raw": "LEGIBILITY: NO - The primary title \"Guatemala Huehuetenango La Libertad Finca\" and secondary details \"George Howell Coffee Company...\" are quite thin and could be bolder or slightly larger for better readability. The \"2manybeans\" watermark is also very small.\nBOUNDS: YES - All text elements are comfortably within the green chalkboard area, without overlapping any frames, shelves, or the character.\nHIERARCHY: YES - The main bean name is clearly the largest and most distinct font, making it the primary focus. Recipe parameters are secondary with a simpler, smaller font.\nSPACING: NO - The vertical spacing between the first and second lines of the top text block is a bit cramped. The horizontal gap between the two columns of recipe parameters is quite wide, making the recipe section feel sparse.\nBALANCE: NO - The \"2manybeans\" text is positioned quite low and feels somewhat isolated from the main recipe content. The overall text distribution could be slightly more harmonized.\n\nSCORE: 2/5\nSUGGESTIONS:\n- Increase `font-size` for \"Guatemala Huehuetenango La Libertad Finca\" from `30px` to `34px`.\n- Increase `font-weight` for \"Guatemala Huehuetenango La Libertad Finca\" from `normal` to `600`.\n- Increase `font-weight` for \"George Howell Coffee Company · Guatemala · Honey\" from `normal` to `500`.\n- Increase `font-size` for \"2manybeans\" from `14px` to `18px`.\n- Increase `margin-bottom` of the element containing \"Guatemala Huehuetenango La Libertad Finca\" from `8px` to `12px`.\n- Reduce `gap` between the recipe parameter columns from `120px` to `90px` (assuming a flex container).\n- Move the `top` position of \"2manybeans\" from `480px` to `450px`."
+  }
+}

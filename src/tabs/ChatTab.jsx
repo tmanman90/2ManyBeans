@@ -110,7 +110,7 @@ const ChatInputBar = memo(function ChatInputBar({
         </div>
       )}
 
-      <div style={{
+      <div data-tour="chat-input" style={{
         position: 'fixed',
         bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
         left: 0, right: 0,

@@ -1,0 +1,23 @@
+{
+  "full": {
+    "raw": "```json\n{\n  \"legibility\": {\n    \"pass\": false,\n    \"note\": \"The '2manybeans' watermark text is very faint and blends too much with the chalkboard, making it hard to read.\"\n  },\n  \"bounds\": {\n",
+    "score": "0/5",
+    "suggestions": [
+      "JSON parse failed"
+    ]
+  },
+  "minimal": {
+    "raw": "```json\n{\n  \"legibility\": {\n    \"pass\": true,\n    \"note\": \"All text is clear and readable against the chalkboard background, despite the 'chalk' style.\"\n  },\n  \"bounds\": {\n    \"pass\": false,\n    ",
+    "score": "0/5",
+    "suggestions": [
+      "JSON parse failed"
+    ]
+  },
+  "longname": {
+    "raw": "```json\n{\n  \"legibility\": {\n    \"pass\": false,\n    \"note\": \"The top line of text, 'Guatemala Huehuetenango La Libertad', appears slightly blurry or less crisp compared to other text elements, making it harder to read clearly",
+    "score": "0/5",
+    "suggestions": [
+      "Could not parse response"
+    ]
+  }
+}

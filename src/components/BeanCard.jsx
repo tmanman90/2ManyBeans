@@ -2,11 +2,24 @@
 import { useState } from 'react';
 import { Pencil, Snowflake, ChevronDown } from 'lucide-react';
 import { C, fonts, journalCard } from '../styles/theme';
-import { getPeakStatus, daysOpen, today, daysBetween, formatDate } from '../lib/peakStatus';
-import { Badge } from './Badge';
+import { getPeakStatus, daysOpen, today, daysBetween, formatDate, lifePct } from '../lib/peakStatus';
 import { EditBeanModal } from './EditBeanModal';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
+
+const PeakArc = ({ pct, color, size = 32 }) => {
+  const r = size / 2 - 3;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * Math.min(1, Math.max(0, pct));
+  return (
+    <svg width={size} height={size}>
+      <circle cx={size/2} cy={size/2} r={r} stroke="#EDE6DC" strokeWidth="2.5" fill="none"/>
+      <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth="2.5" fill="none"
+        strokeDasharray={`${dash} ${circ - dash}`} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`}/>
+    </svg>
+  );
+};
 
 // NOTE: intentionally NOT wrapped in React.memo. A previous memo with a
 // custom comparator that skipped the `actions` prop (because it's inline JSX
@@ -17,7 +30,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 // visible. React's default rendering is fast enough here -- BeanCard has
 // no heavy work inside it and the visible list is short (3 active beans
 // + a few inventory rows at a time).
-export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid }) => {
+export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBean, onLearn, uid, tourTag }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const [editOpen, setEditOpen] = useState(false);
@@ -25,6 +38,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
   const [imgLoaded, setImgLoaded] = useState(false);
   const [freezing, setFreezing] = useState(false);
   const ps = getPeakStatus(bean);
+  const life = lifePct(bean);
   const dOpen = daysOpen(bean.openDate);
 
   const grindText = brewMethod.grindLabel(bean, preferences);
@@ -104,7 +118,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
         </div>
       )}
 
-      <div style={{ padding: compact ? 16 : 20 }}>
+      <div style={{ padding: compact ? 16 : 20, paddingBottom: actions ? 0 : (compact ? 16 : 20) }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {bean.roaster && (
@@ -113,15 +127,28 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
             </div>
           )}
           <div style={{
-            fontFamily: fonts.heading, fontSize: compact ? 18 : 22, color: C.text, lineHeight: 1.2,
+            fontFamily: fonts.heading, fontSize: compact ? 18 : 22, color: C.text, lineHeight: 1.25,
             overflow: 'hidden', display: '-webkit-box',
             WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
             wordBreak: 'break-word',
           }}>
             {bean.name}
           </div>
+          {!bean.photoUrl && (
+            <div style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: ps.color, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+              {ps.label}
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} {...(tourTag ? { 'data-tour': tourTag } : {})}>
+          <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+            <PeakArc pct={life} color={ps.color} size={32} />
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              fontFamily: fonts.heading, fontSize: 10, fontWeight: 600, color: ps.color,
+            }}>{ps.days != null ? ps.days + 'd' : ''}</div>
+          </div>
           {onLearn && (
             <button
               onClick={() => onLearn(bean)}
@@ -176,7 +203,6 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               <Pencil size={14} color={C.textMuted} />
             </button>
           )}
-          {!bean.photoUrl && <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>}
         </div>
       </div>
       {/* Specs grid */}
@@ -283,8 +309,6 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
         </>
       )}
 
-      {actions && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
-
       {updateBean && (
         <EditBeanModal
           open={editOpen}
@@ -296,6 +320,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
         />
       )}
       </div>
+      {actions}
     </div>
   );
 };

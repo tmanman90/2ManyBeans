@@ -22,6 +22,7 @@ const SLIDES = [
   "02-scan-inventory",
   "03-tasting-coach",
   "04-chat-professor",
+  "05-brew-timer",
 ];
 
 const SIZES = [

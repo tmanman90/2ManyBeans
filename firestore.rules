@@ -37,7 +37,8 @@ service cloud.firestore {
           'marketingConsent', 'marketingConsentDate', 'preferences',
           'fellow', 'subscription',
           'onboardingAnswers', 'onboardingCompletedAt',
-          'redeemedCode', 'redeemedAt', 'redemptionAttempts'
+          'redeemedCode', 'redeemedAt', 'redemptionAttempts',
+          'tourCompleted'
         ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100

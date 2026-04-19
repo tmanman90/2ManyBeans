@@ -5,7 +5,7 @@
 // capture clean exports.
 
 import { use } from "react";
-import { Slide1, Slide2, Slide3, Slide4 } from "../../slides";
+import { Slide1, Slide2, Slide3, Slide4, Slide5 } from "../../slides";
 
 const CANVAS_W = 1320;
 const CANVAS_H = 2868;
@@ -15,6 +15,7 @@ const MAP: Record<string, () => React.ReactElement> = {
   "02-scan-inventory": Slide2,
   "03-tasting-coach": Slide3,
   "04-chat-professor": Slide4,
+  "05-brew-timer": Slide5,
 };
 
 export default function SlidePage({ params }: { params: Promise<{ id: string }> }) {
