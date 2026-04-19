@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 const isCapacitor = process.env.CAPACITOR_BUILD === 'true'
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+  },
   build: {
     // Stable vendor chunks so Capgo OTA deltas are small per deploy. A JS
     // change in `src/` only invalidates the `app` chunk, not the big vendor

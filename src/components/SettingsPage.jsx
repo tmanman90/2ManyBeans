@@ -1091,6 +1091,11 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             </>
           )}
 
+          {/* --- App Version --- */}
+          <div style={{ textAlign: 'center', fontSize: 11, color: C.textLight, marginTop: 8, marginBottom: 12 }}>
+            v{__APP_VERSION__}
+          </div>
+
           {/* --- Account Section --- */}
           <div style={sectionHeaderStyle}>Account</div>
           <div style={groupStyle}>

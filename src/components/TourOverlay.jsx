@@ -81,6 +81,7 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
   const observerRef = useRef(null);
   const timeoutRef = useRef(null);
   const resizeObRef = useRef(null);
+  const scrollCleanupRef = useRef(null);
   const skipCountRef = useRef(0);
   const tooltipRef = useRef(null);
   const [tooltipH, setTooltipH] = useState(170);
@@ -156,12 +157,26 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
     if (!step) return;
     const el = document.querySelector(`[data-tour="${step.target}"]`);
     if (el) {
-      setTargetRect(el.getBoundingClientRect());
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const measure = () => setTargetRect(el.getBoundingClientRect());
+      measure();
+      requestAnimationFrame(() => requestAnimationFrame(measure));
+      setTimeout(measure, 350);
       if (resizeObRef.current) resizeObRef.current.disconnect();
-      resizeObRef.current = new ResizeObserver(() => {
-        setTargetRect(el.getBoundingClientRect());
-      });
+      resizeObRef.current = new ResizeObserver(measure);
       resizeObRef.current.observe(el);
+      if (scrollCleanupRef.current) scrollCleanupRef.current();
+      let scrollParent = el.parentElement;
+      while (scrollParent && scrollParent !== document.body) {
+        const ov = getComputedStyle(scrollParent).overflowY;
+        if (ov === 'auto' || ov === 'scroll') break;
+        scrollParent = scrollParent.parentElement;
+      }
+      if (scrollParent && scrollParent !== document.body) {
+        const onScroll = () => measure();
+        scrollParent.addEventListener('scroll', onScroll, { passive: true });
+        scrollCleanupRef.current = () => scrollParent.removeEventListener('scroll', onScroll);
+      }
       return true;
     }
     return false;
@@ -172,6 +187,7 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
     if (observerRef.current) { observerRef.current.disconnect(); observerRef.current = null; }
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     if (resizeObRef.current) { resizeObRef.current.disconnect(); resizeObRef.current = null; }
+    if (scrollCleanupRef.current) { scrollCleanupRef.current(); scrollCleanupRef.current = null; }
 
     setTab(step.tab);
 
@@ -202,6 +218,7 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
       if (observerRef.current) { observerRef.current.disconnect(); observerRef.current = null; }
       if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
       if (resizeObRef.current) { resizeObRef.current.disconnect(); resizeObRef.current = null; }
+      if (scrollCleanupRef.current) { scrollCleanupRef.current(); scrollCleanupRef.current = null; }
     };
   }, [stepIdx, step, findTarget, setTab, steps.length, finishTour]);
 

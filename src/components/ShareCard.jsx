@@ -8,7 +8,7 @@
 // the main bundle and only loads when the user actually taps Share. Callsites
 // that only render the card (e.g. off-screen in JSX) never pay the cost.
 
-import { forwardRef } from 'react';
+import { forwardRef, useRef, useState, useLayoutEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts } from '../styles/theme';
 
@@ -18,6 +18,10 @@ const CARD_WIDTH = 540; // CSS px, scale:2 = 1080px output
 const CARD_HEIGHT = 540; // Fixed square for recipe card (matches 1:1 background image)
 const CARD_BG = C.bg;   // #FAF6F1 warm cream (tasting card)
 export const RECIPE_CARD_BG = '#2B5B4E'; // Dark green fallback matching chalkboard
+
+const BOARD = { L: 67, R: 445, T: 110, B: 430 };
+const BOARD_W = BOARD.R - BOARD.L;
+const BOARD_H = BOARD.B - BOARD.T;
 
 // Typography at 540px CSS (doubled to 1080px at scale:2)
 const type = {
@@ -150,15 +154,55 @@ const CardStarRating = ({ value }) => (
 
 // --- Recipe Share Card (Apothecary chalkboard background) ---
 
-const ChalkParam = ({ label, value }) => {
+const ChalkParam = ({ label, value, labelStyle, valueStyle }) => {
   if (!value) return null;
   return (
     <div style={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
-      <div style={{ ...chalk.paramLabel, marginBottom: 6 }}>{label}</div>
-      <div style={chalk.paramValue}>{value}</div>
+      <div style={{ ...(labelStyle || chalk.paramLabel), marginBottom: 4 }}>{label}</div>
+      <div style={valueStyle || chalk.paramValue}>{value}</div>
     </div>
   );
 };
+
+function FitTitle({ text, maxSize = 26, minSize = 14, maxLines = 2, style }) {
+  const ref = useRef(null);
+  const [size, setSize] = useState(maxSize);
+
+  useLayoutEffect(() => {
+    let s = maxSize;
+    setSize(s);
+    const el = ref.current;
+    if (!el) return;
+    let raf;
+    const check = () => {
+      const lineHeight = 1.15;
+      const maxH = Math.ceil(s * lineHeight * maxLines) + 2;
+      if (el.scrollHeight > maxH && s > minSize) {
+        s -= 1;
+        setSize(s);
+        raf = requestAnimationFrame(check);
+      }
+    };
+    raf = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(raf);
+  }, [text, maxSize, minSize, maxLines]);
+
+  return (
+    <div ref={ref} style={{
+      ...style,
+      fontSize: size,
+      lineHeight: 1.15,
+      textAlign: 'center',
+      wordBreak: 'break-word',
+      overflowWrap: 'anywhere',
+      hyphens: 'auto',
+      display: '-webkit-box',
+      WebkitLineClamp: maxLines,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
+    }}>{text}</div>
+  );
+}
 
 export const RecipeShareCard = forwardRef(({ bean, recipe }, ref) => {
   const { name, roaster, origin, process, bagNotes } = bean || {};
@@ -206,96 +250,98 @@ export const RecipeShareCard = forwardRef(({ bean, recipe }, ref) => {
         Tina
       </div>
 
-      {/* Chalkboard text zone — centered on the board area */}
+      {/* Chalkboard text zone — anchored to measured chalkboard bbox */}
       <div style={{
         position: 'absolute',
-        top: 40,
-        left: 45,
-        right: 60,
-        bottom: 175,
+        left: BOARD.L + 14,
+        top: BOARD.T + 48,
+        width: BOARD_W - 28,
+        height: BOARD_H - 48 - 18,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         gap: 6,
         overflow: 'hidden',
       }}>
-        {/* Bean name — single line, ellipsis on overflow */}
-        <div style={{
-          ...chalk.beanName,
-          textAlign: 'center',
-          lineHeight: 1.2,
-          maxWidth: '100%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {name}
-        </div>
+        <FitTitle
+          text={name}
+          maxSize={26}
+          minSize={14}
+          maxLines={2}
+          style={{ ...chalk.beanName, width: '100%' }}
+        />
 
-        {/* Roaster / Origin / Process */}
         {subtitle && (
           <div style={{
             ...chalk.recipeTitle,
+            fontSize: 15,
             textAlign: 'center',
-            lineHeight: 1.3,
-            maxWidth: '100%',
+            lineHeight: 1.25,
+            width: '100%',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            wordBreak: 'break-word',
           }}>
             {subtitle}
           </div>
         )}
 
-        {/* Bag tasting notes — wraps to 2 lines max */}
         {bagNotes && bagNotes !== '(not logged)' && (
           <div style={{
             fontFamily: fonts.title,
             fontSize: 12,
-            fontWeight: 400,
             fontStyle: 'italic',
             color: 'rgba(255,255,255,0.55)',
             textAlign: 'center',
-            maxWidth: '85%',
+            width: '92%',
             lineHeight: 1.4,
             overflow: 'hidden',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             letterSpacing: 0.3,
+            marginTop: 2,
           }}>
             {bagNotes}
           </div>
         )}
 
-        {/* Divider line */}
-        <div style={{
-          width: 60,
-          height: 1,
-          background: 'rgba(255,255,255,0.3)',
-          margin: '2px 0',
-        }} />
+        <div style={{ width: 54, height: 1, background: 'rgba(255,255,255,0.32)', margin: '6px 0 2px' }} />
 
-        {/* Recipe params — 2x2 grid */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: '8px 20px',
+          columnGap: 12,
+          rowGap: 8,
           width: '100%',
-          maxWidth: 360,
         }}>
-          <ChalkParam label="Ratio" value={ratio} />
-          <ChalkParam label="Bloom" value={bloom} />
-          <ChalkParam label="Grind (SS)" value={grindSingleShot} />
-          <ChalkParam label="Grind (Batch)" value={grindBatch} />
-        </div>
-
-        {/* Watermark */}
-        <div style={{
-          ...chalk.watermark,
-          marginTop: 6,
-        }}>
-          2manybeans
+          <ChalkParam label="Ratio" value={ratio} labelStyle={{ ...chalk.paramLabel, fontSize: 11 }} valueStyle={{ ...chalk.paramValue, fontSize: 17 }} />
+          <ChalkParam label="Bloom" value={bloom} labelStyle={{ ...chalk.paramLabel, fontSize: 11 }} valueStyle={{ ...chalk.paramValue, fontSize: 17 }} />
+          <ChalkParam label="Grind (SS)" value={grindSingleShot} labelStyle={{ ...chalk.paramLabel, fontSize: 11 }} valueStyle={{ ...chalk.paramValue, fontSize: 17 }} />
+          <ChalkParam label="Grind (Batch)" value={grindBatch} labelStyle={{ ...chalk.paramLabel, fontSize: 11 }} valueStyle={{ ...chalk.paramValue, fontSize: 17 }} />
         </div>
       </div>
+
+      {/* Chalk wordmark header — top-center of chalkboard */}
+      <img
+        src="/images/2manybeans-logo-transparent.png"
+        alt="2manybeans"
+        crossOrigin="anonymous"
+        style={{
+          position: 'absolute',
+          top: BOARD.T + 2,
+          left: BOARD.L + BOARD_W / 2,
+          transform: 'translateX(-50%) rotate(-1deg)',
+          width: 135,
+          height: 'auto',
+          filter: 'brightness(0) invert(1) drop-shadow(0 0 0.5px rgba(255,255,255,0.8)) drop-shadow(0 1px 1px rgba(0,0,0,0.25))',
+          opacity: 0.82,
+          pointerEvents: 'none',
+        }}
+      />
     </div>
   );
 });
