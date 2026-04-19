@@ -1,7 +1,7 @@
 {
   "name": "coffee-hub",
   "private": true,
-  "version": "1.1.133",
+  "version": "1.1.138",
   "type": "module",
   "scripts": {
     "dev": "vite",

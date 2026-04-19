@@ -114,6 +114,16 @@ function onboardingReducer(state, action) {
 
     case 'BACK': {
       const prev = PREV_STEP[state.step] || state.step;
+      // Backing into R5 clears the swipes so the user actually redoes
+      // the palate step. Without this, R5's alreadyComplete guard
+      // immediately re-advances to R6 and the back press looks broken.
+      if (prev === 'r5') {
+        return {
+          ...state,
+          step: prev,
+          answers: { ...state.answers, tinderCards: [], palateChart: null },
+        };
+      }
       return { ...state, step: prev };
     }
 
