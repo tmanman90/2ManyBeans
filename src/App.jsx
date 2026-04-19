@@ -149,7 +149,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             style={{
               position: 'absolute', top: -1, left: 0, right: 0,
               width: '100%', height: 'calc(100% + 1px)',
-              objectFit: 'cover', objectPosition: 'center 30%',
+              objectFit: 'cover', objectPosition: 'center 45%',
               pointerEvents: 'none',
             }}
           />
@@ -166,7 +166,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             height: '100%', paddingBottom: 12,
           }}>
             <div>
-              <div style={{ fontFamily: fonts.title, fontSize: 36, color: C.accent, lineHeight: 1.1, textShadow: '0 1px 4px rgba(250,246,241,0.8)' }}>2manybeans</div>
+              <div aria-label="2manybeans" role="img" style={{ height: 32, width: 180, background: C.accent, WebkitMaskImage: 'url(/images/wordmark@2x.png)', WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'left center', maskImage: 'url(/images/wordmark@2x.png)', maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'left center', filter: 'drop-shadow(0 1px 3px rgba(250,246,241,0.8))' }} />
               <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{greeting}</div>
             </div>
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Settings">
