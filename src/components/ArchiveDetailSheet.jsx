@@ -1,10 +1,11 @@
 // Archive detail bottom sheet — full bean metadata + tasting history + restore/delete.
 // Uses the same portal + slide-up / fade-backdrop pattern as ProfessorRuphusSlideUp.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { Camera, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { BeanThumb } from './BeanThumb';
+import { SwipeDownHandle } from './SwipeDownHandle';
 
 function ArchiveStars({ value, size = 12 }) {
   if (!value) return null;
@@ -98,14 +99,17 @@ export function ArchiveDetailSheet({
   onRestore,
   onDelete,
   onLearn,
+  onEditPhoto,
 }) {
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
 
   useEffect(() => {
     if (!bean) {
       setMounted(false);
       setClosing(false);
+      closingRef.current = false;
       return;
     }
     const id = requestAnimationFrame(() => setMounted(true));
@@ -123,10 +127,13 @@ export function ArchiveDetailSheet({
   if (!bean) return null;
 
   const close = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     setClosing(true);
     setTimeout(() => {
       setMounted(false);
       setClosing(false);
+      closingRef.current = false;
       onClose?.();
     }, 220);
   };
@@ -169,6 +176,9 @@ export function ArchiveDetailSheet({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${bean.name} details`}
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
@@ -184,13 +194,12 @@ export function ArchiveDetailSheet({
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: C.cardMuted }} />
-        </div>
+        <SwipeDownHandle onClose={close} />
 
         {/* Hero */}
         <div style={{ padding: '8px 20px 14px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
           <div
+            onClick={e => { e.stopPropagation(); onEditPhoto?.(bean); }}
             style={{
               width: 88,
               height: 88,
@@ -199,9 +208,23 @@ export function ArchiveDetailSheet({
               flexShrink: 0,
               background: C.amberBg,
               boxShadow: `0 0 0 1px ${C.border}, 0 2px 6px rgba(92,61,46,0.08)`,
+              cursor: onEditPhoto ? 'pointer' : 'default',
+              position: 'relative',
             }}
           >
             <BeanThumb bean={bean} size={88} />
+            {onEditPhoto && (
+              <div style={{
+                position: 'absolute', bottom: 4, right: 4,
+                width: 24, height: 24, borderRadius: '50%',
+                background: 'rgba(59,36,23,0.6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {bean.photoUrl
+                  ? <Pencil size={12} color="#fff" />
+                  : <Camera size={12} color="#fff" />}
+              </div>
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
             <div

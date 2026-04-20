@@ -64,41 +64,7 @@ const AromaChips = ({ aroma }) => {
   );
 };
 
-// Drag-down-to-dismiss handle for bottom sheets. Tap also closes. Touch
-// handlers are scoped to the handle so the sheet's inner scroll container
-// isn't hijacked when the user scrolls content.
-const SwipeDownHandle = ({ onClose }) => {
-  const startY = useRef(null);
-  const [dy, setDy] = useState(0);
-  return (
-    <div
-      onClick={onClose}
-      onTouchStart={e => { startY.current = e.touches[0].clientY; setDy(0); }}
-      onTouchMove={e => {
-        if (startY.current == null) return;
-        const delta = e.touches[0].clientY - startY.current;
-        if (delta > 0) setDy(Math.min(delta, 200));
-      }}
-      onTouchEnd={() => {
-        if (dy > 70) onClose();
-        else setDy(0);
-        startY.current = null;
-      }}
-      style={{
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        padding: '8px 0 6px', cursor: 'pointer',
-        // Expand the hit area for easier grabbing without visually changing layout.
-        touchAction: 'none',
-      }}
-    >
-      <div style={{
-        width: 40, height: 4, borderRadius: 2, background: '#D9CBB8',
-        transform: dy ? `translateY(${dy * 0.25}px)` : 'none',
-        transition: dy ? 'none' : 'transform 0.18s',
-      }} />
-    </div>
-  );
-};
+import { SwipeDownHandle } from '../components/SwipeDownHandle';
 
 // Map a step name to the scorecard axis it's exploring. "Smell" and "First
 // Sip" both feed aroma — the rest map 1:1.

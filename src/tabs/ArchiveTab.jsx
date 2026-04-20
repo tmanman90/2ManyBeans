@@ -1,13 +1,15 @@
 // Archive tab — "Ambitious Library" redesign.
 // Painterly header, Unforgettable Cups hero strip, collapsible filter bar,
 // timeline-rail list grouped by year, bean detail bottom sheet.
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Search, X, ChevronDown, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { BeanThumb } from '../components/BeanThumb';
 import { ArchiveDetailSheet } from '../components/ArchiveDetailSheet';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
+
+const EditBeanModalLazy = lazy(() => import('../components/EditBeanModal').then(m => ({ default: m.EditBeanModal })));
 
 const SORT_LABELS = {
   recent: 'Recent',
@@ -235,6 +237,9 @@ function EmptyState({ hasFilters, onClear }) {
 function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
   const best = bestByBean[bean.id] || null;
   const dOwn = diffDays(bean.finishDate, bean.roastDate);
+  const [expanded, setExpanded] = useState(false);
+
+  const hasDetails = bean.variety || bean.region || bean.farm || bean.altitude || bean.roastLevel || bean.cupScore;
 
   const handleKey = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -258,14 +263,16 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
           boxShadow: '0 1px 2px rgba(92,61,46,0.1)',
         }}
       />
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
         onKeyDown={handleKey}
         style={{
           width: '100%',
           textAlign: 'left',
           display: 'flex',
-          gap: 12,
+          flexDirection: 'column',
           padding: 14,
           minHeight: 44,
           background: C.card,
@@ -277,71 +284,115 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
           position: 'relative',
         }}
       >
-        <BeanThumb bean={bean} size={56} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 800,
-                letterSpacing: 1.3,
-                textTransform: 'uppercase',
-                color: C.textMuted,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {bean.roaster || ''}
-            </div>
-            {showMonth && bean.finishDate && (
+        <div style={{ display: 'flex', gap: 12 }}>
+          <BeanThumb bean={bean} size={56} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
               <div
                 style={{
-                  fontFamily: fonts.title,
-                  fontSize: 14,
-                  color: C.accentDark,
-                  lineHeight: 1,
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                  letterSpacing: 1.3,
+                  textTransform: 'uppercase',
+                  color: C.textMuted,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}
               >
-                {monthOf(bean.finishDate)}
+                {bean.roaster || ''}
               </div>
-            )}
-          </div>
-          <div
-            style={{
-              fontFamily: fonts.heading,
-              fontSize: 16,
-              color: C.text,
-              fontWeight: 500,
-              lineHeight: 1.2,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              marginTop: 2,
-              marginBottom: 3,
-            }}
-          >
-            {bean.name}
-          </div>
-          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>
-            {bean.origin || ''}
-            {bean.process ? ` · ${bean.process}` : ''}
-            {dOwn != null ? ` · ${dOwn}d` : ''}
-          </div>
-          <NotesRow notes={bean.bagNotes} />
-          {best ? (
-            <div style={{ marginTop: 6 }}>
-              <Stars value={best} size={11} />
+              {showMonth && bean.finishDate && (
+                <div
+                  style={{
+                    fontFamily: fonts.title,
+                    fontSize: 14,
+                    color: C.accentDark,
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {monthOf(bean.finishDate)}
+                </div>
+              )}
             </div>
-          ) : null}
+            <div
+              style={{
+                fontFamily: fonts.heading,
+                fontSize: 16,
+                color: C.text,
+                fontWeight: 500,
+                lineHeight: 1.2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                marginTop: 2,
+                marginBottom: 3,
+              }}
+            >
+              {bean.name}
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>
+              {bean.origin || ''}
+              {bean.process ? ` · ${bean.process}` : ''}
+              {dOwn != null ? ` · ${dOwn}d` : ''}
+            </div>
+            <NotesRow notes={bean.bagNotes} />
+            {best ? (
+              <div style={{ marginTop: 6 }}>
+                <Stars value={best} size={11} />
+              </div>
+            ) : null}
+          </div>
         </div>
-      </button>
+
+        {hasDetails && (
+          <>
+            <button
+              onClick={e => { e.stopPropagation(); setExpanded(!expanded); }}
+              aria-expanded={expanded}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px 0 0', fontSize: 11, color: C.accent,
+                fontFamily: fonts.body,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              {expanded ? 'Hide details' : 'Show details'}
+              <ChevronDown size={12} color={C.accent} style={{
+                transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
+                transition: 'transform 0.25s ease-out',
+              }} />
+            </button>
+            <div style={{
+              maxHeight: expanded ? 180 : 0,
+              overflow: 'hidden',
+              transition: 'max-height 0.25s ease-out, opacity 0.2s ease-out',
+              opacity: expanded ? 1 : 0,
+            }}>
+              <div style={{
+                fontSize: 12, color: C.textMuted,
+                padding: '8px 10px', borderRadius: 8,
+                background: C.bg,
+                display: 'flex', flexDirection: 'column', gap: 3,
+                marginTop: 6,
+              }}>
+                {bean.variety && <span><strong>Variety:</strong> {bean.variety}</span>}
+                {bean.region && <span><strong>Region:</strong> {bean.region}</span>}
+                {bean.farm && <span><strong>Farm:</strong> {bean.farm}</span>}
+                {bean.altitude && <span><strong>Altitude:</strong> {bean.altitude}</span>}
+                {bean.roastLevel && <span><strong>Roast Level:</strong> {bean.roastLevel}</span>}
+                {bean.cupScore && <span><strong>Accolades:</strong> {bean.cupScore}</span>}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBeanById }) => {
+export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBeanById, uid }) => {
   const [query, setQuery] = useState('');
   const [year, setYear] = useState('all');
   const [sort, setSort] = useState('recent');
@@ -350,7 +401,17 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
   const [origin, setOrigin] = useState('all');
   const [process, setProcess] = useState('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [openBean, setOpenBean] = useState(null);
+  const [openBeanId, setOpenBeanId] = useState(null);
+  const [editBean, setEditBean] = useState(null);
+
+  const openBean = useMemo(
+    () => openBeanId ? beans.find(b => b.id === openBeanId) ?? null : null,
+    [beans, openBeanId]
+  );
+
+  useEffect(() => {
+    if (openBeanId && !openBean) setOpenBeanId(null);
+  }, [openBeanId, openBean]);
 
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
 
@@ -458,7 +519,10 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
     setProcess('all');
   };
 
-  const totalCups = tastings.filter(t => finished.some(b => b.id === t.beanId)).length;
+  const totalCups = useMemo(() => {
+    const finishedIds = new Set(finished.map(b => b.id));
+    return tastings.filter(t => finishedIds.has(t.beanId)).length;
+  }, [finished, tastings]);
 
   const handleRestore = (bean) => {
     updateBean(bean.id, { status: 'SEALED', finishDate: null });
@@ -613,7 +677,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
             {bestCups.map(b => (
               <button
                 key={b.id}
-                onClick={() => setOpenBean(b)}
+                onClick={() => setOpenBeanId(b.id)}
                 style={{
                   flexShrink: 0,
                   width: 132,
@@ -683,6 +747,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
           <div
             style={{
               flex: 1,
+              minWidth: 0,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
@@ -696,7 +761,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search beans, roasters, notes…"
+              placeholder="Search beans, roasters…"
               aria-label="Search archive"
               style={{
                 flex: 1,
@@ -947,7 +1012,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                     bean={bean}
                     bestByBean={bestByBean}
                     showMonth={sort === 'recent' || sort === 'oldest'}
-                    onOpen={() => setOpenBean(bean)}
+                    onOpen={() => setOpenBeanId(bean.id)}
                   />
                 ))}
               </div>
@@ -973,11 +1038,26 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
       <ArchiveDetailSheet
         bean={openBean}
         tastings={tastings}
-        onClose={() => setOpenBean(null)}
+        onClose={() => setOpenBeanId(null)}
         onRestore={handleRestore}
         onDelete={deleteBean ? handleDelete : undefined}
         onLearn={handleLearn}
+        onEditPhoto={b => {
+          setOpenBeanId(null);
+          setTimeout(() => setEditBean(b), 240);
+        }}
       />
+      {editBean && (
+        <Suspense fallback={null}>
+          <EditBeanModalLazy
+            bean={editBean}
+            open={!!editBean}
+            onClose={() => setEditBean(null)}
+            updateBean={updateBean}
+            uid={uid}
+          />
+        </Suspense>
+      )}
       <ProfessorRuphusSlideUp {...ruphusProps} />
     </div>
   );

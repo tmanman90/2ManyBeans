@@ -214,7 +214,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
   // Upload the user's original photo as the bean image (any user).
   const handleUseOriginal = async () => {
-    if (!pendingPhoto || !bean.id) return;
+    if (!pendingPhoto || !bean.id || photoInFlight.current) return;
     setPhotoGenerating(true);
     setPhotoError(false);
     try {
