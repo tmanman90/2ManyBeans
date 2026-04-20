@@ -609,9 +609,13 @@ function classifyFamilyFallback(bean) {
 function enforceDeterministicGrind(recipe, bean, research) {
   // Family-first grind selection: FAMILY -> VOLUME -> PROCESS -> DENSITY -> REFERENCE
   // Reference profiles are secondary modifiers, NOT the source of truth for grind.
-  const family = research?.cupStructureFamily && FAMILY_GRIND_BANDS[research.cupStructureFamily]
+  // Deterministic classifier always runs first (variety-aware, taste-test validated)
+  const deterministicFamily = classifyFamilyFallback(bean);
+  // Only defer to GPT's family if our classifier returned the generic default
+  const family = deterministicFamily === DEFAULT_FAMILY
+    && research?.cupStructureFamily && FAMILY_GRIND_BANDS[research.cupStructureFamily]
     ? research.cupStructureFamily
-    : classifyFamilyFallback(bean);
+    : deterministicFamily;
 
   const band = FAMILY_GRIND_BANDS[family] || FAMILY_GRIND_BANDS[DEFAULT_FAMILY];
 
