@@ -23,15 +23,16 @@ const ODE_GEN2_STEPS = [
 const FAMILY_GRIND_BANDS = {
   'washed-floral-clarity':    { ssMin: 3.2, ssMax: 3.2, batchMin: 5,   batchMax: 6.2 },
   'washed-kenya-clarity':     { ssMin: 3,   ssMax: 3.2, batchMin: 5.1, batchMax: 6.2 },
-  'washed-ethiopia-clarity':  { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
+  'washed-ethiopia-clarity':  { ssMin: 3.2, ssMax: 3.2, batchMin: 5,   batchMax: 6.2 },
   'clean-natural-fruit':      { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
   'processed-clarity':        { ssMin: 4.2, ssMax: 5,   batchMin: 6.2, batchMax: 7.1 },
+  'generic-washed':           { ssMin: 4.2, ssMax: 5.2, batchMin: 6,   batchMax: 7.2 },
   'medium-washed':            { ssMin: 5,   ssMax: 5.2, batchMin: 6,   batchMax: 8 },
   'dark-roast':               { ssMin: 5,   ssMax: 9,   batchMin: 6,   batchMax: 9.2 },
 };
 
 // Fallback family for beans that don't match any specific family
-const DEFAULT_FAMILY = 'washed-ethiopia-clarity';
+const DEFAULT_FAMILY = 'generic-washed';
 
 // Structured grind data keyed by reference profile number (matches beanResearch.js REFERENCE_PROFILE_INDEX)
 // Profiles 11, 25, 26 have no grind data in reference → grind: null
