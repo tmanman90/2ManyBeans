@@ -913,10 +913,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
           {/* REDESIGN: guided-tasting invitation card (list mode only) */}
           {mode === 'list' && (() => {
-            // Prefer the first active-jar bean, otherwise first sealed. Falls
-            // back to nothing if user has no beans at all — in that case we
-            // render a softer variant that nudges toward Inventory.
-            const onDeck = active[0] || sealed[0] || null;
+            const onDeck = beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
             const hasBeans = !!onDeck;
             return (
               <>
