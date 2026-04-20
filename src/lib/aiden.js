@@ -25,6 +25,7 @@ const FAMILY_GRIND_BANDS = {
   'washed-kenya-clarity':     { ssMin: 3,   ssMax: 3.2, batchMin: 5.1, batchMax: 6.2 },
   'washed-ethiopia-clarity':  { ssMin: 3.2, ssMax: 3.2, batchMin: 5,   batchMax: 6.2 },
   'clean-natural-fruit':      { ssMin: 4.2, ssMax: 4.2, batchMin: 6.2, batchMax: 6.2 },
+  'body-natural':             { ssMin: 5,   ssMax: 5,   batchMin: 6.2, batchMax: 7.2 },
   'processed-clarity':        { ssMin: 4.2, ssMax: 5,   batchMin: 6.2, batchMax: 7.1 },
   'generic-washed':           { ssMin: 4.2, ssMax: 5.2, batchMin: 6,   batchMax: 7.2 },
   'medium-washed':            { ssMin: 5,   ssMax: 5.2, batchMin: 6,   batchMax: 8 },
@@ -589,7 +590,10 @@ function classifyFamilyFallback(bean) {
     if (notes.includes('jasmine') || notes.includes('bergamot') || notes.includes('floral') || notes.includes('honeysuckle')) return 'washed-floral-clarity';
   }
 
-  // Natural non-Ethiopia
+  // Body-forward natural varieties (larger beans, denser, need coarser grind)
+  if (process.includes('natural') && (variety.includes('pacamara') || variety.includes('maragogipe'))) return 'body-natural';
+
+  // Natural non-Ethiopia (clean fruit)
   if (process.includes('natural')) return 'clean-natural-fruit';
 
   return DEFAULT_FAMILY;
