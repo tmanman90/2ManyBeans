@@ -590,8 +590,11 @@ function classifyFamilyFallback(bean) {
     if (notes.includes('jasmine') || notes.includes('bergamot') || notes.includes('floral') || notes.includes('honeysuckle')) return 'washed-floral-clarity';
   }
 
-  // Body-forward natural varieties (larger beans, denser, need coarser grind)
-  if (process.includes('natural') && (variety.includes('pacamara') || variety.includes('maragogipe'))) return 'body-natural';
+  // Pacamara/Maragogipe: large dense beans
+  if (variety.includes('pacamara') || variety.includes('maragogipe')) {
+    if (process.includes('natural')) return 'body-natural';
+    return 'processed-clarity';
+  }
 
   // Natural non-Ethiopia (clean fruit)
   if (process.includes('natural')) return 'clean-natural-fruit';
