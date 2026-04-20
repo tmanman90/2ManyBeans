@@ -16,7 +16,8 @@ service cloud.firestore {
           'displayName', 'email', 'photoURL', 'signUpProvider',
           'username', 'createdAt', 'lastLoginAt', 'onboardingComplete',
           'marketingConsent', 'marketingConsentDate', 'preferences',
-          'onboardingAnswers', 'onboardingCompletedAt'
+          'onboardingAnswers', 'onboardingCompletedAt',
+          'aiDataConsent', 'aiConsentDate'
         ])
         // Belt-and-suspenders: even if the keys() check above changes,
         // the create path can never include subscription, fellow, or
@@ -38,7 +39,8 @@ service cloud.firestore {
           'fellow', 'subscription',
           'onboardingAnswers', 'onboardingCompletedAt',
           'redeemedCode', 'redeemedAt', 'redemptionAttempts',
-          'tourCompleted'
+          'tourCompleted',
+          'aiDataConsent', 'aiConsentDate'
         ])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 100

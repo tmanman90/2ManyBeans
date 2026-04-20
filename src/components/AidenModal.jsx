@@ -421,7 +421,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                   a.click();
                   setTimeout(() => document.body.removeChild(a), 100);
                 } else {
-                  window.open(result.link, '_blank');
+                  window.open(result.link, '_blank', 'noopener,noreferrer');
                 }
               }}
             >

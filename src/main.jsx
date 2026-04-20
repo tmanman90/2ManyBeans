@@ -8,6 +8,7 @@ import { useAppData } from './hooks/useAppData';
 import { SignInScreen } from './components/SignInScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { App } from './App';
+import { AiDataConsentModal } from './components/AiDataConsentModal';
 import { AuthContext } from './contexts/AuthContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
@@ -166,6 +167,11 @@ const Root = () => {
                 completeOnboarding={completeOnboarding}
               />
             </React.Suspense>
+          ) : profile?.aiDataConsent !== true ? (
+            // Gate 5.5: AI data consent (Apple Guideline 5.1.2(i)).
+            // Catches both new users (post-onboarding) and existing
+            // users who completed onboarding before this gate existed.
+            <AiDataConsentModal updateProfile={updateProfile} />
           ) : !dataLoaded ? (
             // Gate 6a: Waiting for Firestore data
             <LoadingScreen />

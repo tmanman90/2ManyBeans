@@ -144,8 +144,8 @@ export default function R08PermissionPriming() {
           lineHeight: 1.45,
           fontFamily: fonts.body,
         }}>
-          Just the camera — nothing stored, nothing shared. Labels stay on
-          your device unless you tell me otherwise.
+          Your photos are sent to our AI to read the label, then
+          discarded. We never store your images.
         </div>
       </div>
 

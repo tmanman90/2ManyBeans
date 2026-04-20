@@ -436,7 +436,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     // Apple deep link to the user's subscription management page. Works on
     // native (opens iOS Settings > [Apple ID] > Subscriptions) and web
     // (opens the App Store web page).
-    window.open('https://apps.apple.com/account/subscriptions', '_blank');
+    window.open('https://apps.apple.com/account/subscriptions', '_blank', 'noopener,noreferrer');
   };
 
   const handleOpenPaywall = () => {
@@ -1016,6 +1016,49 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           {/* --- Legal Section --- */}
           <div style={sectionHeaderStyle}>Legal</div>
           <div style={groupStyle}>
+            <div style={{ ...rowStyle, cursor: 'pointer' }} onClick={async () => {
+              const newVal = !profile?.aiDataConsent;
+              if (!newVal) {
+                if (!window.confirm('This will disable all AI features. You can still manage beans and tastings manually. Continue?')) return;
+              }
+              try {
+                await updateProfile({
+                  aiDataConsent: newVal,
+                  aiConsentDate: serverTimestamp(),
+                });
+                haptic.light();
+                setToast(newVal ? 'AI data sharing enabled' : 'AI data sharing disabled');
+              } catch (err) {
+                console.error('[Settings] AI consent toggle failed:', err);
+                setToast('Failed to save, try again');
+              }
+            }}>
+              <div>
+                <span style={rowLabelStyle}>Data & AI</span>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                  {profile?.aiDataConsent ? 'AI features enabled' : 'AI features disabled'}
+                </div>
+              </div>
+              <div style={{
+                width: 51, height: 31, borderRadius: 16,
+                background: profile?.aiDataConsent ? C.green : C.borderLight,
+                position: 'relative',
+                transition: 'background 0.2s',
+                flexShrink: 0,
+              }}>
+                <div style={{
+                  width: 27, height: 27,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  position: 'absolute',
+                  top: 2,
+                  left: profile?.aiDataConsent ? 22 : 2,
+                  transition: 'left 0.2s',
+                }} />
+              </div>
+            </div>
+            <div style={separatorStyle} />
             <a
               href="https://2manybeans.vercel.app/privacy-policy.html"
               target="_blank"
