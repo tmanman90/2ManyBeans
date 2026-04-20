@@ -297,7 +297,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
     }
   };
   const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
-  const isDeviceFull = error && error.includes('14 profiles') && !error.includes('(400)');
+  const isDeviceFull = error && (error.includes('maximum number of profiles') || error.includes('14 profiles'));
   const msg = phaseMessages[phase] || phaseMessages.recipe;
   return (
     <Modal open={open} onClose={onClose} title="Brew with Aiden">
@@ -365,7 +365,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Aiden is full (14/14 profiles)</span>
                 </div>
                 <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-                  Delete a profile in the Fellow app, then tap retry. Your recipe is saved — it won't regenerate.
+                  Please delete profiles in the Fellow app and retry. Your recipe is saved.
                 </div>
                 {onRetryPush && (
                   <Btn variant="small" onClick={onRetryPush} style={{ marginTop: 10 }}>
