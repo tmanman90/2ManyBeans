@@ -132,21 +132,23 @@ NOTE: Grind size is enforced deterministically by the app based on the coffee's 
 GRIND PHILOSOPHY: Grind size comes from cup-structure family first, NOT from generic origin/process reference matches. The app enforces grind from the family baseline bands below. Your grind recommendation is advisory only.
 
 Family baseline grind bands (Ode Gen 2, 300ml single-serve clarity-first):
-- WASHED FLORAL CLARITY: SS 4.1-4.2, Batch 6.0-6.2
-- KENYA CLARITY: SS 4.0-4.2, Batch 6.1-6.2
-- WASHED ETHIOPIA CLARITY: SS 4.2-4.2, Batch 6.2-6.2
-- CLEAN NATURAL FRUIT: SS 4.2-4.2, Batch 6.2-6.2
+- WASHED FLORAL CLARITY: SS 3.2, Batch 5.0-6.2
+- KENYA CLARITY: SS 3.0-3.2, Batch 5.1-6.2
+- WASHED ETHIOPIA CLARITY: SS 3.2, Batch 5.0-6.2
+- CLEAN NATURAL FRUIT: SS 4.2, Batch 6.2
+- BODY NATURAL (Pacamara/Maragogipe): SS 5.0, Batch 6.2-7.2
 - PROCESSED CLARITY: SS 4.2-5.0, Batch 6.2-7.1
+- GENERIC WASHED (non-specialty): SS 4.2-5.2, Batch 6.0-7.2
 
 Choose slightly finer within band if: very high altitude, very light roast, vivid cup target.
 Choose slightly coarser within band if: heavily processed, risks tannin/perfume overload, delicate florals that collapse when over-extracted.
 Choose center if: classic washed floral, no strong warning signs.
 
 RED FLAGS (these are WRONG):
-- Washed floral coffees at 5.0+ single serve
-- Washed floral Ethiopia at 5.2 single serve
+- Washed floral/Ethiopia/Kenya coffees at 4.0+ single serve (should be 3.0-3.2)
 - Washed Gesha treated like generic washed Colombia
 - Batch grind at 7.2 for a light washed coffee (7.2 is dark roast territory)
+- Generic washed Colombia at 3.2 (too fine, should be 4.2-5.2)
 
 Rules for energy vs grind:
 1. Dense light washed coffees need more **early energy** (bloom temp + first pulse temps + bloom saturation), not finer grind. Avoid chasing extraction with grind size; use heat, bloom, and pulse structure first.
@@ -201,10 +203,12 @@ Before using any reference profile, classify the coffee into ONE family based on
 
 Families:
 - Washed Gesha / washed floral Pink Bourbon / washed floral heirloom / washed floral Colombia = WASHED FLORAL CLARITY
-- Washed Kenya SL28/SL34/Batian/Ruiru with pomelo/hibiscus/cane sugar/berry = KENYA CLARITY
+- Washed Kenya/Burundi SL28/SL34/Batian/Ruiru, or any SL28/SL34 regardless of origin = KENYA CLARITY
 - Classic washed Ethiopia with bergamot/white florals/citrus/tea/white grape/nectarine = WASHED ETHIOPIA CLARITY
-- Natural Ethiopia with strawberry/mango/lychee/tropical fruit / clean-fruit natural = CLEAN NATURAL FRUIT
-- Honey / anaerobic / co-ferment / white honey / experimental / floral tea-like processed Gesha = PROCESSED CLARITY
+- Natural Ethiopia with strawberry/mango/lychee/tropical fruit / clean-fruit natural / natural Gesha = CLEAN NATURAL FRUIT
+- Natural Pacamara / natural Maragogipe (large-bean, body-forward) = BODY NATURAL
+- Honey / anaerobic / co-ferment / white honey / experimental / floral tea-like processed Gesha / washed Pacamara = PROCESSED CLARITY
+- Generic washed (non-specialty variety, no strong floral/citrus notes) = GENERIC WASHED
 
 Rules:
 - The family classification comes BEFORE origin-based reference matching.
