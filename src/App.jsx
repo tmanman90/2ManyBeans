@@ -16,6 +16,7 @@ const ArchiveTab = lazy(() => import('./tabs/ArchiveTab').then(m => ({ default: 
 import { OpenBeanFlow } from './components/OpenBeanFlow';
 import { SettingsPage } from './components/SettingsPage';
 import { TourOverlay } from './components/TourOverlay';
+import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
 
 // Minimal fallback while a lazy tab chunk is fetching. Matches the app
@@ -166,7 +167,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             height: '100%', paddingBottom: 12,
           }}>
             <div>
-              <div aria-label="2manybeans" role="img" style={{ height: 32, width: 180, background: C.accent, WebkitMaskImage: 'url(/images/wordmark@2x.png)', WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'left center', maskImage: 'url(/images/wordmark@2x.png)', maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'left center', filter: 'drop-shadow(0 1px 3px rgba(250,246,241,0.8))' }} />
+              <Wordmark />
               <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{greeting}</div>
             </div>
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Settings">
@@ -185,7 +186,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           zIndex: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, lineHeight: 1.1 }}>2manybeans</div>
+            <Wordmark />
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Settings">
               <SettingsIcon size={20} color={C.textMuted} />
             </button>

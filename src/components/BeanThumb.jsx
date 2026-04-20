@@ -1,5 +1,7 @@
 // Painterly SVG coffee bag thumbnail. Seeded by bean.id so each bean gets a
-// stable earthy color + glyph variant without needing a real photo.
+// stable earthy color + glyph variant. When the bean has a real photoUrl,
+// prefer the photo and fall back to the painterly SVG on load failure.
+import { useState } from 'react';
 import { C } from '../styles/theme';
 
 const HUES = ['#B07540', '#8F5A2E', '#5C3D2E', '#9D6A3E', '#6E4730', '#A46D44'];
@@ -10,6 +12,32 @@ function seedFrom(id) {
 }
 
 export function BeanThumb({ bean, size = 56 }) {
+  // Track the URL that last failed to load. Deriving hasPhoto from this
+  // (rather than a boolean) means a new photoUrl automatically retries,
+  // no useEffect reset needed.
+  const [erroredUrl, setErroredUrl] = useState(null);
+  const hasPhoto = bean?.photoUrl && erroredUrl !== bean.photoUrl;
+
+  if (hasPhoto) {
+    return (
+      <img
+        src={bean.photoUrl}
+        alt={bean?.name ? `${bean.name} bag` : ''}
+        loading="lazy"
+        decoding="async"
+        onError={(e) => setErroredUrl(e.currentTarget.src)}
+        style={{
+          width: size,
+          height: size,
+          objectFit: 'cover',
+          borderRadius: 10,
+          display: 'block',
+          background: C.amberBg,
+        }}
+      />
+    );
+  }
+
   const seed = seedFrom(bean?.id);
   const bagColor = HUES[seed % HUES.length];
   const glyph = GLYPHS[seed % GLYPHS.length];
