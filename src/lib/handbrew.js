@@ -1,4 +1,4 @@
-// Hand brew recipe generation — research-driven pour-over recipes via GPT-5.4
+// Hand brew recipe generation — research-driven pour-over recipes via GPT-5.4 Mini
 // Mirrors the Aiden two-step pattern: researchBean() -> generateHandBrewRecipe()
 // Grinder data + family defaults + enforcement layer co-located here (like aiden.js)
 
@@ -465,7 +465,7 @@ BEAN CLASSIFICATION:
   const data = await fetchWithRetry({
     url: PROXY_URL,
     body: {
-      model: 'gpt-5.4',
+      model: 'gpt-5.4-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
