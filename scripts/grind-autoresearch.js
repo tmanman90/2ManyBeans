@@ -120,7 +120,7 @@ function classifyFamily(bean) {
   if (variety.includes('pink bourbon') || variety.includes('pink-bourbon')) return 'washed-floral-clarity';
   if (process.includes('natural') && origin.includes('ethiopia')) return 'clean-natural-fruit';
   if (!process.includes('natural')) {
-    if (origin.includes('kenya')) return 'washed-kenya-clarity';
+    if (origin.includes('kenya') || origin.includes('burundi')) return 'washed-kenya-clarity';
     if (origin.includes('ethiopia')) return 'washed-ethiopia-clarity';
     if (notes.includes('jasmine') || notes.includes('floral')) return 'washed-floral-clarity';
   }

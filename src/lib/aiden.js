@@ -577,7 +577,7 @@ function classifyFamilyFallback(bean) {
 
   // Washed by origin
   if (process.includes('washed') || (!process.includes('natural') && !process.includes('honey'))) {
-    if (origin.includes('kenya')) return 'washed-kenya-clarity';
+    if (origin.includes('kenya') || origin.includes('burundi')) return 'washed-kenya-clarity';
     if (origin.includes('ethiopia')) return 'washed-ethiopia-clarity';
     // Washed florals from any origin (Colombia, Guatemala, etc.) with floral notes
     if (notes.includes('jasmine') || notes.includes('bergamot') || notes.includes('floral') || notes.includes('honeysuckle')) return 'washed-floral-clarity';
