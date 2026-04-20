@@ -116,7 +116,10 @@ function classifyFamily(bean) {
   if (roastLevel === 'medium' && (process.includes('washed') || (!process.includes('natural') && !process.includes('honey')))) return 'medium-washed';
 
   if (process.includes('honey') || process.includes('anaerobic')) return 'processed-clarity';
-  if (variety.includes('gesha') || variety.includes('geisha')) return 'washed-floral-clarity';
+  if (variety.includes('gesha') || variety.includes('geisha')) {
+    if (process.includes('natural')) return 'clean-natural-fruit';
+    return 'washed-floral-clarity';
+  }
   if (variety.includes('pink bourbon') || variety.includes('pink-bourbon')) return 'washed-floral-clarity';
   if (process.includes('natural') && origin.includes('ethiopia')) return 'clean-natural-fruit';
   if (!process.includes('natural')) {

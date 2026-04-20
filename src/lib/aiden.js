@@ -568,8 +568,11 @@ function classifyFamilyFallback(bean) {
   // Honey / anaerobic / co-ferment / experimental
   if (process.includes('honey') || process.includes('anaerobic') || process.includes('co-ferment')) return 'processed-clarity';
 
-  // Gesha/Geisha variety (any origin) or floral Pink Bourbon = washed floral clarity
-  if (variety.includes('gesha') || variety.includes('geisha')) return 'washed-floral-clarity';
+  // Gesha/Geisha variety: washed goes to floral clarity, natural goes to clean-natural-fruit
+  if (variety.includes('gesha') || variety.includes('geisha')) {
+    if (process.includes('natural')) return 'clean-natural-fruit';
+    return 'washed-floral-clarity';
+  }
   if (variety.includes('pink bourbon') && (notes.includes('floral') || notes.includes('jasmine'))) return 'washed-floral-clarity';
 
   // Natural Ethiopia or clean-fruit natural
