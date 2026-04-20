@@ -115,6 +115,9 @@ function classifyFamily(bean) {
   if (roastLevel.includes('dark') || roastLevel === 'medium-dark') return 'dark-roast';
   if (roastLevel === 'medium' && (process.includes('washed') || (!process.includes('natural') && !process.includes('honey')))) return 'medium-washed';
 
+  // SL28/SL34 varieties are clarity-first regardless of process
+  if (variety.includes('sl28') || variety.includes('sl34') || variety === 'sl') return 'washed-kenya-clarity';
+
   if (process.includes('honey') || process.includes('anaerobic')) return 'processed-clarity';
   if (variety.includes('gesha') || variety.includes('geisha')) {
     if (process.includes('natural')) return 'clean-natural-fruit';

@@ -565,6 +565,9 @@ function classifyFamilyFallback(bean) {
   // Medium roasts
   if (roastLevel === 'medium' && process.includes('washed')) return 'medium-washed';
 
+  // SL28/SL34 varieties are clarity-first regardless of process
+  if (variety.includes('sl28') || variety.includes('sl34') || variety === 'sl') return 'washed-kenya-clarity';
+
   // Honey / anaerobic / co-ferment / experimental
   if (process.includes('honey') || process.includes('anaerobic') || process.includes('co-ferment')) return 'processed-clarity';
 
