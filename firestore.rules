@@ -105,6 +105,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // API cost tracking: admin read-only (Tal's email), written by server proxies
+    match /apiUsage/{docId} {
+      allow read: if request.auth != null && request.auth.token.email == 'talmeltzer@gmail.com';
+      allow write: if false;
+    }
+
     // No catch-all subcollection rule. Any future server-managed collection
     // (e.g. usage ledgers, audit logs) is reachable only via Admin SDK and
     // explicitly denied to clients by default. If a new client-writable
