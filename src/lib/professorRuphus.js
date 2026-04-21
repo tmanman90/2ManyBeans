@@ -46,6 +46,7 @@ TONE: Warm, enthusiastic, slightly nerdy professor who really loves coffee. Firs
 
   const data = await callOpenAI({
     model: 'gpt-5.4-mini',
+    feature: 'beanStory',
     messages: [
       { role: 'system', content: systemPrompt },
       {
@@ -113,6 +114,7 @@ export async function convertTastingScores(tasting, bean) {
 
   const data = await callOpenAI({
     model: 'gpt-5.4-mini',
+    feature: 'scoreExtract',
     messages: [
       {
         role: 'system',

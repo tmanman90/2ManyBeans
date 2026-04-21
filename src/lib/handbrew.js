@@ -471,6 +471,7 @@ BEAN CLASSIFICATION:
         { role: 'user', content: userContent },
       ],
       maxTokens: 1000,
+      feature: 'handBrewRecipe',
     },
     retries: 2,
     serviceName: 'OpenAI',

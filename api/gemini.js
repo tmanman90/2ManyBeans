@@ -2,6 +2,7 @@
 // Keeps GEMINI_API_KEY server-side only
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { withCorsAuthMetered } from './_lib/cors-auth.js';
+import { logApiUsage } from './_lib/costLogger.js';
 
 let genAI;
 function getClient() {
@@ -20,7 +21,7 @@ function getClient() {
 const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-3.1-flash-image-preview'];
 const MAX_TOKENS_CAP = 4000;
 
-async function handleText(req, res) {
+async function handleText(req, res, feature, decodedToken) {
   const {
     model: requestedModel = 'gemini-2.5-flash',
     contents,
@@ -49,6 +50,7 @@ async function handleText(req, res) {
   const text = response.text();
   const groundingMetadata = response.candidates?.[0]?.groundingMetadata || null;
 
+  logApiUsage({ uid: decodedToken?.uid, provider: 'gemini', model, feature, endpoint: '/api/gemini', usage: response.usageMetadata });
   return res.status(200).json({ text, groundingMetadata });
 }
 
@@ -57,9 +59,9 @@ async function handleText(req, res) {
 // request via `body.metered = true`. Only the bean-scan call site sets
 // the flag, so research and image-analysis don't burn scan credits.
 // Pro+ users bypass the meter entirely.
-export default withCorsAuthMetered(async (req, res) => {
+export default withCorsAuthMetered(async (req, res, decodedToken) => {
   try {
-    return await handleText(req, res);
+    return await handleText(req, res, req.body.feature, decodedToken);
   } catch (error) {
     console.error('Gemini API error:', error);
     const status = error.status || error.httpStatusCode || 500;

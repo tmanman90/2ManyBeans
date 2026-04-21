@@ -10,6 +10,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './_lib/cors-auth.js';
 import { checkEntitlement } from './_lib/checkEntitlement.js';
+import { logApiUsage } from './_lib/costLogger.js';
 
 // Free users get 1 product shot. Keep in sync with src/lib/subscriptionConfig.js
 const FREE_PRODUCT_SHOTS = 1;
@@ -297,6 +298,8 @@ export default withCorsAuth(async (req, res, decodedToken) => {
         ],
       }],
     });
+
+    logApiUsage({ uid, provider: 'gemini', model: 'gemini-3.1-flash-image-preview', feature: 'productShot', endpoint: '/api/product-shot', usage: result2.response?.usageMetadata });
 
     // Extract image from response
     let imageBase64;

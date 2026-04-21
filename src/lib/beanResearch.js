@@ -126,6 +126,7 @@ export async function researchBean(bean) {
         { role: 'user', content: `Research this coffee bean:\n\n${beanDescription}` },
       ],
       maxTokens: 600,
+      feature: 'beanResearch',
     },
     retries: 2,
     serviceName: 'OpenAI',

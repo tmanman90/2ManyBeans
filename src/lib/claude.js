@@ -39,14 +39,11 @@ function validateGrinderKey(x) {
 
 const PROXY_URL = `${API_BASE}/api/claude`;
 
-export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools, metered = false }) {
+export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools, metered = false, feature }) {
   const body = { system, messages, maxTokens, model };
   if (tools) body.tools = tools;
-  // `metered: true` opts in to the free-tier quota counter on the server.
-  // Only the FIRST message of a guided tasting coach session sets this —
-  // multi-turn replies and ChatTab messages do NOT count against the
-  // user's free taste-test quota. See review todo 005.
   if (metered) body.metered = true;
+  if (feature) body.feature = feature;
   return fetchWithRetry({ url: PROXY_URL, body, serviceName: 'Claude' });
 }
 
@@ -114,6 +111,7 @@ export async function getRecBlurb(activeDesc, recDesc) {
 FORMATTING: Plain text only. NO markdown. NEVER use asterisks (*), pound signs (#), or any markdown formatting -- your output renders as literal text in a mobile card and markdown syntax shows up as garbage. Write in flowing sentences, no headers, no bullets, no bold, no italic.`,
     messages: [{ role: 'user', content: `Current rotation:\n${activeDesc || "(empty)"}\n\nTop candidates:\n${recDesc}\n\nWhy would each be a good pick?` }],
     maxTokens: 400,
+    feature: 'recommendation',
   });
   const raw = data.content?.map(c => c.text || '').join('') || '';
   // Belt-and-suspenders: strip any markdown that slipped through the prompt.
@@ -318,6 +316,7 @@ export async function sendTastingMessage(systemPrompt, history, { firstMessage =
     system: systemPrompt,
     messages: cleanHistory,
     maxTokens: 1000,
+    feature: 'tastingCoach',
   });
   const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
   // Strip markdown at the API boundary so every caller gets clean plain text.
@@ -593,6 +592,7 @@ export async function sendChatMessage(systemPrompt, history) {
     system: systemPrompt,
     messages: recentMessages,
     maxTokens: 800,
+    feature: 'chat',
   });
   const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
   // Preserve the ---BEAN_SCAN---...---END_SCAN--- marker (it's plain JSON, no

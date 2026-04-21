@@ -5,14 +5,11 @@ import { fetchWithRetry } from './fetchWithRetry';
 
 const PROXY_URL = `${API_BASE}/api/gemini`;
 
-export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false }) {
+export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false, feature }) {
   const body = { model, contents, systemInstruction, maxTokens };
   if (tools) body.tools = tools;
-  // `metered: true` opts in to the free-tier quota counter on the server.
-  // Only the bean-scan call site sets this flag — research enrichment,
-  // chat image analysis, and other Gemini calls do NOT count against the
-  // user's free scan quota. See review todo 005.
   if (metered) body.metered = true;
+  if (feature) body.feature = feature;
   return fetchWithRetry({ url: PROXY_URL, body, retries, serviceName: 'Gemini' });
 }
 
@@ -96,6 +93,7 @@ If a field is not visible, use an empty string (or 100 for bagSize). For roastDa
     }],
     maxTokens: 2500,
     metered: true,
+    feature: 'beanScan',
   });
 
   const text = data.text || '';
@@ -168,6 +166,7 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
     }],
     tools: [{ googleSearch: {} }],
     maxTokens: 1500,
+    feature: 'webResearch',
   });
 
   const text = data.text || '';
@@ -225,6 +224,7 @@ export async function describeImage(photos) {
       ],
     }],
     maxTokens: 800,
+    feature: 'imageAnalysis',
   });
 
   return data.text || '';
@@ -244,6 +244,7 @@ export async function summarizeNotes(bagNotes) {
       systemInstruction: 'You return ONLY a final short phrase. Never show reasoning, thinking, or explanation. Never use prefixes like THINK:, THOUGHTS:, ANSWER:. Output the answer directly.',
       metered: false,
       maxTokens: 500,
+      feature: 'noteSummary',
     });
 
     let text = (data.text || '').trim();

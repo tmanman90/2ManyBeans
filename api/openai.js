@@ -2,6 +2,7 @@
 // Keeps OPENAI_API_KEY server-side only
 import OpenAI from 'openai';
 import { withCorsAuthPro } from './_lib/cors-auth.js';
+import { logApiUsage } from './_lib/costLogger.js';
 
 const FALLBACK_MODEL = 'gpt-5.4-mini';
 const ALLOWED_MODELS = ['gpt-5.4', 'gpt-5.4-mini'];
@@ -13,13 +14,14 @@ const client = new OpenAI({
 });
 
 // Recipes, stories, tasting score extraction. Pro or Ultra required.
-export default withCorsAuthPro(async (req, res) => {
+export default withCorsAuthPro(async (req, res, decodedToken) => {
   try {
     const {
       model: requestedModel = 'gpt-5.4',
       messages,
       maxTokens = 1000,
       responseFormat,
+      feature,
     } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
@@ -56,6 +58,7 @@ export default withCorsAuthPro(async (req, res) => {
     const text = response.choices?.[0]?.message?.content || '';
     const usage = response.usage || {};
 
+    logApiUsage({ uid: decodedToken?.uid, provider: 'openai', model: params.model, feature, endpoint: '/api/openai', usage });
     return res.status(200).json({ text, usage });
   } catch (error) {
     console.error('OpenAI API error:', error);

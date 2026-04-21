@@ -739,6 +739,7 @@ export async function generateAidenRecipe(bean, research = null) {
         { role: 'user', content: userContent },
       ],
       maxTokens: 1000,
+      feature: 'aidenRecipe',
     },
     retries: 2,
     serviceName: 'OpenAI',
