@@ -248,7 +248,8 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     const capturedBeanId = bean.id;
     const capturedPhoto = pendingPhoto;
 
-    uploadOriginalPhoto(capturedBeanId, capturedPhoto).catch(() => {});
+    uploadOriginalPhoto(capturedBeanId, capturedPhoto)
+      .catch(err => console.warn('Original photo upload failed:', err.message));
 
     generateProductShot(capturedPhoto, capturedBeanId)
       .then(photoUrl => {
