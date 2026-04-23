@@ -141,9 +141,11 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       // Research online (non-blocking failure)
       setStep('researching');
       let enrichedData = scanData;
+      let researchResult = null;
       try {
         const research = await researchBeanOnline(scanData);
         if (thisGen !== genCounter.current) return;
+        researchResult = research;
         const merged = { ...scanData };
         for (const field of ENRICHABLE_FIELDS) {
           if (!merged[field] && research[field]) merged[field] = research[field];
@@ -154,9 +156,9 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       }
       if (thisGen !== genCounter.current) return;
 
-      // Background story generation (fire-and-forget)
+      // Background story generation (fire-and-forget, includes roaster context from research)
       storyRef.current = null;
-      generateRuphusStory(enrichedData, { useWebSearch: false })
+      generateRuphusStory(enrichedData, { enrichment: researchResult })
         .then(story => { if (thisGen === genCounter.current) storyRef.current = story; })
         .catch(err => console.log('Background story gen skipped:', err.message));
 
