@@ -108,15 +108,15 @@ export function useHandBrew(updateBean) {
     try {
       const recipe = await generateHandBrewRecipe(bean, research, preferences, device);
       if (!isActive(rid)) return;
-      setHandBrewRecipe(recipe);
+      const recipeData = {
+        ...recipe,
+        generatedAt: new Date().toISOString(),
+        grinder: grinderKey,
+        device,
+      };
+      setHandBrewRecipe(recipeData);
       setHandBrewError(null);
       if (bean.id) {
-        const recipeData = {
-          ...recipe,
-          generatedAt: new Date().toISOString(),
-          grinder: grinderKey,
-          device,
-        };
         await updateBean(bean.id, {
           handBrewRecipe: recipeData,
           [`handBrewRecipes.${device}`]: recipeData,

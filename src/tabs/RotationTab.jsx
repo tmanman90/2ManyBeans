@@ -64,9 +64,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [newBeanEntry, setNewBeanEntry] = useState(null);
 
   const handleSaveToInventory = async (data) => {
-    const { aidenRecipe, aidenLink, aidenGrind, photo, ...fields } = data;
+    const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, photo, ...fields } = data;
     const aidenData = aidenRecipe ? { aidenRecipe, aidenLink, aidenGrind } : undefined;
     const beanData = buildNewBeanData(fields, { aidenData });
+    if (handBrewRecipe) beanData.handBrewRecipe = handBrewRecipe;
+    if (handBrewRecipes) beanData.handBrewRecipes = handBrewRecipes;
     try {
       const beanId = await addBean(beanData);
       setNewBeanEntry({ id: beanId, ...beanData });
