@@ -18,9 +18,13 @@ const GRINDERS = [
   { key: 'other', label: 'Other / Manual Entry' },
 ];
 
-const BREW_METHODS = [
+const BREW_OPTIONS = [
   { key: 'aiden', label: 'Fellow Aiden', img: '/images/brew-aiden.webp' },
-  { key: 'handbrew', label: 'Hand Brew', img: '/images/brew-handbrew.webp' },
+  { key: 'v60', label: 'Hario V60', img: '/images/brew-handbrew.webp' },
+  { key: 'kalita', label: 'Kalita Wave', img: '/images/brew-handbrew.webp' },
+  { key: 'chemex', label: 'Chemex', img: '/images/brew-handbrew.webp' },
+  { key: 'aeropress', label: 'Aeropress', img: '/images/brew-handbrew.webp' },
+  { key: 'french-press', label: 'French Press', img: '/images/brew-handbrew.webp' },
 ];
 
 export default function R07Preferences() {
@@ -170,17 +174,16 @@ export default function R07Preferences() {
         }}>
           How do you brew?
         </label>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {BREW_METHODS.map(m => {
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {BREW_OPTIONS.map(m => {
             const selected = brewMethod === m.key;
             return (
               <button
                 key={m.key}
                 onClick={() => setBrewMethod(m.key)}
                 style={{
-                  flex: 1,
-                  minHeight: 140,
-                  padding: 14,
+                  minHeight: 100,
+                  padding: 12,
                   ...cardBase,
                   cursor: 'pointer',
                   textAlign: 'center',
@@ -193,16 +196,16 @@ export default function R07Preferences() {
                   src={m.img}
                   alt={m.label}
                   style={{
-                    width: 80,
-                    height: 80,
+                    width: 56,
+                    height: 56,
                     objectFit: 'cover',
-                    borderRadius: 12,
-                    marginBottom: 8,
+                    borderRadius: 10,
+                    marginBottom: 6,
                   }}
                 />
                 <div style={{
                   fontFamily: fonts.body,
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: 700,
                   color: selected ? C.accent : C.text,
                 }}>

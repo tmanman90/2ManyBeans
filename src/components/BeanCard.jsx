@@ -47,7 +47,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
     ? (bean.notesSummary || bean.bagNotes)
     : null;
 
-  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || grindText || (bean.handBrewRecipe && preferences.brewMethod === 'handbrew');
+  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || grindText || (bean.handBrewRecipe && preferences.brewMethod !== 'aiden');
 
   const photoHeight = compact ? 180 : 240;
 
@@ -301,7 +301,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               {bean.brewingRec && <span><strong>Brewing Rec:</strong> {bean.brewingRec}</span>}
               {bean.bagNotes && bean.bagNotes !== '(not logged)' && <span><strong>Full Notes:</strong> {bean.bagNotes}</span>}
               {grindText && <span><strong>Grind:</strong> {grindText}</span>}
-              {bean.handBrewRecipe && preferences.brewMethod === 'handbrew' && (
+              {bean.handBrewRecipe && preferences.brewMethod !== 'aiden' && (
                 <span><strong>Last Brew:</strong> {bean.handBrewRecipe.method || 'Pour-over'}, {bean.handBrewRecipe.coffeeGrams}g / {bean.handBrewRecipe.waterGrams}g</span>
               )}
             </div>

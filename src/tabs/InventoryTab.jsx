@@ -23,7 +23,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBean, onPendingAddBeanConsumed, onStartTastingSession }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
-  const isHandBrew = preferences.brewMethod === 'handbrew';
+  const isHandBrew = preferences.brewMethod !== 'aiden';
   const canisterCount = preferences.canisterCount || 3;
   const sealed = beans.filter(b => b.status === 'SEALED');
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);

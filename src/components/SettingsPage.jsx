@@ -8,6 +8,7 @@ import { C, fonts, shadows } from '../styles/theme';
 import { haptic } from '../lib/haptics';
 import { Toast } from './Toast';
 import { usePreferences } from '../hooks/useUserProfile';
+import { BREW_DEVICES } from '../lib/brewMethods';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
@@ -716,7 +717,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   style={selectStyle}
                 >
                   <option value="aiden">Aiden Brew</option>
-                  <option value="handbrew">Hand Brew</option>
+                  {BREW_DEVICES.map(d => (
+                    <option key={d.key} value={d.key}>{d.label}</option>
+                  ))}
                 </select>
                 <ChevronRight size={16} color={C.textLight} />
               </div>
@@ -757,7 +760,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           </div>
 
           {/* --- Fellow Aiden Section --- */}
-          {preferences.brewMethod === 'aiden' && (
+          {(preferences.brewMethod === 'aiden') && (
             <>
               <div style={sectionHeaderStyle}>Fellow Aiden</div>
               <div style={groupStyle}>

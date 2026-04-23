@@ -48,7 +48,7 @@ const PillButton = ({ color, icon, label, onClick }) => (
 export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
-  const isHandBrew = preferences.brewMethod === 'handbrew';
+  const isHandBrew = preferences.brewMethod !== 'aiden';
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean);

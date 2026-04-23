@@ -279,16 +279,23 @@ export const useUserProfile = (uid) => {
   // button now writes a local-only `DEV_FORCE_ONBOARDING_KEY` flag
   // that Gate 5 checks in DEV builds only; Firestore is never touched.
 
-  // Stabilize preferences reference: only change when values actually differ
+  // Stabilize preferences reference: only change when values actually differ.
+  // Migrate legacy 'handbrew' to 'v60' with idempotent deferred Firestore write.
   const prevPrefsRef = useRef(null);
   const preferences = useMemo(() => {
-    const next = profile?.preferences || DEFAULT_PREFERENCES;
+    const raw = profile?.preferences || DEFAULT_PREFERENCES;
+    const next = raw.brewMethod === 'handbrew'
+      ? { ...raw, brewMethod: 'v60' }
+      : raw;
+    if (next !== raw && uid) {
+      updateDoc(doc(db, 'users', uid), { 'preferences.brewMethod': 'v60' }).catch(() => {});
+    }
     if (prevPrefsRef.current && JSON.stringify(prevPrefsRef.current) === JSON.stringify(next)) {
       return prevPrefsRef.current;
     }
     prevPrefsRef.current = next;
     return next;
-  }, [profile?.preferences]);
+  }, [profile?.preferences, uid]);
 
   const isOnboarded = profile?.onboardingComplete === true;
 

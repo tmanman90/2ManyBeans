@@ -18,7 +18,7 @@ import { stripMarkdown } from './textFormat';
 // Preference enum whitelists. Firestore does not enforce types, so a tampered
 // doc could put any string in preferences.brewMethod / preferences.grinder.
 // These hard-validate before interpolation.
-const VALID_BREW_METHODS = new Set(['aiden', 'handbrew']);
+const VALID_BREW_METHODS = new Set(['aiden', 'v60', 'kalita', 'chemex', 'aeropress', 'french-press', 'handbrew']);
 const VALID_GRINDER_KEYS = new Set([
   'fellow-ode-gen2',
   'fellow-opus',
@@ -452,8 +452,9 @@ export function buildChatContext(beans, tastings, preferences) {
     grinderKey === 'other'
       ? sanitize(prefs.grinderCustomName, 50) || 'Custom grinder'
       : GRINDER_LABELS[grinderKey] || 'Fellow Ode Gen 2';
-  const brewerLabel = brewMethod === 'handbrew' ? 'Hand-brew (manual pour-over)' : 'Fellow Aiden';
-  const brewerRef = brewMethod === 'handbrew' ? 'HAND-BREW' : 'FELLOW AIDEN';
+  const DEVICE_LABELS = { v60: 'V60 pour-over', kalita: 'Kalita Wave pour-over', chemex: 'Chemex pour-over', aeropress: 'Aeropress', 'french-press': 'French Press', handbrew: 'Hand-brew (manual pour-over)' };
+  const brewerLabel = brewMethod === 'aiden' ? 'Fellow Aiden' : (DEVICE_LABELS[brewMethod] || 'Manual brew');
+  const brewerRef = brewMethod === 'aiden' ? 'FELLOW AIDEN' : (brewMethod || 'HAND-BREW').toUpperCase();
 
   const active = beans
     .filter(b => b.status === 'ACTIVE')
@@ -461,7 +462,7 @@ export function buildChatContext(beans, tastings, preferences) {
       const ps = getPeakStatus(b);
       const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${sanitize(b.openDate, 20)} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
       const recipeLine =
-        brewMethod === 'handbrew' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
+        brewMethod !== 'aiden' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
       return recipeLine ? `${summary}\n${recipeLine}` : summary;
     })
     .join('\n');

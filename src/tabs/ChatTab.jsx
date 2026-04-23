@@ -244,7 +244,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     if (!beanId) return;
     await updateBean(beanId, updates);
   };
-  const isHandBrew = preferences.brewMethod === 'handbrew';
+  const isHandBrew = preferences.brewMethod !== 'aiden';
   const aiden = useAidenBrew(ephemeralUpdateBean);
   const handBrew = useHandBrew(ephemeralUpdateBean);
 

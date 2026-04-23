@@ -18,6 +18,8 @@ import { PROCESS_TYPES } from '../lib/beanFields';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall';
+import { usePreferences } from '../hooks/useUserProfile';
+import { GRINDER_LABELS } from '../lib/brewMethods';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
 const SprigDivider = ({ color = C.accentLight, size = 12 }) => (
@@ -109,6 +111,7 @@ const PeakTimeline = ({ bean }) => {
 export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid, isNewBean = false }) => {
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
+  const { preferences } = usePreferences();
   const [f, setF] = useState({});
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -728,7 +731,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       )}
 
       <ChapterHeader
-        number="6" title="Grind Settings" subtitle="Ode Gen 2"
+        number="6" title="Grind Settings" subtitle={GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder'}
         collapsible open={grindOpen}
         onToggle={() => setGrindOpen(o => !o)}
       />

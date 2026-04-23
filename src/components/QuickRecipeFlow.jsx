@@ -30,7 +30,7 @@ const toEphemeralBean = (data) => {
 
 export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, uid, onStartTastingSession }) => {
   const { preferences } = usePreferences();
-  const isHandBrew = preferences.brewMethod === 'handbrew';
+  const isHandBrew = preferences.brewMethod !== 'aiden';
 
   const [step, setStep] = useState('photo'); // photo | scanning | enriching | bagSize | brewing
   const [photo, setPhoto] = useState(null); // { base64, mediaType, previewUrl }
