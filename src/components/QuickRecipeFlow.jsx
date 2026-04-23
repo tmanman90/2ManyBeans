@@ -227,6 +227,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       aidenLink: aiden.aidenResult?.link || null,
       aidenGrind: aiden.aidenRecipe?.grindRecommendation || null,
       handBrewRecipe: handBrewForSave,
+      ...(handBrewForSave ? { handBrewRecipes: { [handBrewForSave.device || 'v60']: handBrewForSave } } : {}),
       photo,
     };
     onClose();
@@ -254,13 +255,11 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         }
         if (handBrew.handBrewRecipe) {
           beanData.handBrewRecipe = { ...handBrew.handBrewRecipe, generatedAt: new Date().toISOString() };
-          // Carry the user's dose override through to the persisted bean.
-          // The override lives in the hook's lifted state for ephemeral beans
-          // (no Firestore id to write to mid-session), so we merge it here
-          // when the bean is finally saved.
           if (typeof handBrew.userCoffeeGrams === 'number') {
             beanData.handBrewRecipe.userCoffeeGrams = handBrew.userCoffeeGrams;
           }
+          const dev = beanData.handBrewRecipe.device || 'v60';
+          beanData.handBrewRecipes = { [dev]: beanData.handBrewRecipe };
         }
         const newId = await addBean(beanData);
         setSavedBeanId(newId);

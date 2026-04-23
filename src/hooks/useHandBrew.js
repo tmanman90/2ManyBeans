@@ -43,21 +43,25 @@ export function useHandBrew(updateBean) {
     return m;
   };
 
-  const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false) => {
-    const device = getBrewDevice();
+  const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false, deviceOverride = null) => {
+    const device = deviceOverride || getBrewDevice();
     const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
 
-    // Show cached recipe if available and matches current device + grinder
-    if (!forceRegenerate && bean.handBrewRecipe) {
-      const cachedDevice = bean.handBrewRecipe.device || 'v60';
-      const cachedGrinder = bean.handBrewRecipe.grinder || 'fellow-ode-gen2';
-      if (cachedDevice === device && cachedGrinder === grinderKey) {
+    // Check keyed cache first, fall back to legacy single-recipe field
+    const keyedRecipe = bean.handBrewRecipes?.[device];
+    const legacyRecipe = bean.handBrewRecipe;
+    const cached = keyedRecipe ||
+      (legacyRecipe && (legacyRecipe.device || 'v60') === device ? legacyRecipe : null);
+
+    if (!forceRegenerate && cached) {
+      const cachedGrinder = cached.grinder || 'fellow-ode-gen2';
+      if (cachedGrinder === grinderKey) {
         const rid = Symbol('handbrew');
         activeRequestRef.current = rid;
         setHandBrewBean(bean);
         setHandBrewError(null);
         setHandBrewModal(true);
-        setHandBrewRecipe(bean.handBrewRecipe);
+        setHandBrewRecipe(cached);
         setHandBrewLoading(false);
         setHandBrewPhase(null);
         return;
@@ -107,13 +111,15 @@ export function useHandBrew(updateBean) {
       setHandBrewRecipe(recipe);
       setHandBrewError(null);
       if (bean.id) {
+        const recipeData = {
+          ...recipe,
+          generatedAt: new Date().toISOString(),
+          grinder: grinderKey,
+          device,
+        };
         await updateBean(bean.id, {
-          handBrewRecipe: {
-            ...recipe,
-            generatedAt: new Date().toISOString(),
-            grinder: grinderKey,
-            device,
-          },
+          handBrewRecipe: recipeData,
+          [`handBrewRecipes.${device}`]: recipeData,
         });
       }
     } catch (err) {
@@ -138,8 +144,10 @@ export function useHandBrew(updateBean) {
     );
     if (!handBrewBean?.id) return;
     try {
+      const dev = handBrewRecipe?.device || 'v60';
       await updateBean(handBrewBean.id, {
         'handBrewRecipe.userCoffeeGrams': newDose,
+        [`handBrewRecipes.${dev}.userCoffeeGrams`]: newDose,
       });
       if (mountedRef.current) {
         setHandBrewRecipe((prev) =>
@@ -149,7 +157,7 @@ export function useHandBrew(updateBean) {
     } catch (err) {
       console.warn('[handBrew] persistDose failed:', err?.message || err);
     }
-  }, [handBrewBean, updateBean]);
+  }, [handBrewBean, handBrewRecipe, updateBean]);
 
   return {
     handBrewModal, handBrewRecipe, handBrewLoading, handBrewError,
@@ -158,7 +166,7 @@ export function useHandBrew(updateBean) {
     userCoffeeGrams,
     setUserCoffeeGrams,
     persistDose,
-    onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch) : undefined,
-    onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true) : undefined,
+    onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, false, handBrewRecipe?.device) : undefined,
+    onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe?.device) : undefined,
   };
 }

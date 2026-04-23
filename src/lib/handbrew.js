@@ -7,6 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { classifyFamilyFallback } from './beanFields';
+import { GRINDER_MICRON_SCALES } from './brewMethods';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -230,9 +231,11 @@ function getDeviceAdjustedGrindStart(grinderKey, grindTier, device) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   if (!grinder) return null;
   const config = BREW_DEVICE_CONFIGS[device];
-  const offset = config?.grindOffset || 0;
+  const rawOffset = config?.grindOffset || 0;
   const base = grinder.pourOverStart[grindTier] || grinder.validRange.min;
-  const adjusted = base + offset;
+  const targetPerStep = GRINDER_MICRON_SCALES[grinderKey]?.perStep || 70;
+  const nativeOffset = (rawOffset * 70) / targetPerStep;
+  const adjusted = base + nativeOffset;
   // Immersion devices can go finer than pour-over floor (use absolute grinder min, not pour-over min)
   const floor = (config?.type === 'immersion-pressure') ? 1 : grinder.validRange.min;
   return Math.max(floor, Math.min(grinder.validRange.max, adjusted));

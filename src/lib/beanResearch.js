@@ -91,7 +91,7 @@ function sanitize(str, maxLen = 100) {
 export function buildBeanDescription(bean) {
   const ps = getPeakStatus(bean);
   const dsr = daysSinceRoast(bean.roastDate, bean);
-  const profile = getProfileForRoaster(bean.roaster);
+  const profile = getProfileForRoaster(bean.roaster, bean);
 
   return {
     text: [

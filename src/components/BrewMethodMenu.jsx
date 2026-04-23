@@ -68,7 +68,7 @@ export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew }) => {
         <div key={device.key}>
           <div style={{ height: 1, background: C.borderLight }} />
           <div
-            onClick={() => { onHandBrew(); onClose(); }}
+            onClick={() => { onHandBrew(device.key); onClose(); }}
             style={rowStyle}
           >
             <Droplets size={16} color={C.accent} />

@@ -60,7 +60,7 @@ export const BrewButton = ({ bean, label, isHandBrew, brewMenuBean, setBrewMenuB
         open={brewMenuBean?.id === bean.id}
         onClose={() => setBrewMenuBean(null)}
         onAiden={() => onAiden(bean)}
-        onHandBrew={() => onHandBrew(bean)}
+        onHandBrew={(deviceKey) => onHandBrew(bean, null, false, deviceKey)}
       />
     </div>
   );

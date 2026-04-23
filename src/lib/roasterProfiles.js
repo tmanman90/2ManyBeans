@@ -144,6 +144,12 @@ export const getProfileForRoaster = (roasterName, bean = null) => {
   const aliasTarget = ROASTER_ALIASES[lower];
   if (aliasTarget && ROASTER_PROFILES[aliasTarget]) return ROASTER_PROFILES[aliasTarget];
 
+  // Explicit user-set roaster style beats automated fuzzy matching
+  if (bean?.roasterStyle && ROAST_STYLE_CATEGORIES[bean.roasterStyle]) {
+    const style = ROAST_STYLE_CATEGORIES[bean.roasterStyle];
+    return { ...style, category: style.label, guidance: `${style.label} (user-set)` };
+  }
+
   // Tiered fuzzy match
   let bestScore = 0;
   let bestMatch = null;
@@ -155,12 +161,6 @@ export const getProfileForRoaster = (roasterName, bean = null) => {
     }
   }
   if (bestScore >= 60 && bestMatch) return ROASTER_PROFILES[bestMatch];
-
-  // Explicit user-set roaster style (highest priority among fallbacks)
-  if (bean?.roasterStyle && ROAST_STYLE_CATEGORIES[bean.roasterStyle]) {
-    const style = ROAST_STYLE_CATEGORIES[bean.roasterStyle];
-    return { ...style, category: style.label, guidance: `${style.label} (user-set)` };
-  }
 
   // Infer from bean's roast level
   if (bean?.roastLevel) {
