@@ -2,6 +2,26 @@
 // Each tab renders method.label based on the user's preference.
 // Adding a new brew method requires one entry here, not editing three tabs.
 
+// Valid Fellow Ode Gen 2 grind steps (31 positions)
+export const ODE_GEN2_STEPS = [
+  1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2,
+  5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2,
+  9, 9.1, 9.2, 10, 10.1, 10.2, 11,
+];
+
+export function nearestOdeStep(target, preferCoarser = true) {
+  let closest = ODE_GEN2_STEPS[0];
+  let minDist = Math.abs(target - closest);
+  for (const step of ODE_GEN2_STEPS) {
+    const dist = Math.abs(target - step);
+    if (dist < minDist || (dist === minDist && preferCoarser && step > closest)) {
+      closest = step;
+      minDist = dist;
+    }
+  }
+  return closest;
+}
+
 export const GRINDER_LABELS = {
   'fellow-ode-gen2': 'Ode Gen 2',
   'fellow-opus': 'Fellow Opus',

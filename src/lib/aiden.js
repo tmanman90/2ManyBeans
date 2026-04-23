@@ -6,15 +6,9 @@ import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { classifyFamilyFallback } from './beanFields';
+import { ODE_GEN2_STEPS, nearestOdeStep } from './brewMethods';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
-
-// Valid Fellow Ode Gen 2 grind steps (31 positions)
-const ODE_GEN2_STEPS = [
-  1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2,
-  5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2,
-  9, 9.1, 9.2, 10, 10.1, 10.2, 11,
-];
 
 // Cup-structure family grind bands (Ode Gen 2)
 // Tight clarity-first bands. Family determines the band, reference profiles are
@@ -446,19 +440,6 @@ If the bean is Past Peak or Fading, you MUST add +0.5 to +1.0 to the ratio above
 RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
 // --- Deterministic enforcement helpers ---
-
-function nearestOdeStep(target, preferCoarser = true) {
-  let closest = ODE_GEN2_STEPS[0];
-  let minDist = Math.abs(target - closest);
-  for (const step of ODE_GEN2_STEPS) {
-    const dist = Math.abs(target - step);
-    if (dist < minDist || (dist === minDist && preferCoarser && step > closest)) {
-      closest = step;
-      minDist = dist;
-    }
-  }
-  return closest;
-}
 
 function pickUpperMiddle(min, max) {
   const target = min + (max - min) * 0.65;

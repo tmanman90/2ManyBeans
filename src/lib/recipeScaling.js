@@ -70,5 +70,8 @@ export function scaleRecipeForDose(recipe, newDose) {
     coffeeGrams: newDose,
     waterGrams: newWaterGrams,
     steps: newSteps,
+    iceGrams: typeof recipe.iceGrams === 'number'
+      ? Math.round(recipe.iceGrams * scaleFactor)
+      : undefined,
   };
 }
