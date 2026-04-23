@@ -457,9 +457,7 @@ export function ArchiveDetailSheet({
                 border: `1px solid ${C.borderLight}`, marginBottom: 8,
               }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>
-                  {bean.handBrewRecipe.device
-                    ? `${bean.handBrewRecipe.title || 'Hand Brew Recipe'}`
-                    : 'Hand Brew Recipe'}
+                  {bean.handBrewRecipe.title || 'Hand Brew Recipe'}
                 </div>
                 <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
                   {bean.handBrewRecipe.method && <span>{bean.handBrewRecipe.method} &middot; </span>}
