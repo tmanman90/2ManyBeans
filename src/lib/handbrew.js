@@ -201,7 +201,11 @@ function getDeviceFamilyDefaults(device, family) {
   if (config.tempRange) {
     result.tempC = `${config.tempRange[0]}-${config.tempRange[1]}`;
   }
-  result.technique = config.defaultTechnique;
+
+  // Only override family technique for non-V60 devices (V60 preserves family-specific choices like Kasuya for naturals)
+  if (device !== 'v60') {
+    result.technique = config.defaultTechnique;
+  }
 
   // Immersion devices get overrides
   if (IMMERSION_OVERRIDES[device]) {
@@ -219,14 +223,19 @@ function roastToGrindTier(roastLevel) {
   return 'light';
 }
 
-// Apply device grind offset to a grinder's pour-over start point
+// Apply device grind offset to a grinder's pour-over start point.
+// For immersion devices (Aeropress), allow going below the pour-over floor
+// since shorter contact time permits finer grinds.
 function getDeviceAdjustedGrindStart(grinderKey, grindTier, device) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   if (!grinder) return null;
   const config = BREW_DEVICE_CONFIGS[device];
   const offset = config?.grindOffset || 0;
   const base = grinder.pourOverStart[grindTier] || grinder.validRange.min;
-  return Math.max(grinder.validRange.min, Math.min(grinder.validRange.max, base + offset));
+  const adjusted = base + offset;
+  // Immersion devices can go finer than pour-over floor (use absolute grinder min, not pour-over min)
+  const floor = (config?.type === 'immersion-pressure') ? 1 : grinder.validRange.min;
+  return Math.max(floor, Math.min(grinder.validRange.max, adjusted));
 }
 
 export function parseTimeString(str) {
