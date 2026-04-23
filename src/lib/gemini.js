@@ -161,6 +161,9 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   "sourcedBy": "retailer/selector if applicable",
   "producer": "producer name if found",
   "roastedIn": "city/country where the coffee is roasted (roastery location)",
+  "roasterLocation": "city and/or country where the roastery is based",
+  "roasterDescription": "1-2 sentence description of the roaster's style and focus",
+  "roasterFounded": "year founded if known",
   "redditNotes": "community tasting notes or reviews from Reddit if found"
 }` }],
     }],

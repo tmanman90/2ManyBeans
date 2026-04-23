@@ -9,57 +9,49 @@ import { ENRICHABLE_FIELDS, isBagNotesEmpty, beanNeedsRuphusEnrichment } from '.
 // before the enrichedAt cache lands in Firestore.
 const inflightEnrichmentIds = new Set();
 
-// Silent background enrichment fired alongside the Ruphus story.
-// Reuses the same Gemini search-grounding path as Add Bean / AI Fill.
-// Passes metered:true because the /api/gemini proxy rejects non-metered
-// requests from free-tier users with 403. Pro users bypass the meter at
-// the server, so this is a no-op for them. Free users spend one of their
-// aiScans per first-time Ruphus press on an under-populated bean, which
-// matches the semantic: it IS an AI research action. At-cap errors are
-// swallowed silently so the paywall never surfaces on a Ruphus press.
-async function runSilentEnrichment(bean, getBeanById, updateBean) {
-  if (!updateBean || !getBeanById) return;
-  if (!beanNeedsRuphusEnrichment(bean)) return;
-  if (inflightEnrichmentIds.has(bean.id)) return;
+const ENRICHMENT_TIMEOUT = 8000;
+
+// Enrichment fired BEFORE the Ruphus story. Returns the raw research result
+// (including roaster-level fields for story context) or null on failure/timeout.
+// Also writes enriched fields to the bean doc (existing merge logic).
+async function runEnrichment(bean, getBeanById, updateBean) {
+  if (!updateBean || !getBeanById) return null;
+  if (!beanNeedsRuphusEnrichment(bean)) return null;
+  if (inflightEnrichmentIds.has(bean.id)) return null;
 
   inflightEnrichmentIds.add(bean.id);
   try {
-    const research = await researchBeanOnline(bean, { metered: true });
+    const enrichPromise = (async () => {
+      const research = await researchBeanOnline(bean, { metered: true });
 
-    // Re-read the bean from Firestore (not from local state) so a
-    // concurrent user edit during the in-flight window is never clobbered.
-    // Local state can lag several seconds on native due to polling refetch.
-    const current = await getBeanById(bean.id);
-    if (!current) return; // bean was deleted mid-flight
+      const current = await getBeanById(bean.id);
+      if (!current) return research;
 
-    const updates = {};
-    for (const field of ENRICHABLE_FIELDS) {
-      if (!current[field] && research[field]) {
-        updates[field] = research[field];
+      const updates = {};
+      for (const field of ENRICHABLE_FIELDS) {
+        if (!current[field] && research[field]) {
+          updates[field] = research[field];
+        }
       }
-    }
 
-    // bagNotes is special: researchBeanOnline returns redditNotes (community
-    // reviews), not a comma-separated descriptor phrase. Pipe through
-    // summarizeNotes to produce the "blueberry, chocolate, stone fruit" shape
-    // the NOTES card field expects.
-    if (isBagNotesEmpty(current) && research.redditNotes) {
-      const summary = await summarizeNotes(research.redditNotes);
-      if (summary) updates.bagNotes = summary;
-    }
+      if (isBagNotesEmpty(current) && research.redditNotes) {
+        const summary = await summarizeNotes(research.redditNotes);
+        if (summary) updates.bagNotes = summary;
+      }
 
-    // Only stamp enrichedAt when we actually filled at least one field.
-    // Empty-success (research returned nothing usable) is treated as a
-    // no-op so the next Ruphus press retries — better than permanently
-    // stranding a bean on a transient low-quality Gemini response.
-    if (Object.keys(updates).length > 0) {
-      updates.enrichedAt = new Date().toISOString();
-      await updateBean(bean.id, updates);
-    }
+      if (Object.keys(updates).length > 0) {
+        updates.enrichedAt = new Date().toISOString();
+        await updateBean(bean.id, updates);
+      }
+
+      return research;
+    })();
+
+    const timeout = new Promise(r => setTimeout(() => r(null), ENRICHMENT_TIMEOUT));
+    return await Promise.race([enrichPromise, timeout]);
   } catch (err) {
-    // R7: swallow silently. Do NOT write enrichedAt on error so the next
-    // Ruphus press retries.
-    console.log('Silent Ruphus enrichment skipped:', err.message);
+    console.log('Ruphus enrichment skipped:', err.message);
+    return null;
   } finally {
     inflightEnrichmentIds.delete(bean.id);
   }
@@ -72,13 +64,25 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
   const [ruphusLoading, setRuphusLoading] = useState(false);
   const [ruphusError, setRuphusError] = useState(null);
 
-  const generateStory = useCallback(async (bean, useWebSearch) => {
+  const enrichAndGenerate = useCallback(async (bean) => {
     setRuphusLoading(true);
     setRuphusError(null);
     try {
-      const story = await generateRuphusStory(bean, { useWebSearch });
+      // Step 1: enrich (with timeout). Returns raw research including roaster info.
+      const enrichment = await runEnrichment(bean, getBeanById, updateBean);
+
+      // Re-read the bean to pick up any fields enrichment wrote
+      let enrichedBean = bean;
+      if (enrichment && getBeanById) {
+        enrichedBean = await getBeanById(bean.id) || bean;
+      }
+
+      // Step 2: generate story with enrichment context
+      const story = await generateRuphusStory(enrichedBean, {
+        useWebSearch: true,
+        enrichment,
+      });
       setRuphusStory(story);
-      // Persist to Firestore (skip for ephemeral beans without an id)
       if (updateBean && bean.id) {
         await updateBean(bean.id, { story });
       }
@@ -87,33 +91,27 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
       setRuphusError(err.message || "Couldn't generate the lesson");
     }
     setRuphusLoading(false);
-  }, [updateBean]);
+  }, [updateBean, getBeanById]);
 
   const handleLearn = useCallback((bean) => {
     setRuphusBean(bean);
     setRuphusOpen(true);
     setRuphusError(null);
 
-    // Fire silent enrichment in parallel with the story. No await — the story
-    // UI does not wait on enrichment, and enrichment errors don't affect it.
-    runSilentEnrichment(bean, getBeanById, updateBean);
-
-    if (bean.story) {
-      // Cached — show immediately
+    if (bean.story && bean.enrichedAt) {
       setRuphusStory(bean.story);
       setRuphusLoading(false);
     } else {
-      // On-demand — generate with web search (no prior research)
       setRuphusStory(null);
-      generateStory(bean, true);
+      enrichAndGenerate(bean);
     }
-  }, [generateStory, getBeanById, updateBean]);
+  }, [enrichAndGenerate]);
 
   const handleRefresh = useCallback(() => {
     if (!ruphusBean) return;
     setRuphusStory(null);
-    generateStory(ruphusBean, true);
-  }, [ruphusBean, generateStory]);
+    enrichAndGenerate(ruphusBean);
+  }, [ruphusBean, enrichAndGenerate]);
 
   const closeRuphus = useCallback(() => {
     setRuphusOpen(false);
@@ -139,7 +137,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
       story: ruphusStory,
       loading: ruphusLoading,
       error: ruphusError,
-      onRetry: () => ruphusBean && generateStory(ruphusBean, true),
+      onRetry: () => ruphusBean && enrichAndGenerate(ruphusBean),
       onRefresh: handleRefresh,
       tastingScores,
     },
