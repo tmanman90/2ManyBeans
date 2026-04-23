@@ -5,6 +5,7 @@
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
+import { classifyFamilyFallback } from './beanFields';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -552,58 +553,6 @@ function enforceSchemaConstraints(recipe) {
   }
   recipe.batchPulseTemperatures = recipe.batchPulseTemperatures.slice(0, recipe.batchPulsesNumber);
   recipe.batchPulseTemperatures = recipe.batchPulseTemperatures.map(t => clamp(t, 50, 99));
-}
-
-function classifyFamilyFallback(bean) {
-  // Heuristic family classification when research doesn't provide one
-  // Priority: FAMILY -> cup structure, not generic origin/process
-  const origin = (bean.origin || '').toLowerCase();
-  const process = (bean.process || '').toLowerCase();
-  const variety = (bean.variety || '').toLowerCase();
-  const roastLevel = (bean.roastLevel || '').toLowerCase();
-  const notes = (bean.bagNotes || '').toLowerCase();
-
-  // Dark/medium-dark roasts
-  if (roastLevel.includes('dark')) return 'dark-roast';
-  if (roastLevel === 'medium-dark') return 'dark-roast';
-
-  // Medium roasts
-  if (roastLevel === 'medium' && process.includes('washed')) return 'medium-washed';
-
-  // SL28/SL34 varieties are clarity-first regardless of process
-  if (variety.includes('sl28') || variety.includes('sl34') || variety === 'sl') return 'washed-kenya-clarity';
-
-  // Honey / anaerobic / co-ferment / experimental
-  if (process.includes('honey') || process.includes('anaerobic') || process.includes('co-ferment')) return 'processed-clarity';
-
-  // Gesha/Geisha variety: washed goes to floral clarity, natural goes to clean-natural-fruit
-  if (variety.includes('gesha') || variety.includes('geisha')) {
-    if (process.includes('natural')) return 'clean-natural-fruit';
-    return 'washed-floral-clarity';
-  }
-  if (variety.includes('pink bourbon') && (notes.includes('floral') || notes.includes('jasmine'))) return 'washed-floral-clarity';
-
-  // Natural Ethiopia or clean-fruit natural
-  if (process.includes('natural') && origin.includes('ethiopia')) return 'clean-natural-fruit';
-
-  // Washed by origin
-  if (process.includes('washed') || (!process.includes('natural') && !process.includes('honey'))) {
-    if (origin.includes('kenya') || origin.includes('burundi')) return 'washed-kenya-clarity';
-    if (origin.includes('ethiopia')) return 'washed-ethiopia-clarity';
-    // Washed florals from any origin (Colombia, Guatemala, etc.) with floral notes
-    if (notes.includes('jasmine') || notes.includes('bergamot') || notes.includes('floral') || notes.includes('honeysuckle')) return 'washed-floral-clarity';
-  }
-
-  // Pacamara/Maragogipe: large dense beans
-  if (variety.includes('pacamara') || variety.includes('maragogipe')) {
-    if (process.includes('natural')) return 'body-natural';
-    return 'processed-clarity';
-  }
-
-  // Natural non-Ethiopia (clean fruit)
-  if (process.includes('natural')) return 'clean-natural-fruit';
-
-  return DEFAULT_FAMILY;
 }
 
 function enforceDeterministicGrind(recipe, bean, research) {

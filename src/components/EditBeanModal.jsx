@@ -11,6 +11,7 @@ import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
 import { scrollOnFocus } from '../lib/formHelpers';
+import { PROCESS_TYPES } from '../lib/beanFields';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall';
@@ -521,7 +522,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         <div>
           <label style={labelStyle}>Process</label>
           <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
-            {['Washed', 'Natural', 'Honey', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Anaerobic White Honey', 'Advanced Natural', 'Other'].map(p => (
+            {PROCESS_TYPES.map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>

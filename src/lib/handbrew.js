@@ -6,6 +6,7 @@ import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
+import { classifyFamilyFallback } from './beanFields';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -106,31 +107,6 @@ const FAMILY_POUROVER_DEFAULTS = {
 };
 
 const DEFAULT_POUROVER_FAMILY = 'medium-washed';
-
-// ---------------------------------------------------------------------------
-// Family fallback — replicates Aiden's classifyFamilyFallback() logic
-// Used when research doesn't return a cupStructureFamily
-// ---------------------------------------------------------------------------
-function classifyFamilyFallback(bean) {
-  const origin = (bean.origin || '').toLowerCase();
-  const process = (bean.process || '').toLowerCase();
-  const variety = (bean.variety || '').toLowerCase();
-  const roastLevel = (bean.roastLevel || '').toLowerCase();
-  const notes = (bean.bagNotes || '').toLowerCase();
-
-  if (roastLevel.includes('dark') || roastLevel === 'medium-dark') return 'dark-roast';
-  if (roastLevel === 'medium' && process.includes('washed')) return 'medium-washed';
-  if (process.includes('honey') || process.includes('anaerobic') || process.includes('co-ferment')) return 'processed-clarity';
-  if (variety.includes('gesha') || variety.includes('geisha')) return 'washed-floral-clarity';
-  if (process.includes('natural') && origin.includes('ethiopia')) return 'clean-natural-fruit';
-  if (process.includes('washed') || (!process.includes('natural') && !process.includes('honey'))) {
-    if (origin.includes('kenya')) return 'washed-kenya-clarity';
-    if (origin.includes('ethiopia')) return 'washed-ethiopia-clarity';
-    if (notes.includes('jasmine') || notes.includes('bergamot') || notes.includes('floral')) return 'washed-floral-clarity';
-  }
-  if (process.includes('natural')) return 'clean-natural-fruit';
-  return DEFAULT_POUROVER_FAMILY;
-}
 
 // Map roast level to grind tier for grinder lookup
 function roastToGrindTier(roastLevel) {
@@ -434,7 +410,7 @@ export async function generateHandBrewRecipe(bean, research, preferences) {
 
   // Determine family: from research, or fallback heuristic
   const family = research?.cupStructureFamily
-    || classifyFamilyFallback(bean);
+    || classifyFamilyFallback(bean, DEFAULT_POUROVER_FAMILY);
   const roastLevel = research?.roastLevel || '';
 
   // Build explicit user content with top-level fields for reliable matrix lookup

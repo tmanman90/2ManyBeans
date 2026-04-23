@@ -19,7 +19,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
-import { ENRICHABLE_FIELDS } from '../lib/beanFields';
+import { ENRICHABLE_FIELDS, PROCESS_TYPES } from '../lib/beanFields';
 
 // Catch a paywall-triggering error from any AI call and route it to the
 // global paywall sheet instead of showing a generic toast. Returns true if
@@ -723,7 +723,7 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
               <label style={labelStyle}>Process</label>
               <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
                 <option value="" disabled>Select...</option>
-                {['Washed', 'Natural', 'Honey', 'Anaerobic Honey', 'Anaerobic Natural', 'White Honey', 'Anaerobic White Honey', 'Advanced Natural', 'Other'].map(p => (
+                {PROCESS_TYPES.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>

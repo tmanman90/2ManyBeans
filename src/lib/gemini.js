@@ -66,7 +66,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   "name": "coffee name, lot name, or constructed Farm+Variety name",
   "origin": "country",
   "variety": "coffee variety/cultivar if shown",
-  "process": "EXACT processing method as printed on bag (e.g. Washed, Natural, Honey, Anaerobic Honey, Anaerobic Natural, White Honey, Anaerobic White Honey, Advanced Natural, or Other)",
+  "process": "EXACT processing method as printed on bag (e.g. Washed, Natural, Honey, Black Honey, White Honey, Anaerobic Washed, Anaerobic Natural, Anaerobic Honey, Anaerobic White Honey, Advanced Natural, Carbonic Maceration, Lactic Fermentation, Double Washed, Wet-Hulled, Infused / Co-Fermented, or Other)",
   "roastDate": "YYYY-MM-DD if shown, otherwise empty string",
   "bagSize": number in grams (default 100 if not shown),
   "bagNotes": "tasting notes from the bag, separated by ' / '",
