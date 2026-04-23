@@ -84,23 +84,25 @@ export function useAidenBrew(updateBean) {
       openPaywall({ feature: 'aiden', promote: 'ultra' });
       return;
     }
+    const rid = Symbol('icedPush');
+    activeRequestRef.current = rid;
     const targetBean = aidenBean;
     setIcedError(null);
     setIcedResult(null);
     setIcedLoading(true);
     try {
       const result = await pushToAiden(icedRecipe, targetBean, { isIced: true });
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setIcedResult(result);
       if (result.link && targetBean?.id) {
         updateBean(targetBean.id, { aidenIcedLink: result.link, aidenIcedUsedRelay: result.usedRelay || false })
           .catch(err => console.warn('Failed to persist aidenIcedLink:', err.message));
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!isActive(rid)) return;
       setIcedError(err.message || "Couldn't push iced profile");
     }
-    if (mountedRef.current) setIcedLoading(false);
+    if (isActive(rid)) setIcedLoading(false);
   }, [hasUltra, openPaywall, aidenBean, updateBean]);
 
   const handleBrewWithAiden = async (bean, cachedResearch = null, forceRegenerate = false) => {

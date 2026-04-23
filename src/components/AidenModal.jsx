@@ -12,6 +12,20 @@ import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
 import { shareImage } from '../lib/share';
 import { transformAiden } from '../lib/flashBrewTransform';
 
+const openExternalLink = (url) => {
+  if (Capacitor.isNativePlatform()) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 100);
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+};
+
 // Local design tokens specific to this panel
 const RULE = '#EADFD0';
 const RULE_SOFT = '#F0E6D4';
@@ -24,7 +38,6 @@ const TILE_BG = '#EADFCB';
 const ICE_RULE = '#C8D8E4';
 const ICE_PAPER_GRAD = 'linear-gradient(180deg, #E8F0F8 0%, #D8E8F2 100%)';
 const ICE_GRIND_BORDER = '#A8C4D8';
-const ICE_GRIND_DIVIDER = '#8EB0C8';
 const ICE_TILE_BG = '#DCE8F0';
 
 const IceParamCard = ({ label, value, sub }) => (
@@ -463,19 +476,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {result?.link && (
             <AidenPrimaryButton
               leading={<ExternalLink size={14} />}
-              onClick={() => {
-                if (Capacitor.isNativePlatform()) {
-                  const a = document.createElement('a');
-                  a.href = result.link;
-                  a.target = '_blank';
-                  a.rel = 'noopener noreferrer';
-                  document.body.appendChild(a);
-                  a.click();
-                  setTimeout(() => document.body.removeChild(a), 100);
-                } else {
-                  window.open(result.link, '_blank', 'noopener,noreferrer');
-                }
-              }}
+              onClick={() => openExternalLink(result.link)}
             >
               {fellowConnected && !result.usedRelay ? (
                 <span>Open in Fellow</span>
@@ -674,19 +675,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {icedResult?.link && (
             <AidenPrimaryButton
               leading={<ExternalLink size={14} />}
-              onClick={() => {
-                if (Capacitor.isNativePlatform()) {
-                  const a = document.createElement('a');
-                  a.href = icedResult.link;
-                  a.target = '_blank';
-                  a.rel = 'noopener noreferrer';
-                  document.body.appendChild(a);
-                  a.click();
-                  setTimeout(() => document.body.removeChild(a), 100);
-                } else {
-                  window.open(icedResult.link, '_blank', 'noopener,noreferrer');
-                }
-              }}
+              onClick={() => openExternalLink(icedResult.link)}
             >
               {fellowConnected && !icedResult.usedRelay ? (
                 <span>Open Iced in Fellow</span>

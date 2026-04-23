@@ -1,8 +1,7 @@
 // Flash brew (急冷式) transform: hot recipe + device category + dose -> iced recipe
 // Deterministic, no AI calls, no side effects.
 
-import { nearestOdeStep } from './brewMethods';
-import { BREW_METHODS } from './brewMethods';
+import { nearestOdeStep, BREW_METHODS } from './brewMethods';
 
 const ICE_FRACTION = 0.4;
 const HOT_FRACTION = 0.6;
@@ -15,7 +14,6 @@ function computeIceSplit(hotRecipe, userDose) {
   const totalWater = dose * divisor;
   return {
     dose,
-    totalWater,
     hotWater: Math.round(totalWater * HOT_FRACTION),
     iceGrams: Math.round(totalWater * ICE_FRACTION),
   };
@@ -82,7 +80,6 @@ export function transformPourOver(hotRecipe, userDose) {
   icedSteps.unshift({
     time: '0:00',
     timeSeconds: 0,
-    durationSeconds: ICE_PREP_DURATION,
     action: `Add ${iceGrams}g ice to ${icePlacement}`,
     waterTotal: 0,
     isIceStep: true,
@@ -93,7 +90,6 @@ export function transformPourOver(hotRecipe, userDose) {
     coffeeGrams: dose,
     waterGrams: hotWater,
     iceGrams,
-    totalLiquid: hotWater + iceGrams,
     steps: icedSteps,
     grindSize: shiftGrindFiner(hotRecipe.grindSize, 1.5),
     waterTemp: bumpTemp(hotRecipe.waterTemp),
@@ -123,7 +119,6 @@ export function transformImmersion(hotRecipe, userDose) {
     coffeeGrams: dose,
     waterGrams: hotWater,
     iceGrams,
-    totalLiquid: hotWater + iceGrams,
     steps: icedSteps,
     grindSize: shiftGrindFiner(hotRecipe.grindSize, 1),
     waterTemp: bumpTemp(hotRecipe.waterTemp),
@@ -153,7 +148,6 @@ export function transformAiden(hotRecipe, userDose = 25) {
     brewWaterMl,
     iceGrams,
     machineSuggestedDose,
-    totalLiquid: brewWaterMl + iceGrams,
     grindRecommendation: icedSsGrind != null ? {
       singleServe: icedSsGrind,
       batch: hotRecipe.grindRecommendation?.batch,
