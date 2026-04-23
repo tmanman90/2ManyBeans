@@ -332,6 +332,9 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
   const handleEnterIced = () => {
     setIcedMode(true);
+    if (!icedResult && !icedLoading && recipe && onPushIced) {
+      onPushIced(transformAiden(recipe, icedDose));
+    }
     modalContentRef.current?.closest('[role="dialog"]')?.scrollTo?.({ top: 0 });
   };
 
@@ -685,17 +688,6 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                   <AidenScript />
                 </>
               )}
-            </AidenPrimaryButton>
-          )}
-
-          {/* Push iced to Aiden */}
-          {!icedResult && !icedLoading && !icedError && onPushIced && (
-            <AidenPrimaryButton
-              leading={<Snowflake size={14} />}
-              onClick={() => onPushIced(icedRecipe)}
-            >
-              <span>Push Iced to</span>
-              <AidenScript />
             </AidenPrimaryButton>
           )}
 

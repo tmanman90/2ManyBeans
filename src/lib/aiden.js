@@ -683,35 +683,40 @@ export async function generateAidenRecipe(bean, research = null) {
 // Build the Fellow profile title from the current bean state.
 // Fellow caps profile titles at 50 chars (see api/aiden.js validateProfile).
 // Format: "#{jarSlot} {origin} {name} - {roaster}".
+// With label: "#{jarSlot} {label} {origin} {name} - {roaster}" (e.g. "#1 Iced Elora").
 // If too long, drop fields in reverse priority: roaster → origin → (truncate name).
 // Duplicate-title collisions are handled by api/aiden.js's cleanup-and-retry path.
-export function buildAidenTitle(bean, suffix = '') {
+export function buildAidenTitle(bean, label = '') {
   const MAX = 50;
-  const budget50 = MAX - suffix.length;
-
   const slot = bean?.jarSlot ? `#${bean.jarSlot} ` : '';
+  const prefix = label ? `${slot}${label} ` : slot;
+  const budget = MAX - prefix.length;
+
   const name = (bean?.name || '').trim();
   const origin = (bean?.origin || '').trim();
   const roaster = (bean?.roaster || '').trim();
 
-  const withAll = `${slot}${origin ? origin + ' ' : ''}${name}${roaster ? ' - ' + roaster : ''}`.trim();
-  if (withAll.length <= budget50) return withAll + suffix;
+  const withAll = `${origin ? origin + ' ' : ''}${name}${roaster ? ' - ' + roaster : ''}`.trim();
+  if (withAll.length <= budget) return `${prefix}${withAll}`;
 
-  const withoutRoaster = `${slot}${origin ? origin + ' ' : ''}${name}`.trim();
-  if (withoutRoaster.length <= budget50) return withoutRoaster + suffix;
+  const withoutRoaster = `${origin ? origin + ' ' : ''}${name}`.trim();
+  if (withoutRoaster.length <= budget) return `${prefix}${withoutRoaster}`;
 
-  const withoutOrigin = `${slot}${name}`.trim();
-  if (withoutOrigin.length <= budget50) return withoutOrigin + suffix;
+  const withoutOrigin = name;
+  if (withoutOrigin.length <= budget) return `${prefix}${withoutOrigin}`;
 
-  const nameBudget = budget50 - slot.length;
-  return `${slot}${name.slice(0, nameBudget).trim()}${suffix}`;
+  return `${prefix}${name.slice(0, Math.max(0, budget)).trim()}`;
 }
 
 export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) {
   // Strip fields not in Fellow schema
-  const { grindRecommendation, generatedAt, title: _staleTitle, ...profile } = recipe;
+  const {
+    grindRecommendation, generatedAt, title: _staleTitle,
+    icedDose, brewWaterMl, iceGrams, machineSuggestedDose, isIced: _isIced,
+    ...profile
+  } = recipe;
 
-  profile.title = bean ? buildAidenTitle(bean, isIced ? ' (Iced)' : '') : (recipe.title || '');
+  profile.title = bean ? buildAidenTitle(bean, isIced ? 'Iced' : '') : (recipe.title || '');
 
   const result = await fetchWithRetry({
     url: `${API_BASE}/api/aiden`,
