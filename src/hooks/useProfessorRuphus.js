@@ -2,21 +2,19 @@
 import { useState, useCallback } from 'react';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { researchBeanOnline, summarizeNotes } from '../lib/gemini';
-import { ENRICHABLE_FIELDS, isBagNotesEmpty, beanNeedsRuphusEnrichment } from '../lib/beanFields';
+import { ENRICHABLE_FIELDS, isBagNotesEmpty } from '../lib/beanFields';
 
 // Module-level set of bean IDs currently being enriched. Prevents a
 // double-tap on the Ruphus button from firing two concurrent Gemini calls
 // before the enrichedAt cache lands in Firestore.
 const inflightEnrichmentIds = new Set();
 
-const ENRICHMENT_TIMEOUT = 8000;
+const ENRICHMENT_TIMEOUT = 15000;
 
-// Enrichment fired BEFORE the Ruphus story. Returns the raw research result
-// (including roaster-level fields for story context) or null on failure/timeout.
-// Also writes enriched fields to the bean doc (existing merge logic).
+// Always runs web research to get roaster context for the story.
+// Also writes enriched fields to the bean doc if not already done.
 async function runEnrichment(bean, getBeanById, updateBean) {
   if (!updateBean || !getBeanById) return null;
-  if (!beanNeedsRuphusEnrichment(bean)) return null;
   if (inflightEnrichmentIds.has(bean.id)) return null;
 
   inflightEnrichmentIds.add(bean.id);
@@ -24,24 +22,26 @@ async function runEnrichment(bean, getBeanById, updateBean) {
     const enrichPromise = (async () => {
       const research = await researchBeanOnline(bean, { metered: true });
 
-      const current = await getBeanById(bean.id);
-      if (!current) return research;
+      if (!bean.enrichedAt) {
+        const current = await getBeanById(bean.id);
+        if (current) {
+          const updates = {};
+          for (const field of ENRICHABLE_FIELDS) {
+            if (!current[field] && research[field]) {
+              updates[field] = research[field];
+            }
+          }
 
-      const updates = {};
-      for (const field of ENRICHABLE_FIELDS) {
-        if (!current[field] && research[field]) {
-          updates[field] = research[field];
+          if (isBagNotesEmpty(current) && research.redditNotes) {
+            const summary = await summarizeNotes(research.redditNotes);
+            if (summary) updates.bagNotes = summary;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            updates.enrichedAt = new Date().toISOString();
+            await updateBean(bean.id, updates);
+          }
         }
-      }
-
-      if (isBagNotesEmpty(current) && research.redditNotes) {
-        const summary = await summarizeNotes(research.redditNotes);
-        if (summary) updates.bagNotes = summary;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        updates.enrichedAt = new Date().toISOString();
-        await updateBean(bean.id, updates);
       }
 
       return research;

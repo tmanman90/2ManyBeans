@@ -24,11 +24,6 @@ export function isBagNotesEmpty(bean) {
   return !bean.bagNotes || bean.bagNotes === '(not logged)';
 }
 
-export function beanNeedsRuphusEnrichment(bean) {
-  if (!bean || !bean.id) return false;
-  return !bean.enrichedAt;
-}
-
 export function classifyFamilyFallback(bean, defaultFamily = 'generic-washed') {
   const origin = (bean.origin || '').toLowerCase();
   const process = (bean.process || '').toLowerCase();
