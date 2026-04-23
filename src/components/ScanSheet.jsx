@@ -17,7 +17,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
-export const ScanSheet = ({ open, onClose, onBeanCreated, uid, addBean }) => {
+export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, addBean }) => {
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
 
@@ -176,9 +176,10 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, uid, addBean }) => {
       // Clear refs before callback (we're saving, not canceling)
       pendingBeanIdRef.current = null;
 
-      // Pass beanData directly so parent doesn't need beans.find()
+      // Capture photos before reset clears them
+      const scanPhotos = [...photos];
       reset();
-      onBeanCreated(beanId, { id: beanId, ...beanData });
+      onBeanCreated(beanId, { id: beanId, ...beanData, _scanPhotos: scanPhotos });
     } catch (err) {
       if (thisGen !== genCounter.current) return;
       if (handlePaywallError(err, openPaywall)) {
@@ -221,6 +222,14 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, uid, addBean }) => {
               <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
               <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
               <div style={{ fontSize: 13, color: C.textMuted }}>Take a photo or choose from library</div>
+              {onManualEntry && (
+                <div
+                  onClick={(e) => { e.stopPropagation(); onManualEntry(); }}
+                  style={{ fontSize: 13, color: C.accent, marginTop: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  or add manually
+                </div>
+              )}
             </div>
           ) : (
             <>

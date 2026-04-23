@@ -150,7 +150,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       if (!photoInFlight.current) {
         setPhotoGenerating(false);
         setPhotoError(false);
-        setPendingPhoto(null);
+        setPendingPhoto(isNewBean && bean._scanPhotos?.length > 0 ? bean._scanPhotos[0] : null);
       }
       setConfirmDelete(false);
       setEnrichedOpen(false);
@@ -588,6 +588,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         <div>
           <label style={labelStyle}>Process</label>
           <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
+            {f.process && !PROCESS_TYPES.includes(f.process) && (
+              <option value={f.process}>{f.process}</option>
+            )}
             {PROCESS_TYPES.map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
