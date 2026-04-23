@@ -21,24 +21,7 @@ import { useErrorToast } from '../hooks/useErrorToast';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 import { ENRICHABLE_FIELDS, PROCESS_TYPES } from '../lib/beanFields';
 import { buildNewBeanData } from '../lib/beanBuilder';
-
-// Catch a paywall-triggering error from any AI call and route it to the
-// global paywall sheet instead of showing a generic toast. Returns true if
-// the error was a paywall trigger and was handled, false otherwise.
-function handlePaywallError(err, openPaywall) {
-  if (err?.code === 'free_tier_exhausted') {
-    openPaywall({ feature: 'scan_cap', promote: 'pro' });
-    return true;
-  }
-  if (err?.code === 'subscription_required') {
-    openPaywall({
-      feature: 'generic',
-      promote: err.tier === 'ultra' ? 'ultra' : 'pro',
-    });
-    return true;
-  }
-  return false;
-}
+import { handlePaywallError } from '../lib/paywallHelpers';
 
 export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData, onToast }) => {
   const { hasPro, freeUsage } = useSubscription();
