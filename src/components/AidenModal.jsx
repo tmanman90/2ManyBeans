@@ -1,14 +1,16 @@
 // Aiden brew recipe modal — editorial journal entry for the generated recipe
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { C, fonts } from '../styles/theme';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
-import { ExternalLink, Coffee, RefreshCw, AlertTriangle, Share2 } from 'lucide-react';
+import { DoseStepperCard } from './DoseStepperCard';
+import { ExternalLink, Coffee, RefreshCw, AlertTriangle, Share2, Snowflake, ArrowLeft } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
 import { Capacitor } from '@capacitor/core';
 import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
 import { shareImage } from '../lib/share';
+import { transformAiden } from '../lib/flashBrewTransform';
 
 // Local design tokens specific to this panel
 const RULE = '#EADFD0';
@@ -17,6 +19,26 @@ const PAPER_GRAD = 'linear-gradient(180deg, #FBF1DF 0%, #F5E6D3 100%)';
 const GRIND_BORDER = '#E8D5A0';
 const GRIND_DIVIDER = '#D4B878';
 const TILE_BG = '#EADFCB';
+
+// Iced mode palette (frost tones, co-located with hot)
+const ICE_RULE = '#C8D8E4';
+const ICE_PAPER_GRAD = 'linear-gradient(180deg, #E8F0F8 0%, #D8E8F2 100%)';
+const ICE_GRIND_BORDER = '#A8C4D8';
+const ICE_GRIND_DIVIDER = '#8EB0C8';
+const ICE_TILE_BG = '#DCE8F0';
+
+const IceParamCard = ({ label, value, sub }) => (
+  <div style={{
+    background: ICE_TILE_BG,
+    borderRadius: 10,
+    padding: '10px 12px',
+    textAlign: 'center',
+  }}>
+    <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{label}</div>
+    <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: C.textLight }}>{sub}</div>}
+  </div>
+);
 
 const SectionLabel = ({ children, style }) => (
   <div style={{
@@ -275,10 +297,40 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, extraFooter }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
+  const [icedMode, setIcedMode] = useState(false);
+  const [icedDose, setIcedDose] = useState(25);
+  const modalContentRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      setIcedMode(false);
+      setIcedDose(25);
+    }
+  }, [open]);
+
+  const icedRecipe = useMemo(
+    () => (icedMode && recipe) ? transformAiden(recipe, icedDose) : null,
+    [icedMode, recipe, icedDose]
+  );
+
+  const handleEnterIced = () => {
+    setIcedMode(true);
+    modalContentRef.current?.closest('[role="dialog"]')?.scrollTo?.({ top: 0 });
+  };
+
+  const handleBackToHot = () => {
+    setIcedMode(false);
+    modalContentRef.current?.closest('[role="dialog"]')?.scrollTo?.({ top: 0 });
+  };
+
+  const handleRegenerate = () => {
+    setIcedMode(false);
+    onRegenerate?.();
+  };
 
   const handleShareRecipe = async () => {
     if (sharing || !shareCardRef.current) return;
@@ -329,8 +381,8 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
       )}
 
       {/* Recipe success */}
-      {recipe && (
-        <div>
+      {recipe && !icedMode && (
+        <div ref={modalContentRef}>
           <BeanChip bean={bean} />
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
@@ -461,7 +513,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                 <>
                   <div style={{ width: 1, height: 16, background: RULE }} />
                   <IconActionButton
-                    onClick={onRegenerate}
+                    onClick={handleRegenerate}
                     icon={<RefreshCw size={14} />}
                     ariaLabel="Regenerate Aiden recipe"
                   >
@@ -469,6 +521,205 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                   </IconActionButton>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Iced flash brew entry point */}
+          {!loading && (
+            <button
+              onClick={handleEnterIced}
+              style={{
+                width: '100%',
+                marginTop: 10,
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: ICE_PAPER_GRAD,
+                border: `1px solid ${ICE_RULE}`,
+                color: C.text,
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: fonts.body,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Snowflake size={16} color="#5B9BD5" />
+              Iced flash brew this bean
+            </button>
+          )}
+
+          {extraFooter}
+        </div>
+      )}
+
+      {/* Iced mode view */}
+      {recipe && icedMode && icedRecipe && (
+        <div ref={modalContentRef}>
+          {/* Back to hot */}
+          <button
+            onClick={handleBackToHot}
+            style={{
+              background: 'none', border: 'none', padding: '4px 0', marginBottom: 12,
+              fontSize: 13, color: C.accent, fontWeight: 600, fontFamily: fonts.body,
+              display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <ArrowLeft size={14} /> Back to hot recipe
+          </button>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontFamily: fonts.title, fontSize: 24, color: C.text,
+            }}>
+              <Snowflake size={20} color="#5B9BD5" />
+              Iced Flash Brew
+            </div>
+          </div>
+
+          <BeanChip bean={bean} />
+
+          {/* Dose / Water / Ice param grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+            <DoseStepperCard dose={icedDose} onChange={setIcedDose} min={15} max={35} />
+            <IceParamCard label="Water" value={`${icedRecipe.brewWaterMl}ml`} sub="(hot)" />
+            <IceParamCard label="Ice" value={`${icedRecipe.iceGrams}g`} sub="in carafe" />
+          </div>
+
+          {/* Your Aiden Setup card */}
+          <div style={{
+            background: ICE_PAPER_GRAD,
+            borderRadius: 14,
+            padding: '14px 18px 16px',
+            border: `1px solid ${ICE_RULE}`,
+            marginBottom: 14,
+          }}>
+            <SectionLabel style={{ marginBottom: 10 }}>Your Aiden Setup</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Volume dial</div>
+                <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{icedRecipe.brewWaterMl}ml</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Machine says</div>
+                <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{icedRecipe.machineSuggestedDose}g</div>
+              </div>
+            </div>
+            <div style={{
+              background: 'rgba(188,129,73,0.08)',
+              borderRadius: 10,
+              padding: '10px 14px',
+              marginBottom: 10,
+            }}>
+              <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>You load</div>
+              <div style={{ fontFamily: fonts.title, fontSize: 24, color: C.accent, fontWeight: 700 }}>{icedRecipe.icedDose}g</div>
+            </div>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+              Add <strong>{icedRecipe.iceGrams}g</strong> ice to carafe before pressing Start
+            </div>
+          </div>
+
+          {/* Grind card (iced) */}
+          {icedRecipe.grindRecommendation && (
+            <div style={{
+              background: ICE_PAPER_GRAD,
+              borderRadius: 14,
+              padding: '14px 18px 16px',
+              border: `1px solid ${ICE_GRIND_BORDER}`,
+              marginBottom: 14,
+            }}>
+              <SectionLabel style={{ marginBottom: 4 }}>Grind (finer for iced) · {grinderName}</SectionLabel>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12, marginTop: 4 }}>
+                <GrindColumn label="single" value={icedRecipe.grindRecommendation.singleServe} />
+                <GrindColumn label="batch" value={icedRecipe.grindRecommendation.batch} divider />
+              </div>
+            </div>
+          )}
+
+          {/* Temp card (iced, +1C) */}
+          <TempCard recipe={icedRecipe} />
+
+          {/* Iced push state */}
+          {icedLoading && (
+            <div style={{ textAlign: 'center', padding: '12px 0', fontSize: 13, color: C.textMuted, fontStyle: 'italic' }}>
+              Sending iced profile to your Aiden...
+            </div>
+          )}
+
+          {/* Iced push error */}
+          {icedError && !icedLoading && (
+            <div style={{
+              background: C.redBg,
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 10,
+              fontSize: 13,
+            }}>
+              <span style={{ color: C.red, fontWeight: 600 }}>Couldn't push iced profile: </span>
+              <span style={{ color: C.text }}>{icedError}</span>
+              {onRetryIcedPush && (
+                <Btn variant="small" onClick={onRetryIcedPush} style={{ marginTop: 8 }}>
+                  <RefreshCw size={12} /> Retry
+                </Btn>
+              )}
+            </div>
+          )}
+
+          {/* Cached iced link */}
+          {icedResult?.link && (
+            <AidenPrimaryButton
+              leading={<ExternalLink size={14} />}
+              onClick={() => {
+                if (Capacitor.isNativePlatform()) {
+                  const a = document.createElement('a');
+                  a.href = icedResult.link;
+                  a.target = '_blank';
+                  a.rel = 'noopener noreferrer';
+                  document.body.appendChild(a);
+                  a.click();
+                  setTimeout(() => document.body.removeChild(a), 100);
+                } else {
+                  window.open(icedResult.link, '_blank', 'noopener,noreferrer');
+                }
+              }}
+            >
+              {fellowConnected && !icedResult.usedRelay ? (
+                <span>Open Iced in Fellow</span>
+              ) : (
+                <>
+                  <span>Open Iced on</span>
+                  <AidenScript />
+                </>
+              )}
+            </AidenPrimaryButton>
+          )}
+
+          {/* Push iced to Aiden */}
+          {!icedResult && !icedLoading && !icedError && onPushIced && (
+            <AidenPrimaryButton
+              leading={<Snowflake size={14} />}
+              onClick={() => onPushIced(icedRecipe)}
+            >
+              <span>Push Iced to</span>
+              <AidenScript />
+            </AidenPrimaryButton>
+          )}
+
+          {/* Regenerate (snaps back to hot) */}
+          {onRegenerate && !icedLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 4 }}>
+              <IconActionButton
+                onClick={handleRegenerate}
+                icon={<RefreshCw size={14} />}
+                ariaLabel="Regenerate recipe (returns to hot)"
+              >
+                Regenerate
+              </IconActionButton>
             </div>
           )}
 

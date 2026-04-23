@@ -685,8 +685,9 @@ export async function generateAidenRecipe(bean, research = null) {
 // Format: "#{jarSlot} {origin} {name} - {roaster}".
 // If too long, drop fields in reverse priority: roaster → origin → (truncate name).
 // Duplicate-title collisions are handled by api/aiden.js's cleanup-and-retry path.
-export function buildAidenTitle(bean) {
+export function buildAidenTitle(bean, suffix = '') {
   const MAX = 50;
+  const budget50 = MAX - suffix.length;
 
   const slot = bean?.jarSlot ? `#${bean.jarSlot} ` : '';
   const name = (bean?.name || '').trim();
@@ -694,26 +695,23 @@ export function buildAidenTitle(bean) {
   const roaster = (bean?.roaster || '').trim();
 
   const withAll = `${slot}${origin ? origin + ' ' : ''}${name}${roaster ? ' - ' + roaster : ''}`.trim();
-  if (withAll.length <= MAX) return withAll;
+  if (withAll.length <= budget50) return withAll + suffix;
 
   const withoutRoaster = `${slot}${origin ? origin + ' ' : ''}${name}`.trim();
-  if (withoutRoaster.length <= MAX) return withoutRoaster;
+  if (withoutRoaster.length <= budget50) return withoutRoaster + suffix;
 
   const withoutOrigin = `${slot}${name}`.trim();
-  if (withoutOrigin.length <= MAX) return withoutOrigin;
+  if (withoutOrigin.length <= budget50) return withoutOrigin + suffix;
 
-  // Still too long: truncate the name, preserving slot prefix.
-  const budget = MAX - slot.length;
-  return `${slot}${name.slice(0, budget).trim()}`;
+  const nameBudget = budget50 - slot.length;
+  return `${slot}${name.slice(0, nameBudget).trim()}${suffix}`;
 }
 
-export async function pushToAiden(recipe, bean = null) {
+export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) {
   // Strip fields not in Fellow schema
   const { grindRecommendation, generatedAt, title: _staleTitle, ...profile } = recipe;
 
-  // Always stamp the title fresh from the current bean so cached recipes pick
-  // up the current jar slot instead of shipping whatever was baked in at gen time.
-  profile.title = bean ? buildAidenTitle(bean) : (recipe.title || '');
+  profile.title = bean ? buildAidenTitle(bean, isIced ? ' (Iced)' : '') : (recipe.title || '');
 
   const result = await fetchWithRetry({
     url: `${API_BASE}/api/aiden`,

@@ -8,7 +8,7 @@
 // out. Same thing for handlePushToAiden. This prevents recipe/result state from an
 // abandoned async chain from landing on a bean the user has since moved on from, and
 // prevents a stale push from persisting aidenLink on the wrong Firestore doc.
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { generateAidenRecipe, pushToAiden } from '../lib/aiden';
 import { researchBean } from '../lib/beanResearch';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -30,6 +30,9 @@ export function useAidenBrew(updateBean) {
   const [aidenBean, setAidenBean] = useState(null);
   const [aidenResearch, setAidenResearch] = useState(null);
   const [aidenPhase, setAidenPhase] = useState(null);
+  const [icedResult, setIcedResult] = useState(null);
+  const [icedLoading, setIcedLoading] = useState(false);
+  const [icedError, setIcedError] = useState(null);
 
   // Returns true if this async chain should still be applying state updates.
   const isActive = (requestId) => mountedRef.current && activeRequestRef.current === requestId;
@@ -76,6 +79,30 @@ export function useAidenBrew(updateBean) {
     if (isActive(rid)) setAidenLoading(false);
   };
 
+  const handlePushIced = useCallback(async (icedRecipe) => {
+    if (!hasUltra) {
+      openPaywall({ feature: 'aiden', promote: 'ultra' });
+      return;
+    }
+    const targetBean = aidenBean;
+    setIcedError(null);
+    setIcedResult(null);
+    setIcedLoading(true);
+    try {
+      const result = await pushToAiden(icedRecipe, targetBean, { isIced: true });
+      if (!mountedRef.current) return;
+      setIcedResult(result);
+      if (result.link && targetBean?.id) {
+        updateBean(targetBean.id, { aidenIcedLink: result.link, aidenIcedUsedRelay: result.usedRelay || false })
+          .catch(err => console.warn('Failed to persist aidenIcedLink:', err.message));
+      }
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setIcedError(err.message || "Couldn't push iced profile");
+    }
+    if (mountedRef.current) setIcedLoading(false);
+  }, [hasUltra, openPaywall, aidenBean, updateBean]);
+
   const handleBrewWithAiden = async (bean, cachedResearch = null, forceRegenerate = false) => {
     // Cached recipe with no push pending: free to show (just displays stored data).
     const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && bean.aidenLink;
@@ -94,6 +121,9 @@ export function useAidenBrew(updateBean) {
     setAidenBean(bean);
     setAidenResult(null);
     setAidenError(null);
+    setIcedResult(bean.aidenIcedLink ? { link: bean.aidenIcedLink, usedRelay: bean.aidenIcedUsedRelay || false } : null);
+    setIcedError(null);
+    setIcedLoading(false);
     setAidenModal(true);
 
     // Show cached recipe immediately if available (skip generation)
@@ -144,12 +174,11 @@ export function useAidenBrew(updateBean) {
       if (!isActive(rid)) return;
       setAidenRecipe(recipe);
       setAidenError(null);
-      // Persist full recipe + grind recommendation, clear old link (new recipe = new push needed).
-      // bean.id is closure-captured so this write always targets the right doc.
       if (bean.id) {
         const persist = {
           aidenRecipe: { ...recipe, generatedAt: new Date().toISOString() },
           aidenLink: null, aidenUsedRelay: null,
+          aidenIcedLink: null, aidenIcedUsedRelay: null,
         };
         if (recipe.grindRecommendation) persist.aidenGrind = recipe.grindRecommendation;
         await updateBean(bean.id, persist);
@@ -175,10 +204,13 @@ export function useAidenBrew(updateBean) {
   return {
     aidenModal, aidenRecipe, aidenResult, aidenLoading, aidenError,
     aidenPhase, aidenBean, aidenResearch,
+    icedResult, icedLoading, icedError,
     handleBrewWithAiden, closeAidenModal,
     onRetry: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined,
     onRetryPush: aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined,
     onRegenerate: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch, true) : undefined,
     onPushCached: (recipe) => handlePushToAiden(recipe),
+    onPushIced: handlePushIced,
+    onRetryIcedPush: () => setIcedError(null),
   };
 }

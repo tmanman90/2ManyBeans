@@ -383,6 +383,11 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onRetryPush={aiden.onRetryPush}
             onRegenerate={aiden.onRegenerate}
             onPushCached={aiden.onPushCached}
+            icedResult={aiden.icedResult}
+            icedLoading={aiden.icedLoading}
+            icedError={aiden.icedError}
+            onPushIced={aiden.onPushIced}
+            onRetryIcedPush={aiden.onRetryIcedPush}
             extraFooter={actionButtons}
           />
         ) : (
