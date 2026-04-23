@@ -233,6 +233,8 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   };
 
   // Generate an AI product shot from the pending photo.
+  // Safety: uploads the original photo first so it's in Firestore before
+  // generation starts. If the user saves/navigates away, the original is safe.
   // Metered: free users get 1 free, then paywall.
   const handleProductShot = () => {
     if (!pendingPhoto || photoInFlight.current || !bean.id) return;
@@ -244,7 +246,11 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     setPhotoGenerating(true);
     setPhotoError(false);
     const capturedBeanId = bean.id;
-    generateProductShot(pendingPhoto, capturedBeanId)
+    const capturedPhoto = pendingPhoto;
+
+    uploadOriginalPhoto(capturedBeanId, capturedPhoto).catch(() => {});
+
+    generateProductShot(capturedPhoto, capturedBeanId)
       .then(photoUrl => {
         if (!photoInFlight.current) return;
         setPhotoGenerating(false);
@@ -273,6 +279,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   // Remove the current photo from the bean entirely.
   const handleRemovePhoto = async () => {
     if (!bean.id || !updateBean) return;
+    photoInFlight.current = false;
     setPhotoGenerating(true);
     try {
       await updateBean(bean.id, { photoUrl: null });
