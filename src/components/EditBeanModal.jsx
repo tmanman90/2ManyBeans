@@ -20,6 +20,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
+import { ROAST_STYLE_CATEGORIES } from '../lib/roasterProfiles';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
 const SprigDivider = ({ color = C.accentLight, size = 12 }) => (
@@ -149,6 +150,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         brewingRec: bean.brewingRec || '',
         sourcedBy: bean.sourcedBy || '',
         shelfLifeOverride: bean.shelfLifeOverride ? `${bean.shelfLifeOverride} days` : '',
+        roasterStyle: bean.roasterStyle || '',
       });
       if (!photoInFlight.current) {
         setPhotoGenerating(false);
@@ -358,6 +360,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     if (f.cupScore.trim() !== (bean.cupScore || '')) changes.cupScore = f.cupScore.trim();
     if (f.brewingRec.trim() !== (bean.brewingRec || '')) changes.brewingRec = f.brewingRec.trim();
     if (f.sourcedBy.trim() !== (bean.sourcedBy || '')) changes.sourcedBy = f.sourcedBy.trim();
+    if (f.roasterStyle !== (bean.roasterStyle || '')) changes.roasterStyle = f.roasterStyle || null;
 
     // Shelf-life override
     const newShelfDays = parseShelfLifeDays(f.shelfLifeOverride);
@@ -726,6 +729,15 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
               <label style={labelStyle}>Shelf Life</label>
               <input value={f.shelfLifeOverride} onChange={e => setF(p => ({ ...p, shelfLifeOverride: e.target.value }))} placeholder="e.g. 60 days" style={inputStyle} onFocus={scrollOnFocus} />
             </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={labelStyle}>Roast Style</label>
+            <select value={f.roasterStyle} onChange={e => setF(p => ({ ...p, roasterStyle: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
+              <option value="">Auto-detect</option>
+              {Object.entries(ROAST_STYLE_CATEGORIES).map(([key, cat]) => (
+                <option key={key} value={key}>{cat.label}</option>
+              ))}
+            </select>
           </div>
         </div>
       )}

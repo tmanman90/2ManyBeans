@@ -411,6 +411,77 @@ export function ArchiveDetailSheet({
           )}
         </div>
 
+        {/* Brew Profile (read-only archive of saved recipes) */}
+        {(bean.aidenRecipe || bean.handBrewRecipe) && (
+          <div style={{ padding: '14px 20px 4px' }}>
+            <div style={{
+              fontSize: 10, fontWeight: 800, letterSpacing: 1.4,
+              textTransform: 'uppercase', color: C.accent, marginBottom: 6,
+            }}>
+              Brew Profile
+            </div>
+            {bean.aidenRecipe && (
+              <div style={{
+                background: C.card, borderRadius: 10, padding: 12,
+                border: `1px solid ${C.borderLight}`, marginBottom: 8,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                  Aiden Recipe
+                </div>
+                <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                  {bean.aidenRecipe.ratio && <span>Ratio: {bean.aidenRecipe.ratio} &middot; </span>}
+                  {bean.aidenRecipe.bloomTime && <span>Bloom: {bean.aidenRecipe.bloomTime} &middot; </span>}
+                  {bean.aidenRecipe.pulseCount && <span>{bean.aidenRecipe.pulseCount} pulses &middot; </span>}
+                  {bean.aidenRecipe.grindRecommendation?.singleServe && (
+                    <span>Grind SS: {bean.aidenRecipe.grindRecommendation.singleServe}</span>
+                  )}
+                </div>
+                {bean.aidenLink && (
+                  <a
+                    href={bean.aidenLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block', marginTop: 6,
+                      fontSize: 12, color: C.accent, textDecoration: 'none',
+                    }}
+                  >
+                    Open in Aiden App
+                  </a>
+                )}
+              </div>
+            )}
+            {bean.handBrewRecipe && (
+              <div style={{
+                background: C.card, borderRadius: 10, padding: 12,
+                border: `1px solid ${C.borderLight}`, marginBottom: 8,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                  {bean.handBrewRecipe.device
+                    ? `${bean.handBrewRecipe.title || 'Hand Brew Recipe'}`
+                    : 'Hand Brew Recipe'}
+                </div>
+                <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                  {bean.handBrewRecipe.method && <span>{bean.handBrewRecipe.method} &middot; </span>}
+                  {bean.handBrewRecipe.technique && <span>{bean.handBrewRecipe.technique} &middot; </span>}
+                  {bean.handBrewRecipe.coffeeGrams && bean.handBrewRecipe.waterGrams && (
+                    <span>{bean.handBrewRecipe.coffeeGrams}g / {bean.handBrewRecipe.waterGrams}g &middot; </span>
+                  )}
+                  {bean.handBrewRecipe.ratio && <span>{bean.handBrewRecipe.ratio} &middot; </span>}
+                  {bean.handBrewRecipe.grindSize?.description && (
+                    <span>Grind: {bean.handBrewRecipe.grindSize.description}</span>
+                  )}
+                </div>
+                {bean.handBrewRecipe.totalBrewTime && (
+                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                    Total brew time: {bean.handBrewRecipe.totalBrewTime}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tasting history */}
         {beanTastings.length > 0 && (
           <div style={{ padding: '14px 20px 4px' }}>
