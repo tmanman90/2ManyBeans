@@ -1,12 +1,15 @@
 // Edit Bean Modal — edit any bean field + grind settings + enriched details + photo
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Save, Camera, Trash2, X } from 'lucide-react';
+import { Save, Camera, Trash2, X, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getPeakStatus, daysSinceRoast, parseShelfLifeDays, effectivePeakEnd } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
-import { generateProductShot, summarizeNotes } from '../lib/gemini';
+import { generateProductShot, researchBeanOnline, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
+import { generateRuphusStory } from '../lib/professorRuphus';
+import { handlePaywallError } from '../lib/paywallHelpers';
+import { ENRICHABLE_FIELDS } from '../lib/beanFields';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
@@ -103,7 +106,7 @@ const PeakTimeline = ({ bean }) => {
   );
 };
 
-export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid }) => {
+export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid, isNewBean = false }) => {
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
   const [f, setF] = useState({});
@@ -112,15 +115,17 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const { errorMsg, showError, hideError } = useErrorToast();
   const [photoGenerating, setPhotoGenerating] = useState(false);
   const [photoError, setPhotoError] = useState(false);
-  // Pending photo: captured but not yet committed. User chooses original vs product shot.
-  const [pendingPhoto, setPendingPhoto] = useState(null); // { base64, mediaType, previewUrl }
+  const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const photoInFlight = useRef(false);
+  const savedRef = useRef(false);
+  const wasOpen = useRef(false);
   const [enrichedOpen, setEnrichedOpen] = useState(false);
   const [grindOpen, setGrindOpen] = useState(false);
 
   useEffect(() => {
-    if (bean && open) {
+    if (open && !wasOpen.current && bean) {
       setF({
         roaster: bean.roaster || '',
         name: bean.name || '',
@@ -142,7 +147,6 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         sourcedBy: bean.sourcedBy || '',
         shelfLifeOverride: bean.shelfLifeOverride ? `${bean.shelfLifeOverride} days` : '',
       });
-      // Only reset photo state if no generation is in flight
       if (!photoInFlight.current) {
         setPhotoGenerating(false);
         setPhotoError(false);
@@ -151,9 +155,10 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       setConfirmDelete(false);
       setEnrichedOpen(false);
       setGrindOpen(false);
-      // NOTE: photoInFlight.current is NOT reset here.
-      // It is only reset in fireProductShot's .then()/.catch() and handleDelete.
+      setAiFilling(false);
+      savedRef.current = false;
     }
+    wasOpen.current = open;
   }, [bean, open]);
 
   if (!bean) return null;
@@ -169,11 +174,44 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
   const handleDelete = async () => {
     if (!deleteBean || !bean.id) return;
-    // Cancel any in-flight product shot to prevent orphaned storage writes
     photoInFlight.current = false;
     setPhotoGenerating(false);
     await deleteBean(bean.id);
     onClose();
+  };
+
+  const handleCancel = async () => {
+    if (isNewBean && !savedRef.current && deleteBean && bean.id) {
+      await deleteBean(bean.id);
+    }
+    onClose();
+  };
+
+  const handleAiFill = async () => {
+    if (aiFilling) return;
+    if (!hasPro && (freeUsage?.aiScans ?? 0) >= FREE_LIMITS.aiScans) {
+      openPaywall({ feature: 'scan_cap', promote: 'pro' });
+      return;
+    }
+    setAiFilling(true);
+    try {
+      const research = await researchBeanOnline(f, { metered: true });
+      const merged = { ...f };
+      for (const field of ENRICHABLE_FIELDS) {
+        if (!merged[field] && research[field]) merged[field] = research[field];
+      }
+      setF(merged);
+      generateRuphusStory(merged, { useWebSearch: false })
+        .then(story => { if (story && updateBean && bean.id) updateBean(bean.id, { story }); })
+        .catch(() => {});
+    } catch (err) {
+      if (handlePaywallError(err, openPaywall)) {
+        setAiFilling(false);
+        return;
+      }
+      console.log('AI Fill failed:', err.message);
+    }
+    setAiFilling(false);
   };
 
   // Capture a photo and hold it as pending. User then chooses "Use This Photo"
@@ -295,6 +333,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
   const handleSave = async () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
+    savedRef.current = true;
     setSaving(true);
 
     const changes = {};
@@ -378,9 +417,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const total = 8;
 
   return (
-    <Modal open={open} onClose={onClose} title={
+    <Modal open={open} onClose={handleCancel} title={
       <div>
-        <span style={{ fontFamily: fonts.title, fontSize: 28, color: C.accentDark }}>Editing</span>
+        <span style={{ fontFamily: fonts.title, fontSize: 28, color: C.accentDark }}>{isNewBean ? 'New Bean' : 'Editing'}</span>
         <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700, fontFamily: fonts.body }}>
           {bean.roaster} {'\u00B7'} {bean.name.length > 28 ? bean.name.slice(0,28) + '\u2026' : bean.name}
         </div>
@@ -394,14 +433,14 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           <span>{filled}/{total} filled</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+          <Btn variant="secondary" onClick={handleCancel}>{isNewBean ? 'Discard' : 'Cancel'}</Btn>
           <Btn
             variant="primary"
             onClick={handleSave}
             disabled={saving || !f.roaster?.trim() || !f.name?.trim()}
             style={{ flex: 1, justifyContent: 'center' }}
           >
-            <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+            <Save size={14} /> {saving ? 'Saving...' : isNewBean ? 'Add Bean' : 'Save Changes'}
           </Btn>
         </div>
       </div>
@@ -521,6 +560,17 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         <label style={labelStyle}>Coffee Name *</label>
         <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
       </div>
+
+      {f.roaster?.trim() && f.name?.trim() && (
+        <Btn
+          variant="ghost"
+          onClick={handleAiFill}
+          disabled={aiFilling}
+          style={{ width: '100%', justifyContent: 'center', marginBottom: 12, fontSize: 12 }}
+        >
+          <Search size={12} /> {aiFilling ? 'Researching...' : 'AI Fill'}
+        </Btn>
+      )}
 
       <ChapterHeader number="2" title="Origin Story" subtitle="Where this coffee comes from" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
@@ -724,8 +774,8 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         </div>
       )}
 
-      {/* Delete bean */}
-      {deleteBean && (
+      {/* Delete bean (hidden for new beans — cancel/discard handles cleanup) */}
+      {deleteBean && !isNewBean && (
         <div style={{ marginTop: 24, marginBottom: 4 }}>
           {!confirmDelete ? (
             <button
