@@ -1,12 +1,15 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState, useEffect } from 'react';
-import { Plus, Search, Coffee, Check } from 'lucide-react';
+import { Plus, Search, Coffee, Check, Camera } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { BeanCard } from '../components/BeanCard';
 import { Btn } from '../components/Btn';
-import { AddBeanForm } from '../components/AddBeanForm';
+import { Modal } from '../components/Modal';
+import { ScanSheet } from '../components/ScanSheet';
+import { ManualEntrySheet } from '../components/ManualEntrySheet';
+import { EditBeanModal } from '../components/EditBeanModal';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
@@ -27,14 +30,20 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
   const peakCount = sealed.filter(b => getPeakStatus(b).label.startsWith('In Peak')).length;
-  const [showAdd, setShowAdd] = useState(false);
+  const [addChoice, setAddChoice] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [newBeanEntry, setNewBeanEntry] = useState(null);
 
-  // External trigger: another tab (e.g. RotationTab empty state Add Bean
-  // button) can request that we open the AddBeanForm by setting
-  // pendingAddBean to true. We consume the flag here.
+  const handleBeanCreated = (beanId, beanData) => {
+    setScanOpen(false);
+    setManualOpen(false);
+    setNewBeanEntry(beanData);
+  };
+
   useEffect(() => {
     if (pendingAddBean) {
-      setShowAdd(true);
+      setAddChoice(true);
       onPendingAddBeanConsumed?.();
     }
   }, [pendingAddBean, onPendingAddBeanConsumed]);
@@ -105,7 +114,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
               patiently waiting
             </div>
           </div>
-          <Btn variant="primary" onClick={() => setShowAdd(true)} style={{ padding: '8px 14px' }} data-tour="add-bean">
+          <Btn variant="primary" onClick={() => setAddChoice(true)} style={{ padding: '8px 14px' }} data-tour="add-bean">
             <Plus size={14} /> Add Bean
           </Btn>
         </div>
@@ -206,7 +215,41 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         )}
       </div>
 
-      <AddBeanForm open={showAdd} onClose={() => setShowAdd(false)} onAdd={onAddBean} uid={uid} updateBean={updateBean} onToast={setToast} />
+      {/* Add choice modal */}
+      <Modal open={addChoice} onClose={() => setAddChoice(false)} title="Add a Bean" centered>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+          <Btn variant="primary" onClick={() => { setAddChoice(false); setScanOpen(true); }} style={{ width: '100%', justifyContent: 'center' }}>
+            <Camera size={14} /> Scan a Bag
+          </Btn>
+          <Btn variant="secondary" onClick={() => { setAddChoice(false); setManualOpen(true); }} style={{ width: '100%', justifyContent: 'center' }}>
+            <Plus size={14} /> Add Manually
+          </Btn>
+        </div>
+      </Modal>
+      <ScanSheet
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onBeanCreated={handleBeanCreated}
+        uid={uid}
+        addBean={onAddBean}
+      />
+      <ManualEntrySheet
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        onBeanCreated={handleBeanCreated}
+        addBean={onAddBean}
+      />
+      {newBeanEntry && (
+        <EditBeanModal
+          open={!!newBeanEntry}
+          onClose={() => setNewBeanEntry(null)}
+          bean={newBeanEntry}
+          updateBean={updateBean}
+          deleteBean={deleteBean}
+          isNewBean
+          uid={uid}
+        />
+      )}
       <AidenModal
         open={aiden.aidenModal}
         onClose={aiden.closeAidenModal}

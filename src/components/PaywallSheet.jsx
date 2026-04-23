@@ -456,7 +456,7 @@ const styles = {
     background: 'rgba(43,27,14,0.55)',
     // Above any in-app modal (Modal.jsx uses zIndex 1000). The paywall must
     // always be on top because it can be triggered from inside another modal
-    // (e.g. AddBeanForm scan flow → free tier exhausted).
+    // (e.g. ScanSheet scan flow → free tier exhausted).
     zIndex: 2000,
     display: 'flex',
     alignItems: 'flex-end',

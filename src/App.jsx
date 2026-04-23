@@ -47,7 +47,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // whose data comes from Firestore props.
   const [visitedTabs, setVisitedTabs] = useState(new Set(['rotation']));
   // When the user lands in the empty-inventory state and taps "Add a Bean",
-  // we switch to the Inventory tab and signal it to open AddBeanForm.
+  // we switch to the Inventory tab and signal it to open the add-choice modal.
   // InventoryTab consumes this flag and clears it via onPendingAddBeanConsumed.
   const [pendingAddBean, setPendingAddBean] = useState(false);
   // Cross-tab bridge from BrewTimer completion → TastingTab coach.
@@ -75,8 +75,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   };
 
   const handleAddNewBeanFromOpenFlow = () => {
-    // Switch to Inventory tab and queue up the AddBeanForm. InventoryTab
-    // already owns the AddBeanForm component and its state.
+    // Switch to Inventory tab and queue up the add-choice modal.
     setTab('inventory');
     setPendingAddBean(true);
   };

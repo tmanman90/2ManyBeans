@@ -16,7 +16,8 @@ import { Modal } from '../components/Modal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { QuickRecipeFlow } from '../components/QuickRecipeFlow';
-import { AddBeanForm } from '../components/AddBeanForm';
+import { EditBeanModal } from '../components/EditBeanModal';
+import { buildNewBeanData } from '../lib/beanBuilder';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
@@ -60,7 +61,20 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [slotPicker, setSlotPicker] = useState(null);
   const [brewMenuBean, setBrewMenuBean] = useState(null);
   const [quickRecipeOpen, setQuickRecipeOpen] = useState(false);
-  const [quickRecipeSaveData, setQuickRecipeSaveData] = useState(null);
+  const [newBeanEntry, setNewBeanEntry] = useState(null);
+
+  const handleSaveToInventory = async (data) => {
+    const { aidenRecipe, aidenLink, aidenGrind, photo, ...fields } = data;
+    const aidenData = aidenRecipe ? { aidenRecipe, aidenLink, aidenGrind } : undefined;
+    const beanData = buildNewBeanData(fields, { aidenData });
+    try {
+      const beanId = await addBean(beanData);
+      setNewBeanEntry({ id: beanId, ...beanData });
+    } catch (err) {
+      console.error('Failed to save bean:', err);
+      setToast('Failed to save bean');
+    }
+  };
 
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
@@ -362,21 +376,21 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       <QuickRecipeFlow
         open={quickRecipeOpen}
         onClose={() => setQuickRecipeOpen(false)}
-        onSaveToInventory={(data) => setQuickRecipeSaveData(data)}
+        onSaveToInventory={handleSaveToInventory}
         addBean={addBean}
         addTasting={addTasting}
         uid={uid}
         onStartTastingSession={onStartTastingSession}
       />
-      {quickRecipeSaveData && (
-        <AddBeanForm
-          open={!!quickRecipeSaveData}
-          onClose={() => setQuickRecipeSaveData(null)}
-          onAdd={addBean}
-          uid={uid}
+      {newBeanEntry && (
+        <EditBeanModal
+          open={!!newBeanEntry}
+          onClose={() => setNewBeanEntry(null)}
+          bean={newBeanEntry}
           updateBean={updateBean}
-          initialData={quickRecipeSaveData}
-          onToast={setToast}
+          deleteBean={deleteBean}
+          isNewBean
+          uid={uid}
         />
       )}
     </div>
