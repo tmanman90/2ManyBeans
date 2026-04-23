@@ -4,8 +4,7 @@
 // starts (different bean, regenerate, modal reopen) while an earlier one is
 // still awaiting research or recipe generation, the stale chain's `setX`
 // updates are ignored so recipe/error state from an abandoned brew can't land
-// on the bean currently displayed. Firestore writes use the closure-captured
-// bean.id so they always target the right doc regardless of render state.
+// on the bean currently displayed.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { researchBean } from '../lib/beanResearch';
 import { generateHandBrewRecipe } from '../lib/handbrew';
@@ -28,12 +27,6 @@ export function useHandBrew(updateBean) {
   const [handBrewBean, setHandBrewBean] = useState(null);
   const [handBrewResearch, setHandBrewResearch] = useState(null);
   const [handBrewPhase, setHandBrewPhase] = useState(null);
-  // Lifted dose override. Hydrated from the recipe on every NON-NULL recipe
-  // identity change (cached load, regenerate success). We intentionally do
-  // NOT clear when `handBrewRecipe` goes null mid-regeneration — otherwise
-  // the stepper briefly falls back to `min` (10g) while the loading spinner
-  // takes over, producing a visible "dose dropped to 10" flash. When the
-  // new recipe arrives, we hydrate from its (possibly absent) userCoffeeGrams.
   const [userCoffeeGrams, setUserCoffeeGrams] = useState(undefined);
   useEffect(() => {
     if (handBrewRecipe == null) return;
@@ -42,25 +35,36 @@ export function useHandBrew(updateBean) {
 
   const isActive = (rid) => mountedRef.current && activeRequestRef.current === rid;
 
+  // Resolve the brew device from preferences (default to v60 for non-aiden methods)
+  const getBrewDevice = () => {
+    const m = preferences?.brewMethod;
+    if (!m || m === 'aiden') return 'v60';
+    if (m === 'handbrew') return 'v60';
+    return m;
+  };
+
   const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false) => {
-    // Show cached recipe immediately if available, even for free users.
-    // The cached recipe already exists — no API cost to display it.
+    const device = getBrewDevice();
+    const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
+
+    // Show cached recipe if available and matches current device + grinder
     if (!forceRegenerate && bean.handBrewRecipe) {
-      const rid = Symbol('handbrew');
-      activeRequestRef.current = rid;
-      setHandBrewBean(bean);
-      setHandBrewError(null);
-      setHandBrewModal(true);
-      setHandBrewRecipe(bean.handBrewRecipe);
-      setHandBrewLoading(false);
-      setHandBrewPhase(null);
-      return;
+      const cachedDevice = bean.handBrewRecipe.device || 'v60';
+      const cachedGrinder = bean.handBrewRecipe.grinder || 'fellow-ode-gen2';
+      if (cachedDevice === device && cachedGrinder === grinderKey) {
+        const rid = Symbol('handbrew');
+        activeRequestRef.current = rid;
+        setHandBrewBean(bean);
+        setHandBrewError(null);
+        setHandBrewModal(true);
+        setHandBrewRecipe(bean.handBrewRecipe);
+        setHandBrewLoading(false);
+        setHandBrewPhase(null);
+        return;
+      }
     }
 
-    // Recipe generation costs AI tokens. Pro or Ultra required.
     if (!hasPro) {
-      // Cancel any in-flight chain so its tail effects don't land on the
-      // wrong bean after the paywall opens.
       activeRequestRef.current = null;
       openPaywall({ feature: 'generic', promote: 'pro' });
       return;
@@ -77,7 +81,7 @@ export function useHandBrew(updateBean) {
     setHandBrewRecipe(null);
     setHandBrewLoading(true);
 
-    // Step 1: Research (skip if cached on bean doc or passed in)
+    // Step 1: Research (skip if cached)
     let research = cachedResearch || bean.beanResearch || null;
     if (!research) {
       setHandBrewPhase('research');
@@ -85,7 +89,6 @@ export function useHandBrew(updateBean) {
         research = await researchBean(bean);
         if (!isActive(rid)) return;
         setHandBrewResearch(research);
-        // Cache research on bean doc for future use
         if (bean.id) {
           await updateBean(bean.id, { beanResearch: research });
         }
@@ -96,20 +99,20 @@ export function useHandBrew(updateBean) {
     }
     if (!isActive(rid)) return;
 
-    // Step 2: Generate recipe
+    // Step 2: Generate recipe with device context
     setHandBrewPhase('recipe');
     try {
-      const recipe = await generateHandBrewRecipe(bean, research, preferences);
+      const recipe = await generateHandBrewRecipe(bean, research, preferences, device);
       if (!isActive(rid)) return;
       setHandBrewRecipe(recipe);
       setHandBrewError(null);
-      // Persist recipe to bean doc (include grinder key for cache invalidation)
       if (bean.id) {
         await updateBean(bean.id, {
           handBrewRecipe: {
             ...recipe,
             generatedAt: new Date().toISOString(),
-            grinder: preferences?.grinder || 'fellow-ode-gen2',
+            grinder: grinderKey,
+            device,
           },
         });
       }
@@ -124,21 +127,10 @@ export function useHandBrew(updateBean) {
   };
 
   const closeHandBrewModal = () => {
-    // Cancel any in-flight request so tail effects don't repopulate state after close.
     activeRequestRef.current = null;
     setHandBrewModal(false);
   };
 
-  // Persist the user's dose override to Firestore. Called by HandBrewModal
-  // on modal close and on Start Brew press (via onPersistDose prop). Updates
-  // local recipe state AND writes to the bean doc via dot-path merge so
-  // the change survives reopening. Skipped for ephemeral beans (no id) —
-  // QuickRecipeFlow.handleAutoSave persists those on the initial save.
-  //
-  // Race guard: a concurrent useAppData onSnapshot firing between the local
-  // merge and the Firestore ack can stomp the merged override. We re-assert
-  // after the write resolves, gated on mountedRef, to stomp any intermediate
-  // snapshot churn.
   const persistDose = useCallback(async (newDose) => {
     if (typeof newDose !== 'number' || newDose <= 0) return;
     setHandBrewRecipe((prev) =>
