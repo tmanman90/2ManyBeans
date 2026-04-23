@@ -156,7 +156,13 @@ export const getProfileForRoaster = (roasterName, bean = null) => {
   }
   if (bestScore >= 60 && bestMatch) return ROASTER_PROFILES[bestMatch];
 
-  // Layer 3: Infer from bean's roast level if available
+  // Explicit user-set roaster style (highest priority among fallbacks)
+  if (bean?.roasterStyle && ROAST_STYLE_CATEGORIES[bean.roasterStyle]) {
+    const style = ROAST_STYLE_CATEGORIES[bean.roasterStyle];
+    return { ...style, category: style.label, guidance: `${style.label} (user-set)` };
+  }
+
+  // Infer from bean's roast level
   if (bean?.roastLevel) {
     const rl = normalize(bean.roastLevel);
     if (rl.includes('light') || rl.includes('nordic')) {
@@ -168,12 +174,6 @@ export const getProfileForRoaster = (roasterName, bean = null) => {
     if (rl.includes('dark')) {
       return { ...ROAST_STYLE_CATEGORIES['dark'], category: 'Dark (inferred)', guidance: `Inferred from roast level: ${bean.roastLevel}` };
     }
-  }
-
-  // Bean-level override
-  if (bean?.roasterStyle && ROAST_STYLE_CATEGORIES[bean.roasterStyle]) {
-    const style = ROAST_STYLE_CATEGORIES[bean.roasterStyle];
-    return { ...style, category: style.label, guidance: `${style.label} (user-set)` };
   }
 
   return DEFAULT_PROFILE;

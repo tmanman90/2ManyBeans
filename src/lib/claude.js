@@ -454,7 +454,7 @@ export function buildChatContext(beans, tastings, preferences) {
       : GRINDER_LABELS[grinderKey] || 'Fellow Ode Gen 2';
   const DEVICE_LABELS = { v60: 'V60 pour-over', kalita: 'Kalita Wave pour-over', chemex: 'Chemex pour-over', aeropress: 'Aeropress', 'french-press': 'French Press', handbrew: 'Hand-brew (manual pour-over)' };
   const brewerLabel = brewMethod === 'aiden' ? 'Fellow Aiden' : (DEVICE_LABELS[brewMethod] || 'Manual brew');
-  const brewerRef = brewMethod === 'aiden' ? 'FELLOW AIDEN' : (brewMethod || 'HAND-BREW').toUpperCase();
+  const brewerRef = brewMethod === 'aiden' ? 'FELLOW AIDEN' : 'HAND-BREW';
 
   const active = beans
     .filter(b => b.status === 'ACTIVE')

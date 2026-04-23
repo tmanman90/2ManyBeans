@@ -33,14 +33,33 @@ function grinderSettingToMicrons(setting, grinderKey) {
 }
 
 // Translate Ode Gen 2 step to another grinder's setting via micron intermediary
+// Comandante uses clicks (e.g., "22 clicks"), JX-Pro uses rotation notation
+const CLICK_GRINDERS = new Set(['comandante-c40', '1zpresso-jx-pro']);
+
+function formatGrinderSetting(rawSetting, grinderKey) {
+  if (grinderKey === '1zpresso-jx-pro') {
+    const clicks = Math.round(rawSetting);
+    const turns = Math.floor(clicks / 40);
+    const remainder = clicks % 40;
+    const num = Math.floor(remainder / 10);
+    const sub = remainder % 10;
+    return `${turns}.${num}.${sub}`;
+  }
+  if (grinderKey === 'comandante-c40') {
+    return `${Math.round(rawSetting)} clicks`;
+  }
+  return rawSetting;
+}
+
 export function odeStepToGrinderSetting(odeStep, grinderKey) {
   if (grinderKey === 'fellow-ode-gen2') return { setting: odeStep, label: 'Ode Gen 2' };
   const microns = odeStepToMicrons(odeStep);
   const g = GRINDER_MICRON_SCALES[grinderKey];
   if (!g) return { microns, description: descriptorForMicrons(microns) };
-  const setting = Math.round(((microns - g.base) / g.perStep + 1) * 10) / 10;
-  const clamped = Math.max(1, setting);
-  return { setting: clamped, label: GRINDER_LABELS[grinderKey], microns };
+  const rawSetting = Math.round(((microns - g.base) / g.perStep + 1) * 10) / 10;
+  const clamped = Math.max(1, rawSetting);
+  const display = CLICK_GRINDERS.has(grinderKey) ? formatGrinderSetting(clamped, grinderKey) : clamped;
+  return { setting: display, label: GRINDER_LABELS[grinderKey], microns };
 }
 
 function descriptorForMicrons(microns) {
