@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Plus, RotateCcw, X, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
-import { today, parseShelfLifeDays } from '../lib/peakStatus';
+import { today } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
@@ -20,6 +20,7 @@ import { usePaywall } from '../hooks/usePaywall.jsx';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 import { ENRICHABLE_FIELDS, PROCESS_TYPES } from '../lib/beanFields';
+import { buildNewBeanData } from '../lib/beanBuilder';
 
 // Catch a paywall-triggering error from any AI call and route it to the
 // global paywall sheet instead of showing a generic toast. Returns true if
@@ -327,53 +328,15 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
 
   const handleSave = async () => {
     if (!f.roaster.trim() || !f.name.trim()) return;
-    const p = getProfileForRoaster(f.roaster);
 
-    // Override peakEnd if bag states a shelf life
-    const shelfDays = parseShelfLifeDays(f.shelfLife);
-    const peakEnd = shelfDays && shelfDays > p.peakEnd ? shelfDays : p.peakEnd;
-
-    const beanData = {
-      roaster: f.roaster.trim(),
-      name: f.name.trim(),
-      origin: f.origin.trim(),
-      variety: f.variety.trim(),
-      process: f.process,
-      roastDate: f.roastDate || '',
-      bagSize: Number(f.bagSize) || 100,
-      status: 'SEALED',
-      jarSlot: null,
-      openDate: null,
-      finishDate: null,
-      bagNotes: f.bagNotes.trim(),
-      producer: f.producer.trim(),
-      degasMin: p.degasMin,
-      degasMax: p.degasMax,
-      peakStart: p.peakStart,
-      peakEnd,
-      guidance: p.guidance,
-    };
-
-    // Include enriched fields only if non-empty
-    if (f.altitude.trim()) beanData.altitude = f.altitude.trim();
-    if (f.region.trim()) beanData.region = f.region.trim();
-    if (f.farm.trim()) beanData.farm = f.farm.trim();
-    if (f.roastLevel.trim()) beanData.roastLevel = f.roastLevel.trim();
-    if (f.cupScore.trim()) beanData.cupScore = f.cupScore.trim();
-    if (f.brewingRec.trim()) beanData.brewingRec = f.brewingRec.trim();
-    if (f.sourcedBy.trim()) beanData.sourcedBy = f.sourcedBy.trim();
-    if (f.shelfLife.trim()) beanData.shelfLife = f.shelfLife.trim();
-    if (f.roastedIn.trim()) beanData.roastedIn = f.roastedIn.trim();
-
-    // Include Professor Ruphus story if background generation finished
-    if (storyRef.current) beanData.story = storyRef.current;
-
-    // Include Aiden recipe data if pre-filled from Quick Recipe
-    if (initialData?.aidenRecipe) {
-      beanData.aidenRecipe = { ...initialData.aidenRecipe, generatedAt: initialData.aidenRecipe.generatedAt || new Date().toISOString() };
-      if (initialData.aidenLink) beanData.aidenLink = initialData.aidenLink;
-      if (initialData.aidenGrind) beanData.aidenGrind = initialData.aidenGrind;
-    }
+    const beanData = buildNewBeanData(f, {
+      story: storyRef.current,
+      aidenData: initialData?.aidenRecipe ? {
+        aidenRecipe: initialData.aidenRecipe,
+        aidenLink: initialData.aidenLink,
+        aidenGrind: initialData.aidenGrind,
+      } : undefined,
+    });
 
     const scanPhoto = photos.length > 0 ? photos[0] : null;
     const preAllocId = pendingBeanIdRef.current;
