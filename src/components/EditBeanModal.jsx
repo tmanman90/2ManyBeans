@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Save, Camera, Trash2, X } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
-import { getPeakStatus, daysSinceRoast } from '../lib/peakStatus';
+import { getPeakStatus, daysSinceRoast, parseShelfLifeDays, effectivePeakEnd } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { generateProductShot, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
@@ -140,6 +140,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         cupScore: bean.cupScore || '',
         brewingRec: bean.brewingRec || '',
         sourcedBy: bean.sourcedBy || '',
+        shelfLifeOverride: bean.shelfLifeOverride ? `${bean.shelfLifeOverride} days` : '',
       });
       // Only reset photo state if no generation is in flight
       if (!photoInFlight.current) {
@@ -307,6 +308,13 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     if (f.cupScore.trim() !== (bean.cupScore || '')) changes.cupScore = f.cupScore.trim();
     if (f.brewingRec.trim() !== (bean.brewingRec || '')) changes.brewingRec = f.brewingRec.trim();
     if (f.sourcedBy.trim() !== (bean.sourcedBy || '')) changes.sourcedBy = f.sourcedBy.trim();
+
+    // Shelf-life override
+    const newShelfDays = parseShelfLifeDays(f.shelfLifeOverride);
+    const oldShelfDays = bean.shelfLifeOverride ?? null;
+    if (newShelfDays !== oldShelfDays) {
+      changes.shelfLifeOverride = newShelfDays ?? null;
+    }
 
     // Grind handling
     const ssNum = Number(f.ssGrind);
@@ -564,7 +572,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
             <input value={f.producer} onChange={e => setF(p => ({ ...p, producer: e.target.value }))} placeholder="Optional" style={{ ...inputStyle, minWidth: 0, textOverflow: 'ellipsis' }} onFocus={scrollOnFocus} />
           </div>
         </div>
-        <PeakTimeline bean={{ ...bean, roastDate: f.roastDate }} />
+        <PeakTimeline bean={{ ...bean, roastDate: f.roastDate,
+          shelfLifeOverride: undefined,
+          peakEnd: parseShelfLifeDays(f.shelfLifeOverride) || bean.shelfLifeOverride || bean.peakEnd }} />
       </div>
 
       <ChapterHeader number="4" title="Tasting Notes" subtitle="From the bag or what you're finding" />
@@ -643,9 +653,15 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
               <input value={f.sourcedBy} onChange={e => setF(p => ({ ...p, sourcedBy: e.target.value }))} placeholder="e.g. Dayglow" style={inputStyle} onFocus={scrollOnFocus} />
             </div>
           </div>
-          <div style={{ marginBottom: 10 }}>
-            <label style={labelStyle}>Brewing Recommendations</label>
-            <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} onFocus={scrollOnFocus} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={labelStyle}>Brewing Rec</label>
+              <input value={f.brewingRec} onChange={e => setF(p => ({ ...p, brewingRec: e.target.value }))} placeholder="From roaster" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
+            <div>
+              <label style={labelStyle}>Shelf Life</label>
+              <input value={f.shelfLifeOverride} onChange={e => setF(p => ({ ...p, shelfLifeOverride: e.target.value }))} placeholder="e.g. 60 days" style={inputStyle} onFocus={scrollOnFocus} />
+            </div>
           </div>
         </div>
       )}

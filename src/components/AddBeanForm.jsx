@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Plus, RotateCcw, X, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { getProfileForRoaster, DEFAULT_PROFILE } from '../lib/roasterProfiles';
-import { today } from '../lib/peakStatus';
+import { today, parseShelfLifeDays } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot, summarizeNotes } from '../lib/gemini';
 import { uploadOriginalPhoto } from '../lib/storage';
@@ -323,17 +323,6 @@ export const AddBeanForm = ({ open, onClose, onAdd, uid, updateBean, initialData
         setPhotoChoice('original');
       }
     }
-  };
-
-  const parseShelfLifeDays = (str) => {
-    if (!str) return null;
-    const s = str.toLowerCase();
-    const num = parseFloat(s);
-    if (isNaN(num)) return null;
-    if (/month/.test(s)) return Math.round(num * 30);
-    if (/week/.test(s)) return Math.round(num * 7);
-    if (/day/.test(s)) return Math.round(num);
-    return null;
   };
 
   const handleSave = async () => {

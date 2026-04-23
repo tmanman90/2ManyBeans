@@ -34,27 +34,43 @@ export const formatDate = (isoDate) => {
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 };
 
+export const effectivePeakEnd = (bean) => bean.shelfLifeOverride ?? bean.peakEnd;
+
+export const parseShelfLifeDays = (str) => {
+  if (!str) return null;
+  const s = str.toLowerCase();
+  const num = parseFloat(s);
+  if (isNaN(num) || !isFinite(num) || num <= 0) return null;
+  let days;
+  if (/month/.test(s)) days = Math.round(num * 30);
+  else if (/week/.test(s)) days = Math.round(num * 7);
+  else if (/day/.test(s)) days = Math.round(num);
+  else return null;
+  return days > 0 && days <= 730 ? days : null;
+};
+
 export const lifePct = (bean) => {
   const days = daysSinceRoast(bean.roastDate, bean);
-  if (days === null || !bean.peakEnd) return 0;
-  return Math.min(1, Math.max(0, days / bean.peakEnd));
+  const peak = effectivePeakEnd(bean);
+  if (days === null || !peak) return 0;
+  return Math.min(1, Math.max(0, days / peak));
 };
 
 export const getPeakStatus = (bean) => {
   const days = daysSinceRoast(bean.roastDate, bean);
+  const peak = effectivePeakEnd(bean);
   const frozen = !!bean.frozenAt;
   if (days === null) return { label: "Unknown", color: C.textMuted, bg: C.borderLight };
   if (frozen) {
-    // Show frozen status with the paused day count
     return { label: `Frozen (${days}d)`, color: C.blue, bg: C.blueBg, days, frozen: true };
   }
   if (days < bean.degasMin) return { label: "Degassing", color: C.purple, bg: C.purpleBg, days };
   if (days < bean.peakStart) return { label: "Resting", color: C.amber, bg: C.amberBg, days };
-  if (days <= bean.peakEnd) {
-    const pct = Math.round(((days - bean.peakStart) / (bean.peakEnd - bean.peakStart)) * 100);
+  if (days <= peak) {
+    const pct = Math.round(((days - bean.peakStart) / (peak - bean.peakStart)) * 100);
     return { label: `In Peak (${pct}%)`, color: C.green, bg: C.greenBg, days };
   }
-  const over = days - bean.peakEnd;
+  const over = days - peak;
   if (over <= 14) return { label: `Fading (+${over}d)`, color: C.amber, bg: C.amberBg, days };
   if (over <= 30) return { label: `Past Peak (+${over}d)`, color: C.red, bg: C.redBg, days };
   return { label: `Stale (+${over}d)`, color: C.red, bg: C.redBg, days };
