@@ -299,7 +299,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         if (!photoInFlight.current) return;
         setPhotoGenerating(false);
         setPendingPhoto(null);
-        if (Capacitor.isNativePlatform() && updateBean) {
+        if (updateBean) {
           updateBean(capturedBeanId, { photoUrl })
             .finally(() => { photoInFlight.current = false; });
         } else {
