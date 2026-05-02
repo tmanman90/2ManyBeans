@@ -205,8 +205,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       for (const field of ENRICHABLE_FIELDS) {
         if (!merged[field] && research[field]) merged[field] = research[field];
       }
+      merged.enrichedAt = new Date().toISOString();
       setF(merged);
-      generateRuphusStory(merged, { useWebSearch: false })
+      generateRuphusStory(merged, { enrichment: research })
         .then(story => { if (story && updateBean && bean.id) updateBean(bean.id, { story }); })
         .catch(() => {});
     } catch (err) {
@@ -361,6 +362,11 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     if (f.brewingRec.trim() !== (bean.brewingRec || '')) changes.brewingRec = f.brewingRec.trim();
     if (f.sourcedBy.trim() !== (bean.sourcedBy || '')) changes.sourcedBy = f.sourcedBy.trim();
     if (f.roasterStyle !== (bean.roasterStyle || '')) changes.roasterStyle = f.roasterStyle || null;
+
+    // Roaster context + enrichedAt (set by AI Fill, not user-editable)
+    for (const key of ['roasterLocation', 'roasterDescription', 'roasterFounded', 'redditNotes', 'enrichedAt']) {
+      if (f[key] && f[key] !== (bean[key] || '')) changes[key] = f[key];
+    }
 
     // Shelf-life override
     const newShelfDays = parseShelfLifeDays(f.shelfLifeOverride);

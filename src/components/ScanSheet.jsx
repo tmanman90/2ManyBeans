@@ -151,6 +151,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
           if (!merged[field] && research[field]) merged[field] = research[field];
         }
         enrichedData = merged;
+        enrichedData.enrichedAt = new Date().toISOString();
       } catch (researchErr) {
         console.log('Research skipped/failed:', researchErr.message);
       }

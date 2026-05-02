@@ -18,6 +18,10 @@ export const ENRICHABLE_FIELDS = [
   'process',
   'producer',
   'roastedIn',
+  'roasterLocation',
+  'roasterDescription',
+  'roasterFounded',
+  'redditNotes',
 ];
 
 export function isBagNotesEmpty(bean) {

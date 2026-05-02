@@ -1,5 +1,6 @@
 import { getProfileForRoaster } from './roasterProfiles';
 import { parseShelfLifeDays } from './peakStatus';
+import { ENRICHABLE_FIELDS } from './beanFields';
 
 export function buildNewBeanData(fields, { aidenData, story } = {}) {
   const profile = getProfileForRoaster(fields.roaster);
@@ -27,12 +28,13 @@ export function buildNewBeanData(fields, { aidenData, story } = {}) {
     guidance: profile.guidance,
   };
 
-  const enriched = ['altitude', 'region', 'farm', 'roastLevel', 'cupScore',
-    'brewingRec', 'sourcedBy', 'shelfLife', 'roastedIn'];
-  for (const key of enriched) {
+  for (const key of ENRICHABLE_FIELDS) {
     const val = (fields[key] || '').trim();
     if (val) data[key] = val;
   }
+  const shelfVal = (fields.shelfLife || '').trim();
+  if (shelfVal) data.shelfLife = shelfVal;
+  if (fields.enrichedAt) data.enrichedAt = fields.enrichedAt;
 
   if (story) data.story = story;
 
