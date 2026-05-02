@@ -208,7 +208,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       merged.enrichedAt = new Date().toISOString();
       setF(merged);
       generateRuphusStory(merged, { enrichment: research })
-        .then(story => { if (story && updateBean && bean.id) updateBean(bean.id, { story }); })
+        .then(story => { if (story && updateBean && bean.id) updateBean(bean.id, { story, enrichedAt: merged.enrichedAt }); })
         .catch(() => {});
     } catch (err) {
       if (handlePaywallError(err, openPaywall)) {

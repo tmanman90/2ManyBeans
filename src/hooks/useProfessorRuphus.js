@@ -55,13 +55,15 @@ async function runEnrichment(bean, getBeanById, updateBean, { forceResearch = fa
       return research;
     })();
 
+    enrichPromise
+      .catch(err => console.log('Background enrichment failed:', err.message))
+      .finally(() => inflightEnrichmentIds.delete(bean.id));
     const timeout = new Promise(r => setTimeout(() => r(null), ENRICHMENT_TIMEOUT));
     return await Promise.race([enrichPromise, timeout]);
   } catch (err) {
     console.log('Ruphus enrichment skipped:', err.message);
-    return null;
-  } finally {
     inflightEnrichmentIds.delete(bean.id);
+    return null;
   }
 }
 
@@ -95,7 +97,9 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
       });
       setRuphusStory(story);
       if (updateBean && bean.id) {
-        await updateBean(bean.id, { story });
+        const storyUpdate = { story };
+        if (!bean.enrichedAt && enrichment) storyUpdate.enrichedAt = new Date().toISOString();
+        await updateBean(bean.id, storyUpdate);
       }
     } catch (err) {
       console.error('Professor Ruphus story generation failed:', err);
@@ -110,7 +114,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
     setRuphusOpen(true);
     setRuphusError(null);
 
-    if (bean.story && bean.enrichedAt) {
+    if (bean.story?.intro) {
       setRuphusStory(bean.story);
       setRuphusLoading(false);
     } else {
