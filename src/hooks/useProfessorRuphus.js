@@ -10,38 +10,46 @@ import { ENRICHABLE_FIELDS, isBagNotesEmpty } from '../lib/beanFields';
 const inflightEnrichmentIds = new Set();
 
 const ENRICHMENT_TIMEOUT = 15000;
+const ROASTER_CONTEXT_FIELDS = ['roasterLocation', 'roasterDescription', 'roasterFounded', 'redditNotes'];
 
-// Always runs web research to get roaster context for the story.
-// Also writes enriched fields to the bean doc if not already done.
-async function runEnrichment(bean, getBeanById, updateBean) {
+function hasStoredRoasterContext(bean) {
+  return bean.enrichedAt && ROASTER_CONTEXT_FIELDS.some(f => bean[f]);
+}
+
+async function runEnrichment(bean, getBeanById, updateBean, { forceResearch = false } = {}) {
   if (!updateBean || !getBeanById) return null;
   if (inflightEnrichmentIds.has(bean.id)) return null;
+
+  if (!forceResearch && hasStoredRoasterContext(bean)) {
+    return {
+      roasterLocation: bean.roasterLocation,
+      roasterDescription: bean.roasterDescription,
+      roasterFounded: bean.roasterFounded,
+      redditNotes: bean.redditNotes,
+    };
+  }
 
   inflightEnrichmentIds.add(bean.id);
   try {
     const enrichPromise = (async () => {
       const research = await researchBeanOnline(bean, { metered: true });
 
-      if (!bean.enrichedAt) {
-        const current = await getBeanById(bean.id);
-        if (current) {
-          const updates = {};
-          for (const field of ENRICHABLE_FIELDS) {
-            if (!current[field] && research[field]) {
-              updates[field] = research[field];
-            }
-          }
-
-          if (isBagNotesEmpty(current) && research.redditNotes) {
-            const summary = await summarizeNotes(research.redditNotes);
-            if (summary) updates.bagNotes = summary;
-          }
-
-          if (Object.keys(updates).length > 0) {
-            updates.enrichedAt = new Date().toISOString();
-            await updateBean(bean.id, updates);
+      const current = await getBeanById(bean.id);
+      if (current) {
+        const updates = {};
+        for (const field of ENRICHABLE_FIELDS) {
+          if (!current[field] && research[field]) {
+            updates[field] = research[field];
           }
         }
+
+        if (isBagNotesEmpty(current) && research.redditNotes) {
+          const summary = await summarizeNotes(research.redditNotes);
+          if (summary) updates.bagNotes = summary;
+        }
+
+        updates.enrichedAt = new Date().toISOString();
+        await updateBean(bean.id, updates);
       }
 
       return research;
@@ -64,12 +72,11 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
   const [ruphusLoading, setRuphusLoading] = useState(false);
   const [ruphusError, setRuphusError] = useState(null);
 
-  const enrichAndGenerate = useCallback(async (bean) => {
+  const enrichAndGenerate = useCallback(async (bean, { forceResearch = false } = {}) => {
     setRuphusLoading(true);
     setRuphusError(null);
     try {
-      // Step 1: enrich (with timeout). Returns raw research including roaster info.
-      const enrichment = await runEnrichment(bean, getBeanById, updateBean);
+      const enrichment = await runEnrichment(bean, getBeanById, updateBean, { forceResearch });
 
       // Re-read the bean to pick up any fields enrichment wrote
       let enrichedBean = bean;
@@ -110,7 +117,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
   const handleRefresh = useCallback(() => {
     if (!ruphusBean) return;
     setRuphusStory(null);
-    enrichAndGenerate(ruphusBean);
+    enrichAndGenerate(ruphusBean, { forceResearch: true });
   }, [ruphusBean, enrichAndGenerate]);
 
   const closeRuphus = useCallback(() => {
