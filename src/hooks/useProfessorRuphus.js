@@ -70,13 +70,17 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
   const [ruphusBean, setRuphusBean] = useState(null);
   const [ruphusStory, setRuphusStory] = useState(null);
   const [ruphusLoading, setRuphusLoading] = useState(false);
+  const [ruphusResearching, setRuphusResearching] = useState(false);
   const [ruphusError, setRuphusError] = useState(null);
 
   const enrichAndGenerate = useCallback(async (bean, { forceResearch = false } = {}) => {
     setRuphusLoading(true);
     setRuphusError(null);
+    const willResearch = forceResearch || !hasStoredRoasterContext(bean);
+    setRuphusResearching(willResearch);
     try {
       const enrichment = await runEnrichment(bean, getBeanById, updateBean, { forceResearch });
+      setRuphusResearching(false);
 
       // Re-read the bean to pick up any fields enrichment wrote
       let enrichedBean = bean;
@@ -97,6 +101,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
       console.error('Professor Ruphus story generation failed:', err);
       setRuphusError(err.message || "Couldn't generate the lesson");
     }
+    setRuphusResearching(false);
     setRuphusLoading(false);
   }, [updateBean, getBeanById]);
 
@@ -143,6 +148,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
       bean: ruphusBean,
       story: ruphusStory,
       loading: ruphusLoading,
+      researching: ruphusResearching,
       error: ruphusError,
       onRetry: () => ruphusBean && enrichAndGenerate(ruphusBean),
       onRefresh: handleRefresh,

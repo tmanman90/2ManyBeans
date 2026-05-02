@@ -56,7 +56,7 @@ const Spinner = () => (
   }} />
 );
 
-export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, error, onRetry, onRefresh, tastingScores }) => {
+export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, researching, error, onRetry, onRefresh, tastingScores }) => {
   if (!open) return null;
 
   return createPortal(
@@ -118,8 +118,15 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, er
               <img src="/images/professor-ruphus.webp" alt="Professor Ruphus"
                 style={{ width: 80, height: 80, borderRadius: '50%', opacity: 0.8, marginBottom: 16 }} />
               <div style={{ fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 8 }}>
-                Professor Ruphus is preparing your lesson...
+                {researching
+                  ? 'Professor Ruphus is researching your coffee...'
+                  : 'Professor Ruphus is preparing your lesson...'}
               </div>
+              {researching && (
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+                  This may take up to a minute
+                </div>
+              )}
               <Spinner />
             </div>
           )}
