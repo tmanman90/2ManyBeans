@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2manybeans - Brew coffee you're proud of</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #FAF6F1;
+      --card: #FFF8F0;
+      --text: #3B2417;
+      --text-muted: #8B7B6F;
+      --text-light: #A89888;
+      --accent: #B07540;
+      --accent-light: #C9A87C;
+      --accent-dark: #5C3D2E;
+      --border: #E8DDD3;
+      --green: #5B8A6A;
+      --font-script: 'Caveat', cursive;
+      --font-serif: 'Playfair Display', serif;
+      --font-sans: 'Nunito', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .nav.scrolled {
+      background: rgba(250, 246, 241, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 1px 8px rgba(92, 61, 46, 0.06);
+    }
+    .nav-logo {
+      height: 28px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .nav.scrolled .nav-logo { opacity: 1; }
+    .nav-cta {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+      background: var(--accent);
+      border: none;
+      padding: 8px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.2s;
+      opacity: 0;
+      transition: opacity 0.3s, background 0.2s, transform 0.2s;
+    }
+    .nav.scrolled .nav-cta { opacity: 1; }
+    .nav-cta:hover { background: var(--accent-dark); transform: translateY(-1px); }
+
+    /* ── Sections ── */
+    section { position: relative; }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 32px 80px;
+      position: relative;
+    }
+    .hero-inner {
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    .hero-wordmark {
+      height: 48px;
+      margin-bottom: 8px;
+    }
+    .hero-illustration {
+      width: 320px;
+      max-width: 80vw;
+      border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(92, 61, 46, 0.10);
+    }
+    .hero h1 {
+      font-family: var(--font-script);
+      font-size: clamp(40px, 7vw, 64px);
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+    .hero-sub {
+      font-family: var(--font-sans);
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 440px;
+      line-height: 1.5;
+    }
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-sans);
+      font-size: 17px;
+      font-weight: 600;
+      color: white;
+      background: var(--text);
+      border: none;
+      padding: 14px 32px;
+      border-radius: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 2px 12px rgba(59, 36, 23, 0.15);
+      margin-top: 8px;
+    }
+    .hero-cta:hover {
+      background: var(--accent-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(59, 36, 23, 0.2);
+    }
+    .hero-cta svg { width: 20px; height: 20px; fill: white; }
+    .hero-badge {
+      font-size: 13px;
+      color: var(--text-light);
+      margin-top: 4px;
+    }
+
+    /* ── Mascot intro ── */
+    .mascot-section {
+      padding: 100px 32px;
+      text-align: center;
+    }
+    .mascot-section .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    .mascot-img {
+      width: 280px;
+      filter: drop-shadow(0 4px 16px rgba(92, 61, 46, 0.08));
+    }
+    .mascot-section h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(28px, 4vw, 38px);
+      font-weight: 600;
+      color: var(--text);
+    }
+    .mascot-bubble {
+      font-family: var(--font-script);
+      font-size: 22px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 28px;
+      max-width: 480px;
+      line-height: 1.4;
+      position: relative;
+    }
+    .mascot-bubble::before {
+      content: '';
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 10px;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      border-radius: 10px 10px 0 0;
+    }
+
+    /* ── Features ── */
+    .features-section {
+      padding: 60px 32px 100px;
+    }
+    .features-section .section-label {
+      text-align: center;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .features-section .section-title {
+      text-align: center;
+      font-family: var(--font-serif);
+      font-size: clamp(28px, 4vw, 38px);
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 64px;
+    }
+    .feature-row {
+      display: flex;
+      align-items: center;
+      gap: 64px;
+      margin-bottom: 80px;
+      max-width: 960px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .feature-row:last-child { margin-bottom: 0; }
+    .feature-row.reverse { flex-direction: row-reverse; }
+    .feature-visual {
+      flex: 0 0 280px;
+      position: relative;
+    }
+    .feature-screenshot {
+      width: 240px;
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(92, 61, 46, 0.10);
+      border: 1px solid rgba(232, 221, 211, 0.5);
+    }
+    .feature-ruphus {
+      position: absolute;
+      width: 120px;
+      filter: drop-shadow(0 2px 8px rgba(92, 61, 46, 0.1));
+    }
+    .feature-ruphus.pos-br { bottom: -30px; right: -40px; }
+    .feature-ruphus.pos-bl { bottom: -30px; left: -40px; }
+    .feature-ruphus.pos-tr { top: -30px; right: -40px; }
+    .feature-ruphus.pos-tl { top: -20px; left: -40px; }
+    .feature-text { flex: 1; }
+    .feature-tag {
+      display: inline-block;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      background: rgba(176, 117, 64, 0.08);
+      padding: 4px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .feature-text h3 {
+      font-family: var(--font-serif);
+      font-size: clamp(24px, 3vw, 30px);
+      font-weight: 600;
+      margin-bottom: 12px;
+      line-height: 1.25;
+    }
+    .feature-text p {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      max-width: 400px;
+    }
+
+    /* ── Testimonials ── */
+    .testimonials-section {
+      padding: 100px 32px;
+      background: linear-gradient(180deg, transparent 0%, rgba(255, 248, 240, 0.5) 20%, rgba(255, 248, 240, 0.5) 80%, transparent 100%);
+    }
+    .testimonials-section .section-label {
+      text-align: center;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .testimonials-section .section-title {
+      text-align: center;
+      font-family: var(--font-serif);
+      font-size: clamp(28px, 4vw, 38px);
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 56px;
+    }
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .testimonial {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+    .testimonial-quote {
+      font-family: var(--font-serif);
+      font-size: 16px;
+      font-style: italic;
+      line-height: 1.55;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .testimonial-author {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* ── Final CTA ── */
+    .final-cta {
+      padding: 100px 32px 120px;
+      text-align: center;
+    }
+    .final-cta .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    .final-app-icon {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      box-shadow: 0 4px 20px rgba(92, 61, 46, 0.12);
+    }
+    .final-cta h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(28px, 4vw, 38px);
+      font-weight: 600;
+    }
+    .final-cta p {
+      font-size: 16px;
+      color: var(--text-muted);
+      max-width: 400px;
+    }
+    .final-cta .hero-cta { margin-top: 0; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 32px;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+    footer p {
+      font-size: 13px;
+      color: var(--text-light);
+    }
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    footer a:hover { color: var(--accent); }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Scroll Animations ── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .fade-up.delay-1 { transition-delay: 0.1s; }
+    .fade-up.delay-2 { transition-delay: 0.2s; }
+    .fade-up.delay-3 { transition-delay: 0.3s; }
+
+    /* Hero entrance */
+    .hero-inner > * {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: heroIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    .hero-inner > *:nth-child(1) { animation-delay: 0.1s; }
+    .hero-inner > *:nth-child(2) { animation-delay: 0.25s; }
+    .hero-inner > *:nth-child(3) { animation-delay: 0.4s; }
+    .hero-inner > *:nth-child(4) { animation-delay: 0.5s; }
+    .hero-inner > *:nth-child(5) { animation-delay: 0.6s; }
+    .hero-inner > *:nth-child(6) { animation-delay: 0.7s; }
+
+    @keyframes heroIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Gentle float for hero illustration — chained after heroIn */
+    @keyframes gentleFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .hero-illustration {
+      animation: heroIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards,
+                 gentleFloat 6s ease-in-out 1.5s infinite;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .nav { padding: 12px 20px; }
+      .hero { padding: 100px 24px 60px; min-height: auto; padding-top: 120px; }
+      .hero-wordmark { height: 36px; }
+      .hero-illustration { width: 260px; }
+      .hero-sub { font-size: 16px; }
+
+      .mascot-section { padding: 64px 24px; }
+      .mascot-img { width: 220px; }
+
+      .features-section { padding: 40px 24px 64px; }
+      .feature-row, .feature-row.reverse {
+        flex-direction: column;
+        gap: 32px;
+        text-align: center;
+        margin-bottom: 56px;
+      }
+      .feature-visual { flex: 0 0 auto; }
+      .feature-screenshot { width: 200px; }
+      .feature-ruphus { width: 90px; }
+      .feature-text p { max-width: 100%; margin: 0 auto; }
+
+      .testimonials-section { padding: 64px 24px; }
+      .testimonials-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .final-cta { padding: 64px 24px 80px; }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 36px; }
+      .hero-illustration { width: 220px; }
+      .hero-cta { font-size: 15px; padding: 12px 24px; }
+      .feature-screenshot { width: 180px; }
+      .feature-ruphus.pos-br, .feature-ruphus.pos-bl,
+      .feature-ruphus.pos-tr, .feature-ruphus.pos-tl {
+        width: 75px;
+        right: -15px;
+        left: auto;
+      }
+      .feature-ruphus.pos-bl, .feature-ruphus.pos-tl {
+        left: -15px;
+        right: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav" id="nav">
+    <img src="/images/wordmark@2x.png" alt="2manybeans" class="nav-logo">
+    <a href="#download" class="nav-cta">Download</a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <img src="/images/wordmark@2x.png" alt="2manybeans" class="hero-wordmark">
+      <img src="/images/onboarding-welcome.webp" alt="Professor Ruphus in his coffee studio" class="hero-illustration">
+      <h1>Brew coffee you're proud of</h1>
+      <p class="hero-sub">Your AI coffee coach. Scan your beans, track freshness, and learn to taste like a pro.</p>
+      <a href="#download" class="hero-cta">
+        <svg viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 176 4 244.8c0 35.3 12.7 72.7 38.1 111.9 17 26.3 39.6 55.8 69.2 55.3 27-.5 37.3-17.4 70.1-17.4 32.2 0 41.3 17.4 69.8 16.9 30.4-.5 49.8-26.2 66.6-52.6 14.2-22.3 19.6-33 29.8-58.4-78.5-29.8-91.1-141.1-.9-183.9zM248.7 56.5c24-29.1 21.3-55.6 20.5-64.5-20.7 1.3-44.7 14.6-58.5 31.3-15.1 18.3-24 40.6-22.2 65.5 22.4 1.7 45.5-12.6 60.2-32.3z"/></svg>
+        Download for iOS
+      </a>
+      <p class="hero-badge">Free to try. No credit card required.</p>
+    </div>
+  </section>
+
+  <!-- Meet Ruphus -->
+  <section class="mascot-section fade-up">
+    <div class="container">
+      <img src="/images/ruphus-animations/nobg/ruphus-presenting.png" alt="Professor Ruphus" class="mascot-img">
+      <h2>Meet Professor Ruphus</h2>
+      <div class="mascot-bubble">
+        "I'm Professor Ruphus. Give me a minute to learn how you brew, and I'll take good care of you."
+      </div>
+      <p style="color: var(--text-muted); font-size: 16px; max-width: 460px;">
+        Your personal coffee coach who learns your palate, tracks your beans, and helps you brew better every single cup.
+      </p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features-section">
+    <div class="container">
+      <p class="section-label fade-up">What it does</p>
+      <h2 class="section-title fade-up">Everything a serious brewer needs</h2>
+
+      <!-- Scan -->
+      <div class="feature-row fade-up">
+        <div class="feature-visual">
+          <img src="/images/screenshots/R10-ScanDemo.jpg" alt="Bean scanning demo" class="feature-screenshot">
+          <img src="/images/ruphus-animations/nobg/ruphus-magnifying-glass.png" alt="Ruphus investigating" class="feature-ruphus pos-br">
+        </div>
+        <div class="feature-text">
+          <span class="feature-tag">Scan</span>
+          <h3>Snap a bag, know everything</h3>
+          <p>Point your camera at any coffee bag. Ruphus reads the label and researches the roaster, origin, altitude, process, and tasting notes, so you don't have to type a thing.</p>
+        </div>
+      </div>
+
+      <!-- Taste -->
+      <div class="feature-row reverse fade-up">
+        <div class="feature-visual">
+          <img src="/images/screenshots/R11-ValueDelivery.jpg" alt="Palate profile spider chart" class="feature-screenshot">
+          <img src="/images/ruphus-animations/nobg/ruphus-cupping.png" alt="Ruphus tasting" class="feature-ruphus pos-bl">
+        </div>
+        <div class="feature-text">
+          <span class="feature-tag">Taste</span>
+          <h3>Build your palate, step by step</h3>
+          <p>Guided tasting sessions walk you through smell, sip, acidity, sweetness, body, and finish. No vague questions. Just clear prompts and a flavor profile that grows with you.</p>
+        </div>
+      </div>
+
+      <!-- Track -->
+      <div class="feature-row fade-up">
+        <div class="feature-visual">
+          <img src="/images/screenshots/R01-Welcome.jpg" alt="Coffee rotation tracking" class="feature-screenshot">
+          <img src="/images/ruphus-animations/nobg/ruphus-writing-notes.png" alt="Ruphus tracking" class="feature-ruphus pos-br">
+        </div>
+        <div class="feature-text">
+          <span class="feature-tag">Track</span>
+          <h3>Never waste a good bag</h3>
+          <p>Peak freshness windows, jar slot management, and real-time inventory. Ruphus watches the clock on every bag so you always drink your beans at their best.</p>
+        </div>
+      </div>
+
+      <!-- Learn -->
+      <div class="feature-row reverse fade-up">
+        <div class="feature-visual">
+          <img src="/images/screenshots/R05-PalateRound.jpg" alt="Palate learning quiz" class="feature-screenshot">
+          <img src="/images/ruphus-animations/nobg/ruphus-reading-book.png" alt="Ruphus studying" class="feature-ruphus pos-bl">
+        </div>
+        <div class="feature-text">
+          <span class="feature-tag">Learn</span>
+          <h3>From curious to confident</h3>
+          <p>Personalized lessons on origins, processing, and brew technique. Ruphus researches your specific beans and teaches you what makes them special.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="testimonials-section">
+    <div class="container">
+      <p class="section-label fade-up">From brewers like you</p>
+      <h2 class="section-title fade-up">Real people, real cups</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial fade-up">
+          <p class="testimonial-quote">"I was dialing in my V60 by vibes. Ruphus walked me through grind, dose, and pour, and every cup since has tasted like the last good one."</p>
+          <p class="testimonial-author">Dan R.</p>
+        </div>
+        <div class="testimonial fade-up delay-1">
+          <p class="testimonial-quote">"Two weeks in and I'm hitting the same brew every morning. I didn't realize how much I was flying blind before."</p>
+          <p class="testimonial-author">Maya K.</p>
+        </div>
+        <div class="testimonial fade-up delay-2">
+          <p class="testimonial-quote">"Peak window notifications are quietly the killer feature. I drink my beans at their best now, every time."</p>
+          <p class="testimonial-author">Jess L.</p>
+        </div>
+        <div class="testimonial fade-up delay-3">
+          <p class="testimonial-quote">"2manybeans caught a bag sliding past peak before I did. It saved a $24 Gesha from going stale."</p>
+          <p class="testimonial-author">Sam T.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="final-cta" id="download">
+    <div class="container fade-up">
+      <img src="/apple-touch-icon.png" alt="2manybeans app icon" class="final-app-icon">
+      <h2>Ready to brew better?</h2>
+      <p>Download 2manybeans and let Professor Ruphus show you what your coffee can really taste like.</p>
+      <a href="#download" class="hero-cta">
+        <svg viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:20px;fill:white"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 176 4 244.8c0 35.3 12.7 72.7 38.1 111.9 17 26.3 39.6 55.8 69.2 55.3 27-.5 37.3-17.4 70.1-17.4 32.2 0 41.3 17.4 69.8 16.9 30.4-.5 49.8-26.2 66.6-52.6 14.2-22.3 19.6-33 29.8-58.4-78.5-29.8-91.1-141.1-.9-183.9zM248.7 56.5c24-29.1 21.3-55.6 20.5-64.5-20.7 1.3-44.7 14.6-58.5 31.3-15.1 18.3-24 40.6-22.2 65.5 22.4 1.7 45.5-12.6 60.2-32.3z"/></svg>
+        Download for iOS
+      </a>
+      <p class="hero-badge">Free to try. No credit card required.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-links">
+      <a href="/privacy-policy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/support.html">Support</a>
+    </div>
+    <p>2026 Super X LLC. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Nav scroll state
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 60);
+    }, { passive: true });
+
+    // Fade-up on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
