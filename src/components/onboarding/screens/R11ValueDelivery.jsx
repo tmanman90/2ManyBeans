@@ -1,18 +1,7 @@
-import { C, fonts, radius } from '../../../styles/theme';
-import { OnboardingScreenShell } from './OnboardingScreenShell';
+import { C, fonts } from '../../../styles/theme';
 import { useOnboarding } from '../OnboardingContext';
 import { OnboardingPalateChart } from '../OnboardingPalateChart';
-import { RuphusSpeechBubble } from '../RuphusSpeechBubble';
-
-// R11 — value delivery. This is the emotional apex of the flow:
-// user sees the palate chart we computed from R5, reads Ruphus's warm
-// mentor letter templated from their r2+r3 answers, then taps a
-// single clear CTA to start scanning.
-//
-// The CTA label and the action both branch on cameraPermission. If
-// denied/unavailable, we switch from "Scan my first bag" → "Add my
-// first bag" and persist postCompleteAction accordingly — that gets
-// read by App.jsx on mount after onboarding completes.
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const GOAL_INTRO = {
   v60: "You're a V60 brewer who cares about every pour.",
@@ -33,9 +22,6 @@ const PAIN_BODY = {
     "I'll push you — origin, grind size, recipe tweaks, the whole thing. You'll get there.",
 };
 
-// Convert the {sweetness, acidity, body, clean_funky, fruit_nutty}
-// chart into a short "your palate at a glance" line. Pick the two
-// strongest axes and mention them by name.
 function palateOneLiner(chart) {
   if (!chart || typeof chart !== 'object') return '';
   const axes = [
@@ -63,65 +49,85 @@ export default function R11ValueDelivery() {
   const ctaLabel = canScan ? 'Scan my first bag' : 'Add my first bag';
 
   return (
-    <OnboardingScreenShell
-      title="Your palate, in five axes."
-      primaryCta={{
-        label: ctaLabel,
-        onClick: () => {
-          dispatch({
-            type: 'ADVANCE',
-            next: 'r12',
-            answersPatch: {
-              postCompleteAction: canScan ? 'scan' : 'manual_add',
-            },
-          });
-        },
-      }}
-    >
-      {/* Chart — dominates the upper half */}
-      <div style={{ marginTop: 4, marginBottom: 18 }}>
-        <OnboardingPalateChart chart={answers?.palateChart} size={260} />
-      </div>
+    <div style={{
+      width: '100%',
+      minHeight: '100dvh',
+      maxHeight: '100dvh',
+      background: onboardingBg,
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: fonts.body,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <OnboardingTopBar step="R11 · YOUR PALATE" overlay />
 
-      {snapshot && (
+      <MascotStage src="/images/ruphus-animations/ruphus-cupping.mp4" height={410} />
+
+      <div style={{
+        flex: 1,
+        padding: '4px 24px 8px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        minHeight: 0,
+        overflowY: 'auto',
+      }}>
         <div style={{
-          textAlign: 'center',
           fontFamily: fonts.heading,
-          fontSize: 16,
+          fontSize: 26, lineHeight: 1.15,
           color: C.text,
-          marginBottom: 18,
-          lineHeight: 1.3,
+          textAlign: 'center',
         }}>
-          {snapshot}
+          Your palate, in five axes.
         </div>
-      )}
 
-      {/* Ruphus letter — warm mentor, templated from r2+r3 */}
-      <div style={{ marginBottom: 14 }}>
-        <RuphusSpeechBubble>
-          {intro}{' '}{body}{' '}
-          Ready to start? Your first bag is one tap away.
-        </RuphusSpeechBubble>
+        <div style={{ marginTop: 4 }}>
+          <OnboardingPalateChart chart={answers?.palateChart} size={220} />
+        </div>
+
+        {snapshot && (
+          <div style={{
+            textAlign: 'center',
+            fontFamily: fonts.heading,
+            fontSize: 16,
+            color: C.text,
+            lineHeight: 1.3,
+            marginTop: 4,
+          }}>
+            {snapshot}
+          </div>
+        )}
+
+        <NoteBubble>
+          {intro} {body} Ready to start? Your first bag is one tap away.
+        </NoteBubble>
+
+        {!canScan && (
+          <div style={{
+            fontSize: 12,
+            color: C.textMuted,
+            textAlign: 'center',
+            padding: '8px 12px',
+            background: C.amberBg,
+            border: '1px solid #E8D5A0',
+            borderRadius: 8,
+            lineHeight: 1.4,
+          }}>
+            Camera's off for now — I'll help you add bags by hand. You can flip
+            it back on anytime from Settings.
+          </div>
+        )}
       </div>
 
-      {/* Tiny footer note — manages expectations if the user declined
-          the camera, so the CTA label doesn't feel jarring. */}
-      {!canScan && (
-        <div style={{
-          fontSize: 12,
-          color: C.textMuted,
-          textAlign: 'center',
-          padding: '8px 12px',
-          background: C.amberBg,
-          border: `1px solid #E8D5A0`,
-          borderRadius: radius.sm,
-          lineHeight: 1.4,
-          fontFamily: fonts.body,
-        }}>
-          Camera's off for now — I'll help you add bags by hand. You can flip
-          it back on anytime from Settings.
-        </div>
-      )}
-    </OnboardingScreenShell>
+      <OnboardingCtaBar
+        label={ctaLabel}
+        onClick={() => dispatch({
+          type: 'ADVANCE',
+          next: 'r12',
+          answersPatch: { postCompleteAction: canScan ? 'scan' : 'manual_add' },
+        })}
+      />
+    </div>
   );
 }

@@ -78,10 +78,13 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     }
   };
 
+  const [celebratingBean, setCelebratingBean] = useState(null);
+
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
     if (hasTasting) {
       onFinishBean(bean.id);
+      setCelebratingBean(bean);
     } else {
       setFinishPrompt(bean);
     }
@@ -173,7 +176,15 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       }}>
       {beans.length === 0 && (
         <div style={{ ...journalCard, textAlign: 'center', padding: 32 }}>
-          <img src="/images/empty-rotation.webp" alt="Empty jar" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 16, marginBottom: 16 }} />
+          <video
+            src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+            autoPlay muted loop playsInline
+            style={{
+              width: 200, height: 200, objectFit: 'contain', marginBottom: 8,
+              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+            }}
+          />
           <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>Your rotation is empty</div>
           <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Add your first coffee bag to get started</div>
           <Btn variant="primary" onClick={() => onOpenBean(null, 1)}><Plus size={16} /> Add Bean</Btn>
@@ -379,6 +390,27 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onUpdateTasting={updateTasting}
         beans={beans}
       />
+      <Modal open={!!celebratingBean} onClose={() => setCelebratingBean(null)} title="" centered>
+        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+          <video
+            src="/images/ruphus-animations/ruphus-fist-pump.mp4"
+            autoPlay muted playsInline
+            onPlay={() => setTimeout(() => { setCelebratingBean(null); setToast('Bag finished!'); }, 2200)}
+            style={{
+              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 12px',
+              display: 'block',
+              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+            }}
+          />
+          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 4 }}>
+            Bag finished!
+          </div>
+          <div style={{ fontSize: 14, color: C.textMuted }}>
+            On to the next one, brewer.
+          </div>
+        </div>
+      </Modal>
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
       <QuickRecipeFlow
         open={quickRecipeOpen}

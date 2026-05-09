@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from 'react';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
 
 // Default preferences for new users and existing user migration
@@ -16,6 +16,42 @@ const DEFAULT_PREFERENCES = {
 // --- Context (co-located with hook) ---
 
 const UserPreferencesContext = createContext(null);
+
+function normalizeDisplayName(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ').slice(0, 100);
+}
+
+function stashedDisplayName(raw) {
+  if (!raw || typeof raw !== 'object') return '';
+  return normalizeDisplayName(
+    raw.displayName
+    || raw.name
+    || raw.fullName
+    || [raw.givenName, raw.familyName].filter(Boolean).join(' ')
+  );
+}
+
+function readPendingProviderDisplayName() {
+  try {
+    for (const key of ['google_pending_name', 'apple_pending_name']) {
+      const displayName = stashedDisplayName(JSON.parse(localStorage.getItem(key) || 'null'));
+      if (displayName) return displayName;
+    }
+  } catch {
+    // Ignore malformed localStorage; auth.currentUser remains the primary source.
+  }
+  return '';
+}
+
+function clearPendingProviderDisplayName() {
+  try {
+    localStorage.removeItem('google_pending_name');
+    localStorage.removeItem('apple_pending_name');
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
 
 export const UserPreferencesProvider = ({ value, children }) => (
   <UserPreferencesContext value={value}>
@@ -35,6 +71,7 @@ export const useUserProfile = (uid) => {
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const nameHealAttemptedRef = useRef(false);
 
   useEffect(() => {
     if (!uid) {
@@ -121,7 +158,7 @@ export const useUserProfile = (uid) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
     const profileData = {
-      displayName: userData.displayName || '',
+      displayName: normalizeDisplayName(userData.displayName) || readPendingProviderDisplayName(),
       email: userData.email || null,
       photoURL: userData.photoURL || null,
       signUpProvider: userData.signUpProvider || 'unknown',
@@ -143,6 +180,7 @@ export const useUserProfile = (uid) => {
       profileData.onboardingCompletedAt = serverTimestamp();
     }
     await setDoc(profileRef, profileData);
+    clearPendingProviderDisplayName();
     // Optimistic local update + cache
     const localProfile = { id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() };
     setProfile(localProfile);
@@ -154,15 +192,7 @@ export const useUserProfile = (uid) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
 
-    // Check for stashed Apple name
-    let displayName = user.displayName || '';
-    try {
-      const stashed = JSON.parse(localStorage.getItem('apple_pending_name') || 'null');
-      if (stashed && !displayName) {
-        displayName = `${stashed.givenName} ${stashed.familyName}`.trim();
-        localStorage.removeItem('apple_pending_name');
-      }
-    } catch { /* ignore */ }
+    const displayName = normalizeDisplayName(user.displayName) || readPendingProviderDisplayName();
 
     const profileData = {
       displayName,
@@ -178,6 +208,7 @@ export const useUserProfile = (uid) => {
       preferences: DEFAULT_PREFERENCES,
     };
     await setDoc(profileRef, profileData, { merge: true });
+    clearPendingProviderDisplayName();
     const localProfile = { id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() };
     setProfile(localProfile);
     cacheWrite(`profile_${uid}`, localProfile);
@@ -271,6 +302,30 @@ export const useUserProfile = (uid) => {
     });
   }, [uid, profile]);
 
+  // If an existing profile doc is missing the display name, fill it from the
+  // trusted auth/provider profile instead of leaving the UI on "Coffee Lover".
+  useEffect(() => {
+    if (!uid || !profile || normalizeDisplayName(profile.displayName)) return;
+    if (nameHealAttemptedRef.current) return;
+    const displayName = normalizeDisplayName(auth.currentUser?.displayName) || readPendingProviderDisplayName();
+    if (!displayName) return;
+
+    nameHealAttemptedRef.current = true;
+    const profileRef = doc(db, 'users', uid);
+    updateDoc(profileRef, { displayName }).then(() => {
+      clearPendingProviderDisplayName();
+      setProfile(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev, displayName };
+        cacheWrite(`profile_${uid}`, updated);
+        return updated;
+      });
+    }).catch(err => {
+      nameHealAttemptedRef.current = false;
+      console.warn('[Profile] Failed to backfill displayName:', err);
+    });
+  }, [uid, profile]);
+
   // NOTE: the previous `resetOnboarding` helper was removed because it
   // wrote `onboardingComplete: false` directly to Firestore, which bled
   // across devices and environments. A dev toggling the Replay button
@@ -288,18 +343,13 @@ export const useUserProfile = (uid) => {
     }
   }, [profile?.preferences?.brewMethod, uid]);
 
-  // Stabilize preferences reference: only change when values actually differ.
-  const prevPrefsRef = useRef(null);
+  // Normalize legacy preferences for current-session reads while the deferred
+  // Firestore migration above catches the stored value up.
   const preferences = useMemo(() => {
     const raw = profile?.preferences || DEFAULT_PREFERENCES;
-    const next = raw.brewMethod === 'handbrew'
+    return raw.brewMethod === 'handbrew'
       ? { ...raw, brewMethod: 'v60' }
       : raw;
-    if (prevPrefsRef.current && JSON.stringify(prevPrefsRef.current) === JSON.stringify(next)) {
-      return prevPrefsRef.current;
-    }
-    prevPrefsRef.current = next;
-    return next;
   }, [profile?.preferences]);
 
   const isOnboarded = profile?.onboardingComplete === true;

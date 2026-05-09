@@ -30,45 +30,6 @@ const FAMILY_GRIND_BANDS = {
 // Fallback family for beans that don't match any specific family
 const DEFAULT_FAMILY = 'generic-washed';
 
-// Structured grind data keyed by reference profile number (matches beanResearch.js REFERENCE_PROFILE_INDEX)
-// Profiles 11, 25, 26 have no grind data in reference → grind: null
-const REFERENCE_GRIND_DATA = {
-  1:  { name: 'Kiss the Hippo Peru El Morito', origin: 'Peru', process: 'Washed', grind: { ssMin: 3, ssMax: 4, batchMin: 5, batchMax: 7 } },
-  2:  { name: 'Passenger Colombia Divino Niño', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5, ssMax: 6.1, batchMin: 6.2, batchMax: 8 } },
-  3:  { name: 'Coffee Collective Kenya Kieni AB', origin: 'Kenya', process: 'Washed', grind: { ssMin: 3.2, ssMax: 4.2, batchMin: 5.1, batchMax: 7 } },
-  4:  { name: 'Counter Culture Cueva de los Llanos', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5.2, ssMax: 6.2, batchMin: 6.1, batchMax: 7.1 } },
-  5:  { name: 'Sq Mile Ethiopia Telila Kecho', origin: 'Ethiopia', process: 'Washed', grind: { ssMin: 5.1, ssMax: 6, batchMin: 7, batchMax: 8.2 } },
-  6:  { name: 'Sey Burundi Heza', origin: 'Burundi', process: 'Washed', grind: { ssMin: 3, ssMax: 3.2, batchMin: 5.2, batchMax: 7.2 } },
-  7:  { name: 'Wonderstate Ethiopia Danche', origin: 'Ethiopia', process: 'Washed', grind: { ssMin: 3.2, ssMax: 3.2, batchMin: 4.2, batchMax: 4.2 } },
-  8:  { name: 'Flower Child El Nevado Decaf', origin: 'Colombia', process: 'Washed', grind: { ssMin: 2, ssMax: 3, batchMin: 4, batchMax: 6 } },
-  9:  { name: 'Heart Colombia Diomed Montano', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5.2, ssMax: 6.2, batchMin: 6.2, batchMax: 7.2 } },
-  10: { name: 'Wendelboe Kenya Kapsokiso', origin: 'Kenya', process: 'Washed', grind: { ssMin: 3, ssMax: 3, batchMin: 9, batchMax: 9 } },
-  11: { name: 'La Cabra Kiamugumo', origin: 'Kenya', process: 'Washed', grind: null },
-  12: { name: 'April Ethiopia Regessa', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 3, ssMax: 4, batchMin: 6.2, batchMax: 8.2 } },
-  13: { name: 'Brandywine Rwanda Cyesha Natural', origin: 'Rwanda', process: 'Natural', grind: { ssMin: 3, ssMax: 4.2, batchMin: 8, batchMax: 10 } },
-  14: { name: 'Camber Ethiopia Tadesse Yonka', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 3.1, ssMax: 4.1, batchMin: 5, batchMax: 6 } },
-  15: { name: 'Camber Ethiopia Buliye', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 5, ssMax: 5, batchMin: 7, batchMax: 7 } },
-  16: { name: 'Sq Mile Ethiopia Shoondhisa', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 5.1, ssMax: 6, batchMin: 7, batchMax: 8.2 } },
-  17: { name: 'Equator Decaf Rwanda Nyamyumba', origin: 'Rwanda', process: 'Natural', grind: { ssMin: 3.1, ssMax: 4.1, batchMin: 6, batchMax: 7 } },
-  18: { name: 'Brandywine Felloween IV', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 5, ssMax: 5, batchMin: 6, batchMax: 6 } },
-  19: { name: 'Santa Felisa by Bean & Bean', origin: 'Guatemala', process: 'Natural', grind: { ssMin: 4.2, ssMax: 4.2, batchMin: 7.2, batchMax: 7.2 } },
-  20: { name: 'Proud Mary Ethiopia Yirg Adado', origin: 'Ethiopia', process: 'Natural', grind: { ssMin: 3, ssMax: 4, batchMin: 6, batchMax: 7 } },
-  21: { name: 'Equator Thailand Mae Chedi', origin: 'Thailand', process: 'Anaerobic Natural', grind: { ssMin: 4, ssMax: 5, batchMin: 5, batchMax: 7 } },
-  22: { name: 'Special Guests Andres Cardona Purple Honey', origin: 'Colombia', process: 'Natural Honey', grind: { ssMin: 5, ssMax: 6, batchMin: 6, batchMax: 7.2 } },
-  23: { name: 'Sightglass Guatemala Cuevitas', origin: 'Guatemala', process: 'Anaerobic Washed', grind: { ssMin: 3, ssMax: 4, batchMin: 6, batchMax: 7 } },
-  24: { name: 'Black & White Fruit Cake', origin: 'Costa Rica', process: 'Anaerobic', grind: { ssMin: 3.2, ssMax: 3.2, batchMin: 4.2, batchMax: 4.2 } },
-  25: { name: 'Onyx Honey Advent', origin: 'Various', process: 'Honey', grind: null },
-  26: { name: 'Verve Miel de Flores', origin: 'Honduras', process: 'Honey', grind: null },
-  27: { name: 'Loquat Costa Rica Finca Inés Geisha', origin: 'Costa Rica', process: 'Semi-Washed', grind: { ssMin: 4.1, ssMax: 5.1, batchMin: 4.1, batchMax: 5.1 } },
-  28: { name: 'Loquat Costa Rica San Roque', origin: 'Costa Rica', process: 'Semi-Washed', grind: { ssMin: 3.2, ssMax: 4.2, batchMin: 3.2, batchMax: 4.2 } },
-  29: { name: 'Asprotimana Colombia Huila', origin: 'Colombia', process: 'Washed', grind: { ssMin: 5, ssMax: 5.2, batchMin: 6, batchMax: 8 } },
-  30: { name: 'Linea Guatemala La Esperanza', origin: 'Guatemala', process: 'Washed', grind: { ssMin: 2.1, ssMax: 3.1, batchMin: 5, batchMax: 7 } },
-  31: { name: 'Olympia Amparo Pajoy', origin: 'Colombia', process: 'Washed', grind: { ssMin: 3, ssMax: 4, batchMin: 5.1, batchMax: 8 } },
-  32: { name: 'Counter Culture Intango Dark', origin: 'Rwanda', process: 'Washed', grind: { ssMin: 6.1, ssMax: 7.1, batchMin: 7, batchMax: 8.1 } },
-  33: { name: 'Methodical Oscuro Dark', origin: 'Brazil', process: 'Natural', grind: { ssMin: 8, ssMax: 9, batchMin: 8, batchMax: 9.2 } },
-  34: { name: 'KOS Armando Leivas Dark', origin: 'Guatemala', process: 'Washed', grind: { ssMin: 5, ssMax: 6, batchMin: 6, batchMax: 7.2 } },
-};
-
 // Condensed reference profile index for research call (name + key attributes only, no brew params)
 // REFERENCE_PROFILE_INDEX moved to beanResearch.js
 
@@ -441,11 +402,6 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
 // --- Deterministic enforcement helpers ---
 
-function pickUpperMiddle(min, max) {
-  const target = min + (max - min) * 0.65;
-  return nearestOdeStep(target, true);
-}
-
 function snapToHalf(value) {
   return Math.round(value * 2) / 2;
 }
@@ -461,42 +417,6 @@ function isWashed(bean) {
 
 function isKenyaWashed(bean) {
   return (bean.origin || '').toLowerCase().includes('kenya') && isWashed(bean);
-}
-
-function chooseReferenceForBean(bean, research) {
-  // Try research.closestReferenceProfiles first
-  if (research?.closestReferenceProfiles) {
-    for (const ref of research.closestReferenceProfiles) {
-      const entry = REFERENCE_GRIND_DATA[ref.number];
-      if (entry?.grind) return entry;
-    }
-  }
-
-  // Fallback: heuristic match on origin + process
-  const beanOrigin = (bean.origin || '').toLowerCase();
-  const beanProcess = (bean.process || '').toLowerCase();
-
-  // First try: match both origin and process type
-  for (const key of Object.keys(REFERENCE_GRIND_DATA)) {
-    const ref = REFERENCE_GRIND_DATA[key];
-    if (!ref.grind) continue;
-    const refOrigin = ref.origin.toLowerCase();
-    const refProcess = ref.process.toLowerCase();
-    if (beanOrigin.includes(refOrigin) && beanProcess.includes(refProcess)) {
-      return ref;
-    }
-  }
-
-  // Second try: match origin only
-  for (const key of Object.keys(REFERENCE_GRIND_DATA)) {
-    const ref = REFERENCE_GRIND_DATA[key];
-    if (!ref.grind) continue;
-    if (beanOrigin.includes(ref.origin.toLowerCase())) {
-      return ref;
-    }
-  }
-
-  return null;
 }
 
 // --- Enforcement functions (run in order: schema → grind → clarity) ---
@@ -683,8 +603,8 @@ export async function generateAidenRecipe(bean, research = null) {
 // Build the Fellow profile title from the current bean state.
 // Fellow caps profile titles at 50 chars (see api/aiden.js validateProfile).
 // Format: "#{jarSlot} {origin} {name} - {roaster}".
-// With label: "#{jarSlot} {label} {origin} {name} - {roaster}" (e.g. "#1 Iced Elora").
-// If too long, drop fields in reverse priority: roaster → origin → (truncate name).
+// With label: "#{jarSlot} {label} {origin} {name} - {roaster}" (e.g. "#1 (iced) Elora").
+// If too long, truncate name first → drop roaster → drop origin.
 // Duplicate-title collisions are handled by api/aiden.js's cleanup-and-retry path.
 export function buildAidenTitle(bean, label = '') {
   const MAX = 50;
@@ -696,14 +616,22 @@ export function buildAidenTitle(bean, label = '') {
   const origin = (bean?.origin || '').trim();
   const roaster = (bean?.roaster || '').trim();
 
-  const withAll = `${origin ? origin + ' ' : ''}${name}${roaster ? ' - ' + roaster : ''}`.trim();
-  if (withAll.length <= budget) return `${prefix}${withAll}`;
+  const originPart = origin ? origin + ' ' : '';
+  const roasterPart = roaster ? ' - ' + roaster : '';
 
-  const withoutRoaster = `${origin ? origin + ' ' : ''}${name}`.trim();
-  if (withoutRoaster.length <= budget) return `${prefix}${withoutRoaster}`;
+  const full = `${originPart}${name}${roasterPart}`.trim();
+  if (full.length <= budget) return `${prefix}${full}`;
 
-  const withoutOrigin = name;
-  if (withoutOrigin.length <= budget) return `${prefix}${withoutOrigin}`;
+  const nameBudget = budget - originPart.length - roasterPart.length;
+  if (nameBudget > 0) {
+    return `${prefix}${originPart}${name.slice(0, nameBudget).trim()}${roasterPart}`.trim();
+  }
+
+  const nameBudgetNoRoaster = budget - originPart.length;
+  if (nameBudgetNoRoaster > 0) {
+    const n = name.length <= nameBudgetNoRoaster ? name : name.slice(0, nameBudgetNoRoaster).trim();
+    return `${prefix}${originPart}${n}`.trim();
+  }
 
   return `${prefix}${name.slice(0, Math.max(0, budget)).trim()}`;
 }
@@ -711,12 +639,13 @@ export function buildAidenTitle(bean, label = '') {
 export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) {
   // Strip fields not in Fellow schema
   const {
-    grindRecommendation, generatedAt, title: _staleTitle,
-    icedDose, brewWaterMl, iceGrams, machineSuggestedDose, isIced: _isIced,
+    grindRecommendation, generatedAt: _generatedAt, title: _staleTitle,
+    icedDose: _icedDose, brewWaterMl: _brewWaterMl, iceGrams: _iceGrams,
+    machineSuggestedDose: _machineSuggestedDose, isIced: _isIced,
     ...profile
   } = recipe;
 
-  profile.title = bean ? buildAidenTitle(bean, isIced ? 'Iced' : '') : (recipe.title || '');
+  profile.title = bean ? buildAidenTitle(bean, isIced ? '(iced)' : '') : (recipe.title || '');
 
   const result = await fetchWithRetry({
     url: `${API_BASE}/api/aiden`,

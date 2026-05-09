@@ -85,7 +85,7 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
 // Sanitize user-controlled bean fields before prompt injection
 function sanitize(str, maxLen = 100) {
-  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'.,()\/]/g, '');
+  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'. ,()/]/g, '');
 }
 
 export function buildBeanDescription(bean) {

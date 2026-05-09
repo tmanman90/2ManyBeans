@@ -39,7 +39,7 @@ export function loadState(uid, { validSteps, onFailure } = {}) {
       return null;
     }
     return parsed;
-  } catch (err) {
+  } catch {
     if (onFailure) onFailure('corrupt_json');
     return null;
   }

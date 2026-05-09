@@ -1,19 +1,8 @@
 import { useState } from 'react';
 import { C, fonts } from '../../../styles/theme';
-import { OnboardingScreenShell } from './OnboardingScreenShell';
-import { RuphusSpeechBubble } from '../RuphusSpeechBubble';
 import { useOnboarding } from '../OnboardingContext';
 import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
-
-// R13b — the soft nudge after a paywall dismiss. Goal: convert some
-// "maybe later" users into day-1 activators by offering a single
-// scan-CTA. The Phase 1 finish() callback lives on the onboarding
-// context — here we just attach the postCompleteAction first, then
-// fire it.
-//
-// If the user granted the camera, the primary CTA scans a bag; if
-// they didn't, we show the manual-add variant (same postCompleteAction
-// enum, App.jsx handles the branch on the other side).
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 export default function R13bNudge() {
   const { finish, answers } = useOnboarding();
@@ -22,19 +11,12 @@ export default function R13bNudge() {
   const canScan = answers?.cameraPermission === 'granted';
   const primaryLabel = canScan ? "Yes, let's scan" : 'Add a bag manually';
 
-  // `finish` in OnboardingFlow writes the final atomic setDoc and
-  // mirrors marketingConsent to /emailList if set. It THROWS on
-  // failure so the caller can reset the busy state and re-offer the
-  // action — otherwise the user would be stranded on R13b with both
-  // buttons stuck in the spinner state.
   const handlePrimary = async () => {
     if (busy) return;
     setBusy(true);
     try {
       logOnboardingEvent('onboarding_nudge_accepted', {});
       await finish?.({ postCompleteAction: canScan ? 'scan' : 'manual_add' });
-      // On success the main app renders and this component unmounts,
-      // so there's no need to clear busy.
     } catch {
       setBusy(false);
     }
@@ -51,56 +33,54 @@ export default function R13bNudge() {
   };
 
   return (
-    <OnboardingScreenShell
-      title="One more tiny thing."
-      backDisabled
-      primaryCta={{
-        label: primaryLabel,
-        onClick: handlePrimary,
-        disabled: busy,
-      }}
-      secondaryCta={{
-        label: 'Maybe later',
-        onClick: handleMaybeLater,
-      }}
-    >
+    <div style={{
+      width: '100%',
+      minHeight: '100dvh',
+      maxHeight: '100dvh',
+      background: onboardingBg,
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: fonts.body,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <OnboardingTopBar step="R13b · ONE LAST THING" hideBack overlay />
+
+      <MascotStage src="/images/ruphus-animations/ruphus-waving.mp4" height={320} />
+
       <div style={{
+        flex: 1,
+        padding: '4px 24px 8px',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        marginTop: 8,
-        marginBottom: 16,
+        gap: 12,
+        minHeight: 0,
       }}>
-        <img
-          src="/images/professor-ruphus.webp"
-          alt="Professor Ruphus"
-          style={{
-            width: 120,
-            height: 120,
-            borderRadius: '50%',
-            border: `3px solid ${C.borderLight}`,
-            marginBottom: 18,
-          }}
-        />
+        <div style={{
+          fontFamily: fonts.title,
+          fontSize: 36, lineHeight: 1.0,
+          color: C.accent,
+          textAlign: 'center',
+          marginTop: -4,
+        }}>
+          One more tiny thing
+        </div>
+
+        <NoteBubble style={{ marginTop: 4 }}>
+          No worries, brewer. Your first scan is on me — want to try it now?
+          It's the fastest way to see how this all fits together.
+        </NoteBubble>
       </div>
 
-      <RuphusSpeechBubble variant="large">
-        No worries, brewer. Your first scan is on me — want to try it now?
-        It's the fastest way to see how this all fits together.
-      </RuphusSpeechBubble>
-
-      {!canScan && (
-        <div style={{
-          marginTop: 14,
-          fontSize: 12,
-          color: C.textMuted,
-          textAlign: 'center',
-          fontFamily: fonts.body,
-          lineHeight: 1.4,
-        }}>
-          Camera's off — I'll walk you through adding a bag by hand.
-        </div>
-      )}
-    </OnboardingScreenShell>
+      <OnboardingCtaBar
+        label={primaryLabel}
+        onClick={handlePrimary}
+        disabled={busy}
+        secondary={{
+          label: 'Maybe later',
+          onClick: handleMaybeLater,
+        }}
+      />
+    </div>
   );
 }

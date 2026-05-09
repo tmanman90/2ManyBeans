@@ -20,6 +20,7 @@ import { fetchWithRetry } from '../lib/fetchWithRetry';
 import { API_BASE } from '../lib/apiBase';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { redeemCode } from '../lib/redeemCode';
+import { sanitizeUserText } from '../lib/sanitizeUserText';
 
 // Reason-code -> user copy for the inline redeem row. Unknown codes fall
 // back to a generic message. Kept here (consumer) instead of the helper
@@ -122,6 +123,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const { openPaywall } = usePaywall();
 
   const [toast, setToast] = useState(null);
+  const [editingDisplayName, setEditingDisplayName] = useState(false);
+  const [displayNameValue, setDisplayNameValue] = useState('');
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameValue, setUsernameValue] = useState('');
   const [canisterConfirm, setCanisterConfirm] = useState(null); // { newCount, overflowBeans }
@@ -350,6 +353,38 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const handleUsernameEdit = () => {
     setUsernameValue(profile?.username || '');
     setEditingUsername(true);
+  };
+
+  const handleDisplayNameEdit = () => {
+    setDisplayNameValue(profile?.displayName || '');
+    setEditingDisplayName(true);
+  };
+
+  const handleDisplayNameSave = async () => {
+    const cleaned = sanitizeUserText(displayNameValue);
+    if (!cleaned) {
+      setToast('Name cannot be empty');
+      return;
+    }
+    try {
+      await updateProfile({ displayName: cleaned });
+      if (profile?.marketingConsent && uid) {
+        const batch = writeBatch(db);
+        const emailRef = doc(db, 'emailList', uid);
+        batch.set(emailRef, {
+          email: profile?.email || '',
+          displayName: cleaned,
+          source: 'settings',
+        }, { merge: true });
+        await batch.commit();
+      }
+      haptic.light();
+      setToast('Name saved');
+      setEditingDisplayName(false);
+    } catch (err) {
+      console.error('[Settings] Name update failed:', err);
+      setToast('Failed to save, try again');
+    }
   };
 
   const handleUsernameSave = async () => {
@@ -602,6 +637,48 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted, marginTop: 2 }}>
                   {profile.email}
                 </div>
+              )}
+            </div>
+            <div style={separatorStyle} />
+            {/* Name row */}
+            <div style={rowStyle}>
+              <span style={rowLabelStyle}>Name</span>
+              {editingDisplayName ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={displayNameValue}
+                    onChange={e => setDisplayNameValue(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleDisplayNameSave()}
+                    maxLength={50}
+                    placeholder="Your name"
+                    autoFocus
+                    style={{
+                      fontFamily: fonts.body, fontSize: 16, color: C.text,
+                      background: C.bg, border: `1px solid ${C.border}`,
+                      borderRadius: 8, padding: '6px 10px', width: 150,
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={handleDisplayNameSave}
+                    style={{
+                      background: C.accent, color: '#fff', border: 'none',
+                      borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
+                      fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleDisplayNameEdit}
+                  style={{ ...rowValueStyle, background: 'none', border: 'none', cursor: 'pointer', padding: 0, minHeight: 44 }}
+                >
+                  <span>{profile?.displayName || 'Set name'}</span>
+                  <ChevronRight size={16} color={C.textLight} />
+                </button>
               )}
             </div>
             <div style={separatorStyle} />

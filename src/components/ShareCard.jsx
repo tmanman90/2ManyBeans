@@ -16,6 +16,7 @@ import { C, fonts } from '../styles/theme';
 
 const CARD_WIDTH = 540; // CSS px, scale:2 = 1080px output
 const CARD_HEIGHT = 540; // Fixed square for recipe card (matches 1:1 background image)
+const TASTING_CARD_HEIGHT = 572; // scale:2 = 1080x1144, matching current sparse tasting export
 const CARD_BG = C.bg;   // #FAF6F1 warm cream (tasting card)
 export const RECIPE_CARD_BG = '#2B5B4E'; // Dark green fallback matching chalkboard
 
@@ -44,18 +45,6 @@ const chalk = {
 
 // --- Shared layout pieces ---
 
-const cardStyle = {
-  width: CARD_WIDTH,
-  background: CARD_BG,
-  padding: 40,
-  boxSizing: 'border-box',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  color: C.text,
-  borderRadius: 20, // 40px at 2x
-};
-
 // Hidden container — absolutely positioned off-screen so it renders but isn't visible
 export const offScreenStyle = {
   position: 'fixed',
@@ -65,64 +54,6 @@ export const offScreenStyle = {
   pointerEvents: 'none',
   opacity: 1, // must be visible for capture
 };
-
-const BeanPhoto = ({ photoUrl }) => {
-  if (!photoUrl) return null;
-  return (
-    <div style={{
-      width: '100%',
-      height: 200,
-      borderRadius: 14,
-      overflow: 'hidden',
-      marginBottom: 20,
-      background: C.cream,
-    }}>
-      <img
-        src={photoUrl}
-        alt=""
-        crossOrigin="anonymous"
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-      />
-    </div>
-  );
-};
-
-const BeanInfo = ({ name, roaster, origin, process }) => (
-  <div style={{ textAlign: 'center', marginBottom: 16, width: '100%' }}>
-    <div style={{ ...type.beanName, color: C.text, lineHeight: 1.2, marginBottom: 6 }}>
-      {name}
-    </div>
-    <div style={{ ...type.secondary, color: C.textMuted, lineHeight: 1.4 }}>
-      {[roaster, origin, process].filter(Boolean).join(' \u00B7 ')}
-    </div>
-  </div>
-);
-
-const CardFooter = () => (
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 24,
-    paddingTop: 16,
-    borderTop: `1px solid ${C.borderLight}`,
-  }}>
-    <img
-      src="/images/professor-ruphus.webp"
-      alt=""
-      style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 8 }}
-    />
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ ...type.cardTitle, color: C.accent, fontSize: 22 }}>
-        2manybeans
-      </div>
-      <div style={{ ...type.watermark, color: C.textLight }}>
-        Your coffee journal
-      </div>
-    </div>
-  </div>
-);
 
 // Coffee bean SVG for star rating on cards (matches StarRating component)
 const CardBean = ({ filled, size = 18 }) => (
@@ -144,13 +75,72 @@ const CardBean = ({ filled, size = 18 }) => (
   </svg>
 );
 
-const CardStarRating = ({ value }) => (
-  <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 12 }}>
+const CardStarRating = ({ value, style }) => (
+  <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 12, ...style }}>
     {[1, 2, 3, 4, 5].map(n => (
       <CardBean key={n} filled={n <= value} size={22} />
     ))}
   </div>
 );
+
+const splitNoteList = (value) => String(value || '')
+  .split(/\s*(?:\/|,|·|\n)\s*/)
+  .map(item => item.trim())
+  .filter(Boolean);
+
+const truncateText = (value, max = 58) => {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trim()}…`;
+};
+
+const displayRating = (rating) => {
+  const numeric = Number(rating);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return Math.max(0, Math.min(5, Math.round(numeric)));
+};
+
+const formatTastingLine = ({ oneWord, notes, firstSip, bagNotes, rating }) => {
+  const explicit = [oneWord, notes, firstSip].find(value => String(value || '').trim());
+  if (explicit) return truncateText(explicit, 64);
+
+  const bagNoteTags = splitNoteList(bagNotes).slice(0, 3);
+  if (bagNoteTags.length) {
+    return truncateText(`${bagNoteTags.join(', ')}.`, 64);
+  }
+
+  const score = displayRating(rating);
+  return score > 0 ? `Logged as a ${score}-bean cup.` : 'A coffee worth remembering.';
+};
+
+const tastingDetailItems = (bean) => {
+  const details = [
+    ['Variety', bean?.variety],
+    ['Process', bean?.process],
+    ['Origin', bean?.origin],
+  ].filter(([, value]) => String(value || '').trim());
+
+  if (details.length >= 3) return details.slice(0, 3);
+
+  return [
+    ...details,
+    ['Roaster', bean?.roaster],
+    ['Notes', splitNoteList(bean?.bagNotes).slice(0, 2).join(' / ')],
+  ].filter(([, value]) => String(value || '').trim()).slice(0, 3);
+};
+
+const uniqueTags = (values) => {
+  const seen = new Set();
+  return values
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .filter(value => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
 
 // --- Recipe Share Card (Apothecary chalkboard background) ---
 
@@ -191,8 +181,8 @@ function FitTitle({ text, maxSize = 26, minSize = 14, maxLines = 2, style }) {
     <div ref={ref} style={{
       ...style,
       fontSize: size,
-      lineHeight: 1.15,
-      textAlign: 'center',
+      lineHeight: style?.lineHeight || 1.15,
+      textAlign: style?.textAlign || 'center',
       wordBreak: 'break-word',
       overflowWrap: 'anywhere',
       hyphens: 'auto',
@@ -352,50 +342,199 @@ RecipeShareCard.displayName = 'RecipeShareCard';
 
 export const TastingShareCard = forwardRef(({ bean, tasting }, ref) => {
   // Explicit allow-list: only safe display fields
-  const { name, roaster, origin, process, photoUrl } = bean || {};
-  const { rating, oneWord, aroma, acidity, body, finish, sweetness } = tasting || {};
+  const { name, roaster, origin, process, bagNotes } = bean || {};
+  const { rating, oneWord, aroma, acidity, body, finish, sweetness, notes, firstSip } = tasting || {};
 
-  const flavorTags = [aroma, acidity, body, finish, sweetness].filter(Boolean);
+  const score = displayRating(rating);
+  const subtitle = [roaster, origin, process].filter(Boolean).join(' \u00B7 ');
+  const tastingLine = formatTastingLine({ oneWord, notes, firstSip, bagNotes, rating });
+  const flavorTags = uniqueTags([
+    ...splitNoteList(aroma),
+    ...splitNoteList(acidity),
+    ...splitNoteList(body),
+    ...splitNoteList(finish),
+    ...splitNoteList(sweetness),
+    ...splitNoteList(bagNotes),
+  ]).slice(0, 3);
+  const details = tastingDetailItems(bean);
 
   return (
-    <div ref={ref} style={cardStyle}>
-      <div style={{ ...type.cardTitle, color: C.accent, marginBottom: 16 }}>
-        Tasting Notes
+    <div ref={ref} style={{
+      width: CARD_WIDTH,
+      height: TASTING_CARD_HEIGHT,
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 20,
+      background: `
+        radial-gradient(ellipse at 18% 16%, rgba(255,255,255,0.72), transparent 34%),
+        linear-gradient(180deg, #FCF7F1 0%, #F8F0E7 100%)
+      `,
+      boxSizing: 'border-box',
+      padding: '38px 42px 30px',
+      color: C.text,
+    }}>
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        opacity: 0.34,
+        pointerEvents: 'none',
+        backgroundImage: `
+          linear-gradient(90deg, rgba(92,61,46,0.035) 1px, transparent 1px),
+          linear-gradient(rgba(92,61,46,0.028) 1px, transparent 1px)
+        `,
+        backgroundSize: '34px 34px',
+        WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 22%, #000 82%, transparent 100%)',
+        maskImage: 'linear-gradient(180deg, transparent 0%, #000 22%, #000 82%, transparent 100%)',
+      }} />
+
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: 30,
+      }}>
+        <img
+          src="/images/wordmark.png"
+          alt="2manybeans"
+          crossOrigin="anonymous"
+          style={{
+            width: 156,
+            height: 'auto',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 1px 2px rgba(255,255,255,0.82))',
+          }}
+        />
+        <div style={{
+          ...type.cardTitle,
+          color: C.accent,
+          fontSize: 30,
+          lineHeight: 1,
+          textTransform: 'lowercase',
+          whiteSpace: 'nowrap',
+        }}>
+          tasting notes
+        </div>
       </div>
 
-      <BeanPhoto photoUrl={photoUrl} />
-      <BeanInfo name={name} roaster={roaster} origin={origin} process={process} />
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        width: '100%',
+        minHeight: 250,
+        display: 'grid',
+        gridTemplateColumns: '1fr 138px',
+        gap: 20,
+        alignItems: 'flex-start',
+        marginBottom: 0,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontFamily: fonts.body,
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: C.textMuted,
+            marginBottom: 30,
+          }}>
+            Today's cup
+          </div>
 
-      {rating > 0 && <CardStarRating value={rating} />}
+          <FitTitle
+            text={name || 'Coffee tasting'}
+            maxSize={41}
+            minSize={24}
+            maxLines={2}
+            style={{
+              ...type.beanName,
+              color: C.text,
+              fontSize: 41,
+              lineHeight: 0.98,
+              textAlign: 'left',
+              width: '100%',
+              marginBottom: 20,
+            }}
+          />
 
-      {oneWord && (
-        <div style={{
-          ...type.bigScore,
-          color: C.accent,
-          textAlign: 'center',
-          lineHeight: 1.1,
-          marginBottom: 16,
-        }}>
-          {oneWord}
+          {subtitle && (
+            <div style={{
+              ...type.secondary,
+              color: C.textMuted,
+              fontSize: 15,
+              fontWeight: 700,
+              lineHeight: 1.35,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              marginBottom: 12,
+            }}>
+              {subtitle}
+            </div>
+          )}
+
+          {score > 0 && (
+            <CardStarRating value={score} style={{
+              justifyContent: 'flex-start',
+              gap: 6,
+              marginBottom: 8,
+            }} />
+          )}
+
+          <div style={{
+            ...type.beanName,
+            color: C.accent,
+            fontSize: 21,
+            lineHeight: 1.08,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            maxWidth: 300,
+          }}>
+            {tastingLine}
+          </div>
         </div>
-      )}
+
+        <img
+          src="/images/ruphus-animations/nobg/ruphus-writing-notes.png"
+          alt=""
+          crossOrigin="anonymous"
+          style={{
+            position: 'absolute',
+            top: -8,
+            right: -4,
+            width: 142,
+            height: 'auto',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 8px 14px rgba(92,61,46,0.10))',
+          }}
+        />
+      </div>
 
       {flavorTags.length > 0 && (
         <div style={{
+          position: 'relative',
+          zIndex: 1,
           display: 'flex',
           flexWrap: 'wrap',
           gap: 8,
-          justifyContent: 'center',
-          marginTop: 4,
+          marginTop: 14,
         }}>
           {flavorTags.map((tag, i) => (
             <span key={i} style={{
-              ...type.secondary,
-              background: C.cream,
-              color: C.text,
-              padding: '6px 14px',
-              borderRadius: 20,
-              border: `1px solid ${C.borderLight}`,
+              fontFamily: fonts.body,
+              fontSize: 12,
+              fontWeight: 800,
+              lineHeight: 1,
+              whiteSpace: 'nowrap',
+              background: 'rgba(255,248,240,0.76)',
+              color: C.accentDark,
+              padding: '8px 12px',
+              borderRadius: 999,
+              boxShadow: '0 1px 8px rgba(92,61,46,0.035)',
             }}>
               {tag}
             </span>
@@ -403,7 +542,80 @@ export const TastingShareCard = forwardRef(({ bean, tasting }, ref) => {
         </div>
       )}
 
-      <CardFooter />
+      {details.length > 0 && (
+        <div style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'grid',
+          gridTemplateColumns: `repeat(${details.length}, 1fr)`,
+          gap: 10,
+          marginTop: 14,
+        }}>
+          {details.map(([label, value]) => (
+            <div key={label} style={{
+              padding: '14px 12px',
+              borderRadius: 14,
+              background: 'rgba(255,248,240,0.78)',
+              minHeight: 78,
+            }}>
+              <div style={{
+                fontFamily: fonts.body,
+                fontSize: 10,
+                fontWeight: 800,
+                lineHeight: 1,
+                letterSpacing: '0.11em',
+                textTransform: 'uppercase',
+                color: C.textLight,
+                marginBottom: 8,
+              }}>
+                {label}
+              </div>
+              <div style={{
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 800,
+                lineHeight: 1.22,
+                color: C.text,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}>
+                {value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginTop: 10,
+      }}>
+        <div style={{
+          ...type.secondary,
+          color: C.textMuted,
+          fontSize: 15,
+          fontWeight: 800,
+          whiteSpace: 'nowrap',
+        }}>
+          from my coffee journal
+        </div>
+        <div style={{
+          ...type.watermark,
+          color: C.textMuted,
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+        }}>
+          2manybeans
+        </div>
+      </div>
     </div>
   );
 });

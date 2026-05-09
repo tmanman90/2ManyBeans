@@ -2,11 +2,12 @@
 // Actions: connect (validate + encrypt + store) and disconnect (delete)
 // Credentials stored encrypted in users/{uid}/secrets/fellow via Admin SDK
 // Profile doc gets fellow.connected + fellow.email for client-side reads
-import { withCorsAuth, getDb } from './_lib/cors-auth.js';
+import { withCorsAuth, getDb, enforceUserRateLimit } from './_lib/cors-auth.js';
 import { encrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
+const CONNECT_RATE_LIMIT = { key: 'fellowConnect', limit: 5, windowMs: 60 * 60 * 1000 };
 
 async function handleConnect(req, res, uid) {
   const { email, password } = req.body || {};
@@ -111,6 +112,10 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   try {
     switch (action) {
       case 'connect':
+        {
+          const limited = await enforceUserRateLimit(uid, CONNECT_RATE_LIMIT, res);
+          if (limited) return limited;
+        }
         return await handleConnect(req, res, uid);
       case 'disconnect':
         return await handleDisconnect(req, res, uid);

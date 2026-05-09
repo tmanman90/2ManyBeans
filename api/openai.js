@@ -7,6 +7,7 @@ import { logApiUsage } from './_lib/costLogger.js';
 const FALLBACK_MODEL = 'gpt-5.4-mini';
 const ALLOWED_MODELS = ['gpt-5.4', 'gpt-5.4-mini'];
 const MAX_TOKENS_CAP = 4000;
+const RATE_LIMIT = { key: 'openai', limit: 120, windowMs: 60 * 60 * 1000 };
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -66,4 +67,4 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const detail = error.error?.message || error.message || 'Unknown OpenAI error';
     return res.status(status).json({ error: detail });
   }
-});
+}, { rateLimit: RATE_LIMIT });

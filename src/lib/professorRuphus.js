@@ -3,7 +3,7 @@ import { callOpenAI } from './openai';
 import { RUPHUS_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 
 function sanitizeField(str, maxLen = 200) {
-  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'.,()\/]/g, '');
+  return (str || '').slice(0, maxLen).replace(/[^\w\s\-'. ,()/]/g, '');
 }
 
 /**
@@ -12,7 +12,7 @@ function sanitizeField(str, maxLen = 200) {
  * @param {object} opts - { useWebSearch, enrichment }
  * @returns {object} story object { intro, roaster, coffee, process, lookFor, flavorProfile, generatedAt }
  */
-export async function generateRuphusStory(bean, { useWebSearch = false, enrichment = null } = {}) {
+export async function generateRuphusStory(bean, { useWebSearch: _useWebSearch = false, enrichment = null } = {}) {
   const beanContext = [
     bean.roaster && `Roaster: ${bean.roaster}`,
     bean.name && `Name: ${bean.name}`,

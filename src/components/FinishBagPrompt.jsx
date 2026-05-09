@@ -16,6 +16,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   const [oneWord, setOneWord] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [celebrating, setCelebrating] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -25,6 +26,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       setOneWord('');
       setSaving(false);
       setError(null);
+      setCelebrating(false);
     }
   }, [open]);
 
@@ -43,7 +45,8 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
         sweetness: '', body: '', finish: '', notes: '', changeTomorrow: '',
       });
       await onFinish(bean.id);
-      onClose('Saved & finished!');
+      setCelebrating(true);
+      setTimeout(() => onClose('Saved & finished!'), 2200);
     } catch (err) {
       console.error('Quick save failed:', err);
       setError('Failed to save rating. Try again.');
@@ -71,7 +74,9 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       }
 
       await onFinish(bean.id);
-      onClose('Saved & finished!');
+      setCelebrating(true);
+      setView('prompt');
+      setTimeout(() => onClose('Saved & finished!'), 2200);
     } catch (err) {
       console.error('Full review save failed:', err);
       setError('Failed to save review. Try again.');
@@ -127,7 +132,29 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   }
 
   return (
-    <Modal open={open} onClose={() => onClose()} title="Rate this bean?" centered>
+    <Modal open={open} onClose={() => onClose()} title={celebrating ? '' : 'Rate this bean?'} centered>
+      {celebrating && (
+        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+          <video
+            src="/images/ruphus-animations/ruphus-fist-pump.mp4"
+            autoPlay muted playsInline
+            style={{
+              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 12px',
+              display: 'block',
+              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+            }}
+          />
+          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 4 }}>
+            Bag finished!
+          </div>
+          <div style={{ fontSize: 14, color: C.textMuted }}>
+            On to the next one, brewer.
+          </div>
+        </div>
+      )}
+
+      {!celebrating && <>
       {/* Bean info */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text }}>{bean.name}</div>
@@ -181,6 +208,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
           Just finish it
         </span>
       </div>
+      </>}
     </Modal>
   );
 };

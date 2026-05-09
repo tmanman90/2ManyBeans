@@ -27,7 +27,7 @@ export function decrypt(packed) {
   decipher.setAuthTag(authTag);
   try {
     return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
-  } catch (err) {
+  } catch {
     throw new Error('Decryption failed: data may be tampered or key is wrong');
   }
 }

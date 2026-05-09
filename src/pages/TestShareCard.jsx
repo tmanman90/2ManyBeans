@@ -1,11 +1,12 @@
 // Dev-only test page for share card design iteration
-// Renders 3 RecipeShareCard variants for visual QA and autoresearch scoring
+// Renders share card variants for visual QA and autoresearch scoring
 
 import { useRef, useState } from 'react';
-import { RecipeShareCard, captureShareCard, RECIPE_CARD_BG } from '../components/ShareCard';
+import { RecipeShareCard, TastingShareCard, captureShareCard, RECIPE_CARD_BG } from '../components/ShareCard';
 
 const SAMPLE_CARDS = [
   {
+    type: 'recipe',
     id: 'full',
     label: 'Full Recipe',
     bean: {
@@ -22,6 +23,7 @@ const SAMPLE_CARDS = [
     },
   },
   {
+    type: 'recipe',
     id: 'minimal',
     label: 'Minimal (ratio + bloom only)',
     bean: {
@@ -38,6 +40,7 @@ const SAMPLE_CARDS = [
     },
   },
   {
+    type: 'recipe',
     id: 'longname',
     label: 'Long Bean Name',
     bean: {
@@ -53,6 +56,52 @@ const SAMPLE_CARDS = [
       grindBatch: '5.2',
     },
   },
+  {
+    type: 'tasting',
+    id: 'tasting-sparse',
+    label: 'Tasting — Sparse Rating',
+    bean: {
+      name: 'San Isidro Labrador',
+      roaster: "Apollon's Gold",
+      origin: 'Costa Rica',
+      process: 'Washed',
+      variety: 'Geisha Classic',
+      bagNotes: 'lychee / orange blossom / jasmine',
+    },
+    tasting: {
+      rating: 3,
+      oneWord: '',
+      aroma: '',
+      acidity: '',
+      body: '',
+      finish: '',
+      sweetness: '',
+      notes: '',
+    },
+  },
+  {
+    type: 'tasting',
+    id: 'tasting-detailed',
+    label: 'Tasting — Detailed Notes',
+    bean: {
+      name: 'Nelin Guzman',
+      roaster: 'Cat & Cloud',
+      origin: 'Honduras',
+      process: 'Anaerobic Natural',
+      variety: 'Parainema',
+      bagNotes: 'chocolate / berries / jammy fruit',
+    },
+    tasting: {
+      rating: 5,
+      oneWord: 'Chocolatey and berry. Really solid enjoyable cup.',
+      aroma: 'chocolatey',
+      acidity: 'berry',
+      body: 'solid',
+      finish: '',
+      sweetness: '',
+      notes: '',
+    },
+  },
 ];
 
 export const TestShareCard = () => {
@@ -65,7 +114,9 @@ export const TestShareCard = () => {
     if (!ref) return;
     setCapturing(id);
     try {
-      const dataUrl = await captureShareCard({ current: ref }, { backgroundColor: RECIPE_CARD_BG });
+      const card = SAMPLE_CARDS.find(item => item.id === id);
+      const opts = card?.type === 'recipe' ? { backgroundColor: RECIPE_CARD_BG } : {};
+      const dataUrl = await captureShareCard({ current: ref }, opts);
       setCaptures(prev => ({ ...prev, [id]: dataUrl }));
     } finally {
       setCapturing(null);
@@ -111,11 +162,19 @@ export const TestShareCard = () => {
 
             {/* Live rendered card */}
             <div data-card-id={card.id}>
-              <RecipeShareCard
-                ref={el => { refs.current[card.id] = el; }}
-                bean={card.bean}
-                recipe={card.recipe}
-              />
+              {card.type === 'tasting' ? (
+                <TastingShareCard
+                  ref={el => { refs.current[card.id] = el; }}
+                  bean={card.bean}
+                  tasting={card.tasting}
+                />
+              ) : (
+                <RecipeShareCard
+                  ref={el => { refs.current[card.id] = el; }}
+                  bean={card.bean}
+                  recipe={card.recipe}
+                />
+              )}
             </div>
 
             <button
@@ -139,12 +198,18 @@ export const TestShareCard = () => {
             {captures[card.id] && (
               <div>
                 <div style={{ color: '#666', fontFamily: 'system-ui', fontSize: 11, marginBottom: 4 }}>
-                  Captured output (1080x1080):
+                  Captured output:
                 </div>
                 <img
                   src={captures[card.id]}
                   alt={`Captured ${card.label}`}
-                  style={{ width: 270, height: 270, borderRadius: 10, border: '1px solid #333' }}
+                  style={{
+                    width: 270,
+                    height: card.type === 'tasting' ? 286 : 270,
+                    objectFit: 'contain',
+                    borderRadius: 10,
+                    border: '1px solid #333',
+                  }}
                 />
               </div>
             )}

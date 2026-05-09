@@ -91,7 +91,7 @@ export function TourOverlay({ onComplete, setTab, beans, profile, updateProfile 
 
   useLayoutEffect(() => {
     if (tooltipRef.current) setTooltipH(tooltipRef.current.offsetHeight);
-  });
+  }, [stepIdx]);
 
   useEffect(() => {
     const origOverflow = document.body.style.overflow;

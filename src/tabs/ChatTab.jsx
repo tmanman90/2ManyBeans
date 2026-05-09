@@ -63,10 +63,10 @@ const ChatInputBar = memo(function ChatInputBar({
   onPickPhoto,
   onRemovePhoto,
   fileInputRef,
+  inputRef,
   onFileSelect,
 }) {
   const [input, setInput] = useState('');
-  const inputRef = useRef(null);
 
   const send = () => {
     const trimmed = input.trim();
@@ -211,6 +211,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const keyboardHeight = useNativeKeyboard({ enabled: isActive });
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
+  const inputRef = useRef(null);
   // Synchronous guard against double-send. `loading` state is async and both
   // calls can slip past it on rapid Enter+Send. This ref blocks the second
   // call immediately in the same event loop tick.
@@ -267,8 +268,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
   // Cleanup all tracked blob URLs on unmount
   useEffect(() => {
+    const trackedBlobUrls = blobUrlsRef.current;
     return () => {
-      blobUrlsRef.current.forEach(safeRevokeBlobUrl);
+      trackedBlobUrls.forEach(safeRevokeBlobUrl);
     };
   }, []);
 
@@ -588,6 +590,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         onPickPhoto={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
         onRemovePhoto={removePhoto}
         fileInputRef={fileRef}
+        inputRef={inputRef}
         onFileSelect={handlePhotoSelect}
       />
 

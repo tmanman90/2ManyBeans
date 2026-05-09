@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, writeBatch,
-  serverTimestamp, query, where, orderBy, getDoc, getDocs, limit, deleteField
+  serverTimestamp, query, where, getDoc, getDocs, limit, deleteField
 } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
@@ -71,7 +71,7 @@ export const useAppData = (uid) => {
           collection(db, 'users', uid, 'tastings'),
           `beans_${uid}`, `tastings_${uid}`,
         );
-      } catch (err) { /* polling will catch up */ }
+      } catch { /* polling will catch up */ }
       finally { inflightFetchRef.current = null; }
     })();
     inflightFetchRef.current = p;
@@ -133,7 +133,7 @@ export const useAppData = (uid) => {
           if (inflightFetchRef.current) return;
           try {
             await fetchAndCache(beansColl, tastingsColl, beansCacheKey, tastingsCacheKey);
-          } catch (err) { /* silent retry next interval */ }
+          } catch { /* silent retry next interval */ }
         }, 60000);
       };
       startPoll();
@@ -192,7 +192,7 @@ export const useAppData = (uid) => {
       unsubBeans();
       unsubTastings();
     };
-  }, [uid]);
+  }, [fetchAndCache, uid]);
 
   const addBean = useCallback(async (beanData, existingId = null) => {
     if (!uid) return;
@@ -223,7 +223,7 @@ export const useAppData = (uid) => {
   const deleteBean = useCallback(async (beanId) => {
     if (!uid) return;
     // Clean up Storage photo (non-blocking)
-    try { await deleteBeanPhoto(uid, beanId); } catch (e) { /* silent */ }
+    try { await deleteBeanPhoto(uid, beanId); } catch { /* silent */ }
     // Cascade-delete all tastings for this bean. Narrow the query to just this
     // bean's tastings instead of scanning the entire collection.
     const tastingsColl = collection(db, 'users', uid, 'tastings');
@@ -363,7 +363,7 @@ export const useAppData = (uid) => {
       const beanRef = doc(collection(db, 'users', uid, 'beans'));
       if (bean.seedId) seedIdMap[bean.seedId] = beanRef.id;
 
-      const { seedId, ...beanData } = bean;
+      const { seedId: _seedId, ...beanData } = bean;
       batch.set(beanRef, {
         ...beanData,
         createdAt: serverTimestamp(),

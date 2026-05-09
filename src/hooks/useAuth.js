@@ -4,6 +4,13 @@ import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider, appleProvider } from '../firebase';
 import { cacheReadLastUid, cacheWriteLastUid } from '../lib/offlineCache';
 
+function providerDisplayName(profile) {
+  if (!profile || typeof profile !== 'object') return '';
+  const direct = profile.displayName || profile.name || profile.fullName;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  return [profile.givenName, profile.familyName].filter(Boolean).join(' ').trim();
+}
+
 // Nonce utilities for Apple Sign-In
 function generateNonce(length = 32) {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -65,6 +72,16 @@ export const useAuth = () => {
       const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
       const idToken = result?.result?.idToken;
       if (!idToken) throw new Error('No idToken from Google sign-in');
+      const profile = result?.result?.profile;
+      const displayName = providerDisplayName(profile);
+      if (displayName) {
+        try {
+          localStorage.setItem('google_pending_name', JSON.stringify({
+            displayName,
+            email: profile?.email || '',
+          }));
+        } catch { /* localStorage unavailable */ }
+      }
       const credential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, credential);
     } else {

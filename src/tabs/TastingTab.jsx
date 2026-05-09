@@ -1495,7 +1495,20 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       )}
 
       {mode === 'list' && tastings.length === 0 && (
-        <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>No tastings yet. Brew something!</div>
+        <div style={{ textAlign: 'center', padding: '24px 20px' }}>
+          <video
+            src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+            autoPlay muted loop playsInline
+            style={{
+              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px',
+              display: 'block',
+              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+            }}
+          />
+          <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>No tastings yet</div>
+          <div style={{ fontSize: 13, color: C.textMuted }}>Brew something and let's taste</div>
+        </div>
       )}
 
       {/* Off-screen share card for capture */}

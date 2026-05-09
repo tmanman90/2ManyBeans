@@ -7,6 +7,7 @@ import { logApiUsage } from './_lib/costLogger.js';
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
 const MAX_TOKENS_CAP = 4000;
+const RATE_LIMIT = { key: 'claude', limit: 120, windowMs: 60 * 60 * 1000 };
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -67,4 +68,4 @@ export default withCorsAuthMetered(async (req, res, decodedToken) => {
     const detail = error.error?.error?.message || error.message || 'Unknown error';
     return res.status(status).json({ error: detail });
   }
-}, { feature: 'tasteTests', freeLimit: 1 });
+}, { feature: 'tasteTests', freeLimit: 1, rateLimit: RATE_LIMIT });

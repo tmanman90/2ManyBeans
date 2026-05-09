@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, RefreshCw } from 'lucide-react';
 import { C, fonts, cardBase } from '../styles/theme';
 import { SpiderChart } from './SpiderChart';
+import { ResearchLoadingScreen } from './ResearchLoadingScreen';
 
 // Inline SVG section icons (18px, accent colored)
 const IconHouse = () => (
@@ -82,6 +83,10 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
         }}
         onClick={e => e.stopPropagation()}
       >
+        {loading && researching ? (
+          <ResearchLoadingScreen onClose={onClose} />
+        ) : (
+        <>
         {/* Header bar */}
         <div style={{
           padding: '12px 16px 0',
@@ -112,21 +117,17 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
           flex: 1, overflowY: 'auto', minHeight: 0,
           padding: `0 20px calc(40px + env(safe-area-inset-bottom, 0px))`,
         }}>
-          {/* Loading state */}
+          {/* Loading state (non-research) */}
           {loading && (
-            <div style={{ textAlign: 'center', paddingTop: 80 }}>
-              <img src="/images/professor-ruphus.webp" alt="Professor Ruphus"
-                style={{ width: 80, height: 80, borderRadius: '50%', opacity: 0.8, marginBottom: 16 }} />
+            <div style={{ textAlign: 'center', paddingTop: 40 }}>
+              <video
+                src="/images/ruphus-animations/ruphus-examining-v3.mp4"
+                autoPlay muted loop playsInline preload="auto"
+                style={{ width: 240, height: 'auto', marginBottom: 16, background: C.bg }}
+              />
               <div style={{ fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 8 }}>
-                {researching
-                  ? 'Professor Ruphus is researching your coffee...'
-                  : 'Professor Ruphus is preparing your lesson...'}
+                Professor Ruphus is preparing your lesson...
               </div>
-              {researching && (
-                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
-                  This may take up to a minute
-                </div>
-              )}
               <Spinner />
             </div>
           )}
@@ -220,6 +221,8 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
             </>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>,
     document.body

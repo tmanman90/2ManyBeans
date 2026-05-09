@@ -61,13 +61,11 @@ const Root = () => {
   // it only ever reads localStorage once per mount so repeated
   // renders are cheap.
   const devForceOnboarding = useMemo(() => {
-    if (!import.meta.env.DEV) return false;
     try {
       return localStorage.getItem('__dev_force_onboarding_v1') === '1';
     } catch {
       return false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const {
@@ -87,7 +85,7 @@ const Root = () => {
     cacheClearLastUid();
     // Clear RevenueCat session so the next user doesn't inherit this one's
     // entitlements on a shared device.
-    try { await logOutRevenueCat(); } catch {}
+    try { await logOutRevenueCat(); } catch { /* non-fatal logout cleanup */ }
     // Clear the Google/Apple SDK sessions on native. Without this, the iOS
     // Google Sign-In SDK silently re-uses the last-signed-in account on the
     // next SocialLogin.login() call, skipping the account picker entirely.

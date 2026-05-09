@@ -34,6 +34,57 @@ const EXACT_ORIGINS = [
   'capacitor://localhost',
 ];
 
+const RATE_LIMIT_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+async function checkUserRateLimit(uid, { key, limit, windowMs }) {
+  if (!uid || !key || !limit || !windowMs) return { allowed: true };
+  if (!RATE_LIMIT_KEY_PATTERN.test(key)) {
+    throw new Error(`Invalid rate limit key: ${key}`);
+  }
+
+  const db = getDb();
+  const ref = db.collection('users').doc(uid).collection('rateLimits').doc(key);
+  const now = Date.now();
+
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists ? snap.data() : {};
+    const windowStartMs = data?.windowStart ? new Date(data.windowStart).getTime() : 0;
+    const count = Number.isInteger(data?.count) ? data.count : 0;
+    const inWindow = windowStartMs && !Number.isNaN(windowStartMs) && now - windowStartMs < windowMs;
+
+    if (inWindow && count >= limit) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((windowStartMs + windowMs - now) / 1000));
+      return { allowed: false, retryAfterSeconds };
+    }
+
+    tx.set(ref, {
+      count: inWindow ? count + 1 : 1,
+      windowStart: new Date(inWindow ? windowStartMs : now).toISOString(),
+      updatedAt: new Date(now).toISOString(),
+    }, { merge: true });
+
+    return { allowed: true };
+  });
+}
+
+async function rejectIfRateLimited(uid, rateLimit, res) {
+  if (!rateLimit) return null;
+  try {
+    const result = await checkUserRateLimit(uid, rateLimit);
+    if (result.allowed) return null;
+    res.setHeader('Retry-After', String(result.retryAfterSeconds));
+    return res.status(429).json({
+      error: 'rate_limited',
+      retryAfterSeconds: result.retryAfterSeconds,
+      message: 'Too many requests. Please wait a bit and try again.',
+    });
+  } catch (err) {
+    console.error('[rateLimit] Firestore error', err?.message || err);
+    return res.status(500).json({ error: 'Failed to check rate limit' });
+  }
+}
+
 function isAllowedOrigin(origin) {
   if (!origin) return false;
   if (EXACT_ORIGINS.includes(origin)) return true;
@@ -74,8 +125,9 @@ async function verifyAuth(req) {
 
   const token = header.slice(7);
   try {
-    return await auth.verifyIdToken(token);
-  } catch (e) {
+    // Reject tokens after account deletion or explicit refresh-token revocation.
+    return await auth.verifyIdToken(token, true);
+  } catch {
     const err = new Error('Invalid or expired token');
     err.status = 401;
     throw err;
@@ -153,12 +205,14 @@ function rejectFromEntitlement(result, requiredTier, res) {
 
 // Gate: require an active Pro or Ultra entitlement.
 // Use for AI features that are Pro+ (no free tier).
-export function withCorsAuthPro(handler) {
+export function withCorsAuthPro(handler, { rateLimit } = {}) {
   return withCorsAuth(async (req, res, decodedToken) => {
     if (decodedToken?.uid) {
       const result = await checkEntitlement(decodedToken.uid);
       const reject = rejectFromEntitlement(result, 'pro', res);
       if (reject) return reject;
+      const limited = await rejectIfRateLimited(decodedToken.uid, rateLimit, res);
+      if (limited) return limited;
     }
     return handler(req, res, decodedToken);
   });
@@ -166,12 +220,14 @@ export function withCorsAuthPro(handler) {
 
 // Gate: require an active Ultra entitlement.
 // Use for features exclusive to the Ultra tier (Fellow Aiden push, multi-brewer).
-export function withCorsAuthUltra(handler) {
+export function withCorsAuthUltra(handler, { rateLimit } = {}) {
   return withCorsAuth(async (req, res, decodedToken) => {
     if (decodedToken?.uid) {
       const result = await checkEntitlement(decodedToken.uid);
       const reject = rejectFromEntitlement(result, 'ultra', res);
       if (reject) return reject;
+      const limited = await rejectIfRateLimited(decodedToken.uid, rateLimit, res);
+      if (limited) return limited;
     }
     return handler(req, res, decodedToken);
   });
@@ -189,7 +245,7 @@ export function withCorsAuthUltra(handler) {
 //
 // The counter is incremented inside a Firestore transaction so concurrent
 // requests can't both pass an under-cap check and double-spend.
-export function withCorsAuthMetered(handler, { feature, freeLimit }) {
+export function withCorsAuthMetered(handler, { feature, freeLimit, rateLimit }) {
   if (!feature) throw new Error('withCorsAuthMetered: feature is required');
   if (typeof freeLimit !== 'number') throw new Error('withCorsAuthMetered: freeLimit is required');
 
@@ -203,7 +259,11 @@ export function withCorsAuthMetered(handler, { feature, freeLimit }) {
         message: 'Subscription service temporarily unavailable. Please try again in a moment.',
       });
     }
-    if (result.pro) return handler(req, res, decodedToken);
+    if (result.pro) {
+      const limited = await rejectIfRateLimited(decodedToken.uid, rateLimit, res);
+      if (limited) return limited;
+      return handler(req, res, decodedToken);
+    }
 
     // Opt-in metering: callers explicitly mark metered requests so chat
     // replies, retries, and sub-calls don't burn credits unintentionally.
@@ -256,6 +316,12 @@ export function withCorsAuthMetered(handler, { feature, freeLimit }) {
       return res.status(500).json({ error: 'Failed to check usage quota' });
     }
 
+    const limited = await rejectIfRateLimited(decodedToken.uid, rateLimit, res);
+    if (limited) return limited;
     return handler(req, res, decodedToken);
   });
+}
+
+export async function enforceUserRateLimit(uid, rateLimit, res) {
+  return rejectIfRateLimited(uid, rateLimit, res);
 }

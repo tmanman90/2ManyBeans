@@ -1,9 +1,16 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Each user can read/write their own photos
-    match /users/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // User bean photos only. Uploads normally go through api/product-shot.js
+    // using the Admin SDK; this client-side rule remains for reads and
+    // best-effort delete cleanup from the app.
+    match /users/{userId}/bean-photos/{fileName} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && fileName.matches('^[A-Za-z0-9_-]{1,64}\\.(jpg|jpeg|png|webp)$')
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
 
     // Deny everything else

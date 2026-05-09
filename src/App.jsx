@@ -18,6 +18,7 @@ import { SettingsPage } from './components/SettingsPage';
 import { TourOverlay } from './components/TourOverlay';
 import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
+import { Modal } from './components/Modal';
 
 // Minimal fallback while a lazy tab chunk is fetching. Matches the app
 // background so it doesn't flash white on iOS WKWebView.
@@ -58,6 +59,17 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
     if (new URLSearchParams(window.location.search).has('tour')) return true;
     return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
   });
+
+  // First-bean celebration: fires once when user goes from 0 beans to >= 1
+  const [firstBeanCelebrating, setFirstBeanCelebrating] = useState(false);
+  const prevBeanCountRef = useRef(beans.length);
+  useEffect(() => {
+    const prev = prevBeanCountRef.current;
+    prevBeanCountRef.current = beans.length;
+    if (prev === 0 && beans.length > 0) {
+      setFirstBeanCelebrating(true);
+    }
+  }, [beans.length]);
 
   const handleStartTastingSession = (beanId) => {
     if (!beanId) return;
@@ -369,6 +381,29 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           onComplete={() => setTourActive(false)}
         />
       )}
+
+      {/* First bean celebration */}
+      <Modal open={firstBeanCelebrating} onClose={() => setFirstBeanCelebrating(false)} title="" centered>
+        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+          <video
+            src="/images/ruphus-animations/ruphus-first-bean.mp4"
+            autoPlay muted playsInline
+            onPlay={() => setTimeout(() => setFirstBeanCelebrating(false), 4000)}
+            style={{
+              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 12px',
+              display: 'block',
+              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+            }}
+          />
+          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 4 }}>
+            Your first bean!
+          </div>
+          <div style={{ fontSize: 14, color: C.textMuted }}>
+            Welcome to the journey, brewer.
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

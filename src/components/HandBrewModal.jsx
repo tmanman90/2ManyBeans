@@ -124,12 +124,15 @@ export const HandBrewModal = ({
   const msg = phaseMessages[phase] || phaseMessages.recipe;
   const [timerOpen, setTimerOpen] = useState(false);
   const [icedMode, setIcedMode] = useState(false);
+  const [timerRecipeOverride, setTimerRecipeOverride] = useState(null);
   const modalContentRef = useRef(null);
-  const icedTimerRecipeRef = useRef(null);
   const timerReady = recipe?.timerReady === true;
 
   useEffect(() => {
-    if (open) setIcedMode(false);
+    if (open) {
+      setIcedMode(false);
+      setTimerRecipeOverride(null);
+    }
   }, [open]);
 
   const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
@@ -183,11 +186,11 @@ export const HandBrewModal = ({
   }, [persistIfChanged]);
 
   const handleStartIcedBrew = useCallback(() => {
-    icedTimerRecipeRef.current = icedRecipe;
+    setTimerRecipeOverride(icedRecipe);
     setTimerOpen(true);
   }, [icedRecipe]);
 
-  const timerRecipe = icedMode ? (icedTimerRecipeRef.current || icedRecipe) : displayRecipe;
+  const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
 
   return (
     <>
@@ -438,10 +441,10 @@ export const HandBrewModal = ({
       open={timerOpen}
       recipe={timerRecipe}
       bean={bean}
-      onClose={() => { setTimerOpen(false); icedTimerRecipeRef.current = null; }}
+      onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
       onStartTasting={(beanId) => {
         setTimerOpen(false);
-        icedTimerRecipeRef.current = null;
+        setTimerRecipeOverride(null);
         handleClose();
         onStartTasting?.(beanId);
       }}

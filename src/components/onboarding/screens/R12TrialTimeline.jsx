@@ -1,30 +1,12 @@
 import { useState } from 'react';
-import { Bell, Check, Sparkles } from 'lucide-react';
-import { C, fonts, radius } from '../../../styles/theme';
-import { OnboardingScreenShell } from './OnboardingScreenShell';
+import { C, fonts } from '../../../styles/theme';
 import { useOnboarding } from '../OnboardingContext';
-
-// R12 — free trial timeline. Shows a 3-beat explanation of what the
-// user gets over the next few days. Also captures marketing consent
-// with a persistable timestamp + version, so we stay CAN-SPAM / GDPR
-// compliant on the email list mirror.
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const TIMELINE_STEPS = [
-  {
-    icon: Check,
-    title: 'Today',
-    body: 'Full access to everything. Scan, taste, brew — see if we click.',
-  },
-  {
-    icon: Sparkles,
-    title: 'In 3 days',
-    body: "I'll check in and show you what we've tracked together.",
-  },
-  {
-    icon: Bell,
-    title: 'Day 7',
-    body: "Trial ends. Cancel anytime before then and you won't be charged.",
-  },
+  { dot: '✓', title: 'Today', body: 'Full access. Scan, taste, brew — see if we click.' },
+  { dot: '★', title: 'In 3 days', body: "I'll check in and show you what we've tracked together." },
+  { dot: '!', title: 'Day 7', body: "Trial ends. Cancel anytime before then and you won't be charged." },
 ];
 
 const MARKETING_CONSENT_VERSION = 'onboarding-v1-2026-04-12';
@@ -39,9 +21,6 @@ export default function R12TrialTimeline() {
       next: 'r13',
       answersPatch: {
         marketingConsent: consent,
-        // Client-side timestamp here; the SERVER timestamp goes onto
-        // the same doc in the final completeOnboarding write. Two fields
-        // serve two different auditors — analytics vs. legal.
         marketingConsentDate: consent ? new Date().toISOString() : null,
         marketingConsentVersion: consent ? MARKETING_CONSENT_VERSION : null,
       },
@@ -49,143 +28,117 @@ export default function R12TrialTimeline() {
   };
 
   return (
-    <OnboardingScreenShell
-      title="Your free trial, briefly."
-      ruphusLine="Here's what the next few days look like. No surprises."
-      primaryCta={{
-        label: 'Continue',
-        onClick: handleContinue,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0,
-          marginTop: 8,
-          marginBottom: 16,
-        }}
-      >
-        {TIMELINE_STEPS.map((step, i) => {
-          const Icon = step.icon;
-          const isLast = i === TIMELINE_STEPS.length - 1;
-          return (
-            <div key={step.title} style={{ display: 'flex', gap: 14 }}>
-              {/* Icon + connecting line */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                flexShrink: 0,
-                width: 40,
-              }}>
+    <div style={{
+      width: '100%',
+      minHeight: '100dvh',
+      maxHeight: '100dvh',
+      background: onboardingBg,
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: fonts.body,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <OnboardingTopBar step="R12 · YOUR TRIAL" overlay />
+
+      <MascotStage src="/images/ruphus-animations/ruphus-thumbs-up.mp4" height={220} />
+
+      <div style={{
+        flex: 1,
+        padding: '4px 20px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        minHeight: 0,
+        overflowY: 'auto',
+      }}>
+        <NoteBubble>
+          Here's what the next few days look like. No surprises.
+        </NoteBubble>
+
+        <div style={{
+          fontFamily: fonts.heading,
+          fontSize: 23, lineHeight: 1.2,
+          color: C.text,
+          marginTop: 2,
+        }}>
+          Your free trial, briefly.
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 4 }}>
+          {TIMELINE_STEPS.map((s, i) => {
+            const last = i === TIMELINE_STEPS.length - 1;
+            return (
+              <div key={s.title} style={{ display: 'flex', gap: 12 }}>
                 <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: C.amberBg,
-                  border: `1.5px solid #E8D5A0`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: C.accent,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  flexShrink: 0, width: 36,
                 }}>
-                  <Icon size={20} strokeWidth={2} />
-                </div>
-                {!isLast && (
                   <div style={{
-                    width: 2,
-                    flex: 1,
-                    minHeight: 32,
-                    background: C.borderLight,
-                    marginTop: 4,
-                    marginBottom: 4,
-                  }} />
-                )}
-              </div>
-
-              <div style={{ flex: 1, paddingBottom: isLast ? 0 : 20 }}>
-                <div style={{
-                  fontFamily: fonts.heading,
-                  fontSize: 18,
-                  color: C.text,
-                  marginBottom: 4,
-                }}>
-                  {step.title}
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: C.amberBg,
+                    border: '1.5px solid #E8D5A0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: C.accent, fontSize: 15, fontWeight: 800,
+                    fontFamily: fonts.body,
+                  }}>
+                    {s.dot}
+                  </div>
+                  {!last && (
+                    <div style={{
+                      width: 2, flex: 1, minHeight: 22,
+                      background: C.borderLight,
+                      marginTop: 3, marginBottom: 3,
+                    }} />
+                  )}
                 </div>
-                <div style={{
-                  fontSize: 14,
-                  color: C.textMuted,
-                  lineHeight: 1.45,
-                }}>
-                  {step.body}
+                <div style={{ flex: 1, paddingBottom: last ? 0 : 14 }}>
+                  <div style={{
+                    fontFamily: fonts.heading, fontSize: 16, color: C.text,
+                    marginBottom: 2,
+                  }}>
+                    {s.title}
+                  </div>
+                  <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.4 }}>
+                    {s.body}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Marketing consent — optional, 44pt tap target, privacy link */}
-      <label
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 12,
-          minHeight: 44,
+        <label style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '10px 12px',
           background: C.card,
           border: `1px solid ${C.borderLight}`,
-          borderRadius: radius.md,
+          borderRadius: 12,
           cursor: 'pointer',
+          marginTop: 6,
           WebkitTapHighlightColor: 'transparent',
-          marginTop: 4,
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          style={{
-            marginTop: 3,
-            width: 20,
-            height: 20,
-            accentColor: C.accent,
-            flexShrink: 0,
-          }}
-        />
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: 14,
-            color: C.text,
-            fontFamily: fonts.body,
-            lineHeight: 1.4,
-            fontWeight: 600,
-          }}>
-            Send me brewing tips by email
+        }}>
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            style={{ marginTop: 2, width: 18, height: 18, accentColor: C.accent }}
+          />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: C.text, fontWeight: 700, lineHeight: 1.3 }}>
+              Send me brewing tips by email
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.3, marginTop: 2 }}>
+              Occasional emails. Unsubscribe anytime.
+            </div>
           </div>
-          <div style={{
-            fontSize: 12,
-            color: C.textMuted,
-            fontFamily: fonts.body,
-            lineHeight: 1.4,
-            marginTop: 2,
-          }}>
-            Occasional emails about new features and coffee tips. Unsubscribe
-            anytime. See our{' '}
-            <a
-              href="https://2manybeans.vercel.app/privacy-policy.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: C.accent, textDecoration: 'underline' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              Privacy Policy
-            </a>
-            .
-          </div>
-        </div>
-      </label>
-    </OnboardingScreenShell>
+        </label>
+      </div>
+
+      <OnboardingCtaBar
+        label="Continue"
+        onClick={handleContinue}
+      />
+    </div>
   );
 }

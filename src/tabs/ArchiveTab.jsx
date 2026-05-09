@@ -202,12 +202,24 @@ function EmptyState({ hasFilters, onClear }) {
         margin: '12px 0',
       }}
     >
+      {!hasFilters && (
+        <video
+          src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+          autoPlay muted loop playsInline
+          style={{
+            width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px',
+            display: 'block',
+            WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+            maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+          }}
+        />
+      )}
       <div style={{ fontFamily: fonts.title, fontSize: 22, color: C.accentDark, marginBottom: 4 }}>
         {hasFilters ? 'nothing in this corner' : 'no beans yet'}
       </div>
       <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 14 }}>
         {hasFilters
-          ? 'Try loosening a filter — your other beans are still here.'
+          ? 'Try loosening a filter, your other beans are still here.'
           : 'When you finish a bean it lands here.'}
       </div>
       {hasFilters && (

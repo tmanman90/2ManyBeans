@@ -19,7 +19,8 @@ const PUBLIC_IOS_KEY = 'appl_YsjXhHMAtUIVshbIHDUuxZHWlFD';
 
 let sdkModule = null;
 let configurePromise = null;
-let nativeListenerHandle = null;
+let _nativeListenerHandle = null;
+let configured = false;
 const listeners = new Set();
 
 // Lazy-load the native module so web builds don't pay the cost.
@@ -66,10 +67,11 @@ export async function initRevenueCat() {
       const { Purchases, LOG_LEVEL } = await loadSdk();
       await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
       await Purchases.configure({ apiKey: PUBLIC_IOS_KEY });
+      configured = true;
 
       // Register the native listener exactly once. Retain the handle so
       // we can remove it later if needed (e.g. during teardown).
-      nativeListenerHandle = await Purchases.addCustomerInfoUpdateListener((result) => {
+      _nativeListenerHandle = await Purchases.addCustomerInfoUpdateListener((result) => {
         for (const fn of listeners) {
           try { fn(result.customerInfo); } catch (e) { console.error('[RC listener]', e); }
         }
@@ -77,6 +79,7 @@ export async function initRevenueCat() {
     } catch (err) {
       // Allow next caller to retry from scratch.
       configurePromise = null;
+      configured = false;
       throw err;
     }
   })();

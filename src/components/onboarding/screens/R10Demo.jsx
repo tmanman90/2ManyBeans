@@ -1,98 +1,109 @@
-import { useState } from 'react';
-import { C, fonts, radius } from '../../../styles/theme';
-import { OnboardingScreenShell } from './OnboardingScreenShell';
+import { C, fonts } from '../../../styles/theme';
 import { useOnboarding } from '../OnboardingContext';
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
-// R10 — canned scan demo. The real Gemini scan is gated behind the
-// paywall and (more importantly) costs money per invocation, so this
-// screen shows a pre-rendered screenshot with a CSS reveal animation
-// over it. Zero network, zero tokens, zero camera access.
-//
-// Asset `public/images/onboarding/demo-scan.webp` is a TODO — fall
-// back to the existing onboarding-welcome.webp until the real demo
-// asset lands. Phase 5 verifies the file exists and is <500KB.
 export default function R10Demo() {
   const { dispatch } = useOnboarding();
-  const [imageError, setImageError] = useState(false);
 
   return (
-    <OnboardingScreenShell
-      title="Here's what a scan looks like."
-      ruphusLine="Just tap a bag and I'll read the label for you."
-      backDisabled
-      primaryCta={{
-        label: 'Got it',
-        onClick: () => dispatch({ type: 'ADVANCE', next: 'r11' }),
-      }}
-    >
-      <div
-        style={{
+    <div style={{
+      width: '100%',
+      minHeight: '100dvh',
+      maxHeight: '100dvh',
+      background: onboardingBg,
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: fonts.body,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <OnboardingTopBar step="R10 · SCAN DEMO" hideBack overlay />
+
+      <MascotStage src="/images/ruphus-animations/ruphus-writing-notes.mp4" height={230} />
+
+      <div style={{
+        flex: 1,
+        padding: '4px 20px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        minHeight: 0,
+        overflowY: 'auto',
+      }}>
+        <NoteBubble>
+          Just tap a bag and I'll read the label for you.
+        </NoteBubble>
+
+        <div style={{
+          fontFamily: fonts.heading,
+          fontSize: 23, lineHeight: 1.2,
+          color: C.text,
+          marginTop: 2,
+        }}>
+          Here's what a scan looks like.
+        </div>
+
+        <div style={{
           position: 'relative',
           width: '100%',
           maxWidth: 340,
           aspectRatio: '3 / 4',
-          margin: '4px auto 18px',
-          borderRadius: radius.lg,
+          margin: '4px auto 0',
+          borderRadius: 16,
           overflow: 'hidden',
           background: C.card,
           border: `1px solid ${C.borderLight}`,
-        }}
-      >
-        <img
-          src={imageError ? '/images/onboarding-welcome.webp' : '/images/onboarding/demo-scan.webp'}
-          alt="Example bag scan result"
-          onError={() => setImageError(true)}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-          }}
-        />
-        {/* Scanner beam — a thin accent-colored line that glides from
-            top to bottom like a barcode scanner reading the label.
-            Much more obvious than the old translucent sweep gradient
-            (which Tal flagged as unclear). */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            overflow: 'hidden',
-            pointerEvents: 'none',
-          }}
-        >
-          <div style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            height: 3,
-            background: C.accent,
-            boxShadow: `0 0 14px ${C.accent}, 0 0 28px ${C.accent}aa`,
-            animation: 'onboarding-demo-scanline 2.6s ease-in-out infinite',
-            top: 0,
-          }} />
+        }}>
+          <img
+            src="/images/onboarding/demo-scan.webp"
+            alt="Example bag scan result"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              overflow: 'hidden',
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{
+              position: 'absolute',
+              left: 0, right: 0, height: 3,
+              background: C.accent,
+              boxShadow: `0 0 14px ${C.accent}, 0 0 28px ${C.accent}aa`,
+              animation: 'r10-scan 2.6s ease-in-out infinite',
+              top: 0,
+            }} />
+          </div>
+          <style>{`
+            @keyframes r10-scan {
+              0%   { top: 0%;  opacity: 0; }
+              8%   { opacity: 1; }
+              92%  { opacity: 1; }
+              100% { top: 96%; opacity: 0; }
+            }
+          `}</style>
         </div>
-        <style>{`
-          @keyframes onboarding-demo-scanline {
-            0%   { top: 0%;   opacity: 0;   }
-            8%   { opacity: 1; }
-            92%  { opacity: 1; }
-            100% { top: 100%; opacity: 0;   }
-          }
-        `}</style>
+
+        <div style={{
+          fontSize: 13, color: C.textMuted,
+          textAlign: 'center', marginTop: 8, lineHeight: 1.4,
+        }}>
+          No typing. No guessing. Just the back of the bag, turned into something useful.
+        </div>
       </div>
 
-      <div style={{
-        fontSize: 14,
-        color: C.textMuted,
-        textAlign: 'center',
-        lineHeight: 1.5,
-        fontFamily: fonts.body,
-      }}>
-        No typing. No guessing. Just the stuff on the back of the bag,
-        turned into something you can actually use.
-      </div>
-    </OnboardingScreenShell>
+      <OnboardingCtaBar
+        label="Got it"
+        onClick={() => dispatch({ type: 'ADVANCE', next: 'r11' })}
+      />
+    </div>
   );
 }

@@ -20,6 +20,7 @@ function getClient() {
 
 const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-3.1-flash-image-preview'];
 const MAX_TOKENS_CAP = 4000;
+const RATE_LIMIT = { key: 'gemini', limit: 120, windowMs: 60 * 60 * 1000 };
 
 async function handleText(req, res, feature, decodedToken) {
   const {
@@ -68,4 +69,4 @@ export default withCorsAuthMetered(async (req, res, decodedToken) => {
     const detail = error.message || 'Unknown Gemini error';
     return res.status(status).json({ error: detail });
   }
-}, { feature: 'aiScans', freeLimit: 3 });
+}, { feature: 'aiScans', freeLimit: 3, rateLimit: RATE_LIMIT });

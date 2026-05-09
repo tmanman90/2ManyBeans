@@ -67,7 +67,7 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
       // trigger the paywall instead of showing a generic error toast.
       if (response.status === 403) {
         let data = null;
-        try { data = await response.json(); } catch {}
+        try { data = await response.json(); } catch { /* ignore non-JSON error bodies */ }
         if (data?.error === 'subscription_required') {
           const err = new Error(data.message || 'Subscription required');
           err.code = 'subscription_required';
@@ -99,7 +99,7 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
       // they fall through safely to the retry/FRIENDLY_ERRORS path.
       if (response.status === 429) {
         let data = null;
-        try { data = await response.json(); } catch {}
+        try { data = await response.json(); } catch { /* ignore non-JSON error bodies */ }
         if (data?.error && REDEMPTION_REASONS.has(data.error)) {
           const err = new Error(data.error);
           err.code = data.error;

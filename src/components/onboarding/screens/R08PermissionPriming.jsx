@@ -1,26 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Camera as CameraIcon } from 'lucide-react';
 import { C, fonts } from '../../../styles/theme';
-import { OnboardingScreenShell } from './OnboardingScreenShell';
 import { useOnboarding } from '../OnboardingContext';
 import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
-
-// R8 — camera permission priming.
-//
-// The iOS convention is "ask WHY before you ask for permission." This
-// screen explains why Coffee Hub wants the camera, then a single tap
-// triggers the actual prompt.
-//
-// Failure modes we handle:
-// - Not a native platform → skip the prompt entirely, mark unavailable,
-//   advance. (Web build never sees the OS prompt anyway.)
-// - Dynamic import of @capacitor/camera stalls → 4s timeout, mark
-//   unavailable, advance. Cannot block the user if the plugin fails
-//   to load on a bad network.
-// - OS prompt denied → flag denied and advance. R11/R13b fall back to
-//   the "Add a bag manually" CTA.
-// - Prompt returns "prompt" / unexpected → treat as denied.
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const IMPORT_TIMEOUT_MS = 4000;
 
@@ -29,9 +12,6 @@ export default function R08PermissionPriming() {
   const [requesting, setRequesting] = useState(false);
   const [deniedMessage, setDeniedMessage] = useState(null);
 
-  // Canceled flag + timer ref so that navigating away (back button) or
-  // unmounting during the 800ms "denied" follow-up window doesn't strand
-  // a stale setTimeout that later force-advances the reducer.
   const canceledRef = useRef(false);
   const deniedTimerRef = useRef(null);
   useEffect(() => {
@@ -58,8 +38,6 @@ export default function R08PermissionPriming() {
     if (requesting) return;
     setRequesting(true);
 
-    // Web: no native prompt to ask. Mark unavailable so R11 falls back
-    // to the manual-add CTA and move on.
     if (!Capacitor.isNativePlatform()) {
       logOnboardingEvent('onboarding_permission_skipped_web', {});
       advance('unavailable');
@@ -67,8 +45,6 @@ export default function R08PermissionPriming() {
     }
 
     try {
-      // Race the dynamic import against a 4s timeout so a bad chunk
-      // fetch can't strand us here.
       const mod = await Promise.race([
         import('@capacitor/camera'),
         new Promise((_, reject) =>
@@ -83,9 +59,6 @@ export default function R08PermissionPriming() {
       if (state === 'granted') {
         advance('granted');
       } else {
-        // 'denied' OR 'prompt' OR 'prompt-with-rationale' OR anything
-        // unexpected — treat as denied, surface a short follow-up
-        // message, advance anyway. We never hard-stop the flow.
         setDeniedMessage(
           "No worries — you can still add bags manually, and you can turn the camera on later from Settings."
         );
@@ -103,68 +76,78 @@ export default function R08PermissionPriming() {
   };
 
   return (
-    <OnboardingScreenShell
-      title="Give Ruphus a peek at your bags."
-      ruphusLine="I'll need your camera to read the back labels on your bags. It's how I learn what you're drinking."
-      primaryCta={{
-        label: requesting ? 'Requesting…' : 'Allow camera',
-        onClick: handleAllow,
-        disabled: requesting,
-      }}
-    >
-      {/* Visual iconography — big camera on a soft card */}
+    <div style={{
+      width: '100%',
+      minHeight: '100dvh',
+      maxHeight: '100dvh',
+      background: onboardingBg,
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: fonts.body,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <OnboardingTopBar step="R8 · CAMERA" overlay />
+
+      <MascotStage src="/images/ruphus-animations/ruphus-magnifying-glass.mp4" height={410} />
+
       <div style={{
+        flex: 1,
+        padding: '4px 24px 8px',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 20,
+        gap: 12,
+        minHeight: 0,
+        overflowY: 'auto',
       }}>
-        <div
-          style={{
-            width: 140,
-            height: 140,
-            borderRadius: 28,
-            background: C.amberBg,
-            border: `1px solid #E8D5A0`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 18,
-          }}
-          aria-hidden
-        >
-          <CameraIcon size={64} color={C.accent} strokeWidth={1.5} />
-        </div>
         <div style={{
-          fontSize: 14,
-          color: C.textMuted,
+          fontFamily: fonts.heading,
+          fontSize: 26, lineHeight: 1.15,
+          color: C.text,
           textAlign: 'center',
-          maxWidth: 300,
-          lineHeight: 1.45,
-          fontFamily: fonts.body,
         }}>
-          Your photos are sent to our AI to read the label, then
-          discarded. We never store your images.
+          Give me a peek at your bags.
         </div>
+
+        <NoteBubble style={{ marginTop: 4 }}>
+          I'll need your camera to read the back labels on your bags. It's how I learn what you're drinking.
+        </NoteBubble>
+
+        <div style={{
+          background: C.amberBg,
+          border: '1px solid #E8D5A0',
+          borderRadius: 12,
+          padding: '12px 14px',
+          marginTop: 2,
+          fontSize: 13, color: C.textMuted, lineHeight: 1.45,
+          textAlign: 'center',
+        }}>
+          Photos are sent to our AI to read the label, then discarded. We never store your images.
+        </div>
+
+        {deniedMessage && (
+          <div
+            role="status"
+            style={{
+              fontSize: 14,
+              color: C.text,
+              background: '#FEF2F2',
+              border: '1px solid rgba(220,38,38,0.25)',
+              borderRadius: 12,
+              padding: '12px 14px',
+              lineHeight: 1.45,
+            }}
+          >
+            {deniedMessage}
+          </div>
+        )}
       </div>
 
-      {deniedMessage && (
-        <div
-          role="status"
-          style={{
-            fontSize: 14,
-            color: C.text,
-            background: C.redBg,
-            border: `1px solid ${C.red}40`,
-            borderRadius: 12,
-            padding: '12px 14px',
-            lineHeight: 1.45,
-          }}
-        >
-          {deniedMessage}
-        </div>
-      )}
-    </OnboardingScreenShell>
+      <OnboardingCtaBar
+        label={requesting ? 'Requesting...' : 'Allow camera'}
+        onClick={handleAllow}
+        disabled={requesting}
+      />
+    </div>
   );
 }

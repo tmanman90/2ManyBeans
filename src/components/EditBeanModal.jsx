@@ -164,7 +164,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       savedRef.current = false;
     }
     wasOpen.current = open;
-  }, [bean, open]);
+  }, [bean, isNewBean, open]);
 
   if (!bean) return null;
 

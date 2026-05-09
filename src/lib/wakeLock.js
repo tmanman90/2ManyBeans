@@ -25,7 +25,7 @@ export async function acquireWakeLock() {
     // If something else took the module sentinel while we were awaiting
     // (e.g. a concurrent acquire won the race), release this one instead.
     if (sentinel) {
-      try { await next.release(); } catch {}
+      try { await next.release(); } catch { /* already released */ }
       return;
     }
     sentinel = next;
@@ -48,5 +48,7 @@ export async function releaseWakeLock() {
   sentinel = null;
   try {
     await current.release();
-  } catch {}
+  } catch {
+    // Already released.
+  }
 }

@@ -46,12 +46,6 @@ export function odeStepToMicrons(step) {
   return Math.round(200 + (step - 1) * 70);
 }
 
-function grinderSettingToMicrons(setting, grinderKey) {
-  const g = GRINDER_MICRON_SCALES[grinderKey];
-  if (!g) return null;
-  return Math.round(g.base + (setting - 1) * g.perStep);
-}
-
 // Translate Ode Gen 2 step to another grinder's setting via micron intermediary
 // Comandante uses clicks (e.g., "22 clicks"), JX-Pro uses rotation notation
 const CLICK_GRINDERS = new Set(['comandante-c40', '1zpresso-jx-pro']);

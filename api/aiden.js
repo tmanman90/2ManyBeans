@@ -7,6 +7,7 @@ import { decrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
+const RATE_LIMIT = { key: 'aidenPush', limit: 30, windowMs: 60 * 60 * 1000 };
 
 function validateProfile(profile) {
   const errors = [];
@@ -336,4 +337,4 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
     console.error('Fellow API error:', error.message);
     return res.status(502).json({ error: error.message || 'Failed to push profile to Fellow' });
   }
-});
+}, { rateLimit: RATE_LIMIT });

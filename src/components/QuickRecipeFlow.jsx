@@ -66,7 +66,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       setQuickRateOpen(false);
       setToast(null);
     }
-  }, [open]);
+  }, [isHandBrew, open, photo?.previewUrl]);
 
   const takeNativePhoto = async () => {
     try {

@@ -16,18 +16,25 @@ function hasStoredRoasterContext(bean) {
   return bean.enrichedAt && ROASTER_CONTEXT_FIELDS.some(f => bean[f]);
 }
 
+function getStoredRoasterContext(bean) {
+  if (!bean.enrichedAt) return null;
+  if (!ROASTER_CONTEXT_FIELDS.some(f => bean[f])) return null;
+  return {
+    roasterLocation: bean.roasterLocation,
+    roasterDescription: bean.roasterDescription,
+    roasterFounded: bean.roasterFounded,
+    redditNotes: bean.redditNotes,
+  };
+}
+
 async function runEnrichment(bean, getBeanById, updateBean, { forceResearch = false } = {}) {
   if (!updateBean || !getBeanById) return null;
-  if (inflightEnrichmentIds.has(bean.id)) return null;
 
-  if (!forceResearch && hasStoredRoasterContext(bean)) {
-    return {
-      roasterLocation: bean.roasterLocation,
-      roasterDescription: bean.roasterDescription,
-      roasterFounded: bean.roasterFounded,
-      redditNotes: bean.redditNotes,
-    };
-  }
+  const cached = getStoredRoasterContext(bean);
+
+  if (inflightEnrichmentIds.has(bean.id)) return cached;
+
+  if (!forceResearch && cached) return cached;
 
   inflightEnrichmentIds.add(bean.id);
   try {
@@ -59,11 +66,12 @@ async function runEnrichment(bean, getBeanById, updateBean, { forceResearch = fa
       .catch(err => console.log('Background enrichment failed:', err.message))
       .finally(() => inflightEnrichmentIds.delete(bean.id));
     const timeout = new Promise(r => setTimeout(() => r(null), ENRICHMENT_TIMEOUT));
-    return await Promise.race([enrichPromise, timeout]);
+    const result = await Promise.race([enrichPromise, timeout]);
+    return result || cached;
   } catch (err) {
     console.log('Ruphus enrichment skipped:', err.message);
     inflightEnrichmentIds.delete(bean.id);
-    return null;
+    return cached;
   }
 }
 
@@ -82,7 +90,6 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
     setRuphusResearching(willResearch);
     try {
       const enrichment = await runEnrichment(bean, getBeanById, updateBean, { forceResearch });
-      setRuphusResearching(false);
 
       // Re-read the bean to pick up any fields enrichment wrote
       let enrichedBean = bean;

@@ -86,14 +86,16 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
-      <div style={{
-        width: 96, height: 96, borderRadius: '50%',
-        background: C.greenBg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 24,
-      }}>
-        <Check size={48} color={C.green} strokeWidth={3} />
-      </div>
+      <video
+        src="/images/ruphus-animations/ruphus-brew-complete.mp4"
+        autoPlay muted playsInline
+        style={{
+          width: 200, height: 200, objectFit: 'contain',
+          marginBottom: 16,
+          WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+          maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+        }}
+      />
       <div style={{
         fontFamily: fonts.title,
         fontSize: 40,

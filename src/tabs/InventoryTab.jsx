@@ -202,8 +202,19 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         ))}
 
         {sealed.length === 0 && (
-          <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
-            No sealed beans. Time to order!
+          <div style={{ textAlign: 'center', padding: '24px 20px' }}>
+            <video
+              src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+              autoPlay muted loop playsInline
+              style={{
+                width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px',
+                display: 'block',
+                WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+                maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
+              }}
+            />
+            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>No sealed beans</div>
+            <div style={{ fontSize: 13, color: C.textMuted }}>Add your stash to keep track</div>
           </div>
         )}
         {sealed.length > 0 && filtered.length === 0 && (

@@ -3,6 +3,17 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { withCorsAuth, getDb } from './_lib/cors-auth.js';
 
+const DEFAULT_ADMIN_EMAIL = 'talmeltzer@gmail.com';
+
+function getAdminEmails() {
+  return new Set(
+    (process.env.ADMIN_EMAILS || DEFAULT_ADMIN_EMAIL)
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
 let genAI;
 function getClient() {
   if (!genAI) genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -41,6 +52,15 @@ async function summarize(bagNotes) {
 export default withCorsAuth(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
   if (!uid) return res.status(401).json({ error: 'Auth required' });
+
+  if (process.env.ENABLE_FIX_NOTES_SUMMARIES !== 'true') {
+    return res.status(410).json({ error: 'migration_disabled' });
+  }
+
+  const email = decodedToken.email?.toLowerCase();
+  if (!email || !getAdminEmails().has(email)) {
+    return res.status(403).json({ error: 'admin_required' });
+  }
 
   const db = getDb();
   const beansSnap = await db.collection('users').doc(uid).collection('beans').get();

@@ -8,12 +8,14 @@
 //   delete           -- Clean up orphaned Storage file (Pro required)
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
-import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb } from './_lib/cors-auth.js';
+import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb, enforceUserRateLimit } from './_lib/cors-auth.js';
 import { checkEntitlement } from './_lib/checkEntitlement.js';
 import { logApiUsage } from './_lib/costLogger.js';
 
 // Free users get 1 product shot. Keep in sync with src/lib/subscriptionConfig.js
 const FREE_PRODUCT_SHOTS = 1;
+const PRODUCT_SHOT_RATE_LIMIT = { key: 'productShot', limit: 20, windowMs: 60 * 60 * 1000 };
+const PHOTO_UPLOAD_RATE_LIMIT = { key: 'photoUpload', limit: 60, windowMs: 60 * 60 * 1000 };
 
 let genAI;
 function getClient() {
@@ -180,7 +182,31 @@ export default withCorsAuth(async (req, res, decodedToken) => {
 
   // Upload-original: any authenticated user (no Pro check)
   if (action === 'upload-original') {
+    const limited = await enforceUserRateLimit(uid, PHOTO_UPLOAD_RATE_LIMIT, res);
+    if (limited) return limited;
     return handleUploadOriginal(req, res, uid);
+  }
+
+  const { photo, beanId, skipFirestoreWrite } = req.body;
+
+  // Validate paths and required payload before metering so malformed requests
+  // cannot burn a free user's one product-shot credit.
+  if (beanId && !BEAN_ID_PATTERN.test(beanId)) {
+    return res.status(400).json({ error: 'Invalid beanId format' });
+  }
+  if ((action === 'delete' || action === 'reprocess') && !beanId) {
+    return res.status(400).json({ error: 'beanId required' });
+  }
+  if (action !== 'delete' && action !== 'reprocess') {
+    if (!photo?.base64 || !photo?.mimeType) {
+      return res.status(400).json({ error: 'photo with base64 and mimeType is required' });
+    }
+    if (!beanId) {
+      return res.status(400).json({ error: 'beanId is required' });
+    }
+    if (!ALLOWED_MIME.includes(photo.mimeType)) {
+      return res.status(400).json({ error: 'Unsupported image type' });
+    }
   }
 
   // All other actions (generate, delete) are metered: Pro users get unlimited,
@@ -191,6 +217,11 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       error: 'entitlement_check_unavailable',
       code: 'entitlement_check_unavailable',
     });
+  }
+
+  if (action !== 'delete') {
+    const limited = await enforceUserRateLimit(uid, PRODUCT_SHOT_RATE_LIMIT, res);
+    if (limited) return limited;
   }
 
   // Free user metered gate for product shot generation (not delete)
@@ -225,28 +256,18 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     }
   }
 
-  const { photo, beanId, skipFirestoreWrite } = req.body;
-
-  // Validate beanId charset/length up-front. Applies to both delete and create
-  // actions since both paths use it in the Storage object path.
-  if (beanId && !BEAN_ID_PATTERN.test(beanId)) {
-    return res.status(400).json({ error: 'Invalid beanId format' });
-  }
-
   // Delete action: clean up orphaned Storage file (for cancel/rescan cleanup)
   if (action === 'delete') {
-    if (!beanId) return res.status(400).json({ error: 'beanId required' });
     try {
       const bucket = getStorageBucket();
       await bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`).delete();
-    } catch (err) { /* silent on not-found */ }
+    } catch { /* silent on not-found */ }
     return res.status(200).json({ ok: true });
   }
 
   // Reprocess: download existing product shot, normalize background, re-upload.
   // No Gemini call — just fixes the background color on existing photos.
   if (action === 'reprocess') {
-    if (!beanId) return res.status(400).json({ error: 'beanId required' });
     try {
       const bucket = getStorageBucket();
       const file = bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`);
@@ -272,13 +293,6 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       console.error('[product-shot] Reprocess error:', err);
       return res.status(500).json({ error: 'Reprocess failed' });
     }
-  }
-
-  if (!photo?.base64 || !photo?.mimeType) {
-    return res.status(400).json({ error: 'photo with base64 and mimeType is required' });
-  }
-  if (!beanId) {
-    return res.status(400).json({ error: 'beanId is required' });
   }
 
   try {
