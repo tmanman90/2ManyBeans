@@ -1,13 +1,13 @@
 {
   "name": "coffee-hub",
   "private": true,
-  "version": "1.1.195",
+  "version": "1.1.196",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:ios": "CAPACITOR_BUILD=true vite build",
-    "cap:sync": "npm run build:ios && npx cap sync",
+    "cap:sync": "node scripts/patch-social-login.mjs && npm run build:ios && npx cap sync",
     "cap:open": "npx cap open ios",
     "lint": "eslint .",
     "preview": "vite preview"
