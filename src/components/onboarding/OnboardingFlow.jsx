@@ -236,10 +236,6 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
           ? { ...baseAnswers, ...overrides }
           : baseAnswers;
 
-      // Live prefs live on profile.preferences only — never duplicated
-      // inside onboardingAnswers. Strip the subfield out before
-      // persisting. Also drop null/undefined/empty picks so unanswered
-      // fields don't clobber the defaults with blanks.
       const { preferences: answerPrefs, ...answersWithoutPrefs } = answers;
       const prefsPatch = {};
       if (answerPrefs && typeof answerPrefs === 'object') {
@@ -248,9 +244,17 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
         }
       }
 
+      const withTimeout = (promise) =>
+        Promise.race([
+          promise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Network timeout — please try again.')), 12000)
+          ),
+        ]);
+
       if (!profile) {
         if (!createProfile) throw new Error('createProfile not provided');
-        await createProfile({
+        await withTimeout(createProfile({
           displayName: user?.displayName || answerPrefs?.displayName || '',
           email: user?.email || null,
           photoURL: user?.photoURL || null,
@@ -259,9 +263,9 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
           onboardingAnswers: answersWithoutPrefs,
           marketingConsent: !!answers.marketingConsent,
           preferences: Object.keys(prefsPatch).length ? prefsPatch : undefined,
-        });
+        }));
       } else if (completeOnboarding) {
-        await completeOnboarding(answers);
+        await withTimeout(completeOnboarding(answers));
       }
 
       // Marketing consent → mirror to /emailList/{uid}. Matches the

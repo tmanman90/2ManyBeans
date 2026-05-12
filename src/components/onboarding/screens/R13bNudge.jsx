@@ -7,6 +7,7 @@ import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboarding
 export default function R13bNudge() {
   const { finish, answers } = useOnboarding();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
 
   const canScan = answers?.cameraPermission === 'granted';
   const primaryLabel = canScan ? "Yes, let's scan" : 'Add a bag manually';
@@ -14,10 +15,12 @@ export default function R13bNudge() {
   const handlePrimary = async () => {
     if (busy) return;
     setBusy(true);
+    setError(null);
     try {
       logOnboardingEvent('onboarding_nudge_accepted', {});
       await finish?.({ postCompleteAction: canScan ? 'scan' : 'manual_add' });
-    } catch {
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.');
       setBusy(false);
     }
   };
@@ -25,9 +28,11 @@ export default function R13bNudge() {
   const handleMaybeLater = async () => {
     if (busy) return;
     setBusy(true);
+    setError(null);
     try {
       await finish?.({ postCompleteAction: 'none' });
-    } catch {
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.');
       setBusy(false);
     }
   };
@@ -70,6 +75,16 @@ export default function R13bNudge() {
           No worries, brewer. Your first scan is on me — want to try it now?
           It's the fastest way to see how this all fits together.
         </NoteBubble>
+
+        {error && (
+          <div style={{
+            fontSize: 13, color: '#B91C1C', background: '#FEF2F2',
+            border: '1px solid rgba(220,38,38,0.25)', borderRadius: 12,
+            padding: '10px 14px', lineHeight: 1.4, textAlign: 'center',
+          }}>
+            {error}
+          </div>
+        )}
       </div>
 
       <OnboardingCtaBar

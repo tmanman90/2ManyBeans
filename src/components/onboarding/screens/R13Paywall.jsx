@@ -7,7 +7,7 @@ import { useSubscription } from '../../../contexts/SubscriptionContext';
 import { usePaywall } from '../../../hooks/usePaywall.jsx';
 import { onboardingBg } from './OnboardingPrimitives';
 
-const HYDRATION_TIMEOUT_MS = 8000;
+const HYDRATION_TIMEOUT_MS = 5000;
 
 export default function R13Paywall() {
   const { dispatch, finish } = useOnboarding();
