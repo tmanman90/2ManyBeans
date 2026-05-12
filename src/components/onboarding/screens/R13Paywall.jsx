@@ -7,6 +7,8 @@ import { useSubscription } from '../../../contexts/SubscriptionContext';
 import { usePaywall } from '../../../hooks/usePaywall.jsx';
 import { onboardingBg } from './OnboardingPrimitives';
 
+const HYDRATION_TIMEOUT_MS = 8000;
+
 export default function R13Paywall() {
   const { dispatch, finish } = useOnboarding();
   const { hasPro, hasUltra } = useSubscription();
@@ -20,6 +22,13 @@ export default function R13Paywall() {
   } = useOnboardingPaywall();
 
   const [finalizeError, setFinalizeError] = useState(null);
+  const [hydrationTimedOut, setHydrationTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'hydrating') return;
+    const timer = setTimeout(() => setHydrationTimedOut(true), HYDRATION_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
 
   const finalizePurchase = useCallback(async () => {
     try {
@@ -92,23 +101,6 @@ export default function R13Paywall() {
       overflow: 'hidden',
       fontFamily: fonts.body,
     }}>
-      <video
-        src="/images/ruphus-animations/ruphus-confident.mp4"
-        autoPlay muted loop playsInline preload="auto"
-        style={{
-          position: 'absolute', inset: 0,
-          width: '100%', height: '100%',
-          objectFit: 'cover',
-          objectPosition: 'center 30%',
-        }}
-      />
-
-      <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0,
-        height: '74%',
-        background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.92) 22%, #FFFFFF 50%)',
-        pointerEvents: 'none',
-      }} />
 
       <div style={{
         position: 'relative',
@@ -188,6 +180,30 @@ export default function R13Paywall() {
             <div style={{ fontSize: 14, color: C.textMuted }}>
               One second...
             </div>
+            {hydrationTimedOut && (
+              <button
+                onClick={() => {
+                  if (flowCompletedRef.current) return;
+                  flowCompletedRef.current = true;
+                  dispatch({ type: 'COMPLETE', via: 'skipped_paywall' });
+                }}
+                style={{
+                  marginTop: 20,
+                  padding: '12px 24px',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  fontFamily: fonts.body,
+                  background: 'transparent',
+                  color: C.accent,
+                  border: `1.5px solid ${C.accent}`,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Continue without subscription
+              </button>
+            )}
           </>
         ) : (
           <div style={{ fontSize: 14, color: C.textMuted }}>&nbsp;</div>

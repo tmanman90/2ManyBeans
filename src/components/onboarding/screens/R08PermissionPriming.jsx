@@ -54,7 +54,12 @@ export default function R08PermissionPriming() {
       const Camera = mod?.Camera;
       if (!Camera) throw new Error('camera_plugin_missing');
 
-      const result = await Camera.requestPermissions({ permissions: ['camera'] });
+      const result = await Promise.race([
+        Camera.requestPermissions({ permissions: ['camera'] }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('permission_timeout')), 8000)
+        ),
+      ]);
       const state = result?.camera || 'denied';
       if (state === 'granted') {
         advance('granted');
