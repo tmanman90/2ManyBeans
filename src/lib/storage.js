@@ -11,7 +11,7 @@ import { getAuth } from 'firebase/auth';
 
 // Upload the user's original bean photo (no AI product shot).
 // Server-side: normalizes EXIF, compresses to progressive mozjpeg, uploads to Storage.
-export async function uploadOriginalPhoto(beanId, photo, { skipFirestoreWrite = false } = {}) {
+export async function uploadOriginalPhoto(beanId, photo, { skipFirestoreWrite = false, writeMode = 'replace' } = {}) {
   const baseUrl = Capacitor.isNativePlatform()
     ? 'https://2manybeans.vercel.app'
     : '';
@@ -27,6 +27,7 @@ export async function uploadOriginalPhoto(beanId, photo, { skipFirestoreWrite = 
       beanId,
       photo: { base64: photo.base64, mimeType: photo.mediaType || 'image/jpeg' },
       skipFirestoreWrite,
+      writeMode,
     }),
   });
   if (!res.ok) {
@@ -44,8 +45,9 @@ export async function deleteBeanPhoto(uid, beanId) {
     ]);
     const storage = await getAppStorage();
     const jpgRef = ref(storage, `users/${uid}/bean-photos/${beanId}.jpg`);
+    const originalJpgRef = ref(storage, `users/${uid}/bean-photos/${beanId}-original.jpg`);
     const pngRef = ref(storage, `users/${uid}/bean-photos/${beanId}.png`);
-    await Promise.allSettled([deleteObject(jpgRef), deleteObject(pngRef)]);
+    await Promise.allSettled([deleteObject(jpgRef), deleteObject(originalJpgRef), deleteObject(pngRef)]);
   } catch (err) {
     if (err.code !== 'storage/object-not-found') {
       console.error('Failed to delete bean photo:', err);

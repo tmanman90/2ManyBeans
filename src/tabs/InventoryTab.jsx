@@ -20,7 +20,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBean, onPendingAddBeanConsumed, onStartTastingSession }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBean, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -32,6 +32,10 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const [scanOpen, setScanOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [newBeanEntry, setNewBeanEntry] = useState(null);
+  const liveNewBean = newBeanEntry ? beans.find(b => b.id === newBeanEntry.id) : null;
+  const newBeanForModal = newBeanEntry
+    ? { ...newBeanEntry, ...(liveNewBean || {}), _scanPhotos: newBeanEntry._scanPhotos }
+    : null;
 
   const handleBeanCreated = (beanId, beanData) => {
     setScanOpen(false);
@@ -112,7 +116,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
               patiently waiting
             </div>
           </div>
-          <Btn variant="primary" onClick={() => setScanOpen(true)} style={{ padding: '8px 14px' }} data-tour="add-bean">
+          <Btn variant="primary" onClick={() => isDemo ? onDemoAction?.() : setScanOpen(true)} style={{ padding: '8px 14px' }} data-tour="add-bean">
             <Plus size={14} /> Add Bean
           </Btn>
         </div>
@@ -175,7 +179,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                 compact
                 updateBean={updateBean}
                 deleteBean={deleteBean}
-                onLearn={handleLearn}
+                onLearn={isDemo ? onDemoAction : handleLearn}
                 uid={uid}
                 actions={
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 16px 16px' }}>
@@ -188,8 +192,8 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
                       isHandBrew={isHandBrew}
                       brewMenuBean={brewMenuBean}
                       setBrewMenuBean={setBrewMenuBean}
-                      onAiden={aiden.handleBrewWithAiden}
-                      onHandBrew={handBrew.handleBrewHandBrew}
+                      onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
+                      onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
                     />
                     <Btn variant="small" onClick={() => handleFinishBag(bean)}>
                       <Check size={12} /> Finish
@@ -242,7 +246,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         <EditBeanModal
           open={!!newBeanEntry}
           onClose={() => setNewBeanEntry(null)}
-          bean={newBeanEntry}
+          bean={newBeanForModal}
           updateBean={updateBean}
           deleteBean={deleteBean}
           isNewBean

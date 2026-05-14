@@ -18,9 +18,9 @@ export const FREE_LIMITS = {
   // session don't burn additional credits.
   tasteTests: 1,
 
-  // AI product shots (Gemini image generation). Free users get 1 to
-  // experience the feature, then require Pro for unlimited.
-  productShots: 1,
+  // AI product shots (Gemini image generation). Free users get 3 completed
+  // generations to match the free bean-scan allowance, then require Pro.
+  productShots: 3,
 };
 
 // Display labels for plan identifiers, shared between PaywallSheet and

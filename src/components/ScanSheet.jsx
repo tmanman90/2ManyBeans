@@ -172,7 +172,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       // Upload original photo (fire-and-forget, server writes photoUrl directly)
       const scanPhoto = photos[0];
       if (scanPhoto && preAllocId) {
-        uploadOriginalPhoto(preAllocId, scanPhoto)
+        uploadOriginalPhoto(preAllocId, scanPhoto, { writeMode: 'if-empty' })
           .catch(err => console.warn('Original photo upload failed:', err.message));
       }
 

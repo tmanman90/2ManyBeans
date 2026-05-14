@@ -3,17 +3,18 @@
 // Bypasses CapacitorHttp XHR interception on iOS by keeping all Storage ops server-side.
 //
 // Actions:
-//   (default)        -- Generate AI product shot (Pro required)
+//   (default)        -- Generate AI product shot (free quota or Pro required)
 //   upload-original  -- Upload user's original photo (any authenticated user)
-//   delete           -- Clean up orphaned Storage file (Pro required)
+//   delete           -- Clean up orphaned Storage files
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb, enforceUserRateLimit } from './_lib/cors-auth.js';
 import { checkEntitlement } from './_lib/checkEntitlement.js';
 import { logApiUsage } from './_lib/costLogger.js';
 
-// Free users get 1 product shot. Keep in sync with src/lib/subscriptionConfig.js
-const FREE_PRODUCT_SHOTS = 1;
+// Free users get 3 completed product shots. Keep in sync with src/lib/subscriptionConfig.js
+const FREE_PRODUCT_SHOTS = 3;
+const QUOTA_RESERVATION_TTL_MS = 10 * 60 * 1000;
 const PRODUCT_SHOT_RATE_LIMIT = { key: 'productShot', limit: 20, windowMs: 60 * 60 * 1000 };
 const PHOTO_UPLOAD_RATE_LIMIT = { key: 'photoUpload', limit: 60, windowMs: 60 * 60 * 1000 };
 
@@ -98,6 +99,116 @@ const BEAN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB decoded
 
+function generatedPhotoPath(uid, beanId) {
+  return `users/${uid}/bean-photos/${beanId}.jpg`;
+}
+
+function originalPhotoPath(uid, beanId) {
+  return `users/${uid}/bean-photos/${beanId}-original.jpg`;
+}
+
+function createReservationId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function activeReservations(reservations = {}, now = Date.now()) {
+  return Object.fromEntries(
+    Object.entries(reservations).filter(([, value]) => {
+      const createdAt = typeof value === 'string' ? value : value?.createdAt;
+      const createdMs = Date.parse(createdAt);
+      return createdAt && !Number.isNaN(createdMs) && now - createdMs < QUOTA_RESERVATION_TTL_MS;
+    })
+  );
+}
+
+async function reserveFreeProductShot(uid) {
+  const db = getDb();
+  const userRef = db.collection('users').doc(uid);
+  const usageRef = userRef.collection('usage').doc('productShots');
+  const reservationId = createReservationId();
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, usageSnap] = await Promise.all([tx.get(userRef), tx.get(usageRef)]);
+    const used = userSnap.data()?.subscription?.freeUsage?.productShots ?? 0;
+    const reservations = activeReservations(usageSnap.data()?.reservations, now);
+    const activeCount = Object.keys(reservations).length;
+
+    if (used >= FREE_PRODUCT_SHOTS) {
+      const err = new Error('free_tier_exhausted');
+      err.code = 'free_tier_exhausted';
+      err.used = used;
+      throw err;
+    }
+
+    if (used + activeCount >= FREE_PRODUCT_SHOTS) {
+      const err = new Error('quota_reserved');
+      err.code = 'quota_reserved';
+      throw err;
+    }
+
+    tx.set(usageRef, {
+      reservations: {
+        ...reservations,
+        [reservationId]: { createdAt: nowIso },
+      },
+      updatedAt: nowIso,
+    }, { merge: true });
+  });
+
+  return reservationId;
+}
+
+async function finalizeFreeProductShot(uid, reservationId) {
+  if (!reservationId) return;
+  const db = getDb();
+  const userRef = db.collection('users').doc(uid);
+  const usageRef = userRef.collection('usage').doc('productShots');
+  const nowIso = new Date().toISOString();
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, usageSnap] = await Promise.all([tx.get(userRef), tx.get(usageRef)]);
+    const used = userSnap.data()?.subscription?.freeUsage?.productShots ?? 0;
+    const reservations = activeReservations(usageSnap.data()?.reservations);
+    delete reservations[reservationId];
+
+    if (used >= FREE_PRODUCT_SHOTS) {
+      const err = new Error('free_tier_exhausted');
+      err.code = 'free_tier_exhausted';
+      err.used = used;
+      throw err;
+    }
+
+    tx.set(userRef, {
+      subscription: { freeUsage: { productShots: used + 1 } },
+    }, { merge: true });
+    tx.set(usageRef, {
+      reservations,
+      updatedAt: nowIso,
+    }, { merge: true });
+  });
+}
+
+async function releaseFreeProductShot(uid, reservationId) {
+  if (!reservationId) return;
+  try {
+    const db = getDb();
+    const usageRef = db.collection('users').doc(uid).collection('usage').doc('productShots');
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(usageRef);
+      const reservations = activeReservations(snap.data()?.reservations);
+      delete reservations[reservationId];
+      tx.set(usageRef, {
+        reservations,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    });
+  } catch (err) {
+    console.warn('[product-shot] Failed to release quota reservation:', err?.message || err);
+  }
+}
+
 // Normalize a user-uploaded photo: EXIF auto-orient, resize, progressive mozjpeg.
 // Strips all metadata (GPS, camera info). Returns a clean JPEG buffer.
 async function normalizeUserPhoto(base64Input) {
@@ -133,7 +244,7 @@ async function normalizeUserPhoto(base64Input) {
 
 // Upload user's original photo. Any authenticated user (no Pro gate).
 async function handleUploadOriginal(req, res, uid) {
-  const { photo, beanId, skipFirestoreWrite } = req.body;
+  const { photo, beanId, skipFirestoreWrite, writeMode = 'replace' } = req.body;
 
   if (!beanId) return res.status(400).json({ error: 'beanId is required' });
   if (!BEAN_ID_PATTERN.test(beanId)) {
@@ -145,22 +256,36 @@ async function handleUploadOriginal(req, res, uid) {
   if (!ALLOWED_MIME.includes(photo.mimeType)) {
     return res.status(400).json({ error: 'Unsupported image type' });
   }
+  const resolvedWriteMode = skipFirestoreWrite ? 'none' : writeMode;
+  if (!['none', 'if-empty', 'replace'].includes(resolvedWriteMode)) {
+    return res.status(400).json({ error: 'Invalid writeMode' });
+  }
 
   try {
     const jpegBuffer = await normalizeUserPhoto(photo.base64);
 
     const bucket = getStorageBucket();
-    const file = bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`);
+    const file = bucket.file(originalPhotoPath(uid, beanId));
     await file.save(jpegBuffer, { metadata: { contentType: 'image/jpeg' } });
     const photoUrl = await adminGetDownloadURL(file);
 
-    // Always write Firestore for upload-original (unless explicitly skipped
-    // for pre-save uploads where the bean doc doesn't exist yet)
-    if (!skipFirestoreWrite) {
+    if (resolvedWriteMode === 'replace') {
       const db = getDb();
       await db.collection('users').doc(uid).collection('beans').doc(beanId).update({
         photoUrl,
         updatedAt: new Date(),
+      });
+    } else if (resolvedWriteMode === 'if-empty') {
+      const db = getDb();
+      const beanRef = db.collection('users').doc(uid).collection('beans').doc(beanId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(beanRef);
+        if (!snap.exists) return;
+        if (snap.data()?.photoUrl) return;
+        tx.update(beanRef, {
+          photoUrl,
+          updatedAt: new Date(),
+        });
       });
     }
 
@@ -179,6 +304,10 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   if (!uid) return res.status(401).json({ error: 'Authentication required' });
 
   const { action } = req.body;
+  const isGenerateAction = !action || action === 'generate';
+  if (action && !['generate', 'upload-original', 'delete', 'reprocess'].includes(action)) {
+    return res.status(400).json({ error: 'Unsupported product-shot action' });
+  }
 
   // Upload-original: any authenticated user (no Pro check)
   if (action === 'upload-original') {
@@ -197,7 +326,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   if ((action === 'delete' || action === 'reprocess') && !beanId) {
     return res.status(400).json({ error: 'beanId required' });
   }
-  if (action !== 'delete' && action !== 'reprocess') {
+  if (isGenerateAction) {
     if (!photo?.base64 || !photo?.mimeType) {
       return res.status(400).json({ error: 'photo with base64 and mimeType is required' });
     }
@@ -219,27 +348,15 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     });
   }
 
-  if (action !== 'delete') {
+  if (isGenerateAction) {
     const limited = await enforceUserRateLimit(uid, PRODUCT_SHOT_RATE_LIMIT, res);
     if (limited) return limited;
   }
 
-  // Free user metered gate for product shot generation (not delete)
-  if (!result.pro && action !== 'delete') {
-    const db = getDb();
-    const userRef = db.collection('users').doc(uid);
+  let quotaReservationId = null;
+  if (!result.pro && isGenerateAction) {
     try {
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(userRef);
-        const used = snap.data()?.subscription?.freeUsage?.productShots ?? 0;
-        if (used >= FREE_PRODUCT_SHOTS) {
-          const err = new Error('free_tier_exhausted');
-          err.code = 'free_tier_exhausted';
-          err.used = used;
-          throw err;
-        }
-        tx.set(userRef, { subscription: { freeUsage: { productShots: used + 1 } } }, { merge: true });
-      });
+      quotaReservationId = await reserveFreeProductShot(uid);
     } catch (err) {
       if (err?.code === 'free_tier_exhausted') {
         return res.status(403).json({
@@ -251,6 +368,12 @@ export default withCorsAuth(async (req, res, decodedToken) => {
           tier: 'pro',
         });
       }
+      if (err?.code === 'quota_reserved') {
+        return res.status(429).json({
+          error: 'rate_limited',
+          message: 'A product shot is already processing. Please wait for it to finish.',
+        });
+      }
       console.error('[product-shot] Metering error:', err?.message || err);
       return res.status(500).json({ error: 'Failed to check usage quota' });
     }
@@ -260,7 +383,11 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   if (action === 'delete') {
     try {
       const bucket = getStorageBucket();
-      await bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`).delete();
+      await Promise.allSettled([
+        bucket.file(generatedPhotoPath(uid, beanId)).delete(),
+        bucket.file(originalPhotoPath(uid, beanId)).delete(),
+        bucket.file(`users/${uid}/bean-photos/${beanId}.png`).delete(),
+      ]);
     } catch { /* silent on not-found */ }
     return res.status(200).json({ ok: true });
   }
@@ -270,7 +397,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   if (action === 'reprocess') {
     try {
       const bucket = getStorageBucket();
-      const file = bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`);
+      const file = bucket.file(generatedPhotoPath(uid, beanId));
       const [exists] = await file.exists();
       if (!exists) return res.status(404).json({ error: 'No photo found for this bean' });
 
@@ -329,9 +456,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
 
     if (!imageBase64) {
       const blockReason = result2.response.promptFeedback?.blockReason;
-      return res.status(500).json({
-        error: blockReason ? `Image blocked: ${blockReason}` : 'No image generated',
-      });
+      throw new Error(blockReason ? `Image blocked: ${blockReason}` : 'No image generated');
     }
 
     // Step 2: Normalize background to card color, then convert to JPEG
@@ -341,7 +466,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
 
     // Step 3: Upload to Firebase Storage via Admin SDK
     const bucket = getStorageBucket();
-    const file = bucket.file(`users/${uid}/bean-photos/${beanId}.jpg`);
+    const file = bucket.file(generatedPhotoPath(uid, beanId));
     await file.save(jpegBuffer, {
       metadata: { contentType: 'image/jpeg' },
     });
@@ -356,8 +481,11 @@ export default withCorsAuth(async (req, res, decodedToken) => {
       });
     }
 
+    await finalizeFreeProductShot(uid, quotaReservationId);
+
     return res.status(200).json({ photoUrl });
   } catch (error) {
+    await releaseFreeProductShot(uid, quotaReservationId);
     console.error('Product shot error:', error);
     const status = error.status || error.httpStatusCode || 500;
     return res.status(status).json({ error: error.message || 'Product shot failed' });

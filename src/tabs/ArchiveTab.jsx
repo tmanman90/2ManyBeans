@@ -404,7 +404,7 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
   );
 }
 
-export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBeanById, uid }) => {
+export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBeanById, uid, isDemo, onDemoAction }) => {
   const [query, setQuery] = useState('');
   const [year, setYear] = useState('all');
   const [sort, setSort] = useState('recent');
@@ -1053,7 +1053,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
         onClose={() => setOpenBeanId(null)}
         onRestore={handleRestore}
         onDelete={deleteBean ? handleDelete : undefined}
-        onLearn={handleLearn}
+        onLearn={isDemo ? onDemoAction : handleLearn}
         onEditPhoto={b => {
           setOpenBeanId(null);
           setTimeout(() => setEditBean(b), 240);

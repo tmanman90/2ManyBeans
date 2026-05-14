@@ -45,7 +45,7 @@ const PillButton = ({ color, icon, label, onClick }) => (
   </button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -62,6 +62,10 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [brewMenuBean, setBrewMenuBean] = useState(null);
   const [quickRecipeOpen, setQuickRecipeOpen] = useState(false);
   const [newBeanEntry, setNewBeanEntry] = useState(null);
+  const liveNewBean = newBeanEntry ? beans.find(b => b.id === newBeanEntry.id) : null;
+  const newBeanForModal = newBeanEntry
+    ? { ...newBeanEntry, ...(liveNewBean || {}), _scanPhotos: newBeanEntry._scanPhotos }
+    : null;
 
   const handleSaveToInventory = async (data) => {
     const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, photo, ...fields } = data;
@@ -205,7 +209,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           </div>
           <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
           {bean ? (
-            <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={handleLearn} uid={uid} tourTag={i === 0 ? 'bean-actions' : undefined} actions={
+            <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={isDemo ? onDemoAction : handleLearn} uid={uid} tourTag={i === 0 ? 'bean-actions' : undefined} actions={
               <div style={{ paddingTop: 14 }}>
                 <div style={{ borderTop: `1px dashed ${C.border}`, margin: '0 16px' }} />
                 <div style={{
@@ -222,8 +226,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                       isHandBrew={isHandBrew}
                       brewMenuBean={brewMenuBean}
                       setBrewMenuBean={setBrewMenuBean}
-                      onAiden={aiden.handleBrewWithAiden}
-                      onHandBrew={handBrew.handleBrewHandBrew}
+                      onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
+                      onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
                       compact={false}
                     />
                   </div>
@@ -425,7 +429,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         <EditBeanModal
           open={!!newBeanEntry}
           onClose={() => setNewBeanEntry(null)}
-          bean={newBeanEntry}
+          bean={newBeanForModal}
           updateBean={updateBean}
           deleteBean={deleteBean}
           isNewBean

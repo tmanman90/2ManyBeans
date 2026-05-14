@@ -120,6 +120,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const [photoGenerating, setPhotoGenerating] = useState(false);
   const [photoError, setPhotoError] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [displayPhotoUrl, setDisplayPhotoUrl] = useState('');
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const photoInFlight = useRef(false);
@@ -157,6 +158,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         setPhotoError(false);
         setPendingPhoto(isNewBean && bean._scanPhotos?.length > 0 ? bean._scanPhotos[0] : null);
       }
+      setDisplayPhotoUrl(bean.photoUrl || '');
       setConfirmDelete(false);
       setEnrichedOpen(false);
       setGrindOpen(false);
@@ -165,6 +167,12 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     }
     wasOpen.current = open;
   }, [bean, isNewBean, open]);
+
+  useEffect(() => {
+    if (!pendingPhoto && bean?.photoUrl) {
+      setDisplayPhotoUrl(bean.photoUrl);
+    }
+  }, [bean?.photoUrl, pendingPhoto]);
 
   if (!bean) return null;
 
@@ -265,6 +273,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     setPhotoError(false);
     try {
       const result = await uploadOriginalPhoto(bean.id, pendingPhoto);
+      if (result?.photoUrl) {
+        setDisplayPhotoUrl(result.photoUrl);
+      }
       if (result?.photoUrl && updateBean) {
         await updateBean(bean.id, { photoUrl: result.photoUrl });
       }
@@ -279,7 +290,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   // Generate an AI product shot from the pending photo.
   // Safety: uploads the original photo first so it's in Firestore before
   // generation starts. If the user saves/navigates away, the original is safe.
-  // Metered: free users get 1 free, then paywall.
+  // Metered: free users get FREE_LIMITS.productShots completed generations, then paywall.
   const handleProductShot = () => {
     if (!pendingPhoto || photoInFlight.current || !bean.id) return;
     if (!hasPro && (freeUsage?.productShots ?? 0) >= FREE_LIMITS.productShots) {
@@ -292,7 +303,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     const capturedBeanId = bean.id;
     const capturedPhoto = pendingPhoto;
 
-    uploadOriginalPhoto(capturedBeanId, capturedPhoto)
+    uploadOriginalPhoto(capturedBeanId, capturedPhoto, { writeMode: 'if-empty' })
       .catch(err => console.warn('Original photo upload failed:', err.message));
 
     generateProductShot(capturedPhoto, capturedBeanId)
@@ -300,6 +311,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         if (!photoInFlight.current) return;
         setPhotoGenerating(false);
         setPendingPhoto(null);
+        setDisplayPhotoUrl(photoUrl);
         if (updateBean) {
           updateBean(capturedBeanId, { photoUrl })
             .finally(() => { photoInFlight.current = false; });
@@ -311,8 +323,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         if (!photoInFlight.current) return;
         photoInFlight.current = false;
         setPhotoGenerating(false);
-        const msg = err?.message || '';
-        if (msg.includes('subscription_required') || msg.includes('free_tier_exhausted') || msg.toLowerCase().includes('pro subscription')) {
+        if (err?.code === 'subscription_required' || err?.code === 'free_tier_exhausted') {
           openPaywall({ feature: 'product_shot', promote: 'pro' });
           return;
         }
@@ -328,6 +339,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     setPhotoGenerating(true);
     try {
       await updateBean(bean.id, { photoUrl: null });
+      setDisplayPhotoUrl('');
       // Best-effort Storage cleanup (deleteBeanPhoto is already imported lazily in storage.js)
       const { deleteBeanPhoto } = await import('../lib/storage');
       deleteBeanPhoto(uid, bean.id).catch(() => {});
@@ -502,10 +514,10 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
               </Btn>
             )}
           </div>
-        ) : bean.photoUrl ? (
+        ) : displayPhotoUrl ? (
           <div style={{ position: 'relative', width: '100%', height: 180, background: C.card, overflow: 'hidden', borderRadius: 10 }}>
             <img
-              src={bean.photoUrl}
+              src={displayPhotoUrl}
               alt={`${bean.name} bag`}
               style={{
                 width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',

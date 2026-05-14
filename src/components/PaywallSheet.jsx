@@ -22,6 +22,7 @@ import {
   purchasePackage,
   restorePurchases,
   isRevenueCatAvailable,
+  deriveEntitlements,
 } from '../lib/revenuecat';
 
 const CONTEXT_COPY = {
@@ -32,6 +33,10 @@ const CONTEXT_COPY = {
   taste_cap: {
     headline: 'Ready to level up your tasting?',
     subtext: 'Unlimited AI tasting coach, unlimited bean scans, and more.',
+  },
+  product_shot: {
+    headline: "You've used your free product shots",
+    subtext: 'Upgrade to Pro for unlimited studio-style bean photos and scans.',
   },
   aiden: {
     headline: 'Send recipes straight to your Aiden',
@@ -230,7 +235,13 @@ export function PaywallSheet({ open, context, onClose }) {
         setPurchasing(false);
         return;
       }
-      // Success — the SubscriptionContext listener will unlock the UI.
+      const { hasPro, hasUltra } = deriveEntitlements(result.customerInfo);
+      if (!hasPro && !hasUltra) {
+        setError('Purchase confirmed, but the subscription is still syncing. Tap Restore Purchases in Settings.');
+        setPurchasing(false);
+        return;
+      }
+      // Success — purchasePackage publishes customerInfo so SubscriptionContext unlocks immediately.
       // Close the paywall after a short delay so the user sees the state flip.
       setToast('Subscription active');
       closeTimerRef.current = setTimeout(() => {
@@ -253,8 +264,8 @@ export function PaywallSheet({ open, context, onClose }) {
     try {
       const info = await restorePurchases();
       if (!mountedRef.current) return;
-      const active = info?.entitlements?.active || {};
-      if (active.pro || active.ultra) {
+      const { hasPro, hasUltra } = deriveEntitlements(info);
+      if (hasPro || hasUltra) {
         setToast('Subscription restored');
         closeTimerRef.current = setTimeout(() => {
           if (!mountedRef.current) return;

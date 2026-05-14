@@ -36,7 +36,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.webp' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   const [openModal, setOpenModal] = useState(false);
@@ -222,6 +222,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             updateTasting={updateTasting}
             getBeanById={getBeanById}
             onStartTastingSession={handleStartTastingSession}
+            isDemo={isDemo}
+            onDemoAction={onDemoAction}
           />
         )}
         {tab === 'inventory' && (
@@ -241,6 +243,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               pendingAddBean={pendingAddBean}
               onPendingAddBeanConsumed={() => setPendingAddBean(false)}
               onStartTastingSession={handleStartTastingSession}
+              isDemo={isDemo}
+              onDemoAction={onDemoAction}
             />
           </Suspense>
         )}
@@ -255,6 +259,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               updateBean={updateBean}
               pendingTastingBeanId={pendingTastingBeanId}
               onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
+              isDemo={isDemo}
+              onDemoAction={onDemoAction}
             />
           </Suspense>
         )}
@@ -273,13 +279,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
                 updateTasting={updateTasting}
                 isActive={tab === 'chat'}
                 onStartTastingSession={handleStartTastingSession}
+                isDemo={isDemo}
+                onDemoAction={onDemoAction}
               />
             </Suspense>
           </div>
         )}
         {tab === 'archive' && (
           <Suspense fallback={<TabFallback />}>
-            <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} getBeanById={getBeanById} uid={uid} />
+            <ArchiveTab beans={beans} tastings={tastings} updateBean={updateBean} deleteBean={deleteBean} getBeanById={getBeanById} uid={uid} isDemo={isDemo} onDemoAction={onDemoAction} />
           </Suspense>
         )}
       </div>

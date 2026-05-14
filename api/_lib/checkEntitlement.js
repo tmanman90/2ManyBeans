@@ -27,6 +27,7 @@
 //     briefly via positive-only rule does NOT apply, so this re-checks
 //     each time, which is fine for a free user making occasional calls).
 import { getFirestore } from 'firebase-admin/firestore';
+import { normalizeSecret } from './secrets.js';
 
 const RC_PROJECT_ID = 'f33ec0ef'; // 2manybeans project in RevenueCat
 const RC_BASE = 'https://api.revenuecat.com/v2';
@@ -115,7 +116,7 @@ export async function checkEntitlement(uid) {
   }
 
   // 2. RC API fallback. Required for the brief post-purchase window.
-  const apiKey = process.env.REVENUECAT_API_KEY;
+  const apiKey = normalizeSecret(process.env.REVENUECAT_API_KEY);
   if (!apiKey) {
     if (IS_PRODUCTION) {
       // Fail-closed in prod — never silently grant entitlement on misconfig.

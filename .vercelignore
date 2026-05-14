@@ -1,0 +1,9 @@
+ios/
+build/
+assets/
+.splash-backup-*
+.asset-archive/
+screenshot-generator/
+docs/brand/
+docs/data/
+docs/onboarding-screenshots/

@@ -12,7 +12,7 @@ import { BREW_DEVICES } from '../lib/brewMethods';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
-import { restorePurchases, isRevenueCatAvailable } from '../lib/revenuecat';
+import { restorePurchases, isRevenueCatAvailable, deriveEntitlements } from '../lib/revenuecat';
 import { PLAN_LABELS } from '../lib/subscriptionConfig';
 import { auth } from '../firebase';
 import { db } from '../firebase';
@@ -21,6 +21,7 @@ import { API_BASE } from '../lib/apiBase';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { redeemCode } from '../lib/redeemCode';
 import { sanitizeUserText } from '../lib/sanitizeUserText';
+import { reauthenticateForAccountDeletion } from '../lib/reauth';
 
 // Reason-code -> user copy for the inline redeem row. Unknown codes fall
 // back to a generic message. Kept here (consumer) instead of the helper
@@ -454,8 +455,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     setRestoring(true);
     try {
       const info = await restorePurchases();
-      const active = info?.entitlements?.active || {};
-      if (active.pro || active.ultra) {
+      const { hasPro, hasUltra } = deriveEntitlements(info);
+      if (hasPro || hasUltra) {
         setToast('Subscription restored');
       } else {
         setToast('No active subscription found');
@@ -521,16 +522,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     haptic.medium();
     setDeleteStep('deleting');
     try {
-      // Force-refresh the Firebase ID token so the server's reauth check
-      // (auth_time within 5 minutes) sees a fresh timestamp. Without this,
-      // the cached token from sign-in 30+ minutes ago would be rejected as
-      // 'reauth_required'.
-      //
-      // NOTE: this only refreshes the token, it does NOT trigger a fresh
-      // OAuth reauth. For full security parity with banking-grade flows,
-      // we should call reauthenticateWithCredential first. For V1 we accept
-      // that the 1-hour token lifetime is the worst-case replay window —
-      // the auth_time check still rejects tokens from prior sessions.
+      await reauthenticateForAccountDeletion();
       await auth.currentUser?.getIdToken(true);
 
       const res = await fetchWithRetry({
@@ -547,10 +539,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       onClose();
     } catch (err) {
       console.error('[Settings] Delete account failed:', err);
-      // The server returns 401 reauth_required when the token's auth_time
-      // is too old. Surface a clearer message in that case.
-      if (err?.message?.includes('reauth_required') || err?.message?.toLowerCase().includes('re-sign')) {
-        setToast('Please sign out and sign back in, then try again.');
+      if (err?.code === 'reauth_required') {
+        setToast('Please confirm your sign-in again to delete your account.');
+      } else if (err?.code === 'auth/unsupported-provider') {
+        setToast('Please sign out and sign back in, then try deleting again.');
+      } else if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request' || err?.message?.toLowerCase().includes('cancel')) {
+        setToast('Account deletion canceled. Nothing was deleted.');
       } else {
         setToast('Could not delete account. Please try again or contact support.');
       }
@@ -983,101 +977,114 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             {!hasPro && (
               <>
                 <div style={separatorStyle} />
-                {redeemSuccess ? (
-                  <div style={{ padding: 16 }}>
-                    <div style={{ fontSize: 14, color: C.text, marginBottom: 8, fontWeight: 600 }}>
-                      Pro unlocked
-                    </div>
-                    <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
-                      Active until {new Date(redeemSuccess.expiresAt).toLocaleDateString()}
-                    </div>
-                    <button
-                      onClick={resetRedeemForm}
-                      style={{
-                        padding: '10px 16px', borderRadius: 10,
-                        border: `1px solid ${C.border}`, background: C.bg,
-                        fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                        color: C.text, cursor: 'pointer',
-                      }}
-                    >
-                      Close
-                    </button>
-                  </div>
-                ) : redeemOpen ? (
-                  <div style={{ padding: 16 }}>
-                    <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
-                      Enter your redemption code
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="CODE"
-                      value={redeemInput}
-                      onChange={(e) => {
-                        // Auto-uppercase + strip anything that can't be in a code
-                        // so the input mirrors the server-side regex exactly.
-                        const cleaned = e.target.value
-                          .toUpperCase()
-                          .replace(/[^A-Z0-9-]/g, '')
-                          .slice(0, 20);
-                        setRedeemInput(cleaned);
-                        if (redeemError) setRedeemError(null);
-                      }}
-                      onKeyDown={(e) => e.key === 'Enter' && !redeemLoading && handleRedeemSubmit()}
-                      onFocus={scrollOnFocus}
-                      autoCapitalize="characters"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      maxLength={20}
-                      style={{
-                        width: '100%', padding: '10px 12px', borderRadius: 8,
-                        border: `1px solid ${C.border}`, fontFamily: fonts.body,
-                        fontSize: 16, background: C.bg, color: C.text,
-                        boxSizing: 'border-box',
-                        marginBottom: redeemError ? 8 : 12,
-                        letterSpacing: 1,
-                        textTransform: 'uppercase',
-                      }}
-                    />
-                    {redeemError && (
-                      <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
-                        {redeemError}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={resetRedeemForm}
-                        style={{
-                          flex: 1, padding: '10px 16px', borderRadius: 10,
-                          border: `1px solid ${C.border}`, background: C.bg,
-                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                          color: C.text, cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleRedeemSubmit}
-                        disabled={redeemLoading || !redeemInput.trim()}
-                        style={{
-                          flex: 1, padding: '10px 16px', borderRadius: 10,
-                          border: 'none', background: C.accent,
-                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                          color: '#fff', cursor: 'pointer',
-                          opacity: (redeemLoading || !redeemInput.trim()) ? 0.5 : 1,
-                        }}
-                      >
-                        {redeemLoading ? 'Redeeming...' : 'Redeem'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
+                {Capacitor.isNativePlatform() ? (
                   <button
-                    onClick={() => { haptic.light(); setRedeemOpen(true); }}
+                    onClick={() => {
+                      haptic.light();
+                      window.open('https://apps.apple.com/redeem?ctx=offercodes&id=6761014463', '_blank');
+                    }}
                     style={rowStyle}
                   >
-                    <span style={rowLabelStyle}>Redeem Code</span>
-                    <ChevronRight size={18} color={C.textMuted} />
+                    <span style={rowLabelStyle}>Redeem Offer Code</span>
+                    <ExternalLink size={16} color={C.textMuted} />
                   </button>
+                ) : (
+                  <>
+                    {redeemSuccess ? (
+                      <div style={{ padding: 16 }}>
+                        <div style={{ fontSize: 14, color: C.text, marginBottom: 8, fontWeight: 600 }}>
+                          Pro unlocked
+                        </div>
+                        <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
+                          Active until {new Date(redeemSuccess.expiresAt).toLocaleDateString()}
+                        </div>
+                        <button
+                          onClick={resetRedeemForm}
+                          style={{
+                            padding: '10px 16px', borderRadius: 10,
+                            border: `1px solid ${C.border}`, background: C.bg,
+                            fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                            color: C.text, cursor: 'pointer',
+                          }}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    ) : redeemOpen ? (
+                      <div style={{ padding: 16 }}>
+                        <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
+                          Enter your redemption code
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="CODE"
+                          value={redeemInput}
+                          onChange={(e) => {
+                            const cleaned = e.target.value
+                              .toUpperCase()
+                              .replace(/[^A-Z0-9-]/g, '')
+                              .slice(0, 20);
+                            setRedeemInput(cleaned);
+                            if (redeemError) setRedeemError(null);
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && !redeemLoading && handleRedeemSubmit()}
+                          onFocus={scrollOnFocus}
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          maxLength={20}
+                          style={{
+                            width: '100%', padding: '10px 12px', borderRadius: 8,
+                            border: `1px solid ${C.border}`, fontFamily: fonts.body,
+                            fontSize: 16, background: C.bg, color: C.text,
+                            boxSizing: 'border-box',
+                            marginBottom: redeemError ? 8 : 12,
+                            letterSpacing: 1,
+                            textTransform: 'uppercase',
+                          }}
+                        />
+                        {redeemError && (
+                          <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+                            {redeemError}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={resetRedeemForm}
+                            style={{
+                              flex: 1, padding: '10px 16px', borderRadius: 10,
+                              border: `1px solid ${C.border}`, background: C.bg,
+                              fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                              color: C.text, cursor: 'pointer',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleRedeemSubmit}
+                            disabled={redeemLoading || !redeemInput.trim()}
+                            style={{
+                              flex: 1, padding: '10px 16px', borderRadius: 10,
+                              border: 'none', background: C.accent,
+                              fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                              color: '#fff', cursor: 'pointer',
+                              opacity: (redeemLoading || !redeemInput.trim()) ? 0.5 : 1,
+                            }}
+                          >
+                            {redeemLoading ? 'Redeeming...' : 'Redeem'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { haptic.light(); setRedeemOpen(true); }}
+                        style={rowStyle}
+                      >
+                        <span style={rowLabelStyle}>Redeem Code</span>
+                        <ChevronRight size={18} color={C.textMuted} />
+                      </button>
+                    )}
+                  </>
                 )}
               </>
             )}

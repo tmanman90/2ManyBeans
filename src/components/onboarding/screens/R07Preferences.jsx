@@ -5,6 +5,7 @@ import { warmPaywallOfferings } from '../warmPaywallOfferings';
 import { sanitizeUserText } from '../../../lib/sanitizeUserText';
 import { scrollOnFocus } from '../../../lib/formHelpers';
 import { useNativeKeyboard } from '../../../hooks/useNativeKeyboard';
+import { readPendingProviderDisplayName } from '../../../hooks/useUserProfile';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const GRINDERS = [
@@ -44,19 +45,16 @@ const selectStyle = {
 
 export default function R07Preferences() {
   const { dispatch, answers, user } = useOnboarding();
-  const needsName = !user?.displayName;
 
   const [grinder, setGrinder] = useState(answers?.preferences?.grinder || 'fellow-ode-gen2');
   const [grinderCustom, setGrinderCustom] = useState(answers?.preferences?.grinderCustomName || '');
   const [brewMethod, setBrewMethod] = useState(answers?.preferences?.brewMethod || 'aiden');
   const [displayName, setDisplayName] = useState(
-    answers?.preferences?.displayName || user?.displayName || ''
+    answers?.preferences?.displayName || user?.displayName || readPendingProviderDisplayName() || ''
   );
 
   useNativeKeyboard({ hideTabBar: false });
   useEffect(() => { warmPaywallOfferings(); }, []);
-
-  const nameInvalid = needsName && sanitizeUserText(displayName).length === 0;
 
   const handleContinue = () => {
     const prefs = {
@@ -64,9 +62,7 @@ export default function R07Preferences() {
       grinderCustomName: grinder === 'other' ? sanitizeUserText(grinderCustom) : null,
       brewMethod,
     };
-    if (needsName) {
-      prefs.displayName = sanitizeUserText(displayName);
-    }
+    prefs.displayName = sanitizeUserText(displayName);
     dispatch({
       type: 'ADVANCE',
       next: 'r8',
@@ -119,20 +115,16 @@ export default function R07Preferences() {
           Set up your kit
         </div>
 
-        {needsName && (
-          <>
-            <FieldLabel>What should I call you?</FieldLabel>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              onFocus={scrollOnFocus}
-              placeholder="Your name"
-              maxLength={50}
-              style={inputStyle}
-            />
-          </>
-        )}
+        <FieldLabel>What should I call you? (optional)</FieldLabel>
+        <input
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          onFocus={scrollOnFocus}
+          placeholder="Your name"
+          maxLength={50}
+          style={inputStyle}
+        />
 
         <FieldLabel style={{ marginTop: 6 }}>What's your grinder?</FieldLabel>
         <select
@@ -191,7 +183,7 @@ export default function R07Preferences() {
       <OnboardingCtaBar
         label="Continue"
         onClick={handleContinue}
-        disabled={nameInvalid}
+        disabled={false}
       />
     </div>
   );

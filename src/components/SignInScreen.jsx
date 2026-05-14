@@ -55,7 +55,7 @@ function Bean({ size = 40, rotate = 0, opacity = 0.08, color = C.accent, style =
   );
 }
 
-export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple }) => {
+export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple, onExploreDemo }) => {
   const [signingIn, setSigningIn] = useState(null);
   const [error, setError] = useState(null);
 
@@ -197,6 +197,26 @@ export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple }) => {
           </svg>
           {signingIn === 'google' ? 'Signing in…' : 'Sign in with Google'}
         </button>
+
+        {onExploreDemo && (
+          <button
+            type="button"
+            onClick={onExploreDemo}
+            disabled={!!signingIn}
+            style={{
+              ...buttonBase,
+              background: 'transparent',
+              color: C.textMuted,
+              border: 'none',
+              boxShadow: 'none',
+              fontSize: 14,
+              textDecoration: 'underline',
+              opacity: signingIn ? 0.5 : 1,
+            }}
+          >
+            Explore without an account
+          </button>
+        )}
 
         {error && (
           <div

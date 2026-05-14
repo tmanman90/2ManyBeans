@@ -16,12 +16,25 @@ import { Capacitor } from '@capacitor/core';
 // Public Apple API key — safe to embed in client code, per RevenueCat docs.
 // Found in RevenueCat dashboard > Project Settings > API Keys.
 const PUBLIC_IOS_KEY = 'appl_YsjXhHMAtUIVshbIHDUuxZHWlFD';
+const PRODUCT_PLAN_MAP = {
+  'com.talmeltzer.coffeehub.pro.monthly': 'pro_monthly',
+  'com.talmeltzer.coffeehub.pro.annual': 'pro_annual',
+  'com.talmeltzer.coffeehub.ultra.monthly': 'ultra_monthly',
+  'com.talmeltzer.coffeehub.ultra.annual': 'ultra_annual',
+};
 
 let sdkModule = null;
 let configurePromise = null;
 let _nativeListenerHandle = null;
 let configured = false;
 const listeners = new Set();
+
+function notifyCustomerInfo(customerInfo) {
+  if (!customerInfo) return;
+  for (const fn of listeners) {
+    try { fn(customerInfo); } catch (e) { console.error('[RC listener]', e); }
+  }
+}
 
 // Lazy-load the native module so web builds don't pay the cost.
 async function loadSdk() {
@@ -72,9 +85,7 @@ export async function initRevenueCat() {
       // Register the native listener exactly once. Retain the handle so
       // we can remove it later if needed (e.g. during teardown).
       _nativeListenerHandle = await Purchases.addCustomerInfoUpdateListener((result) => {
-        for (const fn of listeners) {
-          try { fn(result.customerInfo); } catch (e) { console.error('[RC listener]', e); }
-        }
+        notifyCustomerInfo(result.customerInfo);
       });
     } catch (err) {
       // Allow next caller to retry from scratch.
@@ -148,13 +159,27 @@ export async function getCustomerInfo() {
 
 /** Derive { hasPro, hasUltra } from a CustomerInfo object. */
 export function deriveEntitlements(customerInfo) {
-  if (!customerInfo?.entitlements?.active) {
-    return { hasPro: false, hasUltra: false };
+  const active = customerInfo?.entitlements?.active || {};
+  const activeSubscriptions = Array.isArray(customerInfo?.activeSubscriptions)
+    ? customerInfo.activeSubscriptions
+    : [];
+
+  const activePlans = activeSubscriptions
+    .map(productId => PRODUCT_PLAN_MAP[productId])
+    .filter(Boolean);
+
+  const entitlementKeys = new Set(Object.keys(active));
+  const hasUltra = entitlementKeys.has('ultra') || activePlans.some(plan => plan.startsWith('ultra'));
+  const hasPro = hasUltra || entitlementKeys.has('pro') || activePlans.some(plan => plan.startsWith('pro'));
+
+  let plan = null;
+  if (hasUltra) {
+    plan = activePlans.find(p => p.startsWith('ultra')) || 'ultra_monthly';
+  } else if (hasPro) {
+    plan = activePlans.find(p => p.startsWith('pro')) || 'pro_monthly';
   }
-  const active = customerInfo.entitlements.active;
-  const hasUltra = !!active.ultra;
-  const hasPro = hasUltra || !!active.pro;
-  return { hasPro, hasUltra };
+
+  return { hasPro, hasUltra, plan };
 }
 
 /** Start a purchase. Returns the updated { customerInfo, userCancelled }. */
@@ -164,10 +189,19 @@ export async function purchasePackage(aPackage) {
   const { Purchases, PURCHASES_ERROR_CODE } = await loadSdk();
   try {
     const result = await Purchases.purchasePackage({ aPackage });
+    notifyCustomerInfo(result.customerInfo);
     return { customerInfo: result.customerInfo, userCancelled: false };
   } catch (err) {
     if (err?.userCancelled || err?.code === PURCHASES_ERROR_CODE?.PURCHASE_CANCELLED_ERROR) {
       return { customerInfo: null, userCancelled: true };
+    }
+    if (
+      err?.code === PURCHASES_ERROR_CODE?.PRODUCT_ALREADY_PURCHASED_ERROR ||
+      /already.*purchas/i.test(err?.message || '')
+    ) {
+      const { customerInfo } = await Purchases.restorePurchases();
+      notifyCustomerInfo(customerInfo);
+      return { customerInfo, userCancelled: false, restored: true };
     }
     throw err;
   }
@@ -179,6 +213,7 @@ export async function restorePurchases() {
   await initRevenueCat();
   const { Purchases } = await loadSdk();
   const { customerInfo } = await Purchases.restorePurchases();
+  notifyCustomerInfo(customerInfo);
   return customerInfo;
 }
 

@@ -16,6 +16,7 @@
 import { timingSafeEqual } from 'crypto';
 import { getDb } from './_lib/cors-auth.js';
 import { invalidateEntitlementCache } from './_lib/checkEntitlement.js';
+import { normalizeSecret } from './_lib/secrets.js';
 
 // Strict allowlist of known product IDs. Any unknown ID on a purchase-like
 // event triggers a 500 so RC retries the webhook (and we get a loud log).
@@ -72,15 +73,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const expected = process.env.REVENUECAT_WEBHOOK_AUTH_KEY;
+  const expected = normalizeSecret(process.env.REVENUECAT_WEBHOOK_AUTH_KEY);
   if (!expected) {
     console.error('[RC webhook] REVENUECAT_WEBHOOK_AUTH_KEY not set');
     return res.status(500).json({ error: 'Webhook auth not configured' });
   }
 
   const authHeader = req.headers.authorization || '';
-  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  const provided = normalizeSecret(authHeader);
   if (!timingSafeCompare(provided, expected)) {
+    console.warn('[RC webhook] auth_failed', {
+      hasAuthorization: !!authHeader,
+      scheme: authHeader.includes(' ') ? authHeader.split(/\s+/, 1)[0] : 'raw',
+      providedLength: provided.length,
+      expectedLength: expected.length,
+    });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

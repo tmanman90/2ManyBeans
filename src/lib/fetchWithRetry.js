@@ -62,6 +62,19 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
         return response.json();
       }
 
+      // Some authenticated destructive flows need typed 401 errors. Parse
+      // those before FRIENDLY_ERRORS turns every 401 into generic session copy.
+      if (response.status === 401) {
+        let data = null;
+        try { data = await response.json(); } catch { /* ignore non-JSON error bodies */ }
+        if (data?.error === 'reauth_required') {
+          const err = new Error(data.message || 'Please reauthenticate to continue.');
+          err.code = 'reauth_required';
+          throw err;
+        }
+        throw new Error(FRIENDLY_ERRORS[401]);
+      }
+
       // Subscription gate (Pro/Ultra required) or free tier quota exhausted.
       // These should NOT retry and should surface a typed error so callers can
       // trigger the paywall instead of showing a generic error toast.

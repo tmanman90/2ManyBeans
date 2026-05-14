@@ -188,7 +188,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive, onStartTastingSession }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const { hasPro, freeUsage } = useSubscription();
@@ -329,17 +329,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
   // Text comes from ChatInputBar (child owns the input state).
   const handleSend = async (text) => {
-    // Synchronous guard: blocks the second call in the same event loop tick
-    // before React has flushed `loading` state. Without this, a fast Enter+Send
-    // double-press can slip both calls through, each appending to
-    // apiMessages.current with stale snapshots and interleaving transcripts.
     if (sendingRef.current) return;
     if (!text && photos.length === 0) return;
 
-    // Chat is Pro-only (no free tier). Server enforces via withCorsAuthMetered
-    // — chat messages don't pass `metered: true` so the server returns 403
-    // subscription_required for free users. Catch that error below and open
-    // the paywall instead of a generic toast.
+    if (isDemo) { onDemoAction?.(); return; }
+
     if (!hasPro) {
       openPaywall({ feature: 'generic', promote: 'pro' });
       return;

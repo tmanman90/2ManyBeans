@@ -32,7 +32,7 @@ function stashedDisplayName(raw) {
   );
 }
 
-function readPendingProviderDisplayName() {
+export function readPendingProviderDisplayName() {
   try {
     for (const key of ['google_pending_name', 'apple_pending_name']) {
       const displayName = stashedDisplayName(JSON.parse(localStorage.getItem(key) || 'null'));

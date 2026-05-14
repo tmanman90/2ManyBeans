@@ -61,6 +61,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Server-managed usage/quota ledgers. Admin SDK only; clients read the
+    // mirrored public counters on users/{uid}.subscription.freeUsage.
+    match /users/{userId}/usage/{usageId} {
+      allow read, write: if false;
+    }
+
     // Beans subcollection. Scoped rule -- size cap + required ownership,
     // no arbitrary garbage bags of data that could drive up Firestore bill.
     // 100KB per bean doc is generous but below the 1MB Firestore per-doc

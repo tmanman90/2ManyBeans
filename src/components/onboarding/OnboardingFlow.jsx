@@ -255,7 +255,7 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
       if (!profile) {
         if (!createProfile) throw new Error('createProfile not provided');
         await withTimeout(createProfile({
-          displayName: user?.displayName || answerPrefs?.displayName || '',
+          displayName: user?.displayName || answerPrefs?.displayName || 'Coffee Lover',
           email: user?.email || null,
           photoURL: user?.photoURL || null,
           signUpProvider: user?.providerData?.[0]?.providerId || 'unknown',

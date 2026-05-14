@@ -32,7 +32,7 @@ const INITIAL_STATE = {
   plan: null,
   status: null,
   cancelAtPeriodEnd: false,
-  freeUsage: { aiScans: 0, tasteTests: 0 },
+  freeUsage: { aiScans: 0, tasteTests: 0, productShots: 0 },
   loading: true,
   firestoreLoaded: false,
   // rcHydrated flips true once the RC side has "tried" at least once:
@@ -60,6 +60,13 @@ export function SubscriptionProvider({ uid, children }) {
       doc(db, 'users', uid),
       (snap) => {
         const sub = snap.data()?.subscription ?? {};
+        const hasSubscriptionRecord = !!(
+          sub.status ||
+          sub.plan ||
+          sub.expiresAt ||
+          sub.originalPurchaseDate ||
+          sub.lastEventType
+        );
         // Defensive expiresAt check: if a webhook (RC cancel/expire) or a
         // redemption grant never fires a follow-up "no longer active"
         // event, the stale status=active would otherwise grant Pro forever
@@ -79,17 +86,21 @@ export function SubscriptionProvider({ uid, children }) {
         // Direct assignment from Firestore — this is the canonical source
         // of truth. A cancellation or expiration event flipping `active` to
         // false MUST be reflected here, otherwise the UI keeps showing Pro
-        // for the lifetime of the mount.
+        // for the lifetime of the mount. However, a user with only local
+        // RevenueCat customerInfo and no webhook record yet has no explicit
+        // Firestore subscription state to apply, so preserve the SDK unlock
+        // instead of downgrading back to Free.
         setState((prev) => ({
           ...prev,
-          hasPro: active && isProPlan,
-          hasUltra: active && isUltraPlan,
-          plan,
-          status: sub.status ?? null,
+          hasPro: hasSubscriptionRecord ? active && isProPlan : prev.hasPro,
+          hasUltra: hasSubscriptionRecord ? active && isUltraPlan : prev.hasUltra,
+          plan: hasSubscriptionRecord ? plan : prev.plan,
+          status: hasSubscriptionRecord ? sub.status ?? null : prev.status,
           cancelAtPeriodEnd: !!sub.cancelAtPeriodEnd,
           freeUsage: {
             aiScans: sub.freeUsage?.aiScans ?? 0,
             tasteTests: sub.freeUsage?.tasteTests ?? 0,
+            productShots: sub.freeUsage?.productShots ?? 0,
           },
           loading: false,
           firestoreLoaded: true,
@@ -133,11 +144,13 @@ export function SubscriptionProvider({ uid, children }) {
           setState((prev) => ({ ...prev, rcHydrated: true }));
           return;
         }
-        const { hasPro, hasUltra } = deriveEntitlements(info);
+        const { hasPro, hasUltra, plan } = deriveEntitlements(info);
         setState((prev) => ({
           ...prev,
           hasPro: prev.hasPro || hasPro,
           hasUltra: prev.hasUltra || hasUltra,
+          plan: prev.plan || plan,
+          status: prev.status || (hasPro ? 'active' : null),
           loading: false,
           rcHydrated: true,
         }));
@@ -152,11 +165,13 @@ export function SubscriptionProvider({ uid, children }) {
       });
 
     const unsub = onCustomerInfoUpdate((info) => {
-      const { hasPro, hasUltra } = deriveEntitlements(info);
+      const { hasPro, hasUltra, plan } = deriveEntitlements(info);
       setState((prev) => ({
         ...prev,
         hasPro: prev.hasPro || hasPro,
         hasUltra: prev.hasUltra || hasUltra,
+        plan: prev.plan || plan,
+        status: prev.status || (hasPro ? 'active' : null),
         rcHydrated: true,
       }));
     });

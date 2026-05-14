@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/global.css';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from './hooks/useAuth';
 import { useUserProfile, UserPreferencesProvider } from './hooks/useUserProfile.jsx';
 import { useAppData } from './hooks/useAppData';
+import { useDemoAppData } from './hooks/useDemoAppData';
 import { SignInScreen } from './components/SignInScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { App } from './App';
@@ -14,6 +15,7 @@ import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
 import { cacheClear, cacheClearLastUid } from './lib/offlineCache';
 import { logInRevenueCat, logOutRevenueCat } from './lib/revenuecat';
+import { C, fonts } from './styles/theme';
 
 // Module-scope lazy load (must NOT be inside component body). The new
 // onboarding flow replaces the single-page wizard — see docs/plans/
@@ -42,8 +44,161 @@ if (Capacitor.isNativePlatform()) {
   });
 }
 
+const DEMO_PROFILE = {
+  displayName: 'Coffee Explorer',
+  onboardingComplete: true,
+  tourCompleted: true,
+  aiDataConsent: true,
+};
+
+const DEMO_PREFS_CONTEXT = {
+  preferences: {
+    grinder: 'fellow-ode-gen2',
+    grinderCustomName: null,
+    brewMethod: 'aiden',
+    grindSizeDisplay: 'default',
+    canisterCount: 3,
+  },
+  updatePreferences: () => {},
+  fellowConnected: false,
+};
+
+function DemoSignInPrompt({ onSignIn, onDismiss }) {
+  return (
+    <div
+      onClick={onDismiss}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: C.card, borderRadius: 20, padding: '28px 24px',
+          maxWidth: 320, width: '100%', textAlign: 'center',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        }}
+      >
+        <div style={{
+          fontFamily: fonts.title, fontSize: 24, color: C.accent,
+          marginBottom: 8, lineHeight: 1.1,
+        }}>
+          Create your free account
+        </div>
+        <div style={{
+          fontSize: 14, color: C.textMuted, lineHeight: 1.5, marginBottom: 20,
+        }}>
+          Sign in to save your beans, log tastings, and unlock all features.
+        </div>
+        <button
+          onClick={onSignIn}
+          style={{
+            width: '100%', minHeight: 48, borderRadius: 12,
+            background: C.accent, color: '#fff', border: 'none',
+            fontFamily: fonts.body, fontSize: 16, fontWeight: 700,
+            cursor: 'pointer', marginBottom: 10,
+          }}
+        >
+          Sign In
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            width: '100%', minHeight: 44, borderRadius: 12,
+            background: 'transparent', color: C.textMuted, border: `1.5px solid ${C.border}`,
+            fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Keep Exploring
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DemoRoot({ onExitDemo }) {
+  const [showPrompt, setShowPrompt] = useState(false);
+  const onWriteAttempt = useCallback(() => setShowPrompt(true), []);
+
+  const {
+    beans, tastings, loaded,
+    addBean, updateBean, deleteBean,
+    addTasting, updateTasting, deleteTasting,
+    openBean, finishBean, returnBean,
+    getBeanById, refetch,
+  } = useDemoAppData(onWriteAttempt);
+
+  const demoAuthValue = useMemo(() => ({ user: null, logOut: () => {} }), []);
+
+  return (
+    <AuthContext value={demoAuthValue}>
+      <SubscriptionProvider uid={null}>
+        <PaywallProvider>
+          <UserPreferencesProvider value={DEMO_PREFS_CONTEXT}>
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0,
+              zIndex: 1000,
+              background: C.amberBg,
+              borderBottom: '1px solid #E8D5A0',
+              padding: `calc(env(safe-area-inset-top, 0px) + 6px) 16px 6px`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              fontSize: 13, color: C.text, fontFamily: fonts.body,
+            }}>
+              <span>Exploring demo mode</span>
+              <button
+                onClick={onExitDemo}
+                style={{
+                  background: C.accent, color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '4px 12px',
+                  fontFamily: fonts.body, fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Sign In
+              </button>
+            </div>
+            <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)' }}>
+              <App
+                uid="demo"
+                beans={beans}
+                tastings={tastings}
+                addBean={addBean}
+                updateBean={updateBean}
+                deleteBean={deleteBean}
+                addTasting={addTasting}
+                updateTasting={updateTasting}
+                deleteTasting={deleteTasting}
+                openBean={openBean}
+                finishBean={finishBean}
+                returnBean={returnBean}
+                getBeanById={getBeanById}
+                profile={DEMO_PROFILE}
+                updateProfile={() => {}}
+                refetchBeans={refetch}
+                isDemo
+                onDemoAction={onWriteAttempt}
+              />
+            </div>
+          </UserPreferencesProvider>
+          {showPrompt && (
+            <DemoSignInPrompt
+              onSignIn={onExitDemo}
+              onDismiss={() => setShowPrompt(false)}
+            />
+          )}
+        </PaywallProvider>
+      </SubscriptionProvider>
+    </AuthContext>
+  );
+}
+
 const Root = () => {
   const migrationStarted = useRef(false);
+  const [demoMode, setDemoMode] = useState(false);
   const { user, loading: authLoading, signInWithGoogle, signInWithApple, logOut } = useAuth();
 
   const {
@@ -123,7 +278,8 @@ const Root = () => {
   if (authLoading) return <LoadingScreen />;
 
   // Gate 2: Not signed in
-  if (!user) return <SignInScreen onSignInWithGoogle={signInWithGoogle} onSignInWithApple={signInWithApple} />;
+  if (!user && !demoMode) return <SignInScreen onSignInWithGoogle={signInWithGoogle} onSignInWithApple={signInWithApple} onExploreDemo={() => setDemoMode(true)} />;
+  if (!user && demoMode) return <DemoRoot onExitDemo={() => setDemoMode(false)} />;
 
   // Gate 3: Profile loading
   if (!profileLoaded) return <LoadingScreen />;

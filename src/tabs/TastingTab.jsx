@@ -448,7 +448,7 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
   );
 };
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, pendingTastingBeanId, onPendingTastingConsumed }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, pendingTastingBeanId, onPendingTastingConsumed, isDemo, onDemoAction }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -578,10 +578,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   // Chat tasting flow
   const startChat = () => {
-    // Free users get FREE_LIMITS.tasteTests lifetime tasting coach sessions.
-    // Server enforces this atomically when the FIRST message is sent (the
-    // sendTastingMessage call passes firstMessage:true to opt into metering).
-    // This local check skips the round-trip and shows the paywall instantly.
+    if (isDemo) { onDemoAction?.(); return; }
     if (!hasPro && (freeUsage?.tasteTests ?? 0) >= FREE_LIMITS.tasteTests) {
       openPaywall({ feature: 'taste_cap', promote: 'pro' });
       return;
@@ -628,6 +625,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
   const handleChatSend = async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (isDemo) { onDemoAction?.(); return; }
     // Bind this send to the bean that was selected at call time. If the user
     // switches the bean dropdown mid-flight, we drop the response instead of
     // appending it to the new bean's transcript.
