@@ -243,14 +243,14 @@ export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple, onExploreD
         >
           By signing in, you agree to our{' '}
           <a
-            href="/terms.html"
+            href="https://2manybeans.vercel.app/terms.html"
             style={{ color: C.textLight, textDecoration: 'underline' }}
           >
             Terms
           </a>{' '}
           &{' '}
           <a
-            href="/privacy-policy.html"
+            href="https://2manybeans.vercel.app/privacy-policy.html"
             style={{ color: C.textLight, textDecoration: 'underline' }}
           >
             Privacy Policy

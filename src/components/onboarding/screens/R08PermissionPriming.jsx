@@ -149,7 +149,7 @@ export default function R08PermissionPriming() {
       </div>
 
       <OnboardingCtaBar
-        label={requesting ? 'Requesting...' : 'Allow camera'}
+        label={requesting ? 'Requesting...' : 'Continue'}
         onClick={handleAllow}
         disabled={requesting}
       />

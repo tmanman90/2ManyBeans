@@ -145,7 +145,13 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const toggleRec = () => {
     const next = !showRec;
     setShowRec(next);
-    if (next && !recBlurb && !recLoading) fetchRecBlurb();
+    if (next && !recBlurb && !recLoading) {
+      if (isDemo) {
+        setRecBlurb("Sign in to unlock AI-powered rotation analysis.");
+      } else {
+        fetchRecBlurb();
+      }
+    }
   };
 
   const sectionTitle = {
@@ -166,7 +172,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={sectionTitle}>Active Rotation</div>
-          <Btn variant="primary" onClick={() => setQuickRecipeOpen(true)} style={{ padding: '8px 14px' }}>
+          <Btn variant="primary" onClick={() => isDemo ? onDemoAction?.() : setQuickRecipeOpen(true)} style={{ padding: '8px 14px' }}>
             <Camera size={14} /> Quick Recipe
           </Btn>
         </div>

@@ -402,6 +402,14 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
   const monthlyPrice = monthly?.product?.priceString ?? '—';
   const annualPrice = annual?.product?.priceString ?? '—';
 
+  const savingsLabel = (() => {
+    const mo = monthly?.product?.price;
+    const yr = annual?.product?.price;
+    if (!mo || !yr || mo <= 0) return null;
+    const pct = Math.round((1 - yr / (mo * 12)) * 100);
+    return pct > 0 ? `Save ${pct}%` : null;
+  })();
+
   return (
     <button
       type="button"
@@ -432,7 +440,7 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
           }}
         >
           <div style={styles.priceLine1}>{annualPrice}/yr</div>
-          <div style={styles.priceLine2}>Save 17%</div>
+          {savingsLabel && <div style={styles.priceLine2}>{savingsLabel}</div>}
         </div>
         <div
           style={{

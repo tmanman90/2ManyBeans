@@ -120,6 +120,45 @@ function DemoSignInPrompt({ onSignIn, onDismiss }) {
   );
 }
 
+function DemoBannerWithPaywall({ onExitDemo }) {
+  const { openPaywall } = usePaywall();
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0,
+      zIndex: 1000,
+      background: C.amberBg,
+      borderBottom: '1px solid #E8D5A0',
+      padding: `calc(env(safe-area-inset-top, 0px) + 6px) 16px 6px`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      fontSize: 13, color: C.text, fontFamily: fonts.body,
+    }}>
+      <span>Exploring demo mode</span>
+      <button
+        onClick={() => openPaywall({ feature: 'generic', promote: 'pro' })}
+        style={{
+          background: 'transparent', color: C.accent, border: `1.5px solid ${C.accent}`,
+          borderRadius: 8, padding: '4px 12px',
+          fontFamily: fonts.body, fontSize: 12, fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        View Plans
+      </button>
+      <button
+        onClick={onExitDemo}
+        style={{
+          background: C.accent, color: '#fff', border: 'none',
+          borderRadius: 8, padding: '4px 12px',
+          fontFamily: fonts.body, fontSize: 12, fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        Sign In
+      </button>
+    </div>
+  );
+}
+
 function DemoRoot({ onExitDemo }) {
   const [showPrompt, setShowPrompt] = useState(false);
   const onWriteAttempt = useCallback(() => setShowPrompt(true), []);
@@ -139,28 +178,7 @@ function DemoRoot({ onExitDemo }) {
       <SubscriptionProvider uid={null}>
         <PaywallProvider>
           <UserPreferencesProvider value={DEMO_PREFS_CONTEXT}>
-            <div style={{
-              position: 'fixed', top: 0, left: 0, right: 0,
-              zIndex: 1000,
-              background: C.amberBg,
-              borderBottom: '1px solid #E8D5A0',
-              padding: `calc(env(safe-area-inset-top, 0px) + 6px) 16px 6px`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              fontSize: 13, color: C.text, fontFamily: fonts.body,
-            }}>
-              <span>Exploring demo mode</span>
-              <button
-                onClick={onExitDemo}
-                style={{
-                  background: C.accent, color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '4px 12px',
-                  fontFamily: fonts.body, fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                Sign In
-              </button>
-            </div>
+            <DemoBannerWithPaywall onExitDemo={onExitDemo} />
             <div style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)' }}>
               <App
                 uid="demo"
@@ -184,6 +202,7 @@ function DemoRoot({ onExitDemo }) {
               />
             </div>
           </UserPreferencesProvider>
+          <PaywallMount />
           {showPrompt && (
             <DemoSignInPrompt
               onSignIn={onExitDemo}
