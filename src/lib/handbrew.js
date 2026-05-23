@@ -582,12 +582,22 @@ BEAN CLASSIFICATION:
   });
 
   const text = data.text || '';
-  const clean = text.replace(/```json|```/g, '').trim();
   let parsed;
   try {
+    const clean = text.replace(/```json|```/g, '').trim();
     parsed = JSON.parse(clean);
   } catch {
-    throw new Error('Recipe generation returned invalid data. Please try again.');
+    // Fallback: extract the first {...} block from the response
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch {
+        throw new Error('Recipe generation returned invalid data. Please try again.');
+      }
+    } else {
+      throw new Error('Recipe generation returned invalid data. Please try again.');
+    }
   }
 
   repairHandBrewRecipe(parsed, grinderKey, family, roastLevel, device);

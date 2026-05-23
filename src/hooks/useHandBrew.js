@@ -7,7 +7,7 @@
 // on the bean currently displayed.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { researchBean } from '../lib/beanResearch';
-import { generateHandBrewRecipe } from '../lib/handbrew';
+import { generateHandBrewRecipe, repairHandBrewRecipe } from '../lib/handbrew';
 import { usePreferences } from './useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
@@ -61,7 +61,14 @@ export function useHandBrew(updateBean) {
         setHandBrewBean(bean);
         setHandBrewError(null);
         setHandBrewModal(true);
-        setHandBrewRecipe(cached);
+        let hydrated = cached;
+        if (cached.timerReady == null) {
+          hydrated = JSON.parse(JSON.stringify(cached));
+          const family = hydrated.family || bean.beanResearch?.cupStructureFamily || 'medium-washed';
+          const roastLevel = hydrated.roastLevel || bean.beanResearch?.roastLevel || '';
+          repairHandBrewRecipe(hydrated, grinderKey, family, roastLevel, device);
+        }
+        setHandBrewRecipe(hydrated);
         setHandBrewLoading(false);
         setHandBrewPhase(null);
         return;
