@@ -25,6 +25,68 @@ import { C, fonts } from './styles/theme';
 const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'));
 const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
 
+class RootErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('[startup] Root render failed', error);
+  }
+
+  handleReload = () => {
+    try { window.location.reload(); } catch { /* ignore */ }
+  };
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <div style={{
+        minHeight: '100dvh',
+        background: C.bg,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 24px',
+        fontFamily: fonts.body,
+        textAlign: 'center',
+      }}>
+        <div style={{ fontFamily: fonts.title, fontSize: 32, color: C.accent, marginBottom: 12 }}>
+          2manybeans
+        </div>
+        <div style={{ fontSize: 15, color: C.textMuted, marginBottom: 24, maxWidth: 300, lineHeight: 1.45 }}>
+          The app hit a startup issue. Reload to try again.
+        </div>
+        <button
+          onClick={this.handleReload}
+          style={{
+            minHeight: 44,
+            padding: '12px 26px',
+            fontSize: 16,
+            fontWeight: 700,
+            fontFamily: fonts.body,
+            background: C.accent,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 12,
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+}
+
 // Mounts the actual paywall UI. Kept out of <Root> so it can read the
 // PaywallContext without triggering extra renders of the app shell.
 function PaywallMount() {
@@ -37,11 +99,45 @@ function PaywallMount() {
   );
 }
 
-// Notify Capgo that the app loaded successfully (prevents rollback)
-if (Capacitor.isNativePlatform()) {
-  import('@capgo/capacitor-updater').then(({ CapacitorUpdater }) => {
-    CapacitorUpdater.notifyAppReady();
-  });
+function NativeReadyNotifier() {
+  useEffect(() => {
+    let cancelled = false;
+    let raf1 = null;
+    let raf2 = null;
+
+    const notifyReady = () => {
+      window.__tmbStartupReady = true;
+      if (!Capacitor.isNativePlatform()) return;
+      import('@capgo/capacitor-updater')
+        .then(({ CapacitorUpdater }) => CapacitorUpdater.notifyAppReady())
+        .catch((err) => {
+          console.warn('[startup] Failed to notify Capgo app ready', err);
+        });
+    };
+
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        if (!cancelled) notifyReady();
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (raf1) cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, []);
+
+  return null;
+}
+
+function ReadyFrame({ children }) {
+  return (
+    <>
+      <NativeReadyNotifier />
+      {children}
+    </>
+  );
 }
 
 const DEMO_PROFILE = {
@@ -235,6 +331,7 @@ const Root = () => {
   // it only ever reads localStorage once per mount so repeated
   // renders are cheap.
   const devForceOnboarding = useMemo(() => {
+    if (!import.meta.env.DEV) return false;
     try {
       return localStorage.getItem('__dev_force_onboarding_v1') === '1';
     } catch {
@@ -294,17 +391,17 @@ const Root = () => {
   const authValue = useMemo(() => ({ user, logOut: handleLogOut }), [user, handleLogOut]);
 
   // Gate 1: Auth loading
-  if (authLoading) return <LoadingScreen />;
+  if (authLoading) return <ReadyFrame><LoadingScreen /></ReadyFrame>;
 
   // Gate 2: Not signed in
-  if (!user && !demoMode) return <SignInScreen onSignInWithGoogle={signInWithGoogle} onSignInWithApple={signInWithApple} onExploreDemo={() => setDemoMode(true)} />;
-  if (!user && demoMode) return <DemoRoot onExitDemo={() => setDemoMode(false)} />;
+  if (!user && !demoMode) return <ReadyFrame><SignInScreen onSignInWithGoogle={signInWithGoogle} onSignInWithApple={signInWithApple} onExploreDemo={() => setDemoMode(true)} /></ReadyFrame>;
+  if (!user && demoMode) return <ReadyFrame><DemoRoot onExitDemo={() => setDemoMode(false)} /></ReadyFrame>;
 
   // Gate 3: Profile loading
-  if (!profileLoaded) return <LoadingScreen />;
+  if (!profileLoaded) return <ReadyFrame><LoadingScreen /></ReadyFrame>;
 
   // Gate 3b: Profile load failed after retries (don't confuse with "doesn't exist")
-  if (profileLoadError) return <LoadingScreen message="Connection issue. Retrying..." />;
+  if (profileLoadError) return <ReadyFrame><LoadingScreen message="Connection issue. Retrying..." /></ReadyFrame>;
 
   // Gate 4: No profile doc exists, need to determine if new or existing user
   if (!profile) {
@@ -316,9 +413,9 @@ const Root = () => {
           migrationStarted.current = false; // allow retry on next render
         });
       }
-      return <LoadingScreen />;
+      return <ReadyFrame><LoadingScreen /></ReadyFrame>;
     }
-    if (!dataLoaded) return <LoadingScreen />;
+    if (!dataLoaded) return <ReadyFrame><LoadingScreen /></ReadyFrame>;
   }
 
   // Gates 5 and 6 are rendered INSIDE the provider stack so the onboarding
@@ -326,60 +423,62 @@ const Root = () => {
   // main app (gate 6). The providers were previously mounted only around
   // gate 6, which made them out-of-scope for the onboarding component tree.
   return (
-    <AuthContext value={authValue}>
-      <SubscriptionProvider uid={user.uid}>
-        <PaywallProvider>
-          {(!isOnboarded || devForceOnboarding) ? (
-            // Gate 5: Onboarding not complete — 13-screen rebuild.
-            // Also enters here when the DEV replay flag is set.
-            <React.Suspense fallback={<LoadingScreen />}>
-              <OnboardingFlow
-                user={user}
-                profile={profile}
-                createProfile={createProfile}
-                completeOnboarding={completeOnboarding}
-              />
-            </React.Suspense>
-          ) : profile?.aiDataConsent !== true ? (
-            // Gate 5.5: AI data consent (Apple Guideline 5.1.2(i)).
-            // Catches both new users (post-onboarding) and existing
-            // users who completed onboarding before this gate existed.
-            <AiDataConsentModal updateProfile={updateProfile} />
-          ) : !dataLoaded ? (
-            // Gate 6a: Waiting for Firestore data
-            <LoadingScreen />
-          ) : (
-            // Gate 6b: Main app
-            <UserPreferencesProvider value={contextValue}>
-              <App
-                uid={user.uid}
-                beans={beans}
-                tastings={tastings}
-                addBean={addBean}
-                updateBean={updateBean}
-                deleteBean={deleteBean}
-                addTasting={addTasting}
-                updateTasting={updateTasting}
-                deleteTasting={deleteTasting}
-                openBean={openBean}
-                finishBean={finishBean}
-                returnBean={returnBean}
-                getBeanById={getBeanById}
-                profile={profile}
-                updateProfile={updateProfile}
-                refetchBeans={refetch}
-              />
-            </UserPreferencesProvider>
-          )}
-          {/* PaywallMount lives inside PaywallProvider but outside the gate
-              ternary so the RevenueCat sheet renders during BOTH onboarding
-              (R13 paywall) and the main app. Previously it was only mounted
-              in Gate 6b, which left R13 white-screened because openPaywall
-              set context but nothing rendered the sheet. */}
-          <PaywallMount />
-        </PaywallProvider>
-      </SubscriptionProvider>
-    </AuthContext>
+    <ReadyFrame>
+      <AuthContext value={authValue}>
+        <SubscriptionProvider uid={user.uid}>
+          <PaywallProvider>
+            {(!isOnboarded || devForceOnboarding) ? (
+              // Gate 5: Onboarding not complete — 13-screen rebuild.
+              // Also enters here when the DEV replay flag is set.
+              <React.Suspense fallback={<LoadingScreen />}>
+                <OnboardingFlow
+                  user={user}
+                  profile={profile}
+                  createProfile={createProfile}
+                  completeOnboarding={completeOnboarding}
+                />
+              </React.Suspense>
+            ) : profile?.aiDataConsent !== true ? (
+              // Gate 5.5: AI data consent (Apple Guideline 5.1.2(i)).
+              // Catches both new users (post-onboarding) and existing
+              // users who completed onboarding before this gate existed.
+              <AiDataConsentModal updateProfile={updateProfile} />
+            ) : !dataLoaded ? (
+              // Gate 6a: Waiting for Firestore data
+              <LoadingScreen />
+            ) : (
+              // Gate 6b: Main app
+              <UserPreferencesProvider value={contextValue}>
+                <App
+                  uid={user.uid}
+                  beans={beans}
+                  tastings={tastings}
+                  addBean={addBean}
+                  updateBean={updateBean}
+                  deleteBean={deleteBean}
+                  addTasting={addTasting}
+                  updateTasting={updateTasting}
+                  deleteTasting={deleteTasting}
+                  openBean={openBean}
+                  finishBean={finishBean}
+                  returnBean={returnBean}
+                  getBeanById={getBeanById}
+                  profile={profile}
+                  updateProfile={updateProfile}
+                  refetchBeans={refetch}
+                />
+              </UserPreferencesProvider>
+            )}
+            {/* PaywallMount lives inside PaywallProvider but outside the gate
+                ternary so the RevenueCat sheet renders during BOTH onboarding
+                (R13 paywall) and the main app. Previously it was only mounted
+                in Gate 6b, which left R13 white-screened because openPaywall
+                set context but nothing rendered the sheet. */}
+            <PaywallMount />
+          </PaywallProvider>
+        </SubscriptionProvider>
+      </AuthContext>
+    </ReadyFrame>
   );
 };
 
@@ -401,6 +500,8 @@ const DevRouter = () => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {import.meta.env.DEV ? <DevRouter /> : <Root />}
+    <RootErrorBoundary>
+      {import.meta.env.DEV ? <DevRouter /> : <Root />}
+    </RootErrorBoundary>
   </React.StrictMode>
 );
