@@ -13,6 +13,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap" crossorigin onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin /></noscript>
+    <script>
+      (function () {
+        window.__tmbCapgoReadyNotified = false;
+
+        var notifyCapgoReady = function (attempt) {
+          if (window.__tmbCapgoReadyNotified) return;
+
+          var cap = window.Capacitor;
+          var isNative = !!(
+            cap &&
+            typeof cap.nativePromise === 'function' &&
+            typeof cap.getPlatform === 'function' &&
+            cap.getPlatform() !== 'web'
+          );
+
+          if (!isNative) {
+            if (attempt < 40) {
+              setTimeout(function () { notifyCapgoReady(attempt + 1); }, 50);
+            }
+            return;
+          }
+
+          window.__tmbCapgoReadyNotified = true;
+          cap.nativePromise('CapacitorUpdater', 'notifyAppReady', {})
+            .catch(function (err) {
+              window.__tmbCapgoReadyNotified = false;
+              console.warn('[startup] Failed to notify Capgo app ready', err);
+            });
+        };
+
+        notifyCapgoReady(0);
+      })();
+    </script>
     <title>2manybeans</title>
   </head>
   <body>
@@ -25,6 +58,7 @@
     <script>
       (function () {
         window.__tmbStartupReady = false;
+
         window.__tmbShowStartupIssue = function () {
           if (window.__tmbStartupReady) return;
           var root = document.getElementById('root');

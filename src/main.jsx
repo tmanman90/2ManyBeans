@@ -25,14 +25,6 @@ import { C, fonts } from './styles/theme';
 const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'));
 const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
 
-if (Capacitor.isNativePlatform()) {
-  import('@capgo/capacitor-updater')
-    .then(({ CapacitorUpdater }) => CapacitorUpdater.notifyAppReady())
-    .catch((err) => {
-      console.warn('[startup] Failed to notify Capgo app ready', err);
-    });
-}
-
 class RootErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
