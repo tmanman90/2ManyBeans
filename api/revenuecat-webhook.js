@@ -38,6 +38,14 @@ function mapPlan(productId) {
   return PLAN_MAP[productId] ?? null;
 }
 
+function isActiveAdminGrant(subscription) {
+  if (!subscription || subscription.lastEventType !== 'ADMIN_GRANT') return false;
+  if (!subscription.expiresAt) return false;
+
+  const expiresAt = new Date(subscription.expiresAt);
+  return !Number.isNaN(expiresAt.getTime()) && expiresAt > new Date();
+}
+
 // Map RevenueCat event types to our internal subscription.status values.
 // CANCELLATION keeps status='active' until the period ends — we set
 // cancelAtPeriodEnd: true so the UI can show "Your subscription ends on…".
@@ -173,6 +181,16 @@ export default async function handler(req, res) {
     await db.runTransaction(async (tx) => {
       const userSnap = await tx.get(userRef);
       if (userSnap.exists) {
+        const existingSub = userSnap.data()?.subscription;
+        if (isActiveAdminGrant(existingSub) && !isPurchaseLike) {
+          console.log('[RC webhook] preserved active admin grant', {
+            uid,
+            type,
+            adminGrantExpiresAt: existingSub.expiresAt,
+          });
+          return;
+        }
+
         tx.set(userRef, { subscription: subFields }, { merge: true });
       } else {
         tx.set(userRef, buildServerProfileSeed({ subscription: subFields }));
