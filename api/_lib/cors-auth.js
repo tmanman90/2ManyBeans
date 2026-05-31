@@ -4,6 +4,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage, getDownloadURL as adminGetDownloadURL } from 'firebase-admin/storage';
 import { checkEntitlement } from './checkEntitlement.js';
+import { buildServerProfileSeed } from './profileSeed.js';
 
 const IS_PRODUCTION = process.env.VERCEL_ENV === 'production';
 
@@ -295,11 +296,12 @@ export function withCorsAuthMetered(handler, { feature, freeLimit, rateLimit }) 
 
         // Use literal value (not FieldValue.increment) so the transaction
         // retries cleanly on contention.
-        tx.set(
-          userRef,
-          { subscription: { freeUsage: { [feature]: used + 1 } } },
-          { merge: true }
-        );
+        const subscription = { freeUsage: { [feature]: used + 1 } };
+        if (snap.exists) {
+          tx.set(userRef, { subscription }, { merge: true });
+        } else {
+          tx.set(userRef, buildServerProfileSeed({ decodedToken, subscription }));
+        }
       });
     } catch (err) {
       if (err?.code === 'free_tier_exhausted') {

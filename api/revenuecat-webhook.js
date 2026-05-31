@@ -16,6 +16,7 @@
 import { timingSafeEqual } from 'crypto';
 import { getDb } from './_lib/cors-auth.js';
 import { invalidateEntitlementCache } from './_lib/checkEntitlement.js';
+import { buildServerProfileSeed } from './_lib/profileSeed.js';
 import { normalizeSecret } from './_lib/secrets.js';
 
 // Strict allowlist of known product IDs. Any unknown ID on a purchase-like
@@ -140,9 +141,6 @@ export default async function handler(req, res) {
     const db = getDb();
     const userRef = db.collection('users').doc(uid);
 
-    // Single atomic write -- `set` with merge:true creates the parent doc if
-    // missing AND updates the nested subscription field in one round-trip.
-    //
     // KEEP IN SYNC with api/_lib/redemption.js (the other writer of
     // users/{uid}.subscription). Both must write the same field shape so
     // api/_lib/checkEntitlement.js and src/contexts/SubscriptionContext.jsx
@@ -172,7 +170,14 @@ export default async function handler(req, res) {
       subFields.cancelAtPeriodEnd = false;
     }
 
-    await userRef.set({ subscription: subFields }, { merge: true });
+    await db.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef);
+      if (userSnap.exists) {
+        tx.set(userRef, { subscription: subFields }, { merge: true });
+      } else {
+        tx.set(userRef, buildServerProfileSeed({ subscription: subFields }));
+      }
+    });
 
     // Force next server-side check to refetch from RC/Firestore.
     invalidateEntitlementCache(uid);

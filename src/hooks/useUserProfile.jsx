@@ -3,34 +3,16 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'fir
 import { Capacitor } from '@capacitor/core';
 import { auth, db } from '../firebase';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
-
-// Default preferences for new users and existing user migration
-const DEFAULT_PREFERENCES = {
-  grinder: 'fellow-ode-gen2',
-  grinderCustomName: null,
-  brewMethod: 'aiden',
-  grindSizeDisplay: 'default',
-  canisterCount: 3,
-};
+import {
+  DEFAULT_PREFERENCES,
+  buildProfileCompletionBase,
+  normalizeDisplayName,
+  stashedDisplayName,
+} from '../lib/profileShape';
 
 // --- Context (co-located with hook) ---
 
 const UserPreferencesContext = createContext(null);
-
-function normalizeDisplayName(value) {
-  if (typeof value !== 'string') return '';
-  return value.trim().replace(/\s+/g, ' ').slice(0, 100);
-}
-
-function stashedDisplayName(raw) {
-  if (!raw || typeof raw !== 'object') return '';
-  return normalizeDisplayName(
-    raw.displayName
-    || raw.name
-    || raw.fullName
-    || [raw.givenName, raw.familyName].filter(Boolean).join(' ')
-  );
-}
 
 export function readPendingProviderDisplayName() {
   try {
@@ -158,7 +140,7 @@ export const useUserProfile = (uid) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
     const profileData = {
-      displayName: normalizeDisplayName(userData.displayName) || readPendingProviderDisplayName(),
+      displayName: normalizeDisplayName(userData.displayName) || readPendingProviderDisplayName() || 'Coffee Lover',
       email: userData.email || null,
       photoURL: userData.photoURL || null,
       signUpProvider: userData.signUpProvider || 'unknown',
@@ -192,7 +174,7 @@ export const useUserProfile = (uid) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
 
-    const displayName = normalizeDisplayName(user.displayName) || readPendingProviderDisplayName();
+    const displayName = normalizeDisplayName(user.displayName) || readPendingProviderDisplayName() || 'Coffee Lover';
 
     const profileData = {
       displayName,
@@ -261,26 +243,24 @@ export const useUserProfile = (uid) => {
   const completeOnboarding = useCallback(async (answers) => {
     if (!uid) return;
     const profileRef = doc(db, 'users', uid);
+    const now = serverTimestamp();
+    const basePatch = buildProfileCompletionBase({
+      profile,
+      user: auth.currentUser,
+      answers,
+      pendingDisplayName: readPendingProviderDisplayName(),
+      timestamp: now,
+    });
     const payload = {
+      ...basePatch,
       onboardingComplete: true,
-      onboardingCompletedAt: serverTimestamp(),
+      onboardingCompletedAt: now,
     };
     if (answers && typeof answers === 'object') {
       // Keep preferences on the top-level `preferences` field, never
       // duplicated inside onboardingAnswers — live prefs live in one place.
       const { preferences: answerPrefs, ...rest } = answers;
       payload.onboardingAnswers = rest;
-      if (answerPrefs && typeof answerPrefs === 'object') {
-        // Drop null/undefined/empty entries so unanswered fields don't
-        // clobber existing live preferences with blanks.
-        const cleanPrefs = {};
-        for (const [k, v] of Object.entries(answerPrefs)) {
-          if (v !== null && v !== undefined && v !== '') cleanPrefs[k] = v;
-        }
-        if (Object.keys(cleanPrefs).length) {
-          payload.preferences = { ...(profile?.preferences || DEFAULT_PREFERENCES), ...cleanPrefs };
-        }
-      }
       // Mirror marketing consent to the top-level profile fields
       // (separate from onboardingAnswers) so SettingsPage's toggle
       // reflects the choice the user just made at R12. Fresh-user
@@ -289,7 +269,7 @@ export const useUserProfile = (uid) => {
       if (typeof answers.marketingConsent === 'boolean') {
         payload.marketingConsent = answers.marketingConsent;
         payload.marketingConsentDate = answers.marketingConsent
-          ? serverTimestamp()
+          ? now
           : null;
       }
     }
