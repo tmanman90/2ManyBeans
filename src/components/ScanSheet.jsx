@@ -7,6 +7,7 @@ import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductSh
 import { uploadOriginalPhoto } from '../lib/storage';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { buildNewBeanData } from '../lib/beanBuilder';
+import { buildSourceContextHash } from '../lib/sourceInsights';
 import { handlePaywallError } from '../lib/paywallHelpers';
 import { ENRICHABLE_FIELDS } from '../lib/beanFields';
 import { collection, doc } from 'firebase/firestore';
@@ -17,7 +18,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
-export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, addBean }) => {
+export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, addBean, updateBean }) => {
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
 
@@ -25,7 +26,6 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
   const [step, setStep] = useState('photo'); // photo | scanning | researching | saving
   const [scanError, setScanError] = useState(null);
   const fileRef = useRef(null);
-  const storyRef = useRef(null);
   const genCounter = useRef(0);
   const pendingBeanIdRef = useRef(null);
 
@@ -37,7 +37,6 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
     setPhotos([]);
     setStep('photo');
     setScanError(null);
-    storyRef.current = null;
     pendingBeanIdRef.current = null;
     genCounter.current++;
   };
@@ -131,6 +130,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
         sourcedBy: parsed.sourcedBy || '',
         shelfLife: parsed.shelfLife || '',
         roastedIn: parsed.roastedIn || '',
+        sourceInsights: parsed.sourceInsights || null,
       };
 
       // Pre-allocate Firestore doc ID for photo upload
@@ -157,15 +157,14 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       }
       if (thisGen !== genCounter.current) return;
 
-      // Background story generation (fire-and-forget, includes roaster context from research)
-      storyRef.current = null;
-      generateRuphusStory(enrichedData, { enrichment: researchResult })
-        .then(story => { if (thisGen === genCounter.current) storyRef.current = story; })
-        .catch(err => console.log('Background story gen skipped:', err.message));
-
       // Auto-save: build bean data and write to Firestore
       setStep('saving');
-      const beanData = buildNewBeanData(enrichedData, { story: storyRef.current });
+      const beanData = buildNewBeanData(enrichedData, {
+        story: null,
+      });
+      if (updateBean) {
+        beanData.storyStatus = 'pending';
+      }
       const preAllocId = pendingBeanIdRef.current;
       const beanId = await addBean(beanData, preAllocId || null);
 
@@ -181,8 +180,32 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
 
       // Capture photos before reset clears them
       const scanPhotos = [...photos];
+      const savedBean = { id: beanId, ...beanData, _scanPhotos: scanPhotos };
+
+      if (updateBean) {
+        const storyBean = { ...savedBean };
+        generateRuphusStory(storyBean, { enrichment: researchResult })
+          .then(story => {
+            const storyContextHash = buildSourceContextHash(storyBean);
+            return updateBean(beanId, {
+              story,
+              storyStatus: 'ready',
+              storyGeneratedAt: story.generatedAt || new Date().toISOString(),
+              storyContextHash,
+              sourceContextHash: storyContextHash,
+            });
+          })
+          .catch(err => {
+            console.log('Background story gen skipped:', err.message);
+            updateBean(beanId, {
+              storyStatus: 'failed',
+              storyError: (err.message || 'Story generation failed').slice(0, 180),
+            }).catch(() => {});
+          });
+      }
+
       reset();
-      onBeanCreated(beanId, { id: beanId, ...beanData, _scanPhotos: scanPhotos });
+      onBeanCreated(beanId, savedBean);
     } catch (err) {
       if (thisGen !== genCounter.current) return;
       if (handlePaywallError(err, openPaywall)) {

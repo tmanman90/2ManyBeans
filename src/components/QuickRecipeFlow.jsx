@@ -1,5 +1,5 @@
 // Quick Recipe Flow — scan a coffee bag and generate a recipe without adding to inventory
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CameraIcon, X, Search, RotateCcw, Save, Coffee, Star, BookOpen } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
@@ -33,7 +33,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   const isHandBrew = preferences.brewMethod !== 'aiden';
 
   const [step, setStep] = useState('photo'); // photo | scanning | enriching | bagSize | brewing
-  const [photo, setPhoto] = useState(null); // { base64, mediaType, previewUrl }
+  const [photos, setPhotos] = useState([]); // up to 3 { base64, mediaType, previewUrl }
   const [scanData, setScanData] = useState(null);
   const [scanError, setScanError] = useState(null);
   const [bagSizeInput, setBagSizeInput] = useState('');
@@ -43,6 +43,19 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   const [toast, setToast] = useState(null);
   const fileRef = useRef(null);
   const savingRef = useRef(null); // guards against double-tap race on auto-save
+  const photosRef = useRef([]);
+
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
+
+  const clearPhotos = useCallback(() => {
+    photosRef.current.forEach(p => {
+      if (p?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
+    });
+    photosRef.current = [];
+    setPhotos([]);
+  }, []);
 
   // Brew hooks with noop updateBean (ephemeral, no Firestore writes)
   const aiden = useAidenBrew(noop);
@@ -52,11 +65,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   // Reset on close + revoke blob URL
   useEffect(() => {
     if (!open) {
-      if (photo?.previewUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(photo.previewUrl);
-      }
+      clearPhotos();
       setStep('photo');
-      setPhoto(null);
       setScanData(null);
       setScanError(null);
       setBagSizeInput('');
@@ -66,7 +76,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       setQuickRateOpen(false);
       setToast(null);
     }
-  }, [isHandBrew, open, photo?.previewUrl]);
+  }, [clearPhotos, isHandBrew, open]);
 
   const takeNativePhoto = async () => {
     try {
@@ -88,7 +98,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       });
       const mediaType = 'image/jpeg';
       const base64 = image.dataUrl.split(',')[1];
-      handlePhotoReady({ base64, mediaType, previewUrl: image.dataUrl });
+      handlePhotosReady([{ base64, mediaType, previewUrl: image.dataUrl }]);
     } catch (err) {
       if (err.message !== 'User cancelled photos app') {
         setScanError(`Failed to capture photo: ${err.message || 'Unknown error'}`);
@@ -97,24 +107,29 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   };
 
   const handleFileInput = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []).slice(0, 3);
+    if (files.length === 0) return;
     try {
-      const compressed = await compressImage(file);
-      handlePhotoReady(compressed);
+      const compressed = await Promise.all(files.map(file => compressImage(file)));
+      handlePhotosReady(compressed);
     } catch (err) {
       setScanError('Failed to process photo. Try another.');
     }
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const handlePhotoReady = async (photoObj) => {
-    setPhoto(photoObj);
+  const handlePhotosReady = async (photoObjs) => {
+    const nextPhotos = photoObjs.slice(0, 3);
+    photosRef.current.forEach(p => {
+      if (p?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
+    });
+    photosRef.current = nextPhotos;
+    setPhotos(nextPhotos);
     setScanError(null);
     setStep('scanning');
 
     try {
-      const parsed = await scanBeanLabel([photoObj]);
+      const parsed = await scanBeanLabel(nextPhotos);
       const scanResult = {
         roaster: parsed.roaster || '',
         name: parsed.name || '',
@@ -133,6 +148,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         brewingRec: parsed.brewingRec || '',
         sourcedBy: parsed.sourcedBy || '',
         shelfLife: parsed.shelfLife || '',
+        roastedIn: parsed.roastedIn || '',
+        sourceInsights: parsed.sourceInsights || null,
       };
 
       // Set scan data immediately so enriching step can show bean name/roaster
@@ -203,8 +220,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   };
 
   const handleRetryPhoto = () => {
-    if (photo?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(photo.previewUrl);
-    setPhoto(null);
+    clearPhotos();
     setScanData(null);
     setScanError(null);
     setBagSizeInput('');
@@ -228,7 +244,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       aidenGrind: aiden.aidenRecipe?.grindRecommendation || null,
       handBrewRecipe: handBrewForSave,
       ...(handBrewForSave ? { handBrewRecipes: { [handBrewForSave.device || 'v60']: handBrewForSave } } : {}),
-      photo,
+      photo: photos[0] || null,
+      scanPhotos: photos,
     };
     onClose();
     onSaveToInventory(saveData);
@@ -425,7 +442,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       {/* Photo capture step */}
       {step === 'photo' && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleFileInput} style={{ display: 'none' }} />
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileInput} style={{ display: 'none' }} />
 
           <div
             onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
@@ -438,7 +455,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
           >
             <CameraIcon size={36} color={C.accent} style={{ marginBottom: 8 }} />
             <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag</div>
-            <div style={{ fontSize: 13, color: C.textMuted }}>Get a brew recipe without adding to inventory</div>
+            <div style={{ fontSize: 13, color: C.textMuted }}>Bag plus pamphlet photos are welcome</div>
           </div>
 
           {scanError && (
@@ -452,13 +469,17 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       {/* Scanning step */}
       {step === 'scanning' && (
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
-          {photo && (
-            <img src={photo.previewUrl} alt="Scanned bag"
-              style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 10, marginBottom: 16, opacity: 0.7 }} />
+          {photos.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+              {photos.map((photo, idx) => (
+                <img key={idx} src={photo.previewUrl} alt={`Scanned photo ${idx + 1}`}
+                  style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 10, opacity: 0.7 }} />
+              ))}
+            </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {spinner}
-            <span style={{ fontSize: 14, color: C.textMuted }}>Reading label...</span>
+            <span style={{ fontSize: 14, color: C.textMuted }}>Reading {photos.length > 1 ? 'photos' : 'label'}...</span>
           </div>
         </div>
       )}

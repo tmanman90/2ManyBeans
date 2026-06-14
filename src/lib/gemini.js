@@ -2,6 +2,7 @@
 // No Google SDK in the browser. No API key in client code.
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
+import { normalizeSourceInsights } from './sourceInsights';
 
 const PROXY_URL = `${API_BASE}/api/gemini`;
 
@@ -42,6 +43,7 @@ Pay special attention to:
 - Roast dates (look for "roasted on", "roast date", handwritten/stamped dates, stickers -- common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "2026-02-17")
 - Best-by / consume-by / shelf life info (e.g. "consume within 3 months", "best within 6 weeks of roast", "90 days")
 - Weight/bag size
+- Pamphlet/card/source insert language, including tasting committee notes, roaster explanations, sensory charts, brew suggestions, selector notes, and farm/provenance stories
 
 STEP 3 -- CURATOR vs ROASTER:
 IMPORTANT: Some images may show a SUBSCRIPTION SERVICE or CURATOR brand (e.g., Dayglow, Trade, Angels' Cup, Yes Plz, Cat & Cloud marketplace) -- this is NOT the roaster. The actual roaster is the company that ROASTED the coffee (usually on the label/box itself).
@@ -51,6 +53,7 @@ IMPORTANT: Some images may show a SUBSCRIPTION SERVICE or CURATOR brand (e.g., D
 
 STEP 4 -- CROSS-REFERENCE:
 Cross-reference information across all provided images. Back labels often have details missing from the front.
+If an image is a pamphlet/card/insert that discusses the same coffee, treat it as high-priority source evidence. If the same sheet mentions multiple coffees, only extract source insights that match the target coffee by name, variety, origin, process, or roaster.
 
 STEP 5 -- COFFEE NAME:
 - If the bag has an explicit coffee name or lot name, use it
@@ -79,10 +82,31 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   "brewingRec": "any brewing recommendations on the bag",
   "sourcedBy": "subscription service or curator if different from roaster",
   "shelfLife": "shelf life or consume-by guidance from the bag (e.g. '3 months', '90 days', 'best within 6 weeks of roast')",
-  "roastedIn": "country or city where the coffee was ROASTED (not the origin country of the beans) -- look for 'roasted in', 'torrefazione', roastery location, city/country on the roaster's branding"
+  "roastedIn": "country or city where the coffee was ROASTED (not the origin country of the beans) -- look for 'roasted in', 'torrefazione', roastery location, city/country on the roaster's branding",
+  "sourceInsights": {
+    "sourceType": "bag | pamphlet | card | insert | mixed",
+    "sourceSummary": "concise summary of the pamphlet/card/source interpretation for THIS coffee",
+    "roasterContext": "roaster philosophy, intent, or direct roaster language about this coffee",
+    "selectorContext": "curator/selector context if present",
+    "tastingCommittee": "committee, evaluator, or cupping-panel notes if present",
+    "sensoryDescriptors": ["descriptor 1", "descriptor 2"],
+    "sensoryAxes": {
+      "fragranceAroma": number from 1-10 if shown,
+      "acidity": number from 1-10 if shown,
+      "sweetness": number from 1-10 if shown,
+      "body": number from 1-10 if shown,
+      "flavor": number from 1-10 if shown,
+      "balance": number from 1-10 if shown,
+      "aftertaste": number from 1-10 if shown
+    },
+    "brewGuidance": "source brew guidance, ratios, temperatures, grind hints, or extraction advice if present",
+    "provenance": "producer, farm, region, altitude, selection, or production story from the source",
+    "extractedTextSummary": "bounded summary of other relevant source text",
+    "extractionWarnings": "ambiguity warnings, such as a sheet containing multiple coffees"
+  }
 }
 
-If a field is not visible, use an empty string (or 100 for bagSize). For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
+If a field is not visible, use an empty string (or 100 for bagSize). If no pamphlet/card/source insight is visible, set "sourceInsights" to null. For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
 
   // Bean scan IS the metered action for the aiScans free-tier counter.
   // This call burns one credit. Research enrichment + image analysis are
@@ -102,12 +126,18 @@ If a field is not visible, use an empty string (or 100 for bagSize). For roastDa
   if (!jsonMatch) {
     throw new Error('Could not read the label. Please try a clearer photo.');
   }
-  const parsed = JSON.parse(jsonMatch[0]);
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new Error('Could not read the label. Please try a clearer photo.');
+  }
 
   if (parsed.error) {
     throw new Error(parsed.error);
   }
 
+  parsed.sourceInsights = normalizeSourceInsights(parsed.sourceInsights);
   return parsed;
 }
 

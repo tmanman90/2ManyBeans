@@ -6,6 +6,7 @@ import { getPeakStatus, daysOpen, today, daysBetween, formatDate, lifePct } from
 import { EditBeanModal } from './EditBeanModal';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
+import { summarizeSourceInsights } from '../lib/sourceInsights';
 
 const PeakArc = ({ pct, color, size = 32 }) => {
   const r = size / 2 - 3;
@@ -46,8 +47,9 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
   const displayNotes = bean.bagNotes && bean.bagNotes !== '(not logged)'
     ? (bean.notesSummary || bean.bagNotes)
     : null;
+  const sourceSummary = summarizeSourceInsights(bean, { maxChars: compact ? 120 : 180 });
 
-  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || grindText || (bean.handBrewRecipe && preferences.brewMethod !== 'aiden');
+  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || sourceSummary || grindText || (bean.handBrewRecipe && preferences.brewMethod !== 'aiden');
 
   const photoHeight = compact ? 180 : 240;
 
@@ -299,6 +301,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
               {bean.roastedIn && <span><strong>Roasted In:</strong> {bean.roastedIn}</span>}
               {bean.sourcedBy && <span><strong>Sourced By:</strong> {bean.sourcedBy}</span>}
               {bean.brewingRec && <span><strong>Brewing Rec:</strong> {bean.brewingRec}</span>}
+              {sourceSummary && <span><strong>Source Insight:</strong> {sourceSummary}</span>}
               {bean.bagNotes && bean.bagNotes !== '(not logged)' && <span><strong>Full Notes:</strong> {bean.bagNotes}</span>}
               {grindText && <span><strong>Grind:</strong> {grindText}</span>}
               {bean.handBrewRecipe && preferences.brewMethod !== 'aiden' && (

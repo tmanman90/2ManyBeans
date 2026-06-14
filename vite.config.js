@@ -3,10 +3,16 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const isCapacitor = process.env.CAPACITOR_BUILD === 'true'
+const appVariant = process.env.TMB_APP_VARIANT === 'dev' ? 'dev' : 'prod'
+const googleIosClientId = appVariant === 'dev'
+  ? '902243550931-oapf974v3f78m5plmoh4urqos01cj6v9.apps.googleusercontent.com'
+  : '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com'
 
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+    __APP_VARIANT__: JSON.stringify(appVariant),
+    __GOOGLE_IOS_CLIENT_ID__: JSON.stringify(googleIosClientId),
   },
   build: {
     // Stable vendor chunks so Capgo OTA deltas are small per deploy. A JS

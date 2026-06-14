@@ -5,6 +5,7 @@ import { getPeakStatus, daysSinceRoast } from './peakStatus';
 import { getProfileForRoaster } from './roasterProfiles';
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
+import { formatSourceInsightsForPrompt } from './sourceInsights';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -109,6 +110,7 @@ export function buildBeanDescription(bean) {
       bean.roastLevel ? `Roast level: ${sanitize(bean.roastLevel)}` : null,
       bean.farm ? `Farm: ${sanitize(bean.farm)}` : null,
       bean.brewingRec ? `Roaster brewing recommendation: ${sanitize(bean.brewingRec, 200)}` : null,
+      formatSourceInsightsForPrompt(bean, { maxChars: 900 }) || null,
     ].filter(Boolean).join('\n'),
     profile,
   };

@@ -11,6 +11,7 @@ import {
   getOriginContext,
 } from './coffeeKnowledge';
 import { GRINDER_LABELS } from './brewMethods';
+import { formatSourceInsightsForPrompt, summarizeSourceInsights } from './sourceInsights';
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { stripMarkdown } from './textFormat';
@@ -165,6 +166,7 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
     selectedBean.roastLevel && `Roast Level: ${selectedBean.roastLevel}`,
     selectedBean.cupScore && `Cup Score: ${selectedBean.cupScore}`,
     selectedBean.brewingRec && `Brewing Rec: ${selectedBean.brewingRec}`,
+    selectedBean.sourceInsights && formatSourceInsightsForPrompt(selectedBean, { maxChars: 700 }),
     currentBrewLine,
   ].filter(Boolean).join('\n- ') : '';
   const beanSection = beanProfile
@@ -460,7 +462,8 @@ export function buildChatContext(beans, tastings, preferences) {
     .filter(b => b.status === 'ACTIVE')
     .map(b => {
       const ps = getPeakStatus(b);
-      const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${sanitize(b.openDate, 20)} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}`;
+      const sourceSummary = summarizeSourceInsights(b, { maxChars: 160 });
+      const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${sanitize(b.openDate, 20)} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}${sourceSummary ? ` | Source: ${sanitize(sourceSummary, 160)}` : ''}`;
       const recipeLine =
         brewMethod !== 'aiden' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
       return recipeLine ? `${summary}\n${recipeLine}` : summary;
@@ -469,7 +472,8 @@ export function buildChatContext(beans, tastings, preferences) {
 
   const sealed = beans.filter(b => b.status === 'SEALED').map(b => {
     const ps = getPeakStatus(b);
-    return `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${sanitize(b.bagNotes, 200)}`;
+    const sourceSummary = summarizeSourceInsights(b, { maxChars: 140 });
+    return `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${sanitize(b.bagNotes, 200)}${sourceSummary ? ` | Source: ${sanitize(sourceSummary, 140)}` : ''}`;
   }).join('\n');
 
   const finished = beans.filter(b => b.status === 'FINISHED').slice(0, 5).map(b =>
@@ -521,14 +525,17 @@ Photo handling:
 When the user sends photos of a coffee bag, scan the label carefully and present what you find. Then include structured data using markers:
 
 ---BEAN_SCAN---
-{"roaster":"...","name":"...","origin":"...","variety":"...","process":"...","roastDate":"YYYY-MM-DD or empty","bagSize":number,"bagNotes":"tasting notes from bag","producer":"...","region":"...","altitude":"...","farm":"...","roastLevel":"...","cupScore":"...","brewingRec":"...","sourcedBy":"..."}
+{"roaster":"...","name":"...","origin":"...","variety":"...","process":"...","roastDate":"YYYY-MM-DD or empty","bagSize":number,"bagNotes":"tasting notes from bag","producer":"...","region":"...","altitude":"...","farm":"...","roastLevel":"...","cupScore":"...","brewingRec":"...","sourcedBy":"...","roastedIn":"...","sourceInsights":{"sourceType":"bag | pamphlet | card | insert | mixed","sourceSummary":"...","roasterContext":"...","selectorContext":"...","tastingCommittee":"...","sensoryDescriptors":["..."],"sensoryAxes":{"fragranceAroma":7,"acidity":7,"sweetness":7,"body":7,"flavor":7,"balance":7},"brewGuidance":"...","provenance":"...","extractedTextSummary":"...","extractionWarnings":"..."}}
 ---END_SCAN---
 
 Rules for photo scanning:
 - Read ALL text in ALL orientations (rotated, vertical, sideways)
 - Distinguish curator/subscription brands from the actual roaster
+- If a pamphlet/card/insert appears with the bag, preserve its insight in sourceInsights instead of only bagNotes
+- If a source sheet mentions multiple coffees, only attach the section matching the scanned bean
 - If no explicit coffee name, construct from farm + variety or origin + variety
 - Use empty string for unknown fields, 100 for unknown bagSize
+- Use sourceInsights: null when no source insert/card/pamphlet context is visible
 - If the photo is NOT a coffee bag, respond normally with no markers
 - If photos are too blurry, ask for clearer photos
 - After the scan data, briefly summarize what you found and offer next steps`;

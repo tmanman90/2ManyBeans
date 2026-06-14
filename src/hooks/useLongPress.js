@@ -17,6 +17,7 @@ import { haptic } from '../lib/haptics';
 export function useLongPress({ onTap, onLongPress, delay = 400 }) {
   const timerRef = useRef(null);
   const firedRef = useRef(false);
+  const suppressClickRef = useRef(false);
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -34,8 +35,10 @@ export function useLongPress({ onTap, onLongPress, delay = 400 }) {
 
   const onTouchStart = useCallback((e) => {
     firedRef.current = false;
+    suppressClickRef.current = false;
     timerRef.current = setTimeout(() => {
       firedRef.current = true;
+      suppressClickRef.current = true;
       timerRef.current = null;
       haptic.medium();
       onLongPress?.(e);
@@ -43,6 +46,11 @@ export function useLongPress({ onTap, onLongPress, delay = 400 }) {
   }, [onLongPress, delay]);
 
   const onTouchEnd = useCallback((e) => {
+    suppressClickRef.current = true;
+    if (firedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (timerRef.current) {
       // Timer hasn't fired yet — this is a tap
       clear();
@@ -63,7 +71,18 @@ export function useLongPress({ onTap, onLongPress, delay = 400 }) {
     e.preventDefault();
   }, []);
 
+  const onClick = useCallback((e) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onTap?.(e);
+  }, [onTap]);
+
   return {
+    onClick,
     onTouchStart,
     onTouchEnd,
     onTouchMove,

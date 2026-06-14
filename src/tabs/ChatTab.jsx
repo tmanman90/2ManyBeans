@@ -12,7 +12,8 @@ import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { getBrewMethod } from '../lib/brewMethods';
-import { getProfileForRoaster } from '../lib/roasterProfiles';
+import { buildNewBeanData } from '../lib/beanBuilder';
+import { buildSourceContextHash, normalizeSourceInsights } from '../lib/sourceInsights';
 import { usePreferences } from '../hooks/useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
@@ -24,6 +25,9 @@ function parseBeanScan(text) {
   try {
     const json = match[1].trim();
     const scannedBean = JSON.parse(json);
+    scannedBean.sourceInsights = normalizeSourceInsights(scannedBean.sourceInsights);
+    const sourceContextHash = buildSourceContextHash(scannedBean);
+    if (sourceContextHash) scannedBean.sourceContextHash = sourceContextHash;
     const cleanText = text.replace(/---BEAN_SCAN---[\s\S]*?---END_SCAN---/, '').trim();
     return { cleanText, scannedBean };
   } catch {
@@ -445,8 +449,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const handleSaveToInventory = async () => {
     if (!scannedBean) return;
     try {
-      const profile = getProfileForRoaster(scannedBean.roaster);
-      await addBean({
+      const beanData = buildNewBeanData({
         name: scannedBean.name || 'Unknown',
         roaster: scannedBean.roaster || 'Unknown',
         origin: scannedBean.origin || '',
@@ -463,14 +466,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         cupScore: scannedBean.cupScore || '',
         brewingRec: scannedBean.brewingRec || '',
         sourcedBy: scannedBean.sourcedBy || '',
-        degasMin: profile.degasMin,
-        degasMax: profile.degasMax,
-        peakStart: profile.peakStart,
-        peakEnd: profile.peakEnd,
-        guidance: profile.guidance,
-        status: 'SEALED',
-        jarSlot: null,
+        roastedIn: scannedBean.roastedIn || '',
+        sourceInsights: scannedBean.sourceInsights || null,
       });
+      await addBean(beanData);
       setToast(`${scannedBean.name || 'Bean'} saved to inventory!`);
       setScannedBean(null);
     } catch (err) {

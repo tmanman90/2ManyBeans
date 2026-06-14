@@ -10,6 +10,7 @@ import { uploadOriginalPhoto } from '../lib/storage';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { handlePaywallError } from '../lib/paywallHelpers';
 import { ENRICHABLE_FIELDS } from '../lib/beanFields';
+import { buildSourceContextHash, summarizeSourceInsights } from '../lib/sourceInsights';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
@@ -152,6 +153,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         sourcedBy: bean.sourcedBy || '',
         shelfLifeOverride: bean.shelfLifeOverride ? `${bean.shelfLifeOverride} days` : '',
         roasterStyle: bean.roasterStyle || '',
+        sourceInsights: bean.sourceInsights || null,
       });
       if (!photoInFlight.current) {
         setPhotoGenerating(false);
@@ -216,7 +218,20 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       merged.enrichedAt = new Date().toISOString();
       setF(merged);
       generateRuphusStory(merged, { enrichment: research })
-        .then(story => { if (story && updateBean && bean.id) updateBean(bean.id, { story, enrichedAt: merged.enrichedAt }); })
+        .then(story => {
+          if (story && updateBean && bean.id) {
+            const storyContextHash = buildSourceContextHash({ ...bean, ...merged });
+            updateBean(bean.id, {
+              story,
+              enrichedAt: merged.enrichedAt,
+              storyStatus: 'ready',
+              storyGeneratedAt: story.generatedAt || new Date().toISOString(),
+              storyContextHash,
+              sourceContextHash: storyContextHash,
+              storyError: null,
+            });
+          }
+        })
         .catch(() => {});
     } catch (err) {
       if (handlePaywallError(err, openPaywall)) {
@@ -375,6 +390,13 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
     if (f.sourcedBy.trim() !== (bean.sourcedBy || '')) changes.sourcedBy = f.sourcedBy.trim();
     if (f.roasterStyle !== (bean.roasterStyle || '')) changes.roasterStyle = f.roasterStyle || null;
 
+    const sourceHashBefore = buildSourceContextHash(bean);
+    const sourceHashAfter = buildSourceContextHash({ ...bean, ...changes, sourceInsights: f.sourceInsights || bean.sourceInsights });
+    if (sourceHashAfter && sourceHashAfter !== sourceHashBefore) {
+      changes.sourceContextHash = sourceHashAfter;
+      if (bean.story?.intro) changes.storyStatus = 'stale';
+    }
+
     // Roaster context + enrichedAt (set by AI Fill, not user-editable)
     for (const key of ['roasterLocation', 'roasterDescription', 'roasterFounded', 'redditNotes', 'enrichedAt']) {
       if (f[key] && f[key] !== (bean[key] || '')) changes[key] = f[key];
@@ -439,6 +461,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const rowStyle = { marginBottom: 12 };
   const filled = [f.roaster, f.name, f.origin, f.variety, f.process, f.bagSize, f.roastDate, f.bagNotes].filter(v => v && String(v).trim()).length;
   const total = 8;
+  const sourceSummary = summarizeSourceInsights(f, { maxChars: 260 });
 
   return (
     <Modal open={open} onClose={handleCancel} title={
@@ -694,6 +717,23 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           >+ {chip}</button>
         ))}
       </div>
+      {sourceSummary && (
+        <div style={{
+          marginTop: 10,
+          padding: '10px 12px',
+          borderRadius: 10,
+          background: C.amberBg,
+          border: `1px solid ${C.border}`,
+          fontSize: 12.5,
+          color: C.text,
+          lineHeight: 1.45,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+            Source insight
+          </div>
+          {sourceSummary}
+        </div>
+      )}
 
       <ChapterHeader
         number="5" title="Deeper Details"

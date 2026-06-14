@@ -1,5 +1,5 @@
 // Rotation tab — ported from prototype lines 279-434
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { C, fonts, journalCard } from '../styles/theme';
@@ -16,11 +16,13 @@ import { Modal } from '../components/Modal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { QuickRecipeFlow } from '../components/QuickRecipeFlow';
+import { QuickRecipeActionMenu } from '../components/QuickRecipeActionMenu';
 import { EditBeanModal } from '../components/EditBeanModal';
 import { buildNewBeanData } from '../lib/beanBuilder';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
+import { useLongPress } from '../hooks/useLongPress';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
@@ -45,7 +47,7 @@ const PillButton = ({ color, icon, label, onClick }) => (
   </button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, isDemo, onDemoAction }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -61,6 +63,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [slotPicker, setSlotPicker] = useState(null);
   const [brewMenuBean, setBrewMenuBean] = useState(null);
   const [quickRecipeOpen, setQuickRecipeOpen] = useState(false);
+  const [quickRecipeMenuOpen, setQuickRecipeMenuOpen] = useState(false);
   const [newBeanEntry, setNewBeanEntry] = useState(null);
   const liveNewBean = newBeanEntry ? beans.find(b => b.id === newBeanEntry.id) : null;
   const newBeanForModal = newBeanEntry
@@ -110,6 +113,29 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const slots = slotNumbers.map(n => beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n) || null);
   const recs = getRecommendations(beans);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
+
+  const openQuickRecipe = useCallback(() => {
+    if (isDemo) {
+      onDemoAction?.();
+      return;
+    }
+    setQuickRecipeMenuOpen(false);
+    setQuickRecipeOpen(true);
+  }, [isDemo, onDemoAction]);
+
+  const openAddBean = useCallback(() => {
+    if (isDemo) {
+      onDemoAction?.();
+      return;
+    }
+    setQuickRecipeMenuOpen(false);
+    onAddBeanQuickAction?.();
+  }, [isDemo, onAddBeanQuickAction, onDemoAction]);
+
+  const quickRecipeLongPressHandlers = useLongPress({
+    onTap: openQuickRecipe,
+    onLongPress: () => setQuickRecipeMenuOpen(true),
+  });
 
   const handleOpenRec = (beanId) => {
     if (emptySlots.length === 0) return;
@@ -172,9 +198,22 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={sectionTitle}>Active Rotation</div>
-          <Btn variant="primary" onClick={() => isDemo ? onDemoAction?.() : setQuickRecipeOpen(true)} style={{ padding: '8px 14px' }}>
-            <Camera size={14} /> Quick Recipe
-          </Btn>
+          <div style={{ position: 'relative' }}>
+            <Btn
+              variant="primary"
+              style={{ padding: '8px 14px' }}
+              aria-label="Quick Recipe"
+              {...quickRecipeLongPressHandlers}
+            >
+              <Camera size={14} /> Quick Recipe
+            </Btn>
+            <QuickRecipeActionMenu
+              open={quickRecipeMenuOpen}
+              onClose={() => setQuickRecipeMenuOpen(false)}
+              onQuickRecipe={openQuickRecipe}
+              onAddBean={openAddBean}
+            />
+          </div>
         </div>
         <div style={accentBar} />
         <div style={{ fontSize: 13, color: C.textMuted }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>

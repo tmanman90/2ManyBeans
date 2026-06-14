@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { researchBean } from '../lib/beanResearch';
 import { generateHandBrewRecipe, repairHandBrewRecipe } from '../lib/handbrew';
+import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
 import { usePreferences } from './useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
@@ -35,6 +36,13 @@ export function useHandBrew(updateBean) {
 
   const isActive = (rid) => mountedRef.current && activeRequestRef.current === rid;
 
+  const recipeMatchesSource = (bean, recipe) => {
+    if (!recipe) return false;
+    if (!hasSourceInsights(bean)) return true;
+    const hash = buildSourceContextHash(bean);
+    return Boolean(hash && recipe.sourceContextHash === hash);
+  };
+
   // Resolve the brew device from preferences (default to v60 for non-aiden methods)
   const getBrewDevice = () => {
     const m = preferences?.brewMethod;
@@ -50,8 +58,10 @@ export function useHandBrew(updateBean) {
     // Check keyed cache first, fall back to legacy single-recipe field
     const keyedRecipe = bean.handBrewRecipes?.[device];
     const legacyRecipe = bean.handBrewRecipe;
-    const cached = keyedRecipe ||
+    const cachedCandidate = keyedRecipe ||
       (legacyRecipe && (legacyRecipe.device || 'v60') === device ? legacyRecipe : null);
+    const cached = recipeMatchesSource(bean, cachedCandidate) ? cachedCandidate : null;
+    const sourceHash = buildSourceContextHash(bean);
 
     if (!forceRegenerate && cached) {
       const cachedGrinder = cached.grinder || 'fellow-ode-gen2';
@@ -120,6 +130,7 @@ export function useHandBrew(updateBean) {
         generatedAt: new Date().toISOString(),
         grinder: grinderKey,
         device,
+        sourceContextHash: sourceHash,
       };
       setHandBrewRecipe(recipeData);
       setHandBrewError(null);

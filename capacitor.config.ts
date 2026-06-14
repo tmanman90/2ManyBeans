@@ -1,8 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const isDevApp = process.env.TMB_APP_VARIANT === 'dev';
+const disableCapgoUpdates = process.env.TMB_DISABLE_CAPGO_UPDATES === '1';
+
 const config: CapacitorConfig = {
-  appId: 'com.talmeltzer.coffeehub',
-  appName: '2manybeans',
+  appId: isDevApp ? 'com.talmeltzer.coffeehub.dev' : 'com.talmeltzer.coffeehub',
+  appName: isDevApp ? '2manybeans Dev' : '2manybeans',
   webDir: 'dist',
   plugins: {
     CapacitorHttp: {
@@ -31,7 +34,8 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
     CapacitorUpdater: {
-      autoUpdate: true,
+      autoUpdate: !disableCapgoUpdates,
+      ...(isDevApp ? { defaultChannel: 'dev' } : {}),
     },
   },
 };

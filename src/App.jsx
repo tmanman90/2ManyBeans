@@ -47,12 +47,12 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // history, blob URLs) that only exists in-component, unlike other tabs
   // whose data comes from Firestore props.
   const [visitedTabs, setVisitedTabs] = useState(new Set(['rotation']));
-  // When the user lands in the empty-inventory state and taps "Add a Bean",
-  // we switch to the Inventory tab and signal it to open the add-choice modal.
-  // InventoryTab consumes this flag and clears it via onPendingAddBeanConsumed.
-  const [pendingAddBean, setPendingAddBean] = useState(false);
+  // When another flow wants to start bean entry, switch to Inventory and pass
+  // the exact entry mode through. Onboarding's manual_add path must not be
+  // collapsed into scan.
+  const [pendingAddBeanMode, setPendingAddBeanMode] = useState(null);
   // Cross-tab bridge from BrewTimer completion → TastingTab coach.
-  // Mirrors pendingAddBean: set here, consumed by TastingTab which
+  // Mirrors pendingAddBeanMode: set here, consumed by TastingTab which
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
   const [tourActive, setTourActive] = useState(() => {
@@ -86,10 +86,9 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
     }
   };
 
-  const handleAddNewBeanFromOpenFlow = () => {
-    // Switch to Inventory tab and queue up the add-choice modal.
+  const handleStartAddBeanScan = () => {
     setTab('inventory');
-    setPendingAddBean(true);
+    setPendingAddBeanMode('scan');
   };
 
   const handleModalOpen = (beanId, slot) => {
@@ -120,7 +119,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // `profile.onboardingAnswers.postCompleteAction` as part of the
   // final atomic setDoc, so by the time App.jsx mounts the field is
   // readable. One-shot: consume + clear so a later profile refresh
-  // or navigation doesn't re-trigger. Mirrors the `pendingAddBean`
+  // or navigation doesn't re-trigger. Mirrors the `pendingAddBeanMode`
   // bridge but Firestore-backed so it survives a cross-device hand-off.
   const handoffConsumedRef = useRef(false);
   useEffect(() => {
@@ -129,9 +128,12 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
     const action = profile?.onboardingAnswers?.postCompleteAction;
     if (!action || action === 'none') return;
     handoffConsumedRef.current = true;
-    if (action === 'scan' || action === 'manual_add') {
+    if (action === 'scan') {
       setTab('inventory');
-      setPendingAddBean(true);
+      setPendingAddBeanMode('scan');
+    } else if (action === 'manual_add') {
+      setTab('inventory');
+      setPendingAddBeanMode('manual_add');
     }
     // Clear the field so re-mounts don't re-trigger. Non-fatal on
     // failure — worst case the next mount hits the guard ref above.
@@ -222,6 +224,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             updateTasting={updateTasting}
             getBeanById={getBeanById}
             onStartTastingSession={handleStartTastingSession}
+            onAddBeanQuickAction={handleStartAddBeanScan}
             isDemo={isDemo}
             onDemoAction={onDemoAction}
           />
@@ -240,8 +243,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               addTasting={addTasting}
               updateTasting={updateTasting}
               getBeanById={getBeanById}
-              pendingAddBean={pendingAddBean}
-              onPendingAddBeanConsumed={() => setPendingAddBean(false)}
+              pendingAddBeanMode={pendingAddBeanMode}
+              onPendingAddBeanConsumed={() => setPendingAddBeanMode(null)}
               onStartTastingSession={handleStartTastingSession}
               isDemo={isDemo}
               onDemoAction={onDemoAction}
@@ -363,7 +366,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         onClose={() => { setOpenModal(false); setTargetSlot(null); }}
         beans={beans}
         onOpenBean={handleModalOpen}
-        onAddNewBean={handleAddNewBeanFromOpenFlow}
+        onAddNewBean={handleStartAddBeanScan}
         targetSlot={targetSlot}
         canisterCount={preferences.canisterCount || 3}
       />

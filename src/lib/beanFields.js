@@ -24,6 +24,15 @@ export const ENRICHABLE_FIELDS = [
   'redditNotes',
 ];
 
+export const SOURCE_DERIVED_FIELDS = [
+  'sourceInsights',
+  'sourceContextHash',
+  'storyContextHash',
+  'storyStatus',
+  'storyGeneratedAt',
+  'storyError',
+];
+
 export function isBagNotesEmpty(bean) {
   return !bean.bagNotes || bean.bagNotes === '(not logged)';
 }

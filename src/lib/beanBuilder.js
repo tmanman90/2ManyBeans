@@ -1,6 +1,7 @@
 import { getProfileForRoaster } from './roasterProfiles';
 import { parseShelfLifeDays } from './peakStatus';
 import { ENRICHABLE_FIELDS } from './beanFields';
+import { buildSourceContextHash, normalizeSourceInsights } from './sourceInsights';
 
 export function buildNewBeanData(fields, { aidenData, story } = {}) {
   const profile = getProfileForRoaster(fields.roaster);
@@ -32,6 +33,17 @@ export function buildNewBeanData(fields, { aidenData, story } = {}) {
     const val = (fields[key] || '').trim();
     if (val) data[key] = val;
   }
+
+  const sourceInsights = normalizeSourceInsights(fields.sourceInsights);
+  if (sourceInsights) {
+    data.sourceInsights = sourceInsights;
+    data.sourceContextHash = buildSourceContextHash({ ...data, sourceInsights });
+  }
+  if (fields.storyContextHash) data.storyContextHash = fields.storyContextHash;
+  if (fields.storyStatus) data.storyStatus = fields.storyStatus;
+  if (fields.storyGeneratedAt) data.storyGeneratedAt = fields.storyGeneratedAt;
+  if (fields.storyError) data.storyError = fields.storyError;
+
   const shelfVal = (fields.shelfLife || '').trim();
   if (shelfVal) data.shelfLife = shelfVal;
   if (fields.enrichedAt) data.enrichedAt = fields.enrichedAt;

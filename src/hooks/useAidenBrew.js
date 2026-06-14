@@ -11,6 +11,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { generateAidenRecipe, pushToAiden } from '../lib/aiden';
 import { researchBean } from '../lib/beanResearch';
+import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
 
@@ -36,6 +37,13 @@ export function useAidenBrew(updateBean) {
 
   // Returns true if this async chain should still be applying state updates.
   const isActive = (requestId) => mountedRef.current && activeRequestRef.current === requestId;
+
+  const recipeMatchesSource = (bean, recipe) => {
+    if (!recipe) return false;
+    if (!hasSourceInsights(bean)) return true;
+    const hash = buildSourceContextHash(bean);
+    return Boolean(hash && recipe.sourceContextHash === hash);
+  };
 
   const handlePushToAiden = async (recipe, beanOverride = null, requestId = null) => {
     // Pushing to the Fellow Aiden account is an Ultra-only feature. Recipe
@@ -107,7 +115,9 @@ export function useAidenBrew(updateBean) {
 
   const handleBrewWithAiden = async (bean, cachedResearch = null, forceRegenerate = false) => {
     // Cached recipe with no push pending: free to show (just displays stored data).
-    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && bean.aidenLink;
+    const sourceHash = buildSourceContextHash(bean);
+    const cachedRecipeFresh = recipeMatchesSource(bean, bean.aidenRecipe);
+    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && cachedRecipeFresh && bean.aidenLink;
     if (!hasCachedRecipeOnly && !hasPro) {
       // Cancel any in-flight chain so its tail effects don't land after
       // the paywall opens (and possibly persist a Pro-gated recipe to a
@@ -129,7 +139,7 @@ export function useAidenBrew(updateBean) {
     setAidenModal(true);
 
     // Show cached recipe immediately if available (skip generation)
-    if (!forceRegenerate && bean.aidenRecipe) {
+    if (!forceRegenerate && bean.aidenRecipe && cachedRecipeFresh) {
       if (!isActive(rid)) return;
       setAidenRecipe(bean.aidenRecipe);
 
@@ -178,7 +188,7 @@ export function useAidenBrew(updateBean) {
       setAidenError(null);
       if (bean.id) {
         const persist = {
-          aidenRecipe: { ...recipe, generatedAt: new Date().toISOString() },
+          aidenRecipe: { ...recipe, generatedAt: new Date().toISOString(), sourceContextHash: sourceHash },
           aidenLink: null, aidenUsedRelay: null,
           aidenIcedLink: null, aidenIcedUsedRelay: null,
         };

@@ -20,7 +20,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBean, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -44,11 +44,14 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   };
 
   useEffect(() => {
-    if (pendingAddBean) {
+    if (pendingAddBeanMode === 'scan') {
       setScanOpen(true);
       onPendingAddBeanConsumed?.();
+    } else if (pendingAddBeanMode === 'manual_add') {
+      setManualOpen(true);
+      onPendingAddBeanConsumed?.();
     }
-  }, [pendingAddBean, onPendingAddBeanConsumed]);
+  }, [pendingAddBeanMode, onPendingAddBeanConsumed]);
   const [search, setSearch] = useState('');
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [toast, setToast] = useState(null);
@@ -235,6 +238,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         onManualEntry={() => { setScanOpen(false); setManualOpen(true); }}
         uid={uid}
         addBean={onAddBean}
+        updateBean={updateBean}
       />
       <ManualEntrySheet
         open={manualOpen}

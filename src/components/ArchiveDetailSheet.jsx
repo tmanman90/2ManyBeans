@@ -6,6 +6,7 @@ import { Camera, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { BeanThumb } from './BeanThumb';
 import { SwipeDownHandle } from './SwipeDownHandle';
+import { summarizeSourceInsights } from '../lib/sourceInsights';
 
 function ArchiveStars({ value, size = 12 }) {
   if (!value) return null;
@@ -157,6 +158,7 @@ export function ArchiveDetailSheet({
   const best = beanTastings.reduce((m, t) => (t.rating && t.rating > m ? t.rating : m), 0) || null;
   const dOwn = diffDays(bean.finishDate, bean.roastDate);
   const dOpen = diffDays(bean.finishDate, bean.openDate);
+  const sourceSummary = summarizeSourceInsights(bean, { maxChars: 260 });
 
   const visible = mounted && !closing;
 
@@ -382,6 +384,32 @@ export function ArchiveDetailSheet({
           <Row label="Roast" value={bean.roastLevel} />
           <Row label="Cup score" value={bean.cupScore} />
           <Row label="Weight" value={bean.bagSize ? `${bean.bagSize}g` : null} />
+          {sourceSummary && (
+            <div style={{ padding: '10px 0' }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: C.textLight,
+                  letterSpacing: 0.8,
+                  textTransform: 'uppercase',
+                  marginBottom: 4,
+                }}
+              >
+                Source insight
+              </div>
+              <div
+                style={{
+                  fontSize: 13.5,
+                  color: C.text,
+                  fontFamily: fonts.body,
+                  lineHeight: 1.45,
+                }}
+              >
+                {sourceSummary}
+              </div>
+            </div>
+          )}
           {bean.bagNotes && (
             <div style={{ padding: '10px 0' }}>
               <div

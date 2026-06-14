@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { researchBeanOnline, summarizeNotes } from '../lib/gemini';
 import { ENRICHABLE_FIELDS, isBagNotesEmpty } from '../lib/beanFields';
+import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
 
 // Module-level set of bean IDs currently being enriched. Prevents a
 // double-tap on the Ruphus button from firing two concurrent Gemini calls
@@ -25,6 +26,14 @@ function getStoredRoasterContext(bean) {
     roasterFounded: bean.roasterFounded,
     redditNotes: bean.redditNotes,
   };
+}
+
+function storyIsFresh(bean) {
+  if (!bean.story?.intro) return false;
+  if (bean.storyStatus === 'stale') return false;
+  const currentHash = buildSourceContextHash(bean);
+  if (!hasSourceInsights(bean) && !bean.storyContextHash) return true;
+  return Boolean(currentHash && bean.storyContextHash === currentHash);
 }
 
 async function runEnrichment(bean, getBeanById, updateBean, { forceResearch = false } = {}) {
@@ -102,9 +111,17 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
         useWebSearch: true,
         enrichment,
       });
+      const storyContextHash = buildSourceContextHash(enrichedBean);
       setRuphusStory(story);
       if (updateBean && bean.id) {
-        const storyUpdate = { story };
+        const storyUpdate = {
+          story,
+          storyStatus: 'ready',
+          storyGeneratedAt: story.generatedAt || new Date().toISOString(),
+          storyContextHash,
+          sourceContextHash: storyContextHash,
+          storyError: null,
+        };
         if (!bean.enrichedAt && enrichment) storyUpdate.enrichedAt = new Date().toISOString();
         await updateBean(bean.id, storyUpdate);
       }
@@ -121,7 +138,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
     setRuphusOpen(true);
     setRuphusError(null);
 
-    if (bean.story?.intro) {
+    if (storyIsFresh(bean)) {
       setRuphusStory(bean.story);
       setRuphusLoading(false);
     } else {
