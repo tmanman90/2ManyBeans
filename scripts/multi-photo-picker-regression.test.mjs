@@ -6,6 +6,7 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 const helper = read('src/lib/photoPicker.js');
 const quickRecipe = read('src/components/QuickRecipeFlow.jsx');
 const scanSheet = read('src/components/ScanSheet.jsx');
+const editBeanModal = read('src/components/EditBeanModal.jsx');
 
 assert.match(helper, /galleryPhotosToScanPhotos/);
 assert.match(helper, /isPhotoPickerCancel/);
@@ -31,5 +32,9 @@ assert.match(scanSheet, /setPhotos\(prev => \[\.\.\.prev, \.\.\.converted\]\.sli
 assert.match(scanSheet, /source: CameraSource\.Camera/);
 assert.doesNotMatch(scanSheet, /requestPermissions\(\{ permissions: \['camera', 'photos'\] \}\)/);
 assert.match(scanSheet, /multiple ref=\{fileRef\}/);
+
+assert.match(editBeanModal, /pendingPhotoPreviewSrc/);
+assert.match(editBeanModal, /previewUrl\.startsWith\('blob:'\)/);
+assert.match(editBeanModal, /src=\{pendingPhotoPreviewSrc\}/);
 
 console.log('multi-photo picker regression passed');

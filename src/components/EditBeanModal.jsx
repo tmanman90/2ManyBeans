@@ -178,6 +178,15 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
   if (!bean) return null;
 
+  const pendingPhotoDataUrl = pendingPhoto?.base64
+    ? `data:${pendingPhoto.mediaType || 'image/jpeg'};base64,${pendingPhoto.base64}`
+    : '';
+  const pendingPhotoPreviewSrc = pendingPhoto
+    ? (pendingPhoto.previewUrl && !pendingPhoto.previewUrl.startsWith('blob:')
+      ? pendingPhoto.previewUrl
+      : pendingPhotoDataUrl || pendingPhoto.previewUrl)
+    : '';
+
   const NOTE_CHIPS = ['Floral','Citrus','Stonefruit','Chocolate','Nutty','Berry','Caramel','Spice'];
   const addChip = (chip) => {
     const notes = (f.bagNotes || '').trim();
@@ -500,7 +509,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         {pendingPhoto ? (
           <div>
             <img
-              src={pendingPhoto.previewUrl || `data:${pendingPhoto.mediaType};base64,${pendingPhoto.base64}`}
+              src={pendingPhotoPreviewSrc}
               alt="New photo"
               style={{
                 width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',
