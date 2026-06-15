@@ -47,23 +47,33 @@ Pay special attention to:
 - Weight/bag size
 - Pamphlet/card/source insert language, including tasting committee notes, roaster explanations, sensory charts, brew suggestions, selector notes, and farm/provenance stories
 
-STEP 3 -- CURATOR vs ROASTER:
+STEP 3 -- DATE CANDIDATE SWEEP:
+Before choosing roastDate, visually find every date-looking text string across all images. This includes numeric dates, month-word dates, all-caps month stamps, handwritten dates, printed stickers, side-panel stamps, and dates next to seals or icons.
+For each date candidate, classify what it most likely means from its nearest label and local visual context:
+- Roast date: labels or nearby words like "roast date", "roasted on", "roasted", "roasting date", "roasted in [place] on [date]", or a stamped date immediately adjacent to "Roast Date".
+- Best-by / consume-by / shelf-life: labels like "best by", "best before", "use by", "consume by", "enjoy by", "expiry", "BB", or "EXP". Do NOT use these as roastDate.
+- Harvest / crop / lot / competition date: labels like "harvest", "crop", "arrival", "auction", "lot", "selected", or "competition". Do NOT use these as roastDate.
+- If multiple roast-date candidates are visible, prefer the one physically closest to a roast-date label or the actual coffee bag label over a pamphlet or marketing text.
+- If a date-looking string is visible but the nearest label clearly says best-by, harvest, lot, or expiry, keep roastDate empty unless another explicit roast date exists.
+- If a date is visually next to "Roast Date" but separated by a line break, rotated orientation, stamp, logo, or seal, still treat it as the roast date.
+
+STEP 4 -- CURATOR vs ROASTER:
 IMPORTANT: Some images may show a SUBSCRIPTION SERVICE or CURATOR brand (e.g., Dayglow, Trade, Angels' Cup, Yes Plz, Cat & Cloud marketplace) -- this is NOT the roaster. The actual roaster is the company that ROASTED the coffee (usually on the label/box itself).
 - If a curator/subscription service is present: set "roaster" to "Curator (Actual Roaster)" format, e.g., "Dayglow (Promethium Coffee)"
 - Set "sourcedBy" to the curator name alone, e.g., "Dayglow"
 - NEVER use the curator name as the coffee name
 
-STEP 4 -- CROSS-REFERENCE:
+STEP 5 -- CROSS-REFERENCE:
 Cross-reference information across all provided images. Back labels often have details missing from the front.
 If an image is a pamphlet/card/insert that discusses the same coffee, treat it as high-priority source evidence. If the same sheet mentions multiple coffees, only extract source insights that match the target coffee by name, variety, origin, process, or roaster.
 
-STEP 5 -- COFFEE NAME:
+STEP 6 -- COFFEE NAME:
 - If the bag has an explicit coffee name or lot name, use it
 - If there is NO explicit name, construct one from farm/estate + variety, e.g., "El Placer Geisha", "La Palma Caturra"
 - If only variety is known, use origin + variety, e.g., "Colombia Geisha"
 - NEVER use the roaster name or curator name as the coffee name
 
-STEP 6 -- STRUCTURED OUTPUT:
+STEP 7 -- STRUCTURED OUTPUT:
 Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation):
 
 {
@@ -108,7 +118,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   }
 }
 
-If a field is not visible, use an empty string (or 100 for bagSize). If no pamphlet/card/source insight is visible, set "sourceInsights" to null. For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "JUN 05 2026". Dates may be printed vertically or separated from the words "Roast Date"; all-caps month stamps like "JUN 05 2026" should be returned as "2026-06-05". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
+If a field is not visible, use an empty string (or 100 for bagSize). If no pamphlet/card/source insight is visible, set "sourceInsights" to null. For roastDate: first perform the DATE CANDIDATE SWEEP above, then return the best roast-date candidate only when visual context supports it. Look for "roasted on", "roast date", "roasting date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "JUN 05 2026". Dates may be printed vertically or separated from the words "Roast Date"; all-caps month stamps like "JUN 05 2026" should be returned as "2026-06-05". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-by, best-before, expiry, harvest, crop, lot, arrival, auction, or competition dates as roastDate.`;
 
   // Bean scan IS the metered action for the aiScans free-tier counter.
   // This call burns one credit. Research enrichment + image analysis are
