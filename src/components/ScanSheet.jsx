@@ -4,6 +4,7 @@ import { X, Search } from 'lucide-react';
 import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot } from '../lib/gemini';
+import { ensurePhotoLibraryAccess, galleryPhotosToScanPhotos, isPhotoPickerCancel } from '../lib/photoPicker';
 import { uploadOriginalPhoto } from '../lib/storage';
 import { generateRuphusStory } from '../lib/professorRuphus';
 import { buildNewBeanData } from '../lib/beanBuilder';
@@ -50,8 +51,8 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
     try {
       const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
       const perms = await Camera.checkPermissions();
-      if (perms.camera !== 'granted' || perms.photos !== 'granted') {
-        const requested = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+      if (perms.camera !== 'granted') {
+        const requested = await Camera.requestPermissions({ permissions: ['camera'] });
         if (requested.camera === 'denied') {
           setScanError('Camera permission denied. Enable it in Settings > 2manybeans.');
           return;
@@ -60,7 +61,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       const image = await Camera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
-        source: CameraSource.Prompt,
+        source: CameraSource.Camera,
         width: 1200,
         height: 1200,
       });
@@ -68,19 +69,50 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       const base64 = image.dataUrl.split(',')[1];
       setPhotos(prev => [...prev, { base64, mediaType, previewUrl: image.dataUrl }].slice(0, 3));
     } catch (err) {
-      if (err.message !== 'User cancelled photos app') {
+      if (!isPhotoPickerCancel(err)) {
         console.error('Camera error:', err);
         setScanError(`Failed to capture photo: ${err.message || 'Unknown error'}`);
       }
     }
   };
 
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const pickNativePhotos = async () => {
+    const remaining = 3 - photos.length;
+    if (remaining <= 0) return;
     try {
-      const compressed = await compressImage(file);
-      setPhotos(prev => [...prev, compressed].slice(0, 3));
+      const { Camera } = await import('@capacitor/camera');
+      const canReadPhotos = await ensurePhotoLibraryAccess(Camera);
+      if (!canReadPhotos) {
+        setScanError('Photo library permission denied. Enable it in Settings > 2manybeans.');
+        return;
+      }
+      const result = await Camera.pickImages({
+        quality: 85,
+        width: 1200,
+        height: 1200,
+        limit: remaining,
+      });
+      const converted = await galleryPhotosToScanPhotos(result.photos, { limit: remaining });
+      if (converted.length > 0) {
+        setPhotos(prev => [...prev, ...converted].slice(0, 3));
+        setScanError(null);
+      }
+    } catch (err) {
+      if (!isPhotoPickerCancel(err)) {
+        console.error('Photo picker error:', err);
+        setScanError(`Failed to choose photos: ${err.message || 'Unknown error'}`);
+      }
+    }
+  };
+
+  const handlePhoto = async (e) => {
+    const remaining = 3 - photos.length;
+    const files = Array.from(e.target.files || []).slice(0, remaining);
+    if (files.length === 0) return;
+    try {
+      const compressed = await Promise.all(files.map(file => compressImage(file)));
+      setPhotos(prev => [...prev, ...compressed].slice(0, 3));
+      setScanError(null);
     } catch (err) {
       console.error('Compression error:', err);
       setScanError('Failed to process photo. Try another.');
@@ -230,7 +262,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
 
   return (
     <Modal open={open} onClose={handleClose} title="Scan a Bag">
-      <input type="file" accept="image/*" ref={fileRef} onChange={handlePhoto}
+      <input type="file" accept="image/*" multiple ref={fileRef} onChange={handlePhoto}
         style={{ display: 'none' }} />
 
       {/* STEP: Photo capture */}
@@ -238,16 +270,25 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           {photos.length === 0 ? (
             <div
-              onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
               style={{
                 border: `2px dashed ${C.border}`, borderRadius: 16,
-                padding: '40px 20px', cursor: 'pointer',
+                padding: '40px 20px',
                 background: C.card,
               }}
             >
               <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
               <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
               <div style={{ fontSize: 13, color: C.textMuted }}>Take a photo or choose from library</div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+                {Capacitor.isNativePlatform() ? (
+                  <>
+                    <Btn variant="secondary" onClick={takeNativePhoto}>Take Photo</Btn>
+                    <Btn variant="primary" onClick={pickNativePhotos}>Choose Photos</Btn>
+                  </>
+                ) : (
+                  <Btn variant="primary" onClick={() => fileRef.current?.click()}>Choose Photos</Btn>
+                )}
+              </div>
               {onManualEntry && (
                 <div
                   onClick={(e) => { e.stopPropagation(); onManualEntry(); }}
@@ -291,9 +332,16 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
                 {photos.length < 3 && (
-                  <Btn variant="secondary" onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}>
-                    + Add photo
-                  </Btn>
+                  Capacitor.isNativePlatform() ? (
+                    <>
+                      <Btn variant="secondary" onClick={takeNativePhoto}>Take Photo</Btn>
+                      <Btn variant="secondary" onClick={pickNativePhotos}>Choose Photos</Btn>
+                    </>
+                  ) : (
+                    <Btn variant="secondary" onClick={() => fileRef.current?.click()}>
+                      + Add photos
+                    </Btn>
+                  )
                 )}
                 <Btn variant="primary" onClick={handleScan}>
                   <Search size={14} /> Scan {photos.length > 1 ? `${photos.length} photos` : 'photo'}

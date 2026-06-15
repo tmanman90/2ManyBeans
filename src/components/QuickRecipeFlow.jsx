@@ -6,6 +6,7 @@ import { C, fonts } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
 import { ENRICHABLE_FIELDS } from '../lib/beanFields';
+import { ensurePhotoLibraryAccess, galleryPhotosToScanPhotos, isPhotoPickerCancel } from '../lib/photoPicker';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
@@ -82,8 +83,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     try {
       const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
       const perms = await Camera.checkPermissions();
-      if (perms.camera !== 'granted' || perms.photos !== 'granted') {
-        const requested = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+      if (perms.camera !== 'granted') {
+        const requested = await Camera.requestPermissions({ permissions: ['camera'] });
         if (requested.camera === 'denied') {
           setScanError('Camera permission denied. Enable it in Settings > 2manybeans.');
           return;
@@ -92,7 +93,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       const image = await Camera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
-        source: CameraSource.Prompt,
+        source: CameraSource.Camera,
         width: 1200,
         height: 1200,
       });
@@ -100,8 +101,33 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       const base64 = image.dataUrl.split(',')[1];
       handlePhotosReady([{ base64, mediaType, previewUrl: image.dataUrl }]);
     } catch (err) {
-      if (err.message !== 'User cancelled photos app') {
+      if (!isPhotoPickerCancel(err)) {
         setScanError(`Failed to capture photo: ${err.message || 'Unknown error'}`);
+      }
+    }
+  };
+
+  const pickNativePhotos = async () => {
+    try {
+      const { Camera } = await import('@capacitor/camera');
+      const canReadPhotos = await ensurePhotoLibraryAccess(Camera);
+      if (!canReadPhotos) {
+        setScanError('Photo library permission denied. Enable it in Settings > 2manybeans.');
+        return;
+      }
+      const result = await Camera.pickImages({
+        quality: 85,
+        width: 1200,
+        height: 1200,
+        limit: 3,
+      });
+      const converted = await galleryPhotosToScanPhotos(result.photos, { limit: 3 });
+      if (converted.length > 0) {
+        handlePhotosReady(converted);
+      }
+    } catch (err) {
+      if (!isPhotoPickerCancel(err)) {
+        setScanError(`Failed to choose photos: ${err.message || 'Unknown error'}`);
       }
     }
   };
@@ -445,9 +471,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
           <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileInput} style={{ display: 'none' }} />
 
           <div
-            onClick={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
             style={{
-              cursor: 'pointer', background: C.card,
+              background: C.card,
               border: `2px dashed ${C.border}`,
               borderRadius: 16, padding: '40px 20px',
               marginBottom: 16, transition: 'border-color 0.15s',
@@ -456,6 +481,16 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             <CameraIcon size={36} color={C.accent} style={{ marginBottom: 8 }} />
             <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag</div>
             <div style={{ fontSize: 13, color: C.textMuted }}>Bag plus pamphlet photos are welcome</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+              {Capacitor.isNativePlatform() ? (
+                <>
+                  <Btn variant="secondary" onClick={takeNativePhoto}>Take Photo</Btn>
+                  <Btn variant="primary" onClick={pickNativePhotos}>Choose Photos</Btn>
+                </>
+              ) : (
+                <Btn variant="primary" onClick={() => fileRef.current?.click()}>Choose Photos</Btn>
+              )}
+            </div>
           </div>
 
           {scanError && (
