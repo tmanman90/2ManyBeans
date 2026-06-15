@@ -40,7 +40,9 @@ Pay special attention to:
 - Region names (e.g., Huila, Yirgacheffe, Nyeri)
 - Roast level indicators
 - Tasting/flavor notes
-- Roast dates (look for "roasted on", "roast date", handwritten/stamped dates, stickers -- common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "2026-02-17")
+- Roast dates (look for "roasted on", "roast date", handwritten/stamped dates, stickers -- common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "2026-02-17", "JUN 05 2026")
+  - Date text may be separated from the words "Roast Date" by a line break, stamp, seal, or rotated side panel. Read the label plus the adjacent printed/stamped date together.
+  - Month names may be all-caps month abbreviations, e.g. "JUN 05 2026" means 2026-06-05.
 - Best-by / consume-by / shelf life info (e.g. "consume within 3 months", "best within 6 weeks of roast", "90 days")
 - Weight/bag size
 - Pamphlet/card/source insert language, including tasting committee notes, roaster explanations, sensory charts, brew suggestions, selector notes, and farm/provenance stories
@@ -106,7 +108,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation
   }
 }
 
-If a field is not visible, use an empty string (or 100 for bagSize). If no pamphlet/card/source insight is visible, set "sourceInsights" to null. For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
+If a field is not visible, use an empty string (or 100 for bagSize). If no pamphlet/card/source insight is visible, set "sourceInsights" to null. For roastDate: look for "roasted on", "roast date", handwritten/stamped dates, date stickers -- convert to YYYY-MM-DD. Common formats: "17 Feb 2026", "Feb 17", "02/17/2026", "JUN 05 2026". Dates may be printed vertically or separated from the words "Roast Date"; all-caps month stamps like "JUN 05 2026" should be returned as "2026-06-05". If NO explicit roast date is found anywhere on the bag, return an EMPTY STRING -- do NOT guess or use today's date. Do NOT use best-before dates as roast date.`;
 
   // Bean scan IS the metered action for the aiScans free-tier counter.
   // This call burns one credit. Research enrichment + image analysis are
