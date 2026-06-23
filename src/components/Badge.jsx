@@ -1,15 +1,21 @@
-// Colored pill status badge — micro-shadow polish
+// Colored pill status badge — refined editorial pill
+import { C, radius, shadows, type } from '../styles/theme';
+
 export const Badge = ({ children, color, bg }) => (
   <span style={{
+    display: 'inline-flex',
+    alignItems: 'center',
     background: bg,
     color,
-    fontSize: 11,
-    fontWeight: 600,
-    padding: '3px 10px',
-    borderRadius: 99,
+    ...type.caption,
+    fontFamily: type.caption.fontFamily,
+    padding: '4px 10px',
+    borderRadius: radius.pill,
     whiteSpace: 'nowrap',
-    letterSpacing: 0.3,
-    boxShadow: '0 1px 3px rgba(92,61,46,0.06)',
+    letterSpacing: '0.04em',
+    minHeight: 24,
+    border: `1px solid ${color}22`,
+    boxShadow: shadows.e1,
   }}>
     {children}
   </span>

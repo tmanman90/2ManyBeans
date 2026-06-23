@@ -4,6 +4,7 @@ import { Coffee } from 'lucide-react';
 import { useLongPress } from '../hooks/useLongPress';
 import { BrewMethodMenu } from './BrewMethodMenu';
 import { Btn } from './Btn';
+import { m, spring } from '../lib/motion';
 
 const renderLabel = (label, aidenSize) => {
   // Inline-script treatment for Aiden: "Brew with [Aiden]" with Aiden in Caveat
@@ -15,13 +16,14 @@ const renderLabel = (label, aidenSize) => {
       {before}
       <span style={{
         fontFamily: "'Caveat', cursive",
-        fontWeight: 600,
+        fontWeight: 700,
         fontSize: aidenSize,
         lineHeight: 0.85,
-        marginLeft: 1,
+        marginLeft: 2,
         marginRight: 1,
         position: 'relative',
         top: 1,
+        letterSpacing: '0.01em',
       }}>Aiden</span>
       {after}
     </>
@@ -47,15 +49,21 @@ export const BrewButton = ({ bean, label, isHandBrew, brewMenuBean, setBrewMenuB
 
   return (
     <div style={{ position: 'relative' }}>
-      <Btn
-        variant="primary"
-        size={compact ? 'sm' : undefined}
-        aria-label={label}
-        style={btnStyle}
-        {...longPressHandlers}
+      <m.div
+        whileTap={{ scale: 0.96 }}
+        transition={spring.snappy}
+        style={{ display: 'inline-flex' }}
       >
-        <Coffee size={iconSize} /> {renderLabel(label, aidenSize)}
-      </Btn>
+        <Btn
+          variant="primary"
+          size={compact ? 'sm' : undefined}
+          aria-label={label}
+          style={btnStyle}
+          {...longPressHandlers}
+        >
+          <Coffee size={iconSize} /> {renderLabel(label, aidenSize)}
+        </Btn>
+      </m.div>
       <BrewMethodMenu
         open={brewMenuBean?.id === bean.id}
         onClose={() => setBrewMenuBean(null)}

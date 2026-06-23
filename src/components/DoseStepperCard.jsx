@@ -15,10 +15,14 @@
 
 import { useCallback } from 'react';
 import { Coffee, Minus, Plus } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { m, spring } from '../lib/motion';
+import { C, fonts, type, radius, shadows } from '../styles/theme';
 import { haptic } from '../lib/haptics';
 import { useRepeatPress } from '../hooks/useRepeatPress';
 
+// Base button style — 44px tap target, no visible background by default.
+// The motion wrapper adds scale-on-press. All WebKit callout suppression
+// is preserved exactly as before.
 const STEPPER_BTN_STYLE = {
   width: 44,
   height: 44,
@@ -30,6 +34,7 @@ const STEPPER_BTN_STYLE = {
   alignItems: 'center',
   justifyContent: 'center',
   cursor: 'pointer',
+  borderRadius: radius.pill,
   // iOS WebKit callout / selection / loupe suppression
   WebkitTouchCallout: 'none',
   WebkitUserSelect: 'none',
@@ -85,24 +90,33 @@ export const DoseStepperCard = ({ dose, onChange, min = 10, max = 40 }) => {
   return (
     <div
       style={{
-        background: C.bg,
-        borderRadius: 10,
-        padding: '10px 4px',
+        background: C.cream,
+        borderRadius: radius.md,
+        border: `1px solid ${C.borderLight}`,
+        boxShadow: shadows.e1,
+        padding: '12px 4px 10px',
         textAlign: 'center',
       }}
     >
-      <Coffee size={14} color={C.accent} style={{ marginBottom: 4 }} />
+      {/* Icon */}
+      <Coffee size={14} color={C.accent} style={{ marginBottom: 5 }} />
+
+      {/* Label — eyebrow caption scale */}
       <div
         style={{
-          fontSize: 11,
+          fontFamily: fonts.body,
+          fontSize: type.caption.fontSize,
+          fontWeight: 700,
           color: C.textMuted,
           textTransform: 'uppercase',
-          letterSpacing: 0.5,
-          marginBottom: 2,
+          letterSpacing: '0.08em',
+          marginBottom: 4,
         }}
       >
         Coffee
       </div>
+
+      {/* Stepper row */}
       <div
         style={{
           display: 'flex',
@@ -111,21 +125,28 @@ export const DoseStepperCard = ({ dose, onChange, min = 10, max = 40 }) => {
           gap: 0,
         }}
       >
-        <button
+        {/* Decrement — spring press */}
+        <m.button
           {...decHandlers}
-          style={{ ...STEPPER_BTN_STYLE, opacity: atMin ? 0.4 : 1 }}
+          style={{ ...STEPPER_BTN_STYLE, opacity: atMin ? 0.35 : 1 }}
+          whileTap={{ scale: 0.84 }}
+          transition={spring.snappy}
           aria-label="Decrease coffee dose"
         >
           <span aria-hidden="true" style={STEPPER_GLYPH_STYLE}>
-            <Minus size={16} strokeWidth={3} />
+            <Minus size={16} strokeWidth={2.5} />
           </span>
-        </button>
+        </m.button>
+
+        {/* Dose value — Fraunces display for warmth + weight */}
         <div
           style={{
-            fontFamily: fonts.title,
-            fontSize: 20,
+            fontFamily: fonts.heading,
+            fontSize: 22,
+            fontWeight: 600,
             color: C.text,
-            minWidth: 36,
+            letterSpacing: '-0.01em',
+            minWidth: 44,
             textAlign: 'center',
             userSelect: 'none',
             WebkitUserSelect: 'none',
@@ -133,15 +154,19 @@ export const DoseStepperCard = ({ dose, onChange, min = 10, max = 40 }) => {
         >
           {safeDose}g
         </div>
-        <button
+
+        {/* Increment — spring press */}
+        <m.button
           {...incHandlers}
-          style={{ ...STEPPER_BTN_STYLE, opacity: atMax ? 0.4 : 1 }}
+          style={{ ...STEPPER_BTN_STYLE, opacity: atMax ? 0.35 : 1 }}
+          whileTap={{ scale: 0.84 }}
+          transition={spring.snappy}
           aria-label="Increase coffee dose"
         >
           <span aria-hidden="true" style={STEPPER_GLYPH_STYLE}>
-            <Plus size={16} strokeWidth={3} />
+            <Plus size={16} strokeWidth={2.5} />
           </span>
-        </button>
+        </m.button>
       </div>
     </div>
   );

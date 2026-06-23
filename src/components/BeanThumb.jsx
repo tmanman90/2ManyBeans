@@ -2,7 +2,7 @@
 // stable earthy color + glyph variant. When the bean has a real photoUrl,
 // prefer the photo and fall back to the painterly SVG on load failure.
 import { useState } from 'react';
-import { C } from '../styles/theme';
+import { C, radius } from '../styles/theme';
 
 const HUES = ['#B07540', '#8F5A2E', '#5C3D2E', '#9D6A3E', '#6E4730', '#A46D44'];
 const GLYPHS = ['dots', 'star', 'ring', 'bar'];
@@ -30,9 +30,10 @@ export function BeanThumb({ bean, size = 56 }) {
           width: size,
           height: size,
           objectFit: 'cover',
-          borderRadius: 10,
+          borderRadius: radius.sm,
           display: 'block',
-          background: C.amberBg,
+          background: C.accentSoft,
+          border: `1px solid ${C.hairline}`,
         }}
       />
     );
@@ -41,14 +42,19 @@ export function BeanThumb({ bean, size = 56 }) {
   const seed = seedFrom(bean?.id);
   const bagColor = HUES[seed % HUES.length];
   const glyph = GLYPHS[seed % GLYPHS.length];
-  const labelTone = C.amberBg;
+  const labelTone = C.accentSoft;
 
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 56 56"
-      style={{ display: 'block' }}
+      style={{
+        display: 'block',
+        borderRadius: radius.sm,
+        border: `1px solid ${C.hairline}`,
+        background: C.accentSoft,
+      }}
       role="img"
       aria-label="coffee bag"
     >

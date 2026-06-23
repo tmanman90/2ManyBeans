@@ -1,7 +1,10 @@
 import { useRef, useCallback } from 'react';
-import { C } from '../styles/theme';
+import { C, radius } from '../styles/theme';
 
-export const SwipeDownHandle = ({ onClose, color = C.cardMuted }) => {
+// Refined grabber pill — visual-only redesign.
+// All RAF drag math, swipe-to-dismiss thresholds, and callbacks are
+// identical to the original. Only the pill geometry and color changed.
+export const SwipeDownHandle = ({ onClose, color }) => {
   const startY = useRef(null);
   const startT = useRef(null);
   const dyRef = useRef(0);
@@ -15,6 +18,10 @@ export const SwipeDownHandle = ({ onClose, color = C.cardMuted }) => {
         ? `translateY(${dyRef.current * 0.25}px)` : 'none';
     }
   }, []);
+
+  // Default pill color: a subtle mid-tone hairline that reads as "grab here"
+  // without competing with sheet content. Caller can still override via prop.
+  const pillColor = color ?? C.border;
 
   return (
     <div
@@ -53,12 +60,18 @@ export const SwipeDownHandle = ({ onClose, color = C.cardMuted }) => {
       }}
       style={{
         display: 'flex', justifyContent: 'center', alignItems: 'center',
-        padding: '8px 0 6px', cursor: 'pointer',
+        // Generous hit target (44px+) per Apple HIG; pill is visually narrow
+        padding: '10px 0 8px', cursor: 'pointer',
         touchAction: 'none',
       }}
     >
+      {/* Refined pill: wider, thinner, fully rounded — editorial grabber */}
       <div ref={pillRef} style={{
-        width: 40, height: 4, borderRadius: 2, background: color,
+        width: 36,
+        height: 5,
+        borderRadius: radius.pill,
+        background: pillColor,
+        opacity: 0.55,
       }} />
     </div>
   );
