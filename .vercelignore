@@ -4,6 +4,9 @@ assets/
 .splash-backup-*
 .asset-archive/
 screenshot-generator/
+demo-recordings/
+design_handoff_onboarding_redesign/
 docs/brand/
 docs/data/
 docs/onboarding-screenshots/
+docs/mockups/
