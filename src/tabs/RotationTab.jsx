@@ -2,7 +2,7 @@
 import { useCallback, useState } from 'react';
 import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
-import { C, fonts, journalCard } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass, journalCard, cardBase } from '../styles/theme';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
 import { getRecBlurb } from '../lib/claude';
@@ -25,26 +25,30 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { useLongPress } from '../hooks/useLongPress';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
+import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 
-const PillButton = ({ color, icon, label, onClick }) => (
-  <button
+const PillButton = ({ color, bg, icon, label, onClick }) => (
+  <m.button
     onClick={onClick}
+    whileTap={{ scale: 0.96 }}
+    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
     style={{
-      background: 'transparent',
-      border: `1px solid ${C.border}`,
-      borderRadius: 12,
-      padding: '8px 6px',
-      fontFamily: fonts.body, fontWeight: 600, fontSize: 11, letterSpacing: 0.2,
+      background: bg || C.bgDeep,
+      border: `1px solid ${C.hairline}`,
+      borderRadius: radius.md,
+      padding: '10px 6px',
+      fontFamily: fonts.body, fontWeight: 700, fontSize: 11, letterSpacing: '0.04em',
       color,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
       cursor: 'pointer',
       WebkitTapHighlightColor: 'transparent',
       minWidth: 0,
+      minHeight: 56,
     }}
   >
     <span style={{ color, display: 'inline-flex' }}>{icon}</span>
     <span>{label}</span>
-  </button>
+  </m.button>
 );
 
 export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, isDemo, onDemoAction }) => {
@@ -180,28 +184,41 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     }
   };
 
-  const sectionTitle = {
-    fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4,
-  };
-  const accentBar = {
-    width: 56, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
-  };
-
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       position: 'absolute', inset: 0,
     }}>
+      {/* Editorial page header */}
       <div style={{
-        flexShrink: 0, background: C.bg,
-        padding: '12px 20px 8px',
+        flexShrink: 0,
+        background: C.bg,
+        padding: '16px 20px 14px',
+        borderBottom: `1px solid ${C.hairline}`,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={sectionTitle}>Active Rotation</div>
-          <div style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            {/* Eyebrow label */}
+            <div style={{
+              ...type.label,
+              color: C.textLight,
+              marginBottom: 4,
+            }}>
+              Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}
+            </div>
+            {/* Display title — Fraunces, editorial */}
+            <div style={{
+              ...type.h1,
+              fontFamily: fonts.heading,
+              color: C.text,
+            }}>
+              Active Rotation
+            </div>
+          </div>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <Btn
               variant="primary"
-              style={{ padding: '8px 14px' }}
+              style={{ padding: '10px 16px', minHeight: 44 }}
               aria-label="Quick Recipe"
               {...quickRecipeLongPressHandlers}
             >
@@ -215,16 +232,22 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
             />
           </div>
         </div>
-        <div style={accentBar} />
-        <div style={{ fontSize: 13, color: C.textMuted }}>Your {canisterCount} jar{canisterCount !== 1 ? 's' : ''}</div>
       </div>
 
       <div style={{
         flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        padding: `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
+        padding: `16px 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
+        background: C.bg,
       }}>
       {beans.length === 0 && (
-        <div style={{ ...journalCard, textAlign: 'center', padding: 32 }}>
+        <m.div
+          {...fadeUp}
+          style={{
+            ...cardBase,
+            textAlign: 'center',
+            padding: 40,
+          }}
+        >
           <video
             src="/images/ruphus-animations/ruphus-empty-cup.mp4"
             autoPlay muted loop playsInline
@@ -237,31 +260,55 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>Your rotation is empty</div>
           <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Add your first coffee bag to get started</div>
           <Btn variant="primary" onClick={() => onOpenBean(null, 1)}><Plus size={16} /> Add Bean</Btn>
-        </div>
+        </m.div>
       )}
 
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+      >
       {slots.map((bean, i) => (
-        <div key={i} {...(i === 0 ? { 'data-tour': 'jar-slots' } : {})}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <img
-              src={bean ? '/images/jar-full.webp' : '/images/jar-empty.webp'}
-              alt={bean ? 'Full jar' : 'Empty jar'}
-              style={{ width: 24, height: 24, objectFit: 'contain' }}
-            />
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Jar #{i + 1}
-            </span>
+        <m.div key={i} variants={listItem} {...(i === 0 ? { 'data-tour': 'jar-slots' } : {})}>
+          {/* Jar eyebrow row */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+          }}>
+            {/* Refined jar indicator pill */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: bean ? C.accentSoft : C.bgDeep,
+              borderRadius: radius.pill,
+              padding: '4px 10px 4px 6px',
+              border: `1px solid ${bean ? C.accentLight : C.hairline}`,
+            }}>
+              <img
+                src={bean ? '/images/jar-full.webp' : '/images/jar-empty.webp'}
+                alt={bean ? 'Full jar' : 'Empty jar'}
+                style={{ width: 18, height: 18, objectFit: 'contain' }}
+              />
+              <span style={{
+                ...type.label,
+                color: bean ? C.accent : C.textLight,
+                fontSize: 11,
+              }}>
+                Jar {i + 1}
+              </span>
+            </div>
+            {/* Hairline separator that extends to fill remaining space */}
+            <div style={{ flex: 1, height: 1, background: C.hairline }} />
           </div>
-          <div style={{ borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 }} />
+
           {bean ? (
             <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={isDemo ? onDemoAction : handleLearn} uid={uid} tourTag={i === 0 ? 'bean-actions' : undefined} actions={
               <div style={{ paddingTop: 14 }}>
-                <div style={{ borderTop: `1px dashed ${C.border}`, margin: '0 16px' }} />
+                <div style={{ borderTop: `1px solid ${C.hairline}`, margin: '0 16px' }} />
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'auto 1fr 1fr 1fr',
                   gap: 8,
-                  padding: '14px 16px 16px',
+                  padding: '12px 16px 16px',
                   alignItems: 'stretch',
                 }}>
                   <div {...(i === 0 ? { 'data-tour': 'brew-button' } : {})}>
@@ -276,76 +323,113 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                       compact={false}
                     />
                   </div>
-                  <PillButton color={C.green} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
-                  <PillButton color={C.textMuted} icon={<Undo2 size={18} />} label="Return" onClick={() => setReturnConfirm(bean)} />
-                  <PillButton color={C.red} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
+                  <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
+                  <PillButton color={C.textMuted} bg={C.bgDeep} icon={<Undo2 size={18} />} label="Return" onClick={() => setReturnConfirm(bean)} />
+                  <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
                 </div>
               </div>
             } />
           ) : (
-            <div style={{
-              ...journalCard,
-              padding: 24,
-              border: `2px dashed ${C.border}`,
-              borderLeft: `2px dashed ${C.border}`,
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 10 }}>Empty slot</div>
-              <Btn variant="primary" onClick={() => onOpenBean(null, i + 1)}>
-                <Plus size={14} /> Open a Bean
-              </Btn>
-            </div>
+            /* Empty slot — elegant dashed card */
+            <m.div
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+              onClick={() => onOpenBean(null, i + 1)}
+              style={{
+                background: C.accentSoft,
+                borderRadius: radius.lg,
+                border: `1.5px dashed ${C.accentLight}`,
+                padding: '28px 24px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <div style={{
+                width: 40, height: 40, borderRadius: radius.pill,
+                background: `rgba(168,106,56,0.12)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 12px',
+              }}>
+                <Plus size={20} color={C.accent} />
+              </div>
+              <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text, fontWeight: 600, marginBottom: 4 }}>
+                Open a bean
+              </div>
+              <div style={{ ...type.body, color: C.textLight }}>
+                Tap to fill this jar from your inventory
+              </div>
+            </m.div>
           )}
-        </div>
+        </m.div>
       ))}
+      </m.div>
 
       {/* Recommendations */}
       {recs.length > 0 && (
-        <div style={{ marginTop: 14 }}>
-          <Btn variant="ghost" onClick={toggleRec} style={{ fontSize: 14 }}>
-            <Star size={14} /> {showRec ? 'Hide' : 'Show'} Recommendations
-          </Btn>
+        <div style={{ marginTop: 24 }}>
+          {/* Eyebrow row + toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ flex: 1, height: 1, background: C.hairline }} />
+            <Btn variant="ghost" onClick={toggleRec} style={{ fontSize: 12, gap: 5, padding: '6px 12px' }}>
+              <Star size={12} /> {showRec ? 'Hide' : 'Show'} Recommendations
+            </Btn>
+            <div style={{ flex: 1, height: 1, background: C.hairline }} />
+          </div>
+
           {showRec && (
-            <div style={{ marginTop: 10 }}>
+            <m.div
+              variants={listContainer}
+              initial="initial"
+              animate="animate"
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
               {/* AI Blurb */}
-              <div style={{
-                background: C.amberBg,
-                borderRadius: 14,
-                padding: 16,
-                border: '1px solid #E8D5A0',
-                marginBottom: 12,
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                  <Star size={12} style={{ verticalAlign: -1, marginRight: 4 }} />What to Open Next
+              <m.div
+                variants={listItem}
+                style={{
+                  background: C.amberBg,
+                  borderRadius: radius.lg,
+                  padding: '16px 18px',
+                  border: `1px solid ${C.border}`,
+                }}
+              >
+                <div style={{ ...type.label, color: C.amber, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Star size={11} />What to Open Next
                 </div>
                 {recLoading ? (
-                  <div style={{ fontSize: 13, color: C.textMuted, fontStyle: 'italic' }}>Analyzing your rotation...</div>
+                  <div style={{ ...type.body, color: C.textMuted, fontStyle: 'italic' }}>Analyzing your rotation...</div>
                 ) : recBlurb ? (
-                  <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{recBlurb}</div>
+                  <div style={{ ...type.body, color: C.text, lineHeight: 1.6 }}>{recBlurb}</div>
                 ) : null}
-              </div>
+              </m.div>
 
               {/* Recommendation Cards */}
               {recs.map((r, idx) => (
-                <div key={r.bean.id} style={journalCard}>
+                <m.div key={r.bean.id} variants={listItem} style={{ ...cardBase, padding: '16px 18px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: C.amber, background: C.amberBg, padding: '2px 7px', borderRadius: 6 }}>
+                        <span style={{
+                          ...type.caption,
+                          color: C.amber, background: C.amberBg,
+                          padding: '2px 8px', borderRadius: radius.pill,
+                          border: `1px solid ${C.border}`,
+                        }}>
                           #{idx + 1}
                         </span>
-                        <div style={{ fontFamily: fonts.heading, fontSize: 17, color: C.text }}>{r.bean.name}</div>
+                        <div style={{ fontFamily: fonts.heading, fontSize: 17, fontWeight: 600, color: C.text }}>{r.bean.name}</div>
                       </div>
-                      <div style={{ fontSize: 13, color: C.textMuted }}>
+                      <div style={{ ...type.body, color: C.textMuted }}>
                         {r.bean.roaster} · {r.bean.origin} · {r.bean.variety} {r.bean.process}
                       </div>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         <Badge color={r.peakStatus.color} bg={r.peakStatus.bg}>{r.peakStatus.label}</Badge>
-                        <Badge color={C.textMuted} bg={C.bg}>{r.bean.bagSize}g</Badge>
-                        <Badge color={C.textMuted} bg={C.bg}>{r.peakStatus.days}d post-roast</Badge>
+                        <Badge color={C.textMuted} bg={C.bgDeep}>{r.bean.bagSize}g</Badge>
+                        <Badge color={C.textMuted} bg={C.bgDeep}>{r.peakStatus.days}d post-roast</Badge>
                       </div>
                       {r.bean.bagNotes && r.bean.bagNotes !== '(not logged)' && (
-                        <div style={{ fontSize: 12, color: C.accentLight, fontStyle: 'italic', marginTop: 6 }}>
+                        <div style={{ ...type.caption, color: C.textLight, fontStyle: 'italic', marginTop: 8 }}>
                           ☕ {r.bean.bagNotes}
                         </div>
                       )}
@@ -353,10 +437,10 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                   </div>
 
                   {emptySlots.length > 0 && (
-                    <div style={{ marginTop: 10 }}>
+                    <div style={{ marginTop: 12 }}>
                       {slotPicker?.beanId === r.bean.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, color: C.textMuted }}>Which jar?</span>
+                          <span style={{ ...type.body, color: C.textMuted }}>Which jar?</span>
                           {emptySlots.map(s => (
                             <Btn key={s} variant="primary" onClick={() => { onOpenBean(r.bean.id, s); setSlotPicker(null); }} style={{ fontSize: 12, padding: '5px 12px' }}>
                               Jar #{s}
@@ -373,9 +457,9 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                       )}
                     </div>
                   )}
-                </div>
+                </m.div>
               ))}
-            </div>
+            </m.div>
           )}
         </div>
       )}

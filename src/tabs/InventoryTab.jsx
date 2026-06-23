@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Coffee, Check } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
-import { C, fonts, journalCard } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass, journalCard } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { BeanCard } from '../components/BeanCard';
 import { Btn } from '../components/Btn';
@@ -19,6 +19,7 @@ import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
+import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
@@ -98,56 +99,133 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
     });
   });
 
-  const accentBar = {
-    width: 56, height: 3, background: C.accentLight, borderRadius: 2, margin: '10px 0 12px',
-  };
-
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       position: 'absolute', inset: 0,
     }}>
-      {/* Fixed header: title, add button, search (non-scrolling) */}
+      {/* Fixed header — glass surface, editorial typography */}
       <div style={{
-        flexShrink: 0, background: C.bg,
-        padding: '12px 20px 8px',
+        flexShrink: 0,
+        background: glass.chrome,
+        backdropFilter: glass.blur,
+        WebkitBackdropFilter: glass.blur,
+        borderBottom: `1px solid ${glass.chromeBorder}`,
+        padding: '14px 20px 12px',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+        {/* Title row + Add Bean CTA */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
           <div>
-            <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, lineHeight: 1 }}>Sealed Inventory</div>
-            <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.accent, marginTop: -2, opacity: 0.8 }}>
-              patiently waiting
+            {/* Eyebrow label */}
+            <div style={{
+              ...type.label,
+              color: C.accent,
+              marginBottom: 4,
+            }}>
+              Sealed Inventory
+            </div>
+            {/* Fraunces display title */}
+            <div style={{
+              fontFamily: fonts.heading,
+              fontSize: type.h1.fontSize,
+              fontWeight: type.h1.fontWeight,
+              lineHeight: type.h1.lineHeight,
+              letterSpacing: type.h1.letterSpacing,
+              color: C.text,
+            }}>
+              Patiently waiting
             </div>
           </div>
-          <Btn variant="primary" onClick={() => isDemo ? onDemoAction?.() : setScanOpen(true)} style={{ padding: '8px 14px' }} data-tour="add-bean">
-            <Plus size={14} /> Add Bean
+          <Btn
+            variant="primary"
+            onClick={() => isDemo ? onDemoAction?.() : setScanOpen(true)}
+            style={{ padding: '10px 16px', minHeight: 44, marginTop: 2 }}
+            data-tour="add-bean"
+          >
+            <Plus size={15} /> Add Bean
           </Btn>
         </div>
-        <div style={accentBar} />
-        <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }} />
-            <strong style={{ color: C.text, fontWeight: 700 }}>{peakCount}</strong> in peak
-          </span>
-          <span style={{ color: C.textLight }}>{'\u00B7'}</span>
-          <span>{sealed.length} bags waiting</span>
-          <span style={{ color: C.textLight }}>{'\u00B7'}</span>
-          <span>{emptySlots.length} empty slot{emptySlots.length !== 1 ? 's' : ''}</span>
+
+        {/* Stats row — inline pills with dot separators */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          flexWrap: 'wrap',
+          marginBottom: 12,
+        }}>
+          {/* In peak stat */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            background: C.greenBg,
+            borderRadius: radius.pill,
+            padding: '3px 10px 3px 7px',
+            border: `1px solid rgba(92,138,102,0.18)`,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
+            <span style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 700, color: C.green, lineHeight: 1 }}>
+              {peakCount}
+            </span>
+            <span style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 500, color: C.green, lineHeight: 1, opacity: 0.85 }}>
+              in peak
+            </span>
+          </div>
+
+          <span style={{ color: C.textLight, fontSize: 11, margin: '0 8px', lineHeight: 1 }}>&middot;</span>
+
+          {/* Bags waiting */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 700, color: C.text }}>{sealed.length}</span>
+            <span style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 500, color: C.textMuted }}>bags waiting</span>
+          </div>
+
+          <span style={{ color: C.textLight, fontSize: 11, margin: '0 8px', lineHeight: 1 }}>&middot;</span>
+
+          {/* Empty slots */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 700, color: C.text }}>{emptySlots.length}</span>
+            <span style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 500, color: C.textMuted }}>
+              empty slot{emptySlots.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
 
+        {/* Search field — premium glass input */}
         {sealed.length > 5 && (
           <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.textMuted }} />
+            <Search
+              size={16}
+              style={{
+                position: 'absolute',
+                left: 13,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: C.textMuted,
+                pointerEvents: 'none',
+              }}
+            />
             <input
               type="text"
               placeholder="Search beans..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
-                width: '100%', padding: '9px 10px 9px 32px', borderRadius: 10,
-                border: `1px solid ${C.border}`, fontFamily: fonts.body,
-                fontSize: 16, background: C.cream, color: C.text,
-                boxSizing: 'border-box', outline: 'none',
+                width: '100%',
+                padding: '12px 14px 12px 40px',
+                borderRadius: radius.md,
+                border: `1px solid ${C.hairline}`,
+                fontFamily: fonts.body,
+                fontSize: 16,
+                fontWeight: 500,
+                background: C.cream,
+                color: C.text,
+                boxSizing: 'border-box',
+                outline: 'none',
+                boxShadow: shadows.e1,
+                minHeight: 44,
+                WebkitAppearance: 'none',
               }}
             />
           </div>
@@ -155,79 +233,153 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
       </div>
 
       {/* Scrollable cards area */}
-      <div data-tour="sealed-beans" style={{
-        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        padding: `0 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
-      }}>
-        {Object.entries(grouped).map(([roaster, rBeans]) => (
-          <div key={roaster} style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                <path d="M12 22V7" stroke={C.green} strokeWidth="1.3" strokeLinecap="round"/>
-                <path d="M12 13c-3 0-5-2-5-4 2 0 5 1 5 4z" fill={C.green} opacity="0.75"/>
-                <path d="M12 10c3 0 5-2 5-4-2 0-5 1-5 4z" fill={C.green} opacity="0.9"/>
-              </svg>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                {roaster}
+      <div
+        data-tour="sealed-beans"
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`,
+        }}
+      >
+        {/* Roaster groups with stagger animation */}
+        <m.div
+          variants={listContainer}
+          initial="initial"
+          animate="animate"
+        >
+          {Object.entries(grouped).map(([roaster, rBeans]) => (
+            <m.div key={roaster} variants={listItem} style={{ marginBottom: 24 }}>
+              {/* Roaster group header — eyebrow label style */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 10,
+              }}>
+                {/* Roaster name — eyebrow label */}
+                <div style={{
+                  ...type.label,
+                  color: C.textMuted,
+                  flexShrink: 0,
+                }}>
+                  {roaster}
+                </div>
+                {/* Hairline rule */}
+                <div style={{
+                  flex: 1,
+                  height: 1,
+                  background: C.hairline,
+                  marginTop: 1,
+                }} />
+                {/* Bag count — refined caption */}
+                <div style={{
+                  fontFamily: fonts.body,
+                  fontSize: type.caption.fontSize,
+                  fontWeight: type.caption.fontWeight,
+                  color: C.textLight,
+                  letterSpacing: '0.02em',
+                  flexShrink: 0,
+                }}>
+                  {rBeans.length} {rBeans.length !== 1 ? 'bags' : 'bag'}
+                </div>
               </div>
-              <div style={{ flex: 1, borderBottom: `1px dotted ${C.accentLight}`, marginLeft: 2, marginBottom: 2 }} />
-              <div style={{ fontSize: 11, color: C.textLight }}>
-                {rBeans.length} bag{rBeans.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-            {rBeans.map(bean => (
-              <BeanCard
-                key={bean.id}
-                bean={bean}
-                compact
-                updateBean={updateBean}
-                deleteBean={deleteBean}
-                onLearn={isDemo ? onDemoAction : handleLearn}
-                uid={uid}
-                actions={
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 16px 16px' }}>
-                    {emptySlots.length > 0 && (
-                      <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
-                    )}
-                    <BrewButton
-                      bean={bean}
-                      label={brewMethod.label}
-                      isHandBrew={isHandBrew}
-                      brewMenuBean={brewMenuBean}
-                      setBrewMenuBean={setBrewMenuBean}
-                      onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
-                      onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
-                    />
-                    <Btn variant="small" onClick={() => handleFinishBag(bean)}>
-                      <Check size={12} /> Finish
-                    </Btn>
-                  </div>
-                }
-              />
-            ))}
-          </div>
-        ))}
 
+              {rBeans.map(bean => (
+                <BeanCard
+                  key={bean.id}
+                  bean={bean}
+                  compact
+                  updateBean={updateBean}
+                  deleteBean={deleteBean}
+                  onLearn={isDemo ? onDemoAction : handleLearn}
+                  uid={uid}
+                  actions={
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 16px 16px' }}>
+                      {emptySlots.length > 0 && (
+                        <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
+                      )}
+                      <BrewButton
+                        bean={bean}
+                        label={brewMethod.label}
+                        isHandBrew={isHandBrew}
+                        brewMenuBean={brewMenuBean}
+                        setBrewMenuBean={setBrewMenuBean}
+                        onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
+                        onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
+                      />
+                      <Btn variant="small" onClick={() => handleFinishBag(bean)}>
+                        <Check size={12} /> Finish
+                      </Btn>
+                    </div>
+                  }
+                />
+              ))}
+            </m.div>
+          ))}
+        </m.div>
+
+        {/* Empty state — warm, inviting */}
         {sealed.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '24px 20px' }}>
+          <m.div
+            {...fadeUp}
+            style={{ textAlign: 'center', padding: '40px 20px 24px' }}
+          >
             <video
               src="/images/ruphus-animations/ruphus-empty-cup.mp4"
               autoPlay muted loop playsInline
               style={{
-                width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px',
+                width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',
                 display: 'block',
                 WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
                 maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
               }}
             />
-            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>No sealed beans</div>
-            <div style={{ fontSize: 13, color: C.textMuted }}>Add your stash to keep track</div>
-          </div>
+            <div style={{
+              fontFamily: fonts.heading,
+              fontSize: type.h2.fontSize,
+              fontWeight: type.h2.fontWeight,
+              lineHeight: type.h2.lineHeight,
+              color: C.text,
+              marginBottom: 8,
+            }}>
+              The stash is empty
+            </div>
+            <div style={{
+              fontFamily: fonts.body,
+              fontSize: type.body.fontSize,
+              fontWeight: type.body.fontWeight,
+              lineHeight: type.body.lineHeight,
+              color: C.textMuted,
+              maxWidth: 240,
+              margin: '0 auto 20px',
+            }}>
+              Add your sealed bags and track every bean before it hits peak.
+            </div>
+            <Btn
+              variant="primary"
+              onClick={() => isDemo ? onDemoAction?.() : setScanOpen(true)}
+              style={{ minHeight: 44, padding: '10px 20px' }}
+            >
+              <Plus size={15} /> Add Bean
+            </Btn>
+          </m.div>
         )}
+
+        {/* No search results */}
         {sealed.length > 0 && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', color: C.textMuted, padding: 40 }}>
-            No beans match "{search}"
-          </div>
+          <m.div
+            {...fadeUp}
+            style={{
+              textAlign: 'center',
+              color: C.textMuted,
+              fontFamily: fonts.body,
+              fontSize: type.body.fontSize,
+              padding: '48px 20px',
+            }}
+          >
+            No beans match &ldquo;{search}&rdquo;
+          </m.div>
         )}
       </div>
 

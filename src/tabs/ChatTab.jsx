@@ -2,7 +2,9 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Send, Camera, X, Coffee, BookOpen, Save } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { AnimatePresence } from 'framer-motion';
+import { C, fonts, glass, shadows, radius, type as typeScale, motion as motionTokens } from '../styles/theme';
+import { m, spring, fadeUp, popIn } from '../lib/motion';
 import { buildChatContext, sendChatMessage, compressImage } from '../lib/claude';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
@@ -55,6 +57,44 @@ function trimApiMessages(messages, keepRecent = 6) {
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
 
+// Animated typing indicator — three bouncing dots
+const TypingIndicator = () => (
+  <m.div
+    {...fadeUp}
+    style={{
+      alignSelf: 'flex-start',
+      background: C.cream,
+      border: `1px solid ${C.hairline}`,
+      borderRadius: `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
+      boxShadow: shadows.e1,
+      padding: '12px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 5,
+    }}
+  >
+    {[0, 1, 2].map(i => (
+      <span
+        key={i}
+        style={{
+          display: 'block',
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: C.accentLight,
+          animation: `chatDot 1.2s ease-in-out ${i * 0.2}s infinite`,
+        }}
+      />
+    ))}
+    <style>{`
+      @keyframes chatDot {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+        30% { transform: translateY(-5px); opacity: 1; }
+      }
+    `}</style>
+  </m.div>
+);
+
 // Isolated input bar -- owns its own `input` state so keystrokes never
 // re-render the parent ChatTab (which re-renders the full message list).
 // Memoized on its props so even parent re-renders don't cascade here unless
@@ -81,50 +121,89 @@ const ChatInputBar = memo(function ChatInputBar({
     // but blur on Enter so iOS dismisses after explicit send.
   };
 
+  const canSend = !loading && (input.trim().length > 0 || photos.length > 0);
+
   return (
     <>
       {/* Photo preview strip */}
       {photos.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {photos.map((p, i) => (
-            <div key={i} style={{ position: 'relative' }}>
-              <img
-                src={p.previewUrl}
-                alt="Preview"
-                style={{
-                  width: 52, height: 52, borderRadius: 8,
-                  objectFit: 'cover', border: `1px solid ${C.borderLight}`,
-                }}
-              />
-              <button
-                onClick={() => onRemovePhoto(i)}
-                style={{
-                  position: 'absolute', top: -10, right: -10,
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: C.accent, color: C.card, border: 'none',
-                  cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, padding: 8,
-                }}
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          padding: '6px 16px',
+          position: 'fixed',
+          bottom: keyboardHeight > 0
+            ? keyboardHeight + 64
+            : `calc(80px + env(safe-area-inset-bottom, 0px) + 64px)`,
+          left: 0,
+          right: 0,
+          zIndex: 49,
+        }}>
+          <AnimatePresence>
+            {photos.map((p, i) => (
+              <m.div
+                key={i}
+                {...popIn}
+                style={{ position: 'relative' }}
               >
-                <X size={12} />
-              </button>
-            </div>
-          ))}
+                <img
+                  src={p.previewUrl}
+                  alt="Preview"
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: radius.sm,
+                    objectFit: 'cover',
+                    border: `1px solid ${C.hairline}`,
+                    boxShadow: shadows.e1,
+                  }}
+                />
+                <button
+                  onClick={() => onRemovePhoto(i)}
+                  style={{
+                    position: 'absolute',
+                    top: -8,
+                    right: -8,
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: C.accent,
+                    color: C.cream,
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    boxShadow: shadows.button,
+                  }}
+                >
+                  <X size={11} />
+                </button>
+              </m.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
 
-      <div data-tour="chat-input" style={{
-        position: 'fixed',
-        bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
-        left: 0, right: 0,
-        display: 'flex', gap: 8, alignItems: 'center',
-        padding: '8px 20px',
-        paddingBottom: keyboardHeight > 0 ? 8 : 8,
-        background: C.bg,
-        borderTop: `1px solid ${C.borderLight}`,
-        zIndex: 50,
-      }}>
+      <div
+        data-tour="chat-input"
+        style={{
+          position: 'fixed',
+          bottom: keyboardHeight > 0 ? keyboardHeight : `calc(80px + env(safe-area-inset-bottom, 0px))`,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center',
+          padding: '10px 16px',
+          background: glass.chrome,
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
+          borderTop: `1px solid ${glass.chromeBorder}`,
+          zIndex: 50,
+        }}
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -133,19 +212,30 @@ const ChatInputBar = memo(function ChatInputBar({
           onChange={onFileSelect}
           style={{ display: 'none' }}
         />
+
+        {/* Camera button */}
         <button
           onClick={onPickPhoto}
           disabled={photos.length >= 3}
           style={{
-            background: 'none', border: `1px solid ${C.border}`,
-            borderRadius: 12, width: 44, height: 44, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: photos.length >= 3 ? 0.4 : 1,
+            background: C.cardMuted,
+            border: `1px solid ${C.hairline}`,
+            borderRadius: radius.sm,
+            width: 44,
+            height: 44,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: photos.length >= 3 ? 0.35 : 1,
             flexShrink: 0,
+            transition: `opacity 0.15s ease`,
           }}
         >
           <Camera size={20} color={C.accent} />
         </button>
+
+        {/* Text input — pill shape */}
         <input
           ref={inputRef}
           value={input}
@@ -156,36 +246,43 @@ const ChatInputBar = memo(function ChatInputBar({
           style={{
             flex: 1,
             minWidth: 0,
-            padding: '12px 14px',
-            borderRadius: 12,
+            padding: '11px 16px',
+            borderRadius: radius.pill,
             border: `1px solid ${C.border}`,
             fontFamily: fonts.body,
             fontSize: 16,
-            background: C.card,
+            lineHeight: 1.4,
+            background: C.cream,
             color: C.text,
             outline: 'none',
             boxSizing: 'border-box',
+            boxShadow: shadows.e1,
           }}
         />
+
+        {/* Send button — caramel circle */}
         <button
           onClick={send}
-          disabled={loading || (!input.trim() && photos.length === 0)}
+          disabled={!canSend}
           style={{
-            background: C.accent,
-            color: C.card,
+            background: canSend
+              ? `linear-gradient(145deg, ${C.accent}, ${C.accentDark})`
+              : C.cardMuted,
+            color: C.cream,
             border: 'none',
-            borderRadius: 12,
+            borderRadius: '50%',
             width: 44,
             height: 44,
-            cursor: 'pointer',
+            cursor: canSend ? 'pointer' : 'default',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: loading || (!input.trim() && photos.length === 0) ? 0.5 : 1,
             flexShrink: 0,
+            boxShadow: canSend ? shadows.navActive : 'none',
+            transition: `background 0.18s ease, box-shadow 0.18s ease`,
           }}
         >
-          <Send size={18} />
+          <Send size={17} />
         </button>
       </div>
     </>
@@ -487,82 +584,207 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     handleSend(prompt);
   };
 
-  const accentBar = {
-    width: 40, height: 3, background: C.accentLight, borderRadius: 2, marginBottom: 14,
-  };
+  // Is this the intro/empty state (only the first assistant message, no user turns)?
+  const isIntroState = messages.length === 1 && messages[0].role === 'assistant';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <div style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, marginBottom: 4 }}>Coffee Chat</div>
-      <div style={accentBar} />
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>AI with your real inventory data</div>
+      {/* Editorial page header */}
+      <div style={{ marginBottom: 4 }}>
+        <div style={{
+          ...typeScale.label,
+          color: C.textLight,
+          marginBottom: 6,
+        }}>
+          AI Chat
+        </div>
+        <div style={{
+          ...typeScale.h1,
+          color: C.text,
+          marginBottom: 6,
+        }}>
+          Coffee Chat
+        </div>
+        <div style={{
+          width: 32,
+          height: 2,
+          background: `linear-gradient(90deg, ${C.accent}, ${C.accentLight})`,
+          borderRadius: radius.pill,
+          marginBottom: 8,
+        }} />
+        <div style={{
+          ...typeScale.body,
+          color: C.textMuted,
+          marginBottom: 12,
+        }}>
+          Your rotation, your taste, your questions.
+        </div>
+      </div>
 
       <div
         ref={scrollRef}
         onClick={() => { if (inputRef.current) inputRef.current.blur(); }}
-        style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: keyboardHeight > 0 ? 80 : 140, height: keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight + 200}px)` : 'calc(100dvh - 340px)' }}>
-        {messages.map((m, i) => (
-          <div key={i}>
-            {/* Photo thumbnails for user messages */}
-            {m.photos && m.photos.length > 0 && (
-              <div style={{
-                display: 'flex', gap: 6, marginBottom: 4,
-                justifyContent: 'flex-end',
-              }}>
-                {m.photos.map((url, pi) => (
-                  <img
-                    key={pi}
-                    src={url}
-                    alt="Uploaded"
-                    style={{
-                      width: 60, height: 60, borderRadius: 10,
-                      objectFit: 'cover', border: `1px solid ${C.borderLight}`,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-            <div
-              style={{
-                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '85%',
-                background: m.role === 'user' ? C.accent : C.cream,
-                color: m.role === 'user' ? C.card : C.text,
-                borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                padding: '10px 14px',
-                fontSize: 14,
-                lineHeight: 1.5,
-                border: m.role === 'user' ? 'none' : `1px solid ${C.borderLight}`,
-                whiteSpace: 'pre-wrap',
-                marginLeft: m.role === 'user' ? 'auto' : undefined,
-              }}
-            >
-              {m.content}
+        style={{
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          paddingBottom: keyboardHeight > 0 ? 80 : 140,
+          height: keyboardHeight > 0
+            ? `calc(100dvh - ${keyboardHeight + 200}px)`
+            : 'calc(100dvh - 340px)',
+        }}
+      >
+        {/* Intro / empty state — shown only when no user turns yet */}
+        {isIntroState && (
+          <m.div
+            {...fadeUp}
+            style={{
+              margin: '8px 0 4px',
+              background: C.cream,
+              border: `1px solid ${C.hairline}`,
+              borderRadius: radius.xl,
+              boxShadow: shadows.e2,
+              padding: '28px 24px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              gap: 10,
+            }}
+          >
+            {/* Avatar ring */}
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: `linear-gradient(145deg, ${C.accentSoft}, ${C.accentLight})`,
+              border: `2px solid ${C.accentLight}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 4,
+              boxShadow: shadows.navActive,
+            }}>
+              <Coffee size={26} color={C.accent} />
             </div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{
-            alignSelf: 'flex-start',
-            background: C.cream,
-            border: `1px solid ${C.borderLight}`,
-            borderRadius: '16px 16px 16px 4px',
-            padding: '10px 14px',
-            fontSize: 14,
-            color: C.textMuted,
-          }}>
-            Thinking...
-          </div>
+            <div style={{
+              ...typeScale.h3,
+              color: C.text,
+            }}>
+              Professor Ruphus
+            </div>
+            <div style={{
+              ...typeScale.bodyL,
+              color: C.textMuted,
+              lineHeight: 1.55,
+            }}>
+              {messages[0].content}
+            </div>
+            {/* Hint chips */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 7,
+              marginTop: 4,
+            }}>
+              {['What should I brew today?', 'Scan a bag', 'Coach my tasting'].map(hint => (
+                <div
+                  key={hint}
+                  style={{
+                    background: C.accentSoft,
+                    border: `1px solid ${C.accentLight}`,
+                    borderRadius: radius.pill,
+                    padding: '5px 13px',
+                    ...typeScale.caption,
+                    color: C.accent,
+                    cursor: 'default',
+                  }}
+                >
+                  {hint}
+                </div>
+              ))}
+            </div>
+          </m.div>
         )}
+
+        {/* Message bubbles — skip the first assistant message when showing intro card */}
+        <AnimatePresence initial={false}>
+          {messages.map((msg, i) => {
+            if (isIntroState && i === 0) return null;
+            return (
+              <m.div key={i} {...fadeUp} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
+                {/* Photo thumbnails for user messages */}
+                {msg.photos && msg.photos.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    gap: 6,
+                    marginBottom: 5,
+                    justifyContent: 'flex-end',
+                  }}>
+                    {msg.photos.map((url, pi) => (
+                      <img
+                        key={pi}
+                        src={url}
+                        alt="Uploaded"
+                        style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: radius.sm,
+                          objectFit: 'cover',
+                          border: `1px solid ${C.hairline}`,
+                          boxShadow: shadows.e1,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+                <div
+                  style={{
+                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    maxWidth: '85%',
+                    // User: caramel gradient, right-aligned
+                    // Assistant: near-white cream card with elevation + hairline
+                    background: msg.role === 'user'
+                      ? `linear-gradient(145deg, ${C.accent}, ${C.accentDark})`
+                      : C.cream,
+                    color: msg.role === 'user' ? C.cream : C.text,
+                    // Asymmetric corner: user tails bottom-right, assistant tails bottom-left
+                    borderRadius: msg.role === 'user'
+                      ? `${radius.lg}px ${radius.lg}px ${radius.sm}px ${radius.lg}px`
+                      : `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
+                    padding: '12px 16px',
+                    ...typeScale.bodyL,
+                    border: msg.role === 'user' ? 'none' : `1px solid ${C.hairline}`,
+                    boxShadow: msg.role === 'user' ? shadows.button : shadows.e1,
+                    whiteSpace: 'pre-wrap',
+                    marginLeft: msg.role === 'user' ? 'auto' : undefined,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {msg.content}
+                </div>
+              </m.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* Typing / loading indicator */}
+        {loading && <TypingIndicator />}
       </div>
 
       {/* Scanned bean action buttons */}
       {scannedBean && !loading && (
-        <div style={{
-          display: 'flex', gap: 6, flexWrap: 'wrap',
-          padding: '8px 0', borderTop: `1px solid ${C.borderLight}`,
-          marginBottom: 8,
-        }}>
+        <m.div
+          {...fadeUp}
+          style={{
+            display: 'flex',
+            gap: 6,
+            flexWrap: 'wrap',
+            padding: '10px 0',
+            borderTop: `1px solid ${C.hairline}`,
+            marginBottom: 8,
+          }}
+        >
           <Btn variant="small" onClick={handleBrewScanned}>
             <Coffee size={12} /> {brewMethod.label}
           </Btn>
@@ -572,7 +794,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           <Btn variant="small" onClick={handleSaveToInventory}>
             <Save size={12} /> Save to Inventory
           </Btn>
-        </div>
+        </m.div>
       )}
 
       <ChatInputBar

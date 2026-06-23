@@ -1,9 +1,10 @@
-// Archive tab — "Ambitious Library" redesign.
-// Painterly header, Unforgettable Cups hero strip, collapsible filter bar,
+// Archive tab — "Modern Coffee Editorial" redesign.
+// Fraunces display header, Unforgettable Cups hero strip, glass filter bar,
 // timeline-rail list grouped by year, bean detail bottom sheet.
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Search, X, ChevronDown, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass, motion as motionTokens } from '../styles/theme';
+import { m, listContainer, listItem, fadeUp, spring } from '../lib/motion';
 import { BeanThumb } from '../components/BeanThumb';
 import { ArchiveDetailSheet } from '../components/ArchiveDetailSheet';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
@@ -38,6 +39,12 @@ function diffDays(laterStr, earlierStr) {
   return days >= 0 ? days : null;
 }
 
+// Eyebrow label helper
+const eyebrowStyle = {
+  ...type.label,
+  color: C.textMuted,
+};
+
 function Stars({ value, size = 11 }) {
   if (!value) return null;
   return (
@@ -51,7 +58,7 @@ function Stars({ value, size = 11 }) {
           <path
             d="M12 2l2.9 6.9L22 10l-5.5 4.8L18.2 22 12 18.3 5.8 22l1.7-7.2L2 10l7.1-1.1z"
             fill={n <= value ? C.accent : 'none'}
-            stroke={C.accent}
+            stroke={n <= value ? C.accent : C.accentLight}
             strokeWidth="1.5"
             strokeLinejoin="round"
           />
@@ -66,18 +73,18 @@ function NotesRow({ notes }) {
   const parts = notes.split(/[,·/]/).map(s => s.trim()).filter(Boolean).slice(0, 3);
   if (parts.length === 0) return null;
   return (
-    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
       {parts.map((p, i) => (
         <span
           key={i}
           style={{
-            fontSize: 10.5,
+            ...type.caption,
             color: C.textMuted,
             fontStyle: 'italic',
-            background: C.amberBg,
-            border: `1px solid ${C.border}`,
-            padding: '2px 7px',
-            borderRadius: 999,
+            background: C.accentSoft,
+            border: `1px solid ${C.hairline}`,
+            padding: '3px 9px',
+            borderRadius: radius.pill,
             whiteSpace: 'nowrap',
             fontFamily: fonts.body,
           }}
@@ -97,19 +104,19 @@ function Chip({ label, active, onClick, count }) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        minHeight: 32,
-        padding: '6px 11px',
-        borderRadius: 999,
+        minHeight: 36,
+        padding: '7px 13px',
+        borderRadius: radius.pill,
         border: `1px solid ${active ? C.accent : C.border}`,
-        background: active ? C.accent : C.card,
+        background: active ? C.accent : C.cream,
         color: active ? C.cream : C.text,
         fontFamily: fonts.body,
-        fontSize: 12.5,
+        fontSize: 13,
         fontWeight: 600,
         cursor: 'pointer',
         whiteSpace: 'nowrap',
-        boxShadow: active ? '0 1px 3px rgba(176,117,64,0.25)' : 'none',
-        transition: 'all 0.15s ease',
+        boxShadow: active ? shadows.button : 'none',
+        transition: `all ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
       }}
     >
       <span>{label}</span>
@@ -119,9 +126,9 @@ function Chip({ label, active, onClick, count }) {
             fontSize: 10,
             fontWeight: 800,
             padding: '1px 5px',
-            background: active ? 'rgba(255,255,255,0.25)' : C.amberBg,
-            color: active ? C.cream : C.textMuted,
-            borderRadius: 999,
+            background: active ? 'rgba(255,255,255,0.22)' : C.accentSoft,
+            color: active ? C.cream : C.accent,
+            borderRadius: radius.pill,
             marginLeft: 2,
           }}
         >
@@ -136,18 +143,7 @@ function SelectField({ label, value, onChange, options }) {
   const isActive = value !== 'all';
   return (
     <div>
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: 1.2,
-          color: C.textMuted,
-          textTransform: 'uppercase',
-          marginBottom: 4,
-        }}
-      >
-        {label}
-      </div>
+      <div style={{ ...eyebrowStyle, marginBottom: 6 }}>{label}</div>
       <div style={{ position: 'relative' }}>
         <select
           value={value}
@@ -156,10 +152,10 @@ function SelectField({ label, value, onChange, options }) {
             width: '100%',
             appearance: 'none',
             WebkitAppearance: 'none',
-            padding: '10px 26px 10px 10px',
-            borderRadius: 10,
+            padding: '10px 28px 10px 12px',
+            borderRadius: radius.md,
             border: `1px solid ${isActive ? C.accent : C.border}`,
-            background: isActive ? C.amberBg : C.bg,
+            background: isActive ? C.accentSoft : C.cream,
             fontFamily: fonts.body,
             fontSize: 16,
             fontWeight: 600,
@@ -178,7 +174,7 @@ function SelectField({ label, value, onChange, options }) {
           size={14}
           style={{
             position: 'absolute',
-            right: 8,
+            right: 10,
             top: '50%',
             transform: 'translateY(-50%)',
             color: C.textMuted,
@@ -194,11 +190,11 @@ function EmptyState({ hasFilters, onClear }) {
   return (
     <div
       style={{
-        padding: '40px 24px',
+        padding: '44px 24px',
         textAlign: 'center',
-        background: C.card,
+        background: C.cream,
         border: `1px dashed ${C.border}`,
-        borderRadius: 14,
+        borderRadius: radius.lg,
         margin: '12px 0',
       }}
     >
@@ -214,10 +210,19 @@ function EmptyState({ hasFilters, onClear }) {
           }}
         />
       )}
-      <div style={{ fontFamily: fonts.title, fontSize: 22, color: C.accentDark, marginBottom: 4 }}>
+      <div
+        style={{
+          fontFamily: fonts.heading,
+          fontSize: 22,
+          fontWeight: 600,
+          color: C.accentDark,
+          marginBottom: 6,
+          letterSpacing: '-0.01em',
+        }}
+      >
         {hasFilters ? 'nothing in this corner' : 'no beans yet'}
       </div>
-      <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 14 }}>
+      <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.55, marginBottom: 16 }}>
         {hasFilters
           ? 'Try loosening a filter, your other beans are still here.'
           : 'When you finish a bean it lands here.'}
@@ -226,16 +231,16 @@ function EmptyState({ hasFilters, onClear }) {
         <button
           onClick={onClear}
           style={{
-            padding: '10px 18px',
+            padding: '11px 22px',
             minHeight: 44,
             border: `1px solid ${C.accent}`,
-            background: C.amberBg,
+            background: C.accentSoft,
             color: C.accent,
             fontFamily: fonts.body,
             fontSize: 13,
             fontWeight: 700,
             letterSpacing: 0.3,
-            borderRadius: 999,
+            borderRadius: radius.pill,
             cursor: 'pointer',
           }}
         >
@@ -261,18 +266,23 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
   };
 
   return (
-    <div style={{ position: 'relative', marginBottom: 10 }}>
+    <m.div
+      variants={listItem}
+      style={{ position: 'relative', marginBottom: 10 }}
+    >
+      {/* Timeline dot */}
       <div
         style={{
           position: 'absolute',
-          left: -10.5,
-          top: 22,
-          width: 10,
-          height: 10,
+          left: -11,
+          top: 24,
+          width: 11,
+          height: 11,
           borderRadius: '50%',
-          background: C.card,
+          background: best >= 5 ? C.accent : C.cream,
           border: `2px solid ${best >= 5 ? C.accent : C.accentLight}`,
-          boxShadow: '0 1px 2px rgba(92,61,46,0.1)',
+          boxShadow: best >= 5 ? shadows.navActive : shadows.e1,
+          zIndex: 1,
         }}
       />
       <div
@@ -287,26 +297,25 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
           flexDirection: 'column',
           padding: 14,
           minHeight: 44,
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 12,
+          background: C.cream,
+          border: `1px solid ${C.borderLight}`,
+          borderRadius: radius.md,
           cursor: 'pointer',
-          boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+          boxShadow: shadows.e1,
           fontFamily: fonts.body,
           position: 'relative',
+          transition: `box-shadow ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
         }}
       >
         <div style={{ display: 'flex', gap: 12 }}>
           <BeanThumb bean={bean} size={56} />
           <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Roaster eyebrow + month */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
               <div
                 style={{
-                  fontSize: 9.5,
-                  fontWeight: 800,
-                  letterSpacing: 1.3,
-                  textTransform: 'uppercase',
-                  color: C.textMuted,
+                  ...eyebrowStyle,
+                  fontSize: 10,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -317,41 +326,47 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
               {showMonth && bean.finishDate && (
                 <div
                   style={{
-                    fontFamily: fonts.title,
-                    fontSize: 14,
-                    color: C.accentDark,
+                    fontFamily: fonts.body,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: C.textLight,
                     lineHeight: 1,
                     whiteSpace: 'nowrap',
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
                   }}
                 >
                   {monthOf(bean.finishDate)}
                 </div>
               )}
             </div>
+            {/* Bean name in Fraunces */}
             <div
               style={{
                 fontFamily: fonts.heading,
                 fontSize: 16,
                 color: C.text,
-                fontWeight: 500,
+                fontWeight: 600,
                 lineHeight: 1.2,
+                letterSpacing: '-0.01em',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
                 marginTop: 2,
-                marginBottom: 3,
+                marginBottom: 4,
               }}
             >
               {bean.name}
             </div>
-            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>
+            {/* Meta line */}
+            <div style={{ ...type.caption, color: C.textMuted, marginBottom: 7, lineHeight: 1.4 }}>
               {bean.origin || ''}
               {bean.process ? ` · ${bean.process}` : ''}
               {dOwn != null ? ` · ${dOwn}d` : ''}
             </div>
             <NotesRow notes={bean.bagNotes} />
             {best ? (
-              <div style={{ marginTop: 6 }}>
+              <div style={{ marginTop: 7 }}>
                 <Stars value={best} size={11} />
               </div>
             ) : null}
@@ -365,42 +380,51 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
               aria-expanded={expanded}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: '8px 0 0', fontSize: 11, color: C.accent,
+                padding: '9px 0 0',
+                display: 'flex', alignItems: 'center', gap: 5,
                 fontFamily: fonts.body,
-                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 11,
+                fontWeight: 700,
+                color: C.accent,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                minHeight: 44,
               }}
             >
               {expanded ? 'Hide details' : 'Show details'}
               <ChevronDown size={12} color={C.accent} style={{
                 transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
-                transition: 'transform 0.25s ease-out',
+                transition: `transform ${motionTokens.dur.base}s ${motionTokens.cssOut}`,
               }} />
             </button>
             <div style={{
               maxHeight: expanded ? 180 : 0,
               overflow: 'hidden',
-              transition: 'max-height 0.25s ease-out, opacity 0.2s ease-out',
+              transition: `max-height ${motionTokens.dur.base}s ${motionTokens.cssOut}, opacity ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
               opacity: expanded ? 1 : 0,
             }}>
               <div style={{
-                fontSize: 12, color: C.textMuted,
-                padding: '8px 10px', borderRadius: 8,
-                background: C.bg,
-                display: 'flex', flexDirection: 'column', gap: 3,
+                ...type.body,
+                color: C.textMuted,
+                padding: '10px 12px',
+                borderRadius: radius.sm,
+                background: C.bgDeep,
+                border: `1px solid ${C.hairline}`,
+                display: 'flex', flexDirection: 'column', gap: 4,
                 marginTop: 6,
               }}>
-                {bean.variety && <span><strong>Variety:</strong> {bean.variety}</span>}
-                {bean.region && <span><strong>Region:</strong> {bean.region}</span>}
-                {bean.farm && <span><strong>Farm:</strong> {bean.farm}</span>}
-                {bean.altitude && <span><strong>Altitude:</strong> {bean.altitude}</span>}
-                {bean.roastLevel && <span><strong>Roast Level:</strong> {bean.roastLevel}</span>}
-                {bean.cupScore && <span><strong>Accolades:</strong> {bean.cupScore}</span>}
+                {bean.variety && <span><strong style={{ color: C.text }}>Variety:</strong> {bean.variety}</span>}
+                {bean.region && <span><strong style={{ color: C.text }}>Region:</strong> {bean.region}</span>}
+                {bean.farm && <span><strong style={{ color: C.text }}>Farm:</strong> {bean.farm}</span>}
+                {bean.altitude && <span><strong style={{ color: C.text }}>Altitude:</strong> {bean.altitude}</span>}
+                {bean.roastLevel && <span><strong style={{ color: C.text }}>Roast Level:</strong> {bean.roastLevel}</span>}
+                {bean.cupScore && <span><strong style={{ color: C.text }}>Accolades:</strong> {bean.cupScore}</span>}
               </div>
             </div>
           </>
         )}
       </div>
-    </div>
+    </m.div>
   );
 }
 
@@ -546,29 +570,32 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
 
   return (
     <div style={{ background: C.bg, fontFamily: fonts.body, color: C.text }}>
-      {/* Painterly header */}
+
+      {/* ── Editorial header ─────────────────────────────────────── */}
       <div
         style={{
           position: 'relative',
-          padding: '20px 20px 16px',
-          background: `linear-gradient(180deg, ${C.amberBg} 0%, ${C.bg} 100%)`,
-          borderBottom: `1px solid ${C.border}`,
+          padding: '24px 20px 20px',
+          background: `linear-gradient(170deg, ${C.amberBg} 0%, ${C.bg} 80%)`,
+          borderBottom: `1px solid ${C.hairline}`,
           overflow: 'hidden',
         }}
       >
+        {/* Ambient glow orb */}
         <div
           style={{
             position: 'absolute',
-            top: 20,
-            right: -20,
-            width: 140,
-            height: 80,
-            opacity: 0.4,
-            background: `radial-gradient(ellipse, ${C.accentLight} 0%, transparent 60%)`,
+            top: -10,
+            right: -30,
+            width: 180,
+            height: 120,
+            opacity: 0.35,
+            background: `radial-gradient(ellipse, ${C.accentLight} 0%, transparent 65%)`,
             borderRadius: '50%',
             pointerEvents: 'none',
           }}
         />
+
         <div
           style={{
             display: 'flex',
@@ -577,112 +604,124 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
             position: 'relative',
           }}
         >
+          {/* Left: title block */}
           <div>
-            <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.accentDark, marginBottom: -2 }}>the</div>
+            {/* Eyebrow */}
+            <div style={{ ...eyebrowStyle, marginBottom: 6 }}>Editorial</div>
+
+            {/* Display title in Fraunces */}
             <div
               style={{
                 fontFamily: fonts.heading,
-                fontSize: 40,
+                fontSize: 42,
+                fontWeight: 600,
                 color: C.text,
-                fontWeight: 500,
-                letterSpacing: -1,
-                lineHeight: 1,
+                letterSpacing: '-0.025em',
+                lineHeight: 0.95,
               }}
             >
-              Archive
+              the Archive
             </div>
+
+            {/* Accent rule */}
             <div
               style={{
-                width: 48,
-                height: 2,
-                background: C.accent,
-                borderRadius: 1,
-                marginTop: 8,
+                width: 40,
+                height: 2.5,
+                background: `linear-gradient(90deg, ${C.accent}, ${C.accentLight})`,
+                borderRadius: radius.pill,
+                marginTop: 10,
                 marginBottom: 10,
               }}
             />
+
+            {/* Subtitle — Nunito, not script */}
             <div
               style={{
-                fontFamily: fonts.title,
-                fontSize: 18,
-                color: C.accentDark,
-                lineHeight: 1.1,
-                marginTop: 4,
+                fontFamily: fonts.body,
+                fontSize: 13,
+                fontWeight: 500,
+                color: C.textMuted,
+                letterSpacing: '0.01em',
+                lineHeight: 1.4,
               }}
             >
               a record of every cup
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: fonts.heading, fontSize: 26, color: C.accent, fontWeight: 600, lineHeight: 1 }}>
-              {finished.length}
+
+          {/* Right: stats cluster */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+            <div style={{ textAlign: 'right' }}>
+              <div
+                style={{
+                  fontFamily: fonts.heading,
+                  fontSize: 30,
+                  fontWeight: 600,
+                  color: C.accent,
+                  lineHeight: 1,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {finished.length}
+              </div>
+              <div style={{ ...eyebrowStyle, fontSize: 10, marginTop: 2 }}>beans</div>
             </div>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 800,
-                letterSpacing: 1.2,
-                color: C.textMuted,
-                textTransform: 'uppercase',
-                marginTop: 2,
-              }}
-            >
-              beans
-            </div>
-            <div
-              style={{
-                fontFamily: fonts.heading,
-                fontSize: 18,
-                color: C.accent,
-                fontWeight: 500,
-                lineHeight: 1,
-                marginTop: 10,
-              }}
-            >
-              {totalCups}
-            </div>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 800,
-                letterSpacing: 1.2,
-                color: C.textMuted,
-                textTransform: 'uppercase',
-                marginTop: 2,
-              }}
-            >
-              tastings
+            <div style={{ textAlign: 'right' }}>
+              <div
+                style={{
+                  fontFamily: fonts.heading,
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: C.accentDark,
+                  lineHeight: 1,
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                {totalCups}
+              </div>
+              <div style={{ ...eyebrowStyle, fontSize: 10, marginTop: 2 }}>tastings</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Unforgettable cups strip */}
+      {/* ── Unforgettable Cups hero strip ────────────────────────── */}
       {filtersActive === 0 && bestCups.length > 0 && (
-        <div style={{ padding: '14px 0 6px' }}>
-          <div style={{ padding: '0 20px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={14} color={C.accent} />
+        <div style={{ padding: '18px 0 4px' }}>
+          {/* Section header */}
+          <div
+            style={{
+              padding: '0 20px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Sparkles size={13} color={C.accent} />
+            <div style={{ ...eyebrowStyle, color: C.accent }}>Unforgettable Cups</div>
+            <div style={{ flex: 1, height: 1, background: C.hairline }} />
             <div
               style={{
-                fontSize: 10,
-                fontWeight: 800,
-                letterSpacing: 1.4,
-                color: C.accent,
+                ...type.caption,
+                color: C.textLight,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
                 textTransform: 'uppercase',
               }}
             >
-              Unforgettable cups
+              5★ only
             </div>
-            <div style={{ flex: 1, height: 1, background: C.border }} />
-            <div style={{ fontSize: 10, color: C.textLight, fontWeight: 600 }}>5★ beans</div>
           </div>
+
+          {/* Horizontally scrollable card strip */}
           <div
             className="hide-scrollbar"
             style={{
               display: 'flex',
-              gap: 10,
+              gap: 12,
               overflowX: 'auto',
-              padding: '4px 20px 12px',
+              padding: '4px 20px 16px',
               scrollbarWidth: 'none',
             }}
           >
@@ -692,44 +731,65 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                 onClick={() => setOpenBeanId(b.id)}
                 style={{
                   flexShrink: 0,
-                  width: 132,
+                  width: 140,
                   textAlign: 'left',
-                  padding: 10,
-                  background: C.card,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 14,
+                  padding: '12px 12px 14px',
+                  background: C.cream,
+                  border: `1px solid ${C.borderLight}`,
+                  borderRadius: radius.lg,
                   cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(92,61,46,0.08)',
+                  boxShadow: shadows.e2,
                   fontFamily: fonts.body,
                   position: 'relative',
                   overflow: 'hidden',
                 }}
               >
+                {/* Premium 5★ badge */}
                 <div
                   style={{
                     position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    fontSize: 9,
-                    fontWeight: 800,
-                    letterSpacing: 1,
-                    padding: '2px 6px',
-                    borderRadius: 999,
-                    background: C.amberBg,
-                    color: C.accent,
+                    top: 9,
+                    right: 9,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    padding: '3px 7px',
+                    borderRadius: radius.pill,
+                    background: C.accent,
+                    boxShadow: shadows.button,
                   }}
                 >
-                  5★
+                  <svg width={7} height={7} viewBox="0 0 24 24">
+                    <path
+                      d="M12 2l2.9 6.9L22 10l-5.5 4.8L18.2 22 12 18.3 5.8 22l1.7-7.2L2 10l7.1-1.1z"
+                      fill={C.cream}
+                      strokeWidth="0"
+                    />
+                  </svg>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 800,
+                      color: C.cream,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    5
+                  </span>
                 </div>
-                <BeanThumb bean={b} size={60} />
+
+                <BeanThumb bean={b} size={62} />
+
+                {/* Bean name in Fraunces */}
                 <div
                   style={{
                     fontFamily: fonts.heading,
-                    fontSize: 13,
-                    color: C.text,
+                    fontSize: 14,
                     fontWeight: 600,
-                    marginTop: 8,
+                    color: C.text,
+                    marginTop: 10,
                     lineHeight: 1.2,
+                    letterSpacing: '-0.01em',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
@@ -738,24 +798,43 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                 >
                   {b.name}
                 </div>
-                <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{b.roaster}</div>
+                <div
+                  style={{
+                    ...type.caption,
+                    color: C.textMuted,
+                    marginTop: 3,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {b.roaster}
+                </div>
+
+                {/* Star indicator row */}
+                <div style={{ marginTop: 8 }}>
+                  <Stars value={5} size={10} />
+                </div>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Filter bar */}
+      {/* ── Search + filter bar ──────────────────────────────────── */}
       <div
         style={{
-          margin: '8px 16px 14px',
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 14,
-          boxShadow: '0 1px 3px rgba(92,61,46,0.04)',
+          margin: '4px 16px 16px',
+          background: glass.chrome,
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
+          border: `1px solid ${glass.chromeBorder}`,
+          borderRadius: radius.lg,
+          boxShadow: shadows.e1,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 10px 8px 12px', gap: 8 }}>
+        {/* Search row */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px 9px 12px', gap: 8 }}>
           <div
             style={{
               flex: 1,
@@ -763,9 +842,10 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              background: C.amberBg,
-              borderRadius: 999,
-              padding: '7px 12px',
+              background: C.bgDeep,
+              borderRadius: radius.pill,
+              border: `1px solid ${C.hairline}`,
+              padding: '8px 14px',
             }}
           >
             <Search size={14} color={C.textMuted} />
@@ -794,32 +874,37 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                   border: 'none',
                   background: 'none',
                   cursor: 'pointer',
-                  padding: 0,
+                  padding: 2,
                   display: 'flex',
                   alignItems: 'center',
+                  minWidth: 24,
+                  minHeight: 24,
                 }}
               >
                 <X size={14} color={C.textMuted} />
               </button>
             )}
           </div>
+
+          {/* Filter toggle button */}
           <button
             onClick={() => setFiltersOpen(o => !o)}
             aria-expanded={filtersOpen}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
-              padding: '8px 12px',
-              minHeight: 36,
-              borderRadius: 999,
+              gap: 5,
+              padding: '9px 13px',
+              minHeight: 44,
+              borderRadius: radius.md,
               border: `1px solid ${filtersActive ? C.accent : C.border}`,
-              background: filtersActive ? C.amberBg : C.card,
+              background: filtersActive ? C.accentSoft : C.cream,
               color: filtersActive ? C.accent : C.textMuted,
               fontFamily: fonts.body,
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
+              letterSpacing: '0.03em',
             }}
           >
             <SlidersHorizontal size={13} />
@@ -827,8 +912,8 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
             {filtersActive > 0 && (
               <span
                 style={{
-                  padding: '0 5px',
-                  borderRadius: 999,
+                  padding: '1px 6px',
+                  borderRadius: radius.pill,
                   background: C.accent,
                   color: C.cream,
                   fontSize: 10,
@@ -841,29 +926,20 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
           </button>
         </div>
 
+        {/* Expanded filter panel */}
         {filtersOpen && (
           <div
             style={{
-              padding: '10px 12px 14px',
-              borderTop: `1px solid ${C.border}`,
+              padding: '12px 14px 16px',
+              borderTop: `1px solid ${C.hairline}`,
               display: 'flex',
               flexDirection: 'column',
-              gap: 12,
+              gap: 14,
             }}
           >
+            {/* Sort */}
             <div>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  letterSpacing: 1.2,
-                  color: C.textMuted,
-                  textTransform: 'uppercase',
-                  marginBottom: 6,
-                }}
-              >
-                Sort
-              </div>
+              <div style={{ ...eyebrowStyle, marginBottom: 8 }}>Sort</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {Object.entries(SORT_LABELS).map(([k, v]) => (
                   <Chip key={k} label={v} active={sort === k} onClick={() => setSort(k)} />
@@ -871,20 +947,10 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
               </div>
             </div>
 
+            {/* Year */}
             {years.length > 0 && (
               <div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 800,
-                    letterSpacing: 1.2,
-                    color: C.textMuted,
-                    textTransform: 'uppercase',
-                    marginBottom: 6,
-                  }}
-                >
-                  Year
-                </div>
+                <div style={{ ...eyebrowStyle, marginBottom: 8 }}>Year</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <Chip label="All" active={year === 'all'} onClick={() => setYear('all')} />
                   {years.map(y => (
@@ -900,19 +966,9 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
               </div>
             )}
 
+            {/* Min rating */}
             <div>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  letterSpacing: 1.2,
-                  color: C.textMuted,
-                  textTransform: 'uppercase',
-                  marginBottom: 6,
-                }}
-              >
-                Minimum rating
-              </div>
+              <div style={{ ...eyebrowStyle, marginBottom: 8 }}>Minimum rating</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <Chip label="Any" active={minRating === 0} onClick={() => setMinRating(0)} />
                 {[3, 4, 5].map(r => (
@@ -926,8 +982,9 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
               </div>
             </div>
 
+            {/* Dropdown selects */}
             {(roasters.length > 0 || origins.length > 0 || processes.length > 0) && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {roasters.length > 0 && (
                   <SelectField label="Roaster" value={roaster} onChange={setRoaster} options={roasters} />
                 )}
@@ -942,8 +999,8 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                     onClick={clearFilters}
                     style={{
                       border: `1px solid ${C.border}`,
-                      background: C.card,
-                      borderRadius: 10,
+                      background: C.cream,
+                      borderRadius: radius.md,
                       padding: '10px',
                       minHeight: 44,
                       fontSize: 12,
@@ -962,52 +1019,74 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
         )}
       </div>
 
-      {/* Timeline list */}
-      <div style={{ padding: '8px 16px 0' }}>
+      {/* ── Timeline list ────────────────────────────────────────── */}
+      <div style={{ padding: '0 16px 0' }}>
         {filtered.length === 0 ? (
           <EmptyState hasFilters={filtersActive > 0} onClear={clearFilters} />
         ) : (
           grouped.map(group => (
             <div key={group.key || 'all'} style={{ position: 'relative' }}>
+              {/* Year rail header */}
               {group.key && (
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'baseline',
                     gap: 10,
-                    padding: '18px 0 6px 42px',
+                    padding: '20px 0 8px 44px',
                     position: 'relative',
                   }}
                 >
+                  {/* Year dot — accent filled with halo ring */}
                   <div
                     style={{
                       position: 'absolute',
-                      left: 18,
-                      top: 24,
-                      width: 12,
-                      height: 12,
+                      left: 17,
+                      top: 26,
+                      width: 14,
+                      height: 14,
                       borderRadius: '50%',
                       background: C.accent,
-                      boxShadow: `0 0 0 3px ${C.bg}, 0 0 0 4px ${C.accent}`,
+                      boxShadow: `0 0 0 3px ${C.bg}, 0 0 0 5px ${C.accentLight}`,
+                      zIndex: 1,
                     }}
                   />
+                  {/* Year label in Fraunces */}
                   <div
                     style={{
                       fontFamily: fonts.heading,
-                      fontSize: 26,
-                      color: C.accent,
+                      fontSize: 28,
+                      color: C.text,
                       fontWeight: 600,
-                      letterSpacing: -0.5,
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1,
                     }}
                   >
                     {group.key}
                   </div>
-                  <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.textLight }}>
+                  {/* Bean count — Nunito, not script */}
+                  <div
+                    style={{
+                      fontFamily: fonts.body,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: C.textLight,
+                      letterSpacing: '0.01em',
+                    }}
+                  >
                     · {group.items.length} {group.items.length === 1 ? 'bean' : 'beans'}
                   </div>
                 </div>
               )}
-              <div style={{ position: 'relative', paddingLeft: 28 }}>
+
+              {/* Entry rows with stagger animation */}
+              <m.div
+                variants={listContainer}
+                initial="initial"
+                animate="animate"
+                style={{ position: 'relative', paddingLeft: 30 }}
+              >
+                {/* Vertical timeline rail — hairline accent gradient */}
                 <div
                   style={{
                     position: 'absolute',
@@ -1015,7 +1094,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                     top: 0,
                     bottom: 8,
                     width: 1,
-                    background: C.border,
+                    background: `linear-gradient(180deg, ${C.accentLight} 0%, ${C.hairline} 100%)`,
                   }}
                 />
                 {group.items.map(bean => (
@@ -1027,22 +1106,38 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
                     onOpen={() => setOpenBeanId(bean.id)}
                   />
                 ))}
-              </div>
+              </m.div>
             </div>
           ))
         )}
 
+        {/* End of trail */}
         {filtered.length > 0 && (
           <div
             style={{
               textAlign: 'center',
-              padding: '20px 0 10px',
-              fontFamily: fonts.title,
-              fontSize: 17,
-              color: C.textLight,
+              padding: '24px 0 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
             }}
           >
-            — end of the trail —
+            <div style={{ flex: 1, height: 1, background: C.hairline }} />
+            <div
+              style={{
+                fontFamily: fonts.body,
+                fontSize: 11,
+                fontWeight: 600,
+                color: C.textLight,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              end of the trail
+            </div>
+            <div style={{ flex: 1, height: 1, background: C.hairline }} />
           </div>
         )}
       </div>

@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2 } from 'lucide-react';
-import { C, fonts, journalCard } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass, cardBase, motion, journalCard } from '../styles/theme';
+import { m, listContainer, listItem, fadeUp } from '../lib/motion';
+import { AnimatePresence } from 'framer-motion';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { convertTastingScores } from '../lib/professorRuphus';
@@ -54,10 +56,9 @@ const AromaChips = ({ aroma }) => {
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
       {parts.map((p, i) => (
         <span key={i} style={{
-          fontSize: 10.5, color: C.textMuted, fontStyle: 'italic',
-          background: C.bg, border: `1px solid ${C.border}`,
-          padding: '2px 7px', borderRadius: 999, whiteSpace: 'nowrap',
-          fontFamily: fonts.body,
+          background: C.accentSoft, border: `1px solid ${C.accentLight}`,
+          padding: '3px 9px', borderRadius: radius.pill, fontSize: 11, fontWeight: 600,
+          color: C.accent, fontFamily: fonts.body, whiteSpace: 'nowrap',
         }}>{p}</span>
       ))}
     </div>
@@ -112,21 +113,19 @@ const RuphusJournalCard = ({ step, stepName, content, onTerm }) => (
   <div style={{ marginBottom: 14 }}>
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
-      fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase',
+      ...type.label, color: C.textMuted,
       marginBottom: 6, paddingLeft: 2,
     }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 18, height: 18, borderRadius: '50%', background: C.accent, color: C.cream,
+        width: 18, height: 18, borderRadius: radius.pill, background: C.accent, color: C.cream,
         fontFamily: fonts.heading, fontSize: 11, fontWeight: 600, letterSpacing: 0,
       }}>{step}</span>
       Step {step} · {stepName}
     </div>
     <div style={{
-      background: C.card, borderRadius: 12,
-      border: `1px solid ${C.border}`, padding: '12px 14px',
+      ...cardBase, padding: '14px 16px',
       fontSize: 14, lineHeight: 1.55, color: C.text,
-      boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     }}>
       <RuphusContent text={content} onTerm={onTerm} />
@@ -138,11 +137,12 @@ const UserHandwrittenBubble = ({ children }) => (
   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
     <div style={{
       maxWidth: '78%',
-      background: '#EFE2CC', color: C.text,
-      borderRadius: '14px 14px 2px 14px',
+      background: C.accentSoft, color: C.text,
+      border: `1px solid ${C.accentLight}`,
+      borderRadius: '18px 18px 4px 18px',
       padding: '10px 13px',
       fontFamily: fonts.title, fontSize: 18, lineHeight: 1.25,
-      boxShadow: '0 1px 2px rgba(92,61,46,0.06)',
+      boxShadow: shadows.e1,
       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     }}>
       {children}
@@ -217,7 +217,7 @@ const TeachSheet = ({ entry, onClose }) => (
       // Fixed to viewport (not absolute) so the backdrop covers the bottom
       // tab bar too. zIndex > 100 beats the tab bar's stacking context.
       position: 'fixed', inset: 0, zIndex: 200,
-      background: 'rgba(59,36,23,0.35)',
+      background: glass.scrim,
       display: 'flex', alignItems: 'flex-end',
       animation: 'tchat-fade-in 180ms ease-out',
     }}
@@ -226,9 +226,9 @@ const TeachSheet = ({ entry, onClose }) => (
       onClick={e => e.stopPropagation()}
       style={{
         width: '100%',
-        background: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+        background: glass.sheet, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
         padding: `10px 18px calc(28px + env(safe-area-inset-bottom, 0px))`,
-        boxShadow: '0 -8px 28px rgba(59,36,23,0.18)',
+        boxShadow: shadows.modal,
         animation: 'tchat-slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
       }}
     >
@@ -246,15 +246,15 @@ const TeachSheet = ({ entry, onClose }) => (
           }}
         />
         <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, color: C.accent, textTransform: 'uppercase', marginBottom: 2 }}>
+          <div style={{ ...type.label, color: C.accent, marginBottom: 2 }}>
             Prof. Ruphus · Teach me
           </div>
-          <div style={{ fontFamily: fonts.heading, fontSize: 22, color: C.text, lineHeight: 1.1, marginBottom: 4 }}>{entry.title}</div>
-          <div style={{ fontFamily: fonts.title, fontSize: 18, color: C.accentDark, lineHeight: 1.2 }}>{entry.tagline}</div>
+          <div style={{ ...type.h2, color: C.text, marginBottom: 4 }}>{entry.title}</div>
+          <div style={{ fontFamily: fonts.title, fontSize: 17, color: C.accentDark, lineHeight: 1.2 }}>{entry.tagline}</div>
         </div>
       </div>
       <div style={{ fontSize: 14, lineHeight: 1.55, color: C.text, marginBottom: 14 }}>{entry.body}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>
+      <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>
         Try these words
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
@@ -262,8 +262,8 @@ const TeachSheet = ({ entry, onClose }) => (
           <span
             key={e}
             style={{
-              background: C.cream, border: `1px solid ${C.border}`, borderRadius: 999,
-              padding: '6px 12px', fontSize: 12, fontWeight: 600, color: C.text,
+              background: C.accentSoft, border: `1px solid ${C.hairline}`, borderRadius: radius.pill,
+              padding: '6px 12px', fontSize: 12, fontWeight: 600, color: C.text, fontFamily: fonts.body,
             }}
           >{e}</span>
         ))}
@@ -271,10 +271,10 @@ const TeachSheet = ({ entry, onClose }) => (
       <button
         onClick={onClose}
         style={{
-          width: '100%', padding: 12, borderRadius: 14, border: 'none',
+          width: '100%', padding: 12, borderRadius: radius.md, border: 'none',
           background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
           color: C.cream, fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
-          cursor: 'pointer', boxShadow: '0 2px 6px rgba(92,61,46,0.18)',
+          cursor: 'pointer', boxShadow: shadows.button,
         }}
       >Got it</button>
     </div>
@@ -316,7 +316,7 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
       style={{
         // Fixed to viewport so the backdrop covers the bottom tab bar too.
         position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(59,36,23,0.35)',
+        background: 'rgba(42,26,16,0.32)',
         display: 'flex', alignItems: 'flex-end',
         animation: 'tchat-fade-in 180ms ease-out',
       }}
@@ -325,8 +325,8 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
-          background: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22,
-          boxShadow: '0 -8px 28px rgba(59,36,23,0.18)',
+          background: glass.sheet, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+          boxShadow: shadows.modal,
           animation: 'tchat-slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
           maxHeight: 'min(80vh, 620px)',
           display: 'flex', flexDirection: 'column',
@@ -340,8 +340,8 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
           flex: 1,
         }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 2, marginTop: 4 }}>
-          <div style={{ fontFamily: fonts.heading, fontSize: 22, color: C.text, lineHeight: 1.1 }}>Your cup so far</div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase' }}>
+          <div style={{ ...type.h2, color: C.text }}>Your cup so far</div>
+          <div style={{ ...type.label, color: C.textMuted }}>
             Step {Math.min(currentStep + 1, stepCount)} / {stepCount}
           </div>
         </div>
@@ -428,7 +428,7 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
                 }}>{a.status}</div>
               </div>
               {a.active && (
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: C.accent, textTransform: 'uppercase' }}>Now</span>
+                <span style={{ ...type.caption, color: C.accent, background: C.accentSoft, borderRadius: radius.pill, padding: '2px 7px' }}>Now</span>
               )}
             </div>
           ))}
@@ -437,8 +437,8 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
         <button
           onClick={onClose}
           style={{
-            width: '100%', marginTop: 14, padding: 12, borderRadius: 14, border: `1px solid ${C.border}`,
-            background: C.cream, color: C.text, fontFamily: fonts.body, fontSize: 13, fontWeight: 700,
+            width: '100%', marginTop: 14, padding: 12, borderRadius: radius.md, border: `1px solid ${C.hairline}`,
+            background: C.card, color: C.text, fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
             cursor: 'pointer',
           }}
         >Keep tasting</button>
@@ -853,17 +853,17 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       {/* Header + list chrome hidden during chat takeover */}
       {mode !== 'chat' && (
         <>
-          {/* REDESIGN: big serif title + caramel accent bar + Caveat kicker */}
+          {/* REDESIGN: big serif title + caramel accent bar + Nunito label kicker */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
-            <div style={{ fontFamily: fonts.heading, fontSize: 32, color: C.text, fontWeight: 500, letterSpacing: -0.5 }}>
+            <div style={{ ...type.display, color: C.text }}>
               Tasting
             </div>
-            <div style={{ fontSize: 11, color: C.textLight, fontWeight: 600 }}>
-              {tastings.length} cup{tastings.length !== 1 ? 's' : ''} logged
-            </div>
+            <span style={{ ...type.caption, color: C.accent, background: C.accentSoft, borderRadius: radius.pill, padding: '3px 10px' }}>
+              {tastings.length} cup{tastings.length !== 1 ? 's' : ''}
+            </span>
           </div>
-          <div style={{ width: 52, height: 2, background: C.accent, borderRadius: 1, marginBottom: 10 }} />
-          <div style={{ fontFamily: fonts.title, fontSize: 18, color: C.accentDark, lineHeight: 1, marginBottom: 14 }}>
+          <div style={{ height: 3, width: 48, background: C.accentLight, borderRadius: radius.pill, marginBottom: 10 }} />
+          <div style={{ fontFamily: fonts.body, fontSize: 13, color: C.textMuted, lineHeight: 1, marginBottom: 14, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 700 }}>
             learn what you taste
           </div>
 
@@ -883,13 +883,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <>
                 <div data-tour="new-tasting" style={{
                   position: 'relative',
-                  background: 'linear-gradient(145deg, #FFF8F0 0%, #F5E6D3 60%, #EDD8BF 100%)',
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 20,
-                  padding: '18px 18px 16px',
-                  boxShadow: '0 2px 8px rgba(92,61,46,0.08)',
+                  background: 'linear-gradient(145deg, #FFFAF5 0%, #F8EDE0 55%, #F0DEC9 100%)',
+                  border: `1px solid ${C.borderLight}`,
+                  borderRadius: radius.xl,
+                  padding: '20px 20px 18px',
+                  boxShadow: shadows.e3,
                   overflow: 'hidden',
-                  marginBottom: 10,
+                  marginBottom: 16,
                 }}>
                   {/* Background bean motifs */}
                   <svg width="88" height="88" viewBox="0 0 24 24" style={{ position: 'absolute', right: -18, top: -18, opacity: 0.08 }}>
@@ -915,10 +915,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                       }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: C.accent, letterSpacing: 1.3, textTransform: 'uppercase' }}>
+                      <div style={{ ...type.label, color: C.accent }}>
                         Prof. Ruphus · your coach
                       </div>
-                      <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text, lineHeight: 1.1, marginTop: 1 }}>
+                      <div style={{ fontFamily: fonts.heading, fontSize: 19, color: C.text, lineHeight: 1.2, marginTop: 1 }}>
                         {hasBeans ? "Let's taste something together." : "Ready when you are."}
                       </div>
                     </div>
@@ -928,12 +928,12 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                       overlays the whole chip for a native picker on mobile. */}
                   {hasBeans && (
                     <div style={{
-                      background: 'rgba(255,248,240,0.7)',
-                      border: `1px solid rgba(232,221,211,0.8)`,
-                      borderRadius: 14, padding: '10px 12px',
+                      background: C.cream,
+                      border: `1px solid ${C.borderLight}`,
+                      borderRadius: radius.md, padding: '11px 13px',
                       display: 'flex', alignItems: 'center', gap: 10,
                       marginBottom: 14, position: 'relative',
-                      backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+                      boxShadow: shadows.e1,
                     }}>
                       {onDeck.photoUrl ? (
                         <img
@@ -1012,10 +1012,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                         ? 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)'
                         : C.cardMuted,
                       color: hasBeans ? C.cream : C.textLight,
-                      padding: '14px 16px', borderRadius: 14,
+                      padding: '14px 16px', borderRadius: radius.md,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                      fontFamily: fonts.body, fontSize: 15, fontWeight: 800, letterSpacing: 0.2,
-                      boxShadow: hasBeans ? '0 3px 10px rgba(143,90,46,0.35), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none',
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 800, letterSpacing: '0.01em',
+                      boxShadow: hasBeans ? '0 4px 14px rgba(143,90,46,0.30), inset 0 1px 0 rgba(255,255,255,0.12)' : 'none',
                     }}
                   >
                     <MessageCircle size={18} />
@@ -1024,14 +1024,14 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
                   {/* Promise row */}
                   <div style={{
-                    marginTop: 10, display: 'flex', justifyContent: 'center', gap: 14,
-                    fontSize: 10.5, color: C.textMuted, fontWeight: 600,
+                    marginTop: 10, display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap',
                   }}>
-                    <span>6 steps</span>
-                    <span style={{ color: C.textLight }}>·</span>
-                    <span>~5 min</span>
-                    <span style={{ color: C.textLight }}>·</span>
-                    <span>auto-logs</span>
+                    {['6 steps', '~5 min', 'auto-logs'].map((item, i) => (
+                      <span key={i} style={{
+                        background: C.accentSoft, borderRadius: radius.pill, padding: '3px 8px',
+                        fontSize: 11, color: C.textMuted, fontWeight: 600,
+                      }}>{item}</span>
+                    ))}
                   </div>
                 </div>
 
@@ -1041,10 +1041,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                     onClick={() => setMode('form')}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
-                      color: C.textMuted, fontSize: 12, fontWeight: 600,
-                      fontFamily: fonts.body, textDecoration: 'underline',
-                      textDecorationStyle: 'dotted', textUnderlineOffset: 3,
-                      padding: '6px 12px',
+                      color: C.accent, fontSize: 12, fontWeight: 600,
+                      fontFamily: fonts.body, textDecoration: 'none',
+                      textUnderlineOffset: 3,
+                      padding: '8px 16px',
                     }}
                   >or log a tasting manually</button>
                 </div>
@@ -1055,7 +1055,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                     display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
                   }}>
                     <div style={{ flex: 1, height: 1, background: C.border }} />
-                    <div style={{ fontFamily: fonts.title, fontSize: 18, color: C.accentDark }}>
+                    <div style={{ fontFamily: fonts.body, fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textMuted }}>
                       your journal
                     </div>
                     <div style={{ flex: 1, height: 1, background: C.border }} />
@@ -1096,7 +1096,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           `}</style>
 
           {/* Bean header with Ruphus avatar + step spine */}
-          <div style={{ background: C.card, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur, borderBottom: `1px solid ${glass.chromeBorder}`, flexShrink: 0 }}>
             <div style={{ padding: '10px 14px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
               {/* Ruphus avatar — "your coach" */}
               <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -1128,7 +1128,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
               {/* Bean name + hidden native select for switching */}
               <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                <div style={{ ...type.label, color: C.textMuted }}>
                   Tasting with Ruphus{selectedBean?.jarSlot ? ` · Jar #${selectedBean.jarSlot}` : ''}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
@@ -1165,8 +1165,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <button
                 onClick={requestExitChat}
                 style={{
-                  background: 'transparent', border: 'none', color: C.accent,
-                  fontFamily: fonts.body, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  background: 'transparent', border: 'none', color: C.red,
+                  fontFamily: fonts.body, fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   padding: '8px 4px',
                 }}
               >End</button>
@@ -1181,13 +1181,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   <div key={s} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0, minWidth: 0 }}>
                       <div style={{
-                        width: active ? 9 : 7, height: active ? 9 : 7, borderRadius: '50%',
+                        width: active ? 10 : 7, height: active ? 10 : 7, borderRadius: '50%',
                         background: done || active ? C.accent : '#D9CBB8',
-                        boxShadow: active ? `0 0 0 3px ${C.cream}` : 'none',
+                        boxShadow: active ? `0 0 0 3px ${C.accentSoft}` : 'none',
                         transition: 'all 0.2s',
                       }} />
                       <div style={{
-                        fontSize: 9, fontWeight: active ? 700 : 500,
+                        fontSize: 9.5, fontWeight: active ? 800 : 500, fontFamily: fonts.body,
                         color: active ? C.text : done ? C.textMuted : C.textLight,
                         textAlign: 'center', lineHeight: 1, letterSpacing: 0.2,
                       }}>{s}</div>
@@ -1195,7 +1195,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                     {i < TASTING_STEPS.length - 1 && (
                       <div style={{
                         flex: 1, height: 1, marginTop: -14,
-                        borderTop: done ? `1px solid ${C.accent}` : `1px dashed ${C.border}`,
+                        borderTop: done ? `1.5px solid ${C.accent}` : `1px dashed ${C.borderLight}`,
                       }} />
                     )}
                   </div>
@@ -1230,10 +1230,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
             {chatExtracted && (
               <div style={{
                 marginTop: 6, marginBottom: 14,
-                background: C.greenBg, border: `1px solid #BFDDC4`,
-                borderRadius: 14, padding: '12px 14px',
+                background: C.greenBg, border: `1px solid ${C.green}20`,
+                borderRadius: radius.lg, padding: '14px 16px',
               }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.green, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
+                <div style={{ ...type.label, color: C.green, marginBottom: 8 }}>
                   Tasting captured — review & save
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -1260,15 +1260,15 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               onClick={() => setCupOpen(true)}
               style={{
                 flexShrink: 0, width: '100%', textAlign: 'left', cursor: 'pointer', border: 'none',
-                background: 'linear-gradient(180deg, #FBF1DF 0%, #F5E6D3 100%)',
-                borderTop: `1px solid ${C.border}`,
+                background: 'linear-gradient(180deg, #FDF8F2 0%, #F8EEE2 100%)',
+                borderTop: `1px solid ${C.borderLight}`,
                 padding: '10px 14px',
                 display: 'flex', alignItems: 'center', gap: 10, fontFamily: fonts.body,
               }}
             >
               <div style={{
-                width: 28, height: 28, borderRadius: 8, background: C.card,
-                border: `1px solid ${C.border}`, flexShrink: 0,
+                width: 28, height: 28, borderRadius: radius.xs, background: C.accentSoft,
+                border: 'none', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -1277,7 +1277,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 </svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, color: C.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                <div style={{ ...type.label, color: C.textMuted }}>
                   Your cup so far — tap to expand
                 </div>
                 <div style={{
@@ -1287,7 +1287,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   <ScorecardPeekLine scorecard={scorecard} stepName={TASTING_STEPS[currentStep] || 'Finish'} />
                 </div>
               </div>
-              <span style={{ color: C.accent, fontSize: 18, lineHeight: 1 }}>⌃</span>
+              <span style={{ color: C.accent, fontSize: 18, lineHeight: 1, fontWeight: 800 }}>⌃</span>
             </button>
           )}
 
@@ -1295,7 +1295,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           {!chatExtracted && (
             <div style={{
               flexShrink: 0,
-              background: C.card, borderTop: `1px solid ${C.border}`,
+              background: glass.sheet, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur,
+              borderTop: `1px solid ${glass.chromeBorder}`,
               padding: `10px 12px calc(10px + env(safe-area-inset-bottom, 0px))`,
               display: 'flex', alignItems: 'flex-end', gap: 8,
             }}>
@@ -1319,7 +1320,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   padding: '10px 16px', borderRadius: 22,
                   border: `1px solid ${C.border}`, fontFamily: fonts.body,
                   fontSize: 16, lineHeight: 1.4,
-                  background: '#FAF6F1', color: C.text,
+                  background: C.bgDeep, color: C.text,
                   outline: 'none', boxSizing: 'border-box',
                   resize: 'none', overflowY: 'auto', maxHeight: 120,
                 }}
@@ -1329,10 +1330,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 disabled={chatLoading || !chatInput.trim()}
                 aria-label="Send"
                 style={{
-                  width: 40, height: 40, borderRadius: '50%', border: 'none',
+                  width: 44, height: 44, borderRadius: '50%', border: 'none',
                   background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
                   color: C.cream, cursor: 'pointer', flexShrink: 0,
-                  boxShadow: '0 1px 4px rgba(92,61,46,0.18)',
+                  boxShadow: shadows.button,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   opacity: chatLoading || !chatInput.trim() ? 0.5 : 1,
                   transition: 'opacity 0.15s',
@@ -1363,17 +1364,33 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
       {/* Sort Controls */}
       {mode === 'list' && tastings.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        <div style={{ display: 'inline-flex', background: C.bgDeep, borderRadius: radius.pill, padding: 3, gap: 2, border: `1px solid ${C.border}`, marginBottom: 14 }}>
           {[['date', 'Recent'], ['rating', 'Top rated']].map(([k, l]) => (
-            <Btn key={k} variant={sortBy === k ? 'primary' : 'ghost'} onClick={() => setSortBy(k)} style={{ fontSize: 12, padding: '6px 14px' }}>
-              {l}
-            </Btn>
+            <button
+              key={k}
+              onClick={() => setSortBy(k)}
+              style={{
+                padding: '7px 16px',
+                borderRadius: radius.pill,
+                border: 'none',
+                background: sortBy === k ? C.accent : 'transparent',
+                color: sortBy === k ? C.cream : C.textMuted,
+                fontFamily: fonts.body, fontSize: 12, fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.18s cubic-bezier(0.22,1,0.36,1)',
+                letterSpacing: '0.02em',
+                boxShadow: sortBy === k ? shadows.button : 'none',
+                minHeight: 36,
+              }}
+            >{l}</button>
           ))}
         </div>
       )}
 
       {/* Tasting Cards */}
-      {mode === 'list' && sorted.map(t => {
+      {mode === 'list' && (
+      <m.div variants={listContainer} initial="initial" animate="animate">
+      {sorted.map(t => {
         const isEditing = editingId === t.id;
 
         if (isEditing && editForm) return (
@@ -1408,14 +1425,14 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         );
 
         return (
-          <div key={t.id} style={{
+          <m.div key={t.id} variants={listItem} style={{
             background: C.card,
-            border: `1px solid ${C.border}`,
+            border: `1px solid ${C.borderLight}`,
             borderLeft: `3px solid ${C.accentLight}`,
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 10,
-            boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+            borderRadius: radius.lg,
+            padding: '16px 16px 14px',
+            marginBottom: 12,
+            boxShadow: shadows.e2,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
               <div style={{ flex: 1, minWidth: 0, marginRight: 6 }}>
@@ -1423,30 +1440,27 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   const b = beans.find(x => x.id === t.beanId);
                   return (
                     <>
+                      <div style={{ ...type.label, color: C.textMuted, marginBottom: 2 }}>{b?.roaster || 'Unknown roaster'}</div>
                       <div style={{
-                        fontSize: 9.5, fontWeight: 800, letterSpacing: 1.3,
-                        color: C.textMuted, textTransform: 'uppercase', marginBottom: 2,
-                      }}>{b?.roaster || 'Unknown roaster'}</div>
-                      <div style={{
-                        fontFamily: fonts.heading, fontSize: 16, color: C.text, fontWeight: 500, lineHeight: 1.2,
+                        fontFamily: fonts.heading, fontSize: 17, color: C.text, fontWeight: 600, lineHeight: 1.2,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{b?.name || 'Unknown bean'}</div>
                     </>
                   );
                 })()}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                <span style={{ fontSize: 10.5, color: C.textLight, fontWeight: 600, marginRight: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <span style={{ fontSize: 10.5, color: C.accent, fontWeight: 700, background: C.accentSoft, borderRadius: radius.pill, padding: '3px 8px', marginRight: 2 }}>
                   {formatDateRelative(t.date)}
                 </span>
-                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', color: C.accent, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: sharingId === t.id ? 0.5 : 1 }}>
-                  <Share2 size={14} />
+                <span onClick={() => handleShareTasting(t)} style={{ cursor: 'pointer', width: 36, height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.bgDeep, borderRadius: '50%', opacity: sharingId === t.id ? 0.5 : 1 }}>
+                  <Share2 size={14} color={C.accent} />
                 </span>
-                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', color: C.textMuted, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Pencil size={14} />
+                <span onClick={() => startEdit(t)} style={{ cursor: 'pointer', width: 36, height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.bgDeep, borderRadius: '50%' }}>
+                  <Pencil size={14} color={C.textMuted} />
                 </span>
-                <span onClick={async () => { if (confirm('Delete this tasting?')) try { await onDeleteTasting(t.id); } catch { showError("Couldn't delete. Check your connection."); } }} style={{ cursor: 'pointer', color: C.red, padding: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Trash2 size={14} />
+                <span onClick={async () => { if (confirm('Delete this tasting?')) try { await onDeleteTasting(t.id); } catch { showError("Couldn't delete. Check your connection."); } }} style={{ cursor: 'pointer', width: 36, height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.bgDeep, borderRadius: '50%' }}>
+                  <Trash2 size={14} color={C.red} />
                 </span>
               </div>
             </div>
@@ -1456,7 +1470,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               <StarRating value={t.rating || 0} onChange={r => updateRating(t.id, r)} size={18} />
               {t.oneWord && (
                 <span style={{
-                  fontFamily: fonts.title, fontSize: 18, color: C.accentDark,
+                  fontFamily: fonts.title, fontSize: 19, color: C.accentDark,
                   lineHeight: 1, letterSpacing: 0.2,
                 }}>"{t.oneWord}"</span>
               )}
@@ -1468,27 +1482,29 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
             {/* Italic free notes */}
             {t.notes && (
               <div style={{
-                fontSize: 12.5, color: C.textMuted, lineHeight: 1.5,
+                fontSize: 13, color: C.textMuted, lineHeight: 1.5,
                 marginTop: 8, fontStyle: 'italic',
               }}>{t.notes}</div>
             )}
 
             {/* Secondary axes row — kept for info parity with today */}
             {(t.acidity || t.body || t.finish) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', marginTop: 6, fontSize: 11, color: C.textLight }}>
-                {t.acidity && <span>Acidity: {t.acidity}</span>}
-                {t.body && <span>Body: {t.body}</span>}
-                {t.finish && <span>Finish: {t.finish}</span>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', marginTop: 6 }}>
+                {t.acidity && <span style={{ background: C.bgDeep, borderRadius: radius.xs, padding: '2px 7px', fontSize: 10.5, color: C.textMuted, fontWeight: 600 }}>Acidity: {t.acidity}</span>}
+                {t.body && <span style={{ background: C.bgDeep, borderRadius: radius.xs, padding: '2px 7px', fontSize: 10.5, color: C.textMuted, fontWeight: 600 }}>Body: {t.body}</span>}
+                {t.finish && <span style={{ background: C.bgDeep, borderRadius: radius.xs, padding: '2px 7px', fontSize: 10.5, color: C.textMuted, fontWeight: 600 }}>Finish: {t.finish}</span>}
               </div>
             )}
-          </div>
+          </m.div>
         );
       })}
+      </m.div>
+      )}
 
       {mode === 'list' && tastings.length > 0 && (
         <div style={{
           textAlign: 'center', padding: '10px 0 6px',
-          fontFamily: fonts.title, fontSize: 16, color: C.textLight,
+          fontFamily: fonts.body, fontSize: 13, color: C.textLight, fontStyle: 'italic', letterSpacing: '0.02em',
         }}>— the more you taste, the more you taste —</div>
       )}
 
@@ -1504,8 +1520,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
               maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
             }}
           />
-          <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>No tastings yet</div>
-          <div style={{ fontSize: 13, color: C.textMuted }}>Brew something and let's taste</div>
+          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 6 }}>No tastings yet</div>
+          <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted }}>Brew something and let's taste</div>
         </div>
       )}
 
