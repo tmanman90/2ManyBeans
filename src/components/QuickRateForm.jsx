@@ -1,6 +1,6 @@
 // Quick Rate — lightweight star rating + note for Quick Recipe flow
 import { useState, useEffect } from 'react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, radius } from '../styles/theme';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { StarRating } from './StarRating';
@@ -38,39 +38,78 @@ export const QuickRateForm = ({ open, onClose, beanName, onSubmit }) => {
 
   return (
     <Modal open={open} onClose={handleClose} title="Quick Rate" centered>
-      <div style={{ textAlign: 'center', padding: '8px 0' }}>
+      <div style={{ paddingBottom: 8 }}>
+        {/* Bean name */}
         {beanName && (
-          <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text, marginBottom: 16 }}>
+          <div style={{
+            fontFamily: fonts.heading,
+            fontSize: 18,
+            fontWeight: 600,
+            color: C.text,
+            letterSpacing: '-0.01em',
+            lineHeight: 1.2,
+            marginBottom: 20,
+            paddingBottom: 16,
+            borderBottom: `1px solid ${C.hairline}`,
+          }}>
             {beanName}
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-          <StarRating value={rating} onChange={setRating} size={32} />
+        {/* Rating label + stars */}
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ ...type.label, color: C.textMuted, display: 'block', marginBottom: 12 }}>
+            Your rating
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <StarRating value={rating} onChange={setRating} size={32} />
+          </div>
         </div>
 
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Quick notes (optional)"
-          rows={3}
-          style={{
-            width: '100%', padding: '10px 12px', borderRadius: 8,
-            border: `1px solid ${C.border}`, fontFamily: fonts.body,
-            fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
-            resize: 'none',
-          }}
-        />
+        {/* Notes textarea */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ ...type.label, color: C.textMuted, display: 'block', marginBottom: 8 }}>
+            Quick notes
+          </label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Optional — what stood out?"
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: radius.sm,
+              border: `1px solid ${C.border}`,
+              fontFamily: fonts.body,
+              fontSize: 16,
+              background: C.bgDeep,
+              color: C.text,
+              boxSizing: 'border-box',
+              resize: 'none',
+              outline: 'none',
+              WebkitAppearance: 'none',
+              lineHeight: 1.5,
+            }}
+          />
+        </div>
 
+        {/* Error */}
         {error && (
-          <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{error}</div>
+          <div style={{
+            ...type.caption,
+            color: C.red,
+            marginBottom: 12,
+          }}>
+            {error}
+          </div>
         )}
 
         <Btn
           variant="primary"
           onClick={handleSubmit}
           disabled={!rating || submitting}
-          style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+          style={{ width: '100%', justifyContent: 'center' }}
         >
           {submitting ? 'Saving...' : 'Save Rating'}
         </Btn>

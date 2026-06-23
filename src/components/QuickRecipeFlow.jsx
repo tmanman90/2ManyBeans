@@ -2,7 +2,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CameraIcon, X, Search, RotateCcw, Save, Coffee, Star, BookOpen } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, shadows, radius } from '../styles/theme';
+import { m } from '../lib/motion';
+import { fadeUp, popIn, spring } from '../lib/motion';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
 import { ENRICHABLE_FIELDS } from '../lib/beanFields';
@@ -353,22 +355,32 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     handleLearn(toEphemeralBean(scanData));
   };
 
+  // Refined CSS spinner
   const spinner = (
     <div style={{
-      width: 16, height: 16,
-      border: `2px solid ${C.accent}`,
-      borderTopColor: 'transparent',
+      width: 20,
+      height: 20,
+      border: `2px solid ${C.borderLight}`,
+      borderTopColor: C.accent,
       borderRadius: '50%',
-      animation: 'spin 0.8s linear infinite',
-      display: 'inline-block',
+      animation: 'spin 0.7s linear infinite',
+      flexShrink: 0,
     }} />
   );
 
   const inputStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: 8,
-    border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
+    width: '100%',
+    padding: '13px 16px',
+    borderRadius: radius.md,
+    border: `1px solid ${C.border}`,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    background: C.card,
+    color: C.text,
+    boxSizing: 'border-box',
     textAlign: 'center',
+    outline: 'none',
+    boxShadow: shadows.e1,
   };
 
   // Build the action buttons shown in the recipe footer
@@ -377,7 +389,13 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     : handBrew.handBrewRecipe && !handBrew.handBrewLoading;
 
   const actionButtons = recipeHasLoaded ? (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+    <m.div
+      {...fadeUp}
+      style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}
+    >
+      {/* Divider */}
+      <div style={{ borderTop: `1px solid ${C.hairline}`, marginBottom: 4 }} />
+
       {/* Brew method toggle */}
       <Btn variant="secondary" onClick={handleToggleMethod} style={{ width: '100%', justifyContent: 'center' }}>
         <Coffee size={14} />
@@ -405,7 +423,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
           <Save size={14} /> Save to Inventory
         </Btn>
       )}
-    </div>
+    </m.div>
   ) : null;
 
   // During brew phase, show the appropriate modal
@@ -467,21 +485,37 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     <Modal open={open} onClose={onClose} title="Quick Recipe" centered>
       {/* Photo capture step */}
       {step === 'photo' && (
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <m.div {...fadeUp} style={{ textAlign: 'center', padding: '12px 0 20px' }}>
           <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileInput} style={{ display: 'none' }} />
 
-          <div
-            style={{
-              background: C.card,
-              border: `2px dashed ${C.border}`,
-              borderRadius: 16, padding: '40px 20px',
-              marginBottom: 16, transition: 'border-color 0.15s',
-            }}
-          >
-            <CameraIcon size={36} color={C.accent} style={{ marginBottom: 8 }} />
-            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag</div>
-            <div style={{ fontSize: 13, color: C.textMuted }}>Bag plus pamphlet photos are welcome</div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+          {/* Drop zone */}
+          <div style={{
+            background: C.card,
+            border: `2px dashed ${C.accentLight}`,
+            borderRadius: radius.lg,
+            padding: '40px 24px 36px',
+            marginBottom: 16,
+          }}>
+            <div style={{
+              width: 56, height: 56,
+              borderRadius: radius.lg,
+              background: C.accentSoft,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 14px',
+            }}>
+              <CameraIcon size={26} color={C.accent} />
+            </div>
+            <div style={{
+              fontFamily: fonts.heading,
+              fontSize: type.h2.fontSize,
+              fontWeight: 600,
+              color: C.text,
+              marginBottom: 6,
+            }}>Snap the bag</div>
+            <div style={{ ...type.body, color: C.textMuted, marginBottom: 20 }}>
+              Bag plus pamphlet photos are welcome
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
               {Capacitor.isNativePlatform() ? (
                 <>
                   <Btn variant="secondary" onClick={takeNativePhoto}>Take Photo</Btn>
@@ -494,72 +528,125 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
           </div>
 
           {scanError && (
-            <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, background: C.amberBg, color: C.amber, marginBottom: 12 }}>
+            <m.div
+              {...popIn}
+              style={{
+                padding: '10px 14px',
+                borderRadius: radius.sm,
+                ...type.body,
+                background: C.amberBg,
+                color: C.amber,
+                marginBottom: 12,
+                textAlign: 'left',
+              }}
+            >
               {scanError}
-            </div>
+            </m.div>
           )}
-        </div>
+        </m.div>
       )}
 
       {/* Scanning step */}
       {step === 'scanning' && (
-        <div style={{ textAlign: 'center', padding: '30px 0' }}>
+        <m.div {...fadeUp} style={{ textAlign: 'center', padding: '36px 0' }}>
           {photos.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 20 }}>
               {photos.map((photo, idx) => (
-                <img key={idx} src={photo.previewUrl} alt={`Scanned photo ${idx + 1}`}
-                  style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 10, opacity: 0.7 }} />
+                <img
+                  key={idx}
+                  src={photo.previewUrl}
+                  alt={`Scanned photo ${idx + 1}`}
+                  style={{
+                    width: 72,
+                    height: 72,
+                    objectFit: 'cover',
+                    borderRadius: radius.sm,
+                    opacity: 0.8,
+                    boxShadow: shadows.e1,
+                  }}
+                />
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             {spinner}
-            <span style={{ fontSize: 14, color: C.textMuted }}>Reading {photos.length > 1 ? 'photos' : 'label'}...</span>
+            <span style={{ ...type.bodyL, color: C.textMuted }}>
+              Reading {photos.length > 1 ? 'photos' : 'label'}...
+            </span>
           </div>
-        </div>
+        </m.div>
       )}
 
       {/* Enriching step */}
       {step === 'enriching' && (
-        <div style={{ textAlign: 'center', padding: '30px 0' }}>
+        <m.div {...fadeUp} style={{ textAlign: 'center', padding: '36px 0' }}>
           {scanData && (scanData.name || scanData.roaster) && (
-            <>
-              <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text, marginBottom: 4 }}>
-                {scanData.name}
-              </div>
+            <div style={{ marginBottom: 20 }}>
+              {scanData.name && (
+                <div style={{
+                  fontFamily: fonts.heading,
+                  fontSize: type.h2.fontSize,
+                  fontWeight: 600,
+                  color: C.text,
+                  marginBottom: 4,
+                }}>
+                  {scanData.name}
+                </div>
+              )}
               {scanData.roaster && (
-                <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>
+                <div style={{ ...type.body, color: C.textMuted }}>
                   by {scanData.roaster}
                 </div>
               )}
-            </>
+            </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             {spinner}
-            <span style={{ fontSize: 14, color: C.textMuted }}>Researching online...</span>
+            <span style={{ ...type.bodyL, color: C.textMuted }}>Researching online...</span>
           </div>
-        </div>
+        </m.div>
       )}
 
       {/* Bag size prompt */}
       {step === 'bagSize' && (
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text, marginBottom: 4 }}>
-            {scanData?.name || 'Unknown Bean'}
-          </div>
+        <m.div {...fadeUp} style={{ textAlign: 'center', padding: '20px 0' }}>
+          {scanData?.name && (
+            <div style={{
+              fontFamily: fonts.heading,
+              fontSize: type.h2.fontSize,
+              fontWeight: 600,
+              color: C.text,
+              marginBottom: 4,
+            }}>
+              {scanData.name}
+            </div>
+          )}
+          {!scanData?.name && (
+            <div style={{
+              fontFamily: fonts.heading,
+              fontSize: type.h2.fontSize,
+              fontWeight: 600,
+              color: C.text,
+              marginBottom: 4,
+            }}>Unknown Bean</div>
+          )}
           {scanData?.roaster && (
-            <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>
+            <div style={{ ...type.body, color: C.textMuted, marginBottom: 20 }}>
               by {scanData.roaster}
             </div>
           )}
-          <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>How many grams do you have?</div>
+          {!scanData?.roaster && <div style={{ marginBottom: 20 }} />}
+
+          <div style={{ ...type.bodyL, color: C.text, marginBottom: 12 }}>
+            How many grams do you have?
+          </div>
           <input
             type="number"
             min={1}
             value={bagSizeInput}
             onChange={e => setBagSizeInput(e.target.value)}
-            placeholder="e.g. 20"
-            style={{ ...inputStyle, maxWidth: 160, margin: '0 auto', marginBottom: 12 }}
+            placeholder="e.g. 200"
+            style={{ ...inputStyle, maxWidth: 160, margin: '0 auto 16px', display: 'block' }}
             autoFocus
           />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -570,7 +657,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
               <Search size={14} /> Get Recipe
             </Btn>
           </div>
-        </div>
+        </m.div>
       )}
     </Modal>
   );

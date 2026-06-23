@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { X, Search } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { X, Search, Camera, Image } from 'lucide-react';
+import { C, fonts, type, shadows, radius, glass } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot } from '../lib/gemini';
 import { ensurePhotoLibraryAccess, galleryPhotosToScanPhotos, isPhotoPickerCancel } from '../lib/photoPicker';
@@ -250,12 +250,16 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
     }
   };
 
-  const spinner = (
-    <div style={{
-      width: 20, height: 20, border: `2px solid ${C.border}`,
-      borderTopColor: C.accent, borderRadius: '50%',
-      animation: 'spin 0.8s linear infinite',
-    }} />
+  const Spinner = ({ label }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '36px 0' }}>
+      <div style={{
+        width: 36, height: 36,
+        border: `2.5px solid ${C.accentLight}`,
+        borderTopColor: C.accent, borderRadius: '50%',
+        animation: 'spin 0.85s linear infinite',
+      }} />
+      <span style={{ ...type.body, color: C.textMuted }}>{label}</span>
+    </div>
   );
 
   if (!open) return null;
@@ -267,91 +271,134 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
 
       {/* STEP: Photo capture */}
       {step === 'photo' && (
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <div style={{ padding: '8px 0 12px' }}>
           {photos.length === 0 ? (
             <div
               style={{
-                border: `2px dashed ${C.border}`, borderRadius: 16,
-                padding: '40px 20px',
-                background: C.card,
+                border: `1.5px dashed ${C.accentLight}`, borderRadius: radius.xl,
+                padding: '40px 24px 36px',
+                background: C.bgDeep,
+                textAlign: 'center',
               }}
             >
-              <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
-              <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 4 }}>Snap the bag label</div>
-              <div style={{ fontSize: 13, color: C.textMuted }}>Take a photo or choose from library</div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+              {/* Camera icon ring */}
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: C.accentSoft, border: `1.5px solid ${C.accentLight}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 18px', boxShadow: shadows.e2,
+              }}>
+                <Camera size={30} color={C.accent} />
+              </div>
+              <div style={{ ...type.h2, color: C.text, marginBottom: 6 }}>Snap the bag label</div>
+              <div style={{ ...type.body, color: C.textMuted, marginBottom: 22 }}>
+                Up to 3 photos for best results
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {Capacitor.isNativePlatform() ? (
                   <>
-                    <Btn variant="secondary" onClick={takeNativePhoto}>Take Photo</Btn>
-                    <Btn variant="primary" onClick={pickNativePhotos}>Choose Photos</Btn>
+                    <Btn variant="secondary" onClick={takeNativePhoto}>
+                      <Camera size={14} /> Camera
+                    </Btn>
+                    <Btn variant="primary" onClick={pickNativePhotos}>
+                      <Image size={14} /> Library
+                    </Btn>
                   </>
                 ) : (
-                  <Btn variant="primary" onClick={() => fileRef.current?.click()}>Choose Photos</Btn>
+                  <Btn variant="primary" onClick={() => fileRef.current?.click()}>
+                    <Image size={14} /> Choose Photos
+                  </Btn>
                 )}
               </div>
               {onManualEntry && (
                 <div
                   onClick={(e) => { e.stopPropagation(); onManualEntry(); }}
-                  style={{ fontSize: 13, color: C.accent, marginTop: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                  style={{ ...type.body, color: C.accent, marginTop: 18, cursor: 'pointer', fontWeight: 600 }}
                 >
                   or add manually
                 </div>
               )}
             </div>
           ) : (
-            <>
+            <div>
+              {/* Photo thumbnails */}
               <div style={{
-                display: 'flex', gap: 10, justifyContent: 'center',
-                marginBottom: 16, flexWrap: 'wrap',
+                display: 'flex', gap: 10, marginBottom: 18,
+                justifyContent: photos.length < 3 ? 'flex-start' : 'center',
               }}>
                 {photos.map((photo, idx) => (
-                  <div key={idx} style={{ position: 'relative' }}>
+                  <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
                     <img
                       src={photo.previewUrl}
                       alt={`Photo ${idx + 1}`}
                       style={{
-                        width: 90, height: 90, objectFit: 'cover',
-                        borderRadius: 10, border: `1px solid ${C.border}`,
+                        width: 96, height: 96, objectFit: 'cover',
+                        borderRadius: radius.md, border: `1px solid ${C.hairline}`,
+                        boxShadow: shadows.e2, display: 'block',
                       }}
                     />
+                    {/* Count badge */}
+                    <div style={{
+                      position: 'absolute', top: 6, left: 6,
+                      background: glass.chrome, backdropFilter: glass.blur,
+                      borderRadius: 6, padding: '2px 6px',
+                      ...type.caption, color: C.textMuted,
+                      border: `1px solid ${glass.chromeBorder}`,
+                    }}>{idx + 1}</div>
                     <button
                       onClick={() => removePhoto(idx)}
                       style={{
-                        position: 'absolute', top: -10, right: -10,
-                        width: 28, height: 28, borderRadius: '50%',
-                        background: C.red, border: 'none', cursor: 'pointer',
+                        position: 'absolute', top: -8, right: -8,
+                        width: 26, height: 26, borderRadius: '50%',
+                        background: C.red, border: `2px solid ${C.cream}`,
+                        cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: 8,
+                        boxShadow: shadows.e1,
                       }}
                     >
-                      <X size={12} color="#fff" />
+                      <X size={11} color="#fff" />
                     </button>
                   </div>
                 ))}
+                {/* Add more slot */}
+                {photos.length < 3 && (
+                  <button
+                    onClick={Capacitor.isNativePlatform() ? pickNativePhotos : () => fileRef.current?.click()}
+                    style={{
+                      width: 96, height: 96, flexShrink: 0,
+                      borderRadius: radius.md, border: `1.5px dashed ${C.accentLight}`,
+                      background: C.bgDeep, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: 6, color: C.textMuted,
+                    }}
+                  >
+                    <Image size={20} color={C.accentLight} />
+                    <span style={{ ...type.caption, color: C.textMuted }}>Add</span>
+                  </button>
+                )}
               </div>
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
-                {photos.length < 3 && (
-                  Capacitor.isNativePlatform() ? (
-                    <>
-                      <Btn variant="secondary" onClick={takeNativePhoto}>Take Photo</Btn>
-                      <Btn variant="secondary" onClick={pickNativePhotos}>Choose Photos</Btn>
-                    </>
-                  ) : (
-                    <Btn variant="secondary" onClick={() => fileRef.current?.click()}>
-                      + Add photos
-                    </Btn>
-                  )
-                )}
-                <Btn variant="primary" onClick={handleScan}>
-                  <Search size={14} /> Scan {photos.length > 1 ? `${photos.length} photos` : 'photo'}
-                </Btn>
-              </div>
-            </>
+              {Capacitor.isNativePlatform() && photos.length < 3 && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <Btn variant="ghost" onClick={takeNativePhoto} style={{ flex: 1, justifyContent: 'center', fontSize: 13 }}>
+                    <Camera size={13} /> Camera
+                  </Btn>
+                </div>
+              )}
+
+              <Btn variant="primary" onClick={handleScan} style={{ width: '100%', justifyContent: 'center' }}>
+                <Search size={14} /> Scan {photos.length > 1 ? `${photos.length} photos` : 'photo'}
+              </Btn>
+            </div>
           )}
 
           {scanError && (
-            <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, background: C.amberBg, color: C.amber, marginBottom: 12 }}>
+            <div style={{
+              padding: '10px 14px', borderRadius: radius.md,
+              ...type.body, fontSize: 13, background: C.amberBg,
+              color: C.amber, marginTop: 14,
+              border: `1px solid ${C.accentLight}`,
+            }}>
               {scanError}
             </div>
           )}
@@ -360,39 +407,34 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
 
       {/* STEP: Scanning */}
       {step === 'scanning' && (
-        <div style={{ textAlign: 'center', padding: '30px 0' }}>
+        <div style={{ textAlign: 'center' }}>
           {photos.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 20, paddingTop: 8 }}>
               {photos.map((photo, idx) => (
                 <img key={idx} src={photo.previewUrl} alt={`Photo ${idx + 1}`}
-                  style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, opacity: 0.7 }} />
+                  style={{
+                    width: 64, height: 64, objectFit: 'cover',
+                    borderRadius: radius.sm, opacity: 0.5,
+                    border: `1px solid ${C.hairline}`, boxShadow: shadows.e1,
+                  }} />
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {spinner}
-            <span style={{ fontSize: 14, color: C.textMuted }}>Reading {photos.length > 1 ? 'labels' : 'label'}...</span>
-          </div>
+          <Spinner label={`Reading ${photos.length > 1 ? 'labels' : 'label'}...`} />
         </div>
       )}
 
       {/* STEP: Researching */}
       {step === 'researching' && (
-        <div style={{ textAlign: 'center', padding: '30px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-            {spinner}
-            <span style={{ fontSize: 14, color: C.textMuted }}>Researching online...</span>
-          </div>
+        <div style={{ textAlign: 'center' }}>
+          <Spinner label="Researching online..." />
         </div>
       )}
 
       {/* STEP: Saving */}
       {step === 'saving' && (
-        <div style={{ textAlign: 'center', padding: '30px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {spinner}
-            <span style={{ fontSize: 14, color: C.textMuted }}>Saving bean...</span>
-          </div>
+        <div style={{ textAlign: 'center' }}>
+          <Spinner label="Saving bean..." />
         </div>
       )}
     </Modal>

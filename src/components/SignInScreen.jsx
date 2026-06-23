@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { C, fonts, radius, shadows } from '../styles/theme';
+import SteamGradient from './visual/SteamGradient';
 
 const wordmark = '/images/wordmark@2x.png';
 
@@ -80,10 +81,7 @@ export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple, onExploreD
         width: '100%',
         position: 'relative',
         overflow: 'hidden',
-        background: `
-          radial-gradient(120% 70% at 50% 0%, #F4E4CC 0%, ${C.bg} 55%),
-          ${C.bg}
-        `,
+        background: C.bg,
         display: 'flex',
         flexDirection: 'column',
         padding:
@@ -91,6 +89,15 @@ export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple, onExploreD
           'calc(env(safe-area-inset-bottom, 0px) + 24px)',
       }}
     >
+      {/* Animated warm steam shader hero band — fades into the page */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '52%', zIndex: 0, pointerEvents: 'none' }}>
+        <SteamGradient speed={0.75} style={{ inset: 0 }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to bottom, rgba(243,237,228,0) 0%, rgba(243,237,228,0.25) 45%, rgba(243,237,228,0.75) 75%, rgba(243,237,228,1) 100%)',
+        }} />
+      </div>
+
       {/* Decorative bean motifs — absolutely positioned, aria-hidden */}
       <Bean size={70} rotate={-25} opacity={0.07}
         style={{ position: 'absolute', top: 100, left: -20 }} />

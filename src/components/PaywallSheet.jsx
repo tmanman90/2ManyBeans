@@ -16,7 +16,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { C, fonts, shadows, radius } from '../styles/theme';
+import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
+import { m, spring, fadeUp, sheet as sheetVariant, scrim, popIn } from '../lib/motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   getOfferings,
   purchasePackage,
@@ -66,6 +68,16 @@ const FEATURES_ULTRA = [
   'Multi-brewer support (V60, Chemex, AeroPress)',
   'Priority model routing',
 ];
+
+// Feature row icons (SVG inline, no external deps)
+function CheckIcon({ color }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: 1 }}>
+      <circle cx="7" cy="7" r="7" fill={color} fillOpacity="0.15" />
+      <path d="M4 7l2 2 4-4" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 function findPackage(offering, match) {
   if (!offering?.availablePackages) return null;
@@ -218,8 +230,8 @@ export function PaywallSheet({ open, context, onClose }) {
     if (!selectedPackage) return 'Subscribe';
     const tierName = tier === 'pro' ? 'Pro' : 'Ultra';
     const cycleName = cycle === 'annual' ? 'Annual' : 'Monthly';
-    if (trialLabel) return `Start ${trialLabel} → ${tierName} ${cycleName}`;
-    return `Subscribe → ${tierName} ${cycleName}`;
+    if (trialLabel) return `Start ${trialLabel} — ${tierName} ${cycleName}`;
+    return `Subscribe — ${tierName} ${cycleName}`;
   }, [selectedPackage, tier, cycle, trialLabel]);
 
   const copy = CONTEXT_COPY[context?.trigger] ?? CONTEXT_COPY.generic;
@@ -298,103 +310,147 @@ export function PaywallSheet({ open, context, onClose }) {
   const isErrorState = !isWeb && error && !offering;
 
   return (
-    <div style={styles.backdrop} onClick={onClose}>
-      <div style={styles.sheet} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <button style={styles.close} onClick={onClose} aria-label="Close">×</button>
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Scrim */}
+          <m.div
+            key="paywall-scrim"
+            {...scrim}
+            style={styles.backdrop}
+            onClick={onClose}
+          />
 
-        {showMarketing ? (
-          <div style={styles.header}>
-            <h2 style={styles.headline}>{copy.headline}</h2>
-            <p style={styles.sub}>{copy.subtext}</p>
-          </div>
-        ) : isErrorState ? (
-          <div style={styles.header}>
-            <h2 style={styles.headline}>Hmm, that didn't work</h2>
-          </div>
-        ) : (
-          <div style={styles.header}>
-            <h2 style={styles.headline}>{copy.headline}</h2>
-            <p style={styles.sub}>{copy.subtext}</p>
-          </div>
-        )}
+          {/* Sheet */}
+          <m.div
+            key="paywall-sheet"
+            {...sheetVariant}
+            style={styles.sheet}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Grabber */}
+            <div style={styles.grabber} />
 
-        {isWeb ? (
-          <div style={styles.webNotice}>
-            Subscriptions are available in the 2manybeans iOS app.
-          </div>
-        ) : loading ? (
-          <div style={styles.loading}>Loading subscription options...</div>
-        ) : error && !offering ? (
-          <div style={styles.errorWithRetry}>
-            <div style={styles.error}>{error}</div>
-            <button style={styles.retryBtn} onClick={handleRetryOfferings}>
-              Try Again
-            </button>
-          </div>
-        ) : (
-          <>
-            <div style={styles.cards}>
-              <TierCard
-                label="PRO"
-                selected={tier === 'pro'}
-                onSelect={() => setTier('pro')}
-                features={FEATURES_PRO}
-                monthly={proMonthly}
-                annual={proAnnual}
-                cycle={tier === 'pro' ? cycle : null}
-                onCycleChange={setCycle}
-              />
-              <TierCard
-                label="ULTRA"
-                badge="BEST VALUE"
-                selected={tier === 'ultra'}
-                onSelect={() => setTier('ultra')}
-                features={FEATURES_ULTRA}
-                monthly={ultraMonthly}
-                annual={ultraAnnual}
-                cycle={tier === 'ultra' ? cycle : null}
-                onCycleChange={setCycle}
-              />
-            </div>
-
-            <button
-              style={{ ...styles.cta, opacity: purchasing || !selectedPackage ? 0.6 : 1 }}
-              onClick={handlePurchase}
-              disabled={purchasing || !selectedPackage}
-            >
-              {purchasing ? 'Processing...' : ctaLabel}
+            {/* Close button */}
+            <button style={styles.close} onClick={onClose} aria-label="Close">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 3l10 10M13 3L3 13" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </button>
 
-            {selectedPackage && (
-              <p style={styles.fineprint}>
-                {trialLabel
-                  ? `${trialLabel}, then ${selectedPackage.product?.priceString}/${cycle === 'annual' ? 'year' : 'month'}. `
-                  : `${selectedPackage.product?.priceString}/${cycle === 'annual' ? 'year' : 'month'}. `}
-                Cancel anytime.
-              </p>
+            {/* Header */}
+            {showMarketing ? (
+              <m.div style={styles.header} {...fadeUp}>
+                <div style={styles.eyebrow}>Coffee Hub</div>
+                <h2 style={styles.headline}>{copy.headline}</h2>
+                <p style={styles.sub}>{copy.subtext}</p>
+              </m.div>
+            ) : isErrorState ? (
+              <div style={styles.header}>
+                <h2 style={styles.headline}>Hmm, that didn't work</h2>
+              </div>
+            ) : (
+              <div style={styles.header}>
+                <div style={styles.eyebrow}>Coffee Hub</div>
+                <h2 style={styles.headline}>{copy.headline}</h2>
+                <p style={styles.sub}>{copy.subtext}</p>
+              </div>
             )}
 
-            {error && <div style={styles.error}>{error}</div>}
+            {isWeb ? (
+              <div style={styles.webNotice}>
+                Subscriptions are available in the 2manybeans iOS app.
+              </div>
+            ) : loading ? (
+              <div style={styles.loading}>
+                <div style={styles.loadingDots}>
+                  <span style={{ ...styles.dot, animationDelay: '0s' }} />
+                  <span style={{ ...styles.dot, animationDelay: '0.15s' }} />
+                  <span style={{ ...styles.dot, animationDelay: '0.3s' }} />
+                </div>
+                <p style={styles.loadingText}>Loading subscription options...</p>
+              </div>
+            ) : error && !offering ? (
+              <div style={styles.errorWithRetry}>
+                <div style={styles.error}>{error}</div>
+                <button style={styles.retryBtn} onClick={handleRetryOfferings}>
+                  Try Again
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={styles.cards}>
+                  <TierCard
+                    label="Pro"
+                    selected={tier === 'pro'}
+                    onSelect={() => setTier('pro')}
+                    features={FEATURES_PRO}
+                    monthly={proMonthly}
+                    annual={proAnnual}
+                    cycle={tier === 'pro' ? cycle : null}
+                    onCycleChange={setCycle}
+                  />
+                  <TierCard
+                    label="Ultra"
+                    badge="Best Value"
+                    selected={tier === 'ultra'}
+                    onSelect={() => setTier('ultra')}
+                    features={FEATURES_ULTRA}
+                    monthly={ultraMonthly}
+                    annual={ultraAnnual}
+                    cycle={tier === 'ultra' ? cycle : null}
+                    onCycleChange={setCycle}
+                  />
+                </div>
 
-            <div style={styles.footerLinks}>
-              <a href="https://2manybeans.vercel.app/terms.html" target="_blank" rel="noopener noreferrer" style={styles.link}>
-                Terms of Use
-              </a>
-              <span style={styles.dot}>·</span>
-              <a href="https://2manybeans.vercel.app/privacy-policy.html" target="_blank" rel="noopener noreferrer" style={styles.link}>
-                Privacy Policy
-              </a>
-              <span style={styles.dot}>·</span>
-              <button type="button" onClick={handleRestore} style={styles.linkButton}>
-                Restore Purchases
-              </button>
-            </div>
-          </>
-        )}
+                <m.button
+                  style={{ ...styles.cta, opacity: purchasing || !selectedPackage ? 0.6 : 1 }}
+                  onClick={handlePurchase}
+                  disabled={purchasing || !selectedPackage}
+                  whileTap={purchasing || !selectedPackage ? {} : { scale: 0.97 }}
+                  transition={spring.snappy}
+                >
+                  {purchasing ? 'Processing...' : ctaLabel}
+                </m.button>
 
-        {toast && <div style={styles.toast}>{toast}</div>}
-      </div>
-    </div>
+                {selectedPackage && (
+                  <p style={styles.fineprint}>
+                    {trialLabel
+                      ? `${trialLabel}, then ${selectedPackage.product?.priceString}/${cycle === 'annual' ? 'year' : 'month'}. `
+                      : `${selectedPackage.product?.priceString}/${cycle === 'annual' ? 'year' : 'month'}. `}
+                    Cancel anytime.
+                  </p>
+                )}
+
+                {error && <div style={styles.errorInline}>{error}</div>}
+
+                <div style={styles.footerLinks}>
+                  <a href="https://2manybeans.vercel.app/terms.html" target="_blank" rel="noopener noreferrer" style={styles.link}>
+                    Terms of Use
+                  </a>
+                  <span style={styles.separator}>·</span>
+                  <a href="https://2manybeans.vercel.app/privacy-policy.html" target="_blank" rel="noopener noreferrer" style={styles.link}>
+                    Privacy Policy
+                  </a>
+                  <span style={styles.separator}>·</span>
+                  <button type="button" onClick={handleRestore} style={styles.linkButton}>
+                    Restore Purchases
+                  </button>
+                </div>
+              </>
+            )}
+
+            {toast && (
+              <m.div style={styles.toast} {...popIn}>
+                {toast}
+              </m.div>
+            )}
+          </m.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -410,27 +466,51 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
     return pct > 0 ? `Save ${pct}%` : null;
   })();
 
+  const cardStyle = {
+    ...styles.card,
+    borderColor: selected ? C.accent : C.borderLight,
+    borderWidth: selected ? 2 : 1,
+    background: selected ? C.accentSoft : C.card,
+    boxShadow: selected ? shadows.e3 : shadows.e1,
+  };
+
   return (
-    <button
+    <m.button
       type="button"
       onClick={onSelect}
-      style={{
-        ...styles.card,
-        borderColor: selected ? C.accent : C.border,
-        background: selected ? '#FFF' : C.card,
-        transform: selected ? 'translateY(-2px)' : 'none',
-        boxShadow: selected ? '0 8px 20px rgba(160,113,75,0.20)' : shadows.card,
-      }}
+      style={cardStyle}
+      whileTap={{ scale: 0.98 }}
+      transition={spring.soft}
+      animate={{ y: selected ? -3 : 0 }}
     >
-      {badge && <div style={styles.badge}>{badge}</div>}
-      <div style={styles.cardLabel}>{label}</div>
+      {badge && (
+        <div style={styles.badge}>
+          <span style={styles.badgeText}>{badge}</span>
+        </div>
+      )}
 
+      {/* Tier label */}
+      <div style={styles.cardLabelRow}>
+        <span style={{
+          ...styles.cardLabel,
+          color: selected ? C.accent : C.textMuted,
+        }}>
+          {label}
+        </span>
+        {selected && (
+          <span style={styles.selectedDot} />
+        )}
+      </div>
+
+      {/* Price stack */}
       <div style={styles.priceStack}>
-        <div
+        <button
+          type="button"
           style={{
             ...styles.priceOption,
             background: selected && cycle === 'annual' ? C.accent : 'transparent',
             color: selected && cycle === 'annual' ? '#FFF' : C.text,
+            border: selected && cycle !== 'annual' ? `1px solid ${C.borderLight}` : '1px solid transparent',
           }}
           onClick={(e) => {
             if (selected) {
@@ -440,13 +520,23 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
           }}
         >
           <div style={styles.priceLine1}>{annualPrice}/yr</div>
-          {savingsLabel && <div style={styles.priceLine2}>{savingsLabel}</div>}
-        </div>
-        <div
+          {savingsLabel && (
+            <div style={{
+              ...styles.priceLine2,
+              color: selected && cycle === 'annual' ? 'rgba(255,255,255,0.8)' : C.green,
+            }}>
+              {savingsLabel}
+            </div>
+          )}
+        </button>
+
+        <button
+          type="button"
           style={{
             ...styles.priceOption,
             background: selected && cycle === 'monthly' ? C.accent : 'transparent',
             color: selected && cycle === 'monthly' ? '#FFF' : C.text,
+            border: selected && cycle !== 'monthly' ? `1px solid ${C.borderLight}` : '1px solid transparent',
           }}
           onClick={(e) => {
             if (selected) {
@@ -456,15 +546,19 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
           }}
         >
           <div style={styles.priceLine1}>{monthlyPrice}/mo</div>
-        </div>
+        </button>
       </div>
 
+      {/* Feature list */}
       <ul style={styles.features}>
         {features.map((f) => (
-          <li key={f} style={styles.feature}>{f}</li>
+          <li key={f} style={styles.feature}>
+            <CheckIcon color={selected ? C.accent : C.textMuted} />
+            <span>{f}</span>
+          </li>
         ))}
       </ul>
-    </button>
+    </m.button>
   );
 }
 
@@ -472,109 +566,199 @@ const styles = {
   backdrop: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(43,27,14,0.55)',
+    background: glass.scrim,
     // Above any in-app modal (Modal.jsx uses zIndex 1000). The paywall must
     // always be on top because it can be triggered from inside another modal
     // (e.g. ScanSheet scan flow → free tier exhausted).
     zIndex: 2000,
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingBottom: 'env(safe-area-inset-bottom)',
   },
   sheet: {
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2001,
     width: '100%',
     maxWidth: 520,
-    background: C.bg,
+    margin: '0 auto',
+    background: glass.sheet,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    padding: '24px 20px 32px',
-    position: 'relative',
+    borderTop: `1px solid ${glass.chromeBorder}`,
+    padding: '8px 20px 0',
+    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
     boxShadow: shadows.modal,
-    maxHeight: '92vh',
+    maxHeight: '92dvh',
     overflowY: 'auto',
     fontFamily: fonts.body,
     color: C.text,
   },
+  grabber: {
+    width: 36,
+    height: 4,
+    borderRadius: radius.pill,
+    background: C.hairline,
+    margin: '8px auto 16px',
+    flexShrink: 0,
+  },
   close: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    border: 'none',
-    background: 'transparent',
-    fontSize: 28,
-    lineHeight: '32px',
-    color: C.textMuted,
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    border: `1px solid ${C.borderLight}`,
+    background: C.card,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     cursor: 'pointer',
+    padding: 0,
+    WebkitTapHighlightColor: 'transparent',
   },
-  header: { textAlign: 'center', marginBottom: 20, paddingTop: 8 },
-  headline: { fontFamily: fonts.heading, fontSize: 24, margin: '0 0 8px', color: C.text },
-  sub: { fontSize: 14, color: C.textMuted, margin: 0, lineHeight: 1.5 },
-  cards: { display: 'flex', gap: 12, marginBottom: 20 },
+  header: {
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingTop: 4,
+    paddingLeft: 32,
+    paddingRight: 32,
+  },
+  eyebrow: {
+    ...typeScale.label,
+    color: C.accent,
+    marginBottom: 8,
+  },
+  headline: {
+    fontFamily: fonts.heading,
+    fontSize: 26,
+    fontWeight: 600,
+    lineHeight: 1.1,
+    letterSpacing: '-0.01em',
+    margin: '0 0 8px',
+    color: C.text,
+  },
+  sub: {
+    fontSize: 14,
+    color: C.textMuted,
+    margin: 0,
+    lineHeight: 1.5,
+  },
+
+  // Plan cards
+  cards: {
+    display: 'flex',
+    gap: 10,
+    marginBottom: 20,
+    alignItems: 'stretch',
+  },
   card: {
     flex: 1,
-    padding: '16px 12px',
+    padding: '16px 12px 14px',
     borderRadius: radius.lg,
-    border: `2px solid ${C.border}`,
+    border: `1px solid ${C.borderLight}`,
     cursor: 'pointer',
     textAlign: 'left',
     fontFamily: 'inherit',
     color: 'inherit',
     position: 'relative',
-    transition: 'all 0.2s',
     minHeight: 280,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 0,
+    WebkitTapHighlightColor: 'transparent',
   },
   badge: {
     position: 'absolute',
-    top: -10,
+    top: -11,
     left: '50%',
     transform: 'translateX(-50%)',
     background: C.accent,
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: 1,
-    padding: '4px 10px',
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
+    padding: '3px 10px',
     whiteSpace: 'nowrap',
   },
-  cardLabel: {
-    fontSize: 12,
+  badgeText: {
+    fontSize: 10,
     fontWeight: 700,
-    letterSpacing: 2,
-    color: C.textMuted,
-    textAlign: 'center',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#FFF',
+  },
+  cardLabelRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  cardLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    transition: 'color 0.15s',
+  },
+  selectedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.pill,
+    background: C.accent,
+    display: 'inline-block',
   },
   priceStack: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 5,
     marginBottom: 14,
   },
   priceOption: {
     borderRadius: radius.sm,
-    padding: '8px 10px',
+    padding: '7px 9px',
     textAlign: 'center',
-    transition: 'all 0.15s',
+    transition: 'background 0.15s, color 0.15s',
+    cursor: 'pointer',
+    width: '100%',
+    fontFamily: 'inherit',
+    WebkitTapHighlightColor: 'transparent',
+    minHeight: 44,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  priceLine1: { fontSize: 16, fontWeight: 700 },
-  priceLine2: { fontSize: 11, opacity: 0.8, marginTop: 2 },
+  priceLine1: { fontSize: 15, fontWeight: 700, lineHeight: 1.2 },
+  priceLine2: { fontSize: 11, marginTop: 2, fontWeight: 600 },
+
+  // Feature rows
   features: {
     listStyle: 'none',
     margin: 0,
     padding: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 0,
+    flex: 1,
+  },
+  feature: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 7,
+    padding: '5px 0',
+    borderTop: `1px solid ${C.hairline}`,
     fontSize: 12,
     color: C.text,
+    lineHeight: 1.4,
   },
-  feature: { padding: '5px 0', borderTop: `1px solid ${C.borderLight}`, lineHeight: 1.4 },
+
+  // CTA
   cta: {
     width: '100%',
     padding: '16px 20px',
     background: C.accent,
+    backgroundImage: `linear-gradient(135deg, ${C.accent} 0%, ${C.accentDark} 100%)`,
     color: '#FFF',
     border: 'none',
     borderRadius: radius.md,
@@ -582,17 +766,22 @@ const styles = {
     fontWeight: 700,
     fontFamily: 'inherit',
     cursor: 'pointer',
-    boxShadow: shadows.button,
+    boxShadow: `${shadows.button}, 0 4px 14px rgba(168,106,56,0.32)`,
     transition: 'opacity 0.2s',
+    minHeight: 52,
+    letterSpacing: '-0.01em',
+    WebkitTapHighlightColor: 'transparent',
   },
+
   fineprint: {
     fontSize: 11,
-    color: C.textMuted,
+    color: C.textLight,
     textAlign: 'center',
-    margin: '12px 0 0',
-    lineHeight: 1.4,
+    margin: '10px 0 0',
+    lineHeight: 1.45,
   },
-  error: {
+
+  errorInline: {
     color: C.red,
     background: C.redBg,
     padding: '10px 14px',
@@ -600,66 +789,123 @@ const styles = {
     fontSize: 13,
     marginTop: 12,
     textAlign: 'center',
+    border: `1px solid rgba(182,92,69,0.15)`,
   },
+
   errorWithRetry: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 12,
-    padding: '20px 0',
+    gap: 14,
+    padding: '28px 0',
+  },
+  error: {
+    color: C.red,
+    background: C.redBg,
+    padding: '10px 14px',
+    borderRadius: radius.sm,
+    fontSize: 13,
+    textAlign: 'center',
+    border: `1px solid rgba(182,92,69,0.15)`,
   },
   retryBtn: {
     background: C.accent,
     color: '#FFF',
     border: 'none',
     borderRadius: radius.md,
-    padding: '12px 24px',
-    fontSize: 14,
-    fontWeight: 600,
+    padding: '13px 28px',
+    fontSize: 15,
+    fontWeight: 700,
     fontFamily: 'inherit',
     cursor: 'pointer',
+    minHeight: 48,
+    WebkitTapHighlightColor: 'transparent',
   },
+
   webNotice: {
-    padding: '20px',
+    padding: '24px 20px',
     textAlign: 'center',
     color: C.textMuted,
     fontSize: 14,
+    lineHeight: 1.5,
     background: C.card,
     borderRadius: radius.md,
     border: `1px dashed ${C.border}`,
+    marginBottom: 8,
   },
-  loading: { padding: '32px', textAlign: 'center', color: C.textMuted },
+
+  loading: {
+    padding: '40px 0 32px',
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 14,
+  },
+  loadingDots: {
+    display: 'flex',
+    gap: 6,
+    alignItems: 'center',
+  },
+  dot: {
+    display: 'inline-block',
+    width: 7,
+    height: 7,
+    borderRadius: radius.pill,
+    background: C.accentLight,
+    animation: 'paywallDotPulse 1.2s ease-in-out infinite',
+  },
+  loadingText: {
+    fontSize: 13,
+    color: C.textLight,
+    margin: 0,
+  },
+
   footerLinks: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    marginTop: 18,
-    fontSize: 12,
+    marginTop: 16,
+    flexWrap: 'wrap',
+    paddingBottom: 4,
   },
-  link: { color: C.textMuted, textDecoration: 'underline' },
+  link: {
+    color: C.textLight,
+    textDecoration: 'none',
+    fontSize: 12,
+    fontWeight: 500,
+    borderBottom: `1px solid ${C.borderLight}`,
+  },
   linkButton: {
     background: 'none',
     border: 'none',
-    color: C.textMuted,
-    textDecoration: 'underline',
+    color: C.textLight,
     fontSize: 12,
+    fontWeight: 500,
     cursor: 'pointer',
     padding: 0,
     fontFamily: 'inherit',
+    borderBottom: `1px solid ${C.borderLight}`,
+    WebkitTapHighlightColor: 'transparent',
+    minHeight: 44,
+    display: 'inline-flex',
+    alignItems: 'center',
   },
-  dot: { color: C.textLight },
+  separator: { color: C.borderLight, fontSize: 12 },
+
   toast: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
     left: '50%',
     transform: 'translateX(-50%)',
     background: C.accentDark,
     color: '#FFF',
-    padding: '10px 18px',
-    borderRadius: radius.md,
+    padding: '10px 20px',
+    borderRadius: radius.pill,
     fontSize: 14,
     fontWeight: 600,
-    boxShadow: shadows.button,
+    boxShadow: shadows.e3,
+    whiteSpace: 'nowrap',
   },
 };

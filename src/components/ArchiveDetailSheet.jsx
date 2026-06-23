@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Pencil, RotateCcw, Trash2 } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, glass, shadows, radius, type } from '../styles/theme';
 import { BeanThumb } from './BeanThumb';
 import { SwipeDownHandle } from './SwipeDownHandle';
 import { summarizeSourceInsights } from '../lib/sourceInsights';
@@ -21,7 +21,7 @@ function ArchiveStars({ value, size = 12 }) {
           <path
             d="M12 2l2.9 6.9L22 10l-5.5 4.8L18.2 22 12 18.3 5.8 22l1.7-7.2L2 10l7.1-1.1z"
             fill={n <= value ? C.accent : 'none'}
-            stroke={C.accent}
+            stroke={n <= value ? C.accent : C.accentLight}
             strokeWidth="1.5"
             strokeLinejoin="round"
           />
@@ -54,6 +54,21 @@ function diffDays(laterStr, earlierStr) {
   return days >= 0 ? days : null;
 }
 
+// Eyebrow label style — uppercase tracked label replacing script section titles
+const eyebrow = {
+  ...type.label,
+  color: C.textMuted,
+  marginBottom: 10,
+  display: 'block',
+};
+
+const accentEyebrow = {
+  ...type.label,
+  color: C.accent,
+  marginBottom: 10,
+  display: 'block',
+};
+
 function Row({ label, value }) {
   if (value === null || value === undefined || value === '') return null;
   return (
@@ -62,25 +77,17 @@ function Row({ label, value }) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'baseline',
-        padding: '8px 0',
-        borderBottom: `1px dashed ${C.border}`,
+        padding: '9px 0',
+        borderBottom: `1px solid ${C.hairline}`,
         gap: 12,
       }}
     >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: C.textLight,
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-        }}
-      >
+      <div style={{ ...type.label, color: C.textLight, marginBottom: 0 }}>
         {label}
       </div>
       <div
         style={{
-          fontSize: 13,
+          ...type.body,
           color: C.text,
           fontFamily: fonts.body,
           textAlign: 'right',
@@ -169,7 +176,9 @@ export function ArchiveDetailSheet({
         position: 'fixed',
         inset: 0,
         zIndex: 1100,
-        background: 'rgba(59,36,23,0.42)',
+        background: glass.scrim,
+        backdropFilter: glass.blur,
+        WebkitBackdropFilter: glass.blur,
         opacity: visible ? 1 : 0,
         transition: 'opacity 200ms ease',
         display: 'flex',
@@ -188,28 +197,31 @@ export function ArchiveDetailSheet({
           maxHeight: '88dvh',
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
-          background: C.card,
-          borderRadius: '22px 22px 0 0',
-          boxShadow: '0 -8px 28px rgba(59,36,23,0.22)',
+          background: glass.sheet,
+          backdropFilter: glass.blurStrong,
+          WebkitBackdropFilter: glass.blurStrong,
+          borderRadius: `${radius.xl}px ${radius.xl}px 0 0`,
+          border: `1px solid ${glass.chromeBorder}`,
+          boxShadow: shadows.modal,
           transform: `translateY(${visible ? '0%' : '100%'})`,
-          transition: 'transform 240ms cubic-bezier(0.2,0.8,0.2,1)',
+          transition: 'transform 280ms cubic-bezier(0.22,1,0.36,1)',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
         <SwipeDownHandle onClose={close} />
 
         {/* Hero */}
-        <div style={{ padding: '8px 20px 14px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <div style={{ padding: '8px 20px 16px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           <div
             onClick={e => { e.stopPropagation(); onEditPhoto?.(bean); }}
             style={{
               width: 88,
               height: 88,
-              borderRadius: 14,
+              borderRadius: radius.md,
               overflow: 'hidden',
               flexShrink: 0,
-              background: C.amberBg,
-              boxShadow: `0 0 0 1px ${C.border}, 0 2px 6px rgba(92,61,46,0.08)`,
+              background: C.accentSoft,
+              boxShadow: `0 0 0 1px ${C.hairline}, ${shadows.e2}`,
               cursor: onEditPhoto ? 'pointer' : 'default',
               position: 'relative',
             }}
@@ -218,8 +230,8 @@ export function ArchiveDetailSheet({
             {onEditPhoto && (
               <div style={{
                 position: 'absolute', bottom: 4, right: 4,
-                width: 24, height: 24, borderRadius: '50%',
-                background: 'rgba(59,36,23,0.6)',
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'rgba(42,26,16,0.65)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {bean.photoUrl
@@ -229,33 +241,27 @@ export function ArchiveDetailSheet({
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 800,
-                letterSpacing: 1.4,
-                textTransform: 'uppercase',
-                color: C.textMuted,
-                marginBottom: 4,
-              }}
-            >
+            {/* Roaster eyebrow */}
+            <div style={{ ...type.label, color: C.textMuted, marginBottom: 5 }}>
               {bean.roaster || ''}
             </div>
+            {/* Bean name in Fraunces display */}
             <div
               style={{
                 fontFamily: fonts.heading,
-                fontSize: 24,
-                lineHeight: 1.15,
+                fontSize: 22,
+                lineHeight: 1.12,
                 color: C.text,
                 fontWeight: 600,
-                marginBottom: 6,
+                letterSpacing: '-0.01em',
+                marginBottom: 8,
               }}
             >
               {bean.name}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               {best && <ArchiveStars value={best} size={13} />}
-              <span style={{ fontSize: 11.5, color: C.textLight, fontFamily: fonts.body }}>
+              <span style={{ ...type.caption, color: C.textLight, fontFamily: fonts.body }}>
                 {beanTastings.length} {beanTastings.length === 1 ? 'tasting' : 'tastings'}
               </span>
               {onLearn && (
@@ -278,7 +284,13 @@ export function ArchiveDetailSheet({
                   <img
                     src="/images/professor-ruphus.webp"
                     alt="Learn"
-                    style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: `2px solid ${C.accentLight}`,
+                    }}
                   />
                 </button>
               )}
@@ -289,51 +301,33 @@ export function ArchiveDetailSheet({
         {/* Ownership strip */}
         <div
           style={{
-            margin: '0 20px 16px',
-            padding: '10px 14px',
-            background: C.amberBg,
-            border: `1px solid ${C.border}`,
-            borderRadius: 12,
+            margin: '0 20px 18px',
+            padding: '14px 16px',
+            background: C.accentSoft,
+            border: `1px solid ${C.borderLight}`,
+            borderRadius: radius.md,
             display: 'flex',
             justifyContent: 'space-between',
           }}
         >
           <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.accent, fontWeight: 600 }}>
+            <div style={{ fontFamily: fonts.heading, fontSize: 22, color: C.accent, fontWeight: 600, lineHeight: 1 }}>
               {dOwn ?? '—'}
             </div>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: C.textMuted,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                marginTop: 1,
-              }}
-            >
+            <div style={{ ...type.label, color: C.textMuted, marginTop: 4, marginBottom: 0 }}>
               Days owned
             </div>
           </div>
-          <div style={{ width: 1, background: C.border, margin: '0 8px' }} />
+          <div style={{ width: 1, background: C.hairline, margin: '0 8px' }} />
           <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.accent, fontWeight: 600 }}>
+            <div style={{ fontFamily: fonts.heading, fontSize: 22, color: C.accent, fontWeight: 600, lineHeight: 1 }}>
               {dOpen ?? '—'}
             </div>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: C.textMuted,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                marginTop: 1,
-              }}
-            >
+            <div style={{ ...type.label, color: C.textMuted, marginTop: 4, marginBottom: 0 }}>
               Days open
             </div>
           </div>
-          <div style={{ width: 1, background: C.border, margin: '0 8px' }} />
+          <div style={{ width: 1, background: C.hairline, margin: '0 8px' }} />
           <div style={{ textAlign: 'center', flex: 1 }}>
             <div
               style={{
@@ -341,21 +335,13 @@ export function ArchiveDetailSheet({
                 fontSize: 14,
                 color: C.text,
                 fontWeight: 500,
-                marginTop: 3,
+                marginTop: 4,
+                lineHeight: 1.2,
               }}
             >
               {formatFinishDay(bean.finishDate)}
             </div>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: C.textMuted,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                marginTop: 2,
-              }}
-            >
+            <div style={{ ...type.label, color: C.textMuted, marginTop: 4, marginBottom: 0 }}>
               Finished
             </div>
           </div>
@@ -363,18 +349,7 @@ export function ArchiveDetailSheet({
 
         {/* Metadata */}
         <div style={{ padding: '0 20px' }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: 1.4,
-              textTransform: 'uppercase',
-              color: C.accent,
-              marginBottom: 6,
-            }}
-          >
-            From the bag
-          </div>
+          <span style={accentEyebrow}>From the bag</span>
           <Row label="Origin" value={bean.origin} />
           <Row label="Region" value={bean.region} />
           <Row label="Farm" value={bean.farm} />
@@ -385,25 +360,18 @@ export function ArchiveDetailSheet({
           <Row label="Cup score" value={bean.cupScore} />
           <Row label="Weight" value={bean.bagSize ? `${bean.bagSize}g` : null} />
           {sourceSummary && (
-            <div style={{ padding: '10px 0' }}>
+            <div style={{ padding: '14px 0 4px' }}>
+              <span style={eyebrow}>Source insight</span>
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: C.textLight,
-                  letterSpacing: 0.8,
-                  textTransform: 'uppercase',
-                  marginBottom: 4,
-                }}
-              >
-                Source insight
-              </div>
-              <div
-                style={{
-                  fontSize: 13.5,
+                  ...type.bodyL,
                   color: C.text,
                   fontFamily: fonts.body,
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
+                  background: C.bgDeep,
+                  borderRadius: radius.sm,
+                  padding: '12px 14px',
+                  border: `1px solid ${C.hairline}`,
                 }}
               >
                 {sourceSummary}
@@ -411,26 +379,19 @@ export function ArchiveDetailSheet({
             </div>
           )}
           {bean.bagNotes && (
-            <div style={{ padding: '10px 0' }}>
+            <div style={{ padding: '14px 0 4px' }}>
+              <span style={eyebrow}>Roaster's notes</span>
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: C.textLight,
-                  letterSpacing: 0.8,
-                  textTransform: 'uppercase',
-                  marginBottom: 4,
-                }}
-              >
-                Roaster's notes
-              </div>
-              <div
-                style={{
-                  fontSize: 14,
+                  fontFamily: fonts.heading,
+                  fontSize: 15,
                   color: C.text,
                   fontStyle: 'italic',
-                  fontFamily: fonts.heading,
-                  lineHeight: 1.4,
+                  lineHeight: 1.5,
+                  background: C.accentSoft,
+                  borderRadius: radius.sm,
+                  padding: '12px 14px',
+                  border: `1px solid ${C.borderLight}`,
                 }}
               >
                 &ldquo;{bean.bagNotes}&rdquo;
@@ -441,22 +402,21 @@ export function ArchiveDetailSheet({
 
         {/* Brew Profile (read-only archive of saved recipes) */}
         {(bean.aidenRecipe || bean.handBrewRecipe) && (
-          <div style={{ padding: '14px 20px 4px' }}>
-            <div style={{
-              fontSize: 10, fontWeight: 800, letterSpacing: 1.4,
-              textTransform: 'uppercase', color: C.accent, marginBottom: 6,
-            }}>
-              Brew Profile
-            </div>
+          <div style={{ padding: '18px 20px 4px' }}>
+            <span style={accentEyebrow}>Brew Profile</span>
             {bean.aidenRecipe && (
               <div style={{
-                background: C.card, borderRadius: 10, padding: 12,
-                border: `1px solid ${C.borderLight}`, marginBottom: 8,
+                background: C.card,
+                borderRadius: radius.md,
+                padding: '12px 14px',
+                border: `1px solid ${C.borderLight}`,
+                boxShadow: shadows.e1,
+                marginBottom: 8,
               }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                <div style={{ ...type.h3, color: C.text, fontFamily: fonts.body, marginBottom: 5 }}>
                   Aiden Recipe
                 </div>
-                <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.6 }}>
                   {bean.aidenRecipe.ratio && <span>Ratio: {bean.aidenRecipe.ratio} &middot; </span>}
                   {bean.aidenRecipe.bloomTime && <span>Bloom: {bean.aidenRecipe.bloomTime} &middot; </span>}
                   {bean.aidenRecipe.pulseCount && <span>{bean.aidenRecipe.pulseCount} pulses &middot; </span>}
@@ -470,8 +430,9 @@ export function ArchiveDetailSheet({
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      display: 'inline-block', marginTop: 6,
+                      display: 'inline-block', marginTop: 8,
                       fontSize: 12, color: C.accent, textDecoration: 'none',
+                      fontFamily: fonts.body, fontWeight: 600,
                     }}
                   >
                     Open in Aiden App
@@ -481,13 +442,17 @@ export function ArchiveDetailSheet({
             )}
             {bean.handBrewRecipe && (
               <div style={{
-                background: C.card, borderRadius: 10, padding: 12,
-                border: `1px solid ${C.borderLight}`, marginBottom: 8,
+                background: C.card,
+                borderRadius: radius.md,
+                padding: '12px 14px',
+                border: `1px solid ${C.borderLight}`,
+                boxShadow: shadows.e1,
+                marginBottom: 8,
               }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                <div style={{ ...type.h3, color: C.text, fontFamily: fonts.body, marginBottom: 5 }}>
                   {bean.handBrewRecipe.title || 'Hand Brew Recipe'}
                 </div>
-                <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.6 }}>
                   {bean.handBrewRecipe.method && <span>{bean.handBrewRecipe.method} &middot; </span>}
                   {bean.handBrewRecipe.technique && <span>{bean.handBrewRecipe.technique} &middot; </span>}
                   {bean.handBrewRecipe.coffeeGrams && bean.handBrewRecipe.waterGrams && (
@@ -499,7 +464,7 @@ export function ArchiveDetailSheet({
                   )}
                 </div>
                 {bean.handBrewRecipe.totalBrewTime && (
-                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                  <div style={{ ...type.body, color: C.textMuted, marginTop: 4 }}>
                     Total brew time: {bean.handBrewRecipe.totalBrewTime}
                   </div>
                 )}
@@ -510,19 +475,8 @@ export function ArchiveDetailSheet({
 
         {/* Tasting history */}
         {beanTastings.length > 0 && (
-          <div style={{ padding: '14px 20px 4px' }}>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 800,
-                letterSpacing: 1.4,
-                textTransform: 'uppercase',
-                color: C.accent,
-                marginBottom: 10,
-              }}
-            >
-              Tasting history
-            </div>
+          <div style={{ padding: '18px 20px 4px' }}>
+            <span style={accentEyebrow}>Tasting history</span>
 
             {beanTastings.map((t, i) => (
               <div
@@ -530,21 +484,22 @@ export function ArchiveDetailSheet({
                 style={{
                   position: 'relative',
                   paddingLeft: 22,
-                  paddingBottom: 16,
-                  borderLeft: i < beanTastings.length - 1 ? `2px solid ${C.border}` : 'none',
+                  paddingBottom: 18,
+                  borderLeft: i < beanTastings.length - 1 ? `2px solid ${C.borderLight}` : 'none',
                   marginLeft: 6,
                 }}
               >
+                {/* Timeline dot */}
                 <div
                   style={{
                     position: 'absolute',
                     left: -7,
-                    top: 2,
+                    top: 3,
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
                     background: C.accent,
-                    boxShadow: `0 0 0 3px ${C.card}, 0 0 0 4px ${C.border}`,
+                    boxShadow: `0 0 0 3px ${C.cream}, 0 0 0 4.5px ${C.accentLight}`,
                   }}
                 />
                 <div
@@ -555,7 +510,7 @@ export function ArchiveDetailSheet({
                     marginBottom: 4,
                   }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text, fontFamily: fonts.body }}>
+                  <div style={{ ...type.body, fontWeight: 700, color: C.text, fontFamily: fonts.body }}>
                     {formatTastingDate(t.date)}
                   </div>
                   {t.rating ? <ArchiveStars value={t.rating} size={11} /> : null}
@@ -563,9 +518,9 @@ export function ArchiveDetailSheet({
                 {t.method && (
                   <div
                     style={{
-                      fontSize: 11,
+                      ...type.caption,
                       color: C.textMuted,
-                      marginBottom: 6,
+                      marginBottom: 7,
                       fontFamily: fonts.body,
                     }}
                   >
@@ -575,14 +530,14 @@ export function ArchiveDetailSheet({
                 {t.notes && (
                   <div
                     style={{
-                      fontSize: 13.5,
+                      ...type.bodyL,
                       color: C.text,
-                      lineHeight: 1.45,
+                      lineHeight: 1.5,
                       fontFamily: fonts.body,
-                      background: C.amberBg,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 10,
-                      padding: '10px 12px',
+                      background: C.bgDeep,
+                      border: `1px solid ${C.hairline}`,
+                      borderRadius: radius.sm,
+                      padding: '10px 13px',
                     }}
                   >
                     {t.notes}
@@ -596,47 +551,38 @@ export function ArchiveDetailSheet({
         {/* Actions */}
         <div
           style={{
-            margin: '16px 20px 28px',
-            padding: '14px 16px',
-            background: C.bg,
-            border: `1px dashed ${C.border}`,
-            borderRadius: 12,
+            margin: '20px 20px 28px',
+            padding: '16px 16px',
+            background: C.bgDeep,
+            border: `1px solid ${C.hairline}`,
+            borderRadius: radius.md,
           }}
         >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: 1.4,
-              textTransform: 'uppercase',
-              color: C.textMuted,
-              marginBottom: 10,
-            }}
-          >
-            Archive actions
-          </div>
+          <span style={eyebrow}>Archive actions</span>
           <button
             onClick={handleRestore}
             style={{
               width: '100%',
-              minHeight: 44,
+              minHeight: 48,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 7,
-              padding: '10px 14px',
+              gap: 8,
+              padding: '12px 16px',
               background: C.card,
               border: `1px solid ${C.border}`,
-              borderRadius: 10,
+              borderRadius: radius.md,
               color: C.accent,
               fontFamily: fonts.body,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
               cursor: 'pointer',
               marginBottom: 8,
+              boxShadow: shadows.button,
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={15} />
             Restore to inventory
           </button>
           {onDelete && (
@@ -654,12 +600,13 @@ export function ArchiveDetailSheet({
                 border: 'none',
                 color: C.red,
                 fontFamily: fonts.body,
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Trash2 size={13} />
+              <Trash2 size={14} />
               Delete permanently
             </button>
           )}

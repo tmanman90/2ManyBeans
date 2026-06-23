@@ -13,13 +13,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
-import { C, fonts, shadows } from '../styles/theme';
+import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
+import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 
-const RING_SIZE = 260;
-const RING_STROKE = 14;
+const RING_SIZE = 280;
+const RING_STROKE = 10;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
@@ -55,11 +56,13 @@ function Countdown({ onDone }) {
       <div
         key={value}
         style={{
-          fontFamily: fonts.title,
-          fontSize: 180,
+          fontFamily: fonts.heading,
+          fontSize: 160,
+          fontWeight: 600,
           color: C.accent,
           lineHeight: 1,
-          animation: 'brewCountdownPulse 0.9s ease-out',
+          letterSpacing: '-0.04em',
+          animation: 'brewCountdownPulse 0.9s cubic-bezier(0.22,1,0.36,1)',
         }}
       >
         {value}
@@ -91,26 +94,39 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
         autoPlay muted playsInline
         style={{
           width: 200, height: 200, objectFit: 'contain',
-          marginBottom: 16,
+          marginBottom: 20,
           WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
           maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
         }}
       />
+      {/* Eyebrow label */}
       <div style={{
-        fontFamily: fonts.title,
-        fontSize: 40,
-        color: C.text,
+        ...typeScale.label,
+        color: C.accent,
         marginBottom: 8,
-        textAlign: 'center',
+        letterSpacing: '0.12em',
       }}>
         Brew Complete
       </div>
-      <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 4 }}>Total time</div>
       <div style={{
         fontFamily: fonts.heading,
-        fontSize: 44,
+        fontSize: 40,
+        fontWeight: 600,
+        color: C.text,
+        lineHeight: 1.05,
+        letterSpacing: '-0.02em',
+        marginBottom: 6,
+        textAlign: 'center',
+      }}>
+        Well done
+      </div>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 4, fontFamily: fonts.body }}>Total brew time</div>
+      <div style={{
+        fontFamily: fonts.heading,
+        fontSize: 48,
         color: C.accent,
-        fontWeight: 700,
+        fontWeight: 600,
+        letterSpacing: '-0.02em',
         marginBottom: 40,
       }}>
         {formatMMSS(totalElapsedMs)}
@@ -122,15 +138,15 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
             width: '100%',
             maxWidth: 320,
             padding: '16px 24px',
-            borderRadius: 14,
-            background: C.accent,
+            borderRadius: radius.md,
+            background: `linear-gradient(135deg, ${C.accent} 0%, ${C.accentDark} 100%)`,
             color: '#fff',
             border: 'none',
             fontSize: 16,
             fontWeight: 700,
             fontFamily: fonts.body,
             cursor: 'pointer',
-            boxShadow: shadows.button,
+            boxShadow: shadows.navActive,
             marginBottom: 12,
           }}
         >
@@ -143,14 +159,16 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
           width: '100%',
           maxWidth: 320,
           padding: '14px 24px',
-          borderRadius: 14,
-          background: 'transparent',
+          borderRadius: radius.md,
+          background: glass.sheet,
           color: C.textMuted,
           border: `1px solid ${C.border}`,
           fontSize: 15,
           fontWeight: 600,
           fontFamily: fonts.body,
           cursor: 'pointer',
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
         }}
       >
         Done
@@ -160,25 +178,40 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
 }
 
 function StepPill({ label, status, timeLabel }) {
-  const bg = status === 'current' ? C.accent : status === 'done' ? C.greenBg : C.cardMuted;
-  const fg = status === 'current' ? '#fff' : status === 'done' ? C.green : C.textMuted;
+  const bg =
+    status === 'current' ? C.accent :
+    status === 'done' ? C.greenBg :
+    C.cardMuted;
+  const fg =
+    status === 'current' ? '#fff' :
+    status === 'done' ? C.green :
+    C.textMuted;
+  const borderColor =
+    status === 'current' ? 'transparent' :
+    status === 'done' ? C.green + '44' :
+    C.hairline;
+
   return (
     <div style={{
       flex: '0 0 auto',
-      padding: '10px 14px',
-      borderRadius: 20,
+      padding: '9px 14px',
+      borderRadius: radius.pill,
       background: bg,
       color: fg,
       fontSize: 12,
-      fontWeight: 600,
+      fontWeight: 700,
+      fontFamily: fonts.body,
       display: 'flex',
       alignItems: 'center',
-      gap: 6,
+      gap: 5,
       whiteSpace: 'nowrap',
+      border: `1px solid ${borderColor}`,
+      boxShadow: status === 'current' ? shadows.navActive : 'none',
+      letterSpacing: '0.01em',
     }}>
-      {status === 'done' && <Check size={12} strokeWidth={3} />}
+      {status === 'done' && <Check size={11} strokeWidth={3} />}
       <span>{label}</span>
-      <span style={{ opacity: 0.85, fontWeight: 500 }}>{timeLabel}</span>
+      <span style={{ opacity: 0.75, fontWeight: 500, fontSize: 11 }}>{timeLabel}</span>
     </div>
   );
 }
@@ -186,28 +219,37 @@ function StepPill({ label, status, timeLabel }) {
 function ControlButton({ onClick, children, ariaLabel, primary, disabled }) {
   const size = primary ? 72 : 56;
   return (
-    <button
+    <m.button
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
+      whileTap={disabled ? {} : { scale: primary ? 0.93 : 0.92 }}
+      transition={spring.bouncy}
       style={{
         width: size,
         height: size,
         borderRadius: '50%',
-        background: primary ? C.accent : C.cream,
+        background: primary
+          ? `linear-gradient(145deg, ${C.accent} 0%, ${C.accentDark} 100%)`
+          : glass.sheet,
         color: primary ? '#fff' : C.text,
         border: primary ? 'none' : `1px solid ${C.border}`,
         cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
+        opacity: disabled ? 0.35 : 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: primary ? shadows.button : 'none',
+        boxShadow: primary ? shadows.navActive : shadows.e1,
         padding: 0,
+        backdropFilter: primary ? 'none' : glass.blur,
+        WebkitBackdropFilter: primary ? 'none' : glass.blur,
+        flexShrink: 0,
+        // GPU hint
+        willChange: 'transform',
       }}
     >
       {children}
-    </button>
+    </m.button>
   );
 }
 
@@ -325,16 +367,16 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
         padding: 32,
         zIndex: 1000,
       }}>
-        <div style={{ fontSize: 16, color: C.text, textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 16, color: C.text, textAlign: 'center', marginBottom: 16, fontFamily: fonts.body }}>
           This recipe is missing timer data.
         </div>
-        <div style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', marginBottom: 24, fontFamily: fonts.body }}>
           Try regenerating it to get a timer-ready version.
         </div>
         <button
           onClick={onClose}
           style={{
-            padding: '12px 24px', borderRadius: 12,
+            padding: '12px 24px', borderRadius: radius.md,
             background: C.accent, color: '#fff', border: 'none',
             fontSize: 15, fontWeight: 600, fontFamily: fonts.body, cursor: 'pointer',
           }}
@@ -382,6 +424,9 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
   const beanName = bean?.name || bean?.roasterName || '';
   const beanPhoto = bean?.productPhotoUrl || bean?.photoUrl || null;
 
+  // Accent color for paused state
+  const ringStrokeColor = phase === 'paused' ? C.accentLight : C.accent;
+
   return createPortal(
     <div
       onClick={(e) => e.stopPropagation()}
@@ -399,20 +444,31 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
     >
       <style>{`
         @keyframes brewCountdownPulse {
-          0%   { transform: scale(0.4); opacity: 0; }
-          35%  { transform: scale(1.15); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
+          0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+          40%  { transform: scale(1.12) rotate(2deg); opacity: 1; }
+          70%  { transform: scale(0.97) rotate(-1deg); }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes brewRingGlow {
+          0%, 100% { filter: drop-shadow(0 0 6px rgba(168,106,56,0.25)); }
+          50% { filter: drop-shadow(0 0 14px rgba(168,106,56,0.45)); }
         }
         .brew-pills::-webkit-scrollbar { display: none; }
+        .brew-ring-active {
+          animation: brewRingGlow 2.4s ease-in-out infinite;
+        }
       `}</style>
 
-      {/* Header */}
+      {/* Header — glass chrome */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '12px 16px',
-        borderBottom: `1px solid ${C.borderLight}`,
+        borderBottom: `1px solid ${C.hairline}`,
+        background: glass.chrome,
+        backdropFilter: glass.blur,
+        WebkitBackdropFilter: glass.blur,
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
@@ -420,17 +476,24 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
             <img
               src={beanPhoto}
               alt=""
-              style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+              style={{
+                width: 34, height: 34, borderRadius: radius.xs,
+                objectFit: 'cover', flexShrink: 0,
+                border: `1px solid ${C.hairline}`,
+                boxShadow: shadows.e1,
+              }}
             />
           )}
           <div style={{ minWidth: 0 }}>
             <div style={{
-              fontSize: 13,
-              fontWeight: 700,
+              fontFamily: fonts.heading,
+              fontSize: 15,
+              fontWeight: 600,
               color: C.text,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              letterSpacing: '-0.01em',
             }}>
               {beanName || 'Brew Timer'}
             </div>
@@ -441,24 +504,29 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                fontWeight: 500,
+                marginTop: 1,
               }}>
                 {recipe.title}
               </div>
             )}
           </div>
         </div>
-        <button
+        <m.button
           onClick={handleCloseRequest}
           aria-label="Close brew timer"
+          whileTap={{ scale: 0.9 }}
+          transition={spring.snappy}
           style={{
             width: 44, height: 44, borderRadius: '50%',
             background: 'transparent', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: C.text, flexShrink: 0,
+            color: C.textMuted, flexShrink: 0,
+            willChange: 'transform',
           }}
         >
-          <X size={22} />
-        </button>
+          <X size={20} strokeWidth={2} />
+        </m.button>
       </div>
 
       {/* Main stage */}
@@ -468,7 +536,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '24px 20px 16px',
+        padding: '28px 20px 16px',
         position: 'relative',
         overflow: 'hidden',
       }}>
@@ -476,28 +544,51 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
         {phase === 'countdown' && <Countdown onDone={beginRunning} />}
 
         {/* Ring */}
-        <div style={{ position: 'relative', width: RING_SIZE, height: RING_SIZE, flexShrink: 0 }}>
-          <svg width={RING_SIZE} height={RING_SIZE}>
+        <div style={{
+          position: 'relative',
+          width: RING_SIZE, height: RING_SIZE,
+          flexShrink: 0,
+        }}>
+          <svg
+            width={RING_SIZE}
+            height={RING_SIZE}
+            className={phase === 'running' ? 'brew-ring-active' : ''}
+            style={{ willChange: 'filter' }}
+          >
+            {/* Hairline track */}
             <circle
               cx={RING_SIZE / 2}
               cy={RING_SIZE / 2}
               r={RING_RADIUS}
               fill="none"
-              stroke={C.borderLight}
-              strokeWidth={RING_STROKE}
+              stroke={C.hairline}
+              strokeWidth={2}
             />
+            {/* Accent progress arc */}
             <circle
               ref={ringRef}
               cx={RING_SIZE / 2}
               cy={RING_SIZE / 2}
               r={RING_RADIUS}
               fill="none"
-              stroke={C.accent}
+              stroke={ringStrokeColor}
               strokeWidth={RING_STROKE}
               strokeLinecap="round"
               strokeDasharray={RING_CIRCUMFERENCE}
               strokeDashoffset={RING_CIRCUMFERENCE}
               transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+              style={{ transition: 'stroke 0.3s ease' }}
+            />
+            {/* Soft warm bloom layer — static full ring behind the accent arc */}
+            <circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke={C.accentSoft}
+              strokeWidth={RING_STROKE + 6}
+              opacity={0.45}
+              style={{ pointerEvents: 'none' }}
             />
           </svg>
           {/* Centered readout */}
@@ -509,53 +600,78 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
             alignItems: 'center',
             justifyContent: 'center',
             pointerEvents: 'none',
+            gap: 2,
           }}>
+            {/* Phase pill */}
+            <div style={{
+              ...typeScale.label,
+              color: phase === 'paused' ? C.textLight : C.accent,
+              letterSpacing: '0.10em',
+              marginBottom: 4,
+              transition: 'color 0.3s ease',
+            }}>
+              {phase === 'paused' ? 'PAUSED' : phase === 'running' ? 'BREWING' : phase === 'idle' ? 'READY' : ''}
+            </div>
+            {/* Main countdown number */}
             <div style={{
               fontFamily: fonts.heading,
-              fontSize: 56,
-              fontWeight: 700,
+              fontSize: 64,
+              fontWeight: 600,
               color: C.text,
               lineHeight: 1,
+              letterSpacing: '-0.03em',
             }}>
               {formatMMSS(globalElapsedMs)}
             </div>
-            <div style={{ fontSize: 13, color: C.textMuted, marginTop: 6 }}>
+            <div style={{
+              fontSize: 12,
+              color: C.textLight,
+              fontWeight: 500,
+              marginTop: 4,
+              letterSpacing: '0.01em',
+            }}>
               of {formatMMSS(totalMs)}
             </div>
           </div>
         </div>
 
         {/* Current step name + instruction */}
-        <div style={{ textAlign: 'center', padding: '16px 8px 8px', width: '100%' }}>
+        <div style={{ textAlign: 'center', padding: '12px 8px 6px', width: '100%' }}>
           <div style={{
-            fontFamily: fonts.title,
-            fontSize: 32,
+            fontFamily: fonts.heading,
+            fontSize: 26,
+            fontWeight: 600,
             color: C.text,
-            marginBottom: 6,
+            marginBottom: 8,
             lineHeight: 1.1,
+            letterSpacing: '-0.01em',
           }}>
             {currentStep?.step?.name || currentStep?.step?.label || `Step ${stepIndex + 1}`}
           </div>
           <div style={{
             fontSize: 14,
             color: C.textMuted,
-            lineHeight: 1.45,
-            maxWidth: 320,
+            lineHeight: 1.5,
+            maxWidth: 300,
             margin: '0 auto',
+            fontWeight: 500,
           }}>
             {currentStep?.step?.action || ''}
           </div>
           {currentStep?.step?.waterTotal != null && (
             <div style={{
-              marginTop: 10,
-              display: 'inline-block',
-              padding: '6px 12px',
-              borderRadius: 12,
-              background: C.cream,
-              border: `1px solid ${C.border}`,
+              marginTop: 12,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 14px',
+              borderRadius: radius.pill,
+              background: C.accentSoft,
+              border: `1px solid ${C.accentLight}`,
               fontSize: 13,
-              fontWeight: 600,
-              color: C.text,
+              fontWeight: 700,
+              color: C.accent,
+              letterSpacing: '0.01em',
             }}>
               {currentStep.step.waterTotal}g total
             </div>
@@ -571,7 +687,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
             gap: 8,
             overflowX: 'auto',
             width: '100%',
-            padding: '12px 4px',
+            padding: '10px 16px',
             scrollbarWidth: 'none',
           }}
         >
@@ -600,8 +716,8 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 24,
-          padding: '16px 0 8px',
+          gap: 20,
+          padding: '12px 0 8px',
           width: '100%',
         }}>
           <ControlButton
@@ -609,7 +725,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
             ariaLabel="Previous step"
             disabled={stepIndex === 0 || phase === 'countdown'}
           >
-            <SkipBack size={22} strokeWidth={2.5} />
+            <SkipBack size={20} strokeWidth={2.5} />
           </ControlButton>
           <ControlButton
             onClick={handlePauseToggle}
@@ -618,15 +734,15 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
             disabled={phase !== 'running' && phase !== 'paused'}
           >
             {phase === 'running'
-              ? <Pause size={28} strokeWidth={2.5} />
-              : <Play size={28} strokeWidth={2.5} />}
+              ? <Pause size={26} strokeWidth={2.5} />
+              : <Play size={26} strokeWidth={2.5} />}
           </ControlButton>
           <ControlButton
             onClick={handleSkipForward}
             ariaLabel="Next step"
             disabled={phase === 'countdown'}
           >
-            <SkipForward size={22} strokeWidth={2.5} />
+            <SkipForward size={20} strokeWidth={2.5} />
           </ControlButton>
         </div>
 
@@ -646,40 +762,52 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'rgba(59, 36, 23, 0.45)',
+          background: glass.scrim,
+          backdropFilter: glass.blurStrong,
+          WebkitBackdropFilter: glass.blurStrong,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
           zIndex: 3,
         }}>
-          <div style={{
-            background: C.cream,
-            borderRadius: 16,
-            padding: 24,
-            maxWidth: 320,
-            width: '100%',
-            textAlign: 'center',
-            boxShadow: shadows.modal,
-          }}>
+          <m.div
+            {...popIn}
+            style={{
+              background: glass.sheet,
+              borderRadius: radius.xl,
+              padding: 28,
+              maxWidth: 320,
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: shadows.modal,
+              border: `1px solid ${C.hairline}`,
+              backdropFilter: glass.blur,
+              WebkitBackdropFilter: glass.blur,
+            }}
+          >
             <div style={{
-              fontFamily: fonts.title,
-              fontSize: 28,
+              fontFamily: fonts.heading,
+              fontSize: 24,
+              fontWeight: 600,
               color: C.text,
               marginBottom: 8,
+              letterSpacing: '-0.01em',
             }}>
               Stop the brew?
             </div>
-            <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 24, lineHeight: 1.5, fontFamily: fonts.body }}>
               You'll lose the current timer progress.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
+              <m.button
                 onClick={() => setConfirmClose(false)}
+                whileTap={{ scale: 0.97 }}
+                transition={spring.snappy}
                 style={{
                   flex: 1,
-                  padding: '12px',
-                  borderRadius: 12,
+                  padding: '13px',
+                  borderRadius: radius.md,
                   background: 'transparent',
                   color: C.text,
                   border: `1px solid ${C.border}`,
@@ -687,16 +815,19 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
                   fontWeight: 600,
                   cursor: 'pointer',
                   fontFamily: fonts.body,
+                  willChange: 'transform',
                 }}
               >
                 Keep brewing
-              </button>
-              <button
+              </m.button>
+              <m.button
                 onClick={handleConfirmClose}
+                whileTap={{ scale: 0.97 }}
+                transition={spring.snappy}
                 style={{
                   flex: 1,
-                  padding: '12px',
-                  borderRadius: 12,
+                  padding: '13px',
+                  borderRadius: radius.md,
                   background: C.red,
                   color: '#fff',
                   border: 'none',
@@ -704,12 +835,13 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
                   fontWeight: 600,
                   cursor: 'pointer',
                   fontFamily: fonts.body,
+                  willChange: 'transform',
                 }}
               >
                 Stop
-              </button>
+              </m.button>
             </div>
-          </div>
+          </m.div>
         </div>
       )}
     </div>,

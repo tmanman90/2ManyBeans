@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, shadows, radius } from '../styles/theme';
 import { buildNewBeanData } from '../lib/beanBuilder';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { Modal } from './Modal';
@@ -38,9 +38,15 @@ export const ManualEntrySheet = ({ open, onClose, onBeanCreated, addBean }) => {
   const canAdd = roaster.trim() && name.trim();
 
   const inputStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: 10,
-    border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
+    width: '100%', padding: '12px 14px', borderRadius: radius.md,
+    border: `1px solid ${C.hairline}`, fontFamily: fonts.body,
+    fontSize: 16, background: C.cream, color: C.text, boxSizing: 'border-box',
+    outline: 'none', boxShadow: shadows.e1,
+  };
+
+  const labelStyle = {
+    ...type.label, color: C.textMuted,
+    marginBottom: 7, display: 'block',
   };
 
   if (!open) return null;
@@ -52,16 +58,14 @@ export const ManualEntrySheet = ({ open, onClose, onBeanCreated, addBean }) => {
       title="Add Bean Manually"
       footer={
         <Btn variant="primary" onClick={handleAdd} disabled={!canAdd || saving}
-          style={{ width: '100%' }}>
+          style={{ width: '100%', justifyContent: 'center' }}>
           {saving ? 'Adding...' : 'Add Bean'}
         </Btn>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingBottom: 8 }}>
         <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' }}>
-            Roaster *
-          </label>
+          <label style={labelStyle}>Roaster *</label>
           <input
             style={inputStyle}
             value={roaster}
@@ -72,9 +76,7 @@ export const ManualEntrySheet = ({ open, onClose, onBeanCreated, addBean }) => {
           />
         </div>
         <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4, display: 'block' }}>
-            Bean Name *
-          </label>
+          <label style={labelStyle}>Bean Name *</label>
           <input
             style={inputStyle}
             value={name}
@@ -83,8 +85,13 @@ export const ManualEntrySheet = ({ open, onClose, onBeanCreated, addBean }) => {
             placeholder="e.g. Tropical Weather"
           />
         </div>
-        <div style={{ fontSize: 12, color: C.textMuted }}>
-          You can fill in all other details after adding.
+        <div style={{
+          padding: '10px 14px', borderRadius: radius.md,
+          background: C.bgDeep, border: `1px solid ${C.borderLight}`,
+        }}>
+          <div style={{ ...type.caption, color: C.textMuted }}>
+            You can fill in origin, process, roast date, and tasting notes after adding.
+          </div>
         </div>
       </div>
     </Modal>

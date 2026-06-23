@@ -1,7 +1,7 @@
 // Open Bean Modal — ported from prototype lines 1153-1191
 import { useState, useEffect } from 'react';
 import { Check, Plus, Search } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass } from '../styles/theme';
 import { getPeakStatus } from '../lib/peakStatus';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
@@ -43,8 +43,15 @@ export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, onAddNewBean, t
   if (open && sealed.length === 0) {
     return (
       <Modal open={open} onClose={onClose} title="Add Your First Bean">
-        <div style={{ textAlign: 'center', padding: '8px 4px 12px' }}>
-          <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 18, lineHeight: 1.5 }}>
+        <div style={{ textAlign: 'center', padding: '12px 4px 16px' }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: '50%',
+            background: C.accentSoft, border: `1.5px solid ${C.accentLight}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px', boxShadow: shadows.e2,
+            fontSize: 26,
+          }}>☕</div>
+          <div style={{ ...type.body, color: C.textMuted, marginBottom: 20, lineHeight: 1.55 }}>
             You don't have any sealed beans yet. Add your first coffee bag to start brewing.
           </div>
           <Btn
@@ -64,26 +71,43 @@ export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, onAddNewBean, t
 
   return (
     <Modal open={open} onClose={onClose} title="Open a Bean">
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
-        Opening in Jar #{targetSlot || emptySlots[0] || '?'} · Tap to select:
+      {/* Jar slot context */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+        padding: '10px 14px', borderRadius: radius.md,
+        background: C.bgDeep, border: `1px solid ${C.hairline}`,
+      }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: radius.sm,
+          background: C.accentSoft, border: `1.5px solid ${C.accentLight}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          ...type.h3, color: C.accent, fontSize: 16,
+        }}>
+          #{targetSlot || emptySlots[0] || '?'}
+        </div>
+        <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.4 }}>
+          Opening into Jar {targetSlot || emptySlots[0] || '?'} — tap a bean to select
+        </div>
       </div>
+
       {sealed.length > 5 && (
-        <div style={{ position: 'relative', marginBottom: 12 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.textMuted }} />
+        <div style={{ position: 'relative', marginBottom: 14 }}>
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.textMuted }} />
           <input
             type="text"
             placeholder="Search beans..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
-              width: '100%', padding: '8px 10px 8px 32px', borderRadius: 8,
-              border: `1px solid ${C.border}`, fontFamily: fonts.body,
+              width: '100%', padding: '11px 12px 11px 36px', borderRadius: radius.md,
+              border: `1px solid ${C.hairline}`, fontFamily: fonts.body,
               fontSize: 16, background: C.cream, color: C.text,
-              boxSizing: 'border-box', outline: 'none',
+              boxSizing: 'border-box', outline: 'none', boxShadow: shadows.e1,
             }}
           />
         </div>
       )}
+
       {filtered.map(bean => {
         const ps = getPeakStatus(bean);
         const isSel = selectedId === bean.id;
@@ -92,37 +116,55 @@ export const OpenBeanFlow = ({ open, onClose, beans, onOpenBean, onAddNewBean, t
             key={bean.id}
             onClick={() => setSelectedId(bean.id)}
             style={{
-              background: isSel ? C.amberBg : C.card,
-              borderRadius: 12,
-              padding: 14,
-              border: `2px solid ${isSel ? C.amber : C.border}`,
-              marginBottom: 8,
+              background: isSel ? C.accentSoft : C.cream,
+              borderRadius: radius.lg,
+              padding: '14px 16px',
+              border: `1.5px solid ${isSel ? C.accent : C.hairline}`,
+              marginBottom: 10,
               cursor: 'pointer',
-              transition: 'all 0.15s',
+              boxShadow: isSel ? shadows.e2 : shadows.e1,
+              transition: `background 0.16s, border-color 0.16s, box-shadow 0.16s`,
+              position: 'relative',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontFamily: fonts.title, fontSize: 15, color: C.text }}>{bean.name}</div>
-                <div style={{ fontSize: 12, color: C.textMuted }}>
-                  {bean.roaster} · {bean.origin} · {bean.variety} · {bean.bagSize || '?'}g
+            {isSel && (
+              <div style={{
+                position: 'absolute', top: 12, right: 12,
+                width: 22, height: 22, borderRadius: '50%',
+                background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: shadows.button,
+              }}>
+                <Check size={12} color="#fff" strokeWidth={3} />
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingRight: isSel ? 30 : 0 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ ...type.h3, color: C.text, fontSize: 15, fontFamily: fonts.heading, marginBottom: 3 }}>
+                  {bean.name}
+                </div>
+                <div style={{ ...type.caption, color: C.textMuted }}>
+                  {[bean.roaster, bean.origin, bean.variety, bean.bagSize ? `${bean.bagSize}g` : null]
+                    .filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>
+              <div style={{ flexShrink: 0, marginLeft: 10 }}>
+                <Badge color={ps.color} bg={ps.bg}>{ps.label}</Badge>
+              </div>
             </div>
             {bean.bagNotes && bean.bagNotes !== '(not logged)' && (
-              <div style={{ fontSize: 11, color: C.accentLight, fontStyle: 'italic', marginTop: 4 }}>
-                ☕ {bean.bagNotes}
+              <div style={{ ...type.caption, color: C.accent, fontStyle: 'italic', marginTop: 7, opacity: 0.85 }}>
+                {bean.bagNotes}
               </div>
             )}
           </div>
         );
       })}
+
       <Btn
         variant="primary"
         onClick={doOpen}
         disabled={!selectedId}
-        style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
+        style={{ width: '100%', justifyContent: 'center', marginTop: 14 }}
       >
         <Check size={14} /> Open Selected Bean
       </Btn>

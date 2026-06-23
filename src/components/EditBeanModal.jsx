@@ -2,7 +2,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Save, Camera, Trash2, X, Search } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass, motion } from '../styles/theme';
+// motion variants available for future animation enhancements (m, fadeUp, popIn, spring)
+
 import { getPeakStatus, daysSinceRoast, parseShelfLifeDays, effectivePeakEnd } from '../lib/peakStatus';
 import { compressImage } from '../lib/claude';
 import { generateProductShot, researchBeanOnline, summarizeNotes } from '../lib/gemini';
@@ -25,7 +27,7 @@ import { ROAST_STYLE_CATEGORIES } from '../lib/roasterProfiles';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 
 const SprigDivider = ({ color = C.accentLight, size = 12 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+  <svg width={size} height={size} viewBox="0 0 14 14" style={{ flexShrink: 0, opacity: 0.7 }}>
     <path d="M7 12 Q7 7 7 2" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
     <path d="M7 5 Q4 4 2.5 5.5" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
     <path d="M7 5 Q10 4 11.5 5.5" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round"/>
@@ -42,28 +44,35 @@ const ChapterHeader = ({ number, title, subtitle, collapsible, open, onToggle })
   <div
     onClick={collapsible ? onToggle : undefined}
     style={{
-      display: 'flex', alignItems: 'center', gap: 10, margin: '22px 0 12px',
+      display: 'flex', alignItems: 'center', gap: 10, margin: '26px 0 14px',
       cursor: collapsible ? 'pointer' : 'default',
+      minHeight: 44,
     }}
   >
     <div style={{
-      width: 22, height: 22, borderRadius: '50%', border: `1px solid ${C.accentLight}`,
-      color: C.accent, fontFamily: fonts.heading, fontSize: 12, fontWeight: 500,
+      width: 24, height: 24, borderRadius: '50%',
+      border: `1.5px solid ${C.accentLight}`,
+      color: C.accent, fontFamily: fonts.body, fontSize: 11, fontWeight: 800,
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      background: C.card,
+      background: C.cream,
+      boxShadow: shadows.e1,
     }}>{number}</div>
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontFamily: fonts.heading, fontSize: 15, color: C.text, lineHeight: 1.1 }}>
+      <div style={{ ...type.h3, fontSize: 15, color: C.text, lineHeight: 1.15 }}>
         {title}
       </div>
       {subtitle && (
-        <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{subtitle}</div>
+        <div style={{ ...type.caption, color: C.textLight, marginTop: 2 }}>{subtitle}</div>
       )}
     </div>
     <SprigDivider />
-    <div style={{ flex: '0 1 80px', height: 1, background: `repeating-linear-gradient(to right, ${C.accentLight} 0, ${C.accentLight} 2px, transparent 2px, transparent 5px)` }} />
+    <div style={{ flex: '0 1 60px', height: 1, background: `linear-gradient(to right, ${C.accentLight}, transparent)`, opacity: 0.7 }} />
     {collapsible && (
-      <div style={{ color: C.textLight, fontSize: 11, fontFamily: fonts.body, width: 14, textAlign: 'right' }}>
+      <div style={{
+        width: 22, height: 22, borderRadius: '50%', background: C.bgDeep,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        color: C.textMuted, fontSize: 13, fontFamily: fonts.body, fontWeight: 700,
+      }}>
         {open ? '\u2212' : '+'}
       </div>
     )}
@@ -457,17 +466,17 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   };
 
   const inputStyle = {
-    width: '100%', padding: '9px 12px', borderRadius: 10,
-    border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 16, background: C.card, color: C.text, boxSizing: 'border-box',
-    outline: 'none',
+    width: '100%', padding: '11px 14px', borderRadius: radius.md,
+    border: `1px solid ${C.hairline}`, fontFamily: fonts.body,
+    fontSize: 16, background: C.cream, color: C.text, boxSizing: 'border-box',
+    outline: 'none', boxShadow: shadows.e1,
+    transition: `border-color 0.18s, box-shadow 0.18s`,
   };
   const labelStyle = {
-    fontSize: 10, fontWeight: 700, color: C.textMuted,
-    textTransform: 'uppercase', letterSpacing: 0.8,
-    marginBottom: 5, display: 'block',
+    ...type.label, color: C.textMuted,
+    marginBottom: 6, display: 'block',
   };
-  const rowStyle = { marginBottom: 12 };
+  const rowStyle = { marginBottom: 14 };
   const filled = [f.roaster, f.name, f.origin, f.variety, f.process, f.bagSize, f.roastDate, f.bagNotes].filter(v => v && String(v).trim()).length;
   const total = 8;
   const sourceSummary = summarizeSourceInsights(f, { maxChars: 260 });
@@ -475,18 +484,25 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   return (
     <Modal open={open} onClose={handleCancel} title={
       <div>
-        <span style={{ fontFamily: fonts.title, fontSize: 28, color: C.accentDark }}>{isNewBean ? 'New Bean' : 'Editing'}</span>
-        <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700, fontFamily: fonts.body }}>
+        <div style={{ ...type.h1, fontSize: 22, color: C.accentDark, lineHeight: 1.1 }}>
+          {isNewBean ? 'New Bean' : 'Edit Bean'}
+        </div>
+        <div style={{ ...type.label, color: C.textMuted, marginTop: 3 }}>
           {bean.roaster} {'\u00B7'} {bean.name.length > 28 ? bean.name.slice(0,28) + '\u2026' : bean.name}
         </div>
       </div>
     } footer={
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10, color: C.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 700 }}>
-          <div style={{ flex: 1, height: 3, background: C.cardMuted, borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ width: `${(filled/total)*100}%`, height: '100%', background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})` }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ flex: 1, height: 2, background: C.bgDeep, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              width: `${(filled/total)*100}%`, height: '100%',
+              background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})`,
+              borderRadius: 2,
+              transition: `width 0.3s ${motion.cssOut}`,
+            }} />
           </div>
-          <span>{filled}/{total} filled</span>
+          <span style={{ ...type.caption, color: C.textMuted }}>{filled}/{total} filled</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn variant="secondary" onClick={handleCancel}>{isNewBean ? 'Discard' : 'Cancel'}</Btn>
@@ -502,35 +518,41 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       </div>
     }>
       {/* Photo section */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 20 }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
 
         {/* Pending photo: show preview with choice buttons */}
         {pendingPhoto ? (
           <div>
-            <img
-              src={pendingPhotoPreviewSrc}
-              alt="New photo"
-              style={{
-                width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',
-                borderRadius: 10, border: `1px solid ${C.borderLight}`, background: C.card,
-              }}
-            />
+            <div style={{
+              borderRadius: radius.lg, overflow: 'hidden',
+              border: `1px solid ${C.hairline}`, background: C.bgDeep,
+              boxShadow: shadows.e2,
+            }}>
+              <img
+                src={pendingPhotoPreviewSrc}
+                alt="New photo"
+                style={{
+                  width: '100%', height: 200, objectFit: 'contain', objectPosition: 'center',
+                  display: 'block',
+                }}
+              />
+            </div>
             {photoGenerating ? (
-              <div style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginTop: 8 }}>Processing...</div>
+              <div style={{ ...type.caption, color: C.textMuted, textAlign: 'center', marginTop: 10 }}>Processing...</div>
             ) : (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <Btn
                   variant="primary"
                   onClick={handleUseOriginal}
-                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 13 }}
                 >
                   Use This Photo
                 </Btn>
                 <Btn
                   variant="secondary"
                   onClick={handleProductShot}
-                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 13 }}
                 >
                   Product Shot
                 </Btn>
@@ -540,35 +562,42 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
               <Btn
                 variant="ghost"
                 onClick={() => setPendingPhoto(null)}
-                style={{ width: '100%', justifyContent: 'center', fontSize: 11, marginTop: 4 }}
+                style={{ width: '100%', justifyContent: 'center', fontSize: 12, marginTop: 6 }}
               >
                 Cancel
               </Btn>
             )}
           </div>
         ) : displayPhotoUrl ? (
-          <div style={{ position: 'relative', width: '100%', height: 180, background: C.card, overflow: 'hidden', borderRadius: 10 }}>
+          <div style={{
+            position: 'relative', width: '100%', height: 200,
+            background: C.bgDeep, overflow: 'hidden',
+            borderRadius: radius.lg, boxShadow: shadows.e2,
+            border: `1px solid ${C.hairline}`,
+          }}>
             <img
               src={displayPhotoUrl}
               alt={`${bean.name} bag`}
-              style={{
-                width: '100%', height: 180, objectFit: 'contain', objectPosition: 'center',
-              }}
+              style={{ width: '100%', height: 200, objectFit: 'contain', objectPosition: 'center' }}
             />
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
               background: [
-                `linear-gradient(to right, ${C.card}, transparent 35%)`,
-                `linear-gradient(to left, ${C.card}, transparent 35%)`,
-                `linear-gradient(to top, ${C.card}, transparent 20%)`,
+                `linear-gradient(to right, ${C.bgDeep}, transparent 30%)`,
+                `linear-gradient(to left, ${C.bgDeep}, transparent 30%)`,
+                `linear-gradient(to top, ${C.bgDeep}, transparent 18%)`,
               ].join(', '),
             }} />
-            <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 4 }}>
+            <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 }}>
               <Btn
                 variant="ghost"
                 onClick={handleRemovePhoto}
                 disabled={photoGenerating}
-                style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
+                style={{
+                  fontSize: 12, padding: '6px 12px', minHeight: 32,
+                  background: glass.chrome, backdropFilter: glass.blur,
+                  border: `1px solid ${glass.chromeBorder}`, borderRadius: radius.sm,
+                }}
               >
                 <X size={12} /> Remove
               </Btn>
@@ -576,7 +605,11 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 variant="ghost"
                 onClick={() => { setPhotoError(false); Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click(); }}
                 disabled={photoGenerating}
-                style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(255,248,240,0.9)', backdropFilter: 'blur(4px)' }}
+                style={{
+                  fontSize: 12, padding: '6px 12px', minHeight: 32,
+                  background: glass.chrome, backdropFilter: glass.blur,
+                  border: `1px solid ${glass.chromeBorder}`, borderRadius: radius.sm,
+                }}
               >
                 {photoError ? 'Failed. Retry?' : <><Camera size={12} /> Change</>}
               </Btn>
@@ -585,22 +618,35 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         ) : (
           <>
             {photoError ? (
-              <Btn
-                variant="ghost"
+              <button
                 onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
-                style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10, color: C.amber }}
+                style={{
+                  width: '100%', minHeight: 80, padding: '18px 0',
+                  borderRadius: radius.lg, border: `1.5px dashed ${C.amber}`,
+                  background: C.amberBg, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: C.amber, ...type.body, fontWeight: 600, gap: 8,
+                }}
               >
                 Failed. Tap to retry.
-              </Btn>
+              </button>
             ) : (
-              <Btn
-                variant="ghost"
+              <button
                 onClick={() => Capacitor.isNativePlatform() ? handleNativePhoto() : fileRef.current?.click()}
                 disabled={photoGenerating}
-                style={{ width: '100%', justifyContent: 'center', padding: '12px 0', border: `1px dashed ${C.border}`, borderRadius: 10 }}
+                style={{
+                  width: '100%', minHeight: 80, padding: '20px 0',
+                  borderRadius: radius.lg, border: `1.5px dashed ${C.accentLight}`,
+                  background: C.bgDeep, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, transition: `opacity 0.18s`,
+                }}
               >
-                {photoGenerating ? 'Processing...' : <><Camera size={14} /> Add Photo</>}
-              </Btn>
+                <Camera size={22} color={C.accent} />
+                <span style={{ ...type.body, color: C.textMuted, fontWeight: 600 }}>
+                  {photoGenerating ? 'Processing...' : 'Add a Photo'}
+                </span>
+              </button>
             )}
           </>
         )}
@@ -622,9 +668,15 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           variant="ghost"
           onClick={handleAiFill}
           disabled={aiFilling}
-          style={{ width: '100%', justifyContent: 'center', marginBottom: 12, fontSize: 12 }}
+          style={{
+            width: '100%', justifyContent: 'center', marginBottom: 14,
+            fontSize: 13, fontWeight: 700,
+            background: C.accentSoft, border: `1px solid ${C.accentLight}`,
+            borderRadius: radius.md, padding: '10px 0', minHeight: 44,
+            color: C.accent,
+          }}
         >
-          <Search size={12} /> {aiFilling ? 'Researching...' : 'AI Fill'}
+          <Search size={13} /> {aiFilling ? 'Researching...' : 'AI Fill'}
         </Btn>
       )}
 
@@ -659,7 +711,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       </div>
 
       <ChapterHeader number="3" title="On the Shelf" subtitle="Roast date sets the peak window" />
-      <div style={{ background: C.card, borderRadius: 14, padding: '14px 14px 10px', border: `1px solid ${C.borderLight}`, marginBottom: 12, boxShadow: '0 1px 2px rgba(92,61,46,0.04)' }}>
+      <div style={{ background: C.cream, borderRadius: radius.lg, padding: '16px 16px 12px', border: `1px solid ${C.hairline}`, marginBottom: 14, boxShadow: shadows.e2 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           <div style={{ minWidth: 0 }}>
             <label style={labelStyle}>Roast Date</label>
@@ -702,45 +754,48 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           placeholder="e.g. nectarine, honeysuckle, lavender finish..."
           rows={3}
           style={{
-            width: '100%', padding: '12px 14px', borderRadius: 12,
-            border: `1px solid ${C.border}`,
-            background: `repeating-linear-gradient(to bottom, #FDF8EF 0px, #FDF8EF 27px, ${C.borderLight} 27px, ${C.borderLight} 28px)`,
+            width: '100%', padding: '13px 15px', borderRadius: radius.md,
+            border: `1px solid ${C.hairline}`,
+            background: `repeating-linear-gradient(to bottom, ${C.cream} 0px, ${C.cream} 27px, ${C.borderLight} 27px, ${C.borderLight} 28px)`,
             fontFamily: fonts.heading, fontSize: 16, color: C.text, lineHeight: '28px',
             boxSizing: 'border-box', resize: 'vertical', outline: 'none',
             fontStyle: f.bagNotes ? 'normal' : 'italic',
+            boxShadow: shadows.e1,
           }}
           onFocus={scrollOnFocus}
         />
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         {NOTE_CHIPS.map(chip => (
           <button
             key={chip}
             onClick={() => addChip(chip)}
             style={{
-              padding: '5px 11px', borderRadius: 99,
-              border: `1px solid ${C.borderLight}`, background: C.card,
-              fontFamily: fonts.body, fontSize: 11, fontWeight: 600, color: C.textMuted,
-              cursor: 'pointer',
+              padding: '6px 13px', borderRadius: radius.pill,
+              border: `1px solid ${C.accentLight}`, background: C.cream,
+              fontFamily: fonts.body, fontSize: 12, fontWeight: 600, color: C.accent,
+              cursor: 'pointer', minHeight: 30,
+              boxShadow: shadows.e1,
+              transition: `background 0.15s, transform 0.15s`,
             }}
           >+ {chip}</button>
         ))}
       </div>
       {sourceSummary && (
         <div style={{
-          marginTop: 10,
-          padding: '10px 12px',
-          borderRadius: 10,
+          marginTop: 12,
+          padding: '12px 14px',
+          borderRadius: radius.md,
           background: C.amberBg,
-          border: `1px solid ${C.border}`,
-          fontSize: 12.5,
+          border: `1px solid ${C.accentLight}`,
+          boxShadow: shadows.e1,
           color: C.text,
-          lineHeight: 1.45,
+          lineHeight: 1.5,
         }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+          <div style={{ ...type.label, color: C.textLight, marginBottom: 5 }}>
             Source insight
           </div>
-          {sourceSummary}
+          <div style={{ ...type.body, fontSize: 13 }}>{sourceSummary}</div>
         </div>
       )}
 
@@ -816,9 +871,10 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       />
       {grindOpen && (
         <div style={{
-          background: `linear-gradient(145deg, ${C.card}, #FDF8EF)`,
-          borderRadius: 14, padding: 14, border: `1px solid ${C.borderLight}`,
-          position: 'relative', overflow: 'hidden', marginBottom: 12,
+          background: `linear-gradient(145deg, ${C.cream}, ${C.bgDeep})`,
+          borderRadius: radius.lg, padding: 16, border: `1px solid ${C.hairline}`,
+          position: 'relative', overflow: 'hidden', marginBottom: 14,
+          boxShadow: shadows.e2,
         }}>
           <div style={{ position: 'absolute', top: -6, right: -6, opacity: 0.1 }}>
             <svg width="70" height="70" viewBox="0 0 70 70">
@@ -838,7 +894,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 step={0.1}
                 min={0}
                 placeholder="4.0"
-                style={{ ...inputStyle, fontFamily: fonts.heading, fontSize: 20, textAlign: 'center' }}
+                style={{ ...inputStyle, fontFamily: fonts.heading, fontSize: 22, textAlign: 'center', letterSpacing: '-0.01em' }}
                 onFocus={scrollOnFocus}
               />
             </div>
@@ -851,7 +907,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 step={0.1}
                 min={0}
                 placeholder="6.2"
-                style={{ ...inputStyle, fontFamily: fonts.heading, fontSize: 20, textAlign: 'center' }}
+                style={{ ...inputStyle, fontFamily: fonts.heading, fontSize: 22, textAlign: 'center', letterSpacing: '-0.01em' }}
                 onFocus={scrollOnFocus}
               />
             </div>
@@ -861,26 +917,28 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
 
       {/* Delete bean (hidden for new beans — cancel/discard handles cleanup) */}
       {deleteBean && !isNewBean && (
-        <div style={{ marginTop: 24, marginBottom: 4 }}>
+        <div style={{ marginTop: 28, marginBottom: 6 }}>
           {!confirmDelete ? (
             <button
               onClick={() => setConfirmDelete(true)}
               style={{
-                width: '100%', padding: 10, borderRadius: 10,
-                background: 'transparent', border: `1px dashed ${C.border}`,
-                color: C.red, fontFamily: fonts.body, fontSize: 12, fontWeight: 600,
+                width: '100%', minHeight: 44, padding: '10px 16px', borderRadius: radius.md,
+                background: 'transparent', border: `1.5px dashed ${C.accentLight}`,
+                color: C.textMuted, fontFamily: fonts.body, fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', gap: 6,
+                justifyContent: 'center', gap: 7,
+                transition: `border-color 0.18s, color 0.18s`,
               }}
             >
               <Trash2 size={14} /> Delete this bean
             </button>
           ) : (
             <div style={{
-              padding: 14, borderRadius: 12, background: '#FDF0EB',
-              border: `1px solid ${C.red}`, textAlign: 'center',
+              padding: 16, borderRadius: radius.lg, background: C.redBg,
+              border: `1.5px solid ${C.red}`, textAlign: 'center',
+              boxShadow: shadows.e1,
             }}>
-              <div style={{ fontSize: 12, color: C.text, marginBottom: 10 }}>
+              <div style={{ ...type.body, color: C.text, marginBottom: 12 }}>
                 Delete <strong>{bean.name}</strong>? This cannot be undone.
               </div>
               <div style={{ display: 'flex', gap: 8 }}>

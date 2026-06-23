@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
 
 const ROTATING_TASKS = [
   'Locating the roaster',
@@ -56,16 +56,33 @@ export const ResearchLoadingScreen = ({
       fontFamily: fonts.body,
       overflow: 'hidden',
     }}>
+      {/* Subtle radial warm glow behind mascot */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: '50%',
+        transform: 'translateX(-50%)',
+        width: 340, height: 340,
+        borderRadius: '50%',
+        background: `radial-gradient(ellipse at center, ${C.accentSoft} 0%, transparent 72%)`,
+        opacity: 0.65,
+        pointerEvents: 'none',
+      }} />
+
+      {/* Close button */}
       {onClose && (
         <button
           onClick={onClose}
           aria-label="Close"
           style={{
-            position: 'absolute', top: 8, right: 12, zIndex: 10,
-            width: 36, height: 36, borderRadius: 18,
+            position: 'absolute', top: 12, right: 14, zIndex: 10,
+            width: 44, height: 44, borderRadius: radius.pill,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(59,36,23,0.04)',
-            border: 'none', cursor: 'pointer', padding: 0,
+            background: glass.chrome,
+            border: `1px solid ${C.hairline}`,
+            backdropFilter: glass.blur,
+            WebkitBackdropFilter: glass.blur,
+            cursor: 'pointer', padding: 0,
+            boxShadow: shadows.e1,
           }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -75,10 +92,11 @@ export const ResearchLoadingScreen = ({
         </button>
       )}
 
+      {/* Mascot video */}
       <div style={{
-        position: 'relative', width: 320, height: 460,
+        position: 'relative', width: 320, height: 440,
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        marginTop: 24, flexShrink: 0,
+        marginTop: 20, flexShrink: 0,
         overflow: 'hidden',
       }}>
         <video
@@ -88,7 +106,7 @@ export const ResearchLoadingScreen = ({
           aria-label="Professor Ruphus"
           style={{
             height: '100%', width: 'auto', objectFit: 'contain',
-            filter: 'drop-shadow(0 6px 14px rgba(59,36,23,0.10))',
+            filter: 'drop-shadow(0 8px 20px rgba(59,36,23,0.13))',
             position: 'relative', zIndex: 1,
             WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
             maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
@@ -96,54 +114,87 @@ export const ResearchLoadingScreen = ({
         />
       </div>
 
+      {/* Name — script accent */}
       <div style={{
-        marginTop: 6,
-        fontFamily: fonts.title, fontSize: 22,
-        color: C.accent, letterSpacing: 0.4,
+        fontFamily: fonts.title,
+        fontSize: 22,
+        color: C.accent,
+        letterSpacing: 0.3,
+        marginTop: 2,
+        lineHeight: 1.2,
       }}>
         Professor Ruphus
       </div>
 
+      {/* Heading */}
       <div style={{
-        marginTop: 14, padding: '0 28px',
-        fontFamily: fonts.heading, fontSize: 22, lineHeight: 1.25,
-        color: C.text, textAlign: 'center', textWrap: 'balance',
+        marginTop: 12, padding: '0 28px',
+        fontFamily: fonts.heading,
+        fontSize: 24,
+        fontWeight: 600,
+        lineHeight: 1.2,
+        letterSpacing: '-0.01em',
+        color: C.text,
+        textAlign: 'center',
       }}>
         Researching your coffee
       </div>
 
+      {/* Rotating task quip */}
       <div style={{
-        marginTop: 12, height: 22,
+        marginTop: 14, height: 24,
         display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 32px',
       }}>
+        {/* Animated dot */}
         <span style={{
-          width: 6, height: 6, borderRadius: 3, background: C.accent,
+          width: 6, height: 6, borderRadius: radius.pill,
+          background: C.accent, flexShrink: 0,
           animation: 'rlsPulse 1.4s ease-in-out infinite',
+          display: 'block',
         }} />
-        <div key={taskIdx} style={{
-          fontSize: 14, color: C.textMuted,
-          animation: 'rlsFade 0.5s ease-out',
-        }}>
+        <div
+          key={taskIdx}
+          style={{
+            ...typeScale.body,
+            color: C.textMuted,
+            animation: 'rlsFade 0.5s cubic-bezier(0.22,1,0.36,1)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {ROTATING_TASKS[taskIdx]}…
         </div>
       </div>
 
+      {/* Progress bar */}
       <div style={{
         marginTop: 28, width: 260,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       }}>
+        {/* Bar track */}
         <div style={{
-          width: '100%', height: 4, background: C.borderLight,
-          borderRadius: 2, overflow: 'hidden',
+          width: '100%', height: 3,
+          background: C.borderLight,
+          borderRadius: radius.pill, overflow: 'hidden',
         }}>
           <div style={{
-            height: '100%', width: `${Math.max(0, Math.min(1, pct)) * 100}%`,
-            background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})`,
-            borderRadius: 2, transition: 'width 0.4s linear',
+            height: '100%',
+            width: `${Math.max(0, Math.min(1, pct)) * 100}%`,
+            background: `linear-gradient(90deg, ${C.accentLight} 0%, ${C.accent} 100%)`,
+            borderRadius: radius.pill,
+            transition: 'width 0.4s linear',
+            boxShadow: `0 0 8px ${C.accent}55`,
           }} />
         </div>
+
+        {/* Helper text */}
         <div style={{
-          fontSize: 12, color: C.textLight, letterSpacing: 0.2,
+          ...typeScale.caption,
+          color: C.textLight,
+          letterSpacing: '0.02em',
+          textAlign: 'center',
         }}>
           This usually takes up to 90 seconds
         </div>
@@ -151,11 +202,11 @@ export const ResearchLoadingScreen = ({
 
       <style>{`
         @keyframes rlsPulse {
-          0%,100% { transform: scale(1); opacity: 1; }
-          50%     { transform: scale(1.6); opacity: 0.5; }
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50%       { transform: scale(1.65); opacity: 0.45; }
         }
         @keyframes rlsFade {
-          from { opacity: 0; transform: translateY(4px); }
+          from { opacity: 0; transform: translateY(5px); }
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>

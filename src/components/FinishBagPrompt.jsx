@@ -2,7 +2,7 @@
 // Single modal with view swapping: 'prompt' (quick rate) | 'fullReview'
 import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, radius } from '../styles/theme';
 import { today } from '../lib/peakStatus';
 import { convertTastingScores } from '../lib/professorRuphus';
 import { Modal } from './Modal';
@@ -99,24 +99,49 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   };
 
   const inputStyle = {
-    width: '100%', padding: '8px 10px', borderRadius: 8,
-    border: `1px solid ${C.border}`, fontFamily: fonts.body,
-    fontSize: 16, background: C.bg, color: C.text, boxSizing: 'border-box',
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: radius.sm,
+    border: `1px solid ${C.border}`,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    background: C.bgDeep,
+    color: C.text,
+    boxSizing: 'border-box',
+    outline: 'none',
+    WebkitAppearance: 'none',
   };
 
   if (view === 'fullReview') {
     return (
       <Modal open={open} onClose={() => onClose()} title="Full Review">
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: 12 }}>
           <span
             onClick={() => setView('prompt')}
-            style={{ fontSize: 13, color: C.accent, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            style={{
+              ...type.body,
+              color: C.accent,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontWeight: 700,
+              minHeight: 44,
+              WebkitTapHighlightColor: 'transparent',
+            }}
           >
             <ArrowLeft size={14} /> Back
           </span>
         </div>
         {error && (
-          <div style={{ background: C.redBg, color: C.red, padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+          <div style={{
+            background: C.redBg,
+            color: C.red,
+            padding: '10px 14px',
+            borderRadius: radius.sm,
+            ...type.body,
+            marginBottom: 14,
+          }}>
             {error}
           </div>
         )}
@@ -134,50 +159,73 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   return (
     <Modal open={open} onClose={() => onClose()} title={celebrating ? '' : 'Rate this bean?'} centered>
       {celebrating && (
-        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+        <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
           <video
             src="/images/ruphus-animations/ruphus-fist-pump.mp4"
             autoPlay muted playsInline
             style={{
-              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 12px',
+              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',
               display: 'block',
               WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
               maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
             }}
           />
-          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 4 }}>
+          <div style={{
+            fontFamily: fonts.heading,
+            fontSize: 22,
+            color: C.text,
+            fontWeight: 600,
+            letterSpacing: '-0.01em',
+            marginBottom: 6,
+          }}>
             Bag finished!
           </div>
-          <div style={{ fontSize: 14, color: C.textMuted }}>
+          <div style={{ ...type.bodyL, color: C.textMuted }}>
             On to the next one, brewer.
           </div>
         </div>
       )}
 
       {!celebrating && <>
-      {/* Bean info */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text }}>{bean.name}</div>
+      {/* Bean identity */}
+      <div style={{ marginBottom: 22, paddingBottom: 18, borderBottom: `1px solid ${C.hairline}` }}>
+        <div style={{
+          fontFamily: fonts.heading,
+          fontSize: 20,
+          fontWeight: 600,
+          color: C.text,
+          letterSpacing: '-0.01em',
+          lineHeight: 1.15,
+        }}>
+          {bean.name}
+        </div>
         {bean.roaster && (
-          <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{bean.roaster}</div>
+          <div style={{ ...type.body, color: C.textMuted, marginTop: 4 }}>{bean.roaster}</div>
         )}
       </div>
 
       {error && (
-        <div style={{ background: C.redBg, color: C.red, padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+        <div style={{
+          background: C.redBg,
+          color: C.red,
+          padding: '10px 14px',
+          borderRadius: radius.sm,
+          ...type.body,
+          marginBottom: 14,
+        }}>
           {error}
         </div>
       )}
 
       {/* Star rating */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 6 }}>Rating</label>
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ ...type.label, color: C.textMuted, display: 'block', marginBottom: 10 }}>Rating</label>
         <StarRating value={rating} onChange={setRating} size={32} />
       </div>
 
       {/* One-word input */}
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>One word</label>
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ ...type.label, color: C.textMuted, display: 'block', marginBottom: 8 }}>One word</label>
         <input
           value={oneWord}
           onChange={e => setOneWord(e.target.value)}
@@ -187,22 +235,38 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       </div>
 
       {/* Quick Save */}
-      <Btn variant="primary" onClick={handleQuickSave} disabled={saving || rating === 0} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>
+      <Btn
+        variant="primary"
+        onClick={handleQuickSave}
+        disabled={saving || rating === 0}
+        style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}
+      >
         Quick Save
       </Btn>
 
       {/* Full Review */}
-      <Btn variant="secondary" onClick={() => setView('fullReview')} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginBottom: 16 }}>
+      <Btn
+        variant="secondary"
+        onClick={() => setView('fullReview')}
+        disabled={saving}
+        style={{ width: '100%', justifyContent: 'center', marginBottom: 20 }}
+      >
         Full Review
       </Btn>
 
-      {/* Skip link */}
-      <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+      {/* Skip */}
+      <div style={{ textAlign: 'center', paddingBottom: 4 }}>
         <span
           onClick={handleSkip}
           style={{
-            fontSize: 13, color: C.textLight, cursor: saving ? 'default' : 'pointer',
+            ...type.body,
+            color: C.textLight,
+            cursor: saving ? 'default' : 'pointer',
             opacity: saving ? 0.5 : 1,
+            minHeight: 44,
+            display: 'inline-flex',
+            alignItems: 'center',
+            WebkitTapHighlightColor: 'transparent',
           }}
         >
           Just finish it

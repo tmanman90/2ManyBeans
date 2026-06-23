@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { ChevronRight, LogOut, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
 import { doc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
-import { C, fonts, shadows } from '../styles/theme';
+import { C, fonts, shadows, radius, type as typeScale, glass, motion as motionTokens } from '../styles/theme';
 import { haptic } from '../lib/haptics';
 import { Toast } from './Toast';
 import { usePreferences } from '../hooks/useUserProfile';
@@ -53,29 +53,27 @@ const CANISTER_OPTIONS = [1, 2, 3, 4, 5, 6];
 
 // --- Styles ---
 const groupStyle = {
-  background: '#FFFFFF',
-  borderRadius: 10,
-  margin: '0 16px 16px',
+  background: C.card,
+  borderRadius: radius.lg,
+  margin: '0 16px 8px',
   overflow: 'hidden',
+  boxShadow: shadows.e2,
+  border: `1px solid ${C.hairline}`,
 };
 
 const sectionHeaderStyle = {
-  fontSize: 13,
-  textTransform: 'uppercase',
-  letterSpacing: 0.5,
+  ...typeScale.label,
   color: C.textMuted,
-  fontFamily: fonts.body,
-  fontWeight: 600,
-  padding: '24px 16px 8px',
-  margin: '0 16px',
+  padding: '20px 20px 6px',
+  margin: 0,
 };
 
 const rowStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  minHeight: 44,
-  padding: '10px 16px',
+  minHeight: 50,
+  padding: '12px 16px',
   background: 'transparent',
   border: 'none',
   width: '100%',
@@ -86,7 +84,7 @@ const rowStyle = {
 };
 
 const separatorStyle = {
-  borderBottom: `0.5px solid ${C.borderLight}`,
+  borderBottom: `0.5px solid ${C.hairline}`,
   marginLeft: 16,
 };
 
@@ -94,13 +92,14 @@ const rowLabelStyle = {
   color: C.text,
   fontSize: 16,
   fontFamily: fonts.body,
+  fontWeight: 500,
   flex: 1,
   minWidth: 0,
 };
 
 const rowValueStyle = {
   color: C.textMuted,
-  fontSize: 16,
+  fontSize: 15,
   fontFamily: fonts.body,
   display: 'flex',
   alignItems: 'center',
@@ -109,7 +108,7 @@ const rowValueStyle = {
 };
 
 const selectStyle = {
-  fontFamily: fonts.body, fontSize: 16, color: C.textMuted,
+  fontFamily: fonts.body, fontSize: 15, color: C.textMuted,
   background: 'transparent', border: 'none',
   appearance: 'none', WebkitAppearance: 'none',
   cursor: 'pointer', textAlign: 'right',
@@ -563,9 +562,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   return createPortal(
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(44,24,16,0.4)',
-      backdropFilter: 'blur(4px)',
-      WebkitBackdropFilter: 'blur(4px)',
+      background: glass.scrim,
+      backdropFilter: glass.blur,
+      WebkitBackdropFilter: glass.blur,
       zIndex: 1000,
       display: 'flex',
       alignItems: 'flex-end',
@@ -573,40 +572,66 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     }}>
       <div
         style={{
-          background: C.bg,
-          borderRadius: '12px 12px 0 0',
+          background: C.bgDeep,
+          borderRadius: `${radius.xl}px ${radius.xl}px 0 0`,
           width: '100%',
           maxWidth: 480,
           maxHeight: '95dvh',
           boxShadow: shadows.modal,
           display: 'flex',
           flexDirection: 'column',
-          transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+          transition: `transform ${motionTokens.dur.base}s ${motionTokens.cssOut}`,
         }}
         onClick={e => e.stopPropagation()}
       >
+        {/* Grabber handle */}
+        <div style={{
+          width: 36, height: 4,
+          borderRadius: radius.pill,
+          background: C.hairline,
+          margin: '10px auto 0',
+          flexShrink: 0,
+        }} />
         {/* Sticky header */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 1,
-          background: C.bg,
-          padding: `calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px`,
-          borderBottom: `0.5px solid ${C.borderLight}`,
+          background: glass.chrome,
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
+          padding: '8px 20px 14px',
+          borderBottom: `0.5px solid ${glass.chromeBorder}`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexShrink: 0,
-          borderRadius: '12px 12px 0 0',
         }}>
-          <div style={{ fontFamily: fonts.heading, fontSize: 20, fontWeight: 600, color: C.text }}>Settings</div>
+          <div style={{
+            fontFamily: fonts.heading,
+            fontSize: typeScale.h2.fontSize,
+            fontWeight: typeScale.h2.fontWeight,
+            lineHeight: typeScale.h2.lineHeight,
+            color: C.text,
+            letterSpacing: '-0.01em',
+          }}>
+            Settings
+          </div>
           <button
             onClick={onClose}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: 8,
-              fontFamily: fonts.body, fontSize: 17, fontWeight: 600,
+              background: C.accentSoft,
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px 16px',
+              borderRadius: radius.pill,
+              fontFamily: fonts.body,
+              fontSize: 15,
+              fontWeight: 700,
               color: C.accent,
-              minWidth: 44, minHeight: 44,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              minWidth: 44,
+              minHeight: 36,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               WebkitTapHighlightColor: 'transparent',
             }}
           >
@@ -617,18 +642,35 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         {/* Scrollable body */}
         <div style={{
           overflowY: 'auto', flex: 1, minHeight: 0,
-          paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+          paddingTop: 8,
+          paddingBottom: 'calc(28px + env(safe-area-inset-bottom, 0px))',
         }}>
 
           {/* --- Profile Section --- */}
           <div style={sectionHeaderStyle}>Profile</div>
           <div style={groupStyle}>
-            <div style={{ padding: '14px 16px' }}>
-              <div style={{ fontFamily: fonts.body, fontSize: 17, fontWeight: 600, color: C.text }}>
+            <div style={{
+              padding: '16px 16px 14px',
+              background: `linear-gradient(135deg, ${C.accentSoft} 0%, ${C.card} 100%)`,
+              borderBottom: `0.5px solid ${C.hairline}`,
+            }}>
+              <div style={{
+                fontFamily: fonts.heading,
+                fontSize: typeScale.h3.fontSize,
+                fontWeight: 700,
+                color: C.text,
+                letterSpacing: '-0.01em',
+              }}>
                 {profile?.displayName || 'Coffee Lover'}
               </div>
               {profile?.email && (
-                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted, marginTop: 2 }}>
+                <div style={{
+                  fontFamily: fonts.body,
+                  fontSize: 13,
+                  color: C.textMuted,
+                  marginTop: 3,
+                  fontWeight: 500,
+                }}>
                   {profile.email}
                 </div>
               )}
@@ -649,8 +691,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     autoFocus
                     style={{
                       fontFamily: fonts.body, fontSize: 16, color: C.text,
-                      background: C.bg, border: `1px solid ${C.border}`,
-                      borderRadius: 8, padding: '6px 10px', width: 150,
+                      background: C.bgDeep, border: `1px solid ${C.border}`,
+                      borderRadius: radius.sm, padding: '8px 12px', width: 150,
                       outline: 'none',
                     }}
                   />
@@ -658,8 +700,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     onClick={handleDisplayNameSave}
                     style={{
                       background: C.accent, color: '#fff', border: 'none',
-                      borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
-                      fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
+                      borderRadius: radius.sm, padding: '8px 16px', cursor: 'pointer',
+                      fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
+                      minHeight: 36,
                     }}
                   >
                     Save
@@ -691,8 +734,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     autoFocus
                     style={{
                       fontFamily: fonts.body, fontSize: 16, color: C.text,
-                      background: C.bg, border: `1px solid ${C.border}`,
-                      borderRadius: 8, padding: '6px 10px', width: 140,
+                      background: C.bgDeep, border: `1px solid ${C.border}`,
+                      borderRadius: radius.sm, padding: '8px 12px', width: 140,
                       outline: 'none',
                     }}
                   />
@@ -700,8 +743,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     onClick={handleUsernameSave}
                     style={{
                       background: C.accent, color: '#fff', border: 'none',
-                      borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
-                      fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
+                      borderRadius: radius.sm, padding: '8px 16px', cursor: 'pointer',
+                      fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
+                      minHeight: 36,
                     }}
                   >
                     Save
@@ -720,7 +764,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           </div>
 
           {/* --- Equipment Section --- */}
-          <div style={sectionHeaderStyle}>Equipment</div>
+          <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Equipment</div>
           <div style={groupStyle}>
             {/* Grinder */}
             <div style={rowStyle}>
@@ -768,8 +812,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     placeholder="e.g., Comandante C40"
                     style={{
                       fontFamily: fonts.body, fontSize: 16, color: C.text,
-                      background: C.bg, border: `1px solid ${C.border}`,
-                      borderRadius: 8, padding: '6px 10px', flex: 1,
+                      background: C.bgDeep, border: `1px solid ${C.border}`,
+                      borderRadius: radius.sm, padding: '8px 12px', flex: 1,
                       textAlign: 'right', outline: 'none',
                       minWidth: 0,
                     }}
@@ -833,23 +877,30 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           {/* --- Fellow Aiden Section --- */}
           {(preferences.brewMethod === 'aiden') && (
             <>
-              <div style={sectionHeaderStyle}>Fellow Aiden</div>
+              <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Fellow Aiden</div>
               <div style={groupStyle}>
                 {fellowConnected && !fellowFormOpen ? (
                   /* Connected state */
                   <div style={rowStyle}>
                     <div>
                       <span style={rowLabelStyle}>Connected as</span>
-                      <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{fellowEmail}</div>
+                      <div style={{ fontSize: 13, color: C.textMuted, marginTop: 3, fontWeight: 500 }}>{fellowEmail}</div>
                     </div>
                     <button
                       onClick={handleFellowDisconnect}
                       disabled={fellowLoading}
                       style={{
-                        background: 'none', border: `1px solid ${C.red}30`,
-                        borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
-                        fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
-                        color: C.red, opacity: fellowLoading ? 0.5 : 1,
+                        background: C.redBg,
+                        border: `1px solid ${C.red}40`,
+                        borderRadius: radius.sm,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        fontFamily: fonts.body,
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: C.red,
+                        opacity: fellowLoading ? 0.5 : 1,
+                        minHeight: 36,
                       }}
                     >
                       {fellowLoading ? 'Disconnecting...' : 'Disconnect'}
@@ -857,8 +908,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   </div>
                 ) : fellowFormOpen ? (
                   /* Connect form */
-                  <div style={{ padding: 16 }}>
-                    <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
+                  <div style={{ padding: 18 }}>
+                    <div style={{ fontSize: 14, color: C.textMuted, marginBottom: 14, fontFamily: fonts.body, fontWeight: 500 }}>
                       Enter your Fellow app credentials
                     </div>
                     <input
@@ -868,10 +919,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       onChange={e => setFellowEmailInput(e.target.value)}
                       onFocus={scrollOnFocus}
                       style={{
-                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                        width: '100%', padding: '12px 14px', borderRadius: radius.sm,
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,
-                        fontSize: 16, background: C.bg, color: C.text,
-                        boxSizing: 'border-box', marginBottom: 8,
+                        fontSize: 16, background: C.bgDeep, color: C.text,
+                        boxSizing: 'border-box', marginBottom: 10, outline: 'none',
                       }}
                     />
                     <input
@@ -882,25 +933,25 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       onKeyDown={e => e.key === 'Enter' && !fellowLoading && handleFellowConnect()}
                       onFocus={scrollOnFocus}
                       style={{
-                        width: '100%', padding: '10px 12px', borderRadius: 8,
+                        width: '100%', padding: '12px 14px', borderRadius: radius.sm,
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,
-                        fontSize: 16, background: C.bg, color: C.text,
-                        boxSizing: 'border-box', marginBottom: fellowError ? 8 : 12,
+                        fontSize: 16, background: C.bgDeep, color: C.text,
+                        boxSizing: 'border-box', marginBottom: fellowError ? 10 : 14, outline: 'none',
                       }}
                     />
                     {fellowError && (
-                      <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, color: C.red, marginBottom: 10, fontFamily: fonts.body }}>
                         {fellowError}
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 10 }}>
                       <button
                         onClick={() => { setFellowFormOpen(false); setFellowError(null); }}
                         style={{
-                          flex: 1, padding: '10px 16px', borderRadius: 10,
-                          border: `1px solid ${C.border}`, background: C.bg,
+                          flex: 1, padding: '12px 16px', borderRadius: radius.md,
+                          border: `1px solid ${C.border}`, background: C.bgDeep,
                           fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                          color: C.text, cursor: 'pointer',
+                          color: C.textMuted, cursor: 'pointer',
                         }}
                       >
                         Cancel
@@ -909,11 +960,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                         onClick={handleFellowConnect}
                         disabled={fellowLoading || !fellowEmailInput.trim() || !fellowPasswordInput}
                         style={{
-                          flex: 1, padding: '10px 16px', borderRadius: 10,
+                          flex: 1, padding: '12px 16px', borderRadius: radius.md,
                           border: 'none', background: C.accent,
-                          fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                          fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                           color: '#fff', cursor: 'pointer',
                           opacity: (fellowLoading || !fellowEmailInput.trim() || !fellowPasswordInput) ? 0.5 : 1,
+                          boxShadow: shadows.button,
                         }}
                       >
                         {fellowLoading ? 'Connecting...' : 'Connect'}
@@ -923,16 +975,24 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 ) : (
                   /* Disconnected state */
                   <div style={rowStyle}>
-                    <span style={{ ...rowLabelStyle, fontSize: 14, flex: 1, paddingRight: 12 }}>
+                    <span style={{ ...rowLabelStyle, fontSize: 14, flex: 1, paddingRight: 14, color: C.textMuted }}>
                       Connect your Fellow account for one-tap recipe push
                     </span>
                     <button
                       onClick={() => setFellowFormOpen(true)}
                       style={{
-                        background: C.accent, color: '#fff', border: 'none',
-                        borderRadius: 8, padding: '8px 16px', cursor: 'pointer',
-                        fontFamily: fonts.body, fontSize: 14, fontWeight: 600,
+                        background: C.accent,
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: radius.sm,
+                        padding: '10px 18px',
+                        cursor: 'pointer',
+                        fontFamily: fonts.body,
+                        fontSize: 14,
+                        fontWeight: 700,
                         flexShrink: 0,
+                        boxShadow: shadows.button,
+                        minHeight: 40,
                       }}
                     >
                       Connect
@@ -944,11 +1004,22 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           )}
 
           {/* --- Subscription Section --- */}
-          <div style={sectionHeaderStyle}>Subscription</div>
+          <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Subscription</div>
           <div style={groupStyle}>
+            {/* Current plan row — premium badge when subscribed */}
             <div style={rowStyle}>
               <span style={rowLabelStyle}>Current Plan</span>
-              <span style={rowValueStyle}>{subscriptionStatusLabel}</span>
+              <span style={{
+                ...rowValueStyle,
+                fontWeight: 700,
+                color: hasPro ? C.accent : C.textMuted,
+                background: hasPro ? C.accentSoft : 'transparent',
+                borderRadius: radius.pill,
+                padding: hasPro ? '3px 12px' : 0,
+                fontSize: 14,
+              }}>
+                {subscriptionStatusLabel}
+              </span>
             </div>
 
             {!hasPro && (
@@ -956,9 +1027,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <div style={separatorStyle} />
                 <button
                   onClick={handleOpenPaywall}
-                  style={{ ...rowStyle, color: C.accent, fontWeight: 600 }}
+                  style={{
+                    ...rowStyle,
+                    background: `linear-gradient(135deg, ${C.accentSoft} 0%, ${C.card} 100%)`,
+                  }}
                 >
-                  <span style={{ ...rowLabelStyle, color: C.accent }}>Upgrade to Pro</span>
+                  <span style={{ ...rowLabelStyle, color: C.accent, fontWeight: 700 }}>Upgrade to Pro</span>
                   <ChevronRight size={18} color={C.accent} />
                 </button>
               </>
@@ -991,28 +1065,34 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 ) : (
                   <>
                     {redeemSuccess ? (
-                      <div style={{ padding: 16 }}>
-                        <div style={{ fontSize: 14, color: C.text, marginBottom: 8, fontWeight: 600 }}>
+                      <div style={{ padding: 18 }}>
+                        <div style={{
+                          fontFamily: fonts.body,
+                          fontSize: 15,
+                          color: C.green,
+                          marginBottom: 6,
+                          fontWeight: 700,
+                        }}>
                           Pro unlocked
                         </div>
-                        <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
+                        <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 14, fontFamily: fonts.body }}>
                           Active until {new Date(redeemSuccess.expiresAt).toLocaleDateString()}
                         </div>
                         <button
                           onClick={resetRedeemForm}
                           style={{
-                            padding: '10px 16px', borderRadius: 10,
-                            border: `1px solid ${C.border}`, background: C.bg,
+                            padding: '10px 20px', borderRadius: radius.md,
+                            border: `1px solid ${C.border}`, background: C.bgDeep,
                             fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                            color: C.text, cursor: 'pointer',
+                            color: C.textMuted, cursor: 'pointer',
                           }}
                         >
                           Close
                         </button>
                       </div>
                     ) : redeemOpen ? (
-                      <div style={{ padding: 16 }}>
-                        <div style={{ fontSize: 14, color: C.text, marginBottom: 12 }}>
+                      <div style={{ padding: 18 }}>
+                        <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12, fontFamily: fonts.body, fontWeight: 500 }}>
                           Enter your redemption code
                         </div>
                         <input
@@ -1034,28 +1114,29 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                           spellCheck={false}
                           maxLength={20}
                           style={{
-                            width: '100%', padding: '10px 12px', borderRadius: 8,
+                            width: '100%', padding: '12px 14px', borderRadius: radius.sm,
                             border: `1px solid ${C.border}`, fontFamily: fonts.body,
-                            fontSize: 16, background: C.bg, color: C.text,
+                            fontSize: 16, background: C.bgDeep, color: C.text,
                             boxSizing: 'border-box',
-                            marginBottom: redeemError ? 8 : 12,
-                            letterSpacing: 1,
+                            marginBottom: redeemError ? 10 : 14,
+                            letterSpacing: 2,
                             textTransform: 'uppercase',
+                            outline: 'none',
                           }}
                         />
                         {redeemError && (
-                          <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+                          <div style={{ fontSize: 13, color: C.red, marginBottom: 10, fontFamily: fonts.body }}>
                             {redeemError}
                           </div>
                         )}
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 10 }}>
                           <button
                             onClick={resetRedeemForm}
                             style={{
-                              flex: 1, padding: '10px 16px', borderRadius: 10,
-                              border: `1px solid ${C.border}`, background: C.bg,
+                              flex: 1, padding: '12px 16px', borderRadius: radius.md,
+                              border: `1px solid ${C.border}`, background: C.bgDeep,
                               fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                              color: C.text, cursor: 'pointer',
+                              color: C.textMuted, cursor: 'pointer',
                             }}
                           >
                             Cancel
@@ -1064,11 +1145,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                             onClick={handleRedeemSubmit}
                             disabled={redeemLoading || !redeemInput.trim()}
                             style={{
-                              flex: 1, padding: '10px 16px', borderRadius: 10,
+                              flex: 1, padding: '12px 16px', borderRadius: radius.md,
                               border: 'none', background: C.accent,
-                              fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                              fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                               color: '#fff', cursor: 'pointer',
                               opacity: (redeemLoading || !redeemInput.trim()) ? 0.5 : 1,
+                              boxShadow: shadows.button,
                             }}
                           >
                             {redeemLoading ? 'Redeeming...' : 'Redeem'}
@@ -1101,7 +1183,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           </div>
 
           {/* --- Legal Section --- */}
-          <div style={sectionHeaderStyle}>Legal</div>
+          <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Legal</div>
           <div style={groupStyle}>
             <div style={{ ...rowStyle, cursor: 'pointer' }} onClick={async () => {
               const newVal = !profile?.aiDataConsent;
@@ -1122,26 +1204,28 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             }}>
               <div>
                 <span style={rowLabelStyle}>Data & AI</span>
-                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3, fontFamily: fonts.body, fontWeight: 500 }}>
                   {profile?.aiDataConsent ? 'AI features enabled' : 'AI features disabled'}
                 </div>
               </div>
+              {/* Refined toggle */}
               <div style={{
-                width: 51, height: 31, borderRadius: 16,
-                background: profile?.aiDataConsent ? C.green : C.borderLight,
+                width: 51, height: 31, borderRadius: radius.pill,
+                background: profile?.aiDataConsent ? C.green : C.cardMuted,
                 position: 'relative',
-                transition: 'background 0.2s',
+                transition: `background ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
                 flexShrink: 0,
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.08)',
               }}>
                 <div style={{
                   width: 27, height: 27,
                   borderRadius: '50%',
                   background: '#fff',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.18)',
                   position: 'absolute',
                   top: 2,
                   left: profile?.aiDataConsent ? 22 : 2,
-                  transition: 'left 0.2s',
+                  transition: `left ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
                 }} />
               </div>
             </div>
@@ -1153,7 +1237,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               style={{ ...rowStyle, textDecoration: 'none', color: C.text }}
             >
               <span style={rowLabelStyle}>Privacy Policy</span>
-              <ExternalLink size={16} color={C.textMuted} />
+              <ExternalLink size={16} color={C.textLight} />
             </a>
             <div style={separatorStyle} />
             <a
@@ -1163,31 +1247,33 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               style={{ ...rowStyle, textDecoration: 'none', color: C.text }}
             >
               <span style={rowLabelStyle}>Terms of Service</span>
-              <ExternalLink size={16} color={C.textMuted} />
+              <ExternalLink size={16} color={C.textLight} />
             </a>
           </div>
 
           {/* --- Notifications Section --- */}
-          <div style={sectionHeaderStyle}>Notifications</div>
+          <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Notifications</div>
           <div style={groupStyle}>
             <div style={{ ...rowStyle, cursor: 'pointer' }} onClick={handleMarketingToggle}>
               <span style={rowLabelStyle}>Email updates</span>
+              {/* Refined toggle */}
               <div style={{
-                width: 51, height: 31, borderRadius: 16,
-                background: profile?.marketingConsent ? C.green : C.borderLight,
+                width: 51, height: 31, borderRadius: radius.pill,
+                background: profile?.marketingConsent ? C.green : C.cardMuted,
                 position: 'relative',
-                transition: 'background 0.2s',
+                transition: `background ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
                 flexShrink: 0,
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.08)',
               }}>
                 <div style={{
                   width: 27, height: 27,
                   borderRadius: '50%',
                   background: '#fff',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.18)',
                   position: 'absolute',
                   top: 2,
                   left: profile?.marketingConsent ? 22 : 2,
-                  transition: 'left 0.2s',
+                  transition: `left ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
                 }} />
               </div>
             </div>
@@ -1200,7 +1286,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               which caused the "dev replay strands user in prod" bug. */}
           {import.meta.env.DEV && (
             <>
-              <div style={sectionHeaderStyle}>Dev</div>
+              <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Dev</div>
               <div style={groupStyle}>
                 <button
                   style={{ ...rowStyle, color: C.accent, fontWeight: 600 }}
@@ -1222,12 +1308,21 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           )}
 
           {/* --- App Version --- */}
-          <div style={{ textAlign: 'center', fontSize: 11, color: C.textLight, marginTop: 8, marginBottom: 12 }}>
+          <div style={{
+            textAlign: 'center',
+            fontFamily: fonts.body,
+            fontSize: 11,
+            fontWeight: 600,
+            color: C.textLight,
+            letterSpacing: '0.04em',
+            marginTop: 16,
+            marginBottom: 8,
+          }}>
             v{__APP_VERSION__}
           </div>
 
           {/* --- Account Section --- */}
-          <div style={sectionHeaderStyle}>Account</div>
+          <div style={{ ...sectionHeaderStyle, paddingTop: 8 }}>Account</div>
           <div style={groupStyle}>
             <button
               onClick={handleSignOut}
@@ -1235,10 +1330,11 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 ...rowStyle,
                 justifyContent: 'center',
                 color: C.red,
-                fontWeight: 600,
+                fontWeight: 700,
+                gap: 8,
               }}
             >
-              <LogOut size={18} color={C.red} style={{ marginRight: 8 }} />
+              <LogOut size={18} color={C.red} />
               Sign Out
             </button>
             <div style={separatorStyle} />
@@ -1248,10 +1344,12 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 ...rowStyle,
                 justifyContent: 'center',
                 color: C.red,
-                fontWeight: 600,
+                fontWeight: 700,
+                gap: 8,
+                opacity: 0.75,
               }}
             >
-              <Trash2 size={18} color={C.red} style={{ marginRight: 8 }} />
+              <Trash2 size={17} color={C.red} />
               Delete Account
             </button>
           </div>
@@ -1265,7 +1363,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 1200,
-            background: 'rgba(44,24,16,0.55)',
+            background: glass.scrim,
+            backdropFilter: glass.blur,
+            WebkitBackdropFilter: glass.blur,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
           }}
@@ -1275,20 +1375,30 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
         >
           <div
             style={{
-              background: C.bg, borderRadius: 16, padding: 24,
+              background: C.card,
+              borderRadius: radius.xl,
+              padding: 24,
               maxWidth: 360, width: '100%',
-              boxShadow: shadows.modal,
+              boxShadow: shadows.e3,
+              border: `1px solid ${C.hairline}`,
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {deleteStep === 'warn' && (
               <>
-                <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 12 }}>
+                <div style={{
+                  fontFamily: fonts.heading,
+                  fontSize: typeScale.h2.fontSize,
+                  fontWeight: typeScale.h2.fontWeight,
+                  color: C.text,
+                  marginBottom: 12,
+                  letterSpacing: '-0.01em',
+                }}>
                   Delete your account?
                 </div>
-                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
+                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted, lineHeight: 1.6, marginBottom: 16, fontWeight: 500 }}>
                   This will permanently delete your account and all your data:
-                  <ul style={{ paddingLeft: 18, marginTop: 8 }}>
+                  <ul style={{ paddingLeft: 18, marginTop: 8, color: C.text }}>
                     <li>All beans, tastings, and photos</li>
                     <li>Your preferences and profile</li>
                     <li>Your Fellow Aiden connection</li>
@@ -1299,13 +1409,14 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   <div
                     style={{
                       background: C.amberBg,
-                      border: `1px solid ${C.amber}`,
-                      borderRadius: 10,
-                      padding: 12,
+                      border: `1px solid ${C.amber}50`,
+                      borderRadius: radius.md,
+                      padding: 14,
                       fontSize: 13,
                       color: C.text,
-                      lineHeight: 1.5,
+                      lineHeight: 1.6,
                       marginBottom: 16,
+                      fontFamily: fonts.body,
                     }}
                   >
                     <strong>You have an active subscription.</strong> Deleting your account does NOT cancel
@@ -1314,21 +1425,21 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       href="https://apps.apple.com/account/subscriptions"
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: C.accent, fontWeight: 600 }}
+                      style={{ color: C.accent, fontWeight: 700 }}
                     >
                       iOS Settings
                     </a>
                     {' '}or you'll keep getting billed.
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     onClick={resetDeleteFlow}
                     style={{
-                      flex: 1, padding: '12px 16px', borderRadius: 10,
-                      border: `1px solid ${C.border}`, background: C.bg,
+                      flex: 1, padding: '12px 16px', borderRadius: radius.md,
+                      border: `1px solid ${C.border}`, background: C.bgDeep,
                       fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                      color: C.text, cursor: 'pointer',
+                      color: C.textMuted, cursor: 'pointer',
                     }}
                   >
                     Cancel
@@ -1336,10 +1447,11 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   <button
                     onClick={() => setDeleteStep('confirm')}
                     style={{
-                      flex: 1, padding: '12px 16px', borderRadius: 10,
+                      flex: 1, padding: '12px 16px', borderRadius: radius.md,
                       border: 'none', background: C.red,
-                      fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                       color: '#fff', cursor: 'pointer',
+                      boxShadow: `0 2px 8px ${C.red}40`,
                     }}
                   >
                     Continue
@@ -1350,11 +1462,18 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
 
             {deleteStep === 'confirm' && (
               <>
-                <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 12 }}>
+                <div style={{
+                  fontFamily: fonts.heading,
+                  fontSize: typeScale.h2.fontSize,
+                  fontWeight: typeScale.h2.fontWeight,
+                  color: C.text,
+                  marginBottom: 12,
+                  letterSpacing: '-0.01em',
+                }}>
                   Confirm deletion
                 </div>
-                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
-                  Type <strong>DELETE</strong> to permanently remove your account and all data.
+                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted, lineHeight: 1.6, marginBottom: 16, fontWeight: 500 }}>
+                  Type <strong style={{ color: C.red }}>DELETE</strong> to permanently remove your account and all data.
                 </div>
                 <input
                   type="text"
@@ -1368,19 +1487,23 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   onFocus={scrollOnFocus}
                   style={{
                     width: '100%', padding: '12px 14px',
-                    borderRadius: 10, border: `1px solid ${C.border}`,
+                    borderRadius: radius.md,
+                    border: `1px solid ${deleteInput === 'DELETE' ? C.red : C.border}`,
                     fontFamily: fonts.body, fontSize: 16,
-                    marginBottom: 16, background: '#fff', color: C.text,
+                    marginBottom: 16, background: C.bgDeep, color: C.text,
+                    outline: 'none', boxSizing: 'border-box',
+                    letterSpacing: 2,
+                    transition: `border-color ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
                   }}
                 />
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     onClick={resetDeleteFlow}
                     style={{
-                      flex: 1, padding: '12px 16px', borderRadius: 10,
-                      border: `1px solid ${C.border}`, background: C.bg,
+                      flex: 1, padding: '12px 16px', borderRadius: radius.md,
+                      border: `1px solid ${C.border}`, background: C.bgDeep,
                       fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                      color: C.text, cursor: 'pointer',
+                      color: C.textMuted, cursor: 'pointer',
                     }}
                   >
                     Cancel
@@ -1389,12 +1512,13 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     onClick={handleDeleteAccount}
                     disabled={deleteInput !== 'DELETE'}
                     style={{
-                      flex: 1, padding: '12px 16px', borderRadius: 10,
+                      flex: 1, padding: '12px 16px', borderRadius: radius.md,
                       border: 'none',
-                      background: deleteInput === 'DELETE' ? C.red : C.borderLight,
-                      fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                      background: deleteInput === 'DELETE' ? C.red : C.cardMuted,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                       color: deleteInput === 'DELETE' ? '#fff' : C.textMuted,
                       cursor: deleteInput === 'DELETE' ? 'pointer' : 'not-allowed',
+                      transition: `background ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
                     }}
                   >
                     Delete Account
@@ -1405,10 +1529,16 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
 
             {deleteStep === 'deleting' && (
               <div style={{ textAlign: 'center', padding: '12px 0' }}>
-                <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 12 }}>
+                <div style={{
+                  fontFamily: fonts.heading,
+                  fontSize: typeScale.h3.fontSize,
+                  fontWeight: 700,
+                  color: C.text,
+                  marginBottom: 12,
+                }}>
                   Deleting your account...
                 </div>
-                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted }}>
+                <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.textMuted, fontWeight: 500 }}>
                   This may take a few seconds. Please don't close the app.
                 </div>
               </div>
@@ -1421,32 +1551,51 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       {canisterConfirm && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1100,
-          background: 'rgba(44,24,16,0.4)',
+          background: glass.scrim,
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: 24,
         }} onClick={() => setCanisterConfirm(null)}>
           <div style={{
-            background: C.bg, borderRadius: 16, padding: 24,
+            background: C.card,
+            borderRadius: radius.xl,
+            padding: 24,
             maxWidth: 340, width: '100%',
-            boxShadow: shadows.modal,
+            boxShadow: shadows.e3,
+            border: `1px solid ${C.hairline}`,
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 12 }}>
+            <div style={{
+              fontFamily: fonts.heading,
+              fontSize: typeScale.h3.fontSize,
+              fontWeight: 700,
+              color: C.text,
+              marginBottom: 12,
+              letterSpacing: '-0.01em',
+            }}>
               Reduce jars?
             </div>
-            <div style={{ fontFamily: fonts.body, fontSize: 14, color: C.text, lineHeight: 1.5, marginBottom: 16 }}>
+            <div style={{
+              fontFamily: fonts.body,
+              fontSize: 14,
+              color: C.textMuted,
+              lineHeight: 1.6,
+              marginBottom: 20,
+              fontWeight: 500,
+            }}>
               {canisterConfirm.overflowBeans.length === 1
                 ? `"${canisterConfirm.overflowBeans[0].name}" is in Jar #${canisterConfirm.overflowBeans[0].jarSlot}. It will be returned to your sealed inventory.`
                 : `${canisterConfirm.overflowBeans.length} beans are in jars that will be removed. They will be returned to your sealed inventory.`
               }
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={() => setCanisterConfirm(null)}
                 style={{
-                  flex: 1, padding: '10px 16px', borderRadius: 10,
-                  border: `1px solid ${C.border}`, background: C.bg,
+                  flex: 1, padding: '12px 16px', borderRadius: radius.md,
+                  border: `1px solid ${C.border}`, background: C.bgDeep,
                   fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
-                  color: C.text, cursor: 'pointer',
+                  color: C.textMuted, cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -1454,10 +1603,11 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               <button
                 onClick={handleCanisterConfirm}
                 style={{
-                  flex: 1, padding: '10px 16px', borderRadius: 10,
+                  flex: 1, padding: '12px 16px', borderRadius: radius.md,
                   border: 'none', background: C.accent,
-                  fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
+                  fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                   color: '#fff', cursor: 'pointer',
+                  boxShadow: shadows.button,
                 }}
               >
                 Confirm

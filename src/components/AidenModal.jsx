@@ -1,6 +1,8 @@
 // Aiden brew recipe modal — editorial journal entry for the generated recipe
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { C, fonts } from '../styles/theme';
+import { C, fonts, type, shadows, radius } from '../styles/theme';
+import { m } from '../lib/motion';
+import { fadeUp, popIn, spring } from '../lib/motion';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { DoseStepperCard } from './DoseStepperCard';
@@ -26,41 +28,38 @@ const openExternalLink = (url) => {
   }
 };
 
-// Local design tokens specific to this panel
-const RULE = '#EADFD0';
-const RULE_SOFT = '#F0E6D4';
-const PAPER_GRAD = 'linear-gradient(180deg, #FBF1DF 0%, #F5E6D3 100%)';
-const GRIND_BORDER = '#E8D5A0';
-const GRIND_DIVIDER = '#D4B878';
-const TILE_BG = '#EADFCB';
+// ── Palette: warm paper journal ──────────────────────────────────────────────
+const RULE        = C.border;
+const RULE_SOFT   = C.borderLight;
+const PAPER_GRAD  = `linear-gradient(160deg, ${C.cream} 0%, ${C.bgDeep} 100%)`;
+const GRIND_BORDER = C.accentLight;
+const GRIND_DIVIDER = C.accentLight;
+const TILE_BG     = C.bgDeep;
 
-// Iced mode palette (frost tones, co-located with hot)
-const ICE_RULE = '#C8D8E4';
-const ICE_PAPER_GRAD = 'linear-gradient(180deg, #E8F0F8 0%, #D8E8F2 100%)';
+// Iced mode palette
+const ICE_RULE       = '#C8D8E4';
+const ICE_PAPER_GRAD = 'linear-gradient(160deg, #EDF5FA 0%, #D8E8F2 100%)';
 const ICE_GRIND_BORDER = '#A8C4D8';
-const ICE_TILE_BG = '#DCE8F0';
+const ICE_TILE_BG    = '#DCE8F0';
+
+// ── Sub-components ───────────────────────────────────────────────────────────
 
 const IceParamCard = ({ label, value, sub }) => (
   <div style={{
     background: ICE_TILE_BG,
-    borderRadius: 10,
+    borderRadius: radius.md,
     padding: '10px 12px',
     textAlign: 'center',
+    border: `1px solid ${ICE_RULE}`,
   }}>
-    <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{label}</div>
-    <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: C.textLight }}>{sub}</div>}
+    <div style={{ ...type.label, color: C.textMuted, marginBottom: 4 }}>{label}</div>
+    <div style={{ ...type.h2, color: C.text }}>{value}</div>
+    {sub && <div style={{ ...type.caption, color: C.textLight, marginTop: 2 }}>{sub}</div>}
   </div>
 );
 
 const SectionLabel = ({ children, style }) => (
-  <div style={{
-    fontFamily: fonts.body,
-    fontSize: 10, fontWeight: 700,
-    color: C.textMuted,
-    textTransform: 'uppercase', letterSpacing: 1.2,
-    ...style,
-  }}>{children}</div>
+  <div style={{ ...type.label, color: C.textMuted, ...style }}>{children}</div>
 );
 
 const IconBean = () => (
@@ -77,25 +76,31 @@ const BeanChip = ({ bean }) => {
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '10px 12px',
       background: PAPER_GRAD,
-      borderRadius: 12,
-      border: `1px solid ${RULE}`,
-      marginBottom: 14,
+      borderRadius: radius.md,
+      border: `1px solid ${C.hairline}`,
+      marginBottom: 16,
+      boxShadow: shadows.e1,
     }}>
       <div style={{
-        width: 40, height: 40, borderRadius: 10,
+        width: 40, height: 40, borderRadius: radius.sm,
         background: TILE_BG,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
+        border: `1px solid ${C.hairline}`,
       }}>
         <IconBean />
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{
-          fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.2,
+          fontFamily: fonts.heading,
+          fontSize: type.h3.fontSize,
+          fontWeight: 700,
+          color: C.text,
+          lineHeight: 1.2,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>{bean.name}</div>
         {bean.roaster && (
-          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, letterSpacing: 0.3 }}>{bean.roaster}</div>
+          <div style={{ ...type.caption, color: C.textMuted, marginTop: 2 }}>{bean.roaster}</div>
         )}
       </div>
     </div>
@@ -103,25 +108,34 @@ const BeanChip = ({ bean }) => {
 };
 
 const RecipeTitleRow = ({ title, note }) => (
-  <div style={{ marginBottom: 18 }}>
+  <div style={{ marginBottom: 20 }}>
+    <SectionLabel style={{ marginBottom: 6 }}>Recipe</SectionLabel>
     <div style={{
-      display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
-      paddingBottom: 10,
-      borderBottom: `1px dashed ${RULE}`,
+      paddingBottom: 12,
+      borderBottom: `1px solid ${RULE}`,
     }}>
-      <SectionLabel>Recipe</SectionLabel>
-      <span style={{ fontFamily: fonts.title, fontSize: 30, color: C.text, lineHeight: 0.9 }}>
+      <span style={{
+        fontFamily: fonts.heading,
+        fontSize: 30,
+        fontWeight: 600,
+        color: C.text,
+        lineHeight: 1.0,
+        letterSpacing: '-0.01em',
+        display: 'block',
+      }}>
         {title}
       </span>
     </div>
     {note && (
       <div style={{
-        fontFamily: fonts.title, fontSize: 17, color: C.accent,
-        marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 6,
-        lineHeight: 1.1,
+        marginTop: 10,
+        display: 'flex', alignItems: 'flex-start', gap: 6,
+        lineHeight: 1.4,
       }}>
-        <span style={{ fontSize: 13, color: C.textMuted, fontFamily: fonts.body, fontStyle: 'italic' }}>— Aiden:</span>
-        <span>{note}</span>
+        <span style={{ ...type.caption, color: C.textMuted, fontStyle: 'italic', paddingTop: 2 }}>— Aiden:</span>
+        <span style={{ fontFamily: fonts.title, fontSize: 17, color: C.accent }}>
+          {note}
+        </span>
       </div>
     )}
   </div>
@@ -130,17 +144,21 @@ const RecipeTitleRow = ({ title, note }) => (
 const DialCell = ({ label, value, sub, borderRight, borderBottom }) => (
   <div style={{
     padding: '16px 14px 18px',
-    borderRight: borderRight ? `1px dashed ${RULE}` : 'none',
-    borderBottom: borderBottom ? `1px dashed ${RULE}` : 'none',
+    borderRight: borderRight ? `1px solid ${RULE}` : 'none',
+    borderBottom: borderBottom ? `1px solid ${RULE}` : 'none',
     textAlign: 'center',
   }}>
-    <SectionLabel style={{ marginBottom: 6 }}>{label}</SectionLabel>
+    <SectionLabel style={{ marginBottom: 8 }}>{label}</SectionLabel>
     <div style={{
-      fontFamily: fonts.heading, fontSize: 28, color: C.text,
-      lineHeight: 0.95, fontWeight: 500,
+      fontFamily: fonts.heading,
+      fontSize: 28,
+      color: C.text,
+      lineHeight: 0.95,
+      fontWeight: 600,
+      letterSpacing: '-0.01em',
     }}>{value}</div>
     {sub && (
-      <div style={{ fontSize: 11, color: C.textLight, marginTop: 4, fontFeatureSettings: "'tnum'" }}>{sub}</div>
+      <div style={{ ...type.caption, color: C.textLight, marginTop: 5, fontFeatureSettings: "'tnum'" }}>{sub}</div>
     )}
   </div>
 );
@@ -148,9 +166,9 @@ const DialCell = ({ label, value, sub, borderRight, borderBottom }) => (
 const DialCard = ({ recipe }) => (
   <div style={{
     background: C.card,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     border: `1px solid ${RULE}`,
-    boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+    boxShadow: shadows.e2,
     overflow: 'hidden',
     marginBottom: 14,
     display: 'grid', gridTemplateColumns: '1fr 1fr',
@@ -164,17 +182,21 @@ const DialCard = ({ recipe }) => (
 
 const TempRow = ({ label, temps }) => (
   <div style={{
-    display: 'grid', gridTemplateColumns: '78px 1fr', alignItems: 'center', gap: 10,
+    display: 'grid', gridTemplateColumns: '70px 1fr', alignItems: 'center', gap: 10,
     padding: '10px 0',
   }}>
     <div style={{
-      fontFamily: fonts.title, fontSize: 17, color: C.text, lineHeight: 1,
-      textAlign: 'right', paddingRight: 2,
+      fontFamily: fonts.heading,
+      fontSize: 14,
+      fontWeight: 600,
+      color: C.textMuted,
+      textAlign: 'right',
+      paddingRight: 4,
     }}>{label}</div>
     <div style={{ position: 'relative', height: 32 }}>
       <div style={{
         position: 'absolute', left: 10, right: 10, top: 15, height: 1,
-        borderTop: `1px dashed ${RULE}`,
+        background: RULE_SOFT,
       }} />
       <div style={{
         position: 'absolute', left: 0, right: 0, top: 0, height: 32,
@@ -184,13 +206,17 @@ const TempRow = ({ label, temps }) => (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 32 }}>
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
-              background: C.text,
+              background: C.accent,
               boxShadow: `0 0 0 3px ${C.card}`,
               marginBottom: 3,
             }} />
             <span style={{
-              fontFamily: fonts.heading, fontSize: 13, fontWeight: 500,
-              color: C.text, fontFeatureSettings: "'tnum'", lineHeight: 1,
+              fontFamily: fonts.heading,
+              fontSize: 13,
+              fontWeight: 600,
+              color: C.text,
+              fontFeatureSettings: "'tnum'",
+              lineHeight: 1,
             }}>{t}°</span>
           </div>
         ))}
@@ -208,19 +234,19 @@ const TempCard = ({ recipe }) => {
   return (
     <div style={{
       background: C.card,
-      borderRadius: 14,
+      borderRadius: radius.lg,
       padding: '14px 18px 16px',
       border: `1px solid ${RULE}`,
-      boxShadow: '0 1px 2px rgba(92,61,46,0.04)',
+      boxShadow: shadows.e2,
       marginBottom: 14,
     }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <SectionLabel>Temperature curve</SectionLabel>
-        <div style={{ fontSize: 10, color: C.textLight, fontFeatureSettings: "'tnum'" }}>°C</div>
+        <div style={{ ...type.caption, color: C.textLight, fontFeatureSettings: "'tnum'" }}>°C</div>
       </div>
       {rows.map((r, i) => (
         <div key={r.label}>
-          {i > 0 && <div style={{ borderTop: `1px dashed ${RULE_SOFT}` }} />}
+          {i > 0 && <div style={{ borderTop: `1px solid ${RULE_SOFT}` }} />}
           <TempRow label={r.label} temps={r.temps} />
         </div>
       ))}
@@ -229,11 +255,16 @@ const TempCard = ({ recipe }) => {
 };
 
 const GrindColumn = ({ label, value, divider }) => (
-  <div style={{ borderLeft: divider ? `1px dashed ${GRIND_DIVIDER}` : 'none', paddingLeft: divider ? 14 : 0 }}>
-    <div style={{ fontFamily: fonts.title, fontSize: 16, color: C.text, lineHeight: 1 }}>{label}</div>
+  <div style={{ borderLeft: divider ? `1px solid ${GRIND_DIVIDER}` : 'none', paddingLeft: divider ? 16 : 0 }}>
+    <div style={{ ...type.label, color: C.textMuted, marginBottom: 4 }}>{label}</div>
     <div style={{
-      fontFamily: fonts.heading, fontSize: 42, color: C.accent,
-      lineHeight: 0.9, fontWeight: 500, fontFeatureSettings: "'tnum'",
+      fontFamily: fonts.heading,
+      fontSize: 44,
+      color: C.accent,
+      lineHeight: 0.9,
+      fontWeight: 600,
+      fontFeatureSettings: "'tnum'",
+      letterSpacing: '-0.02em',
     }}>{value}</div>
   </div>
 );
@@ -241,62 +272,87 @@ const GrindColumn = ({ label, value, divider }) => (
 const GrindCard = ({ recipe, grinderName }) => (
   <div style={{
     background: PAPER_GRAD,
-    borderRadius: 14,
-    padding: '14px 18px 16px',
+    borderRadius: radius.lg,
+    padding: '16px 18px 18px',
     border: `1px solid ${GRIND_BORDER}`,
     marginBottom: 20,
+    boxShadow: shadows.e1,
     position: 'relative',
   }}>
-    <SectionLabel style={{ marginBottom: 4 }}>Grind · {grinderName}</SectionLabel>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12, marginTop: 4 }}>
-      <GrindColumn label="single" value={recipe.grindRecommendation.singleServe} />
+    <SectionLabel style={{ marginBottom: 12 }}>Grind · {grinderName}</SectionLabel>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12 }}>
+      <GrindColumn label="single serve" value={recipe.grindRecommendation.singleServe} />
       <GrindColumn label="batch" value={recipe.grindRecommendation.batch} divider />
     </div>
   </div>
 );
 
 const AidenPrimaryButton = ({ onClick, leading, children }) => (
-  <button
+  <m.button
     onClick={onClick}
+    whileTap={{ scale: 0.97 }}
+    transition={spring.snappy}
     style={{
       width: '100%',
-      background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
-      color: '#FFF8F0', border: 'none',
-      padding: '15px 18px', borderRadius: 12,
-      fontFamily: fonts.body, fontWeight: 700, fontSize: 15, cursor: 'pointer',
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-      boxShadow: '0 1px 0 rgba(255,255,255,0.28) inset, 0 -1px 0 rgba(0,0,0,0.08) inset, 0 1px 2px rgba(92,61,46,0.15), 0 4px 12px rgba(160,113,75,0.18)',
+      background: `linear-gradient(160deg, #C4844A 0%, ${C.accent} 100%)`,
+      color: '#FFF8F0',
+      border: 'none',
+      padding: '16px 18px',
+      borderRadius: radius.md,
+      fontFamily: fonts.body,
+      fontWeight: 700,
+      fontSize: 16,
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      boxShadow: '0 1px 0 rgba(255,255,255,0.22) inset, 0 -1px 0 rgba(0,0,0,0.10) inset, ' + shadows.button + ', 0 4px 14px rgba(168,106,56,0.28)',
       marginBottom: 10,
+      minHeight: 52,
       WebkitTapHighlightColor: 'transparent',
     }}
   >
     {leading}
     {children}
-  </button>
+  </m.button>
 );
 
 const AidenScript = ({ children = 'Aiden' }) => (
-  <span style={{ fontFamily: fonts.title, fontSize: 26, lineHeight: 0.85, marginLeft: -2 }}>
+  <span style={{ fontFamily: fonts.title, fontSize: 27, lineHeight: 0.85, marginLeft: -1 }}>
     {children}
   </span>
 );
 
 const IconActionButton = ({ onClick, disabled, icon, children, ariaLabel }) => (
-  <button
+  <m.button
     onClick={onClick}
     disabled={disabled}
     aria-label={ariaLabel}
+    whileTap={disabled ? {} : { scale: 0.96 }}
+    transition={spring.snappy}
     style={{
-      flex: 1, background: 'transparent', color: C.accent, border: 'none',
-      padding: 12, fontFamily: fonts.body, fontWeight: 600, fontSize: 13,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-      cursor: disabled ? 'default' : 'pointer', borderRadius: 10,
+      flex: 1,
+      background: 'transparent',
+      color: C.accent,
+      border: 'none',
+      padding: '13px 8px',
+      fontFamily: fonts.body,
+      fontWeight: 600,
+      fontSize: 13,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      cursor: disabled ? 'default' : 'pointer',
+      borderRadius: radius.sm,
       opacity: disabled ? 0.55 : 1,
+      minHeight: 44,
       WebkitTapHighlightColor: 'transparent',
     }}
   >
     {icon} {children}
-  </button>
+  </m.button>
 );
 
 const phaseMessages = {
@@ -371,34 +427,40 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
     <Modal open={open} onClose={onClose} title="Brew with Aiden">
       {/* Loading state */}
       {loading && !recipe && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <Coffee size={32} color={C.accent} style={{ marginBottom: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />
-          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{msg.title}</div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{msg.subtitle}</div>
-        </div>
+        <m.div
+          {...fadeUp}
+          style={{ textAlign: 'center', padding: '40px 0' }}
+        >
+          <Coffee size={32} color={C.accent} style={{ marginBottom: 14, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ fontFamily: fonts.heading, fontSize: 17, fontWeight: 600, color: C.text, marginBottom: 4 }}>{msg.title}</div>
+          <div style={{ ...type.body, color: C.textMuted }}>{msg.subtitle}</div>
+        </m.div>
       )}
 
       {/* Error state */}
       {error && !recipe && (
-        <div style={{
-          background: C.redBg,
-          borderRadius: 14,
-          padding: 16,
-          border: `1px solid ${C.red}20`,
-        }}>
-          <div style={{ fontSize: 14, color: C.red, fontWeight: 600, marginBottom: 4 }}>Couldn't generate a recipe</div>
-          <div style={{ fontSize: 13, color: C.text }}>{error}</div>
+        <m.div
+          {...fadeUp}
+          style={{
+            background: C.redBg,
+            borderRadius: radius.lg,
+            padding: 16,
+            border: `1px solid ${C.red}30`,
+          }}
+        >
+          <div style={{ fontFamily: fonts.body, fontSize: 14, fontWeight: 700, color: C.red, marginBottom: 4 }}>Couldn't generate a recipe</div>
+          <div style={{ ...type.body, color: C.text }}>{error}</div>
           {onRetry && (
             <Btn variant="small" onClick={onRetry} style={{ marginTop: 10 }}>
               <RefreshCw size={12} /> Try Again
             </Btn>
           )}
-        </div>
+        </m.div>
       )}
 
       {/* Recipe success */}
       {recipe && !icedMode && (
-        <div ref={modalContentRef}>
+        <m.div ref={modalContentRef} {...fadeUp}>
           <BeanChip bean={bean} />
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
@@ -413,7 +475,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
           {/* Fellow push state */}
           {loading && recipe && !result && (
-            <div style={{ textAlign: 'center', padding: '12px 0', fontSize: 13, color: C.textMuted, fontStyle: 'italic' }}>
+            <div style={{ textAlign: 'center', padding: '12px 0', ...type.body, color: C.textMuted, fontStyle: 'italic' }}>
               Sending to your Aiden...
             </div>
           )}
@@ -421,18 +483,21 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {/* Fellow push error — recipe still visible */}
           {error && recipe && !loading && (
             isDeviceFull ? (
-              <div style={{
-                background: C.amberBg,
-                borderRadius: 10,
-                padding: 14,
-                marginBottom: 10,
-                border: '1px solid #E8D5A0',
-              }}>
+              <m.div
+                {...popIn}
+                style={{
+                  background: C.amberBg,
+                  borderRadius: radius.md,
+                  padding: 14,
+                  marginBottom: 10,
+                  border: `1px solid ${C.accentLight}`,
+                }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <AlertTriangle size={14} color={C.amber} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Aiden is full (14/14 profiles)</span>
                 </div>
-                <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+                <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>
                   Please delete profiles in the Fellow app and retry. Your recipe is saved.
                 </div>
                 {onRetryPush && (
@@ -440,11 +505,11 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                     <RefreshCw size={12} /> Retry brew.link
                   </Btn>
                 )}
-              </div>
+              </m.div>
             ) : (
               <div style={{
                 background: C.redBg,
-                borderRadius: 10,
+                borderRadius: radius.sm,
                 padding: 12,
                 marginBottom: 10,
                 fontSize: 13,
@@ -464,12 +529,12 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {result?.fellowCredentialsInvalid && (
             <div style={{
               background: C.amberBg,
-              borderRadius: 10,
+              borderRadius: radius.sm,
               padding: 12,
               marginBottom: 10,
               fontSize: 13,
               color: C.text,
-              border: '1px solid #E8D5A0',
+              border: `1px solid ${C.accentLight}`,
             }}>
               Your Fellow connection needs updating. Reconnect in Settings.
             </div>
@@ -478,7 +543,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {/* Primary action: Open in Fellow / Open on Aiden / Send to Aiden */}
           {result?.link && (
             <AidenPrimaryButton
-              leading={<ExternalLink size={14} />}
+              leading={<ExternalLink size={15} />}
               onClick={() => openExternalLink(result.link)}
             >
               {fellowConnected && !result.usedRelay ? (
@@ -494,7 +559,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
           {!result && !loading && !error && onPushCached && (
             <AidenPrimaryButton
-              leading={<ExternalLink size={14} />}
+              leading={<ExternalLink size={15} />}
               onClick={() => onPushCached(recipe)}
             >
               <span>{fellowConnected ? 'Send to' : 'Push to'}</span>
@@ -504,7 +569,15 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
           {/* Secondary icon row: Share | Regenerate */}
           {!loading && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              borderRadius: radius.sm,
+              background: C.bgDeep,
+              marginBottom: 2,
+            }}>
               <IconActionButton
                 onClick={handleShareRecipe}
                 disabled={sharing}
@@ -515,7 +588,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
               </IconActionButton>
               {onRegenerate && (
                 <>
-                  <div style={{ width: 1, height: 16, background: RULE }} />
+                  <div style={{ width: 1, height: 20, background: C.hairline }} />
                   <IconActionButton
                     onClick={handleRegenerate}
                     icon={<RefreshCw size={14} />}
@@ -530,13 +603,15 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
           {/* Iced flash brew entry point */}
           {!loading && (
-            <button
+            <m.button
               onClick={handleEnterIced}
+              whileTap={{ scale: 0.97 }}
+              transition={spring.snappy}
               style={{
                 width: '100%',
                 marginTop: 10,
-                padding: '12px 16px',
-                borderRadius: 12,
+                padding: '13px 16px',
+                borderRadius: radius.md,
                 background: ICE_PAPER_GRAD,
                 border: `1px solid ${ICE_RULE}`,
                 color: C.text,
@@ -548,38 +623,56 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
+                minHeight: 48,
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Snowflake size={16} color="#5B9BD5" />
               Iced flash brew this bean
-            </button>
+            </m.button>
           )}
 
           {extraFooter}
-        </div>
+        </m.div>
       )}
 
       {/* Iced mode view */}
       {recipe && icedMode && icedRecipe && (
-        <div ref={modalContentRef}>
+        <m.div ref={modalContentRef} {...fadeUp}>
           {/* Back to hot */}
-          <button
+          <m.button
             onClick={handleBackToHot}
+            whileTap={{ scale: 0.97 }}
+            transition={spring.snappy}
             style={{
-              background: 'none', border: 'none', padding: '4px 0', marginBottom: 12,
-              fontSize: 13, color: C.accent, fontWeight: 600, fontFamily: fonts.body,
-              display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+              background: 'none',
+              border: 'none',
+              padding: '6px 0',
+              marginBottom: 14,
+              fontSize: 13,
+              color: C.accent,
+              fontWeight: 600,
+              fontFamily: fonts.body,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              cursor: 'pointer',
+              minHeight: 44,
               WebkitTapHighlightColor: 'transparent',
             }}
           >
             <ArrowLeft size={14} /> Back to hot recipe
-          </button>
+          </m.button>
 
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...type.label, color: '#5B9BD5', marginBottom: 6 }}>Iced Mode</div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              fontFamily: fonts.title, fontSize: 24, color: C.text,
+              fontFamily: fonts.heading,
+              fontSize: 24,
+              fontWeight: 600,
+              color: C.text,
+              letterSpacing: '-0.01em',
             }}>
               <Snowflake size={20} color="#5B9BD5" />
               Iced Flash Brew
@@ -598,32 +691,33 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {/* Your Aiden Setup card */}
           <div style={{
             background: ICE_PAPER_GRAD,
-            borderRadius: 14,
+            borderRadius: radius.lg,
             padding: '14px 18px 16px',
             border: `1px solid ${ICE_RULE}`,
             marginBottom: 14,
+            boxShadow: shadows.e1,
           }}>
-            <SectionLabel style={{ marginBottom: 10 }}>Your Aiden Setup</SectionLabel>
+            <SectionLabel style={{ marginBottom: 12 }}>Your Aiden Setup</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
-                <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Volume dial</div>
-                <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{icedRecipe.brewWaterMl}ml</div>
+                <div style={{ ...type.label, color: C.textMuted, marginBottom: 4 }}>Volume dial</div>
+                <div style={{ fontFamily: fonts.heading, fontSize: 20, fontWeight: 600, color: C.text }}>{icedRecipe.brewWaterMl}ml</div>
               </div>
               <div>
-                <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Machine says</div>
-                <div style={{ fontFamily: fonts.title, fontSize: 20, color: C.text }}>{icedRecipe.machineSuggestedDose}g</div>
+                <div style={{ ...type.label, color: C.textMuted, marginBottom: 4 }}>Machine says</div>
+                <div style={{ fontFamily: fonts.heading, fontSize: 20, fontWeight: 600, color: C.text }}>{icedRecipe.machineSuggestedDose}g</div>
               </div>
             </div>
             <div style={{
-              background: 'rgba(188,129,73,0.08)',
-              borderRadius: 10,
+              background: `${C.accent}12`,
+              borderRadius: radius.sm,
               padding: '10px 14px',
               marginBottom: 10,
             }}>
-              <div style={{ fontSize: 11, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>You load</div>
-              <div style={{ fontFamily: fonts.title, fontSize: 24, color: C.accent, fontWeight: 700 }}>{icedRecipe.icedDose}g</div>
+              <div style={{ ...type.label, color: C.textMuted, marginBottom: 4 }}>You load</div>
+              <div style={{ fontFamily: fonts.heading, fontSize: 26, fontWeight: 700, color: C.accent }}>{icedRecipe.icedDose}g</div>
             </div>
-            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+            <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>
               Add <strong>{icedRecipe.iceGrams}g</strong> ice to carafe before pressing Start
             </div>
           </div>
@@ -632,14 +726,15 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {icedRecipe.grindRecommendation && (
             <div style={{
               background: ICE_PAPER_GRAD,
-              borderRadius: 14,
+              borderRadius: radius.lg,
               padding: '14px 18px 16px',
               border: `1px solid ${ICE_GRIND_BORDER}`,
               marginBottom: 14,
+              boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ marginBottom: 4 }}>Grind (finer for iced) · {grinderName}</SectionLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12, marginTop: 4 }}>
-                <GrindColumn label="single" value={icedRecipe.grindRecommendation.singleServe} />
+              <SectionLabel style={{ marginBottom: 12 }}>Grind (finer for iced) · {grinderName}</SectionLabel>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12 }}>
+                <GrindColumn label="single serve" value={icedRecipe.grindRecommendation.singleServe} />
                 <GrindColumn label="batch" value={icedRecipe.grindRecommendation.batch} divider />
               </div>
             </div>
@@ -650,7 +745,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
           {/* Iced push state */}
           {icedLoading && (
-            <div style={{ textAlign: 'center', padding: '12px 0', fontSize: 13, color: C.textMuted, fontStyle: 'italic' }}>
+            <div style={{ textAlign: 'center', padding: '12px 0', ...type.body, color: C.textMuted, fontStyle: 'italic' }}>
               Sending iced profile to your Aiden...
             </div>
           )}
@@ -659,7 +754,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {icedError && !icedLoading && (
             <div style={{
               background: C.redBg,
-              borderRadius: 10,
+              borderRadius: radius.sm,
               padding: 12,
               marginBottom: 10,
               fontSize: 13,
@@ -677,7 +772,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {/* Cached iced link */}
           {icedResult?.link && (
             <AidenPrimaryButton
-              leading={<ExternalLink size={14} />}
+              leading={<ExternalLink size={15} />}
               onClick={() => openExternalLink(icedResult.link)}
             >
               {fellowConnected && !icedResult.usedRelay ? (
@@ -705,7 +800,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           )}
 
           {extraFooter}
-        </div>
+        </m.div>
       )}
 
       {/* Off-screen share card for capture */}
