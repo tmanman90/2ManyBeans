@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
+import { m, listContainer, listItem, spring } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
@@ -43,97 +44,142 @@ export default function R12TrialTimeline() {
 
       <MascotStage src="/images/ruphus-animations/ruphus-thumbs-up.mp4" height={220} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 20px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <NoteBubble>
-          Here's what the next few days look like. No surprises.
-        </NoteBubble>
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 20px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        <m.div variants={listItem}>
+          <NoteBubble>
+            Here's what the next few days look like. No surprises.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 23, lineHeight: 1.2,
+        <m.div variants={listItem} style={{
+          ...t.h1,
           color: C.text,
           marginTop: 2,
         }}>
           Your free trial, briefly.
-        </div>
+        </m.div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 4 }}>
+        {/* Vertical stepper */}
+        <m.div variants={listItem} style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 4 }}>
           {TIMELINE_STEPS.map((s, i) => {
             const last = i === TIMELINE_STEPS.length - 1;
             return (
-              <div key={s.title} style={{ display: 'flex', gap: 12 }}>
+              <div key={s.title} style={{ display: 'flex', gap: 14 }}>
+                {/* Stepper spine */}
                 <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  flexShrink: 0, width: 36,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                  width: 32,
                 }}>
+                  {/* Accent dot */}
                   <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: C.amberBg,
-                    border: '1.5px solid #E8D5A0',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: C.accent, fontSize: 15, fontWeight: 800,
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    background: C.accentSoft,
+                    border: `2px solid ${C.accent}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: C.accent,
+                    fontSize: 13,
+                    fontWeight: 800,
                     fontFamily: fonts.body,
+                    boxShadow: shadows.e1,
+                    flexShrink: 0,
                   }}>
                     {s.dot}
                   </div>
+                  {/* Connector line */}
                   {!last && (
                     <div style={{
-                      width: 2, flex: 1, minHeight: 22,
-                      background: C.borderLight,
-                      marginTop: 3, marginBottom: 3,
+                      width: 2,
+                      flex: 1,
+                      minHeight: 20,
+                      background: `linear-gradient(to bottom, ${C.accent}66, ${C.borderLight})`,
+                      marginTop: 3,
+                      marginBottom: 3,
+                      borderRadius: 1,
                     }} />
                   )}
                 </div>
-                <div style={{ flex: 1, paddingBottom: last ? 0 : 14 }}>
+
+                {/* Step content */}
+                <div style={{ flex: 1, paddingBottom: last ? 0 : 16, paddingTop: 4 }}>
                   <div style={{
-                    fontFamily: fonts.heading, fontSize: 16, color: C.text,
+                    ...t.h3,
+                    color: C.text,
                     marginBottom: 2,
                   }}>
                     {s.title}
                   </div>
-                  <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.4 }}>
+                  <div style={{
+                    ...t.body,
+                    color: C.textMuted,
+                  }}>
                     {s.body}
                   </div>
                 </div>
               </div>
             );
           })}
-        </div>
+        </m.div>
 
-        <label style={{
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: '10px 12px',
-          background: C.card,
-          border: `1px solid ${C.borderLight}`,
-          borderRadius: 12,
-          cursor: 'pointer',
-          marginTop: 6,
-          WebkitTapHighlightColor: 'transparent',
-        }}>
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            style={{ marginTop: 2, width: 18, height: 18, accentColor: C.accent }}
-          />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, color: C.text, fontWeight: 700, lineHeight: 1.3 }}>
-              Send me brewing tips by email
+        {/* Email consent toggle */}
+        <m.div variants={listItem}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+            padding: '12px 14px',
+            background: C.cream,
+            border: `1.5px solid ${consent ? C.accent : C.border}`,
+            borderRadius: radius.md,
+            cursor: 'pointer',
+            marginTop: 4,
+            boxShadow: consent ? shadows.e1 : shadows.e0,
+            transition: 'border-color 0.16s ease, box-shadow 0.16s ease',
+            WebkitTapHighlightColor: 'transparent',
+          }}>
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              style={{
+                marginTop: 2,
+                width: 18,
+                height: 18,
+                accentColor: C.accent,
+                flexShrink: 0,
+                cursor: 'pointer',
+              }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ ...t.h3, color: C.text, marginBottom: 2 }}>
+                Send me brewing tips by email
+              </div>
+              <div style={{ ...t.caption, color: C.textMuted, marginTop: 2 }}>
+                Occasional emails. Unsubscribe anytime.
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.3, marginTop: 2 }}>
-              Occasional emails. Unsubscribe anytime.
-            </div>
-          </div>
-        </label>
-      </div>
+          </label>
+        </m.div>
+      </m.div>
 
       <OnboardingCtaBar
         label="Continue"

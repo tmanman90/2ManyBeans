@@ -1,10 +1,13 @@
-import { C, fonts } from '../../styles/theme';
+import { C, fonts, type, radius, shadows } from '../../styles/theme';
 
 // Warm-mentor Ruphus bubble — extracted from ProfessorRuphusSlideUp L150-169
 // so every onboarding screen gets the identical styling without forking.
 // Avatar on the left, speech bubble on the right with the tail-corner at
-// bottom-left (14/14/14/4 border-radius matches the source).
+// bottom-left (matching the source shape). Redesigned to a premium cream
+// surface: hairline border, warm elevation, Nunito bodyL for readability.
+// Script font (Caveat) is no longer used per design direction.
 export function RuphusSpeechBubble({ children, avatarSize = 56, variant = 'default' }) {
+  const isLarge = variant === 'large';
   return (
     <div style={{
       display: 'flex',
@@ -12,6 +15,7 @@ export function RuphusSpeechBubble({ children, avatarSize = 56, variant = 'defau
       gap: 12,
       width: '100%',
     }}>
+      {/* Avatar with warm accent ring */}
       <img
         src="/images/professor-ruphus.webp"
         alt="Professor Ruphus"
@@ -20,21 +24,40 @@ export function RuphusSpeechBubble({ children, avatarSize = 56, variant = 'defau
           height: avatarSize,
           borderRadius: '50%',
           flexShrink: 0,
-          border: `2px solid ${C.borderLight}`,
+          border: `2px solid ${C.accentLight}`,
+          boxShadow: `0 0 0 3px ${C.accentSoft}`,
         }}
       />
+
+      {/* Speech bubble — cream card with hairline + tail */}
       <div style={{
         flex: 1,
         minWidth: 0,
-        background: C.amberBg,
-        borderRadius: '14px 14px 14px 4px',
-        padding: '10px 14px',
-        fontSize: variant === 'large' ? 17 : 15,
+        position: 'relative',
+        background: C.cream,
+        borderRadius: `${radius.md}px ${radius.md}px ${radius.md}px 4px`,
+        padding: isLarge ? '12px 16px' : '10px 14px',
+        fontFamily: type.bodyL.fontFamily,
+        fontSize: isLarge ? type.bodyL.fontSize : 15,
+        fontWeight: type.bodyL.fontWeight,
+        lineHeight: type.bodyL.lineHeight,
         color: C.text,
-        fontFamily: fonts.title,
-        border: '1px solid #E8D5A0',
-        lineHeight: 1.4,
+        border: `1px solid ${C.hairline}`,
+        boxShadow: shadows.e2,
       }}>
+        {/* Tail triangle — bottom-left, matching bubble border colour */}
+        <div style={{
+          position: 'absolute',
+          bottom: 10,
+          left: -7,
+          width: 13,
+          height: 13,
+          background: C.cream,
+          borderBottom: `1px solid ${C.hairline}`,
+          borderLeft: `1px solid ${C.hairline}`,
+          transform: 'rotate(45deg)',
+          borderRadius: 2,
+        }} />
         {children}
       </div>
     </div>

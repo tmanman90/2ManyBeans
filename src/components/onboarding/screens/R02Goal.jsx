@@ -1,7 +1,8 @@
 import { Cpu, Droplets, FlaskConical, Coffee, Zap, Sparkles } from 'lucide-react';
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type, radius } from '../../../styles/theme';
+import { m, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
-import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingOptionList, onboardingBg } from './OnboardingPrimitives';
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingOptionList } from './OnboardingPrimitives';
 
 const GOAL_OPTIONS = [
   { key: 'aiden', label: 'Fellow Aiden', icon: Cpu },
@@ -19,51 +20,74 @@ export default function R02Goal() {
       width: '100%',
       minHeight: '100dvh',
       maxHeight: '100dvh',
-      background: onboardingBg,
+      background: C.bg,
       display: 'flex',
       flexDirection: 'column',
       fontFamily: fonts.body,
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R2 · BREW GOAL" overlay />
+      <OnboardingTopBar step="" overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-thinking.mp4" height={290} />
+      <MascotStage src="/images/ruphus-animations/ruphus-thinking.mp4" height={260} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 20px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <NoteBubble>
-          Right — tell me what you're chasing. I'll tailor everything around it.
-        </NoteBubble>
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 20px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        {/* Note bubble */}
+        <m.div variants={listItem}>
+          <NoteBubble>
+            Right — tell me what you're chasing. I'll tailor everything around it.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 24,
-          lineHeight: 1.15,
-          color: C.text,
+        {/* Eyebrow */}
+        <m.div variants={listItem} style={{
+          ...type.label,
+          color: C.textLight,
           marginTop: 4,
         }}>
-          What do you want to brew better?
-        </div>
+          Brew goal
+        </m.div>
 
-        <OnboardingOptionList
-          options={GOAL_OPTIONS}
-          value={answers?.goal}
-          onSelect={(key) => dispatch({
-            type: 'ADVANCE',
-            next: 'r3',
-            answersPatch: { goal: key },
-          })}
-          compact
-        />
-      </div>
+        {/* Headline */}
+        <m.div variants={listItem} style={{
+          fontFamily: fonts.heading,
+          fontSize: type.h1.fontSize,
+          fontWeight: type.h1.fontWeight,
+          lineHeight: type.h1.lineHeight,
+          letterSpacing: type.h1.letterSpacing,
+          color: C.text,
+          marginTop: -6,
+        }}>
+          What do you want to brew better?
+        </m.div>
+
+        {/* Option list — staggered */}
+        <m.div variants={listItem}>
+          <OnboardingOptionList
+            options={GOAL_OPTIONS}
+            value={answers?.goal}
+            onSelect={(key) => dispatch({
+              type: 'ADVANCE',
+              next: 'r3',
+              answersPatch: { goal: key },
+            })}
+            compact
+          />
+        </m.div>
+      </m.div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
+import { m, fadeUp, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
@@ -21,39 +22,49 @@ export default function R10Demo() {
 
       <MascotStage src="/images/ruphus-animations/ruphus-writing-notes.mp4" height={230} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 20px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <NoteBubble>
-          Just tap a bag and I'll read the label for you.
-        </NoteBubble>
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 20px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        <m.div variants={listItem}>
+          <NoteBubble>
+            Just tap a bag and I'll read the label for you.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 23, lineHeight: 1.2,
+        <m.div variants={listItem} style={{
+          ...t.h1,
           color: C.text,
           marginTop: 2,
         }}>
           Here's what a scan looks like.
-        </div>
+        </m.div>
 
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: 340,
-          aspectRatio: '3 / 4',
-          margin: '4px auto 0',
-          borderRadius: 16,
-          overflow: 'hidden',
-          background: C.card,
-          border: `1px solid ${C.borderLight}`,
-        }}>
+        {/* Premium demo card */}
+        <m.div
+          variants={listItem}
+          style={{
+            ...cardBase,
+            position: 'relative',
+            width: '100%',
+            maxWidth: 340,
+            aspectRatio: '3 / 4',
+            margin: '4px auto 0',
+            borderRadius: radius.lg,
+            overflow: 'hidden',
+            boxShadow: shadows.e3,
+          }}
+        >
           <img
             src="/images/onboarding/demo-scan.webp"
             alt="Example bag scan result"
@@ -64,6 +75,8 @@ export default function R10Demo() {
               display: 'block',
             }}
           />
+
+          {/* Scanning line overlay */}
           <div
             aria-hidden
             style={{
@@ -75,13 +88,33 @@ export default function R10Demo() {
           >
             <div style={{
               position: 'absolute',
-              left: 0, right: 0, height: 3,
-              background: C.accent,
-              boxShadow: `0 0 14px ${C.accent}, 0 0 28px ${C.accent}aa`,
+              left: 0, right: 0, height: 2,
+              background: `linear-gradient(90deg, transparent 0%, ${C.accent} 20%, ${C.accentLight} 50%, ${C.accent} 80%, transparent 100%)`,
+              boxShadow: `0 0 12px ${C.accent}cc, 0 0 24px ${C.accent}66`,
               animation: 'r10-scan 2.6s ease-in-out infinite',
               top: 0,
             }} />
           </div>
+
+          {/* Corner brackets — scanner UI detail */}
+          {[
+            { top: 10, left: 10, borderTop: `2px solid ${C.accent}`, borderLeft: `2px solid ${C.accent}` },
+            { top: 10, right: 10, borderTop: `2px solid ${C.accent}`, borderRight: `2px solid ${C.accent}` },
+            { bottom: 10, left: 10, borderBottom: `2px solid ${C.accent}`, borderLeft: `2px solid ${C.accent}` },
+            { bottom: 10, right: 10, borderBottom: `2px solid ${C.accent}`, borderRight: `2px solid ${C.accent}` },
+          ].map((s, i) => (
+            <div
+              key={i}
+              aria-hidden
+              style={{
+                position: 'absolute',
+                width: 18, height: 18,
+                pointerEvents: 'none',
+                ...s,
+              }}
+            />
+          ))}
+
           <style>{`
             @keyframes r10-scan {
               0%   { top: 0%;  opacity: 0; }
@@ -90,15 +123,18 @@ export default function R10Demo() {
               100% { top: 96%; opacity: 0; }
             }
           `}</style>
-        </div>
+        </m.div>
 
-        <div style={{
-          fontSize: 13, color: C.textMuted,
-          textAlign: 'center', marginTop: 8, lineHeight: 1.4,
+        <m.div variants={listItem} style={{
+          ...t.body,
+          color: C.textMuted,
+          textAlign: 'center',
+          marginTop: 4,
+          lineHeight: 1.5,
         }}>
           No typing. No guessing. Just the back of the bag, turned into something useful.
-        </div>
-      </div>
+        </m.div>
+      </m.div>
 
       <OnboardingCtaBar
         label="Got it"

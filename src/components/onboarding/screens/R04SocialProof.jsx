@@ -1,6 +1,7 @@
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type, shadows, radius, cardBase } from '../../../styles/theme';
+import { m, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
-import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar } from './OnboardingPrimitives';
 
 const TESTIMONIALS_BY_PAIN = {
   inconsistent: [
@@ -41,58 +42,132 @@ export default function R04SocialProof() {
       width: '100%',
       minHeight: '100dvh',
       maxHeight: '100dvh',
-      background: onboardingBg,
+      background: C.bg,
       display: 'flex',
       flexDirection: 'column',
       fontFamily: fonts.body,
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R4 · YOU'RE IN GOOD COMPANY" overlay />
+      <OnboardingTopBar step="" overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-reading-book.mp4" height={410} />
+      <MascotStage src="/images/ruphus-animations/ruphus-reading-book.mp4" height={370} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 24px 8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 26,
-          lineHeight: 1.15,
-          color: C.text,
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 24px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        {/* Eyebrow */}
+        <m.div variants={listItem} style={{
+          ...type.label,
+          color: C.textLight,
           textAlign: 'center',
         }}>
+          Real brewers
+        </m.div>
+
+        {/* Headline */}
+        <m.div variants={listItem} style={{
+          fontFamily: fonts.heading,
+          fontSize: type.h1.fontSize,
+          fontWeight: type.h1.fontWeight,
+          lineHeight: type.h1.lineHeight,
+          letterSpacing: type.h1.letterSpacing,
+          color: C.text,
+          textAlign: 'center',
+          marginTop: -4,
+        }}>
           You're in good company.
-        </div>
+        </m.div>
 
-        <NoteBubble style={{ marginTop: 4 }}>
-          I'm not the only one who believes in this — look what brewers are saying.
-        </NoteBubble>
+        {/* Note bubble */}
+        <m.div variants={listItem}>
+          <NoteBubble style={{ marginTop: 2 }}>
+            I'm not the only one who believes in this — look what brewers are saying.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+        {/* Testimonial cards — staggered */}
+        <m.div
+          variants={listContainer}
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}
+        >
           {testimonials.map((t, i) => (
-            <div key={i} style={{
-              background: C.card,
-              border: `1px solid ${C.borderLight}`,
-              borderRadius: 12,
-              padding: '12px 14px',
+            <m.div key={i} variants={listItem} style={{
+              ...cardBase,
+              borderRadius: radius.md,
+              padding: '14px 16px',
+              position: 'relative',
             }}>
-              <div style={{ fontSize: 14, lineHeight: 1.45, color: C.text, marginBottom: 6 }}>
-                &ldquo;{t.quote}&rdquo;
+              {/* Quote mark accent */}
+              <div style={{
+                position: 'absolute',
+                top: 10,
+                left: 14,
+                fontFamily: fonts.heading,
+                fontSize: 36,
+                lineHeight: 1,
+                color: C.accentLight,
+                opacity: 0.6,
+                userSelect: 'none',
+                pointerEvents: 'none',
+              }}>"</div>
+              <div style={{
+                ...type.body,
+                color: C.text,
+                marginBottom: 8,
+                paddingTop: 14,
+                lineHeight: 1.5,
+              }}>
+                {t.quote}
               </div>
-              <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 700 }}>
-                — {t.author}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                {/* Avatar initial */}
+                <div style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: radius.pill,
+                  background: C.accentSoft,
+                  border: `1px solid ${C.accentLight}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <span style={{
+                    ...type.caption,
+                    color: C.accent,
+                    fontWeight: 700,
+                  }}>
+                    {t.author.charAt(0)}
+                  </span>
+                </div>
+                <div style={{
+                  ...type.caption,
+                  color: C.textMuted,
+                  fontWeight: 700,
+                }}>
+                  {t.author}
+                </div>
               </div>
-            </div>
+            </m.div>
           ))}
-        </div>
-      </div>
+        </m.div>
+      </m.div>
 
       <OnboardingCtaBar
         label="Continue"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type as t, radius } from '../../../styles/theme';
+import { m, fadeUp } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, onboardingBg } from './OnboardingPrimitives';
 
@@ -72,54 +73,85 @@ export default function R09Processing() {
 
       <MascotStage src="/images/ruphus-animations/ruphus-celebrating.mp4" height={410} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 24px 8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-      }}>
+      <m.div
+        {...fadeUp}
+        style={{
+          flex: 1,
+          padding: '4px 24px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          alignItems: 'center',
+        }}
+      >
         <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 26, lineHeight: 1.15,
+          ...t.h1,
           color: C.text,
           textAlign: 'center',
+          width: '100%',
         }}>
           Building your brew plan
         </div>
 
-        <NoteBubble style={{ marginTop: 4 }}>
-          {QUIPS[quipIndex]}
-        </NoteBubble>
+        {/* Animated quip */}
+        <m.div
+          key={quipIndex}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          style={{ width: '100%' }}
+        >
+          <NoteBubble style={{ marginTop: 4 }}>
+            {QUIPS[quipIndex]}
+          </NoteBubble>
+        </m.div>
 
+        {/* Refined progress bar */}
         <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          marginTop: 8,
+          width: '100%',
         }}>
+          {/* Hairline track */}
           <div style={{
-            width: '100%', maxWidth: 280, height: 10,
-            background: C.cardMuted,
-            borderRadius: 999, overflow: 'hidden',
-            border: `1px solid ${C.borderLight}`,
+            width: '100%',
+            maxWidth: 280,
+            height: 3,
+            background: C.hairline,
+            borderRadius: radius.pill,
+            overflow: 'hidden',
+            position: 'relative',
           }}>
+            {/* Accent fill */}
             <div style={{
-              width: '100%', height: '100%',
-              background: C.accent,
-              borderRadius: 999,
+              position: 'absolute',
+              inset: 0,
+              background: `linear-gradient(90deg, ${C.accent} 0%, ${C.accentLight} 100%)`,
+              borderRadius: radius.pill,
               transformOrigin: 'left center',
-              animation: `onboarding-processing-fill ${PROCESSING_MS}ms linear forwards`,
+              animation: `r09-fill ${PROCESSING_MS}ms cubic-bezier(0.22,1,0.36,1) forwards`,
             }} />
           </div>
-          <div style={{ marginTop: 10, fontSize: 12, color: C.textMuted }}>
+
+          <div style={{
+            marginTop: 12,
+            ...t.caption,
+            color: C.textLight,
+            letterSpacing: '0.06em',
+          }}>
             Just a moment...
           </div>
         </div>
-      </div>
+      </m.div>
 
       <style>{`
-        @keyframes onboarding-processing-fill {
+        @keyframes r09-fill {
           from { transform: scaleX(0); }
-          to { transform: scaleX(1); }
+          to   { transform: scaleX(1); }
         }
       `}</style>
     </div>

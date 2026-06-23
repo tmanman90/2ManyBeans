@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
+import { m, fadeUp, listContainer, listItem, spring } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { warmPaywallOfferings } from '../warmPaywallOfferings';
 import { sanitizeUserText } from '../../../lib/sanitizeUserText';
@@ -28,19 +29,32 @@ const BREW_OPTIONS = [
 ];
 
 const inputStyle = {
-  width: '100%', minHeight: 48, padding: '12px 14px',
-  fontSize: 16, fontFamily: "'Nunito', sans-serif",
-  borderRadius: 12, border: `1px solid #E8DDD3`,
-  background: '#FFF8F0', color: '#3B2417', outline: 'none',
+  width: '100%',
+  minHeight: 48,
+  padding: '12px 16px',
+  fontSize: 16,
+  fontFamily: fonts.body,
+  fontWeight: 500,
+  borderRadius: radius.md,
+  border: `1.5px solid ${C.border}`,
+  background: C.cream,
+  color: C.text,
+  outline: 'none',
   boxSizing: 'border-box',
+  boxShadow: shadows.e1,
+  WebkitAppearance: 'none',
+  transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
 };
 
 const selectStyle = {
   ...inputStyle,
-  appearance: 'none', WebkitAppearance: 'none',
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B7B6F' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23A86A38' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 14px center',
+  backgroundPosition: 'right 16px center',
+  paddingRight: 40,
+  cursor: 'pointer',
 };
 
 export default function R07Preferences() {
@@ -86,7 +100,10 @@ export default function R07Preferences() {
 
       <MascotStage src="/images/ruphus-animations/ruphus-holding-grinder.mp4" height={220} />
 
-      <div
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
         onClick={(e) => {
           const tag = e.target.tagName;
           if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA' && tag !== 'BUTTON')
@@ -102,83 +119,102 @@ export default function R07Preferences() {
           overflowY: 'auto',
         }}
       >
-        <NoteBubble>
-          Last bit. Tell me what you've got and I'll set up your kit.
-        </NoteBubble>
+        <m.div variants={listItem}>
+          <NoteBubble>
+            Last bit. Tell me what you've got and I'll set up your kit.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 23, lineHeight: 1.2,
+        <m.div variants={listItem} style={{
+          ...t.h1,
           color: C.text,
           marginTop: 2,
         }}>
           Set up your kit
-        </div>
+        </m.div>
 
-        <FieldLabel>What should I call you? (optional)</FieldLabel>
-        <input
-          type="text"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          onFocus={scrollOnFocus}
-          placeholder="Your name"
-          maxLength={50}
-          style={inputStyle}
-        />
-
-        <FieldLabel style={{ marginTop: 6 }}>What's your grinder?</FieldLabel>
-        <select
-          value={grinder}
-          onChange={(e) => setGrinder(e.target.value)}
-          style={selectStyle}
-        >
-          {GRINDERS.map(g => (
-            <option key={g.key} value={g.key}>{g.label}</option>
-          ))}
-        </select>
-        {grinder === 'other' && (
+        <m.div variants={listItem}>
+          <FieldLabel>What should I call you? <span style={{ opacity: 0.5, fontWeight: 500 }}>(optional)</span></FieldLabel>
           <input
             type="text"
-            value={grinderCustom}
-            onChange={(e) => setGrinderCustom(e.target.value)}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
             onFocus={scrollOnFocus}
-            placeholder="Your grinder name"
+            placeholder="Your name"
             maxLength={50}
-            style={{ ...inputStyle, marginTop: 4 }}
+            style={inputStyle}
           />
-        )}
+        </m.div>
 
-        <FieldLabel style={{ marginTop: 6 }}>How do you brew?</FieldLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          {BREW_OPTIONS.map((m) => {
-            const selected = brewMethod === m.key;
-            return (
-              <button
-                key={m.key}
-                onClick={() => setBrewMethod(m.key)}
-                style={{
-                  minHeight: 72,
-                  padding: 8,
-                  background: selected ? C.amberBg : C.card,
-                  border: `${selected ? 2 : 1.5}px solid ${selected ? C.accent : C.borderLight}`,
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  fontFamily: fonts.body,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: selected ? C.accent : C.text,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  textAlign: 'center',
-                  lineHeight: 1.2,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        <m.div variants={listItem}>
+          <FieldLabel style={{ marginTop: 6 }}>What's your grinder?</FieldLabel>
+          <select
+            value={grinder}
+            onChange={(e) => setGrinder(e.target.value)}
+            style={selectStyle}
+          >
+            {GRINDERS.map(g => (
+              <option key={g.key} value={g.key}>{g.label}</option>
+            ))}
+          </select>
+          {grinder === 'other' && (
+            <m.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={spring.soft}
+            >
+              <input
+                type="text"
+                value={grinderCustom}
+                onChange={(e) => setGrinderCustom(e.target.value)}
+                onFocus={scrollOnFocus}
+                placeholder="Your grinder name"
+                maxLength={50}
+                style={{ ...inputStyle, marginTop: 8 }}
+              />
+            </m.div>
+          )}
+        </m.div>
+
+        <m.div variants={listItem}>
+          <FieldLabel style={{ marginTop: 6 }}>How do you brew?</FieldLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {BREW_OPTIONS.map((method) => {
+              const selected = brewMethod === method.key;
+              return (
+                <m.button
+                  key={method.key}
+                  onClick={() => setBrewMethod(method.key)}
+                  whileTap={{ scale: 0.96 }}
+                  transition={spring.snappy}
+                  style={{
+                    minHeight: 72,
+                    padding: 8,
+                    background: selected ? C.accentSoft : C.cream,
+                    border: `${selected ? 2 : 1.5}px solid ${selected ? C.accent : C.border}`,
+                    borderRadius: radius.md,
+                    cursor: 'pointer',
+                    fontFamily: fonts.body,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: selected ? C.accent : C.text,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
+                    boxShadow: selected ? shadows.e1 : shadows.e0,
+                    transition: 'background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {method.label}
+                </m.button>
+              );
+            })}
+          </div>
+        </m.div>
+      </m.div>
 
       <OnboardingCtaBar
         label="Continue"
@@ -192,11 +228,9 @@ export default function R07Preferences() {
 function FieldLabel({ children, style = {} }) {
   return (
     <div style={{
-      fontSize: 12, color: C.textMuted, fontWeight: 700,
-      fontFamily: fonts.body,
-      letterSpacing: 0.3,
-      textTransform: 'uppercase',
-      marginBottom: 4,
+      ...t.label,
+      color: C.textMuted,
+      marginBottom: 6,
       ...style,
     }}>
       {children}

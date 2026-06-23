@@ -1,8 +1,10 @@
 import { ChevronLeft } from 'lucide-react';
-import { C, fonts, radius, shadows } from '../../../styles/theme';
+import { C, fonts, type, radius, shadows, motion as motionTokens, glass } from '../../../styles/theme';
 import { haptic } from '../../../lib/haptics';
 import { RuphusSpeechBubble } from '../RuphusSpeechBubble';
 import { useOnboarding } from '../OnboardingContext';
+import { m, spring, fadeUp } from '../../../lib/motion';
+import { onboardingBg } from './OnboardingPrimitives';
 
 // Shared layout for the 13 onboarding screens. Safe-area padded full-dvh
 // container with a top bar (back button), optional Ruphus bubble, hero
@@ -32,62 +34,71 @@ export function OnboardingScreenShell({
     <div style={{
       minHeight: '100dvh',
       maxHeight: '100dvh',
-      background: C.bg,
+      background: onboardingBg,
       display: 'flex',
       flexDirection: 'column',
       fontFamily: fonts.body,
       paddingTop: `calc(env(safe-area-inset-top, 0px) + 12px)`,
     }}>
-      {/* Top bar — back button (hidden when back disabled) */}
+      {/* Top bar — back button + subtle step label */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         minHeight: 44,
-        padding: '0 12px',
+        padding: '0 16px',
+        gap: 8,
       }}>
         {!backDisabled ? (
-          <button
+          <m.button
             onClick={handleBack}
             aria-label="Back"
+            whileTap={{ scale: 0.92 }}
+            transition={spring.snappy}
             style={{
               width: 44,
               height: 44,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
+              background: `${C.cream}CC`,
+              border: `1px solid ${C.hairline}`,
+              borderRadius: radius.pill,
               cursor: 'pointer',
+              boxShadow: shadows.e1,
               WebkitTapHighlightColor: 'transparent',
+              flexShrink: 0,
             }}
           >
-            <ChevronLeft size={28} color={C.textMuted} />
-          </button>
+            <ChevronLeft size={20} color={C.textMuted} strokeWidth={2.5} />
+          </m.button>
         ) : (
-          <div style={{ width: 44, height: 44 }} />
+          <div style={{ width: 44, height: 44, flexShrink: 0 }} />
         )}
-        {/* Tiny step indicator for placeholders — helps manual QA scroll
-            through Phase 1. Phase 2+ may replace with a real progress UI. */}
+
+        {/* Step eyebrow label */}
         <div style={{
           flex: 1,
           textAlign: 'center',
-          fontSize: 12,
+          ...type.label,
           color: C.textLight,
-          letterSpacing: 0.5,
-          textTransform: 'uppercase',
+          fontSize: type.caption.fontSize,
         }}>
           {state?.step?.toUpperCase?.() || ''}
         </div>
-        <div style={{ width: 44, height: 44 }} />
+
+        <div style={{ width: 44, height: 44, flexShrink: 0 }} />
       </div>
 
       {/* Scrollable content */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        minHeight: 0,
-        padding: '8px 20px 16px',
-      }}>
+      <m.div
+        {...fadeUp}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          minHeight: 0,
+          padding: '8px 20px 16px',
+        }}
+      >
         {ruphusLine && (
           <div style={{ marginBottom: 20 }}>
             <RuphusSpeechBubble>{ruphusLine}</RuphusSpeechBubble>
@@ -96,9 +107,7 @@ export function OnboardingScreenShell({
 
         {title && (
           <div style={{
-            fontFamily: fonts.heading,
-            fontSize: 28,
-            lineHeight: 1.15,
+            ...type.h1,
             color: C.text,
             marginBottom: 8,
           }}>
@@ -108,9 +117,8 @@ export function OnboardingScreenShell({
 
         {subtitle && (
           <div style={{
-            fontSize: 15,
+            ...type.bodyL,
             color: C.textMuted,
-            lineHeight: 1.4,
             marginBottom: 20,
           }}>
             {subtitle}
@@ -118,54 +126,63 @@ export function OnboardingScreenShell({
         )}
 
         {children}
-      </div>
+      </m.div>
 
-      {/* CTA bar — sticky to bottom, safe-area padded */}
+      {/* CTA bar — glass surface, safe-area padded */}
       {(primaryCta || secondaryCta) && (
         <div style={{
-          padding: `12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px)`,
-          background: C.bg,
-          borderTop: `1px solid ${C.borderLight}`,
+          padding: `12px 20px calc(env(safe-area-inset-bottom, 0px) + 20px)`,
+          background: glass.sheet,
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
+          borderTop: `1px solid ${C.hairline}`,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
         }}>
           {primaryCta && (
-            <button
+            <m.button
               onClick={() => {
                 haptic.selection();
                 primaryCta.onClick?.();
               }}
               disabled={primaryCta.disabled}
+              whileTap={!primaryCta.disabled ? { scale: 0.975 } : {}}
+              transition={spring.snappy}
               style={{
                 width: '100%',
                 minHeight: 52,
-                fontSize: 17,
+                fontSize: type.bodyL.fontSize,
                 fontWeight: 700,
-                fontFamily: fonts.body,
-                background: C.accent,
-                color: '#fff',
+                fontFamily: type.bodyL.fontFamily,
+                background: primaryCta.disabled
+                  ? C.accentLight
+                  : `linear-gradient(135deg, ${C.accent} 0%, #C4793F 100%)`,
+                color: '#FFFDFA',
                 border: 'none',
                 borderRadius: radius.md,
                 cursor: primaryCta.disabled ? 'not-allowed' : 'pointer',
-                opacity: primaryCta.disabled ? 0.5 : 1,
-                boxShadow: shadows.button,
+                opacity: primaryCta.disabled ? 0.6 : 1,
+                boxShadow: primaryCta.disabled ? 'none' : shadows.navActive,
                 WebkitTapHighlightColor: 'transparent',
+                letterSpacing: '0.01em',
               }}
             >
               {primaryCta.label}
-            </button>
+            </m.button>
           )}
           {secondaryCta && (
-            <button
+            <m.button
               onClick={() => {
                 haptic.selection();
                 secondaryCta.onClick?.();
               }}
+              whileTap={{ scale: 0.98 }}
+              transition={spring.snappy}
               style={{
                 width: '100%',
                 minHeight: 44,
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: 600,
                 fontFamily: fonts.body,
                 background: 'transparent',
@@ -173,10 +190,11 @@ export function OnboardingScreenShell({
                 border: 'none',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
+                letterSpacing: '0.01em',
               }}
             >
               {secondaryCta.label}
-            </button>
+            </m.button>
           )}
         </div>
       )}

@@ -1,7 +1,8 @@
 import { useLayoutEffect } from 'react';
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type, shadows, radius, cardBase } from '../../../styles/theme';
+import { m, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
-import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
+import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar } from './OnboardingPrimitives';
 
 const GOAL_COPY = {
   aiden: 'your Fellow Aiden',
@@ -18,6 +19,16 @@ const PAIN_COPY = {
   too_many_beans: "taming your bean collection",
   taste_more: 'actually tasting your coffee',
   brew_like_pro: 'brewing like a pro',
+};
+
+// Feature icon mapping (emoji — no extra imports needed)
+const FEATURE_ICONS = {
+  recipes: '📖',
+  rotation: '🫙',
+  tasting: '👅',
+  scan: '📷',
+  ruphus: '🦊',
+  aiden: '⚙️',
 };
 
 const FEATURE_LIBRARY = {
@@ -74,7 +85,7 @@ export default function R06Personalized() {
   if (!hasPalate) return null;
 
   const featureKeys = GOAL_FEATURE_MAP[answers?.goal] || DEFAULT_FEATURES;
-  const features = featureKeys.map((k) => FEATURE_LIBRARY[k]).filter(Boolean);
+  const features = featureKeys.map((k) => ({ ...FEATURE_LIBRARY[k], icon: FEATURE_ICONS[k], key: k })).filter(Boolean);
   const goalLabel = GOAL_COPY[answers?.goal] || 'your brew';
   const painLabel = PAIN_COPY[answers?.pain] || 'dialing in';
 
@@ -83,70 +94,125 @@ export default function R06Personalized() {
       width: '100%',
       minHeight: '100dvh',
       maxHeight: '100dvh',
-      background: onboardingBg,
+      background: C.bg,
       display: 'flex',
       flexDirection: 'column',
       fontFamily: fonts.body,
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R6 · YOUR PLAN" overlay />
+      <OnboardingTopBar step="" overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-presenting.mp4" height={410} />
+      <MascotStage src="/images/ruphus-animations/ruphus-presenting.mp4" height={360} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 24px 8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 26,
-          lineHeight: 1.15,
-          color: C.text,
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 24px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        {/* Eyebrow */}
+        <m.div variants={listItem} style={{
+          ...type.label,
+          color: C.accent,
           textAlign: 'center',
         }}>
+          Your personalized plan
+        </m.div>
+
+        {/* Headline */}
+        <m.div variants={listItem} style={{
+          fontFamily: fonts.heading,
+          fontSize: type.h1.fontSize,
+          fontWeight: type.h1.fontWeight,
+          lineHeight: type.h1.lineHeight,
+          letterSpacing: type.h1.letterSpacing,
+          color: C.text,
+          textAlign: 'center',
+          marginTop: -4,
+        }}>
           Here's how I'll help.
-        </div>
-        <div style={{
-          fontSize: 15,
+        </m.div>
+
+        {/* Personalization callout */}
+        <m.div variants={listItem} style={{
+          ...type.bodyL,
           color: C.textMuted,
           textAlign: 'center',
           marginTop: -4,
-          lineHeight: 1.4,
         }}>
-          We'll focus on {painLabel} together — starting today.
-        </div>
+          Focused on {painLabel} — starting today.
+        </m.div>
 
-        <NoteBubble style={{ marginTop: 4 }}>
-          Here's how I'll actually help — starting today.
-        </NoteBubble>
+        {/* Note bubble */}
+        <m.div variants={listItem}>
+          <NoteBubble style={{ marginTop: 2 }}>
+            Here's how I'll actually help — starting today.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+        {/* Feature cards — staggered */}
+        <m.div
+          variants={listContainer}
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}
+        >
           {features.map((f) => (
-            <div key={f.title} style={{
-              background: C.card,
-              border: `1px solid ${C.borderLight}`,
-              borderRadius: 12,
-              padding: '12px 14px',
+            <m.div key={f.key} variants={listItem} style={{
+              ...cardBase,
+              borderRadius: radius.md,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 14,
             }}>
+              {/* Feature icon bubble */}
               <div style={{
-                fontFamily: fonts.heading, fontSize: 16, color: C.text,
-                marginBottom: 3,
+                width: 44,
+                height: 44,
+                borderRadius: radius.sm,
+                background: C.accentSoft,
+                border: `1px solid ${C.accentLight}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                fontSize: 22,
               }}>
-                {f.title}
+                {f.icon}
               </div>
-              <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.4 }}>
-                {f.body}
+
+              {/* Text block */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: fonts.heading,
+                  fontSize: type.h3.fontSize,
+                  fontWeight: type.h3.fontWeight,
+                  lineHeight: type.h3.lineHeight,
+                  color: C.text,
+                  marginBottom: 4,
+                }}>
+                  {f.title}
+                </div>
+                <div style={{
+                  ...type.body,
+                  color: C.textMuted,
+                  lineHeight: 1.45,
+                }}>
+                  {f.body}
+                </div>
               </div>
-            </div>
+            </m.div>
           ))}
-        </div>
-      </div>
+        </m.div>
+      </m.div>
 
       <OnboardingCtaBar
         label="Sounds good"

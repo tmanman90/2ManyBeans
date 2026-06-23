@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
+import { m, fadeUp, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const IMPORT_TIMEOUT_MS = 4000;
+
+// Benefit rows that frame the "why"
+const BENEFITS = [
+  {
+    icon: '📦',
+    title: 'Instant bag reading',
+    body: 'Point at the back label — origin, roast, process, all captured in seconds.',
+  },
+  {
+    icon: '🔒',
+    title: 'Privacy by design',
+    body: 'Photos go straight to our AI reader and are never stored.',
+  },
+];
 
 export default function R08PermissionPriming() {
   const { dispatch } = useOnboarding();
@@ -96,60 +111,97 @@ export default function R08PermissionPriming() {
 
       <MascotStage src="/images/ruphus-animations/ruphus-magnifying-glass.mp4" height={410} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 24px 8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 26, lineHeight: 1.15,
-          color: C.text,
-          textAlign: 'center',
-        }}>
-          Give me a peek at your bags.
-        </div>
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 24px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        <m.div variants={listItem}>
+          <div style={{
+            ...t.h1,
+            color: C.text,
+            textAlign: 'center',
+          }}>
+            Give me a peek at your bags.
+          </div>
+        </m.div>
 
-        <NoteBubble style={{ marginTop: 4 }}>
-          I'll need your camera to read the back labels on your bags. It's how I learn what you're drinking.
-        </NoteBubble>
+        <m.div variants={listItem}>
+          <NoteBubble style={{ marginTop: 0 }}>
+            I'll need your camera to read the back labels on your bags. It's how I learn what you're drinking.
+          </NoteBubble>
+        </m.div>
 
-        <div style={{
-          background: C.amberBg,
-          border: '1px solid #E8D5A0',
-          borderRadius: 12,
-          padding: '12px 14px',
-          marginTop: 2,
-          fontSize: 13, color: C.textMuted, lineHeight: 1.45,
-          textAlign: 'center',
-        }}>
-          Photos are sent to our AI to read the label, then discarded. We never store your images.
-        </div>
+        {/* Benefit cards */}
+        <m.div variants={listItem} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {BENEFITS.map((b) => (
+            <div key={b.title} style={{
+              ...cardBase,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              padding: '12px 14px',
+              borderRadius: radius.md,
+            }}>
+              <div style={{
+                fontSize: 22,
+                lineHeight: 1,
+                flexShrink: 0,
+                marginTop: 1,
+              }}>
+                {b.icon}
+              </div>
+              <div>
+                <div style={{
+                  ...t.h3,
+                  color: C.text,
+                  marginBottom: 2,
+                }}>
+                  {b.title}
+                </div>
+                <div style={{
+                  ...t.body,
+                  color: C.textMuted,
+                }}>
+                  {b.body}
+                </div>
+              </div>
+            </div>
+          ))}
+        </m.div>
 
         {deniedMessage && (
-          <div
+          <m.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             role="status"
             style={{
-              fontSize: 14,
+              ...t.body,
               color: C.text,
-              background: '#FEF2F2',
-              border: '1px solid rgba(220,38,38,0.25)',
-              borderRadius: 12,
+              background: C.redBg,
+              border: `1px solid rgba(182,92,69,0.25)`,
+              borderRadius: radius.md,
               padding: '12px 14px',
               lineHeight: 1.45,
             }}
           >
             {deniedMessage}
-          </div>
+          </m.div>
         )}
-      </div>
+      </m.div>
 
       <OnboardingCtaBar
-        label={requesting ? 'Requesting...' : 'Continue'}
+        label={requesting ? 'Requesting...' : 'Allow Camera Access'}
         onClick={handleAllow}
         disabled={requesting}
       />

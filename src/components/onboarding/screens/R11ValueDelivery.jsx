@@ -1,4 +1,5 @@
-import { C, fonts } from '../../../styles/theme';
+import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
+import { m, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { OnboardingPalateChart } from '../OnboardingPalateChart';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
@@ -21,6 +22,13 @@ const PAIN_BODY = {
   brew_like_pro:
     "I'll push you — origin, grind size, recipe tweaks, the whole thing. You'll get there.",
 };
+
+// Feature highlight rows
+const FEATURES = [
+  { icon: '⏱', label: 'Freshness tracking', body: 'Peak window always visible, per bag.' },
+  { icon: '🎯', label: 'Dialed-in recipes', body: 'Brew settings tuned to your grinder and method.' },
+  { icon: '📓', label: 'Tasting log', body: 'Guided note-taking that builds your palate over time.' },
+];
 
 function palateOneLiner(chart) {
   if (!chart || typeof chart !== 'object') return '';
@@ -64,61 +72,106 @@ export default function R11ValueDelivery() {
 
       <MascotStage src="/images/ruphus-animations/ruphus-cupping.mp4" height={410} />
 
-      <div style={{
-        flex: 1,
-        padding: '4px 24px 8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
-      }}>
-        <div style={{
-          fontFamily: fonts.heading,
-          fontSize: 26, lineHeight: 1.15,
+      <m.div
+        variants={listContainer}
+        initial="initial"
+        animate="animate"
+        style={{
+          flex: 1,
+          padding: '4px 24px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      >
+        <m.div variants={listItem} style={{
+          ...t.h1,
           color: C.text,
           textAlign: 'center',
         }}>
           Your palate, in five axes.
-        </div>
+        </m.div>
 
-        <div style={{ marginTop: 4 }}>
+        <m.div variants={listItem} style={{ marginTop: 4 }}>
           <OnboardingPalateChart chart={answers?.palateChart} size={220} />
-        </div>
+        </m.div>
 
         {snapshot && (
-          <div style={{
+          <m.div variants={listItem} style={{
             textAlign: 'center',
             fontFamily: fonts.heading,
-            fontSize: 16,
-            color: C.text,
+            fontSize: 15,
+            fontWeight: 600,
+            color: C.accent,
             lineHeight: 1.3,
-            marginTop: 4,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
           }}>
             {snapshot}
-          </div>
+          </m.div>
         )}
 
-        <NoteBubble>
-          {intro} {body} Ready to start? Your first bag is one tap away.
-        </NoteBubble>
+        <m.div variants={listItem}>
+          <NoteBubble>
+            {intro} {body} Ready to start? Your first bag is one tap away.
+          </NoteBubble>
+        </m.div>
+
+        {/* Feature highlight cards */}
+        <m.div variants={listItem} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
+          {FEATURES.map((f) => (
+            <div key={f.label} style={{
+              ...cardBase,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '11px 14px',
+              borderRadius: radius.md,
+            }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: radius.sm,
+                background: C.accentSoft,
+                border: `1px solid ${C.accentLight}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                flexShrink: 0,
+              }}>
+                {f.icon}
+              </div>
+              <div>
+                <div style={{ ...t.h3, color: C.text, marginBottom: 1 }}>
+                  {f.label}
+                </div>
+                <div style={{ ...t.body, color: C.textMuted }}>
+                  {f.body}
+                </div>
+              </div>
+            </div>
+          ))}
+        </m.div>
 
         {!canScan && (
-          <div style={{
-            fontSize: 12,
+          <m.div variants={listItem} style={{
+            ...t.caption,
             color: C.textMuted,
             textAlign: 'center',
-            padding: '8px 12px',
+            padding: '10px 14px',
             background: C.amberBg,
-            border: '1px solid #E8D5A0',
-            borderRadius: 8,
-            lineHeight: 1.4,
+            border: `1px solid ${C.accentLight}`,
+            borderRadius: radius.md,
+            lineHeight: 1.45,
           }}>
             Camera's off for now — I'll help you add bags by hand. You can flip
             it back on anytime from Settings.
-          </div>
+          </m.div>
         )}
-      </div>
+      </m.div>
 
       <OnboardingCtaBar
         label={ctaLabel}
