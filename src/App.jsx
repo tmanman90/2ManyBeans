@@ -1,7 +1,9 @@
 // App shell — warm Ghibli-inspired coffee journal
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
-import { C, fonts, shadows } from './styles/theme';
+import { C, fonts, shadows, glass } from './styles/theme';
+import { m, spring } from './lib/motion';
+import SteamGradient from './components/visual/SteamGradient';
 import { haptic } from './lib/haptics';
 import { today } from './lib/peakStatus';
 import { useAuthContext } from './contexts/AuthContext';
@@ -112,7 +114,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
 
   // Set html background to match header — covers WKWebView canvas gap at viewport edge
   useEffect(() => {
-    document.documentElement.style.background = isRotation ? '#5C6B4E' : C.bg;
+    document.documentElement.style.background = isRotation ? '#43301F' : C.bg;
   }, [isRotation]);
 
   // Onboarding → home screen handoff. R11 and R13b write
@@ -151,50 +153,42 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       {isRotation ? (
         <div className="app-header" style={{
           position: 'relative',
-          height: `calc(160px + env(safe-area-inset-top, 0px))`,
+          height: `calc(176px + env(safe-area-inset-top, 0px))`,
           flexShrink: 0,
           zIndex: 10,
           overflow: 'hidden',
-          background: '#5C6B4E',
+          background: '#43301F',
         }}>
-          <img
-            src="/images/rotation-header.webp"
-            alt=""
-            style={{
-              position: 'absolute', top: -1, left: 0, right: 0,
-              width: '100%', height: 'calc(100% + 1px)',
-              objectFit: 'cover', objectPosition: 'center 45%',
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Animated warm steam shader hero (replaces stock illustration) */}
+          <SteamGradient speed={0.85} style={{ inset: 0 }} />
+          {/* Fade the shader into the page background so content blends seamlessly */}
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0,
             height: '100%', pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, rgba(250,246,241,0) 0%, rgba(250,246,241,0.3) 40%, rgba(250,246,241,0.7) 65%, rgba(250,246,241,0.95) 85%, rgba(250,246,241,1) 100%)',
+            background: 'linear-gradient(to bottom, rgba(243,237,228,0) 0%, rgba(243,237,228,0.12) 42%, rgba(243,237,228,0.55) 68%, rgba(243,237,228,0.9) 88%, rgba(243,237,228,1) 100%)',
           }} />
           <div style={{
             position: 'relative', zIndex: 1,
             padding: '0 20px',
             paddingTop: 'env(safe-area-inset-top, 0px)',
             display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-            height: '100%', paddingBottom: 12,
+            height: '100%', paddingBottom: 14,
           }}>
             <div>
               <Wordmark />
-              <div style={{ fontSize: 12, color: C.textMuted, fontFamily: fonts.body, marginTop: 2 }}>{greeting}</div>
+              <div style={{ fontSize: 13, color: C.textMuted, fontFamily: fonts.body, fontWeight: 600, marginTop: 3 }}>{greeting}</div>
             </div>
-            <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2 }} aria-label="Settings">
-              <SettingsIcon size={20} color={C.textMuted} />
+            <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} className="glass" style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${glass.chromeBorder}`, borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2, boxShadow: shadows.e1 }} aria-label="Settings">
+              <SettingsIcon size={20} color={C.text} />
             </button>
           </div>
         </div>
       ) : (
-        <div className="app-header" style={{
+        <div className="app-header glass" style={{
           position: 'sticky',
           top: 0,
           padding: `calc(env(safe-area-inset-top, 0px) + 16px) 20px 12px`,
-          borderBottom: `1px solid ${C.borderLight}`,
-          background: C.bg,
+          borderBottom: `1px solid ${glass.chromeBorder}`,
           flexShrink: 0,
           zIndex: 10,
         }}>
@@ -295,16 +289,16 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         )}
       </div>
 
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar — frosted glass chrome with a fluid spring indicator */}
       <div
-        className="app-tab-bar"
+        className="app-tab-bar glass"
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: C.navBg,
-          borderTop: `1px solid ${C.border}`,
+          borderTop: `1px solid ${glass.chromeBorder}`,
           display: 'flex', justifyContent: 'space-around',
-          padding: '6px env(safe-area-inset-right, 8px) calc(env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 8px)',
+          padding: '7px env(safe-area-inset-right, 8px) calc(env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 8px)',
           zIndex: 100,
+          boxShadow: '0 -1px 0 rgba(255,255,255,0.5) inset',
         }}
       >
         {tabs.map(t => {
@@ -313,45 +307,54 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             <button
               key={t.key}
               onClick={() => { haptic.selection(); setTab(t.key); }}
+              aria-label={t.label}
+              aria-current={active ? 'page' : undefined}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 3, padding: '4px 8px',
-                transition: 'all 0.15s',
+                gap: 2, padding: '4px 8px',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
               <div style={{
-                width: 56, height: 56,
+                width: 52, height: 52,
                 position: 'relative',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {/* Circle background (separate from image to avoid clipping) */}
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  borderRadius: '50%',
-                  background: active ? C.amberBg : 'transparent',
-                  border: active ? `2px solid ${C.accentLight}` : '2px solid transparent',
-                  boxShadow: active ? shadows.navActive : 'none',
-                  transition: 'all 0.15s',
-                }} />
-                <img
+                {/* Fluid active indicator — one shared element springs between tabs */}
+                {active && (
+                  <m.div
+                    layoutId="navPill"
+                    transition={spring.bouncy}
+                    style={{
+                      position: 'absolute', inset: 4,
+                      borderRadius: '50%',
+                      background: C.accentSoft,
+                      border: `1.5px solid ${C.accentLight}`,
+                      boxShadow: shadows.navActive,
+                    }}
+                  />
+                )}
+                <m.img
                   src={t.img}
-                  alt={t.label}
+                  alt=""
+                  animate={{ opacity: active ? 1 : 0.5, scale: active ? 1 : 0.92 }}
+                  transition={spring.snappy}
                   style={{
                     position: 'relative',
-                    width: 44,
-                    height: 44,
+                    width: 42,
+                    height: 42,
                     objectFit: 'contain',
-                    opacity: active ? 1 : 0.55,
-                    transition: 'opacity 0.15s',
                   }}
                 />
               </div>
               <span style={{
                 fontSize: 10,
-                fontWeight: active ? 700 : 500,
+                fontWeight: active ? 800 : 600,
                 fontFamily: fonts.body,
+                letterSpacing: active ? '0.01em' : '0',
                 color: active ? C.navActive : C.navText,
+                transition: 'color 0.2s, font-weight 0.2s',
               }}>
                 {t.label}
               </span>
