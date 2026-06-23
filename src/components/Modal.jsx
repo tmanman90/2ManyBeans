@@ -112,8 +112,10 @@ export const Modal = ({ open, onClose, title, children, footer, centered }) => {
               marginBottom: title ? 16 : 0, flexShrink: 0,
             }}>
               <div style={{ fontFamily: fonts.heading, fontSize: 21, fontWeight: 600, letterSpacing: '-0.01em', color: C.text }}>{title}</div>
-              <button onClick={onClose} aria-label="Close" style={{ background: 'rgba(0,0,0,0.04)', border: 'none', cursor: 'pointer', padding: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent' }}>
-                <X size={18} color={C.textMuted} />
+              <button onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, width: 44, height: 44, margin: '-6px -6px -6px 0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
+                <span style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={18} color={C.textMuted} />
+                </span>
               </button>
             </div>
 

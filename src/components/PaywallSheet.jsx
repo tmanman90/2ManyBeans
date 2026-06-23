@@ -335,9 +335,11 @@ export function PaywallSheet({ open, context, onClose }) {
 
             {/* Close button */}
             <button style={styles.close} onClick={onClose} aria-label="Close">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 3l10 10M13 3L3 13" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <span style={styles.closeBtnInner}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 3l10 10M13 3L3 13" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </span>
             </button>
 
             {/* Header */}
@@ -475,10 +477,13 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
   };
 
   return (
-    <m.button
-      type="button"
+    <m.div
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
       onClick={onSelect}
-      style={cardStyle}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(); } }}
+      style={{ ...cardStyle, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
       whileTap={{ scale: 0.98 }}
       transition={spring.soft}
       animate={{ y: selected ? -3 : 0 }}
@@ -558,7 +563,7 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
           </li>
         ))}
       </ul>
-    </m.button>
+    </m.div>
   );
 }
 
@@ -606,7 +611,20 @@ const styles = {
   close: {
     position: 'absolute',
     top: 16,
-    right: 16,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    border: 'none',
+    background: 'transparent',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    padding: 0,
+    WebkitTapHighlightColor: 'transparent',
+  },
+  closeBtnInner: {
     width: 32,
     height: 32,
     borderRadius: radius.pill,
@@ -615,9 +633,6 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer',
-    padding: 0,
-    WebkitTapHighlightColor: 'transparent',
   },
   header: {
     textAlign: 'center',

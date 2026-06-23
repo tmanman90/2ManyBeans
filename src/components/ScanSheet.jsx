@@ -347,16 +347,24 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
                     }}>{idx + 1}</div>
                     <button
                       onClick={() => removePhoto(idx)}
+                      aria-label="Remove photo"
                       style={{
-                        position: 'absolute', top: -8, right: -8,
-                        width: 26, height: 26, borderRadius: '50%',
-                        background: C.red, border: `2px solid ${C.cream}`,
+                        position: 'absolute', top: -16, right: -16,
+                        width: 44, height: 44, borderRadius: '50%',
+                        background: 'transparent', border: 'none', padding: 0,
                         cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: shadows.e1,
+                        WebkitTapHighlightColor: 'transparent',
                       }}
                     >
-                      <X size={11} color="#fff" />
+                      <span style={{
+                        width: 26, height: 26, borderRadius: '50%',
+                        background: C.red, border: `2px solid ${C.cream}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: shadows.e1,
+                      }}>
+                        <X size={11} color="#fff" />
+                      </span>
                     </button>
                   </div>
                 ))}

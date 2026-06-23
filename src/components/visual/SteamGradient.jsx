@@ -121,9 +121,10 @@ export default function SteamGradient({ colors = DEFAULT, speed = 1, style, clas
     resize();
 
     let raf = 0, start = performance.now(), visible = true, running = true;
+    // Sizing is handled by ResizeObserver only — the draw loop never reads
+    // layout (avoids per-frame reflow in WKWebView).
     const frame = (now) => {
       if (!running) return;
-      resize();
       gl.uniform1f(uTime, ((now - start) / 1000) * speed);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (!prefersReduced && visible) raf = requestAnimationFrame(frame);
@@ -139,7 +140,7 @@ export default function SteamGradient({ colors = DEFAULT, speed = 1, style, clas
     const onLost = (e) => { e.preventDefault(); running = false; cancelAnimationFrame(raf); if (fallbackRef.current) fallbackRef.current.style.opacity = '1'; };
     canvas.addEventListener('webglcontextlost', onLost);
 
-    const ro = new ResizeObserver(resize);
+    const ro = new ResizeObserver(() => resize());
     ro.observe(canvas);
 
     return () => {
