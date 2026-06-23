@@ -16,6 +16,8 @@ import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
 import { cacheClear, cacheClearLastUid } from './lib/offlineCache';
 import { logInRevenueCat, logOutRevenueCat } from './lib/revenuecat';
 import { C, fonts } from './styles/theme';
+import { MotionConfig } from 'framer-motion';
+import GrainOverlay from './components/visual/GrainOverlay';
 
 // Module-scope lazy load (must NOT be inside component body). The new
 // onboarding flow replaces the single-page wizard — see docs/plans/
@@ -401,6 +403,9 @@ const DevRouter = () => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {import.meta.env.DEV ? <DevRouter /> : <Root />}
+    <MotionConfig reducedMotion="user">
+      <GrainOverlay />
+      {import.meta.env.DEV ? <DevRouter /> : <Root />}
+    </MotionConfig>
   </React.StrictMode>
 );
