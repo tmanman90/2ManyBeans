@@ -595,7 +595,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 disabled={photoGenerating}
                 style={{
                   fontSize: 12, padding: '6px 12px', minHeight: 32,
-                  background: glass.chrome, backdropFilter: glass.blur,
+                  background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur,
                   border: `1px solid ${glass.chromeBorder}`, borderRadius: radius.sm,
                 }}
               >
@@ -607,7 +607,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
                 disabled={photoGenerating}
                 style={{
                   fontSize: 12, padding: '6px 12px', minHeight: 32,
-                  background: glass.chrome, backdropFilter: glass.blur,
+                  background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur,
                   border: `1px solid ${glass.chromeBorder}`, borderRadius: radius.sm,
                 }}
               >

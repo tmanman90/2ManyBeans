@@ -340,7 +340,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
                     {/* Count badge */}
                     <div style={{
                       position: 'absolute', top: 6, left: 6,
-                      background: glass.chrome, backdropFilter: glass.blur,
+                      background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur,
                       borderRadius: 6, padding: '2px 6px',
                       ...type.caption, color: C.textMuted,
                       border: `1px solid ${glass.chromeBorder}`,
