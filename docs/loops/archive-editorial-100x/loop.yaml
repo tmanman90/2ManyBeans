@@ -1,0 +1,146 @@
+version: 1
+
+meta:
+  name: archive-editorial-100x
+  source_plan: docs/plans/2026-06-28-002-feat-archive-editorial-100x-plan.md
+
+goal:
+  statement: >
+    100x the Archive layout so it reads Apple-caliber, not slop: make the TASTING the hero of every
+    entry (★ rating + one-word + a pull-quote from the note), keep Tal's structure (favourite cups
+    highlighted on top, the rest chronological), and add iOS-native motion (scroll-reveal stagger,
+    parallax bag thumbnails, spring + haptics, pinning year headers) on top of the existing hero morph.
+    Declutter the redundant "Show Details" expander and row flavor-tag chips, and surface the full
+    tasting (stars + aroma/body/finish + notes) on the trading-card back instead of a dead "· N" count.
+    Visual/UX only; no Firebase or feature changes; dev channel only.
+  definition_of_done: >
+    Every archive entry (featured cup + timeline row) leads with its ★ rating + one-word + a tasting
+    pull-quote (degrading gracefully when a bean has no tasting); the trading-card back shows the full
+    tasting per session (stars + aroma/body/finish + notes), not a dead count; the per-row "Show
+    Details" expander and flavor-tag chips are gone; favourite cups stay highlighted on top (editorial
+    featured treatment, lead cup emphasized) with the rest chronological + year-grouped and year headers
+    that pin while their section scrolls; tapping any entry flies the bag into BeanDetailCard via the
+    hero morph; motion (scroll-reveal stagger, parallax bags, spring + haptics) is transform/opacity-only
+    and reduced-motion disables parallax/reveal + the morph; search and every filter still filter both
+    the cups and the timeline and the empty states remain; no Firebase/data/logic/API is touched and no
+    feature is lost; `npx vite build` exits 0; the Archive Playwright harness shows rating + pull-quote
+    per entry, NO Show-Details control and NO row flavor-tag chips, featured cups before a chronological
+    timeline, a working tap→morph, search filtering, reduced-motion with no flight, and zero console
+    errors; verify-inventory and verify-morph still PASS; codex review is clean against the rubric; and
+    Tal signs off on device that the Archive now feels Apple-caliber and the tasting is the visible star.
+  requirements:
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
+    - R7
+    - R8
+    - R9
+  context_sources:
+    - file: docs/plans/2026-06-28-002-feat-archive-editorial-100x-plan.md
+    - file: docs/plans/2026-06-28-001-feat-archive-trophy-redesign-plan.md
+    - file: lessons.md
+
+verification:
+  - id: v1-build
+    type: programmatic
+    check: ["npx", "vite", "build", "--logLevel", "error"]
+    expect: exit_zero
+  - id: v2-harness
+    type: programmatic
+    check: ["node", "scripts/verify-archive.mjs"]
+    expect: exit_zero
+  - id: v3-regression
+    type: programmatic
+    check: ["node", "scripts/verify-inventory.mjs"]
+    expect: exit_zero
+  - id: v4-review
+    type: judge
+    judge: codex
+    rubric: >
+      Adversarially review the Archive editorial-100x diff. Treat the prior redesign baseline
+      (warm-neutral palette, BeanDetailCard trading-card + manual-FLIP hero morph, useBeanDetail,
+      Rotation/Inventory) as APPROVED — only judge this change. FAIL if any of the three inversions
+      remain: the ★ rating is not visibly led on each entry (R1), the trading-card back still shows a
+      dead "· N" tastings count instead of the full tasting (stars + aroma/body/finish + notes) (R2),
+      or the layout is still a uniform card list with no size hierarchy / featured treatment (R4, R5).
+      FAIL if the per-row "Show Details" expander or per-row flavor-tag chips survive (R3). FAIL if
+      favourite cups are not kept on top or the rest is not chronological + year-grouped, or year headers
+      do not pin (R5). FAIL if a pull-quote renders empty when a bean has no tasting note (must degrade)
+      (R1). FAIL if tapping an entry does not open BeanDetailCard via the morph (R7). FAIL if motion is
+      not transform/opacity-only, exceeds 300ms (non-spring), uses bounce > 0.3, or is not gated by
+      reduced-motion (parallax/reveal/morph must all disable) (R6). FAIL if search or any filter (year,
+      min-rating, roaster, origin, process, sort) regressed or stops filtering cups + timeline, or an
+      empty state was dropped (R8). FAIL if gold/accent is used beyond the rating + one active state
+      (must stay ≤10% / scarce), or hairline grouping / tabular-nums on counts regressed. FAIL if the
+      BeanDetailCard changes are not additive (Rotation/Inventory regress), or the diff touches Firebase
+      reads/writes, the bean/tasting data model, statuses, or restore/delete logic. PASS only when the
+      tasting is the visible hero, the redundant disclosure is gone, the layout has real editorial
+      hierarchy with cups-on-top + chronological, motion is tasteful + gated, and the diff is scope- and
+      design-clean.
+  - id: v5-human
+    type: human
+    prompt: >
+      On the dev app (device): open Archive and confirm the layout now feels Apple-caliber, not slop —
+      each entry leads with its rating + your words (pull-quote), favourite cups sit on top with the rest
+      chronological, year headers pin as you scroll, and bags/entries animate in tastefully; tap an entry
+      and confirm the bag flies into the trading card and the back shows your full tasting (stars +
+      aroma/body/finish + notes); confirm "Show Details" and the row flavor-tags are gone; run a search
+      and a filter — proving R1, R2, R3, R4, R5, R6, R7, R8 and the overall feel.
+
+evidence_map:
+  R1: v2-harness
+  R2: v4-review
+  R3: v2-harness
+  R4: v2-harness
+  R5: v4-review
+  R6: v2-harness
+  R7: v2-harness
+  R8: v2-harness
+  R9: v4-review
+
+council:
+  - id: codex
+    role: judge
+    cli: codex
+
+gates:
+  plan_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v4-review]
+    max_revisions: 2
+  delivery_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v1-build, v2-harness, v3-regression, v4-review, v5-human]
+    max_revisions: 3
+
+loop_control:
+  max_iterations: 7
+  cycle_cap: 4
+  quality_streak: 2
+  no_progress:
+    max_stalled_iterations: 2
+    action: stop
+  budget:
+    tokens: 1400000
+
+scope_guard:
+  - Do NOT change Firebase reads/writes, the bean/tasting data model, statuses, or restore/delete/finish logic (presentation only; read tasting fields, never write).
+  - Do NOT make non-additive BeanDetailCard changes — the full-tasting panel must reuse the existing tastings prop and not regress Rotation/Inventory.
+  - Do NOT change WHAT Archive shows (FINISHED beans) or which actions exist (Restore, Delete, Learn, Edit, brew-profile, tastings) — only how they look and are triggered.
+  - Do NOT build the deferred "time machine / what were you sipping" throwback module in this loop (fast-follow).
+  - Do NOT animate any non-transform/opacity property, exceed 300ms (non-spring) / bounce 0.3, or skip the reduced-motion gate; do not deploy to production or merge to main (dev channel only).
+
+execution:
+  mode: goal
+  isolation: branch
+
+model_policy:
+  orchestrator: opus
+  subagents: sonnet
+  reviewer: codex
+  review_cadence: per_phase
