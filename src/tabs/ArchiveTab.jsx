@@ -6,6 +6,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { C, fonts, type, shadows, radius, glass, motion as motionTokens } from '../styles/theme';
+import { AnimatePresence } from 'framer-motion';
 import { m, listContainer, listItem } from '../lib/motion';
 import { BeanThumb } from '../components/BeanThumb';
 import { BeanDetailCard } from '../components/BeanDetailCard';
@@ -294,16 +295,28 @@ function TimelineRow({ bean, bestByBean, showMonth, onOpen }) {
               {expanded ? 'Hide details' : 'Show details'}
               <ChevronDown size={12} color={C.textMuted} style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: `transform ${motionTokens.dur.base}s ${motionTokens.cssOut}` }} />
             </button>
-            <div style={{ maxHeight: expanded ? 200 : 0, overflow: 'hidden', transition: `max-height ${motionTokens.dur.base}s ${motionTokens.cssOut}, opacity ${motionTokens.dur.fast}s ${motionTokens.cssOut}`, opacity: expanded ? 1 : 0 }}>
-              <div style={{ ...type.body, color: C.textMuted, padding: '10px 12px', borderRadius: radius.sm, background: C.bgDeep, border: `1px solid ${C.hairline}`, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
-                {bean.variety && <span><strong style={{ color: C.text }}>Variety:</strong> {bean.variety}</span>}
-                {bean.region && <span><strong style={{ color: C.text }}>Region:</strong> {bean.region}</span>}
-                {bean.farm && <span><strong style={{ color: C.text }}>Farm:</strong> {bean.farm}</span>}
-                {bean.altitude && <span><strong style={{ color: C.text }}>Altitude:</strong> {bean.altitude}</span>}
-                {bean.roastLevel && <span><strong style={{ color: C.text }}>Roast Level:</strong> {bean.roastLevel}</span>}
-                {bean.cupScore && <span><strong style={{ color: C.text }}>Accolades:</strong> {bean.cupScore}</span>}
-              </div>
-            </div>
+            {/* transform/opacity-only reveal (no layout-animating max-height) */}
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <m.div
+                  key="details"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div style={{ ...type.body, color: C.textMuted, padding: '10px 12px', borderRadius: radius.sm, background: C.bgDeep, border: `1px solid ${C.hairline}`, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+                    {bean.variety && <span><strong style={{ color: C.text }}>Variety:</strong> {bean.variety}</span>}
+                    {bean.region && <span><strong style={{ color: C.text }}>Region:</strong> {bean.region}</span>}
+                    {bean.farm && <span><strong style={{ color: C.text }}>Farm:</strong> {bean.farm}</span>}
+                    {bean.altitude && <span><strong style={{ color: C.text }}>Altitude:</strong> {bean.altitude}</span>}
+                    {bean.roastLevel && <span><strong style={{ color: C.text }}>Roast Level:</strong> {bean.roastLevel}</span>}
+                    {bean.cupScore && <span><strong style={{ color: C.text }}>Accolades:</strong> {bean.cupScore}</span>}
+                  </div>
+                </m.div>
+              )}
+            </AnimatePresence>
           </>
         )}
       </div>
