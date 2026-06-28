@@ -77,7 +77,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
   const rows = DETAIL_AXES.filter(([k]) => tasting[k] && String(tasting[k]).trim());
   const reveal = (i) => reduce ? {} : {
     initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 },
-    transition: { delay: 0.15 + i * 0.05, duration: 0.32, ease: [0.16, 1, 0.3, 1] },
+    transition: { delay: 0.15 + i * 0.05, duration: 0.28, ease: [0.16, 1, 0.3, 1] },
   };
 
   return createPortal(
@@ -86,7 +86,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
       style={{
         position: 'fixed', inset: 0, zIndex: 1200, background: glass.scrim,
         WebkitBackdropFilter: 'blur(3px)', backdropFilter: 'blur(3px)',
-        opacity: visible ? 1 : 0, transition: 'opacity 220ms ease',
+        opacity: visible ? 1 : 0, transition: reduce ? 'opacity 0.01ms' : 'opacity 220ms ease',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
     >
@@ -96,7 +96,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
         style={{
           width: '100%', maxWidth: 520, maxHeight: '92dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           background: C.bg, borderRadius: `${radius.xl}px ${radius.xl}px 0 0`, border: `1px solid ${glass.chromeBorder}`,
-          boxShadow: shadows.modal, transform: `translateY(${visible ? '0%' : '100%'})`, transition: `transform 320ms ${IOS}`,
+          boxShadow: shadows.modal, transform: `translateY(${visible ? '0%' : '100%'})`, transition: reduce ? 'transform 0.01ms' : `transform 320ms ${IOS}`,
           paddingBottom: 'max(20px, env(safe-area-inset-bottom, 0px))',
         }}
       >
