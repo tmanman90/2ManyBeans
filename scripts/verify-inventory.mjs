@@ -105,6 +105,19 @@ try {
     else if (!open.blue) fail('"OPEN INTO JAR" is not the blue glass button');
     else if (!open.jar) fail('"OPEN INTO JAR" is missing its jar icon');
     else console.log(`OK  open-into-jar is blue + jar icon (${open.count} rails)`);
+
+    // Brew / Learn / Freeze must be a uniform height (Brew's menu wrapper used to
+    // leave it short next to the taller Ruphus-avatar Learn pill).
+    const heights = await page.evaluate(() => {
+      const want = ['Brew', 'Learn', 'Freeze'];
+      return want.map(l => {
+        const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === l);
+        return b ? Math.round(b.getBoundingClientRect().height) : null;
+      });
+    });
+    if (heights.includes(null)) fail('a footer pill is missing: ' + JSON.stringify(heights));
+    else if (Math.max(...heights) - Math.min(...heights) > 1) fail('Brew/Learn/Freeze heights not uniform: ' + JSON.stringify(heights));
+    else console.log(`OK  footer pills uniform height (${heights[0]}px)`);
     await page.close();
   }
 

@@ -40,7 +40,7 @@ const BrewPill = ({ bean, isHandBrew, isDemo, onDemoAction, aiden, handBrew }) =
   const brew = () => isDemo ? onDemoAction?.() : (isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean));
   const handlers = useLongPress({ onTap: brew, onLongPress: () => isDemo ? onDemoAction?.() : setMenuOpen(true) });
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', display: 'flex' }}>
       <GlassPill color={C.accent} bg={C.accentSoft} icon={<Coffee size={18} />} label="Brew" {...handlers} />
       <BrewMethodMenu open={menuOpen} onClose={() => setMenuOpen(false)} onAiden={() => aiden.handleBrewWithAiden(bean)} onHandBrew={(deviceKey) => handBrew.handleBrewHandBrew(bean, null, false, deviceKey)} />
     </div>
