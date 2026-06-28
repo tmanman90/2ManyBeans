@@ -86,6 +86,23 @@ function StatTicker({ value, duration = 0.8, style }) {
 
 // ---- peak badge (perfect circle, red+blue rings; straddles the corner) ----
 function PeakBadge({ bean, size = 84 }) {
+  // Finished beans aren't "aging on a shelf" — show a vintage year-stamp instead of
+  // the freshness/STALE peak status (which reads wrong on an archived trophy bean).
+  if (bean.status === 'FINISHED') {
+    const d = bean.finishDate ? new Date(bean.finishDate + 'T00:00:00') : null;
+    const yr = d && !isNaN(d) ? String(d.getFullYear()) : null;
+    const mo = d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '';
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', background: PAPER, border: `3px solid ${RED}`, padding: 3, boxShadow: '0 3px 12px rgba(20,12,8,0.16)' }}>
+        <div style={{ width: '100%', height: '100%', borderRadius: '50%', border: `2px solid ${BLUE}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+          <span style={{ fontFamily: G, fontSize: 7.5, fontWeight: 700, letterSpacing: '0.1em', color: GRAY }}>FINISHED</span>
+          <span style={{ fontFamily: G, fontSize: 23, fontWeight: 800, color: INK, letterSpacing: '-0.02em', margin: '1px 0 1px', fontVariantNumeric: 'tabular-nums' }}>{yr ?? '—'}</span>
+          <div style={{ width: 15, height: 2, background: RED, borderRadius: 1, margin: '1px 0 2px' }} />
+          {mo && <span style={{ fontFamily: G, fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: GRAY }}>{mo}</span>}
+        </div>
+      </div>
+    );
+  }
   const ps = getPeakStatus(bean);
   const days = daysSinceRoast(bean.roastDate, bean);
   const pctM = ps.label.match(/\((\d+)%\)/);
@@ -502,7 +519,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                   <div style={{ ...lbl, fontSize: 13, letterSpacing: '0.22em', color: INK, marginBottom: 6 }}>STAT SHEET</div>
                   <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 33, color: INK, lineHeight: 1.02, marginBottom: 20, paddingRight: 70 }}>{bean.name}</div>
 
-                  <CardPeakBar bean={bean} />
+                  {!isFinished && <CardPeakBar bean={bean} />}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 22, rowGap: 16, marginBottom: 22 }}>
                     {stats.map(([label, value]) => <GridCell key={label} label={label} value={value} />)}
