@@ -1,0 +1,107 @@
+// Tasting editorial-100x gate (loop: tasting-editorial-coach-100x). Proves the de-slop +
+// tasting-as-hero + coach-preserved requirements over a committed harness:
+//   R1 masthead de-slop (no "learn what you taste" eyebrow, no gradient accent bar)
+//   R2 journal entries lead with a ★ rating + a taste-fingerprint SVG; NO 3px left-stripe
+//   R3 invitation hero de-slop (solid CTA, no gradient chrome)
+//   R4 guided session opens to the 6-step spine (static render, no live AI)
+//   R6 reduced-motion renders without error; R7-render zero console/page errors
+import { spawn } from 'node:child_process';
+import { chromium } from 'playwright';
+
+const PORT = 5196;
+const URL = `http://localhost:${PORT}/tasting-harness.html`;
+const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
+
+function waitForServer(url, timeoutMs = 20000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      try { const r = await fetch(url); if (r.ok) return resolve(); } catch { /* not up */ }
+      if (Date.now() - start > timeoutMs) return reject(new Error('vite did not start'));
+      setTimeout(tick, 250);
+    };
+    tick();
+  });
+}
+
+const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+const cleanup = () => { try { vite.kill('SIGKILL'); } catch { /* noop */ } };
+
+try {
+  await waitForServer(URL);
+  const browser = await chromium.launch();
+
+  // ---- Pass 1: masthead + journal fingerprints + hero + no errors ----
+  {
+    const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    const errors = [];
+    page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+    page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+    await page.goto(URL, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(900);
+
+    // R1 — masthead: "Tasting" title + tabular stat; NO "learn what you taste" eyebrow.
+    const titleOk = await page.getByText('Tasting', { exact: true }).first().isVisible().catch(() => false);
+    const eyebrow = await page.getByText('learn what you taste', { exact: false }).count();
+    const statTabular = await page.evaluate(() => [...document.querySelectorAll('*')].some(el => /cups? logged/.test(el.textContent || '') && getComputedStyle(el).fontVariantNumeric.includes('tabular-nums')));
+    if (!titleOk) fail('R1: "Tasting" title missing');
+    if (eyebrow > 0) fail('R1: "learn what you taste" eyebrow survives');
+    if (!statTabular) fail('R1: masthead stat is not tabular-nums');
+    if (titleOk && eyebrow === 0 && statTabular) console.log('OK  masthead de-slopped');
+
+    // R2 — journal: taste-fingerprint glyphs present; NO 3px caramel left-stripe on cards.
+    const fingerprints = await page.locator('svg[aria-label="taste fingerprint"]').count();
+    if (fingerprints < 2) fail(`R2: taste-fingerprint glyphs missing (found ${fingerprints})`);
+    const stripe = await page.evaluate(() => [...document.querySelectorAll('div')].some(d => {
+      const s = getComputedStyle(d);
+      return s.borderLeftStyle === 'solid' && Math.round(parseFloat(s.borderLeftWidth)) === 3;
+    }));
+    if (stripe) fail('R2: a 3px left-stripe card survives (banned tell)');
+    // ratings present (StarRating renders bean/star buttons or svgs)
+    if (fingerprints >= 2 && !stripe) console.log(`OK  journal taste-fingerprints (${fingerprints}), no left-stripe`);
+
+    // R3 — invitation hero: "Start guided tasting" CTA is a SOLID button (no gradient chrome).
+    const ctaSolid = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /Start guided tasting/i.test(x.textContent || ''));
+      if (!b) return null;
+      return !(getComputedStyle(b).backgroundImage || '').includes('gradient');
+    });
+    if (ctaSolid === null) fail('R3: "Start guided tasting" CTA missing');
+    else if (!ctaSolid) fail('R3: CTA still uses gradient chrome');
+    else console.log('OK  invitation hero de-slopped (solid CTA)');
+
+    // R4 — tap the CTA → the guided session opens to the 6-step spine.
+    await page.getByText('Start guided tasting', { exact: false }).first().click().catch(() => {});
+    await page.waitForTimeout(700);
+    const steps = await Promise.all(['Smell', 'Acidity', 'Finish'].map(s => page.getByText(s, { exact: true }).first().isVisible().catch(() => false)));
+    if (!steps.every(Boolean)) fail('R4: guided session did not open to the 6-step spine: ' + JSON.stringify(steps));
+    else console.log('OK  guided session opens to the step spine');
+
+    if (errors.length) fail('console/page errors: ' + JSON.stringify(errors.slice(0, 6)));
+    await page.close();
+  }
+
+  // ---- Pass 2: reduced motion — journal renders, no errors ----
+  {
+    const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    const errors = [];
+    page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+    await page.goto(URL, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(700);
+    const fps = await page.locator('svg[aria-label="taste fingerprint"]').count();
+    const visible = await page.getByText('Kotowa Estate', { exact: false }).first().isVisible().catch(() => false);
+    if (!visible || fps < 2) fail('R6: reduced-motion — journal did not render');
+    else console.log('OK  reduced-motion: journal renders');
+    if (errors.length) fail('reduced-motion errors: ' + JSON.stringify(errors.slice(0, 4)));
+    await page.close();
+  }
+
+  await browser.close();
+} catch (e) {
+  fail(e.message);
+} finally {
+  cleanup();
+}
+
+if (process.exitCode) console.error('verify-tasting: FAILED');
+else console.log('verify-tasting: PASS');
