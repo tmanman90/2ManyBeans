@@ -1,10 +1,13 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState, useEffect } from 'react';
-import { Plus, Search, Coffee, Check } from 'lucide-react';
-import { BrewButton } from '../components/BrewButton';
+import { Plus, Search, Coffee, Snowflake } from 'lucide-react';
 import { C, fonts, type, shadows, radius, glass, journalCard } from '../styles/theme';
-import { getPeakStatus } from '../lib/peakStatus';
-import { BeanCard } from '../components/BeanCard';
+import { getPeakStatus, today, daysBetween } from '../lib/peakStatus';
+import { ShelfCard } from '../components/ShelfCard';
+import { BeanDetailCard } from '../components/BeanDetailCard';
+import { BrewMethodMenu } from '../components/BrewMethodMenu';
+import { useBeanDetail } from '../hooks/useBeanDetail';
+import { useLongPress } from '../hooks/useLongPress';
 import { Btn } from '../components/Btn';
 import { ScanSheet } from '../components/ScanSheet';
 import { ManualEntrySheet } from '../components/ManualEntrySheet';
@@ -17,13 +20,45 @@ import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
-import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 
+// Secondary Liquid-Glass pill for the rail card footer (matches the Rotation footer).
+// Spreads ...rest so long-press handlers (Brew) pass through.
+const GlassPill = ({ color, bg, icon, label, onClick, ...rest }) => (
+  <m.button onClick={onClick} {...rest} className="glass-pill" whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 700, damping: 30, mass: 0.6 }}
+    style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', width: '100%', background: `linear-gradient(180deg, rgba(255,255,255,0.55) 0%, ${bg} 100%)`, border: '1px solid rgba(255,255,255,0.65)', borderRadius: radius.md, padding: '10px 6px', fontFamily: fonts.body, fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', minWidth: 0, minHeight: 48, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -2px 5px rgba(70,41,26,0.10), 0 1px 2px rgba(60,38,22,0.10), 0 6px 16px rgba(60,38,22,0.15)' }}>
+    <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.02) 100%)', borderTopLeftRadius: 'inherit', borderTopRightRadius: 'inherit', pointerEvents: 'none' }} />
+    <span style={{ position: 'relative', zIndex: 1, color, display: 'inline-flex' }}>{icon}</span>
+    <span style={{ position: 'relative', zIndex: 1 }}>{label}</span>
+  </m.button>
+);
+
+// Brew pill with long-press → brew-method menu (restores the Rotation brew behavior).
+const BrewPill = ({ bean, isHandBrew, isDemo, onDemoAction, aiden, handBrew }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const brew = () => isDemo ? onDemoAction?.() : (isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean));
+  const handlers = useLongPress({ onTap: brew, onLongPress: () => isDemo ? onDemoAction?.() : setMenuOpen(true) });
+  return (
+    <div style={{ position: 'relative' }}>
+      <GlassPill color={C.accent} bg={C.accentSoft} icon={<Coffee size={18} />} label="Brew" {...handlers} />
+      <BrewMethodMenu open={menuOpen} onClose={() => setMenuOpen(false)} onAiden={() => aiden.handleBrewWithAiden(bean)} onHandBrew={(deviceKey) => handBrew.handleBrewHandBrew(bean, null, false, deviceKey)} />
+    </div>
+  );
+};
+
+// Primary "Open into jar" — blue glass (matches the trading-card blue button) + jar icon.
+const OpenJarBtn = ({ onClick }) => (
+  <m.button onClick={onClick} whileTap={{ scale: 0.97, y: 1 }} transition={{ type: 'spring', stiffness: 700, damping: 30, mass: 0.6 }}
+    style={{ position: 'relative', overflow: 'hidden', width: '100%', border: '1px solid rgba(255,255,255,0.45)', borderRadius: 14, padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(86,196,240,0.94) 0%, rgba(20,150,212,0.96) 55%, rgba(12,120,180,0.97) 100%)', WebkitBackdropFilter: 'blur(12px) saturate(170%)', backdropFilter: 'blur(12px) saturate(170%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 6px rgba(8,60,95,0.28), 0 2px 4px rgba(16,90,130,0.22), 0 8px 20px rgba(24,165,224,0.40)' }}>
+    <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '52%', background: 'linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.04))', borderTopLeftRadius: 13, borderTopRightRadius: 13, pointerEvents: 'none' }} />
+    <img src="/images/jar-full.webp" alt="" style={{ width: 20, height: 20, objectFit: 'contain', position: 'relative', zIndex: 1, filter: 'brightness(0) invert(1) drop-shadow(0 1px 1px rgba(8,50,80,0.3))' }} />
+    <span style={{ position: 'relative', zIndex: 1, fontFamily: fonts.body, fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', color: '#fff', textShadow: '0 1px 2px rgba(8,50,80,0.35)' }}>OPEN INTO JAR</span>
+  </m.button>
+);
+
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
-  const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
   const canisterCount = preferences.canisterCount || 3;
   const sealed = beans.filter(b => b.status === 'SEALED');
@@ -59,7 +94,48 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean);
-  const [brewMenuBean, setBrewMenuBean] = useState(null);
+  const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
+  const [editBean, setEditBean] = useState(null);
+
+  const handleFreeze = async (bean) => {
+    if (isDemo) { onDemoAction?.(); return; }
+    try {
+      if (bean.frozenAt) {
+        const d = daysBetween(bean.frozenAt, today());
+        await updateBean(bean.id, { frozenAt: null, frozenDays: (bean.frozenDays || 0) + (d || 0) });
+      } else {
+        await updateBean(bean.id, { frozenAt: today() });
+      }
+    } catch (err) { console.error('Freeze failed:', err); }
+  };
+
+  // Opens a bean into the first free jar. Jars hold 3 active beans; when all are full
+  // we surface a toast instead of evicting one arbitrarily (matches Rotation, which
+  // simply hides the open affordance when there's no room).
+  const tryOpenBean = (bean) => {
+    if (isDemo) { onDemoAction?.(); return; }
+    if (emptySlots.length === 0) { setToast('All 3 jars are full — finish a bean to free one.'); return; }
+    onOpenBean(bean.id, emptySlots[0]);
+  };
+
+  // Footer for each rail card: Open into jar (primary) + Brew / Learn / Freeze (secondary).
+  // Matches the Rotation footer — Brew long-presses to the method menu, Learn uses the
+  // Ruphus avatar, Freeze toggles the bean's frozen state. (Finish lives on the card back.)
+  const railActions = (bean) => (
+    <div style={{ padding: '12px 16px 14px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+      <div style={{ borderTop: `1px solid ${C.hairline}`, marginBottom: 1 }} />
+      <OpenJarBtn onClick={() => tryOpenBean(bean)} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        <BrewPill bean={bean} isHandBrew={isHandBrew} isDemo={isDemo} onDemoAction={onDemoAction} aiden={aiden} handBrew={handBrew} />
+        <GlassPill color={C.accent} bg={C.accentSoft}
+          icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />}
+          label="Learn" onClick={() => isDemo ? onDemoAction?.() : handleLearn(bean)} />
+        <GlassPill color={bean.frozenAt ? C.frost : C.accent} bg={bean.frozenAt ? C.frostBg : C.accentSoft}
+          icon={<Snowflake size={18} />} label={bean.frozenAt ? 'Frozen' : 'Freeze'}
+          onClick={() => handleFreeze(bean)} />
+      </div>
+    </div>
+  );
 
   const handleFinishBag = (bean) => {
     const hasTasting = tastings.some(t => t.beanId === bean.id);
@@ -248,73 +324,28 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           initial="initial"
           animate="animate"
         >
-          {Object.entries(grouped).map(([roaster, rBeans]) => (
-            <m.div key={roaster} variants={listItem} style={{ marginBottom: 24 }}>
-              {/* Roaster group header — eyebrow label style */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 10,
-              }}>
-                {/* Roaster name — eyebrow label */}
-                <div style={{
-                  ...type.label,
-                  color: C.textMuted,
-                  flexShrink: 0,
-                }}>
+          {Object.entries(grouped)
+            .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+            .map(([roaster, rBeans]) => (
+            <m.div key={roaster} variants={listItem} style={{ marginBottom: 22 }}>
+              {/* Roaster group header — "ROASTER · N" clean eyebrow + hairline rule */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ ...type.label, color: C.textMuted, flexShrink: 0 }}>
                   {roaster}
+                  <span style={{ color: C.textLight, margin: '0 5px' }}>·</span>
+                  <span style={{ color: C.textLight, fontVariantNumeric: 'tabular-nums' }}>{rBeans.length}</span>
                 </div>
-                {/* Hairline rule */}
-                <div style={{
-                  flex: 1,
-                  height: 1,
-                  background: C.hairline,
-                  marginTop: 1,
-                }} />
-                {/* Bag count — refined caption */}
-                <div style={{
-                  fontFamily: fonts.body,
-                  fontSize: type.caption.fontSize,
-                  fontWeight: type.caption.fontWeight,
-                  color: C.textLight,
-                  letterSpacing: '0.02em',
-                  flexShrink: 0,
-                }}>
-                  {rBeans.length} {rBeans.length !== 1 ? 'bags' : 'bag'}
-                </div>
+                <div style={{ flex: 1, height: 1, background: C.hairline, marginTop: 1 }} />
               </div>
 
-              {rBeans.map(bean => (
-                <BeanCard
-                  key={bean.id}
-                  bean={bean}
-                  compact
-                  updateBean={updateBean}
-                  deleteBean={deleteBean}
-                  onLearn={isDemo ? onDemoAction : handleLearn}
-                  uid={uid}
-                  actions={
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 16px 16px' }}>
-                      {emptySlots.length > 0 && (
-                        <Btn variant="small" onClick={() => onOpenBean(bean.id, emptySlots[0])}><Plus size={12} /> Open</Btn>
-                      )}
-                      <BrewButton
-                        bean={bean}
-                        label={brewMethod.label}
-                        isHandBrew={isHandBrew}
-                        brewMenuBean={brewMenuBean}
-                        setBrewMenuBean={setBrewMenuBean}
-                        onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
-                        onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
-                      />
-                      <Btn variant="small" onClick={() => handleFinishBag(bean)}>
-                        <Check size={12} /> Finish
-                      </Btn>
-                    </div>
-                  }
-                />
-              ))}
+              {/* Horizontal scroll-snap rail of flagship cards — swipe through this roaster's beans */}
+              <div className="bean-shelf hide-scrollbar" style={{ display: 'flex', gap: 16, overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', padding: '2px 20px 6px', margin: '0 -20px', scrollPaddingLeft: 20 }}>
+                {rBeans.map(bean => (
+                  <div key={bean.id} style={{ scrollSnapAlign: 'center', flex: '0 0 86%', maxWidth: 430 }}>
+                    <ShelfCard bean={bean} onOpenDetail={openDetail} actions={railActions(bean)} />
+                  </div>
+                ))}
+              </div>
             </m.div>
           ))}
         </m.div>
@@ -382,6 +413,31 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           </m.div>
         )}
       </div>
+
+      {/* Trading card — flies open from the tapped rail card via the hero morph */}
+      {detailBean && (
+        <BeanDetailCard
+          bean={detailBean}
+          tastings={tastings}
+          originRect={morphRect}
+          onOpen={(b) => { closeDetail(); tryOpenBean(b); }}
+          onClose={closeDetail}
+          onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
+          onFreeze={handleFreeze}
+          onFinish={(b) => { closeDetail(); isDemo ? onDemoAction?.() : handleFinishBag(b); }}
+          onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
+        />
+      )}
+      {editBean && (
+        <EditBeanModal
+          open={!!editBean}
+          onClose={() => setEditBean(null)}
+          bean={editBean}
+          updateBean={updateBean}
+          deleteBean={deleteBean}
+          uid={uid}
+        />
+      )}
 
       <ScanSheet
         open={scanOpen}
