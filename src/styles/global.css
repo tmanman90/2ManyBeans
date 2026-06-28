@@ -54,6 +54,10 @@ input[type="date"]::-webkit-datetime-edit {
   border-radius: 4px;
 }
 
+/* Hide scrollbar on horizontal carousels (shelf) while keeping scroll */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Safe area handled per-header in inline styles */
 
 .app-tab-bar {
@@ -117,6 +121,9 @@ input[type="date"]::-webkit-datetime-edit {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Liquid-glass press: brighten (cheap, GPU) — pairs with framer whileTap scale. */
+.glass-pill:active { filter: brightness(1.06); }
+
 @media (prefers-reduced-motion: reduce) {
   .tour-pulse-ring { animation: none !important; }
   *, *::before, *::after {
@@ -139,16 +146,15 @@ input[type="date"]::-webkit-datetime-edit {
 
 .btnp-primary {
   color: #fff; font-size: 13px; padding: 13px 22px; border-radius: 14px;
-  background: linear-gradient(180deg, #BA7C46 0%, #9C5F30 100%);
+  background: #A2632F;
   box-shadow:
-    0 1px 0 rgba(255,255,255,0.30) inset,
-    0 -1px 0 rgba(0,0,0,0.10) inset,
+    0 1px 0 rgba(255,255,255,0.18) inset,
     0 1px 2px rgba(74,47,30,0.16),
-    0 6px 18px rgba(168,106,56,0.26);
+    0 6px 18px rgba(168,106,56,0.22);
 }
-.btnp-primary:hover { background: linear-gradient(180deg, #C4884F 0%, #A66838 100%); }
+.btnp-primary:hover { background: #AE6C36; }
 .btnp-primary:active {
-  background: linear-gradient(180deg, #9C5F30 0%, #855027 100%);
+  background: #8A5226;
   box-shadow:
     0 1px 3px rgba(0,0,0,0.14) inset,
     0 1px 2px rgba(74,47,30,0.12);
