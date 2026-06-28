@@ -26,13 +26,14 @@ const beans = [
   mk('a6', 'Sey', 'Old Faithful', '2025-02-01', true),
 ];
 
-// Best rating per bean: a1/a3/a5 = 5★ (unforgettable cups).
+// Best rating per bean: a1/a3/a5 = 5★ (unforgettable cups). Rich fields so the
+// tasting-hero (rating + one-word + pull-quote) and the card-back full tasting render.
 const tastings = [
-  { id: 't1', beanId: 'a1', date: '2026-05-01', rating: 5, notes: 'Stunning.' },
-  { id: 't2', beanId: 'a2', date: '2026-02-20', rating: 4, notes: 'Lovely.' },
-  { id: 't3', beanId: 'a3', date: '2026-01-10', rating: 5, notes: 'Wild.' },
-  { id: 't4', beanId: 'a4', date: '2025-11-10', rating: 3, notes: 'Fine.' },
-  { id: 't5', beanId: 'a5', date: '2025-08-01', rating: 5, notes: 'Best ever.' },
+  { id: 't1', beanId: 'a1', date: '2026-05-01', rating: 5, oneWord: 'Silky', notes: 'Stunning jammy cherry, syrupy body.', aroma: 'Cherry, Jam', body: 'Full', acidity: 'Bright', finish: 'Long', method: 'V60' },
+  { id: 't2', beanId: 'a2', date: '2026-02-20', rating: 4, oneWord: 'Clean', notes: 'Bright citrus, tea-like.', body: 'Light', finish: 'Crisp' },
+  { id: 't3', beanId: 'a3', date: '2026-01-10', rating: 5, oneWord: 'Wild', notes: 'Funky tropical, boozy.' },
+  { id: 't4', beanId: 'a4', date: '2025-11-10', rating: 3, oneWord: 'Fine', notes: 'Pleasant, forgettable.' },
+  { id: 't5', beanId: 'a5', date: '2025-08-01', rating: 5, oneWord: 'Floral', notes: 'Best ever — jasmine and peach.' },
 ];
 const noop = () => {};
 

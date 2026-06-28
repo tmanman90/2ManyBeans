@@ -29,8 +29,24 @@ const INK = '#161210';
 const GRAY = '#7A7A78';
 const PAPER = '#FBFAF7';
 const HAIR = '#E7E3DB';
+const GOLD = '#C08A2E';
 
 const G = fonts.grotesque;
+
+// Rating stars in the card's gold (the one place accent earns its keep on the back).
+function CardStars({ value = 0, size = 14 }) {
+  if (!value) return null;
+  return (
+    <span style={{ display: 'inline-flex', gap: 1.5 }} role="img" aria-label={`${value} out of 5`}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <svg key={n} width={size} height={size} viewBox="0 0 24 24" style={{ display: 'block' }}>
+          <path d="M12 2l2.9 6.9L22 10l-5.5 4.8L18.2 22 12 18.3 5.8 22l1.7-7.2L2 10l7.1-1.1z"
+            fill={n <= value ? GOLD : 'none'} stroke={n <= value ? GOLD : '#D9D4CB'} strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+      ))}
+    </span>
+  );
+}
 const SERIF = fonts.heading;
 
 // Shared-element morph spring (shelf bag → trading-card bag). Snappy arrival with a
@@ -553,16 +569,25 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                       <Coffee size={26} color={BLUE} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />
                       <div style={{ borderLeft: `1px solid ${HAIR}`, paddingLeft: 14, flex: 1 }}>
-                        <div style={{ ...lbl, fontSize: 11, color: BLUE, marginBottom: 5 }}>Your Tastings {beanTastings.length > 0 && `· ${beanTastings.length}`}</div>
+                        <div style={{ ...lbl, fontSize: 11, color: BLUE, marginBottom: 8 }}>Your Tastings {beanTastings.length > 0 && `· ${beanTastings.length}`}</div>
                         {beanTastings.length === 0
                           ? <div style={{ fontFamily: G, fontSize: 13.5, fontStyle: 'italic', color: GRAY }}>No tastings logged yet for this bean.</div>
-                          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {beanTastings.map(t => (
-                                <div key={t.id}>
-                                  <div style={{ fontFamily: G, fontSize: 11, color: GRAY }}>{formatDate(t.date) || t.date}{t.oneWord ? ` · ${t.oneWord}` : ''}</div>
-                                  {t.notes && <div style={{ fontFamily: G, fontSize: 13.5, color: '#3A3632', lineHeight: 1.45 }}>{t.notes}</div>}
-                                </div>
-                              ))}
+                          : <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                              {beanTastings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((t, i) => {
+                                const axes = [t.aroma, t.acidity && `Acidity ${t.acidity}`, t.body && `Body ${t.body}`, t.finish && `Finish ${t.finish}`].filter(Boolean).join(' · ');
+                                return (
+                                  <div key={t.id} style={{ paddingTop: i > 0 ? 12 : 0, borderTop: i > 0 ? `1px solid ${HAIR}` : 'none' }}>
+                                    {/* date + rating */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: t.oneWord || t.notes ? 5 : 0 }}>
+                                      <span style={{ fontFamily: G, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: GRAY }}>{formatDate(t.date) || t.date}{t.method ? ` · ${t.method}` : ''}</span>
+                                      <CardStars value={t.rating || 0} size={13} />
+                                    </div>
+                                    {t.oneWord && <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, fontStyle: 'italic', color: INK, lineHeight: 1.15, marginBottom: t.notes ? 4 : 0 }}>“{t.oneWord}”</div>}
+                                    {t.notes && <div style={{ fontFamily: G, fontSize: 13.5, color: '#3A3632', lineHeight: 1.5 }}>{t.notes}</div>}
+                                    {axes && <div style={{ fontFamily: G, fontSize: 11.5, color: GRAY, marginTop: 6, lineHeight: 1.4 }}>{axes}</div>}
+                                  </div>
+                                );
+                              })}
                             </div>}
                       </div>
                     </div>

@@ -1,13 +1,11 @@
-// Archive trophy-redesign gate (loop: archive-trophy-redesign). Proves the de-slop +
-// structure-kept + morph requirements over a committed archive-harness:
-//   R1 masthead de-slop (no header radial-glow orb, title + tabular-nums stat line)
-//   R2 Unforgettable Cups trophy carousel on top, scrollable, NO Sparkles icon
-//   R3 year-grouped chronological timeline
-//   R4 tap → trading-card hero morph (flight frames)
-//   R7 search filters the list
-//   R9 reduced-motion: card opens, no morph flight
-//   R7-render zero console/page errors
-// Spins Vite on the committed archive-harness, drives Playwright, asserts, tears down.
+// Archive editorial-100x gate (loop: archive-editorial-100x). Proves tasting-as-hero +
+// declutter + featured-on-top + chronological + motion over a committed harness:
+//   R1 every entry leads with a ★ rating + a tasting pull-quote
+//   R3 the "Show Details" expander and row flavor-tag chips are gone
+//   R4 favourite cups featured on top (before the timeline)
+//   R5 timeline year-grouped + chronological with pinning (position:sticky) headers
+//   R6/R7 tap → hero morph (flight frames); R6 reduced-motion disables the flight
+//   R8 search filters; R7-render zero console/page errors
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 
@@ -41,73 +39,74 @@ try {
   await waitForServer(URL);
   const browser = await chromium.launch();
 
-  // ---- Pass 1: structure (masthead de-slop, cups carousel, timeline) + no errors ----
+  // ---- Pass 1: tasting-as-hero, declutter, featured-on-top, pinning + no errors ----
   {
     const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
     const errors = [];
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
     await page.goto(URL, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(1000);
 
-    // R1 — masthead: "Archive" title + a tabular-nums stat line; NO radial-glow anywhere.
-    const titleOk = await page.getByText('Archive', { exact: true }).first().isVisible().catch(() => false);
-    if (!titleOk) fail('masthead "Archive" title missing');
-    // The banned tell is a header glow orb specifically — scope to the masthead.
-    const glow = await page.evaluate(() => {
-      const m = document.querySelector('[data-masthead]');
-      if (!m) return true; // masthead missing is itself a fail
-      return [m, ...m.querySelectorAll('*')].some(el => (getComputedStyle(el).backgroundImage || '').includes('radial-gradient'));
-    });
-    if (glow) fail('R1: a header radial-glow orb survives (slop tell)');
-    const statTabular = await page.evaluate(() => {
-      const els = [...document.querySelectorAll('*')];
-      return els.some(el => /\bbeans\b/.test(el.textContent || '') && /\btastings\b/.test(el.textContent || '') && getComputedStyle(el).fontVariantNumeric.includes('tabular-nums'));
-    });
-    if (!statTabular) fail('R1: masthead stat line is not tabular-nums');
-    if (!glow && titleOk && statTabular) console.log('OK  masthead de-slopped (title + tabular stat, no glow)');
+    // R1 — tasting is the hero: rating stars on multiple entries + a pull-quote present.
+    const ratings = await page.locator('[role="img"][aria-label*="out of 5"]').count();
+    if (ratings < 3) fail(`R1: ratings not led on entries (found ${ratings} star groups)`);
+    // pull-quote from a tasting note (featured cup a1's note) should be on screen
+    const quoteShown = await page.getByText('jammy cherry', { exact: false }).first().isVisible().catch(() => false);
+    if (!quoteShown) fail('R1: tasting pull-quote not rendered on the entry');
+    if (ratings >= 3 && quoteShown) console.log(`OK  tasting-as-hero (${ratings} ratings + pull-quote)`);
 
-    // R2 — Unforgettable Cups: present, horizontally scrollable, NO Sparkles icon.
-    const sparkles = await page.evaluate(() => !!document.querySelector('.lucide-sparkles, .lucide-sparkle'));
-    if (sparkles) fail('R2: a Sparkles icon survives (slop tell)');
-    const cupsHeader = await page.getByText('Unforgettable Cups', { exact: false }).first().isVisible().catch(() => false);
-    if (!cupsHeader) fail('R2: Unforgettable Cups strip missing');
-    const rails = await page.evaluate(() => [...document.querySelectorAll('.hide-scrollbar')].map(r => ({ sw: Math.round(r.scrollWidth), cw: Math.round(r.clientWidth), btns: r.querySelectorAll('button').length })));
-    const cupsRail = rails.find(r => r.btns >= 3);
-    if (!cupsRail) fail('R2: cups carousel has no card buttons: ' + JSON.stringify(rails));
-    else if (cupsRail.sw <= cupsRail.cw + 20) fail('R2: cups carousel is not horizontally scrollable: ' + JSON.stringify(cupsRail));
-    else if (!sparkles && cupsHeader) console.log(`OK  trophy carousel (${cupsRail.btns} cups, scrollable, no Sparkles)`);
+    // R3 — declutter: no "Show details" control, no row flavor-tag chips (bagNotes "Apple…").
+    const showDetails = await page.getByText('Show details', { exact: false }).count();
+    if (showDetails > 0) fail('R3: a "Show details" control survives');
+    const flavorTag = await page.getByText('Apple', { exact: false }).count(); // bagNotes flavor chip
+    if (flavorTag > 0) fail('R3: a row flavor-tag chip survives (bagNotes rendered as chips)');
+    if (showDetails === 0 && flavorTag === 0) console.log('OK  decluttered (no Show-details, no row flavor-tags)');
 
-    // R3 — timeline year-grouped + chronological (2026 above 2025 on default Recent sort).
+    // R4 — favourite cups featured on top: the featured cup precedes the first year header.
+    const featuredY = await page.getByText('Kotowa Estate', { exact: false }).first().boundingBox().catch(() => null);
+    const yearY = await page.getByText('2026', { exact: true }).first().boundingBox().catch(() => null);
+    const cupsLabel = await page.getByText('Unforgettable Cups', { exact: false }).first().isVisible().catch(() => false);
+    if (!featuredY || !yearY) fail('R4: featured cup or year header missing');
+    else if (!(featuredY.y < yearY.y)) fail('R4: featured cup is not above the timeline');
+    else if (!cupsLabel) fail('R4: Unforgettable Cups label missing');
+    else console.log('OK  favourite cups featured on top');
+
+    // R5 — timeline year-grouped + chronological, headers pin (position: sticky).
     const y2026 = await page.getByText('2026', { exact: true }).first().boundingBox().catch(() => null);
     const y2025 = await page.getByText('2025', { exact: true }).first().boundingBox().catch(() => null);
-    if (!y2026 || !y2025) fail('R3: year headers missing (2026/2025)');
-    else if (!(y2026.y < y2025.y)) fail('R3: years not chronological (recent first)');
-    else console.log('OK  timeline year-grouped + chronological');
+    if (!y2026 || !y2025) fail('R5: year headers missing');
+    else if (!(y2026.y < y2025.y)) fail('R5: years not chronological (recent first)');
+    const sticky = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('div')].find(d => d.textContent && /^2026/.test(d.textContent.trim()) && getComputedStyle(d).position === 'sticky');
+      return !!el;
+    });
+    if (!sticky) fail('R5: year header is not pinning (position: sticky)');
+    if (y2026 && y2025 && y2026.y < y2025.y && sticky) console.log('OK  chronological year groups with pinning headers');
 
-    // R4 — tap a cup card (has photo) → trading card flies open (morph interpolates).
-    await page.locator('.hide-scrollbar button[data-bag], .hide-scrollbar button:has([data-bag])').first().click().catch(() => {});
+    // R7 — tap the featured cup (has a photo) → hero morph flies open.
+    await page.getByText('Kotowa Estate', { exact: false }).first().click().catch(() => {});
     const samples = [];
     for (let i = 0; i < 16; i++) { const c = await page.evaluate(flightCenter); if (c) samples.push(c); await page.waitForTimeout(40); }
     const distinct = new Set(samples.filter(s => s.w > 0).map(s => `${s.y},${s.w}`)).size;
-    if (!samples.length) fail('R4: tap did not open the trading card');
-    else if (distinct < 3) fail(`R4: morph did not interpolate (only ${distinct} flight frames)`);
+    if (!samples.length) fail('R7: tap did not open the trading card');
+    else if (distinct < 3) fail(`R7: morph did not interpolate (only ${distinct} flight frames)`);
     else console.log(`OK  tap → hero morph (${distinct} flight frames)`);
 
     if (errors.length) fail('console/page errors: ' + JSON.stringify(errors.slice(0, 6)));
     await page.close();
   }
 
-  // ---- Pass 2: search filters the timeline ----
+  // ---- Pass 2: search filters the entries ----
   {
     const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
     await page.goto(URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(700);
     const before = await page.locator('[data-bag]').count();
-    await page.locator('input[aria-label="Search archive"]').fill('Kotowa');
+    await page.locator('input[aria-label="Search archive"]').fill('Ceremony');
     await page.waitForTimeout(350);
     const after = await page.locator('[data-bag]').count();
-    if (!(before >= 6 && after > 0 && after < before)) fail(`R7: search did not filter (before ${before}, after ${after})`);
+    if (!(before >= 6 && after > 0 && after < before)) fail(`R8: search did not filter (before ${before}, after ${after})`);
     else console.log(`OK  search filters (${before} → ${after})`);
     await page.close();
   }
@@ -119,12 +118,12 @@ try {
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     await page.goto(URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(700);
-    await page.locator('.hide-scrollbar button[data-bag], .hide-scrollbar button:has([data-bag])').first().click().catch(() => {});
+    await page.getByText('Kotowa Estate', { exact: false }).first().click().catch(() => {});
     await page.waitForTimeout(450);
     const flight = await page.evaluate(() => [...document.querySelectorAll('img')].some(i => { const s = getComputedStyle(i); return s.position === 'fixed' && s.zIndex === '4600'; }));
     const overlay = await page.evaluate(() => [...document.querySelectorAll('div')].some(d => getComputedStyle(d).position === 'fixed' && getComputedStyle(d).zIndex === '4000'));
-    if (!overlay) fail('R9: reduced-motion — trading card did not open');
-    else if (flight) fail('R9: reduced-motion — morph flight ran (should be disabled)');
+    if (!overlay) fail('R6: reduced-motion — trading card did not open');
+    else if (flight) fail('R6: reduced-motion — morph flight ran (should be disabled)');
     else console.log('OK  reduced-motion: card opens, no morph');
     if (errors.length) fail('reduced-motion errors: ' + JSON.stringify(errors.slice(0, 4)));
     await page.close();
