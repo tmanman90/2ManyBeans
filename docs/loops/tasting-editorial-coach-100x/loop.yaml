@@ -1,0 +1,153 @@
+version: 1
+
+meta:
+  name: tasting-editorial-coach-100x
+  source_plan: docs/plans/2026-06-28-003-feat-tasting-editorial-coach-100x-plan.md
+
+goal:
+  statement: >
+    100x the Tasting tab to Apple-caliber while making the tasting itself the hero: each journal cup
+    becomes an editorial entry led by its ★ rating + one-word + a note pull-quote, carrying a radar
+    "taste-fingerprint" of its aroma/acidity/sweetness/body/finish; AND the 6-step guided coaching flow
+    with Ruphus is kept and elevated into a calm, immersive learning moment. Kill the slop tells
+    (eyebrow-over-H1 + gradient accent bar, gradient button chrome + radial glow, accentSoft pill spam,
+    decorative bean motifs, ⌄⌃●· glyph-icons, crushed caps tracking, twee copy, and the 3px caramel
+    left-stripe on every journal card). Presentation only — no Firebase, tasting data model, or AI logic
+    (claude/gemini, score extraction, coaching prompts) changes; dev channel only.
+  definition_of_done: >
+    The Tasting masthead has no "learn what you taste" eyebrow-over-H1 and no gradient accent bar — a clean
+    Fraunces title + a tabular-nums stat line; each journal entry leads with its ★ rating + one-word + a
+    note pull-quote and shows a radar taste-fingerprint of its axes, with the 3px left-stripe gone and
+    graceful degrade when fields are sparse; the invitation/coach hero drops the bean-motif SVGs, gradient
+    fills, and accentSoft sub-promise pills for a clean scaffolded "Start guided tasting" CTA with the
+    on-deck bean picker; a guided session keeps all 6 steps and renders a refined step spine (no glow),
+    editorial Ruphus cards, a live-building fingerprint, the tappable glossary teach-me, the spider/
+    scorecard peek, and the extraction-review card; the ⌄⌃●· glyph-icons are replaced or removed; motion
+    (journal reveal stagger, spring, haptics, fingerprint animate-in) is transform/opacity-only and
+    reduced-motion disables it; gold is scarce (CTA + rating + active) with no gradient button chrome or
+    accentSoft structural fills; copy is concrete + novice-friendly with the glossary scaffolding intact;
+    every feature is preserved (guided + manual add, edit, delete, rating, all 9 fields, AI extraction +
+    coaching, glossary, spider, share capture, sort, paywall gate, BrewTimer handoff); no Firebase/
+    data-model/AI-logic is touched; `npx vite build` exits 0; the Tasting Playwright harness shows
+    rating-led journal entries with a fingerprint SVG, no left-stripe, no eyebrow/gradient-bar, no hero
+    motif, the guided session opening to a step spine, reduced-motion with no reveal, and zero console
+    errors; verify-archive and verify-inventory still PASS; codex review is clean against the rubric; and
+    Tal signs off on device that the journal feels Apple-caliber with each cup's fingerprint and a full
+    guided tasting with Ruphus feels immersive and still teaches.
+  requirements:
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
+    - R7
+    - R8
+    - R9
+  context_sources:
+    - file: docs/plans/2026-06-28-003-feat-tasting-editorial-coach-100x-plan.md
+    - file: docs/plans/2026-06-28-002-feat-archive-editorial-100x-plan.md
+    - file: lessons.md
+
+verification:
+  - id: v1-build
+    type: programmatic
+    check: ["npx", "vite", "build", "--logLevel", "error"]
+    expect: exit_zero
+  - id: v2-harness
+    type: programmatic
+    check: ["node", "scripts/verify-tasting.mjs"]
+    expect: exit_zero
+  - id: v3-regression
+    type: programmatic
+    check: ["node", "scripts/verify-archive.mjs"]
+    expect: exit_zero
+  - id: v4-review
+    type: judge
+    judge: codex
+    rubric: >
+      Adversarially review the Tasting editorial-coach diff. Treat the redesign baseline (warm-neutral
+      theme, BeanDetailCard morph, Archive/Inventory/Rotation, framer-motion, the existing SpiderChart and
+      tasting coaching/extraction engine) as APPROVED — only judge this change. FAIL if any slop tell
+      survives: a "learn what you taste" eyebrow directly above the H1, the 48x3 gradient accent bar, any
+      gradient button/CTA chrome, the radial-glow mask on the empty-state, accentSoft used as structural
+      chrome (cup-count badge / "6 steps · ~5 min · auto-logs" pills / icon wells), decorative bean-motif
+      SVGs on the invitation card, ⌄⌃●· text-glyphs used as icons, crushed caps letter-spacing, twee copy
+      ("the more you taste, the more you taste" / "Let's taste something together"), or the 3px caramel
+      left-stripe on journal cards (R1, R3, R5, R7). FAIL if a journal entry does not lead with its ★
+      rating + one-word + a note pull-quote, or does not show a radar taste-fingerprint of its axes, or the
+      fingerprint/quote can render empty/crash when fields are sparse (must degrade) (R2). FAIL if the
+      guided coaching flow lost any of the 6 steps, the step spine, the tappable glossary teach-me, the
+      spider/scorecard peek, the extraction-review card, or the live-building fingerprint, or if it changed
+      the message/marker/extraction/state machine rather than just restyling it (R4, R8). FAIL if motion is
+      not transform/opacity-only, exceeds 300ms (non-spring), bounce > 0.3, or is not reduced-motion gated
+      (R6). FAIL if gold/accent is used beyond CTA + rating + active state, or tabular-nums/hairline
+      regressed (R7). FAIL if ANY feature regressed — guided/manual add, edit, delete, rating, the 9
+      tasting fields, AI extraction, sort, share capture, paywall gate, or the BrewTimer→tasting handoff
+      (R8). FAIL if the diff touches Firebase, the tasting/bean data model, or AI logic (claude/gemini
+      libs, prompts, markers, score extraction), or regresses shared StarRating/SpiderChart for other tabs
+      (R9). PASS only when the tasting is the visible hero (rating + words + fingerprint), the coaching is
+      preserved + elevated, the slop is gone, motion is tasteful + gated, and the diff is scope-clean.
+  - id: v5-human
+    type: human
+    prompt: >
+      On the dev app (device): open Tasting and confirm the journal feels Apple-caliber — each cup leads
+      with its rating + your words and shows its taste-fingerprint shape, no left-stripe, no eyebrow/
+      gradient-bar; run a FULL guided tasting with Ruphus and confirm it feels immersive, the step spine +
+      glossary teach-me + live fingerprint + extraction-review all work and still teach; confirm manual
+      add, edit, delete, sort, and share still work — proving R1, R2, R3, R4, R8 and the overall feel.
+
+evidence_map:
+  R1: v2-harness
+  R2: v2-harness
+  R3: v2-harness
+  R4: v4-review
+  R5: v4-review
+  R6: v2-harness
+  R7: v4-review
+  R8: v4-review
+  R9: v4-review
+
+council:
+  - id: codex
+    role: judge
+    cli: codex
+
+gates:
+  plan_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v4-review]
+    max_revisions: 2
+  delivery_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v1-build, v2-harness, v3-regression, v4-review, v5-human]
+    max_revisions: 3
+
+loop_control:
+  max_iterations: 7
+  cycle_cap: 4
+  quality_streak: 2
+  no_progress:
+    max_stalled_iterations: 2
+    action: stop
+  budget:
+    tokens: 4000000
+
+scope_guard:
+  - Do NOT change Firebase, the tasting/bean data model, or any AI logic (claude/gemini libs, coaching prompts, term/step markers, score extraction) — reskin their output only.
+  - Do NOT lose or alter any feature — guided + manual add, edit, delete, rating, all 9 tasting fields, AI extraction, the 6-step coaching, glossary teach-me, spider/scorecard, share capture, sort, paywall gate, BrewTimer→tasting handoff (presentation only).
+  - Do NOT make non-additive changes to shared StarRating/SpiderChart that regress Archive/Rotation/Inventory.
+  - Do NOT introduce gradient button chrome, accentSoft structural fills, glow shadows, or a second accent; keep gold scarce (CTA + rating + active state).
+  - Do NOT animate any non-transform/opacity property, exceed 300ms (non-spring)/bounce 0.3, or skip the reduced-motion gate; do not deploy to production or merge to main (dev channel only).
+
+execution:
+  mode: goal
+  isolation: branch
+
+model_policy:
+  orchestrator: opus
+  subagents: sonnet
+  reviewer: codex
+  review_cadence: per_phase
