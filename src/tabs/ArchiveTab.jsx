@@ -80,7 +80,7 @@ function Quote({ text, size = 14, clamp = 2 }) {
 
 function Chip({ label, active, onClick, count }) {
   return (
-    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 36, padding: '7px 13px', borderRadius: radius.pill, border: `1px solid ${active ? C.accent : C.border}`, background: active ? C.accent : C.cream, color: active ? C.cream : C.text, fontFamily: fonts.body, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: active ? shadows.button : 'none', transition: `all ${motionTokens.dur.fast}s ${motionTokens.cssOut}` }}>
+    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 36, padding: '7px 13px', borderRadius: radius.pill, border: `1px solid ${active ? C.accent : C.border}`, background: active ? C.accent : C.cream, color: active ? C.cream : C.text, fontFamily: fonts.body, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: active ? shadows.button : 'none', transition: `background-color ${motionTokens.dur.fast}s ${motionTokens.cssOut}, border-color ${motionTokens.dur.fast}s ${motionTokens.cssOut}, color ${motionTokens.dur.fast}s ${motionTokens.cssOut}` }}>
       <span>{label}</span>
       {count != null && <span style={{ ...num, fontSize: 11, fontWeight: 700, color: active ? 'rgba(255,255,255,0.85)' : C.textLight }}>{count}</span>}
     </button>
@@ -135,7 +135,7 @@ function FeaturedCup({ bean, hero, onOpen, reduce }) {
   return (
     <m.button
       onClick={() => onOpen(bean, bagRef.current?.getBoundingClientRect())}
-      whileTap={{ scale: 0.985 }} transition={motionTokens.spring.soft}
+      whileTap={reduce ? undefined : { scale: 0.985 }} transition={motionTokens.spring.soft}
       style={{ width: '100%', textAlign: 'left', display: 'flex', gap: 16, alignItems: 'center', padding: 16, cursor: 'pointer', background: C.cream, border: `1px solid ${C.accentLight}`, borderRadius: radius.xl, boxShadow: shadows.e3, WebkitTapHighlightColor: 'transparent' }}
     >
       <div style={{ flexShrink: 0, width: 116, height: 116, background: C.bgDeep, borderRadius: radius.lg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -164,7 +164,7 @@ function CupCardSmall({ bean, hero, onOpen, reduce }) {
   const bagRef = useRef(null);
   return (
     <button onClick={() => onOpen(bean, bagRef.current?.getBoundingClientRect())}
-      style={{ flexShrink: 0, width: 150, textAlign: 'left', padding: 12, cursor: 'pointer', background: C.cream, border: `1px solid ${C.accentLight}`, borderRadius: radius.lg, boxShadow: shadows.e2, fontFamily: fonts.body, WebkitTapHighlightColor: 'transparent' }}>
+      style={{ flexShrink: 0, width: 150, textAlign: 'left', padding: 12, cursor: 'pointer', background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, boxShadow: shadows.e2, fontFamily: fonts.body, WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ background: C.bgDeep, borderRadius: radius.md, padding: 8, display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
         <ParallaxBag bean={bean} size={88} innerRef={bagRef} reduce={reduce} range={5} />
       </div>
@@ -188,7 +188,6 @@ function CupCardSmall({ bean, hero, onOpen, reduce }) {
 // Chronological ledger entry — rating-led, pull-quote, parallax bag, scroll-reveal.
 function ArchiveEntry({ bean, hero, showMonth, onOpen, reduce, index }) {
   const bagRef = useRef(null);
-  const dOwn = diffDays(bean.finishDate, bean.roastDate);
   const open = () => onOpen(bean, bagRef.current?.getBoundingClientRect());
   const onKey = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
   const reveal = reduce ? {} : { initial: { opacity: 0, y: 14 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-8% 0px' }, transition: { duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: Math.min(index, 6) * 0.04 } };
@@ -215,9 +214,7 @@ function ArchiveEntry({ bean, hero, showMonth, onOpen, reduce, index }) {
           {hero?.quote && hero.quote !== hero.oneWord
             ? <Quote text={hero.quote} size={13} clamp={2} />
             : ((!hero || (!hero.oneWord && !hero.quote)) && (
-                <div style={{ ...type.caption, ...num, color: C.textMuted, lineHeight: 1.4 }}>
-                  {bean.origin || ''}{bean.process ? ` · ${bean.process}` : ''}{dOwn != null ? ` · ${dOwn}d owned` : ''}
-                </div>
+                <div style={{ ...type.caption, ...num, color: C.textMuted, lineHeight: 1.4 }}>{metaLine(bean)}</div>
               ))}
         </div>
       </div>

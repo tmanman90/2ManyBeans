@@ -17,18 +17,21 @@ export function heroTastingFor(beanId, tastings) {
 
 // A short pull-quote for an entry headline, degrading gracefully:
 // free notes → one-word impression → first aroma note → null (caller falls back to meta).
+// All branches normalize whitespace, so a blank/whitespace field never yields an empty quote.
 export function pullQuoteFrom(tasting, maxLen = 90) {
   if (!tasting) return null;
   const note = (tasting.notes || '').trim();
   if (note) return note.length > maxLen ? note.slice(0, maxLen - 1).trimEnd() + '…' : note;
-  if (tasting.oneWord) return tasting.oneWord.trim();
+  const ow = (tasting.oneWord || '').trim();
+  if (ow) return ow;
   const aroma = (tasting.aroma || '').split(/[,·/]/).map(s => s.trim()).filter(Boolean);
   return aroma.length ? aroma.slice(0, 3).join(', ') : null;
 }
 
 // {rating, oneWord, quote} for an entry hero, or null when the bean has no tasting.
+// oneWord is normalized to a non-empty trimmed string or null (no whitespace-only words).
 export function entryHero(beanId, tastings) {
   const t = heroTastingFor(beanId, tastings);
   if (!t) return null;
-  return { rating: t.rating || 0, oneWord: t.oneWord || null, quote: pullQuoteFrom(t), tasting: t };
+  return { rating: t.rating || 0, oneWord: (t.oneWord || '').trim() || null, quote: pullQuoteFrom(t), tasting: t };
 }

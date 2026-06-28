@@ -55,8 +55,8 @@ try {
     const quoteShown = await page.getByText('jammy cherry', { exact: false }).first().isVisible().catch(() => false);
     if (!quoteShown) fail('R1: tasting pull-quote not rendered on the entry');
     // graceful degrade: a rated-but-wordless bean (a7) shows its meta line, never an empty quote
-    const emptyQuote = await page.evaluate(() => (document.body.innerText || '').includes('“”'));
-    if (emptyQuote) fail('R1: an empty pull-quote “” rendered (no graceful fallback)');
+    const emptyQuote = await page.evaluate(() => /[“"]\s*[”"]/.test(document.body.innerText || ''));
+    if (emptyQuote) fail('R1: an empty/whitespace pull-quote rendered (no graceful fallback)');
     const metaFallback = await page.getByText('Kenya · Natural', { exact: false }).first().isVisible().catch(() => false);
     if (!metaFallback) fail('R1: rated-but-wordless bean did not degrade to a meta line');
     if (ratings >= 3 && quoteShown && !emptyQuote && metaFallback) console.log(`OK  tasting-as-hero (${ratings} ratings + pull-quote, graceful degrade)`);
