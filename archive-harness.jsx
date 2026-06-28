@@ -24,6 +24,8 @@ const beans = [
   mk('a4', 'Apollon', 'Gesha One', '2025-11-20', true),
   mk('a5', 'Onyx', 'Mystery Box', '2025-08-05', true),
   mk('a6', 'Sey', 'Old Faithful', '2025-02-01', true),
+  // a7: rated but NO words (no oneWord/notes/aroma) → must degrade to a meta line, not an empty quote.
+  mk('a7', 'Kurasu', 'Kenya Peaberry', '2025-05-15', true, { origin: 'Kenya', process: 'Natural' }),
 ];
 
 // Best rating per bean: a1/a3/a5 = 5★ (unforgettable cups). Rich fields so the
@@ -34,6 +36,7 @@ const tastings = [
   { id: 't3', beanId: 'a3', date: '2026-01-10', rating: 5, oneWord: 'Wild', notes: 'Funky tropical, boozy.' },
   { id: 't4', beanId: 'a4', date: '2025-11-10', rating: 3, oneWord: 'Fine', notes: 'Pleasant, forgettable.' },
   { id: 't5', beanId: 'a5', date: '2025-08-01', rating: 5, oneWord: 'Floral', notes: 'Best ever — jasmine and peach.' },
+  { id: 't7', beanId: 'a7', date: '2025-05-10', rating: 4 }, // rated, no words → meta fallback
 ];
 const noop = () => {};
 

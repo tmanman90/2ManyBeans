@@ -119,11 +119,19 @@ function EmptyState({ hasFilters, onClear }) {
   );
 }
 
-// Featured fav cup — the editorial lead. Big bag + rating + name + pull-quote.
+// origin · process · days-owned — the graceful fallback when a bean has no tasting words.
+function metaLine(bean) {
+  const dOwn = diffDays(bean.finishDate, bean.roastDate);
+  return [bean.origin, bean.process, dOwn != null ? `${dOwn}d owned` : null].filter(Boolean).join(' · ');
+}
+
+// Featured fav cup — the editorial lead. Leads with the rating, then name + pull-quote.
 function FeaturedCup({ bean, hero, onOpen, reduce }) {
   const bagRef = useRef(null);
   const { scrollYProgress } = useScroll({ target: bagRef, offset: ['start end', 'end start'] });
   const py = useTransform(scrollYProgress, [0, 1], [10, -10]);
+  const rating = hero?.rating || 5;
+  const words = hero?.oneWord || hero?.quote;
   return (
     <m.button
       onClick={() => onOpen(bean, bagRef.current?.getBoundingClientRect())}
@@ -136,13 +144,16 @@ function FeaturedCup({ bean, hero, onOpen, reduce }) {
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ ...type.caption, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{bean.roaster || ''}</div>
-        <div style={{ fontFamily: fonts.heading, fontSize: 22, fontWeight: 600, color: C.text, lineHeight: 1.1, letterSpacing: '-0.015em', marginBottom: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{bean.name}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: hero?.quote ? 7 : 0 }}>
-          <Stars value={hero?.rating || 5} size={13} />
-          {hero?.oneWord && <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 15, color: C.accentDark }}>“{hero.oneWord}”</span>}
+        {/* lead with the rating */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
+          <Stars value={rating} size={15} />
+          <span style={{ ...type.caption, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.08em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bean.roaster || ''}</span>
         </div>
-        {hero?.quote && hero.quote !== hero.oneWord && <Quote text={hero.quote} size={13.5} clamp={2} />}
+        <div style={{ fontFamily: fonts.heading, fontSize: 22, fontWeight: 600, color: C.text, lineHeight: 1.1, letterSpacing: '-0.015em', marginBottom: 6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{bean.name}</div>
+        {hero?.oneWord && <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 15, color: C.accentDark, marginBottom: hero?.quote && hero.quote !== hero.oneWord ? 4 : 0 }}>“{hero.oneWord}”</div>}
+        {hero?.quote && hero.quote !== hero.oneWord
+          ? <Quote text={hero.quote} size={13.5} clamp={2} />
+          : (!words && <div style={{ ...type.caption, ...num, color: C.textMuted }}>{metaLine(bean)}</div>)}
       </div>
     </m.button>
   );
@@ -157,11 +168,18 @@ function CupCardSmall({ bean, hero, onOpen, reduce }) {
       <div style={{ background: C.bgDeep, borderRadius: radius.md, padding: 8, display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
         <ParallaxBag bean={bean} size={88} innerRef={bagRef} reduce={reduce} range={5} />
       </div>
-      <div style={{ ...type.caption, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.06em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{bean.roaster || ''}</div>
-      <div style={{ fontFamily: fonts.heading, fontSize: 14.5, fontWeight: 600, color: C.text, lineHeight: 1.16, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 34 }}>{bean.name}</div>
-      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* lead with the rating */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
         <Stars value={hero?.rating || 5} size={11} />
-        {hero?.oneWord && <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 12.5, color: C.accentDark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{hero.oneWord}”</span>}
+        <span style={{ ...type.caption, color: C.textLight, textTransform: 'uppercase', letterSpacing: '0.06em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bean.roaster || ''}</span>
+      </div>
+      <div style={{ fontFamily: fonts.heading, fontSize: 14.5, fontWeight: 600, color: C.text, lineHeight: 1.16, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 34 }}>{bean.name}</div>
+      <div style={{ marginTop: 6 }}>
+        {hero?.quote
+          ? <Quote text={hero.quote} size={12} clamp={2} />
+          : (hero?.oneWord
+              ? <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 12.5, color: C.accentDark }}>“{hero.oneWord}”</span>
+              : <span style={{ ...type.caption, ...num, color: C.textMuted }}>{metaLine(bean)}</span>)}
       </div>
     </button>
   );
@@ -185,24 +203,22 @@ function ArchiveEntry({ bean, hero, showMonth, onOpen, reduce, index }) {
           <ParallaxBag bean={bean} size={64} innerRef={bagRef} reduce={reduce} range={6} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-            <div style={{ ...type.label, color: C.textLight, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bean.roaster || ''}</div>
-            {showMonth && bean.finishDate && <div style={{ ...type.label, ...num, color: C.textLight, fontSize: 10 }}>{monthOf(bean.finishDate)}</div>}
+          {/* lead with the rating (or roaster·month when the bean has no tasting) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            {hero?.rating ? <Stars value={hero.rating} size={12} /> : <span style={{ ...type.label, color: C.textLight, fontSize: 10 }}>{bean.roaster || ''}</span>}
+            <span style={{ ...type.label, ...num, color: C.textLight, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {hero?.rating ? (bean.roaster || '') : ''}{showMonth && bean.finishDate ? `${hero?.rating && bean.roaster ? ' · ' : ''}${monthOf(bean.finishDate)}` : ''}
+            </span>
           </div>
-          <div style={{ fontFamily: fonts.heading, fontSize: 17, color: C.text, fontWeight: 600, lineHeight: 1.16, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, marginBottom: 5 }}>{bean.name}</div>
-          {hero ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: hero.quote ? 5 : 0 }}>
-                <Stars value={hero.rating} size={12} />
-                {hero.oneWord && <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 14, color: C.accentDark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{hero.oneWord}”</span>}
-              </div>
-              {hero.quote && hero.quote !== hero.oneWord && <Quote text={hero.quote} size={13} clamp={2} />}
-            </>
-          ) : (
-            <div style={{ ...type.caption, ...num, color: C.textMuted, lineHeight: 1.4 }}>
-              {bean.origin || ''}{bean.process ? ` · ${bean.process}` : ''}{dOwn != null ? ` · ${dOwn}d owned` : ''}
-            </div>
-          )}
+          <div style={{ fontFamily: fonts.heading, fontSize: 17, color: C.text, fontWeight: 600, lineHeight: 1.16, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{bean.name}</div>
+          {hero?.oneWord && <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 14, color: C.accentDark, marginBottom: hero?.quote && hero.quote !== hero.oneWord ? 4 : 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{hero.oneWord}”</div>}
+          {hero?.quote && hero.quote !== hero.oneWord
+            ? <Quote text={hero.quote} size={13} clamp={2} />
+            : ((!hero || (!hero.oneWord && !hero.quote)) && (
+                <div style={{ ...type.caption, ...num, color: C.textMuted, lineHeight: 1.4 }}>
+                  {bean.origin || ''}{bean.process ? ` · ${bean.process}` : ''}{dOwn != null ? ` · ${dOwn}d owned` : ''}
+                </div>
+              ))}
         </div>
       </div>
     </m.div>
