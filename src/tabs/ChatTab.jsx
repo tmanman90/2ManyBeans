@@ -2,9 +2,10 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Send, Camera, X, Coffee, BookOpen, Save } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, useReducedMotion } from 'framer-motion';
 import { C, fonts, glass, shadows, radius, type as typeScale, motion as motionTokens } from '../styles/theme';
 import { m, spring, fadeUp, popIn } from '../lib/motion';
+import { haptic } from '../lib/haptics';
 import { buildChatContext, sendChatMessage, compressImage } from '../lib/claude';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
@@ -57,41 +58,31 @@ function trimApiMessages(messages, keepRecent = 6) {
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
 
-// Animated typing indicator — three bouncing dots
-const TypingIndicator = () => (
-  <m.div
-    {...fadeUp}
-    style={{
-      alignSelf: 'flex-start',
-      background: C.cream,
-      border: `1px solid ${C.hairline}`,
+// "Ruphus is thinking" — the mascot present with a calm, characterful pulse (the dots
+// fade in sequence via opacity only; the avatar breathes). Reduced-motion: static.
+const TypingIndicator = ({ reduce }) => (
+  <m.div {...(reduce ? {} : fadeUp)} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, alignSelf: 'flex-start' }}>
+    <m.img
+      src="/images/ruphus-avatar.png"
+      alt="Ruphus"
+      animate={reduce ? {} : { y: [0, -2, 0] }}
+      transition={reduce ? {} : { duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
+      style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0 }}
+    />
+    <div style={{
+      background: C.cream, border: `1px solid ${C.hairline}`,
       borderRadius: `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
-      boxShadow: shadows.e1,
-      padding: '12px 16px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 5,
-    }}
-  >
-    {[0, 1, 2].map(i => (
-      <span
-        key={i}
-        style={{
-          display: 'block',
-          width: 7,
-          height: 7,
-          borderRadius: '50%',
-          background: C.accentLight,
-          animation: `chatDot 1.2s ease-in-out ${i * 0.2}s infinite`,
-        }}
-      />
-    ))}
-    <style>{`
-      @keyframes chatDot {
-        0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-        30% { transform: translateY(-5px); opacity: 1; }
-      }
-    `}</style>
+      boxShadow: shadows.e1, padding: '12px 16px',
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <span style={{ ...typeScale.caption, color: C.textLight, fontStyle: 'italic' }}>Ruphus is thinking</span>
+      <span style={{ display: 'inline-flex', gap: 3 }}>
+        {[0, 1, 2].map(i => (
+          <span key={i} style={{ display: 'block', width: 5, height: 5, borderRadius: '50%', background: C.accentLight, animation: reduce ? 'none' : `chatPulse 1.3s ease-in-out ${i * 0.18}s infinite` }} />
+        ))}
+      </span>
+      <style>{`@keyframes chatPulse { 0%, 70%, 100% { opacity: 0.35 } 35% { opacity: 1 } }`}</style>
+    </div>
   </m.div>
 );
 
@@ -115,6 +106,7 @@ const ChatInputBar = memo(function ChatInputBar({
   const send = () => {
     const trimmed = input.trim();
     if (!trimmed && photos.length === 0) return;
+    haptic.light();
     onSend(trimmed);
     setInput('');
     // Let the input keep focus so the keyboard stays up for multi-turn chat,
@@ -265,9 +257,7 @@ const ChatInputBar = memo(function ChatInputBar({
           onClick={send}
           disabled={!canSend}
           style={{
-            background: canSend
-              ? `linear-gradient(145deg, ${C.accent}, ${C.accentDark})`
-              : C.cardMuted,
+            background: canSend ? C.accent : C.cardMuted,
             color: C.cream,
             border: 'none',
             borderRadius: '50%',
@@ -290,6 +280,7 @@ const ChatInputBar = memo(function ChatInputBar({
 });
 
 export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive, onStartTastingSession, isDemo, onDemoAction }) => {
+  const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const { hasPro, freeUsage } = useSubscription();
@@ -589,34 +580,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Editorial page header */}
-      <div style={{ marginBottom: 4 }}>
-        <div style={{
-          ...typeScale.label,
-          color: C.textLight,
-          marginBottom: 6,
-        }}>
-          AI Chat
-        </div>
-        <div style={{
-          ...typeScale.h1,
-          color: C.text,
-          marginBottom: 6,
-        }}>
-          Coffee Chat
-        </div>
-        <div style={{
-          width: 32,
-          height: 2,
-          background: `linear-gradient(90deg, ${C.accent}, ${C.accentLight})`,
-          borderRadius: radius.pill,
-          marginBottom: 8,
-        }} />
-        <div style={{
-          ...typeScale.body,
-          color: C.textMuted,
-          marginBottom: 12,
-        }}>
+      {/* Masthead — calm editorial: Fraunces title + subtitle (no eyebrow, no gradient rule). */}
+      <div data-masthead style={{ marginBottom: 10 }}>
+        <div style={{ ...typeScale.display, color: C.text }}>Chat</div>
+        <div style={{ ...typeScale.body, color: C.textMuted, marginTop: 6 }}>
           Your rotation, your taste, your questions.
         </div>
       </div>
@@ -638,7 +605,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         {/* Intro / empty state — shown only when no user turns yet */}
         {isIntroState && (
           <m.div
-            {...fadeUp}
+            {...(reduceMotion ? {} : fadeUp)}
             style={{
               margin: '8px 0 4px',
               background: C.cream,
@@ -652,56 +619,37 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
               gap: 10,
             }}
           >
-            {/* Avatar ring */}
-            <div style={{
-              width: 52,
-              height: 52,
-              borderRadius: '50%',
-              background: `linear-gradient(145deg, ${C.accentSoft}, ${C.accentLight})`,
-              border: `2px solid ${C.accentLight}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 4,
-              boxShadow: shadows.navActive,
-            }}>
-              <Coffee size={26} color={C.accent} />
-            </div>
-            <div style={{
-              ...typeScale.h3,
-              color: C.text,
-            }}>
-              Professor Ruphus
-            </div>
-            <div style={{
-              ...typeScale.bodyL,
-              color: C.textMuted,
-              lineHeight: 1.55,
-            }}>
+            {/* Ruphus mascot — the character, present in his own study */}
+            <img
+              src="/images/ruphus-avatar.png"
+              alt="Professor Ruphus"
+              style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, boxShadow: shadows.e1, marginBottom: 4 }}
+            />
+            <div style={{ ...typeScale.h3, color: C.text }}>Professor Ruphus</div>
+            <div style={{ ...typeScale.bodyL, color: C.textMuted, lineHeight: 1.55 }}>
               {messages[0].content}
             </div>
-            {/* Hint chips */}
-            <div style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 7,
-              marginTop: 4,
-            }}>
+            {/* Tappable starter prompts — send the prompt on tap */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 4 }}>
               {['What should I brew today?', 'Scan a bag', 'Coach my tasting'].map(hint => (
-                <div
+                <m.button
                   key={hint}
+                  onClick={() => { haptic.light(); handleSend(hint); }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                  transition={spring.snappy}
                   style={{
-                    background: C.accentSoft,
-                    border: `1px solid ${C.accentLight}`,
+                    background: C.bgDeep,
+                    border: `1px solid ${C.border}`,
                     borderRadius: radius.pill,
-                    padding: '5px 13px',
+                    padding: '7px 14px',
                     ...typeScale.caption,
-                    color: C.accent,
-                    cursor: 'default',
+                    color: C.text,
+                    cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
                   }}
                 >
                   {hint}
-                </div>
+                </m.button>
               ))}
             </div>
           </m.div>
@@ -712,7 +660,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           {messages.map((msg, i) => {
             if (isIntroState && i === 0) return null;
             return (
-              <m.div key={i} {...fadeUp} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
+              <m.div key={i} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
                 {/* Photo thumbnails for user messages */}
                 {msg.photos && msg.photos.length > 0 && (
                   <div style={{
@@ -738,30 +686,30 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
                     ))}
                   </div>
                 )}
-                <div
-                  style={{
-                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    maxWidth: '85%',
-                    // User: caramel gradient, right-aligned
-                    // Assistant: near-white cream card with elevation + hairline
-                    background: msg.role === 'user'
-                      ? `linear-gradient(145deg, ${C.accent}, ${C.accentDark})`
-                      : C.cream,
-                    color: msg.role === 'user' ? C.cream : C.text,
-                    // Asymmetric corner: user tails bottom-right, assistant tails bottom-left
-                    borderRadius: msg.role === 'user'
-                      ? `${radius.lg}px ${radius.lg}px ${radius.sm}px ${radius.lg}px`
-                      : `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
-                    padding: '12px 16px',
-                    ...typeScale.bodyL,
-                    border: msg.role === 'user' ? 'none' : `1px solid ${C.hairline}`,
-                    boxShadow: msg.role === 'user' ? shadows.button : shadows.e1,
-                    whiteSpace: 'pre-wrap',
-                    marginLeft: msg.role === 'user' ? 'auto' : undefined,
-                    lineHeight: 1.55,
-                  }}
-                >
-                  {msg.content}
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  {/* Ruphus is present on his own turns */}
+                  {msg.role === 'assistant' && (
+                    <img src="/images/ruphus-avatar.png" alt="Ruphus" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }} />
+                  )}
+                  <div
+                    style={{
+                      maxWidth: '82%',
+                      // User: solid accent. Assistant: cream card + hairline.
+                      background: msg.role === 'user' ? C.accent : C.cream,
+                      color: msg.role === 'user' ? C.cream : C.text,
+                      borderRadius: msg.role === 'user'
+                        ? `${radius.lg}px ${radius.lg}px ${radius.sm}px ${radius.lg}px`
+                        : `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
+                      padding: '12px 16px',
+                      ...typeScale.bodyL,
+                      border: msg.role === 'user' ? 'none' : `1px solid ${C.hairline}`,
+                      boxShadow: msg.role === 'user' ? shadows.button : shadows.e1,
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    {msg.content}
+                  </div>
                 </div>
               </m.div>
             );
@@ -769,31 +717,30 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         </AnimatePresence>
 
         {/* Typing / loading indicator */}
-        {loading && <TypingIndicator />}
+        {loading && <TypingIndicator reduce={reduceMotion} />}
       </div>
 
-      {/* Scanned bean action buttons */}
+      {/* Scanned bean — refined result card with its actions */}
       {scannedBean && !loading && (
         <m.div
-          {...fadeUp}
+          {...(reduceMotion ? {} : fadeUp)}
           style={{
-            display: 'flex',
-            gap: 6,
-            flexWrap: 'wrap',
-            padding: '10px 0',
-            borderTop: `1px solid ${C.hairline}`,
-            marginBottom: 8,
+            background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg,
+            boxShadow: shadows.e2, padding: '12px 14px', marginBottom: 10,
           }}
         >
-          <Btn variant="small" onClick={handleBrewScanned}>
-            <Coffee size={12} /> {brewMethod.label}
-          </Btn>
-          <Btn variant="small" onClick={handleGuidedTasting}>
-            <BookOpen size={12} /> Guided Tasting
-          </Btn>
-          <Btn variant="small" onClick={handleSaveToInventory}>
-            <Save size={12} /> Save to Inventory
-          </Btn>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ ...typeScale.label, color: C.textLight, marginBottom: 2 }}>Scanned bean</div>
+              <div style={{ fontFamily: fonts.heading, fontSize: 16, fontWeight: 600, color: C.text, lineHeight: 1.18, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scannedBean.name || 'New bean'}</div>
+              {scannedBean.roaster && <div style={{ ...typeScale.caption, color: C.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scannedBean.roaster}</div>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Btn variant="small" onClick={handleBrewScanned}><Coffee size={12} /> {brewMethod.label}</Btn>
+            <Btn variant="small" onClick={handleGuidedTasting}><BookOpen size={12} /> Guided Tasting</Btn>
+            <Btn variant="small" onClick={handleSaveToInventory}><Save size={12} /> Save to Inventory</Btn>
+          </div>
         </m.div>
       )}
 

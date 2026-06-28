@@ -24,7 +24,8 @@ import {
   onCustomerInfoUpdate,
 } from '../lib/revenuecat';
 
-const SubscriptionContext = createContext(null);
+// Exported so tests/harnesses can inject a fixed subscription value via the raw Provider.
+export const SubscriptionContext = createContext(null);
 
 const INITIAL_STATE = {
   hasPro: false,
