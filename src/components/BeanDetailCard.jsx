@@ -9,7 +9,7 @@
 // pending (real photos render as-is on the white card for now).
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check } from 'lucide-react';
+import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2 } from 'lucide-react';
 import { AnimatePresence, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
 import { m, spring } from '../lib/motion';
 import { haptic } from '../lib/haptics';
@@ -220,10 +220,10 @@ const StatBarItem = ({ icon, label, value, meter }) => (
   </div>
 );
 
-const MiniAction = ({ icon, label, onClick, active }) => (
+const MiniAction = ({ icon, label, onClick, active, danger }) => (
   <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '4px 2px', WebkitTapHighlightColor: 'transparent' }}>
-    <span style={{ color: active ? BLUE : GRAY }}>{icon}</span>
-    <span style={{ fontFamily: G, fontSize: 10, fontWeight: 600, color: GRAY }}>{label}</span>
+    <span style={{ color: danger ? RED : active ? BLUE : GRAY }}>{icon}</span>
+    <span style={{ fontFamily: G, fontSize: 10, fontWeight: 600, color: danger ? RED : GRAY }}>{label}</span>
   </button>
 );
 
@@ -259,7 +259,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, showBrewProfile = false }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -349,6 +349,11 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
 
   // Stat sheet rows — only render the ones that actually have data (no empty "—" rows).
   const daysPost = daysSinceRoast(bean.roastDate, bean);
+  // Ownership context (finished beans only — derived from existing fields, no new data).
+  const isFinished = bean.status === 'FINISHED';
+  const daysOwned = (isFinished && bean.finishDate && bean.roastDate)
+    ? Math.max(0, Math.round((new Date(bean.finishDate + 'T00:00:00') - new Date(bean.roastDate + 'T00:00:00')) / 86400000))
+    : null;
   const stats = [
     ['Roaster', bean.roaster],
     ['Coffee Name', bean.name],
@@ -363,10 +368,11 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
     ['Roast Level', bean.roastLevel],
     ['Sourced By', bean.sourcedBy],
     ['Roast Date', formatDate(bean.roastDate)],
-    ['Days Post Roast', daysPost != null ? `${daysPost} days` : null],
+    isFinished ? ['Finished', formatDate(bean.finishDate)] : ['Days Post Roast', daysPost != null ? `${daysPost} days` : null],
+    isFinished ? ['Days Owned', daysOwned != null ? `${daysOwned} days` : null] : null,
     ['Grind', grindText],
     ['Weight', bean.bagSize ? `${bean.bagSize}g` : null],
-  ].filter(([, v]) => v != null && v !== '' && v !== '—');
+  ].filter(Boolean).filter(([, v]) => v != null && v !== '' && v !== '—');
 
   const node = (
     <>
@@ -545,6 +551,34 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                     </div>
                   </Panel>
 
+                  {/* Saved brew profile (archive only) — read-only recap of stored recipes */}
+                  {showBrewProfile && (bean.aidenRecipe || bean.handBrewRecipe) && (
+                    <Panel>
+                      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                        <Coffee size={26} color={INK} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ borderLeft: `1px solid ${HAIR}`, paddingLeft: 14, flex: 1, minWidth: 0 }}>
+                          <div style={{ ...lbl, fontSize: 11, color: INK, marginBottom: 8 }}>Brew Profile</div>
+                          {bean.aidenRecipe && (
+                            <div style={{ marginBottom: bean.handBrewRecipe ? 10 : 0 }}>
+                              <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>Aiden Recipe</div>
+                              <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
+                                {[bean.aidenRecipe.ratio && `Ratio ${bean.aidenRecipe.ratio}`, bean.aidenRecipe.bloomTime && `Bloom ${bean.aidenRecipe.bloomTime}`, bean.aidenRecipe.pulseCount && `${bean.aidenRecipe.pulseCount} pulses`, bean.aidenRecipe.grindRecommendation?.singleServe && `Grind ${bean.aidenRecipe.grindRecommendation.singleServe}`].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                          )}
+                          {bean.handBrewRecipe && (
+                            <div>
+                              <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>{bean.handBrewRecipe.title || 'Hand Brew'}</div>
+                              <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
+                                {[bean.handBrewRecipe.method, bean.handBrewRecipe.coffeeGrams && bean.handBrewRecipe.waterGrams && `${bean.handBrewRecipe.coffeeGrams}g / ${bean.handBrewRecipe.waterGrams}g`, bean.handBrewRecipe.ratio, bean.handBrewRecipe.grindSize?.description && `Grind ${bean.handBrewRecipe.grindSize.description}`].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Panel>
+                  )}
+
                   {/* flip back to front */}
                   <button onClick={() => doFlip(false)} style={{ width: '100%', background: 'transparent', border: `1.5px solid ${BLUE}`, borderRadius: 13, padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer', marginTop: 6 }}>
                     <RotateCcw size={16} color={BLUE} />
@@ -558,8 +592,10 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                       onLearn && { icon: <BookOpen size={16} />, label: 'Learn', onClick: () => onLearn(bean) },
                       onFreeze && { icon: <Snowflake size={16} />, label: bean.frozenAt ? 'Frozen' : 'Freeze', onClick: () => onFreeze(bean), active: !!bean.frozenAt },
                       onReturn && { icon: <Undo2 size={16} />, label: 'Return', onClick: () => onReturn(bean) },
+                      onRestore && { icon: <RotateCcw size={16} />, label: 'Restore', onClick: () => { if (window.confirm('Move back to inventory?')) onRestore(bean); } },
                       onFinish && { icon: <Check size={16} />, label: 'Finish', onClick: () => onFinish(bean) },
                       onEdit && { icon: <Pencil size={16} />, label: 'Edit', onClick: () => onEdit(bean) },
+                      onDelete && { icon: <Trash2 size={16} />, label: 'Delete', danger: true, onClick: () => { if (window.confirm('Delete this bean? Tastings will be removed.')) onDelete(bean); } },
                     ].filter(Boolean);
                     return (
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${acts.length}, 1fr)`, gap: 8, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${HAIR}` }}>

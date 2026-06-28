@@ -1,0 +1,148 @@
+version: 1
+
+meta:
+  name: archive-trophy-redesign
+  source_plan: docs/plans/2026-06-28-001-feat-archive-trophy-redesign-plan.md
+
+goal:
+  statement: >
+    Keep the Archive's structure (Unforgettable Cups hero strip on top, year-grouped timeline below)
+    but 100x the craft to anti-slop / Apple-caliber and wire tap → trading-card hero morph. Kill the
+    8 audited slop tells (header glow orb, eyebrow-over-H1, gradient accent rule, Sparkles icon,
+    accent-soft pill spam, twee voice, big-number stat banner, flat decorative timeline rail). Reuse
+    BeanDetailCard + the manual-FLIP morph; add Restore/Delete to the card back and port ownership +
+    saved brew profile so no feature is lost. Visual/UX only; no Firebase or feature changes; dev only.
+  definition_of_done: >
+    The Archive masthead has no glow orb / no gradient rule / no eyebrow-over-H1 / no twee title and a
+    single tabular-nums stat line; the Unforgettable Cups (5★) strip stays on top as a restrained
+    trophy-card carousel with no Sparkles icon, horizontally scrollable; the year-grouped timeline stays
+    below with neutral surfaces, hairline grouping, tabular-nums counts, and preserved expand-details;
+    tapping any finished bean (cup card or row) morphs the bag into BeanDetailCard (bag flies, no
+    teleport); the card back exposes Restore (→ SEALED) and Delete (destructive, confirmed) plus Learn
+    and Edit-photo, and renders ownership (days owned / finished) + saved brew profile when present;
+    search and every filter (year, min-rating, roaster, origin, process, sort) still filter both the cups
+    strip and the timeline; the three distinct empty states remain; reduced-motion disables the morph;
+    accent (gold) is scarce (5★ + one active state); `npx vite build` exits 0; the Archive Playwright
+    harness renders multi-year finished mock beans with the cups strip scrollable, the timeline
+    year-grouped + chronological, a working tap→morph, search/filter reducing visible beans, no header
+    glow, no Sparkles, reduced-motion with no flight, and zero console errors; verify-inventory and
+    verify-morph still PASS (no BeanDetailCard regression); codex review is clean against the rubric; and
+    Tal signs off on device that the Archive now feels Apple-caliber, not slop.
+  requirements:
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
+    - R7
+    - R8
+    - R9
+    - R10
+  context_sources:
+    - file: docs/plans/2026-06-28-001-feat-archive-trophy-redesign-plan.md
+    - file: docs/plans/2026-06-28-002-feat-inventory-roaster-rails-plan.md
+    - file: lessons.md
+
+verification:
+  - id: v1-build
+    type: programmatic
+    check: ["npx", "vite", "build", "--logLevel", "error"]
+    expect: exit_zero
+  - id: v2-harness
+    type: programmatic
+    check: ["node", "scripts/verify-archive.mjs"]
+    expect: exit_zero
+  - id: v3-regression
+    type: programmatic
+    check: ["node", "scripts/verify-inventory.mjs"]
+    expect: exit_zero
+  - id: v4-review
+    type: judge
+    judge: codex
+    rubric: >
+      Adversarially review the Archive-redesign diff. FAIL if any of the 8 audited slop tells survive:
+      a header radial-glow orb, an eyebrow tracked-label directly above an oversized H1, a gradient
+      accent underline/rule, a Sparkles (or decorative Lucide) icon in the cups header, accent-soft gold
+      fills used for structural chrome (accent must be scarce — 5★ + at most one active state, ≤10% of
+      surface), twee copy ("the Archive"/"a record of every cup"/"end of the trail"/"nothing in this
+      corner"), a competing big-number stat banner, or a flat decorative accent-dot timeline rail (R1,
+      R2, R3). FAIL if the Unforgettable Cups strip is not kept on top + horizontally scrollable (R2), or
+      the timeline is not year-grouped + chronological with tabular-nums counts and preserved
+      expand-details (R3). FAIL if tapping a bean does not open BeanDetailCard via the morph or the morph
+      is not transform/opacity-only (R4, R9). FAIL if Restore (→ SEALED) or Delete (destructive +
+      confirmed) is missing/unreachable on the card, or Learn / Edit-photo regressed (R5). FAIL if
+      ownership (days owned / finished) or a saved brew profile (Aiden / hand-brew) that ArchiveDetailSheet
+      showed is lost (R6). FAIL if search or any filter (year, min-rating, roaster, origin, process, sort)
+      regressed or stops filtering the cups strip + timeline (R7). FAIL if the three distinct empty states
+      (first-run, filtered-empty, no-5★ cups) are not all present (R8). FAIL if reduced-motion does not
+      disable the morph (R9). FAIL if BeanDetailCard changes are not additive/prop-gated (Rotation /
+      Inventory regress), or the diff touches Firebase reads/writes, the bean data model, statuses,
+      restore/delete logic, other tabs' behavior, or onboarding (R10). Also FAIL on design-bank violations:
+      more than one accent, heavy/glow shadows, non-hairline structural dividers, missing tabular-nums on
+      counts, or motion >300ms / not ease-out. PASS only when all 8 slop tells are gone, the structure +
+      every feature are preserved, the morph is reused cleanly, and the diff is scope- and design-clean.
+  - id: v5-human
+    type: human
+    prompt: >
+      On the dev app (device): open Archive and confirm the masthead, Unforgettable Cups strip, and
+      timeline now read as Apple-caliber (no glow/slop); tap a 5★ cup and a timeline bean and confirm each
+      flies open via the morph; on the card back use Restore and confirm Delete is reachable + confirmed,
+      and that ownership + any saved brew profile show; run a search and a filter and confirm both the cups
+      strip and timeline respond — proving R1, R2, R3, R4, R5, R6, R7 and the overall feel.
+
+evidence_map:
+  R1: v2-harness
+  R2: v2-harness
+  R3: v2-harness
+  R4: v2-harness
+  R5: v4-review
+  R6: v4-review
+  R7: v2-harness
+  R8: v4-review
+  R9: v2-harness
+  R10: v4-review
+
+council:
+  - id: codex
+    role: judge
+    cli: codex
+
+gates:
+  plan_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v4-review]
+    max_revisions: 2
+  delivery_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v1-build, v2-harness, v3-regression, v4-review, v5-human]
+    max_revisions: 3
+
+loop_control:
+  max_iterations: 8
+  cycle_cap: 4
+  quality_streak: 2
+  no_progress:
+    max_stalled_iterations: 2
+    action: stop
+  budget:
+    tokens: 1400000
+
+scope_guard:
+  - Do NOT change Firebase reads/writes, the bean data model, statuses, or restore/delete/finish logic (layout/presentation only).
+  - Do NOT make non-additive BeanDetailCard changes — all new props (onRestore, onDelete, ownership, brew profile) must be optional and render only when passed, so Rotation and Inventory do not regress.
+  - Do NOT change WHAT Archive shows (still FINISHED beans) or which actions exist (Restore, Delete, Learn, Edit photo, brew-profile viewing, tasting history) — only how they look and are triggered.
+  - Do NOT touch other tabs' behavior or onboarding; retire ArchiveDetailSheet only AFTER card parity is verified.
+  - Do NOT animate any non-transform/opacity property; do not introduce a second accent or glow shadow; do not deploy to production or merge to main (dev channel only).
+
+execution:
+  mode: goal
+  isolation: branch
+
+model_policy:
+  orchestrator: opus
+  subagents: sonnet
+  reviewer: codex
+  review_cadence: per_phase
