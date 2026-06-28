@@ -8,9 +8,15 @@
 //     so far (it does not imply intensity), letting "your cup so far" build live.
 import { C } from '../styles/theme';
 
-const AXES = ['fragranceAroma', 'acidity', 'sweetness', 'body', 'flavor', 'balance'];
-// Which qualitative tasting field maps to each axis (coverage mode only).
-const FIELD_FOR = { fragranceAroma: 'aroma', acidity: 'acidity', sweetness: 'sweetness', body: 'body', flavor: 'firstSip', balance: 'finish' };
+export const AXES = ['fragranceAroma', 'acidity', 'sweetness', 'body', 'flavor', 'balance'];
+export const AXIS_LABELS = { fragranceAroma: 'Aroma', acidity: 'Acidity', sweetness: 'Sweetness', body: 'Body', flavor: 'Flavor', balance: 'Balance' };
+// Which qualitative tasting field maps to each axis (coverage mode + detail descriptors).
+export const FIELD_FOR = { fragranceAroma: 'aroma', acidity: 'acidity', sweetness: 'sweetness', body: 'body', flavor: 'firstSip', balance: 'finish' };
+
+// Resolve the radar scores for a tasting: real magnitudes, or coverage, or null.
+export function radarScores(tasting, coverage = false) {
+  return coverage ? coverageScores(tasting) : realScores(tasting);
+}
 
 // Real stored magnitudes, or null. No fabrication.
 function realScores(tasting) {

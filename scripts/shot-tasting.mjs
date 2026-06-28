@@ -12,6 +12,13 @@ try {
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1100);
   await p.screenshot({ path: `${OUT}/tasting-1-journal.png` });
+  // tap a journal card (its unique note preview) → the detail review opens (radar draws in)
+  await p.getByText('Syrupy ripe cherry', { exact: false }).first().click().catch(() => {});
+  await p.waitForTimeout(1300);
+  await p.screenshot({ path: `${OUT}/tasting-3-detail.png` });
+  // close + open the coach
+  await p.keyboard.press('Escape').catch(() => {});
+  await p.waitForTimeout(500);
   await p.getByText('Start guided tasting', { exact: false }).first().click().catch(() => {});
   await p.waitForTimeout(900);
   await p.screenshot({ path: `${OUT}/tasting-2-coach.png` });

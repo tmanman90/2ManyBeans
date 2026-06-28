@@ -2,11 +2,12 @@
 // 3 modes: list, form, chat
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2 } from 'lucide-react';
+import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2, ChevronRight } from 'lucide-react';
 import { C, fonts, type, shadows, radius, glass, cardBase, motion } from '../styles/theme';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 import { AnimatePresence, useReducedMotion } from 'framer-motion';
 import { TasteFingerprint } from '../components/TasteFingerprint';
+import { TastingDetailCard } from '../components/TastingDetailCard';
 import { haptic } from '../lib/haptics';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
@@ -455,6 +456,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       .catch(err => console.log('Score conversion skipped:', err.message));
   };
   const reduceMotion = useReducedMotion();
+  const [detailTasting, setDetailTasting] = useState(null);
   const [mode, setMode] = useState('list');
   const [sortBy, setSortBy] = useState('date');
   const [editingId, setEditingId] = useState(null);
@@ -1384,51 +1386,41 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         );
 
         const b = beans.find(x => x.id === t.beanId);
-        // Neutral axes meta line (no accentSoft chips) — only the captured axes.
-        const axes = [t.aroma && `Aroma ${t.aroma}`, t.acidity && `Acidity ${t.acidity}`, t.body && `Body ${t.body}`, t.finish && `Finish ${t.finish}`].filter(Boolean).join(' · ');
+        const notePreview = (t.notes || t.aroma || '').trim();
+        // Compact, tappable summary — the full organized review opens in the detail card.
         return (
-          <m.div key={t.id} variants={listItem} style={{
-            background: C.card,
-            border: `1px solid ${C.borderLight}`,
-            borderRadius: radius.lg,
-            padding: '15px 16px 12px',
-            marginBottom: 12,
-            boxShadow: shadows.e2,
-          }}>
-            {/* lead with the rating + one-word; date right */}
+          <m.div
+            key={t.id}
+            variants={listItem}
+            role="button"
+            tabIndex={0}
+            onClick={() => { haptic.light(); setDetailTasting(t); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailTasting(t); } }}
+            whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+            style={{
+              background: C.card, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg,
+              padding: '14px 16px', marginBottom: 12, boxShadow: shadows.e2,
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {/* rating + one-word lead; date right */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-                <StarRating value={t.rating || 0} onChange={r => updateRating(t.id, r)} size={18} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <StarRating value={t.rating || 0} size={17} />
                 {t.oneWord && <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 16, color: C.accentDark, lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{t.oneWord}”</span>}
               </div>
               <div style={{ ...type.caption, color: C.textLight, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{formatDateRelative(t.date)}</div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              {/* left: roaster + name + pull-quote + axes */}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ ...type.label, color: C.textLight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b?.roaster || 'Unknown roaster'}</div>
-                <div style={{ fontFamily: fonts.heading, fontSize: 17.5, color: C.text, fontWeight: 600, lineHeight: 1.18, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: (t.notes || axes) ? 6 : 0 }}>{b?.name || 'Unknown bean'}</div>
-                {t.notes && (
-                  <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 14, color: C.textMuted, lineHeight: 1.4, letterSpacing: '-0.005em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>“{t.notes}”</div>
-                )}
-                {axes && <div style={{ ...type.caption, color: C.textLight, marginTop: t.notes ? 5 : 0, lineHeight: 1.4 }}>{axes}</div>}
+                <div style={{ fontFamily: fonts.heading, fontSize: 17.5, color: C.text, fontWeight: 600, lineHeight: 1.18, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: notePreview ? 3 : 0 }}>{b?.name || 'Unknown bean'}</div>
+                {notePreview && <div style={{ ...type.caption, color: C.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>{notePreview}</div>}
               </div>
-              {/* right: taste-fingerprint glyph */}
-              <TasteFingerprint tasting={t} size={52} />
-            </div>
-
-            {/* actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.hairline}` }}>
-              <button onClick={() => handleShareTasting(t)} aria-label="Share tasting" style={{ border: 'none', cursor: 'pointer', width: 40, height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: radius.sm, opacity: sharingId === t.id ? 0.5 : 1, WebkitTapHighlightColor: 'transparent' }}>
-                <Share2 size={15} color={C.textMuted} />
-              </button>
-              <button onClick={() => startEdit(t)} aria-label="Edit tasting" style={{ border: 'none', cursor: 'pointer', width: 40, height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: radius.sm, WebkitTapHighlightColor: 'transparent' }}>
-                <Pencil size={15} color={C.textMuted} />
-              </button>
-              <button onClick={async () => { if (confirm('Delete this tasting?')) try { await onDeleteTasting(t.id); } catch { showError("Couldn't delete. Check your connection."); } }} aria-label="Delete tasting" style={{ border: 'none', cursor: 'pointer', width: 40, height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: radius.sm, WebkitTapHighlightColor: 'transparent' }}>
-                <Trash2 size={15} color={C.red} />
-              </button>
+              {/* the cup's flavor fingerprint — the visual signature */}
+              <TasteFingerprint tasting={t} size={58} />
+              <ChevronRight size={18} color={C.textLight} style={{ flexShrink: 0 }} />
             </div>
           </m.div>
         );
@@ -1452,6 +1444,20 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           <div style={{ ...type.body, color: C.textMuted }}>Start a guided tasting above and your first cup lands here.</div>
         </div>
       )}
+
+      {/* Tap-through tasting review — animated radar + organized detail */}
+      <TastingDetailCard
+        tasting={detailTasting}
+        bean={detailTasting ? beans.find(x => x.id === detailTasting.beanId) : null}
+        onClose={() => setDetailTasting(null)}
+        onShare={(t) => handleShareTasting(t)}
+        onEdit={(t) => startEdit(t)}
+        onDelete={async (t) => {
+          if (!confirm('Delete this tasting?')) return;
+          try { await onDeleteTasting(t.id); setDetailTasting(null); }
+          catch { showError("Couldn't delete. Check your connection."); }
+        }}
+      />
 
       {/* Off-screen share card for capture */}
       {sharingId && shareDataRef.current && (

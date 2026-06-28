@@ -81,6 +81,25 @@ try {
     await page.close();
   }
 
+  // ---- Pass 1b: tap a journal card → organized detail review (radar + flavor rows) ----
+  {
+    const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    await page.goto(URL, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+    // tap the journal card via its unique note preview
+    await page.getByText('Syrupy ripe cherry', { exact: false }).first().click().catch(() => {});
+    await page.waitForTimeout(900);
+    const radar = await page.locator('svg[aria-label="flavor radar"]').count();
+    const flavorHdr = await page.getByText('Flavor notes', { exact: false }).first().isVisible().catch(() => false);
+    // organized rows: a descriptor lands on its own labelled row (not a wall of text)
+    const aromaRow = await page.getByText('Cherry, Jam', { exact: false }).first().isVisible().catch(() => false);
+    if (radar < 1) fail('detail: flavor radar did not open on tap');
+    else if (!flavorHdr) fail('detail: "Flavor notes" section missing');
+    else if (!aromaRow) fail('detail: organized flavor rows missing');
+    else console.log('OK  tap → organized detail (radar + flavor rows)');
+    await page.close();
+  }
+
   // ---- Pass 2: reduced motion — journal renders, no errors ----
   {
     const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
