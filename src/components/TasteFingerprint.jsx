@@ -1,26 +1,32 @@
 // TasteFingerprint — a compact radar glyph that gives each logged cup a recognizable
-// "flavor shape." Pure + read-only: it prefers the tasting's stored 6-axis tastingScores
-// (from convertTastingScores), and otherwise falls back to a presence shape from the
-// qualitative axis fields (matching how the live coach radar marks captured axes). It
-// never fabricates magnitudes and returns null when the cup has no axis data at all.
+// "flavor shape." Pure + read-only.
+//   • Default (journal): renders ONLY from the tasting's stored 6-axis tastingScores
+//     (from convertTastingScores) — real magnitudes, never fabricated. Returns null
+//     when the cup has no stored scores, so manual/unscored cups degrade gracefully.
+//   • coverage mode (live coach): renders a COVERAGE polygon — each captured axis at a
+//     uniform radius, uncaptured at 0. This honestly shows *which* axes have been noted
+//     so far (it does not imply intensity), letting "your cup so far" build live.
 import { C } from '../styles/theme';
 
 const AXES = ['fragranceAroma', 'acidity', 'sweetness', 'body', 'flavor', 'balance'];
-// Which qualitative tasting field stands in for each radar axis (presence fallback).
+// Which qualitative tasting field maps to each axis (coverage mode only).
 const FIELD_FOR = { fragranceAroma: 'aroma', acidity: 'acidity', sweetness: 'sweetness', body: 'body', flavor: 'firstSip', balance: 'finish' };
 
-function scoresFor(tasting) {
+// Real stored magnitudes, or null. No fabrication.
+function realScores(tasting) {
   const ts = tasting?.tastingScores;
-  if (ts && typeof ts === 'object') {
-    const s = {}; let any = false;
-    AXES.forEach(k => { const v = Number(ts[k]); if (!isNaN(v) && v > 0) { s[k] = v; any = true; } else s[k] = 0; });
-    if (any) return s;
-  }
-  // presence fallback: captured axis → mid value, empty → a small floor (so the shape reads)
+  if (!ts || typeof ts !== 'object') return null;
+  const s = {}; let any = false;
+  AXES.forEach(k => { const v = Number(ts[k]); if (!isNaN(v) && v > 0) { s[k] = v; any = true; } else s[k] = 0; });
+  return any ? s : null;
+}
+
+// Coverage: captured axis → full radius (uniform), uncaptured → 0. Presence, not intensity.
+function coverageScores(tasting) {
   const s = {}; let any = false;
   AXES.forEach(k => {
     const has = tasting?.[FIELD_FOR[k]] && String(tasting[FIELD_FOR[k]]).trim();
-    s[k] = has ? 6.5 : 1.8;
+    s[k] = has ? 10 : 0;
     if (has) any = true;
   });
   return any ? s : null;
@@ -33,8 +39,8 @@ const pt = (i, v, cx, cy, r) => {
 const path = (vals, cx, cy, r) =>
   vals.map((v, i) => pt(i, v, cx, cy, r)).map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ') + ' Z';
 
-export function TasteFingerprint({ tasting, size = 46, color = C.accent }) {
-  const scores = scoresFor(tasting);
+export function TasteFingerprint({ tasting, size = 46, color = C.accent, coverage = false }) {
+  const scores = coverage ? coverageScores(tasting) : realScores(tasting);
   if (!scores) return null;
   const cx = size / 2, cy = size / 2, r = size * 0.42;
   const poly = path(AXES.map(k => scores[k] || 0), cx, cy, r);

@@ -255,7 +255,7 @@ const TeachSheet = ({ entry, onClose }) => (
         onClick={onClose}
         style={{
           width: '100%', padding: 12, borderRadius: radius.md, border: 'none',
-          background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
+          background: C.accent,
           color: C.cream, fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
           cursor: 'pointer', boxShadow: shadows.button,
         }}
@@ -1145,10 +1145,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   <div key={s} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0, minWidth: 0 }}>
                       <div style={{
-                        width: active ? 10 : 7, height: active ? 10 : 7, borderRadius: '50%',
+                        width: 8, height: 8, borderRadius: '50%',
                         background: done || active ? C.accent : '#D9CBB8',
                         boxShadow: active ? `0 0 0 2px ${C.bg}, 0 0 0 3.5px ${C.accent}` : 'none',
-                        transition: 'background 0.2s, width 0.2s, height 0.2s',
+                        transform: active ? 'scale(1.25)' : 'scale(1)',
+                        transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1)',
                       }} />
                       <div style={{
                         fontSize: 9.5, fontWeight: active ? 800 : 500, fontFamily: fonts.body,
@@ -1232,7 +1233,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
             >
               {/* live taste-fingerprint — grows as axes are captured */}
               <div style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <TasteFingerprint tasting={{ aroma: scorecard.aroma, acidity: scorecard.acidity, sweetness: scorecard.sweet, body: scorecard.body, finish: scorecard.finish, firstSip: scorecard.flavor }} size={34} />
+                <TasteFingerprint coverage tasting={{ aroma: scorecard.aroma, acidity: scorecard.acidity, sweetness: scorecard.sweet, body: scorecard.body, finish: scorecard.finish, firstSip: scorecard.flavor }} size={34} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ ...type.label, color: C.textMuted }}>
@@ -1289,7 +1290,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                 aria-label="Send"
                 style={{
                   width: 44, height: 44, borderRadius: '50%', border: 'none',
-                  background: 'linear-gradient(180deg, #BC8149 0%, #A66B38 100%)',
+                  background: C.accent,
                   color: C.cream, cursor: 'pointer', flexShrink: 0,
                   boxShadow: shadows.button,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1394,20 +1395,20 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
             marginBottom: 12,
             boxShadow: shadows.e2,
           }}>
-            {/* top: roaster + date */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
-              <div style={{ ...type.label, color: C.textLight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b?.roaster || 'Unknown roaster'}</div>
+            {/* lead with the rating + one-word; date right */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+                <StarRating value={t.rating || 0} onChange={r => updateRating(t.id, r)} size={18} />
+                {t.oneWord && <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 16, color: C.accentDark, lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{t.oneWord}”</span>}
+              </div>
               <div style={{ ...type.caption, color: C.textLight, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{formatDateRelative(t.date)}</div>
             </div>
 
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              {/* left: name + rating-led + pull-quote + axes */}
+              {/* left: roaster + name + pull-quote + axes */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: fonts.heading, fontSize: 17.5, color: C.text, fontWeight: 600, lineHeight: 1.18, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{b?.name || 'Unknown bean'}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: (t.notes || axes) ? 6 : 0 }}>
-                  <StarRating value={t.rating || 0} onChange={r => updateRating(t.id, r)} size={18} />
-                  {t.oneWord && <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 16, color: C.accentDark, lineHeight: 1 }}>“{t.oneWord}”</span>}
-                </div>
+                <div style={{ ...type.label, color: C.textLight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b?.roaster || 'Unknown roaster'}</div>
+                <div style={{ fontFamily: fonts.heading, fontSize: 17.5, color: C.text, fontWeight: 600, lineHeight: 1.18, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: (t.notes || axes) ? 6 : 0 }}>{b?.name || 'Unknown bean'}</div>
                 {t.notes && (
                   <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 14, color: C.textMuted, lineHeight: 1.4, letterSpacing: '-0.005em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>“{t.notes}”</div>
                 )}

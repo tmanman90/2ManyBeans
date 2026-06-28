@@ -18,7 +18,8 @@ const beans = [
 // qualitative axes (presence fingerprint), one sparse (rating only → no fingerprint, degrade).
 const tastings = [
   { id: 't1', beanId: 'b1', date: '2026-06-20', rating: 5, oneWord: 'Silky', aroma: 'Cherry, Jam', acidity: 'Bright', sweetness: 'High', body: 'Full', finish: 'Long', firstSip: 'Juicy', notes: 'Syrupy ripe cherry, stunning.', tastingScores: { fragranceAroma: 8, acidity: 7, sweetness: 6, body: 7, flavor: 8, balance: 7 } },
-  { id: 't2', beanId: 'b2', date: '2026-05-12', rating: 4, oneWord: 'Floral', aroma: 'Jasmine', acidity: 'Sparkling', body: 'Light', finish: 'Clean', notes: 'Tea-like and bright.' },
+  { id: 't2', beanId: 'b2', date: '2026-05-12', rating: 4, oneWord: 'Floral', aroma: 'Jasmine', acidity: 'Sparkling', body: 'Light', finish: 'Clean', notes: 'Tea-like and bright.', tastingScores: { fragranceAroma: 9, acidity: 8, sweetness: 4, body: 3, flavor: 7, balance: 6 } },
+  // t3: manual cup with no stored scores → NO fingerprint (graceful degrade), card still renders.
   { id: 't3', beanId: 'b3', date: '2026-04-01', rating: 4, notes: 'Solid, classic Kenyan.' },
 ];
 const noop = () => {};
