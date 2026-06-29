@@ -46,6 +46,8 @@ goal:
     - R9
     - R10
     - R11
+    - R12
+    - R13
   context_sources:
     - file: docs/plans/2026-06-29-001-feat-intelligent-tasting-wizard-plan.md
     - file: docs/research/2026-06-29-tasting-methodology-brief.md
@@ -65,7 +67,11 @@ verification:
     type: programmatic
     check: ["node", "scripts/verify-tasting.mjs"]
     expect: exit_zero
-  - id: v4-review
+  - id: v4-audit
+    type: programmatic
+    check: ["node", "scripts/audit-wizard.mjs"]
+    expect: exit_zero
+  - id: v5-review
     type: judge
     judge: codex
     rubric: >
@@ -85,19 +91,27 @@ verification:
       reduced-motion gated (R9, R10); the LLM layer is a hard gate (the deterministic core must work without live
       AI) or it changes the stored tasting/extraction shape (R11); OR the diff touches Firebase, the tasting/bean
       data model, the extraction output contract, or builds the Phase-3 comparative two-bean mode / generates new
-      Higgsfield assets (scope). Also FAIL on design-bank violations (gradient chrome that isn't intentional Liquid
-      Glass material, glow, missing tabular-nums, motion >300ms non-spring). PASS only when the wizard is a
-      faithful Hoffmann-grounded predict-then-confirm guided experience, tap-first with type kept, real fingerprint,
-      progression derived, manual preserved, deterministic-core-works-without-AI, and scope-clean.
-  - id: v5-human
+      Higgsfield assets (scope). DESIGN EXCELLENCE (R12/R13 — the headline bar): FAIL on any anti-slop tell
+      (generic/non-Liquid-Glass gradient chrome, glow shadows, awkward layout, missing tabular-nums on numbers,
+      non-hairline structural dividers, motion >300ms non-spring or not transform/opacity-only or not
+      reduced-motion-gated). FAIL if the axis slider / flavor-wheel / step pager are stock controls rather than
+      custom-built; if there is no signature WebGL/canvas/shader moment on a key beat (radar light-sweep or fluid
+      page transition); or if backdrop-filter is animated / SVG feDisplacementMap is shipped (WKWebView). Treat the
+      existing WebGL SteamGradient/GrainOverlay and the Liquid Glass material as the approved baseline. PASS only
+      when the wizard is a faithful Hoffmann-grounded predict-then-confirm guided experience, tap-first with type
+      kept, real fingerprint, progression derived, manual preserved, deterministic-core-works-without-AI,
+      scope-clean, AND design-bank-clean with custom controls + a signature shader moment + frame-perfect
+      transform/opacity motion.
+  - id: v6-human
     type: human
     prompt: >
-      On the dev app (device): run a FULL guided tasting on a real bean and confirm it feels like a pro mentor —
-      Ruphus predicts what the bean should taste like, walks you through smell (with the break cue) → slurp →
-      acidity/sweetness/body/flavor/finish/balance one screen at a time, the sliders + flavor-wheel chips are easy
-      and the fingerprint builds live, the reveal compares what you found vs the bag and teaches, and it's fun +
-      beautiful; confirm typing still works and is understood, manual entry still works, and your palate surface
-      reflects progress — proving R1-R8 and the overall feel.
+      On the dev app (device): run a FULL guided tasting on a real bean and confirm it feels like a pro mentor AND
+      Apple-Design-Award caliber — Ruphus predicts what the bean should taste like, walks you through smell (with
+      the break cue) → slurp → acidity/sweetness/body/flavor/finish/balance one screen at a time, the custom
+      sliders + flavor-wheel chips are easy and the fingerprint builds live with its signature shader moment, the
+      reveal compares found-vs-bag and teaches, every transition is fluid and frame-perfect and it's beautiful;
+      confirm typing still works and is understood, manual entry still works, and your palate surface reflects
+      progress — proving R1-R13 and the overall feel.
 
 evidence_map:
   R1: v2-harness
@@ -105,12 +119,14 @@ evidence_map:
   R3: v2-harness
   R4: v2-harness
   R5: v2-harness
-  R6: v4-review
+  R6: v5-review
   R7: v2-harness
   R8: v2-harness
-  R9: v4-review
+  R9: v5-review
   R10: v2-harness
-  R11: v4-review
+  R11: v5-review
+  R12: v4-audit
+  R13: v4-audit
 
 council:
   - id: codex
@@ -121,16 +137,16 @@ gates:
   plan_gate:
     verdict_policy: revise_until_clean
     verdict_source: codex
-    criteria: [v4-review]
+    criteria: [v5-review]
     max_revisions: 2
   delivery_gate:
     verdict_policy: revise_until_clean
     verdict_source: codex
-    criteria: [v1-build, v2-harness, v3-regression, v4-review, v5-human]
+    criteria: [v1-build, v2-harness, v3-regression, v4-audit, v5-review, v6-human]
     max_revisions: 3
 
 loop_control:
-  max_iterations: 8
+  max_iterations: 9
   cycle_cap: 4
   quality_streak: 2
   no_progress:

@@ -27,22 +27,25 @@ The guided-tasting CTA opens a card-based wizard that walks the full Hoffmann ar
 - `v1-build` (programmatic): run `["npx", "vite", "build", "--logLevel", "error"]`, expect `exit_zero`
 - `v2-harness` (programmatic): run `["node", "scripts/verify-wizard.mjs"]`, expect `exit_zero`
 - `v3-regression` (programmatic): run `["node", "scripts/verify-tasting.mjs"]`, expect `exit_zero`
-- `v4-review` (judge via codex): Adversarially review the intelligent-tasting-wizard diff. Treat the redesign baseline (theme, Liquid Glass controls, TasteFingerprint/FlavorRadar, TastingDetailCard, the existing claude.js tasting coach + professorRuphus extraction + coffeeKnowledge) as APPROVED. FAIL if: the wizard step spine does not cover the full Hoffmann arc including explicit Flavor and Balance steps and slurp / break-the-crust / taste-warm technique cues (R1); the per-bean EXPECTED profile is not derived from a structured origin × process × roast × altitude engine and surfaced as predict-then-confirm coaching (R2); axis input is not a slider with novice glossary labels, or flavor naming is not gated flavor-wheel chips (Tier 1→2→3) with Tier-3 gated by a palate level, or the free-text field/LLM-understanding path was removed (R3); the slider values do not feed the 6-axis tastingScores directly (i.e. fabricated/placeholder magnitudes remain) or the FlavorRadar does not build from them (R4); there is no end-of-session reveal comparing found-vs-expected/bag (R5); the palate progression is not derived from existing tasting history (i.e. it adds new Firebase fields) (R7); the wizard does not REPLACE the guided-tasting entry while PRESERVING manual entry, or the saved tasting is not the existing record shape via the existing addTasting (R8); motion is not transform/opacity-only / not reduced-motion gated (R9, R10); the LLM layer is a hard gate (the deterministic core must work without live AI) or it changes the stored tasting/extraction shape (R11); OR the diff touches Firebase, the tasting/bean data model, the extraction output contract, or builds the Phase-3 comparative two-bean mode / generates new Higgsfield assets (scope). Also FAIL on design-bank violations (gradient chrome that isn't intentional Liquid Glass material, glow, missing tabular-nums, motion >300ms non-spring). PASS only when the wizard is a faithful Hoffmann-grounded predict-then-confirm guided experience, tap-first with type kept, real fingerprint, progression derived, manual preserved, deterministic-core-works-without-AI, and scope-clean.
-- `v5-human` (human): On the dev app (device): run a FULL guided tasting on a real bean and confirm it feels like a pro mentor — Ruphus predicts what the bean should taste like, walks you through smell (with the break cue) → slurp → acidity/sweetness/body/flavor/finish/balance one screen at a time, the sliders + flavor-wheel chips are easy and the fingerprint builds live, the reveal compares what you found vs the bag and teaches, and it's fun + beautiful; confirm typing still works and is understood, manual entry still works, and your palate surface reflects progress — proving R1-R8 and the overall feel.
+- `v4-audit` (programmatic): run `["node", "scripts/audit-wizard.mjs"]`, expect `exit_zero`
+- `v5-review` (judge via codex): Adversarially review the intelligent-tasting-wizard diff. Treat the redesign baseline (theme, Liquid Glass controls, TasteFingerprint/FlavorRadar, TastingDetailCard, the existing claude.js tasting coach + professorRuphus extraction + coffeeKnowledge) as APPROVED. FAIL if: the wizard step spine does not cover the full Hoffmann arc including explicit Flavor and Balance steps and slurp / break-the-crust / taste-warm technique cues (R1); the per-bean EXPECTED profile is not derived from a structured origin × process × roast × altitude engine and surfaced as predict-then-confirm coaching (R2); axis input is not a slider with novice glossary labels, or flavor naming is not gated flavor-wheel chips (Tier 1→2→3) with Tier-3 gated by a palate level, or the free-text field/LLM-understanding path was removed (R3); the slider values do not feed the 6-axis tastingScores directly (i.e. fabricated/placeholder magnitudes remain) or the FlavorRadar does not build from them (R4); there is no end-of-session reveal comparing found-vs-expected/bag (R5); the palate progression is not derived from existing tasting history (i.e. it adds new Firebase fields) (R7); the wizard does not REPLACE the guided-tasting entry while PRESERVING manual entry, or the saved tasting is not the existing record shape via the existing addTasting (R8); motion is not transform/opacity-only / not reduced-motion gated (R9, R10); the LLM layer is a hard gate (the deterministic core must work without live AI) or it changes the stored tasting/extraction shape (R11); OR the diff touches Firebase, the tasting/bean data model, the extraction output contract, or builds the Phase-3 comparative two-bean mode / generates new Higgsfield assets (scope). DESIGN EXCELLENCE (R12/R13 — the headline bar): FAIL on any anti-slop tell (generic/non-Liquid-Glass gradient chrome, glow shadows, awkward layout, missing tabular-nums on numbers, non-hairline structural dividers, motion >300ms non-spring or not transform/opacity-only or not reduced-motion-gated). FAIL if the axis slider / flavor-wheel / step pager are stock controls rather than custom-built; if there is no signature WebGL/canvas/shader moment on a key beat (radar light-sweep or fluid page transition); or if backdrop-filter is animated / SVG feDisplacementMap is shipped (WKWebView). Treat the existing WebGL SteamGradient/GrainOverlay and the Liquid Glass material as the approved baseline. PASS only when the wizard is a faithful Hoffmann-grounded predict-then-confirm guided experience, tap-first with type kept, real fingerprint, progression derived, manual preserved, deterministic-core-works-without-AI, scope-clean, AND design-bank-clean with custom controls + a signature shader moment + frame-perfect transform/opacity motion.
+- `v6-human` (human): On the dev app (device): run a FULL guided tasting on a real bean and confirm it feels like a pro mentor AND Apple-Design-Award caliber — Ruphus predicts what the bean should taste like, walks you through smell (with the break cue) → slurp → acidity/sweetness/body/flavor/finish/balance one screen at a time, the custom sliders + flavor-wheel chips are easy and the fingerprint builds live with its signature shader moment, the reveal compares found-vs-bag and teaches, every transition is fluid and frame-perfect and it's beautiful; confirm typing still works and is understood, manual entry still works, and your palate surface reflects progress — proving R1-R13 and the overall feel.
 
 ## Evidence Map (every requirement -> proof)
 
 - `R1` -> `v2-harness`
 - `R10` -> `v2-harness`
-- `R11` -> `v4-review`
+- `R11` -> `v5-review`
+- `R12` -> `v4-audit`
+- `R13` -> `v4-audit`
 - `R2` -> `v2-harness`
 - `R3` -> `v2-harness`
 - `R4` -> `v2-harness`
 - `R5` -> `v2-harness`
-- `R6` -> `v4-review`
+- `R6` -> `v5-review`
 - `R7` -> `v2-harness`
 - `R8` -> `v2-harness`
-- `R9` -> `v4-review`
+- `R9` -> `v5-review`
 
 ## Gates
 
@@ -50,14 +53,14 @@ The guided-tasting CTA opens a card-based wizard that walks the full Hoffmann ar
 
 - Policy: `revise_until_clean`
 - Verdict source: `codex`
-- Criteria: `v4-review`
+- Criteria: `v5-review`
 - Max revisions: `2`
 
 ### delivery_gate
 
 - Policy: `revise_until_clean`
 - Verdict source: `codex`
-- Criteria: `v1-build, v2-harness, v3-regression, v4-review, v5-human`
+- Criteria: `v1-build, v2-harness, v3-regression, v4-audit, v5-review, v6-human`
 - Max revisions: `3`
 
 ## Council
@@ -66,7 +69,7 @@ The guided-tasting CTA opens a card-based wizard that walks the full Hoffmann ar
 
 ## Loop Control (brakes)
 
-- Max iterations (units): `8`
+- Max iterations (units): `9`
 - Cycle cap per unit/phase: `4`  (CLAUDE.md: stop on 5th attempt)
 - Quality streak to ship: `2` consecutive clean runs
 - No-progress stop: same failure x`2` -> `stop`
