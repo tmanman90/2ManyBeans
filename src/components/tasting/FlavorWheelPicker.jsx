@@ -36,7 +36,8 @@ function Chip({ label, active, locked, onClick, reduce }) {
         fontFamily: fonts.body, fontWeight: 700, fontSize: 13, letterSpacing: '-0.005em',
         textTransform: 'capitalize', cursor: locked ? 'not-allowed' : 'pointer',
         opacity: locked ? 0.6 : 1, WebkitTapHighlightColor: 'transparent',
-        transition: reduce ? 'none' : 'color 150ms ease, border-color 160ms ease',
+        // color/border snap instantly (the opacity fill overlay below carries the animation —
+        // transform/opacity-only; no animating paint properties).
       }}
     >
       {/* accent fill overlay — opacity-animated (safe), crisp ease-out */}
