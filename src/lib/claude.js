@@ -607,3 +607,30 @@ export async function sendChatMessage(systemPrompt, history) {
   // markdown) and strip any stray bold/italic from the conversational text.
   return stripMarkdown(raw);
 }
+
+// reactToTastingStep — additive, NON-GATING Ruphus reaction for one beat of the guided tasting
+// wizard. The wizard's deterministic coaching always renders; if this resolves, it swaps in a
+// warmer, bean-specific line. Pro-gated at the call site (free users get the full deterministic
+// flow). Returns a short plain-text reaction, or '' on any failure (caller ignores empties).
+export async function reactToTastingStep({ bean, step, userText, expected }) {
+  if (!userText || !step) return '';
+  const beanName = sanitize(bean?.name || bean?.roaster || 'this coffee', 80);
+  const origin = sanitize(bean?.origin || '', 60);
+  const expectedLine = expected?.cues?.[step.key] ? sanitize(String(expected.cues[step.key]).replace(/-{3,}/g, '--'), 180) : '';
+  const system = `You are Professor Ruphus, a warm, witty master coffee taster mentoring a NOVICE through tasting one specific cup, one attribute at a time.
+You are reacting to their observation on the "${sanitize(step.title, 30)}" step for ${beanName}${origin ? ` (${origin})` : ''}.
+${expectedLine ? `For context, you expected: ${expectedLine}` : ''}
+Reply in ONE or TWO short sentences. Affirm what they noticed, gently sharpen it, and if useful nudge toward what to feel next. Encouraging, specific, never a lecture. No markdown, no lists, no emoji.`;
+  try {
+    const data = await callClaude({
+      system,
+      messages: [{ role: 'user', content: String(userText).slice(0, 400) }],
+      maxTokens: 110,
+      feature: 'tastingCoach',
+    });
+    const raw = data.content?.map(c => c.text || '').join('') || '';
+    return stripMarkdown(raw).trim();
+  } catch {
+    return '';
+  }
+}

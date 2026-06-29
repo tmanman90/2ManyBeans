@@ -21,6 +21,7 @@ import { scrollOnFocus } from '../lib/formHelpers';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { TastingForm } from '../components/TastingForm';
+import { TastingWizard } from '../components/tasting/TastingWizard';
 import { Modal } from '../components/Modal';
 import { TastingShareCard, captureShareCard, offScreenStyle } from '../components/ShareCard';
 import { shareImage } from '../lib/share';
@@ -463,6 +464,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [sortBy, setSortBy] = useState('date');
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  // Intelligent tasting wizard — the guided-tasting experience (replaces the chat takeover).
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Chat tasting state
   const [chatMessages, setChatMessages] = useState([]);
@@ -576,6 +579,29 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     setMode('chat');
     setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean), stepKey: 'smell' }]);
     setChatExtracted(null);
+  };
+
+  // Open the intelligent tasting wizard (same demo + free-tier gate as the old chat entry).
+  const startWizard = () => {
+    if (isDemo) { onDemoAction?.(); return; }
+    if (!hasPro && (freeUsage?.tasteTests ?? 0) >= FREE_LIMITS.tasteTests) {
+      openPaywall({ feature: 'taste_cap', promote: 'pro' });
+      return;
+    }
+    haptic.medium();
+    setWizardOpen(true);
+  };
+
+  // Wizard saved a tasting — it already wrote tastingScores directly (real fingerprint), so we
+  // persist as-is without the background LLM score conversion that the manual/chat paths use.
+  const saveWizardTasting = async (record) => {
+    try {
+      await onAddTasting(record);
+      setWizardOpen(false);
+      setMode('list');
+    } catch (err) {
+      showError("Couldn't save tasting. Check your connection and try again.");
+    }
   };
 
   // Reset chat when bean changes mid-session
@@ -837,8 +863,24 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     }
   };
 
+  const wizardBean = beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
+
   return (
     <div>
+      {/* Intelligent tasting wizard — full-screen overlay (portals to body) */}
+      {wizardOpen && wizardBean && (
+        <TastingWizard
+          bean={wizardBean}
+          beans={beans}
+          tastings={tastings}
+          isPro={hasPro}
+          reduce={reduceMotion}
+          onSave={saveWizardTasting}
+          onClose={() => setWizardOpen(false)}
+          onSwitchToManual={() => { setWizardOpen(false); setMode('form'); }}
+        />
+      )}
+
       {/* Header + list chrome hidden during chat takeover */}
       {mode !== 'chat' && (
         <>
@@ -983,7 +1025,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                   {/* Big primary CTA — Liquid Glass (iOS 26): tinted-glass body + specular rim
                       sheen + inner glow + floating shadow; press scales + brightens + springs. */}
                   <m.button
-                    onClick={hasBeans ? startChat : undefined}
+                    onClick={hasBeans ? startWizard : undefined}
                     disabled={!hasBeans}
                     whileTap={reduceMotion || !hasBeans ? undefined : { scale: 0.975, filter: 'brightness(1.08)' }}
                     transition={motion.spring.snappy}
@@ -1019,7 +1061,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
                   {/* Quiet scaffolding line (no chrome) */}
                   <div style={{ marginTop: 10, textAlign: 'center', fontFamily: fonts.body, fontSize: 12, color: C.textLight, fontVariantNumeric: 'tabular-nums' }}>
-                    6 guided steps · about 5 minutes · auto-logged to your journal
+                    Ruphus predicts · you taste · auto-logged to your journal
                   </div>
                 </div>
 
