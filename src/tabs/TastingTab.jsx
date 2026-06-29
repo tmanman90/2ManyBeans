@@ -978,26 +978,33 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                     </div>
                   )}
 
-                  {/* Big primary CTA */}
+                  {/* Big primary CTA — tactile, depth, leading icon + trailing arrow */}
                   <m.button
                     onClick={hasBeans ? startChat : undefined}
                     disabled={!hasBeans}
-                    whileTap={reduceMotion || !hasBeans ? undefined : { scale: 0.98 }}
+                    whileTap={reduceMotion || !hasBeans ? undefined : { scale: 0.975, y: 1 }}
                     transition={motion.spring.snappy}
                     style={{
-                      width: '100%', border: 'none',
+                      position: 'relative', overflow: 'hidden', width: '100%', border: 'none',
                       cursor: hasBeans ? 'pointer' : 'not-allowed',
                       background: hasBeans ? C.accent : C.cardMuted,
                       color: hasBeans ? C.cream : C.textLight,
-                      padding: '14px 16px', borderRadius: radius.md,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                      fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
-                      boxShadow: hasBeans ? shadows.button : 'none',
+                      padding: '15px 16px 15px 15px', borderRadius: radius.lg,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      fontFamily: fonts.body, fontSize: 15, fontWeight: 700, letterSpacing: '0.01em',
+                      boxShadow: hasBeans
+                        ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 4px rgba(70,41,26,0.18), 0 10px 24px rgba(162,99,47,0.30)'
+                        : 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <MessageCircle size={18} />
-                    <span>{hasBeans ? 'Start guided tasting' : 'Add a bean to start'}</span>
+                    <span style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: hasBeans ? 'rgba(255,255,255,0.18)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <MessageCircle size={16} />
+                      </span>
+                      <span>{hasBeans ? 'Start guided tasting' : 'Add a bean to start'}</span>
+                    </span>
+                    {hasBeans && <ChevronRight size={20} style={{ position: 'relative', opacity: 0.85 }} />}
                   </m.button>
 
                   {/* Quiet scaffolding line (no chrome) */}

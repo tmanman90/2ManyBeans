@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { Share2, Pencil, Trash2 } from 'lucide-react';
 import { C, fonts, type, glass, shadows, radius } from '../styles/theme';
 import { m } from '../lib/motion';
-import { useReducedMotion } from 'framer-motion';
+import { useReducedMotion, useDragControls } from 'framer-motion';
 import { StarRating } from './StarRating';
 import { SwipeDownHandle } from './SwipeDownHandle';
 import { FlavorRadar } from './FlavorRadar';
@@ -46,6 +46,7 @@ function ActionBtn({ icon, label, danger, onClick }) {
 
 export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete }) {
   const reduce = useReducedMotion();
+  const dragControls = useDragControls();
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
@@ -90,72 +91,80 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
     >
-      <div
+      <m.div
         role="dialog" aria-modal="true" aria-label={`${bean?.name || 'Tasting'} review`}
         onClick={e => e.stopPropagation()}
+        drag="y" dragListener={false} dragControls={dragControls}
+        dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
+        onDragEnd={(e, info) => { if (info.offset.y > 110 || info.velocity.y > 600) close(); }}
+        initial={{ y: '100%' }}
+        animate={{ y: visible ? 0 : '100%' }}
+        transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 340, damping: 36 }}
         style={{
-          width: '100%', maxWidth: 520, maxHeight: '92dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          width: '100%', maxWidth: 520, maxHeight: '92dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           background: C.bg, borderRadius: `${radius.xl}px ${radius.xl}px 0 0`, border: `1px solid ${glass.chromeBorder}`,
-          boxShadow: shadows.modal, transform: `translateY(${visible ? '0%' : '100%'})`, transition: reduce ? 'transform 0.01ms' : `transform 320ms ${IOS}`,
+          boxShadow: shadows.modal, touchAction: 'pan-y',
           paddingBottom: 'max(20px, env(safe-area-inset-bottom, 0px))',
         }}
       >
-        <SwipeDownHandle onClose={close} />
-
-        {/* header */}
-        <div style={{ padding: '4px 22px 0', textAlign: 'center' }}>
-          <div style={{ ...type.label, color: C.textLight }}>{bean?.roaster || 'Tasting'}</div>
-          <div style={{ ...type.h1, color: C.text, marginTop: 3 }}>{bean?.name || 'Tasting'}</div>
-          <div style={{ ...type.caption, color: C.textLight, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{formatDate(tasting.date)}</div>
+        {/* drag zone — grab anywhere on the handle / header / radar to swipe down to close */}
+        <div onPointerDown={(e) => dragControls.start(e)} style={{ flexShrink: 0, touchAction: 'none', cursor: 'grab' }}>
+          <SwipeDownHandle onClose={close} />
+          <div style={{ padding: '4px 22px 0', textAlign: 'center' }}>
+            <div style={{ ...type.label, color: C.textLight }}>{bean?.roaster || 'Tasting'}</div>
+            <div style={{ ...type.h1, color: C.text, marginTop: 3 }}>{bean?.name || 'Tasting'}</div>
+            <div style={{ ...type.caption, color: C.textLight, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{formatDate(tasting.date)}</div>
+          </div>
+          <div style={{ padding: '10px 16px 4px' }}>
+            <FlavorRadar tasting={tasting} size={252} />
+          </div>
         </div>
 
-        {/* hero radar — draws in */}
-        <div style={{ padding: '10px 16px 4px' }}>
-          <FlavorRadar tasting={tasting} size={252} />
-        </div>
+        {/* scroll zone */}
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* rating + one-word headline */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '0 22px 6px' }}>
+            {tasting.rating ? <StarRating value={tasting.rating} size={24} /> : null}
+            {tasting.oneWord && (
+              <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 26, fontWeight: 600, color: C.accentDark, lineHeight: 1.1, textAlign: 'center', letterSpacing: '-0.01em' }}>
+                “{tasting.oneWord}”
+              </div>
+            )}
+          </div>
 
-        {/* rating + one-word headline */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '0 22px 6px' }}>
-          {tasting.rating ? <StarRating value={tasting.rating} size={24} /> : null}
-          {tasting.oneWord && (
-            <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 26, fontWeight: 600, color: C.accentDark, lineHeight: 1.1, textAlign: 'center', letterSpacing: '-0.01em' }}>
-              “{tasting.oneWord}”
+          {/* organized flavor rows */}
+          {rows.length > 0 && (
+            <div style={{ padding: '12px 20px 4px' }}>
+              <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>Flavor notes</div>
+              <div>
+                {rows.map(([k, label], i) => (
+                  <m.div key={k} {...reveal(i)} style={{ display: 'flex', gap: 14, alignItems: 'baseline', padding: '11px 0', borderBottom: i < rows.length - 1 ? `1px solid ${C.hairline}` : 'none' }}>
+                    <div style={{ ...type.label, color: C.textLight, width: 88, flexShrink: 0 }}>{label}</div>
+                    <div style={{ ...type.body, color: C.text, flex: 1, lineHeight: 1.45 }}>{tasting[k]}</div>
+                  </m.div>
+                ))}
+              </div>
             </div>
           )}
-        </div>
 
-        {/* organized flavor rows */}
-        {rows.length > 0 && (
-          <div style={{ padding: '12px 20px 4px' }}>
-            <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>Flavor notes</div>
-            <div>
-              {rows.map(([k, label], i) => (
-                <m.div key={k} {...reveal(i)} style={{ display: 'flex', gap: 14, alignItems: 'baseline', padding: '11px 0', borderBottom: i < rows.length - 1 ? `1px solid ${C.hairline}` : 'none' }}>
-                  <div style={{ ...type.label, color: C.textLight, width: 88, flexShrink: 0 }}>{label}</div>
-                  <div style={{ ...type.body, color: C.text, flex: 1, lineHeight: 1.45 }}>{tasting[k]}</div>
-                </m.div>
-              ))}
+          {/* free notes */}
+          {tasting.notes && (
+            <div style={{ padding: '12px 20px 4px' }}>
+              <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>Your notes</div>
+              <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 16, color: C.text, lineHeight: 1.5, background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.md, padding: '14px 16px' }}>
+                “{tasting.notes}”
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* free notes */}
-        {tasting.notes && (
-          <div style={{ padding: '12px 20px 4px' }}>
-            <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>Your notes</div>
-            <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 16, color: C.text, lineHeight: 1.5, background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.md, padding: '14px 16px' }}>
-              “{tasting.notes}”
-            </div>
+          {/* actions */}
+          <div style={{ display: 'flex', gap: 8, padding: '16px 20px 8px' }}>
+            {onShare && <ActionBtn icon={<Share2 size={17} />} label="Share" onClick={() => onShare(tasting)} />}
+            {onEdit && <ActionBtn icon={<Pencil size={17} />} label="Edit" onClick={() => { close(); onEdit(tasting); }} />}
+            {onDelete && <ActionBtn icon={<Trash2 size={17} />} label="Delete" danger onClick={() => onDelete(tasting)} />}
           </div>
-        )}
-
-        {/* actions */}
-        <div style={{ display: 'flex', gap: 8, padding: '16px 20px 8px' }}>
-          {onShare && <ActionBtn icon={<Share2 size={17} />} label="Share" onClick={() => onShare(tasting)} />}
-          {onEdit && <ActionBtn icon={<Pencil size={17} />} label="Edit" onClick={() => { close(); onEdit(tasting); }} />}
-          {onDelete && <ActionBtn icon={<Trash2 size={17} />} label="Delete" danger onClick={() => onDelete(tasting)} />}
         </div>
-      </div>
+      </m.div>
     </div>,
     document.body
   );
