@@ -16,6 +16,7 @@ import { palateLevel } from '../../lib/palate';
 import { AXES as SLIDER_AXES } from '../../lib/flavorWheel';
 import { TASTING_WIZARD_STEPS, initialAnswers, stepComplete, capturedScores, buildTastingFromAnswers } from '../../lib/tastingWizardSteps';
 import { reactToTastingStep } from '../../lib/claude';
+import { useNativeKeyboard } from '../../hooks/useNativeKeyboard';
 import { AxisSlider } from './AxisSlider';
 import { FlavorWheelPicker } from './FlavorWheelPicker';
 import { RuphusReaction } from './RuphusReaction';
@@ -28,7 +29,13 @@ const BALANCE_AXIS = { label: 'Balance', notches: ['clashing', 'uneven', 'settli
 
 const POSE_FOR = {
   intro: 'presenting', smell: 'magnifying', firstsip: 'cupping', acidity: 'magnifying',
-  sweetness: 'cupping', body: 'magnifying', flavor: 'reading', finish: 'notes', balance: 'presenting', reveal: 'presenting',
+  sweetness: 'reading', body: 'magnifying', flavor: 'cupping', finish: 'notes', balance: 'presenting', reveal: 'presenting',
+};
+// Per-step "lens" caption — distinguishes the beats that share the flavor wheel (smell vs flavor)
+// so they don't read as the same screen twice. Plain-language, not jargon.
+const STEP_LENS = {
+  smell: 'before you sip', firstsip: 'first taste', acidity: 'the liveliness', sweetness: 'as it cools',
+  body: 'the weight', flavor: 'while you taste', finish: 'after you swallow', balance: 'the whole picture',
 };
 // Scaffolded quick-picks for the first-sip beat (so non-typers always have a path).
 const SIP_PICKS = ['Bright & light', 'Round & smooth', 'Bold & intense', 'Delicate & clean', 'Rich & syrupy'];
@@ -41,6 +48,8 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   const [answers, setAnswers] = useState(initialAnswers);
   const [aiLine, setAiLine] = useState(null);
   const aiSeq = useRef(0);
+  // Keyboard height so the content area can pad out and the focused field scrolls clear of the keyboard.
+  const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
   const expected = useMemo(() => predict(bean), [bean]);
   const palate = useMemo(() => palateLevel(tastings), [tastings]);
@@ -113,7 +122,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
           NEVER gated on framer's animate — which does not reliably run inside the WKWebView portal,
           leaving opacity:0 content stuck invisible. No AnimatePresence mode="wait" either: it gates
           the next page on an exit animation that may never complete. */}
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 20px 20px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 20px 20px', paddingBottom: 20 + keyboardHeight }}>
         {phase === 'intro' && (
           <Stage key="intro" reduce={reduce}>
             <IntroCard bean={bean} expected={expected} palate={palate} reduce={reduce} />
@@ -192,7 +201,7 @@ function IntroCard({ bean, expected, palate, reduce }) {
   return (
     <div>
       <RuphusReaction pose="presenting" reduce={reduce}
-        line={`I've studied this one. Here's what I expect — let's see if you can find it together.`} />
+        line={`I've studied this one. On each slider I'll mark a ◆ where I expect it to land — try to find it yourself, then we'll compare.`} />
       <div style={{ ...cardStyle, marginTop: 18 }}>
         <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 8 }}>What to expect</div>
         <p style={{ margin: 0, fontFamily: fonts.heading, fontSize: 20, fontWeight: 600, lineHeight: 1.3, color: C.text, letterSpacing: '-0.01em' }}>{expected.summary}</p>
@@ -229,7 +238,12 @@ function StepCard({ step, bean, expected, answers, captured, allCaptured, palate
       <RuphusReaction pose={POSE_FOR[step.key] || 'magnifying'} reduce={reduce} line={line} size={84} />
 
       <div style={{ ...cardStyle, marginTop: 16 }}>
-        <div style={{ ...type.eyebrow, color: C.accent, marginBottom: 4 }}>{step.title}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+          <div style={{ ...type.eyebrow, color: C.accent }}>{step.title}</div>
+          {STEP_LENS[step.key] && (
+            <span style={{ fontFamily: fonts.body, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.02em', color: C.textLight, textTransform: 'none' }}>· {STEP_LENS[step.key]}</span>
+          )}
+        </div>
         <p style={{ margin: '0 0 14px', fontFamily: fonts.body, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5, color: C.textMuted }}>{step.technique}</p>
 
         <StepInput step={step} bean={bean} expected={expected} answers={answers} palate={palate} reduce={reduce}
@@ -266,8 +280,17 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
     );
   }
   if (step.kind === 'flavor') {
+    const smelled = answers.aromaChips;
     return (
       <div>
+        {/* reference the smell so this beat is predict-then-confirm, not a repeat of the same wheel */}
+        <div style={{ background: C.accentSoft, borderRadius: radius.md, padding: '11px 13px', marginBottom: 14 }}>
+          <p style={{ margin: 0, fontFamily: fonts.body, fontSize: 13, fontWeight: 600, lineHeight: 1.45, color: C.accentDark }}>
+            {smelled.length > 0
+              ? <>You smelled <strong style={{ fontWeight: 800 }}>{smelled.join(', ')}</strong>. Which actually come through now you're tasting — and what's <em>new</em>?</>
+              : <>Now that it's on your tongue, which flavors come through? Tap what you taste — add anything new.</>}
+          </p>
+        </div>
         <FlavorWheelPicker selected={answers.flavorChips} onToggle={(l) => toggleChip('flavorChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
@@ -306,7 +329,8 @@ function FreeText({ step, value, onChange }) {
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="In your own words… (optional — Ruphus reads this)"
+        onFocus={(e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }}
+        placeholder="In your own words… (optional — Professor Ruphus reads this)"
         rows={2}
         style={{
           width: '100%', boxSizing: 'border-box', resize: 'none',
@@ -346,14 +370,24 @@ function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswer
         )}
       </div>
 
-      {/* one-word + rating */}
+      {/* one-word headline + your-own-words reflection + rating */}
       <div style={{ ...cardStyle, marginTop: 12 }}>
         <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 10 }}>Sum it up</div>
         <input
           value={answers.oneWord}
           onChange={(e) => setAnswers(a => ({ ...a, oneWord: e.target.value }))}
+          onFocus={(e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }}
           placeholder="One word for this cup…"
-          style={{ width: '100%', boxSizing: 'border-box', fontFamily: fonts.heading, fontSize: 18, fontWeight: 600, color: C.text, background: C.bgDeep, border: `1px solid ${C.hairline}`, borderRadius: radius.md, padding: '11px 13px', WebkitAppearance: 'none', outline: 'none', marginBottom: 14 }}
+          style={{ width: '100%', boxSizing: 'border-box', fontFamily: fonts.heading, fontSize: 18, fontWeight: 600, color: C.text, background: C.bgDeep, border: `1px solid ${C.hairline}`, borderRadius: radius.md, padding: '11px 13px', WebkitAppearance: 'none', outline: 'none', marginBottom: 12 }}
+        />
+        {/* your own words — this becomes "Your notes" on the saved cup (not the auto Flavors line) */}
+        <textarea
+          value={answers.notes}
+          onChange={(e) => setAnswers(a => ({ ...a, notes: e.target.value }))}
+          onFocus={(e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }}
+          placeholder="In your own words — what did you think of this cup? (optional)"
+          rows={3}
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'none', fontFamily: fonts.body, fontSize: 16, fontWeight: 500, lineHeight: 1.45, color: C.text, background: C.bgDeep, border: `1px solid ${C.hairline}`, borderRadius: radius.md, padding: '11px 13px', WebkitAppearance: 'none', outline: 'none', marginBottom: 14 }}
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ ...type.eyebrow, color: C.textLight }}>Rating</span>

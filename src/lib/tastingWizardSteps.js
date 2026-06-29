@@ -118,9 +118,11 @@ export function buildTastingFromAnswers(answers, beanId, date) {
   };
 
   const aroma = [a.aromaChips.join(', '), a.text.smell.trim()].filter(Boolean).join(' — ');
+  // notes = a structured "Flavors:" line (split out as its own element on the cards) followed by
+  // the user's own-words reflection. The headline pull-quote comes from oneWord, not this.
   const flavorLine = a.flavorChips.length ? `Flavors: ${a.flavorChips.join(', ')}.` : '';
-  const balanceLine = a.text.balance.trim() ? `Balance: ${a.text.balance.trim()}.` : '';
-  const notes = [flavorLine, balanceLine, a.notes.trim()].filter(Boolean).join(' ');
+  const reflection = [a.notes.trim(), a.text.balance.trim() ? `Balance — ${a.text.balance.trim()}.` : ''].filter(Boolean).join(' ');
+  const notes = [flavorLine, reflection].filter(Boolean).join('\n');
 
   const scores = {};
   for (const k of Object.keys(a.scores)) {

@@ -6,6 +6,7 @@ import { C, fonts, type, shadows, radius, glass, journalCard } from '../styles/t
 import { getPeakStatus, today, daysBetween } from '../lib/peakStatus';
 import { ShelfCard } from '../components/ShelfCard';
 import { BeanDetailCard } from '../components/BeanDetailCard';
+import { TastingDetailCard } from '../components/TastingDetailCard';
 import { BrewMethodMenu } from '../components/BrewMethodMenu';
 import { useBeanDetail } from '../hooks/useBeanDetail';
 import { useLongPress } from '../hooks/useLongPress';
@@ -97,6 +98,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const handBrew = useHandBrew(updateBean);
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
   const [editBean, setEditBean] = useState(null);
+  const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
 
   const handleFreeze = async (bean) => {
     if (isDemo) { onDemoAction?.(); return; }
@@ -427,6 +429,16 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           onFreeze={handleFreeze}
           onFinish={(b) => { closeDetail(); isDemo ? onDemoAction?.() : handleFinishBag(b); }}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
+          onOpenTasting={(t) => setDetailTasting(t)}
+        />
+      )}
+      {/* Full tasting opened from the bean card — z above BeanDetailCard (4600) so it stacks on top */}
+      {detailTasting && (
+        <TastingDetailCard
+          tasting={detailTasting}
+          bean={detailBean}
+          z={5000}
+          onClose={() => setDetailTasting(null)}
         />
       )}
       {editBean && (

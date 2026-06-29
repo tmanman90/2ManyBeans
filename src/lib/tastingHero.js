@@ -15,12 +15,26 @@ export function heroTastingFor(beanId, tastings) {
   return best;
 }
 
+// Split a tasting's `notes` into its structured Flavors line + the user's own-words reflection.
+// The wizard writes "Flavors: a, b.\n<reflection>"; old/freeform notes have no prefix → all
+// reflection. Returns { flavors: string|null, reflection: string|null }.
+export function splitTastingNotes(notes) {
+  const raw = (notes || '').trim();
+  if (!raw) return { flavors: null, reflection: null };
+  const nl = raw.indexOf('\n');
+  const first = (nl >= 0 ? raw.slice(0, nl) : raw).trim();
+  const rest = (nl >= 0 ? raw.slice(nl + 1) : '').trim();
+  const fm = first.match(/^Flavors:\s*(.+?)\.?$/i);
+  if (fm) return { flavors: fm[1].trim() || null, reflection: rest || null };
+  return { flavors: null, reflection: raw };
+}
+
 // A short pull-quote for an entry headline, degrading gracefully:
-// free notes → one-word impression → first aroma note → null (caller falls back to meta).
-// All branches normalize whitespace, so a blank/whitespace field never yields an empty quote.
+// the user's own-words reflection → one-word impression → first aroma note → null. The Flavors
+// line is excluded (it's shown as its own element, not as the quote). Whitespace normalized.
 export function pullQuoteFrom(tasting, maxLen = 90) {
   if (!tasting) return null;
-  const note = (tasting.notes || '').trim();
+  const note = (splitTastingNotes(tasting.notes).reflection || '').trim();
   if (note) return note.length > maxLen ? note.slice(0, maxLen - 1).trimEnd() + '…' : note;
   const ow = (tasting.oneWord || '').trim();
   if (ow) return ow;

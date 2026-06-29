@@ -10,6 +10,7 @@ import { m } from '../lib/motion';
 import { useReducedMotion, useDragControls } from 'framer-motion';
 import { StarRating } from './StarRating';
 import { SwipeDownHandle } from './SwipeDownHandle';
+import { splitTastingNotes } from '../lib/tastingHero';
 import { FlavorRadar } from './FlavorRadar';
 
 const IOS = 'cubic-bezier(0.32, 0.72, 0, 1)';
@@ -44,7 +45,7 @@ function ActionBtn({ icon, label, danger, onClick }) {
   );
 }
 
-export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete }) {
+export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete, z = 1200 }) {
   const reduce = useReducedMotion();
   const dragControls = useDragControls();
   const [mounted, setMounted] = useState(false);
@@ -76,6 +77,10 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
 
   const visible = mounted && !closing;
   const rows = DETAIL_AXES.filter(([k]) => tasting[k] && String(tasting[k]).trim());
+  // The named flavors + the user's own-words reflection are stored together in `notes`; split them
+  // so flavors show as their own element and "Your notes" is the reflection, not the auto line.
+  const { flavors: flavorStr, reflection } = splitTastingNotes(tasting.notes);
+  const flavorList = flavorStr ? flavorStr.split(',').map(s => s.trim()).filter(Boolean) : [];
   const reveal = (i) => reduce ? {} : {
     initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 },
     transition: { delay: 0.15 + i * 0.05, duration: 0.28, ease: [0.16, 1, 0.3, 1] },
@@ -85,7 +90,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
     <div
       onClick={close}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1200, background: glass.scrim,
+        position: 'fixed', inset: 0, zIndex: z, background: glass.scrim,
         WebkitBackdropFilter: 'blur(3px)', backdropFilter: 'blur(3px)',
         opacity: visible ? 1 : 0, transition: reduce ? 'opacity 0.01ms' : 'opacity 220ms ease',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
@@ -147,12 +152,24 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
             </div>
           )}
 
-          {/* free notes */}
-          {tasting.notes && (
+          {/* flavors — their own element (chips) */}
+          {flavorList.length > 0 && (
+            <div style={{ padding: '12px 20px 4px' }}>
+              <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>Flavors</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                {flavorList.map(f => (
+                  <span key={f} style={{ background: C.accentSoft, color: C.accentDark, borderRadius: radius.pill, padding: '6px 12px', fontFamily: fonts.body, fontWeight: 700, fontSize: 12.5, textTransform: 'capitalize' }}>{f}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* your notes — the user's own-words reflection */}
+          {reflection && (
             <div style={{ padding: '12px 20px 4px' }}>
               <div style={{ ...type.label, color: C.textMuted, marginBottom: 8 }}>Your notes</div>
               <div style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 16, color: C.text, lineHeight: 1.5, background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.md, padding: '14px 16px' }}>
-                “{tasting.notes}”
+                “{reflection}”
               </div>
             </div>
           )}

@@ -9,7 +9,8 @@
 // pending (real photos render as-is on the white card for now).
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2 } from 'lucide-react';
+import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight } from 'lucide-react';
+import { splitTastingNotes } from '../lib/tastingHero';
 import { AnimatePresence, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
 import { m, spring } from '../lib/motion';
 import { haptic } from '../lib/haptics';
@@ -314,7 +315,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, showBrewProfile = false }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -606,17 +607,33 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                           ? <div style={{ fontFamily: G, fontSize: 13.5, fontStyle: 'italic', color: GRAY }}>No tastings logged yet for this bean.</div>
                           : <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                               {beanTastings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((t, i) => {
-                                const axes = [t.aroma, t.acidity && `Acidity ${t.acidity}`, t.body && `Body ${t.body}`, t.finish && `Finish ${t.finish}`].filter(Boolean).join(' · ');
+                                // Compact: headline quote + flavors only. Tap to open the full tasting.
+                                const flavorStr = splitTastingNotes(t.notes).flavors;
+                                const flavorList = flavorStr ? flavorStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                const tappable = !!onOpenTasting;
                                 return (
-                                  <div key={t.id} style={{ paddingTop: i > 0 ? 12 : 0, borderTop: i > 0 ? `1px solid ${HAIR}` : 'none' }}>
-                                    {/* date + rating */}
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: t.oneWord || t.notes ? 5 : 0 }}>
+                                  <div
+                                    key={t.id}
+                                    onClick={tappable ? () => onOpenTasting(t) : undefined}
+                                    role={tappable ? 'button' : undefined}
+                                    style={{ paddingTop: i > 0 ? 12 : 0, borderTop: i > 0 ? `1px solid ${HAIR}` : 'none', cursor: tappable ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
+                                  >
+                                    {/* date + rating (+ tap affordance) */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: t.oneWord ? 5 : 0 }}>
                                       <span style={{ fontFamily: G, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: GRAY }}>{formatDate(t.date) || t.date}{t.method ? ` · ${t.method}` : ''}</span>
-                                      <CardStars value={t.rating || 0} size={13} />
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        <CardStars value={t.rating || 0} size={13} />
+                                        {tappable && <ChevronRight size={14} color={GRAY} style={{ flexShrink: 0 }} />}
+                                      </span>
                                     </div>
-                                    {t.oneWord && <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, fontStyle: 'italic', color: INK, lineHeight: 1.15, marginBottom: t.notes ? 4 : 0 }}>“{t.oneWord}”</div>}
-                                    {t.notes && <div style={{ fontFamily: G, fontSize: 13.5, color: '#3A3632', lineHeight: 1.5 }}>{t.notes}</div>}
-                                    {axes && <div style={{ fontFamily: G, fontSize: 11.5, color: GRAY, marginTop: 6, lineHeight: 1.4 }}>{axes}</div>}
+                                    {t.oneWord && <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 600, fontStyle: 'italic', color: INK, lineHeight: 1.15 }}>“{t.oneWord}”</div>}
+                                    {flavorList.length > 0 && (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                                        {flavorList.map(f => (
+                                          <span key={f} style={{ fontFamily: G, fontSize: 11.5, fontWeight: 700, color: INK, background: '#F2EEE7', border: `1px solid ${HAIR}`, borderRadius: 999, padding: '3px 9px', textTransform: 'capitalize' }}>{f}</span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
