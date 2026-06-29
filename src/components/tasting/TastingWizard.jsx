@@ -94,10 +94,13 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     onSave?.(record);
   }, [answers, bean, onSave]);
 
+  // The overlay is a PLAIN div (opaque, opacity defaults to 1) so it is ALWAYS visible the instant
+  // it mounts — never dependent on a JS/framer animation that could fail to fire on WKWebView and
+  // leave it stuck invisible. A CSS keyframe (.wiz-overlay-in, in global.css) adds a safe fade that
+  // degrades to "instantly visible" if it doesn't run. Inner content still animates via framer.
   return createPortal(
-    <m.div
-      initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      transition={{ duration: M.dur.base, ease: M.ease.out }}
+    <div
+      className={reduce ? undefined : 'wiz-overlay-in'}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000, background: C.bg,
         display: 'flex', flexDirection: 'column',
@@ -137,7 +140,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
         phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} canAdvance={canAdvance}
         onBack={goBack} onNext={goNext} onSave={handleSave} onSwitchToManual={onSwitchToManual} reduce={reduce}
       />
-    </m.div>,
+    </div>,
     document.body
   );
 }
