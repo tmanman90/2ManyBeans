@@ -1357,8 +1357,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
       {/* Tasting Cards */}
       {mode === 'list' && (
-      <m.div variants={listContainer} initial={reduceMotion ? false : 'initial'} animate="animate">
-      {sorted.map(t => {
+      <div>
+      {sorted.map((t, idx) => {
         const isEditing = editingId === t.id;
 
         if (isEditing && editForm) return (
@@ -1398,11 +1398,16 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         return (
           <m.div
             key={t.id}
-            variants={listItem}
             role="button"
             tabIndex={0}
             onClick={() => { haptic.light(); setDetailTasting(t); }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailTasting(t); } }}
+            {...(reduceMotion ? {} : {
+              initial: { opacity: 0, y: 16 },
+              whileInView: { opacity: 1, y: 0 },
+              viewport: { once: true, margin: '-8% 0px' },
+              transition: { duration: 0.34, ease: [0.16, 1, 0.3, 1], delay: Math.min(idx, 6) * 0.05 },
+            })}
             whileTap={reduceMotion ? undefined : { scale: 0.985 }}
             style={{
               background: C.card, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg,
@@ -1432,7 +1437,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           </m.div>
         );
       })}
-      </m.div>
+      </div>
       )}
 
       {mode === 'list' && tastings.length === 0 && (
