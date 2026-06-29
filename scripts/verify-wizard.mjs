@@ -95,7 +95,16 @@ try {
   if (!lockHint) fail('R3: Tier-3 lock/unlock hint missing at palate L1 (gating not enforced)');
   else ok('R3 Tier-3 flavor chips gated at palate L1 (family-first)');
   await page.getByRole('button', { name: 'Berry', exact: true }).first().click(); // broad pick (always allowed)
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(220);
+  // R4 — multi-select chip has a per-chip ACCENT FILL overlay (opacity-animated), and selecting a
+  // SECOND chip keeps BOTH filled (multi-select, not one shared highlight).
+  const berryFilled = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button[aria-pressed="true"]')].find(x => (x.textContent || '').trim().toLowerCase().startsWith('berry'));
+    if (!b) return false;
+    return [...b.querySelectorAll('span')].some(s => { const st = getComputedStyle(s); return st.position === 'absolute' && st.backgroundColor.replace(/\s/g, '').includes('162,99,47'); });
+  });
+  if (berryFilled) ok('R4 multi-select chip carries its own accent fill overlay');
+  else fail('R4 multi-select chip fill overlay missing');
   await clickSlider(); // aroma intensity → fragranceAroma score
   await clickFooter('Next');
 
@@ -103,15 +112,29 @@ try {
   const sipTxt = await techniqueText();
   if (!sipTxt.includes('slurp') || !sipTxt.includes('warm')) fail('R1: First sip missing slurp / taste-warm cues');
   else ok('R1 First sip has slurp + taste-warm cues');
+  // R3 — single-select SLIDE: exactly one pick is selected and carries the shared accent highlight,
+  // and it MOVES to a different pick (not a per-chip fill). accent = #A2632F = rgb(162, 99, 47).
+  const hlIn = (name) => page.evaluate((n) => {
+    const b = [...document.querySelectorAll('button[aria-pressed="true"]')].find(x => (x.textContent || '').includes(n));
+    return !!b && [...b.querySelectorAll('span')].some(s => getComputedStyle(s).backgroundColor.replace(/\s/g, '').includes('162,99,47'));
+  }, name);
   await page.getByRole('button', { name: 'Bright & light', exact: true }).first().click();
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(220);
+  const p1 = await page.locator('button[aria-pressed="true"]').count();
+  const h1 = await hlIn('Bright & light');
+  await page.getByRole('button', { name: 'Round & smooth', exact: true }).first().click();
+  await page.waitForTimeout(320);
+  const p2 = await page.locator('button[aria-pressed="true"]').count();
+  const h2 = await hlIn('Round & smooth');
+  if (p1 === 1 && h1 && p2 === 1 && h2) ok('R3 single-select highlight slides between picks (one selected at a time)');
+  else fail(`R3 single-select slide: pressed=${p1}/${p2} highlight=${h1}/${h2}`);
   await clickFooter('Next');
 
-  // ---- STEP 3: Acidity — predict ghost marker (R2) + slider (R4) ----
+  // ---- STEP 3: Acidity — subtle predict marker (R2/R5) + slider (R4) ----
   if (!(await page.getByText('Acidity', { exact: true }).first().isVisible().catch(() => false))) fail('R1: Acidity step missing');
-  const ghost = await page.getByText('Ruphus', { exact: false }).first().isVisible().catch(() => false);
-  if (!ghost) fail('R2: predict ghost marker (Ruphus expected) missing on axis slider');
-  else ok('R2 axis slider shows Ruphus expected ghost marker');
+  const marker = await page.evaluate(() => [...document.querySelectorAll('span')].some(s => s.textContent.trim() === '◆'));
+  if (!marker) fail('R2/R5: subtle ◆ expected marker missing on axis slider');
+  else ok('R2/R5 axis slider shows a subtle ◆ expected marker (no prominent name label)');
   await clickSlider();
   await clickFooter('Next');
 

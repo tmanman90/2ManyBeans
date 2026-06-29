@@ -18,6 +18,7 @@ import { TASTING_WIZARD_STEPS, initialAnswers, stepComplete, capturedScores, bui
 import { reactToTastingStep } from '../../lib/claude';
 import { useNativeKeyboard } from '../../hooks/useNativeKeyboard';
 import { AxisSlider } from './AxisSlider';
+import { SlideSelect } from './SlideSelect';
 import { FlavorWheelPicker } from './FlavorWheelPicker';
 import { RuphusReaction } from './RuphusReaction';
 import { RadarLightSweep } from './RadarLightSweep';
@@ -47,7 +48,9 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState(initialAnswers);
   const [aiLine, setAiLine] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const aiSeq = useRef(0);
+  const reactedIdx = useRef(-1);
   // Keyboard height so the content area can pad out and the focused field scrolls clear of the keyboard.
   const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
@@ -67,26 +70,36 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     return { ...a, [field]: next };
   }), []);
 
-  // --- additive LLM reaction (best-effort; deterministic line shows regardless) ---
-  const fireReaction = useCallback(async (stepObj, ans) => {
-    if (!isPro || typeof reactToTastingStep !== 'function') return;
+  // --- Professor Ruphus's reaction to the CURRENT step. Additive — the deterministic cue shows
+  // regardless. Fires once the user has answered THIS step (debounced); a thinking loader shows
+  // while it's in flight (~15s), then the reaction cross-fades in. Reacting to the step you're on
+  // (not the one you just left) keeps it coherent. Pro-gated; non-gating on failure. ---
+  const stepDone = phase === 'steps' && stepComplete(step, answers);
+  useEffect(() => { setAiLine(null); setAiLoading(false); }, [idx, phase]); // fresh per step
+  useEffect(() => {
+    if (!stepDone || !isPro || phase !== 'steps' || reactedIdx.current === idx || typeof reactToTastingStep !== 'function') return;
+    const userText = summarizeStepAnswer(step, answers);
+    if (!userText) return;
     const seq = ++aiSeq.current;
-    try {
-      const userText = summarizeStepAnswer(stepObj, ans);
-      if (!userText) return;
-      const line = await reactToTastingStep({ bean, step: stepObj, userText, expected });
-      if (line && seq === aiSeq.current) setAiLine(line);
-    } catch { /* non-gating */ }
-  }, [bean, expected, isPro]);
+    const t = setTimeout(async () => {
+      reactedIdx.current = idx;
+      setAiLoading(true);
+      try {
+        const line = await reactToTastingStep({ bean, step, userText, expected });
+        if (seq === aiSeq.current && line) setAiLine(line);
+      } catch { /* non-gating */ }
+      if (seq === aiSeq.current) setAiLoading(false);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [stepDone, idx, phase, isPro, bean, expected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const goNext = useCallback(() => {
     haptic.light();
-    setAiLine(null);
+    setAiLine(null); setAiLoading(false); aiSeq.current++; // cancel any in-flight reaction
     if (phase === 'intro') { setPhase('steps'); return; }
-    fireReaction(step, answers); // react to what they just entered (non-blocking)
     if (idx < TASTING_WIZARD_STEPS.length - 1) setIdx(i => i + 1);
     else { setPhase('reveal'); haptic.success(); }
-  }, [phase, idx, step, answers, fireReaction]);
+  }, [phase, idx]);
 
   const goBack = useCallback(() => {
     haptic.light(); setAiLine(null);
@@ -132,7 +145,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
           <Stage key={`step-${idx}`} reduce={reduce}>
             <StepCard
               step={step} bean={bean} expected={expected} answers={answers} captured={captured}
-              allCaptured={allCaptured} palate={palate} aiLine={aiLine} reduce={reduce}
+              allCaptured={allCaptured} palate={palate} aiLine={aiLine} aiLoading={aiLoading} reduce={reduce}
               setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip}
             />
           </Stage>
@@ -225,7 +238,7 @@ function IntroCard({ bean, expected, palate, reduce }) {
 }
 
 // ---------------------------------------------------------------- step
-function StepCard({ step, bean, expected, answers, captured, allCaptured, palate, aiLine, reduce, setScore, setFinish, setText, toggleChip }) {
+function StepCard({ step, bean, expected, answers, captured, allCaptured, palate, aiLine, aiLoading, reduce, setScore, setFinish, setText, toggleChip }) {
   const cue = expected.cues[step.key] || step.prompt;
   const line = aiLine || cue;
   return (
@@ -235,7 +248,7 @@ function StepCard({ step, bean, expected, answers, captured, allCaptured, palate
         <RadarLightSweep scores={captured} size={184} complete={allCaptured} reduce={reduce} />
       </div>
 
-      <RuphusReaction pose={POSE_FOR[step.key] || 'magnifying'} reduce={reduce} line={line} size={84} />
+      <RuphusReaction pose={POSE_FOR[step.key] || 'magnifying'} reduce={reduce} line={line} loading={aiLoading} size={84} />
 
       <div style={{ ...cardStyle, marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -300,21 +313,8 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
     );
   }
   if (step.kind === 'sip') {
-    const sel = answers.text.firstsip;
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {SIP_PICKS.map(p => {
-          const active = sel === p;
-          return (
-            <m.button key={p} type="button" whileTap={reduce ? {} : { scale: 0.95 }} transition={M.spring.snappy}
-              onClick={() => { haptic.selection(); setText('firstsip', active ? '' : p); }}
-              style={{ border: `1px solid ${active ? 'rgba(255,255,255,0.4)' : C.border}`, background: active ? C.accent : C.cream, color: active ? C.cream : C.text, borderRadius: radius.pill, padding: '9px 15px', minHeight: 40, fontFamily: fonts.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', boxShadow: active ? '0 2px 8px rgba(162,99,47,0.3)' : 'none' }}>
-              {p}
-            </m.button>
-          );
-        })}
-      </div>
-    );
+    // Single-select → the highlight SLIDES between picks (shared layoutId).
+    return <SlideSelect options={SIP_PICKS} value={answers.text.firstsip} onChange={(v) => setText('firstsip', v)} reduce={reduce} groupId="sip" />;
   }
   return null;
 }

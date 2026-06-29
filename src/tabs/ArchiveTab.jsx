@@ -12,6 +12,7 @@ import { m } from '../lib/motion';
 import { haptic } from '../lib/haptics';
 import { BeanThumb } from '../components/BeanThumb';
 import { BeanDetailCard } from '../components/BeanDetailCard';
+import { TastingDetailCard } from '../components/TastingDetailCard';
 import { useBeanDetail } from '../hooks/useBeanDetail';
 import { entryHero } from '../lib/tastingHero';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
@@ -233,6 +234,7 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
   const [process, setProcess] = useState('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editBean, setEditBean] = useState(null);
+  const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
   const reduce = useReducedMotion();
 
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
@@ -431,7 +433,11 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
           onRestore={(b) => { closeDetail(); handleRestore(b); }}
           onDelete={deleteBean ? (b) => { closeDetail(); handleDelete(b); } : undefined}
           onEdit={(b) => { closeDetail(); setEditBean(b); }}
+          onOpenTasting={(t) => setDetailTasting(t)}
         />
+      )}
+      {detailTasting && (
+        <TastingDetailCard tasting={detailTasting} bean={detailBean} z={5000} onClose={() => setDetailTasting(null)} />
       )}
       {editBean && (
         <Suspense fallback={null}>

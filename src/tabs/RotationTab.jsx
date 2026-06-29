@@ -10,6 +10,7 @@ import { getRecBlurb } from '../lib/claude';
 import { BeanCard } from '../components/BeanCard';
 import { ShelfCard } from '../components/ShelfCard';
 import { BeanDetailCard } from '../components/BeanDetailCard';
+import { TastingDetailCard } from '../components/TastingDetailCard';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
@@ -73,6 +74,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const handBrew = useHandBrew(updateBean);
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
+  const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
   const [toast, setToast] = useState(null);
   const [showRec, setShowRec] = useState(false);
   const [recBlurb, setRecBlurb] = useState('');
@@ -632,7 +634,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}
           onFreeze={handleFreeze}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
+          onOpenTasting={(t) => setDetailTasting(t)}
         />
+      )}
+      {detailTasting && (
+        <TastingDetailCard tasting={detailTasting} bean={detailBean} z={5000} onClose={() => setDetailTasting(null)} />
       )}
       {editBean && (
         <EditBeanModal

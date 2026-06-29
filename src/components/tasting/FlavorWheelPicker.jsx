@@ -4,7 +4,8 @@
 // specifics unlock as you log cups). Multi-select; selected descriptors lift into accent glass
 // chips. transform/opacity-only motion; reduced-motion snaps.
 import { useState } from 'react';
-import { m, AnimatePresence } from 'framer-motion';
+import { m } from 'framer-motion';
+import { Check, Lock } from 'lucide-react';
 import { FLAVOR_WHEEL, tier3Unlocked } from '../../lib/flavorWheel';
 import { haptic } from '../../lib/haptics';
 import { C, fonts, radius, shadows, motion as M } from '../../styles/theme';
@@ -15,28 +16,41 @@ const FAMILY_DOT = {
   spices: '#A85537', roasted: '#5C4636', green: '#5B8762', ferment: '#8C5B86', offnotes: '#8A7765',
 };
 
+// Multi-select chip. The accent fill animates via an OPACITY overlay (transform/opacity-safe — a
+// crisp ease-out fill, NOT animating background-color, and NOT a shared highlight which only single-
+// select can use). whileTap depress + synchronous haptic (in pick) for premium press feel.
 function Chip({ label, active, locked, onClick, reduce }) {
   return (
     <m.button
       type="button"
       onClick={locked ? undefined : onClick}
-      whileTap={reduce || locked ? {} : { scale: 0.95 }}
+      whileTap={reduce || locked ? {} : { scale: 0.96 }}
       transition={M.spring.snappy}
       aria-pressed={active}
       style={{
-        position: 'relative', border: `1px solid ${active ? 'rgba(255,255,255,0.4)' : C.border}`,
-        background: active ? C.accent : locked ? C.cardMuted : C.cream,
+        position: 'relative', overflow: 'hidden',
+        border: `1px solid ${active ? 'transparent' : C.border}`,
+        background: locked ? C.cardMuted : C.cream,
         color: active ? C.cream : locked ? C.textLight : C.text,
         borderRadius: radius.pill, padding: '8px 14px', minHeight: 38,
         fontFamily: fonts.body, fontWeight: 700, fontSize: 13, letterSpacing: '-0.005em',
         textTransform: 'capitalize', cursor: locked ? 'not-allowed' : 'pointer',
         opacity: locked ? 0.6 : 1, WebkitTapHighlightColor: 'transparent',
-        boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 8px rgba(162,99,47,0.3)' : 'none',
+        transition: reduce ? 'none' : 'color 150ms ease, border-color 160ms ease',
       }}
     >
-      {locked && <span aria-hidden style={{ marginRight: 5, opacity: 0.7 }}>🔒</span>}
-      {label}
-      {active && <span aria-hidden style={{ marginLeft: 6, fontSize: 11 }}>✓</span>}
+      {/* accent fill overlay — opacity-animated (safe), crisp ease-out */}
+      <span aria-hidden style={{
+        position: 'absolute', inset: 0, borderRadius: 'inherit', background: C.accent,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 8px rgba(162,99,47,0.28)',
+        opacity: active ? 1 : 0, transition: reduce ? 'none' : 'opacity 170ms cubic-bezier(0.23,1,0.32,1)',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+      <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex', alignItems: 'center', gap: 5, textShadow: active ? '0 1px 2px rgba(40,20,8,0.26)' : 'none' }}>
+        {locked && <Lock size={11} strokeWidth={2.4} style={{ opacity: 0.7, flexShrink: 0 }} />}
+        {label}
+        {active && <Check size={13} strokeWidth={3} style={{ flexShrink: 0 }} />}
+      </span>
     </m.button>
   );
 }

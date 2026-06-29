@@ -74,12 +74,12 @@ export function AxisSlider({ axis, value, onChange, expected = null, reduce = fa
           boxShadow: 'inset 0 1.5px 3px rgba(70,41,26,0.14), inset 0 -1px 0 rgba(255,255,255,0.5)',
         }} />
 
-        {/* expected marker — where Professor Ruphus predicts this bean lands (explained in the
-            intro). Labeled with his name + a small diamond so it reads as a target, not noise. */}
+        {/* expected marker — a faint ◆ tick at Professor Ruphus's predicted spot. Deliberately
+            SUBTLE (no repeated name label on every slider — the intro explains what ◆ means). */}
         {expPct != null && (
           <div aria-hidden style={{ position: 'absolute', left: `${expPct}%`, top: '50%', transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
-            <span style={{ position: 'absolute', top: -23, fontFamily: fonts.body, fontSize: 8, fontWeight: 700, letterSpacing: '0.02em', color: C.accent, whiteSpace: 'nowrap', opacity: 0.85 }}>◆ Professor Ruphus</span>
-            <span style={{ width: 2, height: 22, borderRadius: 2, background: C.accentLight, opacity: 0.9, boxShadow: `0 0 0 2px ${C.bg}` }} />
+            <span style={{ position: 'absolute', top: -14, fontSize: 8, lineHeight: 1, color: C.accentLight, opacity: 0.7 }}>◆</span>
+            <span style={{ width: 1.5, height: 18, borderRadius: 2, background: C.accentLight, opacity: 0.5, boxShadow: `0 0 0 2px ${C.bg}` }} />
           </div>
         )}
 
