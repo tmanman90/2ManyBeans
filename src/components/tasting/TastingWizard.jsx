@@ -74,24 +74,24 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   // regardless. Fires once the user has answered THIS step (debounced); a thinking loader shows
   // while it's in flight (~15s), then the reaction cross-fades in. Reacting to the step you're on
   // (not the one you just left) keeps it coherent. Pro-gated; non-gating on failure. ---
-  const stepDone = phase === 'steps' && stepComplete(step, answers);
+  // Trigger off the NAMED input (what Ruphus reacts to), not mere step-completion — so naming a
+  // flavor AFTER setting intensity still fires, and the debounce coalesces rapid edits.
+  const reactionInput = phase === 'steps' ? summarizeStepAnswer(step, answers) : '';
   useEffect(() => { setAiLine(null); setAiLoading(false); }, [idx, phase]); // fresh per step
   useEffect(() => {
-    if (!stepDone || !isPro || phase !== 'steps' || reactedIdx.current === idx || typeof reactToTastingStep !== 'function') return;
-    const userText = summarizeStepAnswer(step, answers);
-    if (!userText) return;
+    if (!reactionInput || !isPro || phase !== 'steps' || reactedIdx.current === idx || typeof reactToTastingStep !== 'function') return;
     const seq = ++aiSeq.current;
     const t = setTimeout(async () => {
       reactedIdx.current = idx;
       setAiLoading(true);
       try {
-        const line = await reactToTastingStep({ bean, step, userText, expected });
+        const line = await reactToTastingStep({ bean, step, userText: reactionInput, expected });
         if (seq === aiSeq.current && line) setAiLine(line);
       } catch { /* non-gating */ }
       if (seq === aiSeq.current) setAiLoading(false);
     }, 700);
     return () => clearTimeout(t);
-  }, [stepDone, idx, phase, isPro, bean, expected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reactionInput, idx, phase, isPro, bean, expected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const goNext = useCallback(() => {
     haptic.light();
