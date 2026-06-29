@@ -278,6 +278,28 @@ const faceBase = {
 };
 // red + blue rings drawn as concentric box-shadows so the corners stay perfectly
 // parallel (no mismatched bends), with white margin around them on the white face.
+// Always-available swipe-to-dismiss grabber for the back (stat-sheet) face, where the
+// content scrolls so the scroll-top pull alone feels stuck on long sheets. Tap or swipe
+// down to close — never conflicts with the scroll because it's a non-scrolling strip.
+function Grabber({ onClose }) {
+  const start = useRef(null);
+  return (
+    <div
+      onClick={() => onClose?.()}
+      onTouchStart={(e) => { start.current = e.touches[0].clientY; }}
+      onTouchEnd={(e) => {
+        if (start.current == null) return;
+        const dy = e.changedTouches[0].clientY - start.current;
+        start.current = null;
+        if (dy > 56) { haptic.light(); onClose?.(); }
+      }}
+      style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '9px 0 5px', flexShrink: 0, touchAction: 'none', cursor: 'grab', zIndex: 12 }}
+    >
+      <div style={{ width: 38, height: 5, borderRadius: 999, background: '#D9D2C7' }} />
+    </div>
+  );
+}
+
 const RedFrame = ({ children }) => (
   <div style={{
     position: 'absolute', inset: 12,
@@ -531,7 +553,8 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
             {/* ===================== BACK ===================== */}
             <div style={{ ...faceBase, transform: 'rotateY(180deg)', opacity: flipped ? 1 : 0, transition: 'opacity 0s linear 0.22s' }}>
               <RedFrame>
-                <div ref={backScrollRef} {...backPull} style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '22px 24px 16px' }}>
+                <Grabber onClose={onClose} />
+                <div ref={backScrollRef} {...backPull} style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '6px 24px 16px' }}>
                   <div style={{ ...lbl, fontSize: 13, letterSpacing: '0.22em', color: INK, marginBottom: 6 }}>STAT SHEET</div>
                   <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 33, color: INK, lineHeight: 1.02, marginBottom: 20, paddingRight: 70 }}>{bean.name}</div>
 
