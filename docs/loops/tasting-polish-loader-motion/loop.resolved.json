@@ -1,0 +1,232 @@
+{
+  "$schema": "getup/loop.resolved.v1",
+  "compiled_at": "2026-06-29T17:10:58+00:00",
+  "council": [
+    {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  ],
+  "council_by_id": {
+    "codex": {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  },
+  "criteria_by_id": {
+    "v1-build": {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    "v2-harness": {
+      "check": [
+        "node",
+        "scripts/verify-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-harness",
+      "type": "programmatic"
+    },
+    "v3-regression": {
+      "check": [
+        "bash",
+        "-c",
+        "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-chat.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v3-regression",
+      "type": "programmatic"
+    },
+    "v4-audit": {
+      "check": [
+        "node",
+        "scripts/audit-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v4-audit",
+      "type": "programmatic"
+    },
+    "v5-review": {
+      "id": "v5-review",
+      "judge": "codex",
+      "rubric": "Adversarially review the tasting-polish diff. Treat the existing wizard (theme, Liquid Glass, TasteFingerprint/FlavorRadar, the CSS-driven visibility fixes, the existing claude.js reaction) as APPROVED. FAIL if: there is no liquid-glass \"thinking\" loader shown while the AI reaction loads, or the loader is a generic spinner / a looping GIF / fake placeholder copy that later swaps (R1/R2); the loader animates backdrop-filter, ships an SVG goo/displacement filter, or uses mix-blend-mode for the sheen (WKWebView-broken) (R1/R7); the single-select quick-picks do NOT use a shared layoutId highlight that slides between options, or the highlight's radius/shadow are set via className (warps) instead of inline style, or chips aren't position:relative (R3); the multi-select flavor/aroma chips reuse a single shared highlight (structurally wrong) instead of an independent per-chip fill (R4); the expected slider marker is still prominent rather than de-emphasized (R5); tap-to-expand is not wired on Rotation AND Archive (not just Inventory), or the TastingDetailCard doesn't stack above the bean card (R6); any new motion is not transform/opacity-only or not reduced-motion-gated, or there is an anti-slop tell (second accent hue, glow shadow, non-hairline divider, missing tabular-nums) (R7); OR the diff changes Firebase / the tasting-bean data model / the AI-extraction output shape, rebuilds the API proxy for streaming, changes the deterministic coaching content or the step spine, or regresses the CSS-driven visibility fixes (scope). Ambient infinite loops (breathing dots, shimmer sweep) are EXEMPT from the 300ms micro-interaction rule. PASS only when the loader is premium + WKWebView-safe, single-select slides + multi-select fills as distinct mechanisms, the marker is subtle, tap-to-expand works on all three surfaces, and it's design-bank clean and scope-clean.\n",
+      "type": "judge"
+    },
+    "v6-human": {
+      "id": "v6-human",
+      "prompt": "On the dev app (device): trigger a guided-tasting AI reaction and confirm the liquid-glass loader looks premium and you KNOW the line is coming (no 15s of dead placeholder); tap between the single-select quick-picks and confirm the highlight SLIDES from one to the next; tap multi-select flavor chips and confirm the fill feels crisp/premium; confirm the expected slider marker is subtle; and open a logged tasting from the bean card on Inventory, Rotation, AND Archive \u2014 each opens the full tasting. Proving R1-R8 and the overall feel.\n",
+      "type": "human"
+    }
+  },
+  "evidence_map": {
+    "R1": "v4-audit",
+    "R2": "v2-harness",
+    "R3": "v2-harness",
+    "R4": "v2-harness",
+    "R5": "v4-audit",
+    "R6": "v2-harness",
+    "R7": "v5-review",
+    "R8": "v6-human"
+  },
+  "execution": {
+    "isolation": "branch",
+    "mode": "goal"
+  },
+  "gates": {
+    "delivery_gate": {
+      "criteria": [
+        "v1-build",
+        "v2-harness",
+        "v3-regression",
+        "v4-audit",
+        "v5-review",
+        "v6-human"
+      ],
+      "max_revisions": 3,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    },
+    "plan_gate": {
+      "criteria": [
+        "v5-review"
+      ],
+      "max_revisions": 2,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    }
+  },
+  "goal": {
+    "context_sources": [
+      {
+        "file": "docs/plans/2026-06-29-002-feat-tasting-polish-loader-motion-plan.md"
+      },
+      {
+        "file": "~/.claude/design-bank/liquid-glass-hud.md"
+      },
+      {
+        "file": "~/.claude/design-bank/motion-library.md"
+      },
+      {
+        "file": "src/components/SegmentedControl.jsx"
+      },
+      {
+        "file": "lessons.md"
+      }
+    ],
+    "definition_of_done": "A RuphusThinking loader renders while an AI reaction is genuinely loading \u2014 a static frosted-glass pill (-webkit-backdrop-filter blur+saturate + inset top-rim sheen, never mix-blend-mode) with breathing dots (transform/opacity only) and a shimmer caption that rotates its micro-copy \u2014 shown in a same-height slot that replaces the placeholder (no fake-copy-then- swap, no layout shift) and the real coaching line cross-fades in when it resolves, with the reaction corresponding to the step the user just answered; the deterministic core still works with AI off/free tier and the loader only appears when a reaction is loading. The single-select quick-picks render a single shared layoutId highlight that springs/slides between buttons across rows (chips position:relative, highlight radius/shadow inline so it scale-corrects), with a synchronous haptic on tap and a reduced-motion snap; the multi-select flavor/aroma chips animate their own fill crisply (short ease-out, whileTap scale, haptic) and do NOT use a shared highlight. The slider's expected marker is subtle. A logged tasting opens the full TastingDetailCard (z above the bean card) from Inventory, Rotation, and Archive. All new motion is transform/opacity-only, reduced-motion-gated, and WKWebView-safe; the design is anti-slop clean with one accent. `npx vite build` exits 0; the wizard harness drives the deterministic flow incl. a mocked-slow reaction that surfaces the loader, the single-select slide highlight, the multi-select fill, and tap-to-expand opening the detail; verify-tasting/inventory/archive/ morph/chat still pass; the audit + codex review are clean; every changed interactive element was clicked-through and screenshotted on the real engine (sim-from-vite) on all three surfaces; and Tal signs off on device that the loader, the slide, the fill, the marker, and tap-to-expand all feel right.\n",
+    "requirements": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+      "R8"
+    ],
+    "statement": "Close four on-device quality gaps in the intelligent tasting wizard, craft-only (no data/logic change): (1) Professor Ruphus's ~15s AI coaching line gets a best-in-class liquid-glass \"thinking\" loader (frosted-glass pill + breathing CSS dots + a shimmer caption that rotates micro-copy) that REPLACES the generic placeholder while loading, then cross-fades the real line in; (2) the single-select quick-picks get a shared-element highlight that SLIDES from the old choice to the new one (layoutId magic-move), while the multi-select flavor/aroma chips get a distinct premium per-chip fill (one highlight can't be in many places); (3) the slider's expected \"Professor Ruphus\" marker is de-emphasized; (4) tapping a logged tasting on the bean card opens the full TastingDetailCard from ALL surfaces (Inventory, Rotation, Archive). All WKWebView-safe (no SVG goo filter, no animated backdrop-filter, no mix-blend-mode sheen), transform/opacity-only, reduced-motion-gated, design-bank clean, and verified on-device before \"done\". Dev channel only.\n"
+  },
+  "loop_control": {
+    "budget": {
+      "tokens": 6000000
+    },
+    "cycle_cap": 4,
+    "max_iterations": 7,
+    "no_progress": {
+      "action": "stop",
+      "max_stalled_iterations": 2
+    },
+    "quality_streak": 2
+  },
+  "meta": {
+    "name": "tasting-polish-loader-motion",
+    "source_plan": "docs/plans/2026-06-29-002-feat-tasting-polish-loader-motion-plan.md"
+  },
+  "model_policy": {
+    "orchestrator": "opus",
+    "review_cadence": "per_phase",
+    "reviewer": "codex",
+    "subagents": "sonnet"
+  },
+  "scope_guard": [
+    "Do NOT change Firebase, the tasting/bean data model, or the AI-extraction OUTPUT shape.",
+    "Do NOT rebuild the API proxy for streaming/SSE (the loader is the deliverable; streaming is a future note).",
+    "Do NOT change the deterministic coaching content, the Hoffmann step spine, or the tasting flow.",
+    "Do NOT regress the wizard's CSS-driven visibility fixes (framer animate stays off for visibility-critical content; new motion uses CSS/canvas + framer only for layoutId/whileTap).",
+    "Single-select and multi-select use DIFFERENT mechanisms \u2014 do not force a shared highlight onto multi-select chips.",
+    "Reuse existing mascot assets; no new Higgsfield assets. Dev channel only; no prod deploy or main merge."
+  ],
+  "source": "/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/docs/loops/tasting-polish-loader-motion/loop.yaml",
+  "verification": [
+    {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/verify-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-harness",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "bash",
+        "-c",
+        "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-chat.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v3-regression",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/audit-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v4-audit",
+      "type": "programmatic"
+    },
+    {
+      "id": "v5-review",
+      "judge": "codex",
+      "rubric": "Adversarially review the tasting-polish diff. Treat the existing wizard (theme, Liquid Glass, TasteFingerprint/FlavorRadar, the CSS-driven visibility fixes, the existing claude.js reaction) as APPROVED. FAIL if: there is no liquid-glass \"thinking\" loader shown while the AI reaction loads, or the loader is a generic spinner / a looping GIF / fake placeholder copy that later swaps (R1/R2); the loader animates backdrop-filter, ships an SVG goo/displacement filter, or uses mix-blend-mode for the sheen (WKWebView-broken) (R1/R7); the single-select quick-picks do NOT use a shared layoutId highlight that slides between options, or the highlight's radius/shadow are set via className (warps) instead of inline style, or chips aren't position:relative (R3); the multi-select flavor/aroma chips reuse a single shared highlight (structurally wrong) instead of an independent per-chip fill (R4); the expected slider marker is still prominent rather than de-emphasized (R5); tap-to-expand is not wired on Rotation AND Archive (not just Inventory), or the TastingDetailCard doesn't stack above the bean card (R6); any new motion is not transform/opacity-only or not reduced-motion-gated, or there is an anti-slop tell (second accent hue, glow shadow, non-hairline divider, missing tabular-nums) (R7); OR the diff changes Firebase / the tasting-bean data model / the AI-extraction output shape, rebuilds the API proxy for streaming, changes the deterministic coaching content or the step spine, or regresses the CSS-driven visibility fixes (scope). Ambient infinite loops (breathing dots, shimmer sweep) are EXEMPT from the 300ms micro-interaction rule. PASS only when the loader is premium + WKWebView-safe, single-select slides + multi-select fills as distinct mechanisms, the marker is subtle, tap-to-expand works on all three surfaces, and it's design-bank clean and scope-clean.\n",
+      "type": "judge"
+    },
+    {
+      "id": "v6-human",
+      "prompt": "On the dev app (device): trigger a guided-tasting AI reaction and confirm the liquid-glass loader looks premium and you KNOW the line is coming (no 15s of dead placeholder); tap between the single-select quick-picks and confirm the highlight SLIDES from one to the next; tap multi-select flavor chips and confirm the fill feels crisp/premium; confirm the expected slider marker is subtle; and open a logged tasting from the bean card on Inventory, Rotation, AND Archive \u2014 each opens the full tasting. Proving R1-R8 and the overall feel.\n",
+      "type": "human"
+    }
+  ],
+  "version": 1
+}
