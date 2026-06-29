@@ -1,5 +1,6 @@
 // App shell — warm Ghibli-inspired coffee journal
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { assetUrl } from "./lib/assetUrl";
 import { Settings as SettingsIcon } from 'lucide-react';
 import { C, fonts, shadows, glass } from './styles/theme';
 import { m, spring } from './lib/motion';
@@ -114,7 +115,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
 
   // Set html background to match header — covers WKWebView canvas gap at viewport edge
   useEffect(() => {
-    document.documentElement.style.background = isRotation ? '#43301F' : C.bg;
+    document.documentElement.style.background = isRotation ? C.roast : C.bg;
   }, [isRotation]);
 
   // Onboarding → home screen handoff. R11 and R13b write
@@ -153,11 +154,11 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       {isRotation ? (
         <div className="app-header" style={{
           position: 'relative',
-          height: `calc(176px + env(safe-area-inset-top, 0px))`,
+          height: `calc(116px + env(safe-area-inset-top, 0px))`,
           flexShrink: 0,
           zIndex: 10,
           overflow: 'hidden',
-          background: '#43301F',
+          background: C.roast,
         }}>
           {/* Animated warm steam shader hero (replaces stock illustration) */}
           <SteamGradient speed={0.85} style={{ inset: 0 }} />
@@ -165,7 +166,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0,
             height: '100%', pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, rgba(243,237,228,0) 0%, rgba(243,237,228,0.12) 42%, rgba(243,237,228,0.55) 68%, rgba(243,237,228,0.9) 88%, rgba(243,237,228,1) 100%)',
+            background: 'linear-gradient(to bottom, rgba(241,234,223,0) 0%, rgba(241,234,223,0.08) 50%, rgba(241,234,223,0.5) 74%, rgba(241,234,223,0.92) 91%, rgba(241,234,223,1) 100%)',
           }} />
           <div style={{
             position: 'relative', zIndex: 1,
@@ -400,7 +401,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       <Modal open={firstBeanCelebrating} onClose={() => setFirstBeanCelebrating(false)} title="" centered>
         <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
           <video
-            src="/images/ruphus-animations/ruphus-first-bean.mp4"
+            src={assetUrl("/images/ruphus-animations/ruphus-first-bean.mp4")}
             autoPlay muted playsInline
             onPlay={() => setTimeout(() => setFirstBeanCelebrating(false), 4000)}
             style={{

@@ -1,5 +1,6 @@
 // Professor Ruphus — full-screen slide-up educational lesson
 import { createPortal } from 'react-dom';
+import { assetUrl } from "../lib/assetUrl";
 import { X, RefreshCw } from 'lucide-react';
 import { C, fonts, glass, shadows, radius, type, cardBase } from '../styles/theme';
 import { SpiderChart } from './SpiderChart';
@@ -169,7 +170,7 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
           {loading && (
             <div style={{ textAlign: 'center', paddingTop: 40 }}>
               <video
-                src="/images/ruphus-animations/ruphus-examining-v3.mp4"
+                src={assetUrl("/images/ruphus-animations/ruphus-examining-v3.mp4")}
                 autoPlay muted loop playsInline preload="auto"
                 style={{ width: 240, height: 'auto', marginBottom: 16, background: 'transparent' }}
               />

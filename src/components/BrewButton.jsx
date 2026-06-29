@@ -3,11 +3,13 @@ import { useCallback } from 'react';
 import { Coffee } from 'lucide-react';
 import { useLongPress } from '../hooks/useLongPress';
 import { BrewMethodMenu } from './BrewMethodMenu';
-import { Btn } from './Btn';
+import { GlassButton } from './GlassButton';
+import { fonts } from '../styles/theme';
 import { m, spring } from '../lib/motion';
 
 const renderLabel = (label, aidenSize) => {
-  // Inline-script treatment for Aiden: "Brew with [Aiden]" with Aiden in Caveat
+  // Editorial treatment for the Aiden product name: "Brew with [Aiden]" with
+  // Aiden set in Fraunces italic (refined serif emphasis, not casual script).
   const aidenMatch = label.match(/^(.*?)\bAiden\b(.*)$/);
   if (!aidenMatch) return label;
   const [, before, after] = aidenMatch;
@@ -15,15 +17,13 @@ const renderLabel = (label, aidenSize) => {
     <>
       {before}
       <span style={{
-        fontFamily: "'Caveat', cursive",
-        fontWeight: 700,
+        fontFamily: fonts.heading,
+        fontStyle: 'italic',
+        fontWeight: 600,
         fontSize: aidenSize,
-        lineHeight: 0.85,
-        marginLeft: 2,
+        marginLeft: 3,
         marginRight: 1,
-        position: 'relative',
-        top: 1,
-        letterSpacing: '0.01em',
+        letterSpacing: '0',
       }}>Aiden</span>
       {after}
     </>
@@ -42,28 +42,21 @@ export const BrewButton = ({ bean, label, isHandBrew, brewMenuBean, setBrewMenuB
   const longPressHandlers = useLongPress({ onTap: handleTap, onLongPress: handleLongPress });
 
   const iconSize = compact ? 12 : 18;
-  const aidenSize = compact ? '1.7em' : 22;
+  const aidenSize = compact ? '1.08em' : 16;
   const btnStyle = compact
     ? undefined
     : { padding: '11px 16px', fontSize: 14, gap: 7, flexShrink: 0 };
 
   return (
-    <div style={{ position: 'relative' }}>
-      <m.div
-        whileTap={{ scale: 0.96 }}
-        transition={spring.snappy}
-        style={{ display: 'inline-flex' }}
+    <div style={{ position: 'relative', width: compact ? undefined : '100%' }}>
+      <GlassButton
+        fullWidth={!compact}
+        compact={compact}
+        aria-label={label}
+        {...longPressHandlers}
       >
-        <Btn
-          variant="primary"
-          size={compact ? 'sm' : undefined}
-          aria-label={label}
-          style={btnStyle}
-          {...longPressHandlers}
-        >
-          <Coffee size={iconSize} /> {renderLabel(label, aidenSize)}
-        </Btn>
-      </m.div>
+        <Coffee size={iconSize} /> {renderLabel(label, aidenSize)}
+      </GlassButton>
       <BrewMethodMenu
         open={brewMenuBean?.id === bean.id}
         onClose={() => setBrewMenuBean(null)}

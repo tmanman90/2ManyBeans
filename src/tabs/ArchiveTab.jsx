@@ -4,6 +4,7 @@
 // year headers, scroll-reveal, and parallax bags. Tap flies the bag into the trading card
 // (hero morph). Gold is scarce — reserved for ratings and one active filter state.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { Search, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { C, fonts, type, shadows, radius, glass, motion as motionTokens } from '../styles/theme';
@@ -107,7 +108,7 @@ function EmptyState({ hasFilters, onClear }) {
   return (
     <div style={{ padding: '40px 24px', textAlign: 'center', background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, margin: '12px 0' }}>
       {!hasFilters && (
-        <video src="/images/ruphus-animations/ruphus-empty-cup.mp4" autoPlay muted loop playsInline
+        <video src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")} autoPlay muted loop playsInline
           style={{ width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px', display: 'block', WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)', maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)' }} />
       )}
       <div style={{ ...type.h2, color: C.text, marginBottom: 6 }}>{hasFilters ? 'No matches' : 'Nothing archived yet'}</div>

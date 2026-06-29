@@ -13,9 +13,9 @@ import { GRINDER_LABELS } from '../lib/brewMethods';
 import { scaleRecipeForDose } from '../lib/recipeScaling';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
 
-const ICE_RULE       = '#C8D8E4';
-const ICE_PAPER_GRAD = 'linear-gradient(160deg, #EDF5FA 0%, #D8E8F2 100%)';
-const ICE_TILE_BG    = '#DCE8F0';
+const ICE_RULE       = C.frostBorder;
+const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
+const ICE_TILE_BG    = C.frostSoft;
 
 // ── Eyebrow label ─────────────────────────────────────────────────────────────
 const SectionLabel = ({ children, style }) => (
@@ -101,7 +101,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
       }} />
       {(steps || []).map((step, i) => {
         const dotColor = step.isIceStep
-          ? (iceAccent || '#5B9BD5')
+          ? (iceAccent || C.frost)
           : (i === 0 ? accentColor : C.accentLight);
         return (
           <m.div
@@ -139,9 +139,10 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <div style={{
                 ...type.caption,
-                fontFamily: 'monospace',
+                fontFamily: fonts.body,
+                fontVariantNumeric: 'tabular-nums',
                 fontWeight: 700,
-                color: step.isIceStep ? (iceAccent || '#5B9BD5') : accentColor,
+                color: step.isIceStep ? (iceAccent || C.frost) : accentColor,
                 minWidth: 46,
                 flexShrink: 0,
                 paddingTop: 3,
@@ -463,7 +464,7 @@ export const HandBrewModal = ({
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Snowflake size={16} color="#5B9BD5" />
+              <Snowflake size={16} color={C.frost} />
               Iced flash brew this bean
             </m.button>
           )}
@@ -500,7 +501,7 @@ export const HandBrewModal = ({
           </m.button>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ ...type.label, color: '#5B9BD5', marginBottom: 6 }}>Iced Mode</div>
+            <div style={{ ...type.label, color: C.frost, marginBottom: 6 }}>Iced Mode</div>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -511,7 +512,7 @@ export const HandBrewModal = ({
               color: C.text,
               letterSpacing: '-0.01em',
             }}>
-              <Snowflake size={20} color="#5B9BD5" />
+              <Snowflake size={20} color={C.frost} />
               Iced Flash Brew
             </div>
             {recipe.technique && TECHNIQUE_LABELS[recipe.technique] && (
@@ -531,7 +532,7 @@ export const HandBrewModal = ({
               textAlign: 'center',
               border: `1px solid ${ICE_RULE}`,
             }}>
-              <Droplets size={14} color="#5B9BD5" style={{ marginBottom: 4 }} />
+              <Droplets size={14} color={C.frost} style={{ marginBottom: 4 }} />
               <SectionLabel style={{ marginBottom: 3 }}>Water</SectionLabel>
               <div style={{ fontFamily: fonts.heading, fontSize: 18, fontWeight: 600, color: C.text }}>{icedRecipe.waterGrams}g</div>
               <div style={{ ...type.caption, color: C.textLight }}>hot</div>
@@ -543,7 +544,7 @@ export const HandBrewModal = ({
               textAlign: 'center',
               border: `1px solid ${ICE_RULE}`,
             }}>
-              <Snowflake size={14} color="#5B9BD5" style={{ marginBottom: 4 }} />
+              <Snowflake size={14} color={C.frost} style={{ marginBottom: 4 }} />
               <SectionLabel style={{ marginBottom: 3 }}>Ice</SectionLabel>
               <div style={{ fontFamily: fonts.heading, fontSize: 18, fontWeight: 600, color: C.text }}>{icedRecipe.iceGrams}g</div>
               <div style={{ ...type.caption, color: C.textLight }}>{icedRecipe.icePlacement}</div>
@@ -561,7 +562,7 @@ export const HandBrewModal = ({
               boxShadow: shadows.e1,
             }}>
               <SectionLabel style={{ marginBottom: 8 }}>{grinderName} Grind (finer for iced)</SectionLabel>
-              <GrindDisplay grindSize={icedRecipe.grindSize} grinderName={grinderName} preferences={preferences} accentColor="#5B9BD5" />
+              <GrindDisplay grindSize={icedRecipe.grindSize} grinderName={grinderName} preferences={preferences} accentColor={C.frost} />
             </div>
           )}
 
@@ -577,7 +578,7 @@ export const HandBrewModal = ({
               alignItems: 'center',
               gap: 10,
             }}>
-              <Thermometer size={18} color="#5B9BD5" />
+              <Thermometer size={18} color={C.frost} />
               <div>
                 <SectionLabel>Water Temperature (+1C for iced)</SectionLabel>
                 <div style={{ fontFamily: fonts.heading, fontSize: 16, fontWeight: 600, color: C.text, marginTop: 2 }}>
@@ -592,7 +593,7 @@ export const HandBrewModal = ({
             steps={icedRecipe.steps}
             timelineColor={ICE_RULE}
             accentColor={C.accent}
-            iceAccent="#5B9BD5"
+            iceAccent={C.frost}
           />
 
           {/* Start Iced Brew button */}
@@ -605,8 +606,8 @@ export const HandBrewModal = ({
               width: '100%',
               padding: '16px 20px',
               borderRadius: radius.md,
-              background: 'linear-gradient(160deg, #5B9BD5 0%, #4A8BC5 100%)',
-              color: '#fff',
+              background: `linear-gradient(180deg, ${C.frost} 0%, #4E6878 100%)`,
+              color: C.cream,
               border: 'none',
               fontSize: 16,
               fontWeight: 700,

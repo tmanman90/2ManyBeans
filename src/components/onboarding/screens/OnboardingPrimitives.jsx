@@ -1,6 +1,7 @@
 import { ChevronLeft, Check } from 'lucide-react';
 import { C, fonts, type, radius, shadows, motion as motionTokens, glass } from '../../../styles/theme';
 import { haptic } from '../../../lib/haptics';
+import { assetUrl } from '../../../lib/assetUrl';
 import { useOnboarding } from '../OnboardingContext';
 import { m, spring, listContainer, listItem } from '../../../lib/motion';
 
@@ -32,7 +33,7 @@ export function MascotStage({ src, height = 460, poster }) {
         zIndex: 0,
       }} />
       <video
-        src={src}
+        src={assetUrl(src)}
         poster={poster}
         autoPlay
         muted

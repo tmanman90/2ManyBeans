@@ -1,6 +1,7 @@
 // Finish bag rating prompt -- intercepts finish flow for unrated beans
 // Single modal with view swapping: 'prompt' (quick rate) | 'fullReview'
 import { useState, useEffect } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { ArrowLeft } from 'lucide-react';
 import { C, fonts, type, radius } from '../styles/theme';
 import { today } from '../lib/peakStatus';
@@ -161,7 +162,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       {celebrating && (
         <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
           <video
-            src="/images/ruphus-animations/ruphus-fist-pump.mp4"
+            src={assetUrl("/images/ruphus-animations/ruphus-fist-pump.mp4")}
             autoPlay muted playsInline
             style={{
               width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',

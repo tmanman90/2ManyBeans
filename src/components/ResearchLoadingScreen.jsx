@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
+import { assetUrl } from '../lib/assetUrl';
 
 const ROTATING_TASKS = [
   'Locating the roaster',
@@ -100,7 +101,7 @@ export const ResearchLoadingScreen = ({
         overflow: 'hidden',
       }}>
         <video
-          src={mascotSrc}
+          src={assetUrl(mascotSrc)}
           poster="/images/professor-ruphus.webp"
           autoPlay loop muted playsInline
           aria-label="Professor Ruphus"

@@ -37,10 +37,10 @@ const GRIND_DIVIDER = C.accentLight;
 const TILE_BG     = C.bgDeep;
 
 // Iced mode palette
-const ICE_RULE       = '#C8D8E4';
-const ICE_PAPER_GRAD = 'linear-gradient(160deg, #EDF5FA 0%, #D8E8F2 100%)';
-const ICE_GRIND_BORDER = '#A8C4D8';
-const ICE_TILE_BG    = '#DCE8F0';
+const ICE_RULE       = C.frostBorder;
+const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
+const ICE_GRIND_BORDER = C.frostBorder;
+const ICE_TILE_BG    = C.frostSoft;
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ const RecipeTitleRow = ({ title, note }) => (
         lineHeight: 1.4,
       }}>
         <span style={{ ...type.caption, color: C.textMuted, fontStyle: 'italic', paddingTop: 2 }}>— Aiden:</span>
-        <span style={{ fontFamily: fonts.title, fontSize: 17, color: C.accent }}>
+        <span style={{ fontFamily: fonts.body, fontSize: 17, color: C.accent }}>
           {note}
         </span>
       </div>
@@ -627,7 +627,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Snowflake size={16} color="#5B9BD5" />
+              <Snowflake size={16} color={C.frost} />
               Iced flash brew this bean
             </m.button>
           )}
@@ -665,7 +665,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           </m.button>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ ...type.label, color: '#5B9BD5', marginBottom: 6 }}>Iced Mode</div>
+            <div style={{ ...type.label, color: C.frost, marginBottom: 6 }}>Iced Mode</div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               fontFamily: fonts.heading,
@@ -674,7 +674,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
               color: C.text,
               letterSpacing: '-0.01em',
             }}>
-              <Snowflake size={20} color="#5B9BD5" />
+              <Snowflake size={20} color={C.frost} />
               Iced Flash Brew
             </div>
           </div>

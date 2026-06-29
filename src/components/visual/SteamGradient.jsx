@@ -36,19 +36,26 @@ float fbm(vec2 p){
 void main(){
   vec2 uv = gl_FragCoord.xy / u_res.xy;
   vec2 p = uv * vec2(u_res.x/u_res.y, 1.0) * 2.2;
-  float t = u_time * 0.06;
+  float t = u_time * 0.05;
   // domain warp for organic curling steam
   vec2 q = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(3.7, -t*0.8)));
   vec2 r = vec2(fbm(p + 2.0*q + vec2(1.7, 9.2) + 0.15*t),
                 fbm(p + 2.0*q + vec2(8.3, 2.8) - 0.12*t));
-  float f = fbm(p + 2.5*r);
-  // warm vertical falloff so the top is lighter (steam rising)
-  float vfall = smoothstep(0.0, 1.0, uv.y);
-  vec3 col = mix(u_c1, u_c2, smoothstep(0.25, 0.85, f));
-  col = mix(col, u_c3, smoothstep(0.55, 1.0, f*r.x) * 0.5);
-  col = mix(col, u_c2, (1.0 - vfall) * 0.18);
-  // subtle grain
-  col += (hash(uv * u_res.xy + t) - 0.5) * 0.025;
+  float f = fbm(p + 2.5*r);                       // steam density 0..1
+  float yy = uv.y;                                // 0 bottom .. 1 top
+  // u_c1 = espresso (dark), u_c2 = caramel/gold, u_c3 = warm cream highlight.
+  // Deep espresso at the very top (white status-bar text stays legible),
+  // warming to caramel lower down. Premium dark-hero feel.
+  vec3 col = mix(u_c2, u_c1, smoothstep(0.34, 1.0, yy));
+  // Steam catches warm light as cream wisps — strongest in a mid band,
+  // faded out at the very top so the roast stays clean behind the status bar.
+  float band = smoothstep(0.12, 0.58, yy) * (1.0 - smoothstep(0.74, 1.0, yy));
+  float steam = smoothstep(0.40, 0.95, f);
+  col = mix(col, u_c3, steam * band * 0.5);
+  // warm caramel bloom (light glowing behind the steam) in the mid band
+  col += u_c2 * band * 0.10;
+  // fine grain
+  col += (hash(uv * u_res.xy + t) - 0.5) * 0.016;
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -58,11 +65,12 @@ attribute vec2 a_pos;
 void main(){ gl_Position = vec4(a_pos, 0.0, 1.0); }
 `;
 
-// Default warm coffee palette (paper-dark, caramel, espresso)
+// Default warm coffee palette: c1 espresso base, c2 caramel/gold, c3 warm cream
+// highlight. Luminous (light from above) rather than a flat brown fog.
 const DEFAULT = {
-  c1: [0.36, 0.27, 0.20],
-  c2: [0.66, 0.42, 0.22],
-  c3: [0.29, 0.18, 0.11],
+  c1: [0.20, 0.125, 0.065],
+  c2: [0.78, 0.52, 0.28],
+  c3: [0.96, 0.90, 0.80],
 };
 
 function hexToRgb01(arr) { return arr; }
@@ -156,7 +164,7 @@ export default function SteamGradient({ colors = DEFAULT, speed = 1, style, clas
         ref={fallbackRef}
         style={{
           position: 'absolute', inset: 0, opacity: 0, transition: 'opacity 0.3s',
-          background: 'linear-gradient(160deg, #5C4636 0%, #A86A38 55%, #4A2F1E 100%)',
+          background: 'linear-gradient(180deg, #F3E2C8 0%, #C98A4E 46%, #33200F 100%)',
         }}
       />
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />

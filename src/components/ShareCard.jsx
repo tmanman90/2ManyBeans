@@ -9,6 +9,7 @@
 // that only render the card (e.g. off-screen in JSX) never pay the cost.
 
 import { forwardRef, useRef, useState, useLayoutEffect } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { Capacitor } from '@capacitor/core';
 import { C, fonts } from '../styles/theme';
 
@@ -499,7 +500,7 @@ export const TastingShareCard = forwardRef(({ bean, tasting }, ref) => {
         </div>
 
         <img
-          src="/images/ruphus-animations/nobg/ruphus-writing-notes.png"
+          src={assetUrl("/images/ruphus-animations/nobg/ruphus-writing-notes.png")}
           alt=""
           crossOrigin="anonymous"
           style={{

@@ -71,6 +71,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
   return (
     <div style={{
       ...cardBase,
+      boxShadow: `${shadows.card}, ${shadows.innerTop}`,
       padding: 0,
       overflow: 'hidden',
       marginBottom: 14,
@@ -183,7 +184,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
           </div>
 
           {/* Icon cluster — NO minWidth/minHeight per iOS rule */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} {...(tourTag ? { 'data-tour': tourTag } : {})}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} {...(tourTag ? { 'data-tour': tourTag } : {})}>
             <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
               <PeakArc pct={life} color={ps.color} size={32} />
               <div style={{
@@ -192,6 +193,10 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
                 fontFamily: fonts.heading, fontSize: 10, fontWeight: 600, color: ps.color,
               }}>{ps.days != null ? ps.days + 'd' : ''}</div>
             </div>
+            {(onLearn || updateBean) && (
+              <div style={{ width: 1, height: 18, background: C.hairline, flexShrink: 0 }} />
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {onLearn && (
               <button
                 onClick={() => onLearn(bean)}
@@ -232,7 +237,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
                 }}
                 title={bean.frozenAt ? 'Unfreeze bean' : 'Freeze bean'}
               >
-                <Snowflake size={14} color={bean.frozenAt ? C.blue : C.textMuted} fill={bean.frozenAt ? C.blue : 'none'} />
+                <Snowflake size={14} color={bean.frozenAt ? C.frost : C.textLight} fill={bean.frozenAt ? C.frost : 'none'} />
               </button>
             )}
             {updateBean && (
@@ -243,9 +248,10 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
                   padding: 4, display: 'flex', alignItems: 'center',
                 }}
               >
-                <Pencil size={14} color={C.textMuted} />
+                <Pencil size={14} color={C.textLight} />
               </button>
             )}
+            </div>
           </div>
         </div>
 
@@ -256,8 +262,8 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
           gap: compact ? 10 : 12,
           marginTop: 14,
           marginBottom: 10,
-          padding: '12px 14px',
-          background: C.bgDeep,
+          padding: '14px 16px',
+          background: 'rgba(70,41,26,0.035)',
           borderRadius: radius.md,
           border: `1px solid ${C.hairline}`,
         }}>

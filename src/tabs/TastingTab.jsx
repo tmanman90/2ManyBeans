@@ -1,6 +1,7 @@
 // Tasting tab — ported from prototype lines 500-789
 // 3 modes: list, form, chat
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { createPortal } from 'react-dom';
 import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2, ChevronRight } from 'lucide-react';
 import { C, fonts, type, shadows, radius, glass, cardBase, motion } from '../styles/theme';
@@ -1440,7 +1441,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       {mode === 'list' && tastings.length === 0 && (
         <div style={{ textAlign: 'center', padding: '24px 20px' }}>
           <video
-            src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+            src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")}
             autoPlay muted loop playsInline
             style={{
               width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px',

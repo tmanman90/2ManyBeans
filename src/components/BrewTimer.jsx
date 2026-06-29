@@ -11,6 +11,7 @@
 // ~10Hz via the hook's setInterval.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { createPortal } from 'react-dom';
 import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
 import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
@@ -90,7 +91,7 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
       <video
-        src="/images/ruphus-animations/ruphus-brew-complete.mp4"
+        src={assetUrl("/images/ruphus-animations/ruphus-brew-complete.mp4")}
         autoPlay muted playsInline
         style={{
           width: 200, height: 200, objectFit: 'contain',

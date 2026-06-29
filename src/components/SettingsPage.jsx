@@ -134,6 +134,17 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const [deleteStep, setDeleteStep] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
 
+  // Live OTA bundle id — confirms which Capgo bundle is actually running (vs. the
+  // static native version), so update delivery can be verified at a glance.
+  const [otaBundle, setOtaBundle] = useState(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    import('@capgo/capacitor-updater')
+      .then(({ CapacitorUpdater }) => CapacitorUpdater.current())
+      .then((r) => setOtaBundle(r?.bundle?.version || r?.bundle?.id || 'builtin'))
+      .catch(() => setOtaBundle('builtin'));
+  }, []);
+
   // Grinder <select> width is pinned to the rendered width of the selected
   // option. Native <select> on iOS WKWebView sizes its intrinsic width using
   // the longest <option>, not the current value, which left a visible gap
@@ -1318,7 +1329,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             marginTop: 16,
             marginBottom: 8,
           }}>
-            v{__APP_VERSION__}
+            v{__APP_VERSION__}{otaBundle ? ` · OTA ${otaBundle}` : ''}
           </div>
 
           {/* --- Account Section --- */}

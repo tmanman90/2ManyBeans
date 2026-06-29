@@ -1,5 +1,6 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState, useEffect } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { Plus, Search, Coffee, Snowflake } from 'lucide-react';
 import { C, fonts, type, shadows, radius, glass, journalCard } from '../styles/theme';
 import { getPeakStatus, today, daysBetween } from '../lib/peakStatus';
@@ -357,7 +358,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
             style={{ textAlign: 'center', padding: '40px 20px 24px' }}
           >
             <video
-              src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+              src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")}
               autoPlay muted loop playsInline
               style={{
                 width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',

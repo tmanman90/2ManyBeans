@@ -1,12 +1,15 @@
 // Rotation tab — ported from prototype lines 279-434
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { assetUrl } from "../lib/assetUrl";
 import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { C, fonts, type, shadows, radius, glass, journalCard, cardBase } from '../styles/theme';
-import { getPeakStatus, daysOpen } from '../lib/peakStatus';
+import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
 import { getRecBlurb } from '../lib/claude';
 import { BeanCard } from '../components/BeanCard';
+import { ShelfCard } from '../components/ShelfCard';
+import { BeanDetailCard } from '../components/BeanDetailCard';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
@@ -26,15 +29,22 @@ import { useLongPress } from '../hooks/useLongPress';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
+import { useBeanDetail } from '../hooks/useBeanDetail';
 
+// Secondary Liquid-Glass pill (iOS 26 material): bright rim + specular top sheen +
+// a floating drop shadow that lifts it off the card, with a faint semantic tint.
+// No backdrop-filter — these sit on a white card inside a scrolling carousel, where
+// blur has nothing to refract and would only cost frames (per liquid-glass spec §4).
 const PillButton = ({ color, bg, icon, label, onClick }) => (
   <m.button
     onClick={onClick}
-    whileTap={{ scale: 0.96 }}
-    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+    className="glass-pill"
+    whileTap={{ scale: 0.95 }}
+    transition={{ type: 'spring', stiffness: 700, damping: 30, mass: 0.6 }}
     style={{
-      background: bg || C.bgDeep,
-      border: `1px solid ${C.hairline}`,
+      position: 'relative', overflow: 'hidden', isolation: 'isolate',
+      background: `linear-gradient(180deg, rgba(255,255,255,0.55) 0%, ${bg} 100%)`,
+      border: '1px solid rgba(255,255,255,0.65)',
       borderRadius: radius.md,
       padding: '10px 6px',
       fontFamily: fonts.body, fontWeight: 700, fontSize: 11, letterSpacing: '0.04em',
@@ -43,11 +53,14 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
       cursor: 'pointer',
       WebkitTapHighlightColor: 'transparent',
       minWidth: 0,
-      minHeight: 56,
+      minHeight: 48,
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -2px 5px rgba(70,41,26,0.10), 0 1px 2px rgba(60,38,22,0.10), 0 6px 16px rgba(60,38,22,0.15)',
     }}
   >
-    <span style={{ color, display: 'inline-flex' }}>{icon}</span>
-    <span>{label}</span>
+    {/* specular top sheen */}
+    <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.02) 100%)', borderTopLeftRadius: 'inherit', borderTopRightRadius: 'inherit', pointerEvents: 'none' }} />
+    <span style={{ position: 'relative', zIndex: 1, color, display: 'inline-flex' }}>{icon}</span>
+    <span style={{ position: 'relative', zIndex: 1 }}>{label}</span>
   </m.button>
 );
 
@@ -69,6 +82,46 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [quickRecipeOpen, setQuickRecipeOpen] = useState(false);
   const [quickRecipeMenuOpen, setQuickRecipeMenuOpen] = useState(false);
   const [newBeanEntry, setNewBeanEntry] = useState(null);
+  const [activeJar, setActiveJar] = useState(0);
+  const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
+  const [editBean, setEditBean] = useState(null);
+  const shelfRef = useRef(null);
+  const cardRefs = useRef([]);
+
+  // Continuous depth-of-field: each card's scale/opacity/lift tracks its distance
+  // from the carousel center, live during the drag (not a discrete snap). Driven
+  // by direct DOM mutation — no React re-render in the scroll path. transform/opacity only.
+  const applyShelfDepth = useCallback((el) => {
+    if (!el) return;
+    const mid = el.scrollLeft + el.clientWidth / 2;
+    const cw = el.clientWidth * 0.86 + 16;
+    cardRefs.current.forEach((card) => {
+      if (!card) return;
+      const cc = card.parentElement.offsetLeft + card.parentElement.offsetWidth / 2;
+      const t = Math.min(1, Math.abs(cc - mid) / cw);
+      const scale = 1 - 0.07 * t;
+      card.style.transform = `scale(${scale}) translateY(${5 * t}px)`;
+      card.style.opacity = String(1 - 0.4 * t);
+    });
+  }, []);
+
+  useEffect(() => {
+    // Initial paint + recompute when the bean set changes (RAF lets layout settle).
+    const id = requestAnimationFrame(() => applyShelfDepth(shelfRef.current));
+    return () => cancelAnimationFrame(id);
+  });
+
+  const handleFreeze = async (bean) => {
+    if (isDemo) { onDemoAction?.(); return; }
+    try {
+      if (bean.frozenAt) {
+        const d = daysBetween(bean.frozenAt, today());
+        await updateBean(bean.id, { frozenAt: null, frozenDays: (bean.frozenDays || 0) + (d || 0) });
+      } else {
+        await updateBean(bean.id, { frozenAt: today() });
+      }
+    } catch (err) { console.error('Freeze failed:', err); }
+  };
   const liveNewBean = newBeanEntry ? beans.find(b => b.id === newBeanEntry.id) : null;
   const newBeanForModal = newBeanEntry
     ? { ...newBeanEntry, ...(liveNewBean || {}), _scanPhotos: newBeanEntry._scanPhotos }
@@ -193,8 +246,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       <div style={{
         flexShrink: 0,
         background: C.bg,
-        padding: '16px 20px 14px',
-        borderBottom: `1px solid ${C.hairline}`,
+        padding: '12px 20px 8px',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -208,7 +260,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
             </div>
             {/* Display title — Fraunces, editorial */}
             <div style={{
-              ...type.h1,
+              ...type.h2,
               fontFamily: fonts.heading,
               color: C.text,
             }}>
@@ -249,7 +301,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           }}
         >
           <video
-            src="/images/ruphus-animations/ruphus-empty-cup.mp4"
+            src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")}
             autoPlay muted loop playsInline
             style={{
               width: 200, height: 200, objectFit: 'contain', marginBottom: 8,
@@ -263,107 +315,112 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         </m.div>
       )}
 
-      <m.div
-        variants={listContainer}
-        initial="initial"
-        animate="animate"
-        style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+      {/* Horizontal shelf — paged bean carousel */}
+      <div
+        ref={shelfRef}
+        className="bean-shelf hide-scrollbar"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          applyShelfDepth(el);
+          const mid = el.scrollLeft + el.clientWidth / 2;
+          let best = 0, bestD = Infinity;
+          Array.from(el.children).forEach((c, idx) => {
+            const cc = c.offsetLeft + c.offsetWidth / 2;
+            const d = Math.abs(cc - mid);
+            if (d < bestD) { bestD = d; best = idx; }
+          });
+          if (best !== activeJar) setActiveJar(best);
+        }}
+        style={{
+          display: 'flex',
+          gap: 16,
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch',
+          padding: '2px 20px 6px',
+          margin: '0 -20px',
+          scrollPaddingLeft: 20,
+        }}
       >
-      {slots.map((bean, i) => (
-        <m.div key={i} variants={listItem} {...(i === 0 ? { 'data-tour': 'jar-slots' } : {})}>
-          {/* Jar eyebrow row */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-          }}>
-            {/* Refined jar indicator pill */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: bean ? C.accentSoft : C.bgDeep,
-              borderRadius: radius.pill,
-              padding: '4px 10px 4px 6px',
-              border: `1px solid ${bean ? C.accentLight : C.hairline}`,
-            }}>
-              <img
-                src={bean ? '/images/jar-full.webp' : '/images/jar-empty.webp'}
-                alt={bean ? 'Full jar' : 'Empty jar'}
-                style={{ width: 18, height: 18, objectFit: 'contain' }}
-              />
-              <span style={{
-                ...type.label,
-                color: bean ? C.accent : C.textLight,
-                fontSize: 11,
-              }}>
-                Jar {i + 1}
-              </span>
+        {slots.map((bean, i) => (
+          <div
+            key={i}
+            style={{ scrollSnapAlign: 'center', flex: '0 0 86%', maxWidth: 430 }}
+            {...(i === 0 ? { 'data-tour': 'jar-slots' } : {})}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '0 2px' }}>
+              <span style={{ ...type.label, color: bean ? C.accent : C.textLight, fontSize: 11 }}>Jar {i + 1}</span>
+              <div style={{ flex: 1, height: 1, background: C.hairline }} />
             </div>
-            {/* Hairline separator that extends to fill remaining space */}
-            <div style={{ flex: 1, height: 1, background: C.hairline }} />
-          </div>
-
-          {bean ? (
-            <BeanCard bean={bean} updateBean={updateBean} deleteBean={deleteBean} onLearn={isDemo ? onDemoAction : handleLearn} uid={uid} tourTag={i === 0 ? 'bean-actions' : undefined} actions={
-              <div style={{ paddingTop: 14 }}>
-                <div style={{ borderTop: `1px solid ${C.hairline}`, margin: '0 16px' }} />
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr 1fr 1fr',
-                  gap: 8,
-                  padding: '12px 16px 16px',
-                  alignItems: 'stretch',
-                }}>
-                  <div {...(i === 0 ? { 'data-tour': 'brew-button' } : {})}>
-                    <BrewButton
-                      bean={bean}
-                      label={brewMethod.label}
-                      isHandBrew={isHandBrew}
-                      brewMenuBean={brewMenuBean}
-                      setBrewMenuBean={setBrewMenuBean}
-                      onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
-                      onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
-                      compact={false}
-                    />
-                  </div>
-                  <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
-                  <PillButton color={C.textMuted} bg={C.bgDeep} icon={<Undo2 size={18} />} label="Return" onClick={() => setReturnConfirm(bean)} />
-                  <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
-                </div>
-              </div>
-            } />
-          ) : (
-            /* Empty slot — elegant dashed card */
-            <m.div
-              whileTap={{ scale: 0.985 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-              onClick={() => onOpenBean(null, i + 1)}
-              style={{
-                background: C.accentSoft,
-                borderRadius: radius.lg,
-                border: `1.5px dashed ${C.accentLight}`,
-                padding: '28px 24px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-              }}
+            <div
+              ref={(el) => { cardRefs.current[i] = el; }}
+              style={{ transformOrigin: 'center top', willChange: 'transform, opacity' }}
             >
-              <div style={{
-                width: 40, height: 40, borderRadius: radius.pill,
-                background: `rgba(168,106,56,0.12)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 12px',
-              }}>
-                <Plus size={20} color={C.accent} />
-              </div>
-              <div style={{ fontFamily: fonts.heading, fontSize: 16, color: C.text, fontWeight: 600, marginBottom: 4 }}>
-                Open a bean
-              </div>
-              <div style={{ ...type.body, color: C.textLight }}>
-                Tap to fill this jar from your inventory
-              </div>
-            </m.div>
-          )}
-        </m.div>
-      ))}
-      </m.div>
+            {bean ? (
+              <ShelfCard
+                bean={bean}
+                onOpenDetail={openDetail}
+                actions={
+                  <div style={{ padding: '12px 18px 14px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    <div style={{ borderTop: `1px solid ${C.hairline}`, marginBottom: 1 }} />
+                    <div {...(i === 0 ? { 'data-tour': 'brew-button' } : {})}>
+                      <BrewButton
+                        bean={bean}
+                        label={brewMethod.label}
+                        isHandBrew={isHandBrew}
+                        brewMenuBean={brewMenuBean}
+                        setBrewMenuBean={setBrewMenuBean}
+                        onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
+                        onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
+                        compact={false}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
+                      <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label="Learn" onClick={() => (isDemo ? onDemoAction : handleLearn)?.(bean)} />
+                      <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
+                    </div>
+                  </div>
+                }
+              />
+            ) : (
+              <m.div
+                whileTap={{ scale: 0.985 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                onClick={() => onOpenBean(null, i + 1)}
+                style={{
+                  ...cardBase, borderRadius: 28,
+                  background: C.accentSoft, border: `1.5px dashed ${C.accentLight}`,
+                  height: 448, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                  cursor: 'pointer', padding: '28px 24px', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <div style={{ width: 56, height: 56, borderRadius: radius.pill, background: 'rgba(162,99,47,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Plus size={26} color={C.accent} />
+                </div>
+                <div style={{ ...type.h2, color: C.text, marginBottom: 6 }}>Open a bean</div>
+                <div style={{ ...type.body, color: C.textLight, maxWidth: 200 }}>Tap to fill this jar from your inventory</div>
+              </m.div>
+            )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Page indicator — tracks the focused jar */}
+      {slots.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+          {slots.map((_, i) => (
+            <m.div
+              key={i}
+              animate={{ width: i === activeJar ? 18 : 6, opacity: i === activeJar ? 1 : 0.4 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+              style={{ height: 6, borderRadius: 3, background: i === activeJar ? C.accent : C.accentLight }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Recommendations */}
       {recs.length > 0 && (
@@ -526,7 +583,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       <Modal open={!!celebratingBean} onClose={() => setCelebratingBean(null)} title="" centered>
         <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
           <video
-            src="/images/ruphus-animations/ruphus-fist-pump.mp4"
+            src={assetUrl("/images/ruphus-animations/ruphus-fist-pump.mp4")}
             autoPlay muted playsInline
             onPlay={() => setTimeout(() => { setCelebratingBean(null); setToast('Bag finished!'); }, 2200)}
             style={{
@@ -562,6 +619,28 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           updateBean={updateBean}
           deleteBean={deleteBean}
           isNewBean
+          uid={uid}
+        />
+      )}
+      {detailBean && (
+        <BeanDetailCard
+          bean={detailBean}
+          tastings={tastings}
+          originRect={morphRect}
+          onClose={closeDetail}
+          onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
+          onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}
+          onFreeze={handleFreeze}
+          onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
+        />
+      )}
+      {editBean && (
+        <EditBeanModal
+          open={!!editBean}
+          onClose={() => setEditBean(null)}
+          bean={editBean}
+          updateBean={updateBean}
+          deleteBean={deleteBean}
           uid={uid}
         />
       )}
