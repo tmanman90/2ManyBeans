@@ -75,12 +75,14 @@ try {
     else if (!cta.blur || !cta.tint || !cta.sheen) fail('R3: CTA is not a Liquid Glass button: ' + JSON.stringify(cta));
     else console.log('OK  invitation CTA is Liquid Glass (blur + tint + sheen)');
 
-    // R4 — tap the CTA → the guided session opens to the 6-step spine.
+    // R4 — tap the CTA → the guided session opens. The guided entry is now the intelligent
+    // tasting wizard (see scripts/verify-wizard.mjs for the full spine), which opens to a
+    // predict-then-confirm intro before the Hoffmann steps.
     await page.getByText('Start guided tasting', { exact: false }).first().click().catch(() => {});
     await page.waitForTimeout(700);
-    const steps = await Promise.all(['Smell', 'Acidity', 'Finish'].map(s => page.getByText(s, { exact: true }).first().isVisible().catch(() => false)));
-    if (!steps.every(Boolean)) fail('R4: guided session did not open to the 6-step spine: ' + JSON.stringify(steps));
-    else console.log('OK  guided session opens to the step spine');
+    const wizardOpen = await page.getByText('What to expect', { exact: false }).first().isVisible().catch(() => false);
+    if (!wizardOpen) fail('R4: guided tasting CTA did not open the wizard intro');
+    else console.log('OK  guided tasting opens the intelligent wizard');
 
     if (errors.length) fail('console/page errors: ' + JSON.stringify(errors.slice(0, 6)));
     await page.close();
