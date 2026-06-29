@@ -43,7 +43,6 @@ export function SegmentedControl({ options, value, onChange, reduce, groupId = '
               fontFamily: fonts.body, fontWeight: 700, fontSize: 12.5, letterSpacing: '0.02em',
               color: active ? C.cream : C.textMuted,
               textShadow: active ? '0 1px 2px rgba(40,20,8,0.28)' : 'none',
-              transition: 'color 0.18s ease',
             }}>{label}</span>
           </button>
         );
