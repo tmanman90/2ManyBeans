@@ -8,6 +8,7 @@ import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 import { AnimatePresence, useReducedMotion } from 'framer-motion';
 import { TasteFingerprint } from '../components/TasteFingerprint';
 import { TastingDetailCard } from '../components/TastingDetailCard';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { haptic } from '../lib/haptics';
 import { today } from '../lib/peakStatus';
 import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
@@ -978,33 +979,41 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                     </div>
                   )}
 
-                  {/* Big primary CTA — tactile, depth, leading icon + trailing arrow */}
+                  {/* Big primary CTA — Liquid Glass (iOS 26): tinted-glass body + specular rim
+                      sheen + inner glow + floating shadow; press scales + brightens + springs. */}
                   <m.button
                     onClick={hasBeans ? startChat : undefined}
                     disabled={!hasBeans}
-                    whileTap={reduceMotion || !hasBeans ? undefined : { scale: 0.975, y: 1 }}
+                    whileTap={reduceMotion || !hasBeans ? undefined : { scale: 0.975, filter: 'brightness(1.08)' }}
                     transition={motion.spring.snappy}
                     style={{
-                      position: 'relative', overflow: 'hidden', width: '100%', border: 'none',
+                      position: 'relative', overflow: 'hidden', isolation: 'isolate', width: '100%',
+                      border: hasBeans ? '1px solid rgba(255,255,255,0.30)' : `1px solid ${C.border}`,
                       cursor: hasBeans ? 'pointer' : 'not-allowed',
-                      background: hasBeans ? C.accent : C.cardMuted,
-                      color: hasBeans ? C.cream : C.textLight,
+                      background: hasBeans
+                        ? 'linear-gradient(176deg, rgba(184,120,70,0.96) 0%, rgba(150,90,48,0.97) 45%, rgba(120,72,40,0.98) 100%)'
+                        : C.cardMuted,
+                      WebkitBackdropFilter: 'blur(14px) saturate(170%)', backdropFilter: 'blur(14px) saturate(170%)',
+                      color: hasBeans ? '#FFF7EE' : C.textLight,
                       padding: '15px 16px 15px 15px', borderRadius: radius.lg,
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
                       fontFamily: fonts.body, fontSize: 15, fontWeight: 700, letterSpacing: '0.01em',
+                      textShadow: hasBeans ? '0 1px 2px rgba(40,20,8,0.30)' : 'none',
                       boxShadow: hasBeans
-                        ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 4px rgba(70,41,26,0.18), 0 10px 24px rgba(162,99,47,0.30)'
+                        ? 'inset 0 1px 0 rgba(255,255,255,0.52), inset 0 -2px 7px rgba(40,20,8,0.30), 0 1px 2px rgba(70,41,26,0.20), 0 12px 30px rgba(120,70,34,0.36)'
                         : 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <span style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: hasBeans ? 'rgba(255,255,255,0.18)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {hasBeans && <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '52%', borderRadius: 'inherit', background: 'linear-gradient(180deg, rgba(255,255,255,0.36) 0%, rgba(255,255,255,0.04) 100%)', pointerEvents: 'none', zIndex: 0 }} />}
+                    {hasBeans && <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(130% 90% at 16% -10%, rgba(255,238,214,0.24), transparent 58%)', pointerEvents: 'none', zIndex: 0 }} />}
+                    <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: hasBeans ? 'rgba(255,255,255,0.20)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <MessageCircle size={16} />
                       </span>
                       <span>{hasBeans ? 'Start guided tasting' : 'Add a bean to start'}</span>
                     </span>
-                    {hasBeans && <ChevronRight size={20} style={{ position: 'relative', opacity: 0.85 }} />}
+                    {hasBeans && <ChevronRight size={20} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />}
                   </m.button>
 
                   {/* Quiet scaffolding line (no chrome) */}
@@ -1330,28 +1339,16 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
         </div>
       ), document.body)}
 
-      {/* Sort Controls */}
+      {/* Sort Controls — sliding Liquid Glass segmented control */}
       {mode === 'list' && tastings.length > 0 && (
-        <div style={{ display: 'inline-flex', background: C.bgDeep, borderRadius: radius.pill, padding: 3, gap: 2, border: `1px solid ${C.border}`, marginBottom: 14 }}>
-          {[['date', 'Recent'], ['rating', 'Top rated']].map(([k, l]) => (
-            <button
-              key={k}
-              onClick={() => setSortBy(k)}
-              style={{
-                padding: '7px 16px',
-                borderRadius: radius.pill,
-                border: 'none',
-                background: sortBy === k ? C.accent : 'transparent',
-                color: sortBy === k ? C.cream : C.textMuted,
-                fontFamily: fonts.body, fontSize: 12, fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.18s cubic-bezier(0.22,1,0.36,1)',
-                letterSpacing: '0.02em',
-                boxShadow: sortBy === k ? shadows.button : 'none',
-                minHeight: 36,
-              }}
-            >{l}</button>
-          ))}
+        <div style={{ marginBottom: 14 }}>
+          <SegmentedControl
+            options={[['date', 'Recent'], ['rating', 'Top rated']]}
+            value={sortBy}
+            onChange={(k) => { haptic.selection(); setSortBy(k); }}
+            reduce={reduceMotion}
+            groupId="tasting-sort"
+          />
         </div>
       )}
 

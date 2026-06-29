@@ -60,15 +60,20 @@ try {
     // ratings present (StarRating renders bean/star buttons or svgs)
     if (fingerprints >= 2 && !stripe) console.log(`OK  journal taste-fingerprints (${fingerprints}), no left-stripe`);
 
-    // R3 — invitation hero: "Start guided tasting" CTA is a SOLID button (no gradient chrome).
-    const ctaSolid = await page.evaluate(() => {
+    // R3 — invitation hero: "Start guided tasting" CTA is a LIQUID GLASS button
+    // (tinted-glass body + backdrop blur + a specular rim sheen overlay), not a flat fill.
+    const cta = await page.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find(x => /Start guided tasting/i.test(x.textContent || ''));
       if (!b) return null;
-      return !(getComputedStyle(b).backgroundImage || '').includes('gradient');
+      const s = getComputedStyle(b);
+      const blur = (s.backdropFilter || s.webkitBackdropFilter || '').includes('blur');
+      const tint = (s.backgroundImage || '').includes('gradient');
+      const sheen = !!b.querySelector('span[aria-hidden]'); // specular rim / inner glow overlay
+      return { blur, tint, sheen };
     });
-    if (ctaSolid === null) fail('R3: "Start guided tasting" CTA missing');
-    else if (!ctaSolid) fail('R3: CTA still uses gradient chrome');
-    else console.log('OK  invitation hero de-slopped (solid CTA)');
+    if (!cta) fail('R3: "Start guided tasting" CTA missing');
+    else if (!cta.blur || !cta.tint || !cta.sheen) fail('R3: CTA is not a Liquid Glass button: ' + JSON.stringify(cta));
+    else console.log('OK  invitation CTA is Liquid Glass (blur + tint + sheen)');
 
     // R4 — tap the CTA → the guided session opens to the 6-step spine.
     await page.getByText('Start guided tasting', { exact: false }).first().click().catch(() => {});
