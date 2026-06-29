@@ -323,6 +323,15 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
   const pullStart = useRef(null);
   const bagSrc = useStrippedBag(bagPhotoFor(bean));
 
+  // Lock the page behind the card so a downward swipe-to-dismiss on the front is never
+  // stolen by the background scroll (the culprit behind the "buggy on Archive's long
+  // timeline, fine on Inventory/Rotation" front-swipe). Restore on close.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   // ---- Hero morph (manual FLIP): fly the bag from its shelf rect into the card ----
   // layoutId can't project through the 3D flip card + portal, so we animate a floating
   // bag overlay (pure transform) from the shelf rect to the card's bag rect, then hand
@@ -473,7 +482,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={{ top: 0, bottom: 0.6 }}
           onDragEnd={(e, info) => { if (info.offset.y > 110 || info.velocity.y > 650) onClose(); }}
-          style={{ width: '100%', maxWidth: 384, height: 'min(90vh, 720px)', perspective: 2200, touchAction: 'pan-y' }}
+          style={{ width: '100%', maxWidth: 384, height: 'min(90vh, 720px)', perspective: 2200, touchAction: flipped ? 'pan-y' : 'none' }}
         >
           <m.div
             animate={{ rotateY: flipped ? 180 : 0 }}
