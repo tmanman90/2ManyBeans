@@ -1,0 +1,129 @@
+version: 1
+
+meta:
+  name: inventory-roaster-rails
+  source_plan: docs/plans/2026-06-28-002-feat-inventory-roaster-rails-plan.md
+
+goal:
+  statement: >
+    Rebuild the Inventory tab so it reads like App Store "by developer" shelves: scroll vertically
+    through roaster sections (alphabetical, "ROASTER · count" headers), swipe horizontally through
+    that roaster's beans rendered as the flagship card, and tap a card to fly open the trading card
+    via the hero morph. Sealed-bean primary action is "Open into jar" (Brew preserved as secondary).
+    Reuses ShelfCard, BeanDetailCard, and the manual-FLIP morph. Visual/UX only; no Firebase or
+    feature changes; dev channel only.
+  definition_of_done: >
+    Inventory body is a vertical list of alphabetical roaster sections, each a horizontal scroll-snap
+    rail of flagship ShelfCards; tapping a card morphs open the BeanDetailCard (bag flies, no teleport);
+    the card/detail primary action is "Open into jar" (disabled with an explanation when no empty slot)
+    with Brew/Finish/Learn preserved and no Taste; search still filters across roasters and the no-result
+    + empty states show; open-into-jar / edit / delete / finish still work; reduced-motion disables the
+    morph; `npx vite build` exits 0 and the Inventory Playwright harness renders multi-roaster mock data
+    with rails scrollable, alphabetical order, a working tap-morph, and zero console errors; codex review
+    is clean against the rubric; and Tal signs off on device that the rails, morph, and open-into-jar
+    feel right.
+  requirements:
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
+    - R7
+    - R8
+    - R9
+    - R10
+  context_sources:
+    - file: docs/plans/2026-06-28-002-feat-inventory-roaster-rails-plan.md
+    - file: docs/plans/2026-06-28-001-feat-hero-card-morph-plan.md
+    - file: lessons.md
+
+verification:
+  - id: v1-build
+    type: programmatic
+    check: ["npx", "vite", "build", "--logLevel", "error"]
+    expect: exit_zero
+  - id: v2-harness
+    type: programmatic
+    check: ["node", "scripts/verify-inventory.mjs"]
+    expect: exit_zero
+  - id: v3-review
+    type: judge
+    judge: codex
+    rubric: >
+      Adversarially review the Inventory-rails diff. FAIL if: roaster sections are not alphabetical
+      or the "ROASTER · count" header/eyebrow is missing or count is not tabular-nums (R1); a roaster's
+      beans are not in a horizontal scroll-snap rail of ShelfCards (R2); the action footer removed Brew
+      from sealed beans, dropped Finish/Learn, or added Taste, or "Open into jar" is not primary / is a
+      dead button when no empty slot exists (R3, R5); tapping a card does not open BeanDetailCard via the
+      morph, or the morph is not transform/opacity-only (R4, R8); search/no-result/empty states or the
+      open-into-jar / edit / delete / finish handlers regressed (R6, R7); the reduced-motion gate is
+      missing (R8); design-bank violations appear — more than one accent, heavy/glow shadows, non-hairline
+      dividers, missing tabular-nums, motion >300ms or not ease-out (R9); or the diff touches Firebase
+      reads/writes, the bean data model, statuses, other tabs, or onboarding (R10). Also FAIL if two
+      BeanDetailHost instances can mount at once. PASS only when rails are alphabetical scroll-snap,
+      actions are correct + non-regressing, the morph is reused cleanly, and the diff is scope- and
+      design-clean.
+  - id: v4-human
+    type: human
+    prompt: >
+      On the dev app (device): scroll Inventory vertically through alphabetical roaster sections, swipe
+      a roaster's rail horizontally, tap a bean and confirm it flies open via the morph, use "Open into
+      jar" to move a sealed bean into rotation, and confirm search still works — proving R1, R2, R4, R5
+      and the overall feel.
+
+evidence_map:
+  R1: v2-harness
+  R2: v2-harness
+  R3: v3-review
+  R4: v2-harness
+  R5: v3-review
+  R6: v2-harness
+  R7: v3-review
+  R8: v3-review
+  R9: v3-review
+  R10: v3-review
+
+council:
+  - id: codex
+    role: judge
+    cli: codex
+
+gates:
+  plan_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v3-review]
+    max_revisions: 2
+  delivery_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v1-build, v2-harness, v3-review, v4-human]
+    max_revisions: 3
+
+loop_control:
+  max_iterations: 7
+  cycle_cap: 4
+  quality_streak: 2
+  no_progress:
+    max_stalled_iterations: 2
+    action: stop
+  budget:
+    tokens: 1200000
+
+scope_guard:
+  - Do NOT change Firebase reads/writes, the bean data model, statuses, or any feature behavior (layout/presentation only).
+  - Do NOT touch other tabs (Rotation logic stays; only an opt-in shared BeanDetailHost extraction) or onboarding.
+  - Do NOT change what Inventory shows (still SEALED beans) or the open-into-jar / edit / delete / finish handlers — only how they're laid out and triggered.
+  - Do NOT build per-rail depth-of-field scaling or per-roaster logos in v1 (deferred).
+  - Do NOT animate any non-transform/opacity property; do not deploy to production or merge to main (dev channel only).
+
+execution:
+  mode: goal
+  isolation: branch
+
+model_policy:
+  orchestrator: opus
+  subagents: sonnet
+  reviewer: codex
+  review_cadence: per_phase

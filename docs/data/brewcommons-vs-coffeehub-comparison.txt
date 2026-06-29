@@ -1,0 +1,64 @@
+====================================================================================================
+BREW COMMONS vs COFFEE HUB — GRIND & RECIPE COMPARISON (Single Serve, neutral sliders)
+====================================================================================================
+
+--- Washed Ethiopia Heirloom (light, 1900m) ---
+  Brew Commons:  Grind 3.2 (~510um) | 205F (96.1C) | 1:18 | Bloom 3x/55s | 5 pulses
+  Coffee Hub:    Grind SS=4.2 / Batch=6.2 (family: washed-ethiopia-clarity)
+  GRIND DELTA:   BC=3.2 vs US=4.2
+
+--- Washed Kenya SL28 (light, 1800m) ---
+  Brew Commons:  Grind 3.1 (~465um) | 205F (96.1C) | 1:18 | Bloom 3x/55s | 4 pulses
+  Coffee Hub:    Grind SS=4.1 / Batch=6.2 (family: washed-kenya-clarity)
+  GRIND DELTA:   BC=3.1 vs US=4.1
+
+--- Natural Ethiopia Heirloom (light, 2000m) ---
+  Brew Commons:  Grind 4.1 (~600um) | 205F (96.1C) | 1:17.5 | Bloom 3x/45s | 4 pulses
+  Coffee Hub:    Grind SS=4.2 / Batch=6.2 (family: clean-natural-fruit)
+  GRIND DELTA:   BC=4.1 vs US=4.2
+
+--- Washed Colombia Gesha (light, 1700m) ---
+  Brew Commons:  Grind 3.2 (~510um) | 205F (96.1C) | 1:18 | Bloom 3x/60s | 5 pulses
+  Coffee Hub:    Grind SS=4.2 / Batch=6.1 (family: washed-floral-clarity)
+  GRIND DELTA:   BC=3.2 vs US=4.2
+
+--- Washed Colombia Caturra (medium, 1500m) ---
+  Brew Commons:  Grind 5.0 (~690um) | 202F (94.4C) | 1:16.5 | Bloom 2x/35s | 3 pulses
+  Coffee Hub:    Grind SS=5.1 / Batch=7 (family: medium-washed)
+  GRIND DELTA:   BC=5.0 vs US=5.1
+
+--- Natural Brazil Mundo Novo (dark, 1000m) ---
+  Brew Commons:  Grind 7.0 (~960um) | 186F (85.6C) | 1:14.5 | Bloom 2x/25s | 2 pulses
+  Coffee Hub:    Grind SS=7 / Batch=7.2 (family: dark-roast)
+  GRIND DELTA:   BC=7.0 vs US=7
+
+--- Honey Guatemala Pacamara (light, 1600m) ---
+  Brew Commons:  Grind 4.2 (~645um) | 205F (96.1C) | 1:17 | Bloom 3x/50s | 4 pulses
+  Coffee Hub:    Grind SS=4.2 / Batch=7 (family: processed-clarity)
+  GRIND DELTA:   SAME
+
+--- Washed Colombia Pink Bourbon (light, 1800m) ---
+  Brew Commons:  Grind 3.0 (~420um) | 205F (96.1C) | 1:18 | Bloom 3x/55s | 6 pulses
+  Coffee Hub:    Grind SS=4.2 / Batch=6.1 (family: washed-floral-clarity)
+  GRIND DELTA:   BC=3.0 vs US=4.2
+
+====================================================================================================
+BATCH BREW COMPARISON
+====================================================================================================
+
+--- Washed Ethiopia Heirloom (light, 1900m) (BATCH) ---
+  Brew Commons:  Grind 5.2 (~780um) | 205F (96.1C) | 1:18 | 6 pulses
+  Coffee Hub:    Grind Batch=6.2
+
+--- Washed Kenya SL28 (light, 1800m) (BATCH) ---
+  Brew Commons:  Grind 5.1 (~735um) | 205F (96.1C) | 1:18 | 5 pulses
+  Coffee Hub:    Grind Batch=6.2
+
+--- Natural Ethiopia Heirloom (light, 2000m) (BATCH) ---
+  Brew Commons:  Grind 6.1 (~870um) | 205F (96.1C) | 1:17.5 | 5 pulses
+  Coffee Hub:    Grind Batch=6.2
+
+--- Washed Colombia Gesha (light, 1700m) (BATCH) ---
+  Brew Commons:  Grind 5.2 (~780um) | 205F (96.1C) | 1:18 | 6 pulses
+  Coffee Hub:    Grind Batch=6.1
+

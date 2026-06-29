@@ -84,22 +84,22 @@ export function AxisSlider({ axis, value, onChange, expected = null, reduce = fa
           </div>
         )}
 
-        {/* accent fill */}
+        {/* accent fill — transform/scaleX only (never animate width); snaps to the finger */}
         <div style={{
-          position: 'absolute', left: 0, width: `${pct}%`, height: 12, borderRadius: radius.pill,
+          position: 'absolute', left: 0, width: '100%', height: 12, borderRadius: radius.pill,
+          transformOrigin: 'left center', transform: `scaleX(${Math.max(0.0001, pct / 100)})`,
           background: touched ? `linear-gradient(180deg, ${C.accentLight}, ${C.accent})` : 'transparent',
           boxShadow: touched ? 'inset 0 1px 0 rgba(255,255,255,0.4)' : 'none',
-          transition: reduce ? 'none' : `width ${M.dur.fast}s ${M.cssOut}`,
         }} />
 
-        {/* Liquid Glass thumb */}
+        {/* Liquid Glass thumb — positioned via static left (no left animation); only the grab
+            SCALE animates (transform). framer `y` handles vertical centering so scale composes. */}
         <m.div
-          animate={{ left: `${pct}%`, scale: 1 }}
           whileTap={reduce ? {} : { scale: 1.14 }}
           transition={reduce ? { duration: 0 } : M.spring.snappy}
           style={{
-            position: 'absolute', top: '50%', width: 30, height: 30, marginLeft: -15,
-            transform: 'translateY(-50%)', borderRadius: '50%',
+            position: 'absolute', top: '50%', left: `${pct}%`, y: '-50%', width: 30, height: 30, marginLeft: -15,
+            borderRadius: '50%',
             background: touched ? `radial-gradient(120% 120% at 30% 25%, ${C.accentLight}, ${C.accent} 70%)` : C.cream,
             border: `1px solid ${touched ? 'rgba(255,255,255,0.4)' : C.border}`,
             boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.6), inset 0 -2px 5px rgba(40,20,8,0.26), 0 1px 2px rgba(70,41,26,0.2), 0 6px 16px rgba(120,70,34,0.34)',

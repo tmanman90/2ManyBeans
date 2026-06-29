@@ -73,7 +73,7 @@ The guided-tasting CTA opens a card-based wizard that walks the full Hoffmann ar
 - Cycle cap per unit/phase: `4`  (CLAUDE.md: stop on 5th attempt)
 - Quality streak to ship: `2` consecutive clean runs
 - No-progress stop: same failure x`2` -> `stop`
-- Budget ceiling: `tokens=8000000`
+- Budget ceiling: `tokens=10000000`
 
 ## Scope Guard (do NOT touch)
 

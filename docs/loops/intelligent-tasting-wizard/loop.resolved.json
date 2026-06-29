@@ -1,6 +1,6 @@
 {
   "$schema": "getup/loop.resolved.v1",
-  "compiled_at": "2026-06-29T05:39:03+00:00",
+  "compiled_at": "2026-06-29T05:53:17+00:00",
   "council": [
     {
       "cli": "codex",
@@ -152,7 +152,7 @@
   },
   "loop_control": {
     "budget": {
-      "tokens": 8000000
+      "tokens": 10000000
     },
     "cycle_cap": 4,
     "max_iterations": 9,

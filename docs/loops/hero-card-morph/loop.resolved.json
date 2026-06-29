@@ -1,0 +1,188 @@
+{
+  "$schema": "getup/loop.resolved.v1",
+  "compiled_at": "2026-06-28T04:12:11+00:00",
+  "council": [
+    {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  ],
+  "council_by_id": {
+    "codex": {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  },
+  "criteria_by_id": {
+    "v1-build": {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    "v2-harness": {
+      "check": [
+        "node",
+        "scripts/verify-morph.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-harness",
+      "type": "programmatic"
+    },
+    "v3-review": {
+      "id": "v3-review",
+      "judge": "codex",
+      "rubric": "Adversarially verify the morph diff. FAIL if: any non-transform/opacity property animates during the morph (width/height/top/left/backdrop-filter/blur => R2 fail); the scrim participates in the FLIP instead of its own AnimatePresence (R4); the bag float or a FitText useLayoutEffect can run mid-FLIP and cause a jump (R8); existing behavior regresses \u2014 flip to stat sheet, note rail, pull-to-dismiss front+back, stat-sheet scroll, peak badge (R5); the reduced-motion gate is missing or wrong (R6); or the diff touches Firebase reads/writes, the bean data model, any feature behavior, other tabs, or onboarding (R9). PASS only when the morph is layoutId-driven, transform/opacity-only, scrim-independent, regression-free, and scope-clean.\n",
+      "type": "judge"
+    },
+    "v4-human": {
+      "id": "v4-human",
+      "prompt": "On the dev app (device), tap a shelf card and confirm the bag visibly TRAVELS from the shelf card into the trading card (no fade/teleport), the close reverses gracefully, and there is no mid-morph jump or jank \u2014 proving R1, R3, R5(feel), R8 as experienced.\n",
+      "type": "human"
+    }
+  },
+  "evidence_map": {
+    "R1": "v2-harness",
+    "R2": "v3-review",
+    "R3": "v4-human",
+    "R4": "v3-review",
+    "R5": "v3-review",
+    "R6": "v2-harness",
+    "R7": "v1-build",
+    "R8": "v3-review",
+    "R9": "v3-review"
+  },
+  "execution": {
+    "isolation": "branch",
+    "mode": "goal"
+  },
+  "gates": {
+    "delivery_gate": {
+      "criteria": [
+        "v1-build",
+        "v2-harness",
+        "v3-review",
+        "v4-human"
+      ],
+      "max_revisions": 3,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    },
+    "plan_gate": {
+      "criteria": [
+        "v3-review"
+      ],
+      "max_revisions": 2,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    }
+  },
+  "goal": {
+    "context_sources": [
+      {
+        "file": "docs/plans/2026-06-28-001-feat-hero-card-morph-plan.md"
+      },
+      {
+        "file": "docs/internal/liquid-glass-button-spec.md"
+      },
+      {
+        "file": "lessons.md"
+      }
+    ],
+    "definition_of_done": "Tapping a shelf card morphs the bag continuously shelf->card and back on close, using transform/opacity only; the scrim fades independently; reduced-motion disables the morph; flip, note rail, pull-to-dismiss, stat-sheet scroll, peak badge and bag float all still work; `npx vite build` exits 0 and the shelf+detail Playwright harness renders both states with zero console errors and frame-capture shows the bag rect interpolating (not jumping); codex review is clean against the rubric; and Tal signs off on device that it looks and feels right.\n",
+    "requirements": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+      "R8",
+      "R9"
+    ],
+    "statement": "Make the bean bag photo physically travel (a continuous shared-element morph, not a fade-in) from the small Rotation shelf card into the full trading card when tapped, and morph back on close \u2014 the web-faithful equivalent of SwiftUI matchedGeometryEffect, built with framer-motion layoutId. Visual/animation only; no Firebase or feature changes; dev channel only.\n"
+  },
+  "loop_control": {
+    "budget": {
+      "tokens": 1000000
+    },
+    "cycle_cap": 4,
+    "max_iterations": 7,
+    "no_progress": {
+      "action": "stop",
+      "max_stalled_iterations": 2
+    },
+    "quality_streak": 2
+  },
+  "meta": {
+    "name": "hero-card-morph",
+    "source_plan": "docs/plans/2026-06-28-001-feat-hero-card-morph-plan.md"
+  },
+  "model_policy": {
+    "orchestrator": "opus",
+    "review_cadence": "per_phase",
+    "reviewer": "codex",
+    "subagents": "sonnet"
+  },
+  "scope_guard": [
+    "Do NOT change Firebase reads/writes, the bean data model, or any feature behavior (visual/animation only).",
+    "Do NOT touch other tabs (Inventory / Tasting / Chat / Archive) or onboarding.",
+    "Do NOT restructure shelf-card or trading-card content \u2014 only add the shared morph wrapper around the existing bag image.",
+    "Do NOT morph name/peak-badge in v1 (deferred).",
+    "Do NOT animate backdrop-filter, blur, or any non-transform/opacity property during the morph.",
+    "Do NOT deploy to production or merge to main \u2014 Capgo dev channel only."
+  ],
+  "source": "/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/docs/loops/hero-card-morph/loop.yaml",
+  "verification": [
+    {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/verify-morph.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-harness",
+      "type": "programmatic"
+    },
+    {
+      "id": "v3-review",
+      "judge": "codex",
+      "rubric": "Adversarially verify the morph diff. FAIL if: any non-transform/opacity property animates during the morph (width/height/top/left/backdrop-filter/blur => R2 fail); the scrim participates in the FLIP instead of its own AnimatePresence (R4); the bag float or a FitText useLayoutEffect can run mid-FLIP and cause a jump (R8); existing behavior regresses \u2014 flip to stat sheet, note rail, pull-to-dismiss front+back, stat-sheet scroll, peak badge (R5); the reduced-motion gate is missing or wrong (R6); or the diff touches Firebase reads/writes, the bean data model, any feature behavior, other tabs, or onboarding (R9). PASS only when the morph is layoutId-driven, transform/opacity-only, scrim-independent, regression-free, and scope-clean.\n",
+      "type": "judge"
+    },
+    {
+      "id": "v4-human",
+      "prompt": "On the dev app (device), tap a shelf card and confirm the bag visibly TRAVELS from the shelf card into the trading card (no fade/teleport), the close reverses gracefully, and there is no mid-morph jump or jank \u2014 proving R1, R3, R5(feel), R8 as experienced.\n",
+      "type": "human"
+    }
+  ],
+  "version": 1
+}

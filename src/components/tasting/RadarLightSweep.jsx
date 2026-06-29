@@ -130,7 +130,7 @@ export function RadarLightSweep({ scores, size = 240, complete = false, reduce =
       let bloomP = 0;
       if (bloom.current.active) {
         if (bloom.current.t0 < 0) bloom.current.t0 = ts;
-        bloomP = (ts - bloom.current.t0) / 900;
+        bloomP = (ts - bloom.current.t0) / 600; // deliberate-delight success bloom (design-bank 500–600ms)
         if (bloomP >= 1) bloom.current.active = false;
       }
       draw(sweep, bloomP);

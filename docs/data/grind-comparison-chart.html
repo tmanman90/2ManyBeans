@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grind Size Comparison: Coffee Hub vs Brew Commons</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #faf8f5;
+    color: #2c1810;
+    padding: 40px 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #1a0e08;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #8b7355;
+    margin-bottom: 32px;
+  }
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+    font-size: 13px;
+    align-items: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .legend-dot.ch { background: #4a90d9; }
+  .legend-dot.bc { background: #d94a4a; }
+  .legend-dot.delta { background: #e8c547; }
+
+  .chart-container {
+    position: relative;
+  }
+
+  /* Grid lines */
+  .grid {
+    position: absolute;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 30px;
+  }
+  .grid-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #e0d8cc;
+  }
+  .grid-label {
+    position: absolute;
+    bottom: -22px;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #8b7355;
+    font-weight: 600;
+  }
+
+  .bean-row {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    border-bottom: 1px solid #f0ebe3;
+    position: relative;
+  }
+  .bean-row:hover {
+    background: #f5f0e8;
+  }
+  .bean-row.active {
+    background: #eef5e8;
+  }
+  .bean-row.sealed {
+    background: #f0effd;
+  }
+
+  .bean-label {
+    width: 220px;
+    flex-shrink: 0;
+    font-size: 12px;
+    padding-right: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bean-label .roaster {
+    color: #8b7355;
+    font-size: 10px;
+  }
+  .bean-label .status {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .status-active { background: #d4edda; color: #155724; }
+  .status-sealed { background: #d6d4f0; color: #383670; }
+  .status-finished { background: #f0e8dd; color: #8b7355; }
+
+  .chart-area {
+    flex: 1;
+    position: relative;
+    height: 100%;
+  }
+
+  .dot {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .dot:hover {
+    transform: translate(-50%, -50%) scale(1.4);
+    z-index: 10;
+  }
+  .dot.ch {
+    background: #4a90d9;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .dot.bc {
+    background: #d94a4a;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .delta-bar {
+    position: absolute;
+    height: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, #d94a4a, #e8c547, #4a90d9);
+    border-radius: 2px;
+    opacity: 0.5;
+    z-index: 1;
+  }
+
+  .tooltip {
+    display: none;
+    position: absolute;
+    background: #2c1810;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 100;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .section-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b7355;
+    padding: 12px 0 6px;
+    border-bottom: 2px solid #d4c9b8;
+  }
+
+  .summary-box {
+    margin-top: 32px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #e0d8cc;
+    border-radius: 8px;
+  }
+  .summary-box h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  .summary-stat {
+    display: inline-block;
+    margin-right: 32px;
+    margin-bottom: 8px;
+  }
+  .summary-stat .num {
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .summary-stat .label {
+    font-size: 12px;
+    color: #8b7355;
+  }
+
+  .finer-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 600;
+    color: #8b7355;
+    top: -18px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Grind Size Comparison</h1>
+<p class="subtitle">Coffee Hub (current) vs Brew Commons algorithm, across all beans in Tal's inventory</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot ch"></div> Coffee Hub (current)</div>
+  <div class="legend-item"><div class="legend-dot bc"></div> Brew Commons</div>
+  <div class="legend-item"><div class="legend-dot delta"></div> Gap between them</div>
+  <span style="color:#8b7355; font-size:11px; margin-left:auto;">Ode Gen 2 grind scale. Left = finer. Right = coarser.</span>
+</div>
+
+<div class="chart-container" id="chart"></div>
+
+<div class="summary-box" id="summary"></div>
+
+<script>
+const beans = [
+  { name: "Elora Station Classic Washed Ethiopia", roaster: "Elto Coffee", status: "ACTIVE", origin: "Ethiopia", variety: "74158", process: "Classic Washed", ch: 4.2, bc: 3.2, family: "washed-ethiopia-clarity" },
+  { name: "Finca Catalan Pacamara", roaster: "ditta Artigianale", status: "ACTIVE", origin: "Guatemala", variety: "Pacamara", process: "Washed", ch: 4.2, bc: 4.1, family: "washed-ethiopia-clarity" },
+  { name: "Nelin Guzman", roaster: "Cat & Cloud", status: "ACTIVE", origin: "Honduras", variety: "Parainema", process: "Anaerobic Natural", ch: 4.2, bc: 4.2, family: "processed-clarity" },
+
+  { name: "Mulish", roaster: "Apollon's Gold", status: "SEALED", origin: "Ethiopia", variety: "Heirloom", process: "Washed", ch: 4.2, bc: 3.2, family: "washed-ethiopia-clarity" },
+  { name: "El Injerto", roaster: "Apollon's Gold", status: "SEALED", origin: "Guatemala", variety: "Pacamara", process: "Washed", ch: 4.2, bc: 4.1, family: "washed-ethiopia-clarity" },
+  { name: "Ethiopia Wessi Tima", roaster: "Momos Coffee", status: "SEALED", origin: "Ethiopia", variety: "?", process: "Anaerobic Honey", ch: 4.2, bc: 4.1, family: "processed-clarity" },
+  { name: "El Triangulo Geisha", roaster: "Apollon's Gold", status: "SEALED", origin: "Honduras", variety: "Geisha", process: "Washed", ch: 4.2, bc: 3.2, family: "washed-floral-clarity" },
+  { name: "El Placer Geisha", roaster: "Dayglow", status: "SEALED", origin: "Colombia", variety: "Geisha", process: "Anaerobic White Honey", ch: 4.2, bc: 4.0, family: "processed-clarity" },
+  { name: "Finca La Fuente", roaster: "Koppi", status: "SEALED", origin: "Colombia", variety: "Pink Bourbon", process: "Washed", ch: 4.2, bc: 3.1, family: "washed-floral-clarity" },
+
+  { name: "San Jose (Pacamara Natural)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Nicaragua", variety: "Pacamara", process: "Natural", ch: 4.2, bc: 5.0, family: "clean-natural-fruit" },
+  { name: "Chelchele (74112/74110 Nat)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Ethiopia", variety: "74112/74110", process: "Natural", ch: 4.2, bc: 4.1, family: "clean-natural-fruit" },
+  { name: "Chelbesa Natural", roaster: "Apollon's Gold", status: "FINISHED", origin: "Ethiopia", variety: "Wolisho/Dega", process: "Natural", ch: 4.2, bc: 4.1, family: "clean-natural-fruit" },
+  { name: "Finca San Antonio", roaster: "Prodigal", status: "FINISHED", origin: "Colombia", variety: "?", process: "Washed", ch: 4.2, bc: 4.0, family: "washed-floral-clarity" },
+  { name: "Wadi Jannat (Yemen SL34 Nat)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Yemen", variety: "SL34", process: "Natural", ch: 4.2, bc: 4.0, family: "clean-natural-fruit" },
+  { name: "Arbegona (74158 Natural)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Ethiopia", variety: "74158", process: "Natural", ch: 4.2, bc: 4.1, family: "clean-natural-fruit" },
+  { name: "Kenya Gichathaini AA", roaster: "Leaves (Tokyo)", status: "FINISHED", origin: "Kenya", variety: "SL28, SL34, Batian", process: "Washed", ch: 4.1, bc: 3.1, family: "washed-kenya-clarity" },
+  { name: "Santa Teresa 2000 (SL28 Honey)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Costa Rica", variety: "SL28", process: "White Honey", ch: 4.2, bc: 3.2, family: "processed-clarity" },
+  { name: "Elora Station (duplicate)", roaster: "ARCHERS", status: "FINISHED", origin: "Ethiopia", variety: "74158", process: "Classic Washed", ch: 4.2, bc: 3.2, family: "washed-ethiopia-clarity" },
+  { name: "Santa Ana (Dillaalghe)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Guatemala", variety: "Dillaalghe", process: "Washed", ch: 4.2, bc: 3.2, family: "washed-floral-clarity" },
+  { name: "Cafén (Geisha Adv Natural)", roaster: "Dayglow", status: "FINISHED", origin: "Colombia", variety: "Geisha", process: "Advanced Natural", ch: 4.2, bc: 4.1, family: "washed-floral-clarity" },
+  { name: "Elora (74158 Anaerobic Honey)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Ethiopia", variety: "74158", process: "Anaerobic Honey", ch: 4.2, bc: 4.0, family: "processed-clarity" },
+  { name: "Las Delicias Geisha Natural", roaster: "Apollon's Gold", status: "FINISHED", origin: "Nicaragua", variety: "Geisha", process: "Natural", ch: 4.2, bc: 4.1, family: "washed-floral-clarity" },
+  { name: "San Jose (extra)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Nicaragua", variety: "Pacamara", process: "Natural", ch: 4.2, bc: 5.0, family: "clean-natural-fruit" },
+  { name: "Rareglow (Geisha Adv Natural)", roaster: "Dayglow", status: "FINISHED", origin: "Colombia", variety: "Geisha", process: "Advanced Natural", ch: 4.2, bc: 4.1, family: "washed-floral-clarity" },
+  { name: "El Triangulo Geisha (fin)", roaster: "Apollon's Gold", status: "FINISHED", origin: "Honduras", variety: "Geisha", process: "Washed", ch: 4.2, bc: 3.2, family: "washed-floral-clarity" },
+  { name: "San Isidro Labrador Geisha", roaster: "Apollon's Gold", status: "FINISHED", origin: "Costa Rica", variety: "Geisha Classic", process: "Washed", ch: 4.2, bc: 3.2, family: "washed-floral-clarity" },
+  { name: "Layampata (Gesha Inka/SL9)", roaster: "Wonderstate", status: "FINISHED", origin: "Peru", variety: "Gesha Inka", process: "Washed", ch: 4.2, bc: 3.2, family: "washed-floral-clarity" },
+];
+
+// Chart config
+const MIN_GRIND = 2.5;
+const MAX_GRIND = 5.5;
+const CHART_LEFT = 220;
+
+function grindToPercent(grind) {
+  return ((grind - MIN_GRIND) / (MAX_GRIND - MIN_GRIND)) * 100;
+}
+
+const chart = document.getElementById('chart');
+
+// Grid lines
+const gridDiv = document.createElement('div');
+gridDiv.className = 'grid';
+gridDiv.style.position = 'relative';
+gridDiv.style.height = '0';
+chart.appendChild(gridDiv);
+
+const gridValues = [3.0, 3.1, 3.2, 4.0, 4.1, 4.2, 5.0];
+gridValues.forEach(g => {
+  const pct = grindToPercent(g);
+  const line = document.createElement('div');
+  line.className = 'grid-line';
+  line.style.left = pct + '%';
+  line.style.position = 'absolute';
+  line.style.top = '0';
+  line.style.height = (beans.length * 38 + 80) + 'px';
+  line.style.width = '1px';
+  line.style.background = g === 4.2 ? '#b8d4e8' : '#e8e2d8';
+  line.style.zIndex = '0';
+  if (g === 4.2) { line.style.width = '2px'; line.style.opacity = '0.6'; }
+  gridDiv.appendChild(line);
+
+  const label = document.createElement('div');
+  label.className = 'grid-label';
+  label.style.left = pct + '%';
+  label.style.position = 'absolute';
+  label.style.bottom = '-20px';
+  label.style.transform = 'translateX(-50%)';
+  label.textContent = g.toFixed(1);
+  gridDiv.appendChild(label);
+});
+
+// Finer/Coarser labels
+const finerLabel = document.createElement('div');
+finerLabel.className = 'finer-label';
+finerLabel.style.left = '0';
+finerLabel.textContent = 'FINER GRIND';
+gridDiv.appendChild(finerLabel);
+
+const coarserLabel = document.createElement('div');
+coarserLabel.className = 'finer-label';
+coarserLabel.style.right = '0';
+coarserLabel.textContent = 'COARSER GRIND';
+gridDiv.appendChild(coarserLabel);
+
+// Group by status
+const groups = [
+  { label: 'Active (in rotation)', beans: beans.filter(b => b.status === 'ACTIVE') },
+  { label: 'Sealed (queued)', beans: beans.filter(b => b.status === 'SEALED') },
+  { label: 'Finished (historical)', beans: beans.filter(b => b.status === 'FINISHED') },
+];
+
+const tooltip = document.createElement('div');
+tooltip.className = 'tooltip';
+chart.appendChild(tooltip);
+
+groups.forEach(group => {
+  if (group.beans.length === 0) return;
+
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.textContent = `${group.label} (${group.beans.length})`;
+  chart.appendChild(header);
+
+  group.beans.forEach(bean => {
+    const row = document.createElement('div');
+    row.className = 'bean-row ' + bean.status.toLowerCase();
+
+    const label = document.createElement('div');
+    label.className = 'bean-label';
+    const statusClass = bean.status === 'ACTIVE' ? 'status-active' : bean.status === 'SEALED' ? 'status-sealed' : 'status-finished';
+    label.innerHTML = `<span class="roaster">${bean.roaster}</span><br>${bean.name}`;
+
+    const chartArea = document.createElement('div');
+    chartArea.className = 'chart-area';
+
+    // Delta bar
+    const minG = Math.min(bean.ch, bean.bc);
+    const maxG = Math.max(bean.ch, bean.bc);
+    if (Math.abs(bean.ch - bean.bc) > 0.05) {
+      const bar = document.createElement('div');
+      bar.className = 'delta-bar';
+      bar.style.left = grindToPercent(minG) + '%';
+      bar.style.width = (grindToPercent(maxG) - grindToPercent(minG)) + '%';
+      if (bean.ch > bean.bc) {
+        bar.style.background = 'linear-gradient(90deg, #d94a4a, #e8c547, #4a90d9)';
+      } else {
+        bar.style.background = 'linear-gradient(90deg, #4a90d9, #e8c547, #d94a4a)';
+      }
+      chartArea.appendChild(bar);
+    }
+
+    // CH dot
+    const chDot = document.createElement('div');
+    chDot.className = 'dot ch';
+    chDot.style.left = grindToPercent(bean.ch) + '%';
+    chartArea.appendChild(chDot);
+
+    // BC dot
+    const bcDot = document.createElement('div');
+    bcDot.className = 'dot bc';
+    bcDot.style.left = grindToPercent(bean.bc) + '%';
+    chartArea.appendChild(bcDot);
+
+    // Tooltip on hover
+    const showTooltip = (e) => {
+      const delta = bean.ch - bean.bc;
+      const dir = delta > 0 ? 'BC grinds finer' : delta < 0 ? 'CH grinds finer' : 'Same';
+      tooltip.innerHTML = `<strong>${bean.roaster} ${bean.name}</strong><br>` +
+        `Coffee Hub: ${bean.ch} | Brew Commons: ${bean.bc}<br>` +
+        `Delta: ${Math.abs(delta).toFixed(1)} steps (${dir})<br>` +
+        `<span style="color:#aaa">${bean.origin} / ${bean.variety} / ${bean.process}</span><br>` +
+        `<span style="color:#aaa">Family: ${bean.family}</span>`;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 15) + 'px';
+      tooltip.style.top = (e.clientY - 30 + window.scrollY) + 'px';
+    };
+    const hideTooltip = () => { tooltip.style.display = 'none'; };
+    row.addEventListener('mousemove', showTooltip);
+    row.addEventListener('mouseleave', hideTooltip);
+
+    row.appendChild(label);
+    row.appendChild(chartArea);
+    chart.appendChild(row);
+  });
+});
+
+// Add padding for grid labels
+const spacer = document.createElement('div');
+spacer.style.height = '30px';
+chart.appendChild(spacer);
+
+// Summary
+const finerCount = beans.filter(b => b.ch > b.bc).length;
+const sameCount = beans.filter(b => Math.abs(b.ch - b.bc) < 0.05).length;
+const coarserCount = beans.filter(b => b.ch < b.bc).length;
+const avgDelta = beans.reduce((s, b) => s + (b.ch - b.bc), 0) / beans.length;
+
+// Beans where gap >= 1.0
+const bigGap = beans.filter(b => (b.ch - b.bc) >= 0.9);
+
+document.getElementById('summary').innerHTML = `
+  <h3>Summary</h3>
+  <div class="summary-stat"><div class="num" style="color:#d94a4a">${finerCount}</div><div class="label">BC grinds finer</div></div>
+  <div class="summary-stat"><div class="num" style="color:#666">${sameCount}</div><div class="label">Same grind</div></div>
+  <div class="summary-stat"><div class="num" style="color:#4a90d9">${coarserCount}</div><div class="label">CH grinds finer</div></div>
+  <div class="summary-stat"><div class="num">${avgDelta.toFixed(2)}</div><div class="label">Avg delta (steps)</div></div>
+  <div class="summary-stat"><div class="num">${bigGap.length}</div><div class="label">Beans with 1+ step gap</div></div>
+  <p style="margin-top:12px; font-size:13px; color:#8b7355;">
+    The biggest gaps are on washed specialty varieties (Gesha, Ethiopian heirloom, Kenya SL, Pink Bourbon).
+    Brew Commons pushes 1+ full Ode step finer on these. For naturals/honeys/anaerobics, both algorithms mostly agree.
+  </p>
+`;
+</script>
+</body>
+</html>

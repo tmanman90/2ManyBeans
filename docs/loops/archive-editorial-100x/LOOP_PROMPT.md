@@ -68,7 +68,7 @@ Every archive entry (featured cup + timeline row) leads with its ★ rating + on
 - Cycle cap per unit/phase: `4`  (CLAUDE.md: stop on 5th attempt)
 - Quality streak to ship: `2` consecutive clean runs
 - No-progress stop: same failure x`2` -> `stop`
-- Budget ceiling: `tokens=1400000`
+- Budget ceiling: `tokens=4000000`
 
 ## Scope Guard (do NOT touch)
 

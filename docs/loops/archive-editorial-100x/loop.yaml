@@ -126,7 +126,7 @@ loop_control:
     max_stalled_iterations: 2
     action: stop
   budget:
-    tokens: 1400000
+    tokens: 4000000
 
 scope_guard:
   - Do NOT change Firebase reads/writes, the bean/tasting data model, statuses, or restore/delete/finish logic (presentation only; read tasting fields, never write).

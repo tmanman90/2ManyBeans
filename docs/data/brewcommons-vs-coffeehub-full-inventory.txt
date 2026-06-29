@@ -1,0 +1,51 @@
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+FULL A/B COMPARISON: COFFEE HUB (current) vs BREW COMMONS — All Beans in Tal's Inventory
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Note: Most beans lack explicit roastLevel in Firestore, so Brew Commons defaults to "light" for those.
+Coffee Hub classifies by cup-structure family. Brew Commons uses additive deltas from roast/origin/variety/process/altitude.
+
+Bean                                                │ BC Grind │ CH Grind │ Delta  │ BC Temp   │ BC Ratio │ BC Bloom   │ BC Pulse │ Family
+────────────────────────────────────────────────────┼──────────┼──────────┼────────┼───────────┼──────────┼────────────┼──────────┼─────────────────────────
+Apollon's Go - Mulish                               │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ washed-ethiopia-clarity
+Apollon's Go - San Jose                             │  5.0     │  4.2     │ -0.8 ▼ │ 204F/95.6C │  1:16.5  │ 3x/45s     │ 3x 23s  │ clean-natural-fruit
+Apollon's Go - El Injerto                           │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/55s     │ 4x 23s  │ washed-ethiopia-clarity
+Apollon's Go - Chelchele                            │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/45s     │ 4x 23s  │ clean-natural-fruit
+Apollon's Go - Chelbesa Natural                     │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/45s     │ 4x 23s  │ clean-natural-fruit
+Prodigal - Finca San Antonio                        │  4.0     │  4.2     │ +0.2 ▲ │ 205F/96.1C │  1:17.5  │ 3x/50s     │ 4x 23s  │ washed-floral-clarity
+Apollon's Go - Wadi Jannat                          │  4.0     │  4.2     │ +0.2 ▲ │ 205F/96.1C │  1:17.0  │ 3x/45s     │ 3x 23s  │ clean-natural-fruit
+Apollon's Go - Arbegona                             │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/45s     │ 4x 23s  │ clean-natural-fruit
+Leaves (Toky - Kenya Gichathaini AA                 │  3.1     │  4.1     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 4x 23s  │ washed-kenya-clarity
+Momos Coffee - Ethiopia Wessi Tima                  │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/50s     │ 4x 23s  │ processed-clarity
+Apollon's Go - Santa Teresa 2000                    │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:17.5  │ 3x/50s     │ 4x 23s  │ processed-clarity
+ARCHERS - Elto Coffee Elora Station Classic W       │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ washed-ethiopia-clarity
+Apollon's Go - Santa Ana                            │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ washed-floral-clarity
+Dayglow - Cafén                                     │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/50s     │ 4x 23s  │ washed-floral-clarity
+Apollon's Go - Elora                                │  4.0     │  4.2     │ +0.2 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ processed-clarity
+Apollon's Go - Las Delicias Geisha                  │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/50s     │ 4x 23s  │ washed-floral-clarity
+Apollon's Go - San Jose (extra)                     │  5.0     │  4.2     │ -0.8 ▼ │ 204F/95.6C │  1:16.5  │ 3x/45s     │ 3x 23s  │ clean-natural-fruit
+Dayglow - Rareglow                                  │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/50s     │ 4x 23s  │ washed-floral-clarity
+Apollon's Go - El Triangulo                         │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/60s     │ 5x 23s  │ washed-floral-clarity
+Elto Coffee - Elora Station Classic Washed Ethiop   │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ washed-ethiopia-clarity
+Apollon's Go - San Isidro Labrador                  │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/60s     │ 5x 23s  │ washed-floral-clarity
+Apollon's Go - El Triangulo                         │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/60s     │ 5x 23s  │ washed-floral-clarity
+Dayglow (Pro - El Placer                            │  4.0     │  4.2     │ +0.2 ▲ │ 205F/96.1C │  1:18.0  │ 3x/60s     │ 5x 23s  │ processed-clarity
+Koppi - Finca La Fuente                             │  3.1     │  4.2     │ +1.1 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ washed-floral-clarity
+ditta Artigi - Finca Catalan de Las Mercedes Pacam  │  4.1     │  4.2     │ +0.1 ▲ │ 205F/96.1C │  1:17.5  │ 3x/55s     │ 4x 23s  │ washed-ethiopia-clarity
+Wonderstate - Layampata                             │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/60s     │ 5x 23s  │ washed-floral-clarity
+Cat & Cloud - Nelin Guzman                          │  4.2     │  4.2     │  SAME  │ 203F/95C │  1:17.0  │ 3x/50s     │ 4x 23s  │ processed-clarity
+Archers - Elora Station Classic Washed (TEST)       │  3.2     │  4.2     │ +1.0 ▲ │ 205F/96.1C │  1:18.0  │ 3x/55s     │ 5x 23s  │ washed-ethiopia-clarity
+
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+SUMMARY
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+Total beans compared: 28
+  Brew Commons FINER:  25 beans (CH grind is coarser than BC)
+  Coffee Hub FINER:    2 beans (CH grind is finer than BC)
+  Same grind:          1 beans
+  Average delta:       0.44 steps (positive = CH coarser)
+  Max delta:           1.1 steps
+
+KEY: "Delta" shows (Coffee Hub - Brew Commons). Positive = CH grinds coarser. Negative = CH grinds finer.
+     ▲ = CH is coarser than BC (BC says grind finer)
+     ▼ = CH is finer than BC (BC says grind coarser)

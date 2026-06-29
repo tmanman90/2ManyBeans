@@ -14,6 +14,11 @@ export default defineConfig({
     __APP_VARIANT__: JSON.stringify(appVariant),
     __GOOGLE_IOS_CLIENT_ID__: JSON.stringify(googleIosClientId),
   },
+  server: {
+    // Don't watch generated native projects (Capacitor iOS/Android + SPM
+    // checkouts) — they churn and trigger spurious dev reloads.
+    watch: { ignored: ['**/ios/**', '**/android/**'] },
+  },
   build: {
     // Stable vendor chunks so Capgo OTA deltas are small per deploy. A JS
     // change in `src/` only invalidates the `app` chunk, not the big vendor

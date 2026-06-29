@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>2manybeans · Onboarding Redesign — R1–R3</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Playfair+Display:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin: 0; padding: 0; background: #EFEAE3; font-family: 'Nunito', sans-serif; color: #3B2417; }
+  * { box-sizing: border-box; }
+  /* iPhone-shaped artboard frame */
+  .phone {
+    width: 390px; height: 844px;
+    border-radius: 48px;
+    overflow: hidden;
+    background: #FFFFFF;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(92,61,46,0.08), 0 24px 56px rgba(92,61,46,0.18);
+    border: 1px solid rgba(92,61,46,0.08);
+  }
+  .phone .status {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 44px; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px 0;
+    font-family: -apple-system, "SF Pro", system-ui;
+    font-weight: 600; font-size: 15px; color: #3B2417;
+    pointer-events: none;
+  }
+  .phone .notch {
+    position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 32px; border-radius: 18px; background: #1a1a1a; z-index: 31;
+  }
+  .phone .home {
+    position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+    width: 130px; height: 5px; border-radius: 3px;
+    background: rgba(59,36,23,0.45); z-index: 40; pointer-events: none;
+  }
+  .phone .stage-content {
+    position: absolute; inset: 0;
+    padding-top: 44px;
+  }
+  .phone .stage-content > div { width: 100%; height: 100%; }
+</style>
+
+<!-- ext-resource-dependency: required for bundling -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+  const { useState } = React;
+
+  // Persisted tweak defaults — stored between EDITMODE markers so the host
+  // can rewrite them on disk when the user changes a value.
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "mascotHeight": 390,
+    "peekHeight": 300,
+    "paywallVariant": "immersive"
+  }/*EDITMODE-END*/;
+
+  function Phone({ label, bg, children }) {
+    return (
+      <div className="phone" data-screen-label={label} style={{ background: bg }}>
+        <div className="notch" />
+        <div className="status">
+          <span>10:04</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 18, height: 12, borderRadius: 2, background: '#3B2417' }} />
+          </span>
+        </div>
+        <div className="stage-content">{children}</div>
+        <div className="home" />
+      </div>
+    );
+  }
+
+  function App() {
+    const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+    const [r2Value, setR2Value] = useState('v60');
+    const [r3Value, setR3Value] = useState('taste_more');
+    const [r5Index, setR5Index] = useState(1);
+    const [r7Name, setR7Name] = useState('Sam');
+    const [r7Grinder, setR7Grinder] = useState('fellow-ode-gen2');
+    const [r7Brew, setR7Brew] = useState('v60');
+    const [r12Consent, setR12Consent] = useState(true);
+    const [r13Plan, setR13Plan] = useState('annual');
+
+    const sharedTweaks = {
+      mascotHeight: tweaks.mascotHeight,
+      peekHeight: tweaks.peekHeight,
+      onAdvance: () => {},
+      onBack: () => {},
+    };
+
+    return (
+      <>
+        <DesignCanvas
+          title="2manybeans · Onboarding Redesign"
+          subtitle="Mascot-forward layout · R1–R13b · animation loops by Tal"
+          background="#EFEAE3"
+        >
+          <DCSection id="onb" title="Onboarding flow">
+            <DCArtboard id="r1" label="R1 · Welcome" width={390} height={844}>
+              <Phone label="01 R1 Welcome" bg="#FFFFFF">
+                <R1Welcome tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r2" label="R2 · Brew Goal" width={390} height={844}>
+              <Phone label="02 R2 Brew Goal" bg="#FFFFFF">
+                <R2Goal tweaks={sharedTweaks} value={r2Value} onSelect={setR2Value} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r3" label="R3 · Pain Point" width={390} height={844}>
+              <Phone label="03 R3 Pain Point" bg="#FFFFFF">
+                <R3Pain tweaks={sharedTweaks} value={r3Value} onSelect={setR3Value} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r4" label="R4 · Social Proof" width={390} height={844}>
+              <Phone label="04 R4 Social Proof" bg="#FFFFFF">
+                <R4Social tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r5" label="R5 · Palate Tinder" width={390} height={844}>
+              <Phone label="05 R5 Palate Tinder" bg="#FFFFFF">
+                <R5Tinder tweaks={sharedTweaks} cardIndex={r5Index} onSwipe={() => setR5Index(i => Math.min(i + 1, 4))} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r6" label="R6 · Personalized" width={390} height={844}>
+              <Phone label="06 R6 Personalized" bg="#FFFFFF">
+                <R6Personalized tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r7" label="R7 · Kit Setup" width={390} height={844}>
+              <Phone label="07 R7 Kit Setup" bg="#FFFFFF">
+                <R7Kit
+                  tweaks={sharedTweaks}
+                  displayName={r7Name} onName={setR7Name}
+                  grinder={r7Grinder} onGrinder={setR7Grinder}
+                  brew={r7Brew} onBrew={setR7Brew}
+                />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r8" label="R8 · Camera Permission" width={390} height={844}>
+              <Phone label="08 R8 Camera Permission" bg="#FFFFFF">
+                <R8Camera tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r9" label="R9 · Processing" width={390} height={844}>
+              <Phone label="09 R9 Processing" bg="#FFFFFF">
+                <R9Processing tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r10" label="R10 · Scan Demo" width={390} height={844}>
+              <Phone label="10 R10 Scan Demo" bg="#FFFFFF">
+                <R10Scan tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r11" label="R11 · Value Delivery" width={390} height={844}>
+              <Phone label="11 R11 Value Delivery" bg="#FFFFFF">
+                <R11Value tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r12" label="R12 · Trial Timeline" width={390} height={844}>
+              <Phone label="12 R12 Trial Timeline" bg="#FFFFFF">
+                <R12Trial tweaks={sharedTweaks} consent={r12Consent} onConsent={setR12Consent} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r13" label={`R13 · Paywall (${tweaks.paywallVariant === 'immersive' ? 'Immersive' : 'Sheet'})`} width={390} height={844}>
+              <Phone label="13 R13 Paywall" bg="#FFFFFF">
+                <R13Paywall tweaks={sharedTweaks} plan={r13Plan} onPlan={setR13Plan} variant={tweaks.paywallVariant} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r13-alt" label={`R13 · Paywall (${tweaks.paywallVariant === 'immersive' ? 'Sheet' : 'Immersive'})`} width={390} height={844}>
+              <Phone label="13 R13 Paywall Alt" bg="#FFFFFF">
+                <R13Paywall tweaks={sharedTweaks} plan={r13Plan} onPlan={setR13Plan} variant={tweaks.paywallVariant === 'immersive' ? 'sheet' : 'immersive'} />
+              </Phone>
+            </DCArtboard>
+
+            <DCArtboard id="r13b" label="R13b · Nudge" width={390} height={844}>
+              <Phone label="13b R13b Nudge" bg="#FFFFFF">
+                <R13bNudge tweaks={sharedTweaks} />
+              </Phone>
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+
+        <TweaksPanel title="Tweaks">
+          <TweakSection title="Mascot" subtitle="Hero screens use the full mascot stage; dense screens use a smaller peek so the controls have room.">
+            <TweakSlider
+              label="Hero mascot height"
+              value={tweaks.mascotHeight}
+              min={340} max={560} step={10}
+              onChange={(v) => setTweak('mascotHeight', v)}
+            />
+            <TweakSlider
+              label="Peek mascot height"
+              value={tweaks.peekHeight}
+              min={180} max={320} step={10}
+              onChange={(v) => setTweak('peekHeight', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Paywall" subtitle="Sheet keeps the mascot up top with a familiar plan grid. Immersive runs the loop edge-to-edge with the offer composited on top.">
+            <TweakRadio
+              label="Layout"
+              value={tweaks.paywallVariant}
+              options={[{ value: 'sheet', label: 'Sheet' }, { value: 'immersive', label: 'Immersive' }]}
+              onChange={(v) => setTweak('paywallVariant', v)}
+            />
+          </TweakSection>
+        </TweaksPanel>
+      </>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>

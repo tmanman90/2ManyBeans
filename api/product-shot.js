@@ -29,7 +29,7 @@ const PRODUCT_SHOT_PROMPT = `You are a product photography AI. Generate a NEW st
 IMPORTANT: Do NOT reproduce or collage the input photo. Instead, GENERATE a completely new image showing this coffee bag as if photographed in a professional studio.
 
 SCENE:
-- Show the full coffee bag standing upright on a seamless warm cream background (#FFF8F0)
+- Show the full coffee bag standing upright on a seamless near-white background (#FBFAF7)
 - The bag fills 60-70% of the frame, centered with 15-20% padding on all sides
 - Camera angle: straight-on with a very slight angle for depth
 - Soft diffused studio lighting from upper-left
@@ -47,7 +47,7 @@ OUTPUT: Square 1:1 composition, photorealistic studio product shot`;
 // card color so product shots blend seamlessly regardless of what Gemini
 // produces. Detects background via corner sampling, then smoothly replaces
 // pixels close to it with the target.
-const TARGET_BG = { r: 255, g: 248, b: 240 }; // #FFF8F0 — matches C.card
+const TARGET_BG = { r: 251, g: 250, b: 247 }; // #FBFAF7 — matches the trading-card paper (was warm cream #FFF8F0)
 async function normalizeProductShotBg(pngBuffer) {
   const { data, info } = await sharp(pngBuffer)
     .ensureAlpha()

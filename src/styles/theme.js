@@ -1,98 +1,121 @@
-// Color palette — 2manybeans "Modern Coffee Editorial" system
+// Color palette — 2manybeans "Warm Editorial, Elevated" system
 // Brand tokens: paper (bg), latte (cards), caramel (accent), espresso (text), sage (peak/fresh)
 // NOTE: every key here is consumed across ~60 files. Values are upgraded for the
 // redesign; keys are kept backward-compatible. New token groups (glass, type,
-// motion, expanded shadows/radius) are additive.
+// motion, frost/roast, expanded shadows/radius) are additive.
 export const C = {
-  // Backgrounds — deeper warm paper so near-white cards gain real elevation
-  bg: "#F3EDE4",           // warm paper — main background
-  bgDeep: "#EBE3D7",       // recessed wells, grouped-table backgrounds
-  cream: "#FFFDFA",        // near-white warm — cards, soft surfaces
-  card: "#FFFDFA",         // card fill
-  cardMuted: "#ECE3D8",    // warm gray — muted cards, disabled surfaces
+  // Backgrounds — warm paper. Cards are a cooler near-white so they truly lift
+  // off the page (the old system was one flat beige at one elevation).
+  bg: "#F1EADF",           // warm paper — main background
+  bgDeep: "#E7DECF",       // recessed wells, grouped-table backgrounds
+  cream: "#FFFEFB",        // near-white warm — cards, soft surfaces
+  card: "#FFFEFB",         // card fill
+  cardMuted: "#ECE3D6",    // warm gray — muted cards, disabled surfaces
 
   // Text — near-black espresso for premium crispness
-  text: "#2A1A10",         // espresso — primary text
-  textMuted: "#7A6A5C",    // mocha — secondary text
-  textLight: "#A18F7E",    // taupe — helper text, placeholders
+  text: "#241710",         // espresso — primary text
+  textMuted: "#6E5D4E",    // mocha — secondary text (darkened for contrast)
+  textLight: "#9C8A78",    // taupe — helper text, placeholders
 
   // Brand accent (caramel) — richer
-  accent: "#A86A38",       // caramel — brand actions, selected states
-  accentLight: "#D8B68A",  // light caramel — borders, subtle highlights
-  accentDark: "#4A2F1E",   // dark roast — pressed states
-  accentSoft: "#F3E4D2",   // caramel tint — selected chips, fills
+  accent: "#A2632F",       // caramel — brand actions, selected states
+  accentLight: "#D9B687",  // light caramel — borders, subtle highlights
+  accentDark: "#46291A",   // dark roast — pressed states
+  accentSoft: "#F4E5D1",   // caramel tint — selected chips, fills
+
+  // Deep espresso surfaces (hero, immersive chrome). Replaces hardcoded #43301F.
+  roast: "#33200F",        // hero background base
+  roastDeep: "#21130A",    // darkest espresso
 
   // Borders
-  border: "#E7DBCD",
-  borderLight: "#F1E9DE",
-  hairline: "rgba(74,47,30,0.10)",
+  border: "#E6D9C9",
+  borderLight: "#F1E8DC",
+  hairline: "rgba(70,41,26,0.10)",
+  hairlineStrong: "rgba(70,41,26,0.16)",
 
   // Status: peak / freshness
-  green: "#5C8A66",        // sage — peak window, fresh, alive
-  greenBg: "#E9F1EB",
+  green: "#5B8762",        // sage — peak window, fresh, alive
+  greenBg: "#E8F0EA",
 
   // Status: warning / aging
-  amber: "#B98A33",        // muted amber — aging, needs attention
-  amberBg: "#FBF3E1",
+  amber: "#B0832F",        // muted amber — aging, needs attention
+  amberBg: "#FAF1DF",
 
   // Status: error / problem
-  red: "#B65C45",          // soft terracotta — errors, destructive
-  redBg: "#FBEDE7",
+  red: "#B25741",          // soft terracotta — errors, destructive
+  redBg: "#FAEAE3",
 
   // Status: archive / inactive
-  purple: "#6B5B95",
-  purpleBg: "#F0EDF5",
+  purple: "#6A5A93",
+  purpleBg: "#EFECF4",
 
-  // Info / links
+  // Info / links (genuine info only — NOT for iced mode; use frost tokens)
   blue: "#3B7BD6",
   blueBg: "#E5EEFB",
 
+  // Frost — iced-brew mode. Desaturated warm-slate so "cold" reads without a
+  // foreign candy-blue clashing with the warm system. Replaces #5B9BD5 family.
+  frost: "#5E7A8A",        // iced accent
+  frostBg: "#EDF1F3",      // iced surface
+  frostSoft: "#DCE6EB",    // iced tile fill
+  frostBorder: "#C7D4DA",  // iced borders
+  frozen: "#6E7B82",       // frozen-bean indicator (cool gray; replaces C.blue on snowflake)
+
   // Navigation — glass tab bar (translucent; chrome blurs content behind)
-  navBg: "rgba(255,253,250,0.72)",
-  navText: "#7A6A5C",
-  navActive: "#A86A38",    // caramel — matches brand accent
+  navBg: "rgba(255,254,251,0.72)",
+  navText: "#8A7765",
+  navActive: "#A2632F",    // caramel — matches brand accent
 };
 
 // Glass / frosted material — floating chrome (tab bar, sticky headers, sheets)
 export const glass = {
-  chrome: "rgba(252,249,244,0.72)",
-  chromeBorder: "rgba(74,47,30,0.08)",
+  chrome: "rgba(252,250,245,0.72)",
+  chromeBorder: "rgba(70,41,26,0.08)",
   blur: "saturate(180%) blur(20px)",
   blurStrong: "saturate(180%) blur(30px)",
-  sheet: "rgba(255,253,250,0.88)",
-  scrim: "rgba(42,26,16,0.32)",
+  sheet: "rgba(255,254,251,0.90)",
+  scrim: "rgba(33,19,10,0.36)",
 };
 
-// Typography — 3 roles. Script reserved for wordmark + rare 1-word accents ONLY.
+// Typography — 2 working roles. `title` REPOINTED off the casual script (Caveat)
+// onto Fraunces: the redesign is editorial, not handwritten. The wordmark is a
+// PNG asset and is unaffected. Keep the `title` key for backward compat; lingering
+// usages now render as elegant serif instead of script.
 export const fonts = {
-  title: "'Caveat', cursive",                          // wordmark + rare accent only
+  title: "'Fraunces', 'Playfair Display', serif",      // display accents (was Caveat — purged)
   heading: "'Fraunces', 'Playfair Display', serif",    // display, bean names, section emphasis
   body: "'Nunito', sans-serif",                        // all UI
+  grotesque: "'DM Sans', 'Inter', system-ui, sans-serif", // trading-card name + Swiss caps labels (rounder grotesque)
 };
 
 // Modular type scale (px). Use for consistent hierarchy across screens.
+// Fraunces gets negative tracking at display sizes for optical tightness.
 export const type = {
-  display: { fontFamily: "'Fraunces', 'Playfair Display', serif", fontSize: 34, fontWeight: 600, lineHeight: 1.05, letterSpacing: "-0.02em" },
-  h1:      { fontFamily: "'Fraunces', 'Playfair Display', serif", fontSize: 26, fontWeight: 600, lineHeight: 1.1,  letterSpacing: "-0.01em" },
-  h2:      { fontFamily: "'Fraunces', 'Playfair Display', serif", fontSize: 20, fontWeight: 600, lineHeight: 1.15 },
-  h3:      { fontFamily: "'Nunito', sans-serif", fontSize: 17, fontWeight: 700, lineHeight: 1.2 },
-  bodyL:   { fontFamily: "'Nunito', sans-serif", fontSize: 16, fontWeight: 500, lineHeight: 1.45 },
-  body:    { fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 500, lineHeight: 1.45 },
-  // Eyebrow / section label — replaces script section titles
-  label:   { fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700, lineHeight: 1.2, letterSpacing: "0.08em", textTransform: "uppercase" },
+  display: { fontFamily: "'Fraunces', 'Playfair Display', serif", fontSize: 34, fontWeight: 600, lineHeight: 1.04, letterSpacing: "-0.022em" },
+  h1:      { fontFamily: "'Fraunces', 'Playfair Display', serif", fontSize: 26, fontWeight: 600, lineHeight: 1.1,  letterSpacing: "-0.018em" },
+  h2:      { fontFamily: "'Fraunces', 'Playfair Display', serif", fontSize: 20, fontWeight: 600, lineHeight: 1.16, letterSpacing: "-0.01em" },
+  h3:      { fontFamily: "'Nunito', sans-serif", fontSize: 17, fontWeight: 700, lineHeight: 1.25, letterSpacing: "-0.005em" },
+  bodyL:   { fontFamily: "'Nunito', sans-serif", fontSize: 16, fontWeight: 500, lineHeight: 1.5 },
+  body:    { fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 500, lineHeight: 1.5 },
+  // Eyebrow / section label — replaces script section titles. Default neutral color.
+  label:   { fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700, lineHeight: 1.2, letterSpacing: "0.10em", textTransform: "uppercase" },
+  eyebrow: { fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700, lineHeight: 1.2, letterSpacing: "0.10em", textTransform: "uppercase" },
   caption: { fontFamily: "'Nunito', sans-serif", fontSize: 11, fontWeight: 600, lineHeight: 1.3 },
 };
 
-// Elevation — warm, soft, layered. Keep card/button/modal/navActive keys.
+// Elevation — warm, soft, layered. Three-stop shadows give real depth on warm
+// paper. Keep card/button/modal/navActive keys.
 export const shadows = {
   e0: "none",
-  e1: "0 1px 2px rgba(74,47,30,0.05), 0 2px 6px rgba(74,47,30,0.04)",
-  e2: "0 2px 4px rgba(74,47,30,0.06), 0 8px 20px rgba(74,47,30,0.06)",
-  e3: "0 6px 16px rgba(74,47,30,0.10), 0 18px 40px rgba(74,47,30,0.10)",
-  card: "0 2px 4px rgba(74,47,30,0.06), 0 8px 20px rgba(74,47,30,0.05)",
-  button: "0 1px 3px rgba(74,47,30,0.14)",
-  modal: "0 -8px 40px rgba(74,47,30,0.14)",
-  navActive: "0 4px 14px rgba(168,106,56,0.28)",
+  e1: "0 1px 2px rgba(46,28,16,0.05), 0 2px 5px rgba(46,28,16,0.04)",
+  e2: "0 1px 2px rgba(46,28,16,0.05), 0 4px 10px rgba(46,28,16,0.06), 0 10px 22px rgba(46,28,16,0.05)",
+  e3: "0 2px 4px rgba(46,28,16,0.07), 0 10px 24px rgba(46,28,16,0.10), 0 24px 48px rgba(46,28,16,0.10)",
+  card: "0 1px 2px rgba(46,28,16,0.05), 0 5px 14px rgba(46,28,16,0.07), 0 14px 32px rgba(46,28,16,0.06)",
+  button: "0 1px 3px rgba(70,41,26,0.16)",
+  modal: "0 -8px 44px rgba(33,19,10,0.16)",
+  navActive: "0 4px 14px rgba(162,99,47,0.30)",
+  // Inner top-highlight that makes a surface read as real material (light from above)
+  innerTop: "inset 0 1px 0 rgba(255,255,255,0.6)",
 };
 
 export const radius = {

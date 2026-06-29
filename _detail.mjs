@@ -1,0 +1,20 @@
+// TEMP — capture trading-card front/back. Delete before commit.
+import { chromium } from 'playwright';
+const OUT = process.env.OUT;
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+const page = await ctx.newPage();
+page.on('pageerror', e => console.log('PAGEERR:', e.message));
+page.on('console', msg => { if (msg.type() === 'error') console.log('CONSOLE.ERR:', msg.text().slice(0, 160)); });
+await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
+await page.waitForTimeout(900);
+await page.getByText('Explore without an account').click().catch(() => {});
+await page.waitForTimeout(1700);
+await page.getByText('Ombligon', { exact: false }).first().click();
+await page.waitForTimeout(1000);
+await page.screenshot({ path: `${OUT}/card-front.png` });
+await page.getByText('VIEW STAT SHEET').click();
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${OUT}/card-back.png` });
+console.log('done');
+await browser.close();

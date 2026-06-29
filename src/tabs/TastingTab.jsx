@@ -614,11 +614,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only resets on selection change, not data changes
 
   // Cross-tab bridge: BrewTimer completion sets pendingTastingBeanId in App.
-  // Here we consume it — pre-select the bean, open chat mode, and clear the
-  // flag. The effect re-runs whenever beans updates, so if the pending bean
-  // isn't in the list yet (e.g. a Firestore round-trip is pending), we keep
-  // the flag set and retry on the next beans update. The paywall path still
-  // clears the flag since that's a terminal outcome.
+  // Here we consume it — pre-select the bean, open the guided tasting WIZARD, and clear the
+  // flag. The effect re-runs whenever beans updates, so if the pending bean isn't in the list
+  // yet (e.g. a Firestore round-trip is pending), we keep the flag set and retry on the next
+  // beans update. The paywall path still clears the flag since that's a terminal outcome.
   useEffect(() => {
     if (!pendingTastingBeanId) return;
     const bean = beans.find(b => b.id === pendingTastingBeanId);
@@ -632,9 +631,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       return;
     }
     setSel(pendingTastingBeanId);
-    setMode('chat');
-    setChatMessages([{ role: 'assistant', content: buildOpeningMessage(bean), stepKey: 'smell' }]);
-    setChatExtracted(null);
+    setWizardOpen(true);
     onPendingTastingConsumed?.();
   }, [pendingTastingBeanId, beans, hasPro, freeUsage]); // eslint-disable-line react-hooks/exhaustive-deps
 

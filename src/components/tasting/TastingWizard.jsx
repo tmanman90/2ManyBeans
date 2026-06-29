@@ -104,7 +104,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
         paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={onClose} />
+      <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={onClose} reduce={reduce} />
 
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 20px 20px' }}>
         <AnimatePresence mode="wait">
@@ -143,7 +143,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
 }
 
 // ---------------------------------------------------------------- header
-function WizardHeader({ bean, phase, idx, total, onClose }) {
+function WizardHeader({ bean, phase, idx, total, onClose, reduce }) {
   const pct = phase === 'intro' ? 0 : phase === 'reveal' ? 1 : (idx + 1) / total;
   return (
     <div style={{ padding: '6px 16px 10px', background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur, borderBottom: `1px solid ${glass.chromeBorder}` }}>
@@ -154,9 +154,13 @@ function WizardHeader({ bean, phase, idx, total, onClose }) {
         </div>
         <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, border: 'none', background: 'transparent', color: C.textMuted, fontSize: 22, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>✕</button>
       </div>
-      {/* progress rail */}
+      {/* progress rail — scaleX only (never animate width); gated under reduced motion */}
       <div style={{ position: 'relative', height: 4, borderRadius: 2, background: C.bgDeep, overflow: 'hidden', marginTop: 2 }}>
-        <m.div animate={{ width: `${pct * 100}%` }} transition={M.spring.soft} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 2, background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})` }} />
+        <m.div
+          animate={{ scaleX: pct }}
+          transition={reduce ? { duration: 0 } : M.spring.soft}
+          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', transformOrigin: 'left center', borderRadius: 2, background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})` }}
+        />
       </div>
     </div>
   );
@@ -169,7 +173,7 @@ function Stage({ children, reduce }) {
       initial={reduce ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
-      transition={{ duration: M.dur.base, ease: M.ease.out }}
+      transition={{ duration: reduce ? 0 : M.dur.base, ease: M.ease.out }}
       style={{ maxWidth: 460, margin: '0 auto' }}
     >
       {children}
@@ -242,7 +246,7 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
       onChange={(v) => (isFinish ? setFinish(v) : setScore(step.scoreKey, v))} />;
   }
   if (step.kind === 'balance') {
-    return <AxisSlider axis={BALANCE_AXIS} value={answers.scores.balance} reduce={reduce} onChange={(v) => setScore('balance', v)} />;
+    return <AxisSlider axis={BALANCE_AXIS} value={answers.scores.balance} expected={expected.axes.balance?.level ?? null} reduce={reduce} onChange={(v) => setScore('balance', v)} />;
   }
   if (step.kind === 'aroma') {
     return (
@@ -250,7 +254,7 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
         <FlavorWheelPicker selected={answers.aromaChips} onToggle={(l) => toggleChip('aromaChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
-          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.fragranceAroma} reduce={reduce} onChange={(v) => setScore('fragranceAroma', v)} />
+          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.fragranceAroma} expected={expected.axes.fragranceAroma?.level ?? null} reduce={reduce} onChange={(v) => setScore('fragranceAroma', v)} />
         </div>
       </div>
     );
@@ -261,7 +265,7 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
         <FlavorWheelPicker selected={answers.flavorChips} onToggle={(l) => toggleChip('flavorChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
-          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.flavor} reduce={reduce} onChange={(v) => setScore('flavor', v)} />
+          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.flavor} expected={expected.axes.flavor?.level ?? null} reduce={reduce} onChange={(v) => setScore('flavor', v)} />
         </div>
       </div>
     );

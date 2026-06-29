@@ -122,11 +122,21 @@ export function predict(bean) {
   if (roast?.addHero) hero.push(...roast.addHero);
   hero = [...new Set(hero)].slice(0, 4);
 
+  // The other three radar axes (intensity-style) — expected levels so every wizard slider gets a
+  // predict-then-confirm ghost marker. Aromatic/flavor intensity track origin brightness + roast;
+  // specialty coffee defaults to good balance, dented when acidity & sweetness are far apart.
+  const fragranceAroma = clamp(4 + Math.round(base.acidity / 2) + (roast?.originBoost ? 1 : 0) - (roast?.mute ? 3 : 0));
+  const flavor = clamp(5 + (proc === PROCESS.natural ? 2 : 0) + (roast?.originBoost ? 1 : 0) - (roast?.mute ? 2 : 0));
+  const balance = clamp(8 - Math.round(Math.abs(acidity - sweetness) / 3));
+
   const axes = {
+    fragranceAroma: { level: fragranceAroma },
     acidity:   { level: acidity,   label: labelFor('acidity', acidity) },
     sweetness: { level: sweetness, label: labelFor('sweetness', sweetness) },
     body:      { level: body,      label: labelFor('body', body) },
+    flavor:    { level: flavor },
     finish:    { level: finish,    label: labelFor('finish', finish) },
+    balance:   { level: balance },
   };
 
   const originName = bean?.origin || 'this coffee';
