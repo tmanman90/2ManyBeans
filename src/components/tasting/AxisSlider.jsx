@@ -45,15 +45,13 @@ export function AxisSlider({ axis, value, onChange, expected = null, reduce = fa
     <div style={{ width: '100%', userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}>
       {/* live notch word — the predict-then-confirm headline */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, minHeight: 40, marginBottom: 14 }}>
-        <m.span
+        <span
           key={word}
-          initial={reduce ? false : { opacity: 0, y: 6 }}
-          animate={{ opacity: touched ? 1 : 0.4, y: 0 }}
-          transition={reduce ? { duration: 0 } : { duration: M.dur.fast, ease: M.ease.out }}
-          style={{ fontFamily: fonts.heading, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: touched ? C.text : C.textLight, textTransform: 'capitalize' }}
+          className={reduce ? undefined : 'wiz-pop'}
+          style={{ fontFamily: fonts.heading, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: touched ? C.text : C.textLight, opacity: touched ? 1 : 0.4, textTransform: 'capitalize' }}
         >
           {word}
-        </m.span>
+        </span>
         <span style={{ fontFamily: fonts.body, fontWeight: 700, fontSize: 14, color: C.textLight, fontVariantNumeric: 'tabular-nums', opacity: touched ? 1 : 0.5 }}>
           {touched ? v : '–'}<span style={{ fontSize: 11 }}>/10</span>
         </span>

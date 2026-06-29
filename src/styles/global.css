@@ -204,3 +204,17 @@ input[type="date"]::-webkit-datetime-edit {
 @keyframes wizOverlayIn { from { opacity: 0; } to { opacity: 1; } }
 .wiz-overlay-in { animation: wizOverlayIn 280ms cubic-bezier(0.22, 1, 0.36, 1); }
 @media (prefers-reduced-motion: reduce) { .wiz-overlay-in { animation: none; } }
+
+/* Wizard step content fade/rise — SAFE: the .wiz-stage div is opacity:1 by default, so content is
+   visible even if this animation never runs (WKWebView). Re-keyed per step so it re-triggers. */
+@keyframes wizStageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.wiz-stage-in { animation: wizStageIn 300ms cubic-bezier(0.22, 1, 0.36, 1); }
+@media (prefers-reduced-motion: reduce) { .wiz-stage-in { animation: none; } }
+
+/* Ruphus mascot — visible by default; CSS pop-in + ambient float (work in WKWebView where framer
+   animate does not). .wiz-pop is a generic safe fade/scale used by visibility-critical wizard bits. */
+@keyframes wizPop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+.wiz-pop { animation: wizPop 260ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+@keyframes ruphusFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.ruphus-float { animation: wizPop 260ms cubic-bezier(0.34,1.4,0.64,1), ruphusFloat 4.2s ease-in-out 260ms infinite; }
+@media (prefers-reduced-motion: reduce) { .wiz-pop, .ruphus-float { animation: none; } }

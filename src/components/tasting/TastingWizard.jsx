@@ -109,31 +109,33 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     >
       <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={onClose} reduce={reduce} />
 
+      {/* Content is plain-DOM + CSS-fade (keyed per phase/step so the fade re-runs). Visibility is
+          NEVER gated on framer's animate — which does not reliably run inside the WKWebView portal,
+          leaving opacity:0 content stuck invisible. No AnimatePresence mode="wait" either: it gates
+          the next page on an exit animation that may never complete. */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 20px 20px' }}>
-        <AnimatePresence mode="wait">
-          {phase === 'intro' && (
-            <Stage key="intro" reduce={reduce}>
-              <IntroCard bean={bean} expected={expected} palate={palate} reduce={reduce} />
-            </Stage>
-          )}
-          {phase === 'steps' && (
-            <Stage key={`step-${idx}`} reduce={reduce}>
-              <StepCard
-                step={step} bean={bean} expected={expected} answers={answers} captured={captured}
-                allCaptured={allCaptured} palate={palate} aiLine={aiLine} reduce={reduce}
-                setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip}
-              />
-            </Stage>
-          )}
-          {phase === 'reveal' && (
-            <Stage key="reveal" reduce={reduce}>
-              <RevealCard
-                bean={bean} expected={expected} answers={answers} scores={scores} palate={palate}
-                reduce={reduce} setAnswers={setAnswers}
-              />
-            </Stage>
-          )}
-        </AnimatePresence>
+        {phase === 'intro' && (
+          <Stage key="intro" reduce={reduce}>
+            <IntroCard bean={bean} expected={expected} palate={palate} reduce={reduce} />
+          </Stage>
+        )}
+        {phase === 'steps' && (
+          <Stage key={`step-${idx}`} reduce={reduce}>
+            <StepCard
+              step={step} bean={bean} expected={expected} answers={answers} captured={captured}
+              allCaptured={allCaptured} palate={palate} aiLine={aiLine} reduce={reduce}
+              setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip}
+            />
+          </Stage>
+        )}
+        {phase === 'reveal' && (
+          <Stage key="reveal" reduce={reduce}>
+            <RevealCard
+              bean={bean} expected={expected} answers={answers} scores={scores} palate={palate}
+              reduce={reduce} setAnswers={setAnswers}
+            />
+          </Stage>
+        )}
       </div>
 
       <WizardFooter
@@ -157,30 +159,31 @@ function WizardHeader({ bean, phase, idx, total, onClose, reduce }) {
         </div>
         <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, border: 'none', background: 'transparent', color: C.textMuted, fontSize: 22, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>✕</button>
       </div>
-      {/* progress rail — scaleX only (never animate width); gated under reduced motion */}
+      {/* progress rail — scaleX set DIRECTLY via style (not framer animate, which doesn't run in
+          the WKWebView portal); a CSS transition animates it smoothly when it does work. */}
       <div style={{ position: 'relative', height: 4, borderRadius: 2, background: C.bgDeep, overflow: 'hidden', marginTop: 2 }}>
-        <m.div
-          animate={{ scaleX: pct }}
-          transition={reduce ? { duration: 0 } : M.spring.soft}
-          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', transformOrigin: 'left center', borderRadius: 2, background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})` }}
+        <div
+          style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', borderRadius: 2,
+            transformOrigin: 'left center', transform: `scaleX(${pct})`,
+            transition: reduce ? 'none' : 'transform 360ms cubic-bezier(0.22,1,0.36,1)',
+            background: `linear-gradient(90deg, ${C.accentLight}, ${C.accent})`,
+          }}
         />
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- stage wrapper (page swap)
+// Stage wrapper — a PLAIN div, visible by default (opacity 1). A CSS keyframe (.wiz-stage-in,
+// global.css) provides a safe fade/rise that degrades to instantly-visible if it does not run.
+// Re-keyed per phase/step so the CSS animation re-triggers on each page. No framer here: framer's
+// animate does not reliably run inside the WKWebView portal, which would strand opacity:0 content.
 function Stage({ children, reduce }) {
   return (
-    <m.div
-      initial={reduce ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
-      transition={{ duration: reduce ? 0 : M.dur.base, ease: M.ease.out }}
-      style={{ maxWidth: 460, margin: '0 auto' }}
-    >
+    <div className={reduce ? undefined : 'wiz-stage-in'} style={{ maxWidth: 460, margin: '0 auto' }}>
       {children}
-    </m.div>
+    </div>
   );
 }
 

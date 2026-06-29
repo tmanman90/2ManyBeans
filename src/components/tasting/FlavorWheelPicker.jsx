@@ -54,22 +54,14 @@ export function FlavorWheelPicker({ selected = [], onToggle, level = 1, reduce =
 
   return (
     <div style={{ width: '100%' }}>
-      {/* selected summary */}
-      <AnimatePresence initial={false}>
-        {selected.length > 0 && (
-          <m.div
-            initial={reduce ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduce ? 0 : M.dur.fast, ease: M.ease.out }}
-            style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}
-          >
-            {selected.map((s) => (
-              <Chip key={s} label={s} active onClick={() => pick(s)} reduce={reduce} />
-            ))}
-          </m.div>
-        )}
-      </AnimatePresence>
+      {/* selected summary — plain div, visible by default (no framer-animate visibility gate) */}
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
+          {selected.map((s) => (
+            <Chip key={s} label={s} active onClick={() => pick(s)} reduce={reduce} />
+          ))}
+        </div>
+      )}
 
       {/* family petals */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -100,16 +92,9 @@ export function FlavorWheelPicker({ selected = [], onToggle, level = 1, reduce =
         })}
       </div>
 
-      {/* expanded drawer */}
-      <AnimatePresence initial={false}>
-        {openKey && (
-          <m.div
-            key={openKey}
-            initial={reduce ? false : { opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduce ? 0 : M.dur.fast, ease: M.ease.out }}
-          >
+      {/* expanded drawer — plain div, visible by default (re-keyed per family so the CSS fade runs) */}
+      {openKey && (
+        <div key={openKey} className={reduce ? undefined : 'wiz-stage-in'}>
             <div style={{ marginTop: 12, padding: 14, background: C.bgDeep, borderRadius: radius.md, border: `1px solid ${C.hairline}` }}>
               {(() => {
                 const fam = FLAVOR_WHEEL.find((f) => f.key === openKey);
@@ -133,9 +118,8 @@ export function FlavorWheelPicker({ selected = [], onToggle, level = 1, reduce =
                 </div>
               )}
             </div>
-          </m.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
