@@ -29,6 +29,7 @@ A RuphusThinking loader renders while an AI reaction is genuinely loading — a 
 - `v3-regression` (programmatic): run `["bash", "-c", "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-chat.mjs"]`, expect `exit_zero`
 - `v4-audit` (programmatic): run `["node", "scripts/audit-wizard.mjs"]`, expect `exit_zero`
 - `v5-review` (judge via codex): Adversarially review the tasting-polish diff. Treat the existing wizard (theme, Liquid Glass, TasteFingerprint/FlavorRadar, the CSS-driven visibility fixes, the existing claude.js reaction) as APPROVED. FAIL if: there is no liquid-glass "thinking" loader shown while the AI reaction loads, or the loader is a generic spinner / a looping GIF / fake placeholder copy that later swaps (R1/R2); the loader animates backdrop-filter, ships an SVG goo/displacement filter, or uses mix-blend-mode for the sheen (WKWebView-broken) (R1/R7); the single-select quick-picks do NOT use a shared layoutId highlight that slides between options, or the highlight's radius/shadow are set via className (warps) instead of inline style, or chips aren't position:relative (R3); the multi-select flavor/aroma chips reuse a single shared highlight (structurally wrong) instead of an independent per-chip fill (R4); the expected slider marker is still prominent rather than de-emphasized (R5); tap-to-expand is not wired on Rotation AND Archive (not just Inventory), or the TastingDetailCard doesn't stack above the bean card (R6); any new motion is not transform/opacity-only or not reduced-motion-gated, or there is an anti-slop tell (second accent hue, glow shadow, non-hairline divider, missing tabular-nums) (R7); OR the diff changes Firebase / the tasting-bean data model / the AI-extraction output shape, rebuilds the API proxy for streaming, changes the deterministic coaching content or the step spine, or regresses the CSS-driven visibility fixes (scope). Ambient infinite loops (breathing dots, shimmer sweep) are EXEMPT from the 300ms micro-interaction rule. PASS only when the loader is premium + WKWebView-safe, single-select slides + multi-select fills as distinct mechanisms, the marker is subtle, tap-to-expand works on all three surfaces, and it's design-bank clean and scope-clean.
+- `v7-evidence` (programmatic): run `["node", "scripts/verify-polish-evidence.mjs"]`, expect `exit_zero`
 - `v6-human` (human): On the dev app (device): trigger a guided-tasting AI reaction and confirm the liquid-glass loader looks premium and you KNOW the line is coming (no 15s of dead placeholder); tap between the single-select quick-picks and confirm the highlight SLIDES from one to the next; tap multi-select flavor chips and confirm the fill feels crisp/premium; confirm the expected slider marker is subtle; and open a logged tasting from the bean card on Inventory, Rotation, AND Archive — each opens the full tasting. Proving R1-R8 and the overall feel.
 
 ## Evidence Map (every requirement -> proof)
@@ -40,7 +41,7 @@ A RuphusThinking loader renders while an AI reaction is genuinely loading — a 
 - `R5` -> `v4-audit`
 - `R6` -> `v2-harness`
 - `R7` -> `v5-review`
-- `R8` -> `v6-human`
+- `R8` -> `v7-evidence`
 
 ## Gates
 
@@ -55,7 +56,7 @@ A RuphusThinking loader renders while an AI reaction is genuinely loading — a 
 
 - Policy: `revise_until_clean`
 - Verdict source: `codex`
-- Criteria: `v1-build, v2-harness, v3-regression, v4-audit, v5-review, v6-human`
+- Criteria: `v1-build, v2-harness, v3-regression, v4-audit, v5-review, v7-evidence, v6-human`
 - Max revisions: `3`
 
 ## Council

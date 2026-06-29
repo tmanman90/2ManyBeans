@@ -98,6 +98,10 @@ verification:
       when the loader is premium + WKWebView-safe, single-select slides + multi-select fills as
       distinct mechanisms, the marker is subtle, tap-to-expand works on all three surfaces, and it's
       design-bank clean and scope-clean.
+  - id: v7-evidence
+    type: programmatic
+    check: ["node", "scripts/verify-polish-evidence.mjs"]
+    expect: exit_zero
   - id: v6-human
     type: human
     prompt: >
@@ -116,7 +120,7 @@ evidence_map:
   R5: v4-audit
   R6: v2-harness
   R7: v5-review
-  R8: v6-human
+  R8: v7-evidence
 
 council:
   - id: codex
@@ -132,7 +136,7 @@ gates:
   delivery_gate:
     verdict_policy: revise_until_clean
     verdict_source: codex
-    criteria: [v1-build, v2-harness, v3-regression, v4-audit, v5-review, v6-human]
+    criteria: [v1-build, v2-harness, v3-regression, v4-audit, v5-review, v7-evidence, v6-human]
     max_revisions: 3
 
 loop_control:
