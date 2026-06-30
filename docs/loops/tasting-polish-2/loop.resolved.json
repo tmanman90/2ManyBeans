@@ -1,0 +1,250 @@
+{
+  "$schema": "getup/loop.resolved.v1",
+  "compiled_at": "2026-06-30T02:24:53+00:00",
+  "council": [
+    {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  ],
+  "council_by_id": {
+    "codex": {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  },
+  "criteria_by_id": {
+    "v1-build": {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    "v2-harness": {
+      "check": [
+        "node",
+        "scripts/verify-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-harness",
+      "type": "programmatic"
+    },
+    "v3-regression": {
+      "check": [
+        "bash",
+        "-c",
+        "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-chat.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v3-regression",
+      "type": "programmatic"
+    },
+    "v4-audit": {
+      "check": [
+        "node",
+        "scripts/audit-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v4-audit",
+      "type": "programmatic"
+    },
+    "v5-review": {
+      "id": "v5-review",
+      "judge": "codex",
+      "rubric": "Adversarially review the tasting-polish-2 diff. Treat the existing wizard (theme, Liquid Glass, the shipped loader/slide/fill/marker/tap-to-expand, CSS-driven visibility fixes, reaction-on- named-input trigger) as APPROVED. FAIL if: the slider expected marker is not a lucide Bone glyph OR it is visible before the user sets a value (it must be hidden until touched, then fade in) (R1); the AI reaction is not a chat thread with a SEPARATE loading bubble that appears immediately on answer-commit (not gated on the call debounce), or the reaction does not replace the loader with the coaching bubble fading out (R2); the loader is not a canvas dot-matrix in a frosted-glass pill, OR it animates backdrop-filter / ships an SVG goo/feDisplacement filter / uses mix-blend-mode sheen (WKWebView-broken) (R3); an exited tasting cannot be resumed in-session OR the draft is persisted to Firebase / a new data field (must be in-memory only), OR there is no confirm-on-\u2715 with progress (R4); any new motion is not transform/opacity/canvas-only or not reduced-motion-gated, OR an anti-slop tell (second accent hue in the dots, glow shadow, emoji-as- icon, missing tabular-nums) (R5); OR the diff changes Firebase / the tasting-bean data model / the AI-extraction output shape, rebuilds the API proxy, changes the deterministic coaching content or the step spine, or regresses the shipped polish. Ambient infinite loops (the dot- matrix scan) are EXEMPT from the 300ms rule; the loader glass backdrop-filter is static (correct). PASS only when bone-reveals-after-answer, the chat-thread + instant canvas loader, and in-session resume + confirm-on-exit are all correct, WKWebView-safe, one-accent, and scope-clean.\n",
+      "type": "judge"
+    },
+    "v6-human": {
+      "id": "v6-human",
+      "prompt": "On the dev app (device): start a guided tasting and confirm the slider marker (a \ud83e\uddb4) only appears AFTER you set your own value, so you guess first then compare; complete a step and confirm the chat-thread \u2014 his coaching line, an immediate alien-hardware dot-matrix loading bubble below it, then his reaction replacing it; confirm the loader looks premium; then X out mid-tasting and confirm you can resume right where you left off (and that the confirm prevents accidental loss). Proving R1-R6 and the overall feel.\n",
+      "type": "human"
+    },
+    "v7-evidence": {
+      "check": [
+        "node",
+        "scripts/verify-polish-evidence.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v7-evidence",
+      "type": "programmatic"
+    }
+  },
+  "evidence_map": {
+    "R1": "v2-harness",
+    "R2": "v2-harness",
+    "R3": "v4-audit",
+    "R4": "v2-harness",
+    "R5": "v5-review",
+    "R6": "v7-evidence"
+  },
+  "execution": {
+    "isolation": "branch",
+    "mode": "goal"
+  },
+  "gates": {
+    "delivery_gate": {
+      "criteria": [
+        "v1-build",
+        "v2-harness",
+        "v3-regression",
+        "v4-audit",
+        "v5-review",
+        "v7-evidence",
+        "v6-human"
+      ],
+      "max_revisions": 3,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    },
+    "plan_gate": {
+      "criteria": [
+        "v5-review"
+      ],
+      "max_revisions": 2,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    }
+  },
+  "goal": {
+    "context_sources": [
+      {
+        "file": "docs/plans/2026-06-29-003-feat-tasting-polish-2-bone-dotmatrix-resume-plan.md"
+      },
+      {
+        "file": "~/.claude/design-bank/liquid-glass-hud.md"
+      },
+      {
+        "file": "src/components/tasting/RuphusThinking.jsx"
+      },
+      {
+        "file": "src/components/tasting/AxisSlider.jsx"
+      },
+      {
+        "file": "src/components/tasting/TastingWizard.jsx"
+      },
+      {
+        "file": "lessons.md"
+      }
+    ],
+    "definition_of_done": "The AxisSlider expected marker is a lucide Bone icon at the predicted spot that does NOT show until the user has set a value on that slider, then fades in (opacity-only, reduced-motion instant) and stays; the intro copy reframes to \"set yours first, then I'll show where I'd land\". Ruphus's reaction is a chat thread: the coaching bubble is shown, and the moment the user commits an answer a separate loading bubble appears IMMEDIATELY below it (loader visibility NOT gated on the call debounce), then when the reaction resolves it replaces the loader and the coaching bubble fades out; it reacts to the current step's named input, is pro-gated, and the deterministic core works with AI off (no thread/loader when nothing is loading). The loader is a frosted-glass pill (static -webkit-backdrop-filter + inset rim sheen, never animated, never mix-blend) containing a canvas dot-matrix scanning shimmer (DPR-capped, offscreen-paused, reduced-motion single static frame, role=status); no SVG goo/feDisplacement filter ships. An exited in-progress tasting can be resumed: the draft (answers, step index, phase) survives the wizard closing and persists in- session in memory (NO Firebase, NO new persisted field); tapping \u2715 with real progress shows a confirm, and the guided-tasting entry offers Resume when a draft exists; manual entry still works. All new motion is transform/opacity/canvas-only, reduced-motion-gated, WKWebView-safe, one-accent, design-bank clean. `npx vite build` exits 0; the wizard harness proves bone-hidden-until-touched + reveal, the chat-thread + immediate loader, the canvas loader present, and resume restoring the draft; verify-tasting/inventory/archive/morph/chat still pass; audit + codex are clean; real fresh device screenshots exist for every changed element (bone hidden, bone revealed, dot-matrix loader, chat-thread, resume prompt); and Tal signs off on device.\n",
+    "requirements": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6"
+    ],
+    "statement": "Second round of tasting-wizard craft polish (no data/logic change): (1) the slider's expected marker becomes a crisp dog-BONE glyph that is HIDDEN until the user sets their own value, then fades in \u2014 so they guess unbiased then compare (true predict-then-confirm); (2) Professor Ruphus's AI reaction reads as a CHAT THREAD \u2014 his coaching line in one bubble, and the instant the user answers a loading bubble pops below it IMMEDIATELY (no perceived lag), then the reaction replaces the loader and the coaching bubble fades out; (3) the loader is \"alien hardware\" \u2014 a compact frosted-glass pill with a CANVAS DOT-MATRIX scanning shimmer (the real liquid-glass+dots look), replacing the CSS breathing dots; (4) quitting a tasting no longer loses progress \u2014 the draft persists IN-SESSION so the user can RESUME, plus a confirm-on-\u2715 so an accidental close doesn't discard. WKWebView-safe (canvas rAF + static glass; no goo/feDisplacement filter, no animated backdrop-filter, no mix-blend sheen), transform/opacity/canvas-only, reduced-motion gated, design-bank clean, one accent, verified on-device before done. Dev channel only.\n"
+  },
+  "loop_control": {
+    "budget": {
+      "tokens": 6000000
+    },
+    "cycle_cap": 4,
+    "max_iterations": 5,
+    "no_progress": {
+      "action": "stop",
+      "max_stalled_iterations": 2
+    },
+    "quality_streak": 2
+  },
+  "meta": {
+    "name": "tasting-polish-2",
+    "source_plan": "docs/plans/2026-06-29-003-feat-tasting-polish-2-bone-dotmatrix-resume-plan.md"
+  },
+  "model_policy": {
+    "orchestrator": "opus",
+    "review_cadence": "per_phase",
+    "reviewer": "codex",
+    "subagents": "sonnet"
+  },
+  "scope_guard": [
+    "Do NOT change Firebase, the tasting/bean data model, or the AI-extraction OUTPUT shape; the resume draft is in-memory only (no persisted field, no cross-restart persistence this round).",
+    "Do NOT rebuild the API proxy or change the reactToTastingStep call shape (only WHEN the loader shows + the bubble structure).",
+    "Do NOT change the deterministic coaching content, the Hoffmann step spine, or the saved record shape.",
+    "Keep CSS/canvas-driven visibility (framer animate stays OFF for visibility-critical content; framer only for layoutId/whileTap); do not regress the shipped loader/slide/fill/marker/tap-to-expand or the reaction-on-named-input trigger.",
+    "Reuse existing mascot assets; no new Higgsfield assets. Dev channel only; no prod deploy or main merge.",
+    "The v7-evidence frame set must be updated for THIS round (bone-hidden, bone-revealed, loader-matrix, thread, resume) and captured on-device."
+  ],
+  "source": "/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/docs/loops/tasting-polish-2/loop.yaml",
+  "verification": [
+    {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/verify-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-harness",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "bash",
+        "-c",
+        "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-chat.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v3-regression",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/audit-wizard.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v4-audit",
+      "type": "programmatic"
+    },
+    {
+      "id": "v5-review",
+      "judge": "codex",
+      "rubric": "Adversarially review the tasting-polish-2 diff. Treat the existing wizard (theme, Liquid Glass, the shipped loader/slide/fill/marker/tap-to-expand, CSS-driven visibility fixes, reaction-on- named-input trigger) as APPROVED. FAIL if: the slider expected marker is not a lucide Bone glyph OR it is visible before the user sets a value (it must be hidden until touched, then fade in) (R1); the AI reaction is not a chat thread with a SEPARATE loading bubble that appears immediately on answer-commit (not gated on the call debounce), or the reaction does not replace the loader with the coaching bubble fading out (R2); the loader is not a canvas dot-matrix in a frosted-glass pill, OR it animates backdrop-filter / ships an SVG goo/feDisplacement filter / uses mix-blend-mode sheen (WKWebView-broken) (R3); an exited tasting cannot be resumed in-session OR the draft is persisted to Firebase / a new data field (must be in-memory only), OR there is no confirm-on-\u2715 with progress (R4); any new motion is not transform/opacity/canvas-only or not reduced-motion-gated, OR an anti-slop tell (second accent hue in the dots, glow shadow, emoji-as- icon, missing tabular-nums) (R5); OR the diff changes Firebase / the tasting-bean data model / the AI-extraction output shape, rebuilds the API proxy, changes the deterministic coaching content or the step spine, or regresses the shipped polish. Ambient infinite loops (the dot- matrix scan) are EXEMPT from the 300ms rule; the loader glass backdrop-filter is static (correct). PASS only when bone-reveals-after-answer, the chat-thread + instant canvas loader, and in-session resume + confirm-on-exit are all correct, WKWebView-safe, one-accent, and scope-clean.\n",
+      "type": "judge"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/verify-polish-evidence.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v7-evidence",
+      "type": "programmatic"
+    },
+    {
+      "id": "v6-human",
+      "prompt": "On the dev app (device): start a guided tasting and confirm the slider marker (a \ud83e\uddb4) only appears AFTER you set your own value, so you guess first then compare; complete a step and confirm the chat-thread \u2014 his coaching line, an immediate alien-hardware dot-matrix loading bubble below it, then his reaction replacing it; confirm the loader looks premium; then X out mid-tasting and confirm you can resume right where you left off (and that the confirm prevents accidental loss). Proving R1-R6 and the overall feel.\n",
+      "type": "human"
+    }
+  ],
+  "version": 1
+}
