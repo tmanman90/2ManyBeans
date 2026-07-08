@@ -1,0 +1,291 @@
+version: 1
+
+meta:
+  name: chat-100x
+  source_plan: docs/plans/2026-07-07-001-feat-chat-professor-ruphus-100x-plan.md
+
+goal:
+  statement: >
+    Upgrade the Chat tab (Professor Ruphus) in three phased tiers on the redesign branch, dev
+    channel only. Phase A (intelligence): chat moves to claude-sonnet-5 with thinking disabled
+    (Haiku fallback pre-first-byte only, thinking param rebuilt per final model, token budgets
+    re-baselined via count_tokens); RUPHUS_KNOWLEDGE + TASTING_KNOWLEDGE join the cached static
+    prompt; the dynamic block gains the user's sanitized first name and active-rotation origin
+    context; the "Scan a bag" chip opens the camera instead of sending text; "Coach my tasting"
+    opens the Tasting Wizard (zero beans: in-character line, then a dedicated onNavigateToTasting
+    prop — the shared handler's falsy no-op stays for BrewTimer); the scanned-bean Guided Tasting
+    button dedupes, saves with a busy state, and hands off; rotation-aware starter prompts ship in
+    Phase A; scan truncation can never render raw marker text; the message renderer is extracted
+    with UUID keys. Phase B (premium): a NEW api/claude-stream.js endpoint streams NDJSON
+    (spike-gated: curl -N transcript proves incremental delivery before any UI work; shared
+    constants incl. the FULL RATE_LIMIT with windowMs live in api/_lib/claudeShared.js;
+    api/claude.js untouched beyond the allowlist entry); the client streams via
+    window.CapacitorWebFetch (CapacitorHttp buffers) with a flagged buffered-transport fallback;
+    tokens render in an isolated StreamingBubble (ref buffer + rAF flush, plain DOM + CSS
+    entrances, role="log" announce-on-commit, composer disabled in flight); marker hold-back never
+    shows partial markers; the conversation persists to users/{uid}/chatSessions/active (rolling
+    50-message doc, fire-and-forget LWW-once-hydrated full snapshots, hydration-gated, idb mirror
+    unconditional, injectable storage adapter, New chat affordance, additive-only rules deploy);
+    brew answers can emit a RECIPE_CARD marker rendered as an editorial card with Brew + capped
+    Save-to-notes actions. Phase C (depth): a palate summary (level + per-axis tastingScores
+    means, sanitized descriptors) joins the dynamic block; NEEDS_SEARCH two-pass live web answers
+    (marker-only response, pass two replaces pass one, capped visible query, untrusted-data
+    framing, https-only sources footer from groundingChunks). Everything design-bank clean:
+    monochrome + one accent, gradient-free thread, CSS keyframes for entrances, framer only for
+    whileTap/layoutId, reduced-motion gated chrome, Professor Ruphus naming, 44pt targets.
+    PRE-LOOP PRECONDITION: the "Tal" naming hotfix (user-agnostic prompt wording) ships to
+    production BEFORE this loop launches; the loop treats it as landed baseline.
+  definition_of_done: >
+    All 23 plan requirements verified through the per-tier gate stack. npx vite build exits 0.
+    The extended verify-chat harness proves: scan chip opens the picker with no sent bubble; a
+    text starter sends; coach-chip spy fires with the first active bean id (and the zero-bean path
+    posts the line + fires onNavigateToTasting); scanned-bean handoff saves exactly once with a
+    busy state and dedupes; rotation-aware starters derive from seeded beans with static fallback;
+    progressive streaming against the stream-mock server (text strictly grows across polls);
+    recipe card renders from a mocked marker with save-state transitions; persistence round-trips
+    through the injectable adapter (resume, trailing-retry, 50-cap, New chat, key uniqueness);
+    reduced-motion pass; zero linear-gradients; zero console errors. verify-stream-parse proves
+    marker hold-back across arbitrary chunk splits, truncation rejection, framing-spoof fixtures,
+    prose-then-NEEDS_SEARCH replacement, and typed pre-stream errors. All prior verify-* gates
+    stay green. The U5 curl -N transcript (multi-timestamp incremental arrival, thinking disabled,
+    usage frame with cache fields) exists as evidence; kill-mid-stream shows upstream abort with
+    usage still logged; shipping in buffered-fallback mode requires the explicit contract flag.
+    The firestore.rules diff is exactly one new chatSessions block, deployed with the fully
+    specified command after a dry-run pre-flight, with denial checks and the post-deploy smoke
+    check recorded in the loop log. The per-tier evidence gate passes tier A/B on simulator frames
+    (thinking loader, two stream-in-progress frames with visibly longer text, recipe card,
+    dynamic starters, resumed conversation after relaunch, New chat, scan-chip camera prompt)
+    without any tier-C frame; tier C adds search caption + sources footer. Fresh codex passes the
+    pre-briefed rubric. Tal signs off on device (v5), including keyboard-during-stream and
+    background-and-return checks. Dev channel only; no prod deploy or main merge by the loop.
+  requirements:
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
+    - R7
+    - R8
+    - R9
+    - R10
+    - R11
+    - R12
+    - R13
+    - R14
+    - R15
+    - R16
+    - R17
+    - R18
+    - R19
+    - R20
+    - R21
+    - R22
+    - R23
+  context_sources:
+    - file: docs/plans/2026-07-07-001-feat-chat-professor-ruphus-100x-plan.md
+    - file: lessons.md
+    - file: src/tabs/ChatTab.jsx
+    - file: src/lib/claude.js
+    - file: api/claude.js
+    - file: api/_lib/cors-auth.js
+    - file: scripts/verify-chat.mjs
+    - file: docs/loops/tasting-polish-2/loop.yaml
+
+verification:
+  - id: v1-build
+    type: programmatic
+    check: ["npx", "vite", "build", "--logLevel", "error"]
+    expect: exit_zero
+  - id: v2-chat
+    type: programmatic
+    check: ["node", "scripts/verify-chat.mjs"]
+    expect: exit_zero
+  - id: v2b-parse
+    type: programmatic
+    check: ["node", "scripts/verify-stream-parse.mjs"]
+    expect: exit_zero
+  - id: v3-regression
+    type: programmatic
+    check: ["bash", "-c", "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-wizard.mjs && node scripts/audit-wizard.mjs"]
+    expect: exit_zero
+  - id: v4-codex
+    type: judge
+    judge: codex
+    rubric: >
+      Adversarially review the chat-100x diff, whole-file behavior, not just the asked question.
+      PRE-BRIEF (do not false-positive on these): the chat THREAD is intentionally gradient-free
+      (the zero-linear-gradient gate is stricter than you); Liquid Glass gradients elsewhere in the
+      app are approved material; ambient infinite loops (RuphusThinking dot-matrix, caret blink)
+      are EXEMPT from the 300ms micro-interaction rule; the buildTastingSystemPrompt naming edit
+      (removing "Tal") is in-scope; filter:brightness press states are the approved pattern.
+      FAIL if: chat does not pass model claude-sonnet-5 with thinking disabled rebuilt per final
+      model (Haiku fallback must not inherit the param; fallback only pre-first-byte) (R1); any
+      user-derived value (displayName, oneWord descriptors, origin echo) reaches a system prompt
+      without sanitize() + cap, or user-specific bytes enter a cache_control block (R2,R3); a
+      truncated or malformed marker can render raw to the user in either the JSON or stream path
+      (R4,R13); the scan chip sends text instead of opening the picker, or the coach/scanned-bean
+      handoffs overload the shared onStartTastingSession falsy no-op that BrewTimer depends on
+      (R5,R6,R7); api/claude.js changed beyond the allowlist entry + shared-constants import, or
+      the stream endpoint forks ALLOWED_MODELS / MAX_TOKENS_CAP / RATE_LIMIT instead of importing
+      them, or RATE_LIMIT lacks windowMs (silently disables limiting), or NDJSON frames are not
+      exactly one JSON.stringify per line (spoofable) (R8); the client stream path does not use
+      CapacitorWebFetch on native or degrades silently when it is absent, or retries after first
+      byte (R9); streaming/entrance visuals use framer animate for entrance/visibility (dead in
+      this WKWebView; CSS keyframes required; framer only whileTap/layoutId), or the streaming
+      bubble is not an isolated leaf with rAF-batched flushes, or the thread lacks role=log with
+      commit-time announcement, or the composer stays enabled mid-flight (R10); the autoscroll
+      override listens to scroll events instead of touchstart/wheel, or keyboard handling code was
+      touched (R11); mid-stream failure discards partial text, contaminates apiMessages, or the
+      server cannot log usage on client disconnect (R12); persistence violates the invariants: a
+      failed hydration treated as doc-absent, any persist awaited on the send path, a per-write
+      freshness-skip scheme (plain LWW once hydrated is the contract), idb mirror coupled to the
+      Firestore write, missing New chat cleanup incl. the idb key and cacheClear, or message ids
+      that can collide across hydration (R14-R17,R20); the firestore.rules diff touches anything
+      beyond one new chatSessions block, or the block misses owner-only + pinned 'active' id +
+      keys().hasOnly + messages.size()<=50 (R14); recipe card or save-to-notes lacks length caps,
+      busy state, or toasts (R18); starters are not rotation-aware with static/demo fallback
+      (R19); NEEDS_SEARCH is in the prompt before U11 ships, the search turn is not marker-only
+      with pass-two REPLACING pass-one, the query is uncapped or hidden, grounded content lacks
+      untrusted-data framing, or the sources footer renders any non-https scheme or parses URLs
+      from model text (R21); any anti-slop tell (second accent hue, glow shadows, purple, missing
+      tabular-nums on card numbers, sub-44pt targets), or "Ruphus" bare in user-facing copy
+      instead of "Professor Ruphus" (R23). PASS only when all requirement clusters hold, scope
+      guards are respected, and the diff regresses nothing in the pre-briefed shipped surface.
+  - id: v6-evidence-ab
+    type: programmatic
+    check: ["node", "scripts/verify-chat-evidence.mjs", "--tier", "ab"]
+    expect: exit_zero
+  - id: v6c-evidence-c
+    type: programmatic
+    check: ["node", "scripts/verify-chat-evidence.mjs", "--tier", "c"]
+    expect: exit_zero
+  - id: v5-human
+    type: human
+    prompt: >
+      On the dev app (real device): open Chat and confirm the greeting uses YOUR name and feels
+      like the professor knows your rotation (starters reference your actual jars). Tap "Scan a
+      bag" — the camera opens, nothing is sent. Send a question — the dot-matrix loader appears,
+      then the reply STREAMS in token by token (not one blob); scroll up mid-stream and confirm
+      it stops following, with a jump-to-latest pill; open the keyboard mid-stream and confirm
+      nothing breaks; background the app mid-stream, return, and confirm a clean partial+retry
+      state (not a stuck loader). Ask for a recipe for a jar — a recipe card renders with clean
+      numbers; Brew this opens the right modal; Save to bean notes shows saving then a toast.
+      Kill and relaunch the app — the conversation is still there, and a trailing unanswered
+      question shows retry. Tap New chat — intro + starters return. Tap "Coach my tasting" — the
+      wizard opens on your first active bean. (Phase C, if shipped): ask what to order from a
+      roaster — you see "Searching the web: <query>", one single answer with tappable https
+      sources. Proving R1-R23 and the overall premium feel.
+
+evidence_map:
+  R1: v4-codex
+  R2: v4-codex
+  R3: v2-chat
+  R4: v2b-parse
+  R5: v2-chat
+  R6: v2-chat
+  R7: v2-chat
+  R8: v6-evidence-ab
+  R9: v2b-parse
+  R10: v2-chat
+  R11: v2-chat
+  R12: v4-codex
+  R13: v2b-parse
+  R14: v2-chat
+  R15: v2-chat
+  R16: v2-chat
+  R17: v4-codex
+  R18: v2-chat
+  R19: v2-chat
+  R20: v2-chat
+  R21: v6c-evidence-c
+  R22: v3-regression
+  R23: v5-human
+
+council:
+  - id: codex
+    role: judge
+    cli: codex
+
+gates:
+  plan_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v4-codex]
+    max_revisions: 2
+  delivery_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v1-build, v2-chat, v2b-parse, v3-regression, v4-codex, v6-evidence-ab, v6c-evidence-c, v5-human]
+    max_revisions: 3
+
+loop_control:
+  max_iterations: 13
+  cycle_cap: 4
+  quality_streak: 2
+  no_progress:
+    max_stalled_iterations: 2
+    action: stop
+  budget:
+    tokens: 12000000
+
+scope_guard:
+  - >-
+    PRE-FLIGHT (verify before iterating): the "Tal" naming hotfix is live on production; dry-run
+    of "npx firebase-tools deploy --only firestore:rules --project <VITE_FIREBASE_PROJECT_ID>"
+    succeeds with non-interactive credentials; window.CapacitorWebFetch exists in the native bridge.
+  - >-
+    Do NOT touch useNativeKeyboard, input-bar positioning, safe-area math, or scroll/keyboard
+    interplay code.
+  - >-
+    Do NOT change the reactToTastingStep call shape, paywall/demo gating semantics, or any
+    non-claude proxy (api/gemini.js, api/openai.js, api/aiden.js) beyond the U11 CLIENT helper
+    in src/lib/gemini.js.
+  - >-
+    api/claude.js changes ONLY: the claude-sonnet-5 allowlist entry and the shared-constants
+    import from api/_lib/claudeShared.js. All streaming lives in api/claude-stream.js.
+  - >-
+    firestore.rules is ADDITIVE-ONLY: the diff must be exactly one new chatSessions match block;
+    any edit to an existing block fails the gate; run the post-deploy smoke check (cross-uid bean
+    read still denied) and record it in the loop log.
+  - >-
+    Phase ordering is a hard gate: tier B units do not start until Phase A gates pass; tier C not
+    until A+B pass; the U5 streaming spike (curl transcript + disconnect check) passes before ANY
+    client streaming UI is written; shipping buffered-fallback requires the explicit contract
+    flag, surfaced as a first-class outcome.
+  - >-
+    CSS keyframes for all entrance/visibility (framer animate is dead in this WKWebView portal);
+    framer only for layoutId/whileTap; no animated backdrop-filter, no mix-blend sheen, no
+    feDisplacement; ambient loops exempt from the 300ms rule.
+  - >-
+    The chat thread stays gradient-free (keep the zero-linear-gradient assertion); no
+    GlassButton/glass material in-thread; monochrome + single accent; tabular-nums on all card
+    numbers; "Professor Ruphus" in all user-facing copy.
+  - >-
+    Streaming text renders via the isolated StreamingBubble only; never render streamed partials
+    through framer-gated visibility; marker hold-back before display, always.
+  - >-
+    Persistence invariants are non-negotiable: hydration-gated Firestore writes, fire-and-forget
+    never-awaited persists, plain LWW once hydrated (NO per-write freshness skip), unconditional
+    idb mirroring, chat key added to cacheClear.
+  - >-
+    Overnight evidence frames come from the SIMULATOR (sim-from-vite recipe, CapacitorUpdater
+    autoUpdate off during debugging); the real device is Tal's v5 sign-off. Verify streaming
+    behavior in Playwright WebKit, not Chromium, when engine fidelity matters.
+  - >-
+    Dev channel only: no production Vercel deploy (except the pre-loop hotfix, which is NOT the
+    loop's job), no Capgo production channel, no main merge. Dev bundle labels use the
+    -devapp.<ts> convention.
+  - >-
+    Do NOT migrate api/gemini.js to @google/genai, add multi-thread chat history, remove the
+    TastingTab legacy block, or add markdown rendering: all explicitly deferred.
+
+execution:
+  mode: goal
+  isolation: branch
+
+model_policy:
+  orchestrator: opus
+  subagents: sonnet
+  reviewer: codex
+  review_cadence: per_phase
