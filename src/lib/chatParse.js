@@ -1,12 +1,12 @@
 import { buildSourceContextHash, normalizeSourceInsights } from './sourceInsights.js';
+import { MARKER_FAMILIES } from './streamChat.js';
 
-const BEAN_SCAN_OPEN = '---BEAN_SCAN---';
-const BEAN_SCAN_CLOSE = '---END_SCAN---';
-const BEAN_SCAN_RE = /---BEAN_SCAN---([\s\S]*?)---END_SCAN---/;
+const BEAN_SCAN_MARKER = MARKER_FAMILIES.find(family => family.key === 'beanScan');
+const BEAN_SCAN_RE = new RegExp(`${BEAN_SCAN_MARKER.open}([\\s\\S]*?)${BEAN_SCAN_MARKER.close}`);
 
 export function parseBeanScan(text, { stopReason } = {}) {
   const source = String(text || '');
-  const openIdx = source.indexOf(BEAN_SCAN_OPEN);
+  const openIdx = source.indexOf(BEAN_SCAN_MARKER.open);
   if (openIdx === -1) return { cleanText: source, scannedBean: null, scanMarkerStripped: false };
 
   const match = source.match(BEAN_SCAN_RE);

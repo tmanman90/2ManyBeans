@@ -1,5 +1,4 @@
 // Shared fetch utility with retry, timeout, and auth token injection
-import { auth } from '../firebase';
 
 // Redemption-code reason codes. When any of these land in a 403/429
 // response body, surface them as typed err.code so the Settings redeem
@@ -25,16 +24,61 @@ const FRIENDLY_ERRORS = {
   529: 'AI service is temporarily busy, please try again in a moment',
 };
 
+export async function getAuthToken() {
+  try {
+    const { auth } = await import('../firebase');
+    return await auth.currentUser?.getIdToken();
+  } catch {
+    // If token fetch fails, proceed without (server will reject if auth required)
+    return undefined;
+  }
+}
+
+export function parseTypedError(data, status) {
+  if (status === 401 && data?.error === 'reauth_required') {
+    const err = new Error(data.message || 'Please reauthenticate to continue.');
+    err.code = 'reauth_required';
+    return err;
+  }
+
+  if (status === 403) {
+    if (data?.error === 'subscription_required') {
+      const err = new Error(data.message || 'Subscription required');
+      err.code = 'subscription_required';
+      err.tier = data.tier || 'pro'; // 'pro' | 'ultra'
+      return err;
+    }
+    if (data?.error === 'free_tier_exhausted') {
+      const err = new Error(data.message || 'Free tier exhausted');
+      err.code = 'free_tier_exhausted';
+      err.feature = data.feature;
+      err.used = data.used;
+      err.limit = data.limit;
+      return err;
+    }
+    // Redemption reason codes (403 variants). Thin passthrough —
+    // friendly copy lives in the consumer (SettingsPage redeem row).
+    if (data?.error && REDEMPTION_REASONS.has(data.error)) {
+      const err = new Error(data.error);
+      err.code = data.error;
+      return err;
+    }
+  }
+
+  if (status === 429 && data?.error && REDEMPTION_REASONS.has(data.error)) {
+    const err = new Error(data.error);
+    err.code = data.error;
+    return err;
+  }
+
+  return null;
+}
+
 // 60s accommodates Claude tool-use + long context windows. Short callers
 // can still override via the `timeout` arg.
 export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, serviceName = 'AI' }) {
   // Get fresh Firebase ID token for auth
-  let token;
-  try {
-    token = await auth.currentUser?.getIdToken();
-  } catch {
-    // If token fetch fails, proceed without (server will reject if auth required)
-  }
+  const token = await getAuthToken();
 
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -67,11 +111,8 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
       if (response.status === 401) {
         let data = null;
         try { data = await response.json(); } catch { /* ignore non-JSON error bodies */ }
-        if (data?.error === 'reauth_required') {
-          const err = new Error(data.message || 'Please reauthenticate to continue.');
-          err.code = 'reauth_required';
-          throw err;
-        }
+        const typed = parseTypedError(data, response.status);
+        if (typed) throw typed;
         throw new Error(FRIENDLY_ERRORS[401]);
       }
 
@@ -81,27 +122,8 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
       if (response.status === 403) {
         let data = null;
         try { data = await response.json(); } catch { /* ignore non-JSON error bodies */ }
-        if (data?.error === 'subscription_required') {
-          const err = new Error(data.message || 'Subscription required');
-          err.code = 'subscription_required';
-          err.tier = data.tier || 'pro'; // 'pro' | 'ultra'
-          throw err;
-        }
-        if (data?.error === 'free_tier_exhausted') {
-          const err = new Error(data.message || 'Free tier exhausted');
-          err.code = 'free_tier_exhausted';
-          err.feature = data.feature;
-          err.used = data.used;
-          err.limit = data.limit;
-          throw err;
-        }
-        // Redemption reason codes (403 variants). Thin passthrough —
-        // friendly copy lives in the consumer (SettingsPage redeem row).
-        if (data?.error && REDEMPTION_REASONS.has(data.error)) {
-          const err = new Error(data.error);
-          err.code = data.error;
-          throw err;
-        }
+        const typed = parseTypedError(data, response.status);
+        if (typed) throw typed;
         throw new Error(data?.error || `${serviceName} API error: 403`);
       }
 
@@ -113,11 +135,8 @@ export async function fetchWithRetry({ url, body, retries = 2, timeout = 60000, 
       if (response.status === 429) {
         let data = null;
         try { data = await response.json(); } catch { /* ignore non-JSON error bodies */ }
-        if (data?.error && REDEMPTION_REASONS.has(data.error)) {
-          const err = new Error(data.error);
-          err.code = data.error;
-          throw err;
-        }
+        const typed = parseTypedError(data, response.status);
+        if (typed) throw typed;
         // Fall through to retry or FRIENDLY_ERRORS below.
       }
 
