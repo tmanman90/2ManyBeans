@@ -593,9 +593,10 @@ export async function sendChatMessage(systemPrompt, history) {
   // Route images through Gemini for vision, then pass text description to Claude
   const recentMessages = history.slice(-8);
   const lastMsg = recentMessages[recentMessages.length - 1];
+  let hasImages = false;
 
   if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content)) {
-    const hasImages = lastMsg.content.some(block => block.type === 'image');
+    hasImages = lastMsg.content.some(block => block.type === 'image');
     if (hasImages) {
       try {
         const { describeImage } = await import('./gemini');
@@ -621,14 +622,16 @@ export async function sendChatMessage(systemPrompt, history) {
   const data = await callClaude({
     system: systemPrompt,
     messages: recentMessages,
-    maxTokens: 800,
+    // Sized for BEAN_SCAN + sourceInsights under the Sonnet 5 tokenizer;
+    // re-baseline via count_tokens fixture during Phase B.
+    maxTokens: hasImages ? 2600 : 800,
     model: 'claude-sonnet-5',
     feature: 'chat',
   });
   const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
   // Preserve the ---BEAN_SCAN---...---END_SCAN--- marker (it's plain JSON, no
   // markdown) and strip any stray bold/italic from the conversational text.
-  return stripMarkdown(raw);
+  return { text: stripMarkdown(raw), stopReason: data.stop_reason };
 }
 
 // reactToTastingStep — additive, NON-GATING Ruphus reaction for one beat of the guided tasting

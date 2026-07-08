@@ -16,46 +16,12 @@ import { useHandBrew } from '../hooks/useHandBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { getBrewMethod } from '../lib/brewMethods';
 import { buildNewBeanData } from '../lib/beanBuilder';
-import { buildSourceContextHash, normalizeSourceInsights } from '../lib/sourceInsights';
 import { usePreferences } from '../hooks/useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { RuphusThinking } from '../components/tasting/RuphusThinking';
 import { ChatMessage } from '../components/chat/ChatMessage';
-
-// Parse ---BEAN_SCAN---{json}---END_SCAN--- from assistant text
-function parseBeanScan(text) {
-  const match = text.match(/---BEAN_SCAN---([\s\S]*?)---END_SCAN---/);
-  if (!match) return { cleanText: text, scannedBean: null };
-  try {
-    const json = match[1].trim();
-    const scannedBean = JSON.parse(json);
-    scannedBean.sourceInsights = normalizeSourceInsights(scannedBean.sourceInsights);
-    const sourceContextHash = buildSourceContextHash(scannedBean);
-    if (sourceContextHash) scannedBean.sourceContextHash = sourceContextHash;
-    const cleanText = text.replace(/---BEAN_SCAN---[\s\S]*?---END_SCAN---/, '').trim();
-    return { cleanText, scannedBean };
-  } catch {
-    return { cleanText: text, scannedBean: null };
-  }
-}
-
-// Strip base64 image data from older API messages to prevent memory bloat
-function trimApiMessages(messages, keepRecent = 6) {
-  if (messages.length <= keepRecent) return messages;
-  return messages.map((msg, i) => {
-    if (i >= messages.length - keepRecent) return msg;
-    if (Array.isArray(msg.content)) {
-      return {
-        ...msg,
-        content: msg.content.map(block =>
-          block.type === 'image' ? { type: 'text', text: '[image]' } : block
-        ),
-      };
-    }
-    return msg;
-  });
-}
+import { parseBeanScan, trimApiMessages } from '../lib/chatParse';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
@@ -477,10 +443,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     try {
       const systemPrompt = buildChatContext(beans, tastings, preferences, firstName);
       const history = apiMessages.current.filter(m => m.role !== 'system');
-      const rawText = await sendChatMessage(systemPrompt, history);
+      const { text: rawText, stopReason } = await sendChatMessage(systemPrompt, history);
 
       // Parse scan markers
-      const { cleanText, scannedBean: parsed } = parseBeanScan(rawText);
+      const { cleanText, scannedBean: parsed } = parseBeanScan(rawText, { stopReason });
       if (parsed) setScannedBean(parsed);
 
       const assistantMsg = newMessage({ role: 'assistant', content: cleanText });
