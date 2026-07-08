@@ -1,7 +1,10 @@
+import { ExternalLink } from 'lucide-react';
 import { C, radius, shadows, type as typeScale } from '../../styles/theme';
 import { RecipeCard } from './RecipeCard';
 
 export function ChatMessage({ msg, recipeActions, onRetryErrored }) {
+  const sources = msg.role === 'assistant' && Array.isArray(msg.sources) ? msg.sources.slice(0, 3) : [];
+
   return (
     <>
       {msg.photos && msg.photos.length > 0 && (
@@ -60,8 +63,60 @@ export function ChatMessage({ msg, recipeActions, onRetryErrored }) {
               Didn't finish — tap to retry
             </div>
           )}
+          {msg.disclaimer && !msg.errored && (
+            <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: 8, lineHeight: 1.3 }}>
+              {msg.disclaimer}
+            </div>
+          )}
         </div>
       </div>
+      {sources.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginLeft: 38 }}>
+          <div
+            data-chat-sources="true"
+            style={{
+              width: '82%',
+              borderTop: `1px solid ${C.hairline}`,
+              marginTop: 4,
+            }}
+          >
+            {sources.map((source, idx) => (
+              <button
+                key={`${source.uri}-${idx}`}
+                type="button"
+                onClick={() => window.open(source.uri, '_blank')}
+                style={{
+                  width: '100%',
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  padding: '8px 0',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: idx < sources.length - 1 ? `1px solid ${C.hairline}` : 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{
+                  ...typeScale.caption,
+                  color: C.textMuted,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                }}>
+                  {source.title || source.uri}
+                </span>
+                <ExternalLink size={12} color={C.accent} style={{ flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {msg.role === 'assistant' && msg.recipeCard && (
         <RecipeCard
           recipe={msg.recipeCard}

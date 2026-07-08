@@ -26,17 +26,90 @@ const noop = () => {};
 const noopAsync = async () => {};
 
 window.__SPY__ = { startedTasting: null, navigatedToTasting: 0, addedBeans: [], updatedBeans: [] };
-window.__STREAM_TEST__ = { enabled: new URLSearchParams(window.location.search).get('stream') === '1' };
+const streamReply = [
+  'Good morning. ', 'Jar 2 is right in its peak window, ',
+  'so I would brew the Kiawamururu today. ', 'Expect that blackcurrant ',
+  'acidity to be at its brightest ', 'around a 1:16 ratio. ',
+  'Slurp the first sip ', 'while it is warm, not hot, ', 'and tell me ',
+  'what you find.',
+];
+const recipeMarker = '---RECIPE_CARD---{"title":"Kiawamururu Morning Pour","method":"V60","ratio":"1:16","temp":93,"grind":"finer: Ode 4.3","steps":["Bloom 40g, 35s","Pour to 150g by 1:00","Pour to 250g by 1:45","Drawdown by 2:45"],"reasoning":"Peak-window Kenyan wants bright extraction with a controlled finish."}---END_RECIPE---';
+const searchMarkerParts = [
+  '---NEEDS_',
+  'SEARCH---{"query":"best kenyan releases 2026"}',
+  '---END_SEARCH---',
+];
+const searchReply = [
+  'I found one current Kenyan release worth watching. ',
+  'Start with the washed Nyeri lot while it is fresh, ',
+  'then compare it against a brighter Kirinyaga if you want more citrus snap.',
+];
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function inlineStreamResponse(parts, { errorMid = false } = {}) {
+  const encoder = new TextEncoder();
+  return new Response(new ReadableStream({
+    async start(controller) {
+      let i = 0;
+      for (const text of parts) {
+        controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'delta', text })}\n`));
+        i += 1;
+        if (errorMid && i === 3) {
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'error', code: 'overloaded', message: 'Upstream overloaded mid-stream.' })}\n`));
+          controller.close();
+          return;
+        }
+        await sleep(120);
+      }
+      controller.enqueue(encoder.encode(`${JSON.stringify({
+        type: 'usage',
+        usage: { input_tokens: 420, output_tokens: 96, cache_read_input_tokens: 380, cache_creation_input_tokens: 0 },
+        stop_reason: 'end_turn',
+      })}\n`));
+      controller.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' } });
+}
+
+window.__STREAM_TEST__ = {
+  enabled: new URLSearchParams(window.location.search).get('stream') === '1',
+  inline: new URLSearchParams(window.location.search).get('inline') === '1',
+  searchCount: 0,
+};
 if (window.__STREAM_TEST__.enabled) {
   const originalFetch = window.fetch.bind(window);
   window.fetch = (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
     if (url.pathname === '/api/claude-stream') {
       const params = new URLSearchParams(window.location.search);
+      if (window.__STREAM_TEST__.inline) {
+        const withSearch = params.get('search') === '1';
+        if (withSearch) window.__STREAM_TEST__.searchCount += 1;
+        const parts = withSearch && window.__STREAM_TEST__.searchCount === 1
+          ? searchMarkerParts
+          : (withSearch ? searchReply : (params.get('recipe') ? [...streamReply, '\n\n', recipeMarker] : streamReply));
+        return inlineStreamResponse(parts, { errorMid: params.get('error') === 'mid' });
+      }
       const target = new URL('http://localhost:5197/api/claude-stream');
       if (params.get('error')) target.searchParams.set('error', params.get('error'));
       if (params.get('recipe')) target.searchParams.set('recipe', params.get('recipe'));
+      if (params.get('search')) target.searchParams.set('search', params.get('search'));
       return originalFetch(target.toString(), init);
+    }
+    if (url.pathname === '/api/gemini' && new URLSearchParams(window.location.search).get('search') === '1') {
+      if (window.__STREAM_TEST__.inline) {
+        return Promise.resolve(new Response(JSON.stringify({
+          text: 'Kenyan release roundup: washed Nyeri lots are showing blackcurrant, citrus, and molasses this season.',
+          groundingMetadata: {
+            groundingChunks: [
+              { web: { title: 'Kenyan Releases 2026', uri: 'https://example.com/kenya-2026' } },
+              { web: { title: 'Bad Script', uri: 'javascript:alert(1)' } },
+              { web: { title: 'App Link', uri: 'someapp://x' } },
+            ],
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return originalFetch('http://localhost:5197/api/gemini', init);
     }
     return originalFetch(input, init);
   };

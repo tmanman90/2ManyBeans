@@ -7,8 +7,10 @@
 // Endpoints:
 //   POST /api/claude-stream           — streams a canned reply, ~10 deltas, 120ms gaps
 //   POST /api/claude-stream?recipe=1  — reply ends with a RECIPE_CARD marker payload
+//   POST /api/claude-stream?search=1  — first call emits NEEDS_SEARCH, second emits answer
 //   POST /api/claude-stream?error=mid — errors after 3 deltas ({type:'error'} frame)
 //   POST /api/claude                  — JSON path passthrough shape (single blob)
+//   POST /api/gemini                  — JSON search grounding mock
 // Any other path: 404. CORS: permissive (harness only — never deployed).
 import http from 'node:http';
 
@@ -24,8 +26,19 @@ const REPLY = [
 ];
 
 const RECIPE = `---RECIPE_CARD---{"title":"Kiawamururu Morning Pour","method":"V60","ratio":"1:16","temp":93,"grind":"finer: Ode 4.3","steps":["Bloom 40g, 35s","Pour to 150g by 1:00","Pour to 250g by 1:45","Drawdown by 2:45"],"reasoning":"Peak-window Kenyan wants bright extraction with a controlled finish."}---END_RECIPE---`;
+const SEARCH_MARKER_PARTS = [
+  '---NEEDS_',
+  'SEARCH---{"query":"best kenyan releases 2026"}',
+  '---END_SEARCH---',
+];
+const SEARCH_REPLY = [
+  'I found one current Kenyan release worth watching. ',
+  'Start with the washed Nyeri lot while it is fresh, ',
+  'then compare it against a brighter Kirinyaga if you want more citrus snap.',
+];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+let searchStreamCount = 0;
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,7 +53,11 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
     const midError = url.searchParams.get('error') === 'mid';
     const withRecipe = url.searchParams.get('recipe') === '1';
-    const parts = withRecipe ? [...REPLY, '\n\n', RECIPE] : REPLY;
+    const withSearch = url.searchParams.get('search') === '1';
+    if (withSearch) searchStreamCount += 1;
+    const parts = withSearch && searchStreamCount === 1
+      ? SEARCH_MARKER_PARTS
+      : (withSearch ? SEARCH_REPLY : (withRecipe ? [...REPLY, '\n\n', RECIPE] : REPLY));
     let i = 0;
     for (const text of parts) {
       res.write(JSON.stringify({ type: 'delta', text }) + '\n');
@@ -62,6 +79,20 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/claude') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ content: [{ type: 'text', text: REPLY.join('') }], stop_reason: 'end_turn', usage: { input_tokens: 420, output_tokens: 96 } }));
+  }
+
+  if (url.pathname === '/api/gemini') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      text: 'Kenyan release roundup: washed Nyeri lots are showing blackcurrant, citrus, and molasses this season.',
+      groundingMetadata: {
+        groundingChunks: [
+          { web: { title: 'Kenyan Releases 2026', uri: 'https://example.com/kenya-2026' } },
+          { web: { title: 'Bad Script', uri: 'javascript:alert(1)' } },
+          { web: { title: 'App Link', uri: 'someapp://x' } },
+        ],
+      },
+    }));
   }
 
   res.writeHead(404);

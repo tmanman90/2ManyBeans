@@ -13,6 +13,19 @@ function markerTokens() {
   return MARKER_FAMILIES.flatMap(family => [family.open, family.close]);
 }
 
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stripCompleteMarkerRegions(text) {
+  let clean = String(text || '');
+  for (const family of MARKER_FAMILIES) {
+    const re = new RegExp(`${escapeRegex(family.open)}[\\s\\S]*?${escapeRegex(family.close)}`, 'g');
+    clean = clean.replace(re, '');
+  }
+  return clean;
+}
+
 function trailingPartialToken(text) {
   let best = null;
   if (markerTokens().some(token => text.endsWith(token))) return best;
@@ -68,7 +81,7 @@ export function holdBackScan(fullText) {
   }
 
   return {
-    display: text.slice(0, holdStart),
+    display: stripCompleteMarkerRegions(text.slice(0, holdStart)),
     held: text.slice(holdStart),
   };
 }

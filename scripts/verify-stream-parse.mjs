@@ -91,6 +91,18 @@ check('prose before NEEDS_SEARCH marker is held from open token', () => {
   if (!result.held.startsWith('---NEEDS_SEARCH---')) throw new Error('NEEDS_SEARCH region was not held');
 });
 
+check('complete NEEDS_SEARCH marker never appears in streaming display', () => {
+  const result = holdBackScan('I should check.\n---NEEDS_SEARCH---{"query":"best Kenyan releases"}---END_SEARCH---');
+  if (result.display.includes('---') || result.display.includes('NEEDS_SEARCH')) throw new Error('complete NEEDS_SEARCH marker leaked');
+  if (result.display.trim() !== 'I should check.') throw new Error('prose before complete marker was not preserved');
+});
+
+check('complete recipe marker is stripped from streaming display while prose stays', () => {
+  const result = holdBackScan('Recipe follows.\n---RECIPE_CARD---{"title":"A"}---END_RECIPE---\nDone.');
+  if (result.display.includes('RECIPE_CARD') || result.display.includes('---')) throw new Error('complete recipe marker leaked');
+  if (!result.display.includes('Recipe follows.') || !result.display.includes('Done.')) throw new Error('surrounding prose was not preserved');
+});
+
 check('typed subscription error passthrough parses from 403 body', () => {
   const err = parseTypedError({
     error: 'subscription_required',

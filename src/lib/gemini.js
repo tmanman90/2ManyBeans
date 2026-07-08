@@ -224,6 +224,28 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   return JSON.parse(jsonMatch[0]);
 }
 
+export async function searchWeb(query) {
+  const data = await callGemini({
+    model: 'gemini-2.5-flash',
+    contents: [{ role: 'user', parts: [{ text: query }] }],
+    tools: [{ googleSearch: {} }],
+    feature: 'chatSearch',
+    maxTokens: 800,
+  });
+
+  const chunks = (data.groundingMetadata?.groundingChunks || [])
+    .map(chunk => ({
+      title: chunk.web?.title || '',
+      uri: chunk.web?.uri || '',
+    }))
+    .filter(chunk => chunk.title || chunk.uri);
+
+  return {
+    summaryText: data.text || '',
+    chunks,
+  };
+}
+
 // --- Product shot generation (server-side: generate + convert + upload + write to Firestore) ---
 // Returns { photoUrl } string. Server handles everything including Firebase Storage upload.
 

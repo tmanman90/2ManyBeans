@@ -8,11 +8,18 @@
 //   R7-reduced-motion renders; zero console errors on the static render
 import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import http from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
 const PORT = 5194;
-const URL = `http://localhost:${PORT}/chat-harness.html`;
 const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
+const canListen = await canBindLocalPort();
+const staticOutDir = `/tmp/coffee-chat-harness-${process.pid}`;
+const URL = canListen
+  ? `http://localhost:${PORT}/chat-harness.html`
+  : pathToFileURL(`${staticOutDir}/chat-harness.html`).toString();
 
 function waitForServer(url, timeoutMs = 20000) {
   const start = Date.now();
@@ -27,7 +34,38 @@ function waitForServer(url, timeoutMs = 20000) {
 }
 
 const noGradient = () => [...document.querySelectorAll('*')].every(el => !(getComputedStyle(el).backgroundImage || '').includes('linear-gradient'));
-const streamUrl = (params = '') => `${URL}?stream=1${params}`;
+const streamUrl = (params = '') => `${URL}?stream=1${params}${canListen ? '' : '&inline=1'}`;
+
+function canBindLocalPort() {
+  return new Promise(resolve => {
+    const server = http.createServer((req, res) => res.end('ok'));
+    server.once('error', () => resolve(false));
+    server.listen(0, '127.0.0.1', () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+function buildStaticHarness() {
+  const configPath = `/tmp/vite-chat-harness-${process.pid}.config.mjs`;
+  const root = process.cwd().replace(/\\/g, '/');
+  writeFileSync(configPath, `import base from ${JSON.stringify(`${root}/vite.config.js`)};
+export default {
+  ...base,
+  base: './',
+  build: {
+    ...base.build,
+    outDir: ${JSON.stringify(staticOutDir)},
+    emptyOutDir: false,
+    rollupOptions: {
+      ...(base.build?.rollupOptions || {}),
+      input: ${JSON.stringify(`${root}/chat-harness.html`)},
+    },
+  },
+};
+`);
+  execFileSync('npx', ['vite', 'build', '--config', configPath], { stdio: 'ignore' });
+}
 
 function killPortListeners(port) {
   try {
@@ -57,16 +95,19 @@ async function waitForStreamingDone(page) {
   await page.waitForFunction(() => !document.querySelector('[data-streaming-bubble="true"]'), null, { timeout: 8000 });
 }
 
-killPortListeners(PORT);
-const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+if (!canListen) buildStaticHarness();
+if (canListen) killPortListeners(PORT);
+const vite = canListen
+  ? spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' })
+  : null;
 let streamMock = null;
 const cleanup = () => {
-  try { vite.kill('SIGKILL'); } catch { /* noop */ }
+  try { vite?.kill('SIGKILL'); } catch { /* noop */ }
   try { streamMock?.kill('SIGKILL'); } catch { /* noop */ }
 };
 
 try {
-  await waitForServer(URL);
+  if (canListen) await waitForServer(URL);
   const browser = await chromium.launch();
 
   // ---- Pass 1: header + intro + starters + no gradient + no errors ----
@@ -177,9 +218,11 @@ try {
 
   // ---- Pass 4: streaming UI, partial retry, reduced motion ----
   {
-    killPortListeners(5197);
-    streamMock = spawn('node', ['scripts/stream-mock-server.mjs', '5197'], { stdio: 'ignore' });
-    await waitForPostServer('http://localhost:5197/api/claude', 10000);
+    if (canListen) {
+      killPortListeners(5197);
+      streamMock = spawn('node', ['scripts/stream-mock-server.mjs', '5197'], { stdio: 'ignore' });
+      await waitForPostServer('http://localhost:5197/api/claude', 10000);
+    }
 
     const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
     await page.goto(streamUrl(), { waitUntil: 'networkidle' });
@@ -294,12 +337,55 @@ try {
     await page.close();
   }
 
+  // ---- Pass 7: search two-pass + sourced footer ----
+  {
+    const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    await page.goto(streamUrl('&search=1'), { waitUntil: 'networkidle' });
+    await page.getByText('What should I brew today?', { exact: true }).first().click();
+    // RuphusThinking appends an ellipsis to every caption, so match on the
+    // substring — the visible-query contract is the query text, not framing.
+    const caption = await page.getByText('Searching the web: "best kenyan releases 2026"', { exact: false })
+      .first()
+      .waitFor({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!caption) fail('Pass 7: search loader caption with visible query did not render');
+
+    await page.waitForFunction(() => document.body.innerText.includes('washed Nyeri lot'), null, { timeout: 8000 });
+    await waitForStreamingDone(page);
+    const state = await page.evaluate(() => {
+      const body = document.body.innerText;
+      const sourceRows = [...document.querySelectorAll('[data-chat-sources="true"] button')];
+      return {
+        markerVisible: /NEEDS_SEARCH|END_SEARCH|---/.test(body),
+        finalCount: (body.match(/washed Nyeri lot/g) || []).length,
+        sourceRows: sourceRows.length,
+        rowHeight: sourceRows[0]?.getBoundingClientRect?.().height || 0,
+        rowTag: sourceRows[0]?.tagName || '',
+        badSchemesVisible: /javascript:|someapp:/.test(body),
+      };
+    });
+    if (state.markerVisible) fail('Pass 7: marker text became visible');
+    if (state.finalCount !== 1) fail(`Pass 7: expected one final answer, saw ${state.finalCount}`);
+    if (state.sourceRows !== 1) fail(`Pass 7: expected exactly one HTTPS source row, saw ${state.sourceRows}`);
+    if (state.badSchemesVisible) fail('Pass 7: unsafe source schemes rendered');
+    if (state.rowHeight < 44 || state.rowTag !== 'BUTTON') fail(`Pass 7: source row is not tappable enough (${state.rowTag}, ${state.rowHeight}px)`);
+    else console.log('OK  search: two-pass answer, marker hidden, HTTPS source footer only');
+    await page.close();
+  }
+
   await browser.close();
 } catch (e) {
   fail(e.message);
 } finally {
+  // The browser must die here too: a failure thrown before browser.close()
+  // otherwise leaves Playwright's children holding the event loop open —
+  // the script prints FAILED and then hangs forever (the 6-hour overnight
+  // stall). Belt-and-suspenders: hard-exit after the verdict prints.
+  try { await browser?.close(); } catch { /* noop */ }
   cleanup();
 }
 
 if (process.exitCode) console.error('verify-chat: FAILED');
 else console.log('verify-chat: PASS');
+process.exit(process.exitCode || 0);
