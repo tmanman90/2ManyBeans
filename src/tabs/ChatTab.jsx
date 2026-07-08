@@ -496,11 +496,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   // ensures layout has settled after the display toggle.
   useEffect(() => {
     if (isActive && scrollRef.current) {
-      requestAnimationFrame(() => {
+      const raf = requestAnimationFrame(() => {
         if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
       });
+      return () => cancelAnimationFrame(raf);
     }
   }, [isActive]);
 
@@ -567,6 +568,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
   const handlePickPhoto = () => {
     if (isDemo) { onDemoAction?.(); return; }
+    // No photo changes while a reply is in flight — the pending photo set is
+    // captured at send time and mutating it mid-stream muddies the next turn.
+    if (loading || sendingRef.current) return;
     if (Capacitor.isNativePlatform()) {
       takeNativePhoto();
     } else {
@@ -1048,6 +1052,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
                     onBrew: handleBrewRecipe,
                     onSave: handleSaveRecipe,
                     savingKey: savingRecipeKey,
+                    brewing: isHandBrew
+                      ? (handBrew.handBrewModal || handBrew.handBrewLoading)
+                      : (aiden.aidenModal || aiden.aidenLoading),
                   }}
                 />
               </m.div>

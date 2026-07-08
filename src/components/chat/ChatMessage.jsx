@@ -70,6 +70,7 @@ export function ChatMessage({ msg, recipeActions, onRetryErrored }) {
           onBrew={recipeActions?.onBrew}
           onSave={recipeActions?.onSave}
           saving={recipeActions?.savingKey === msg.recipeCard.title}
+          brewing={recipeActions?.brewing}
         />
       )}
     </>

@@ -133,7 +133,14 @@ function errorFromStatus(data, status, serviceName = 'Claude') {
 
 function getStreamingFetch() {
   const webFetch = typeof window !== 'undefined' ? window.CapacitorWebFetch : undefined;
-  bufferedTransport = Boolean(Capacitor.isNativePlatform() && !webFetch);
+  const buffered = Boolean(Capacitor.isNativePlatform() && !webFetch);
+  if (buffered && !bufferedTransport) {
+    // Never degrade silently: device evidence reads this flag, and the warn
+    // makes a Capacitor upgrade that renames the internal visible in logs.
+    console.warn('[streamChat] CapacitorWebFetch missing — buffered transport, no incremental streaming.');
+    if (typeof window !== 'undefined') window.__CHAT_BUFFERED_TRANSPORT__ = true;
+  }
+  bufferedTransport = buffered;
   return webFetch || fetch;
 }
 
@@ -175,6 +182,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
       const reader = response.body?.getReader?.();
       if (!reader) throw makeError('stream_unavailable', 'Streaming is not available in this browser.');
 
+      try {
       const decoder = new TextDecoder();
       let pending = '';
 
@@ -238,6 +246,11 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
           continue;
         }
         throw makeError('stream_incomplete', 'The AI stream ended before it returned usage.');
+      }
+      } finally {
+        // cancel() releases the lock AND closes the connection, so an early
+        // return or thrown error signals the server to abort upstream.
+        reader.cancel().catch(() => {});
       }
     } catch (err) {
       if (!sawByte && attempt < maxRetries) {

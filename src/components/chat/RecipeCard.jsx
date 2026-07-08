@@ -23,7 +23,7 @@ export function recipeSummary(recipe) {
   ].filter(Boolean).join('\n');
 }
 
-export function RecipeCard({ recipe, brewBean, saveBean, onBrew, onSave, saving = false }) {
+export function RecipeCard({ recipe, brewBean, saveBean, onBrew, onSave, saving = false, brewing = false }) {
   if (!recipe) return null;
 
   const meta = [
@@ -77,7 +77,11 @@ export function RecipeCard({ recipe, brewBean, saveBean, onBrew, onSave, saving 
       )}
       {(brewBean || saveBean) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, minHeight: 44, alignItems: 'center' }}>
-          {brewBean && <Btn variant="small" onClick={() => onBrew?.(brewBean)} style={{ minHeight: 44 }}><Coffee size={12} /> Brew this</Btn>}
+          {brewBean && (
+            <Btn variant="small" onClick={() => onBrew?.(brewBean)} disabled={brewing} style={{ minHeight: 44 }}>
+              <Coffee size={12} /> {brewing ? 'Opening…' : 'Brew this'}
+            </Btn>
+          )}
           {saveBean && (
             <Btn variant="small" onClick={() => onSave?.(saveBean, recipe)} disabled={saving} style={{ minHeight: 44 }}>
               <Save size={12} /> {saving ? 'Saving…' : 'Save to bean notes'}
