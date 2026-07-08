@@ -982,7 +982,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
               retryTurn: { text, displayMsg, apiMsg },
             }));
           } else {
-            commitAssistantMessage(newMessage({ role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." }));
+            // errored: a transient failure must not persist into the session
+            // doc (a durable "Couldn't reach the AI" haunts every resume) —
+            // and the flag buys the tap-to-retry affordance for free.
+            commitAssistantMessage(newMessage({
+              role: 'assistant',
+              content: "Couldn't reach the AI. Try again in a sec.",
+              errored: true,
+              retryTurn: { text, displayMsg, apiMsg },
+            }));
           }
           complete();
         }
