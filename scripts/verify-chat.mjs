@@ -7,6 +7,7 @@
 //   R6 solid send button (no gradient chrome)
 //   R7-reduced-motion renders; zero console errors on the static render
 import { spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const PORT = 5194;
@@ -26,9 +27,42 @@ function waitForServer(url, timeoutMs = 20000) {
 }
 
 const noGradient = () => [...document.querySelectorAll('*')].every(el => !(getComputedStyle(el).backgroundImage || '').includes('linear-gradient'));
+const streamUrl = (params = '') => `${URL}?stream=1${params}`;
+
+function killPortListeners(port) {
+  try {
+    const pids = execFileSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf8' })
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    for (const pid of pids) {
+      try { process.kill(Number(pid), 'SIGKILL'); } catch { /* noop */ }
+    }
+  } catch { /* no listener */ }
+}
+
+function waitForPostServer(url, timeoutMs = 10000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      try { const r = await fetch(url, { method: 'POST' }); if (r.ok) return resolve(); } catch { /* not up */ }
+      if (Date.now() - start > timeoutMs) return reject(new Error('stream mock did not start'));
+      setTimeout(tick, 200);
+    };
+    tick();
+  });
+}
+
+async function waitForStreamingDone(page) {
+  await page.waitForFunction(() => !document.querySelector('[data-streaming-bubble="true"]'), null, { timeout: 8000 });
+}
 
 const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
-const cleanup = () => { try { vite.kill('SIGKILL'); } catch { /* noop */ } };
+let streamMock = null;
+const cleanup = () => {
+  try { vite.kill('SIGKILL'); } catch { /* noop */ }
+  try { streamMock?.kill('SIGKILL'); } catch { /* noop */ }
+};
 
 try {
   await waitForServer(URL);
@@ -138,6 +172,57 @@ try {
     else console.log('OK  reduced-motion: chat renders');
     if (errors.length) fail('reduced-motion errors: ' + JSON.stringify(errors.slice(0, 4)));
     await page.close();
+  }
+
+  // ---- Pass 4: streaming UI, partial retry, reduced motion ----
+  {
+    killPortListeners(5197);
+    streamMock = spawn('node', ['scripts/stream-mock-server.mjs', '5197'], { stdio: 'ignore' });
+    await waitForPostServer('http://localhost:5197/api/claude', 10000);
+
+    const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    await page.goto(streamUrl(), { waitUntil: 'networkidle' });
+    await page.getByText('What should I brew today?', { exact: true }).first().click();
+    const thinking = await page.waitForSelector('[data-chat-typing="true"] [data-dot-matrix-loader="true"] canvas', { timeout: 2500 }).then(() => true).catch(() => false);
+    if (!thinking) fail('Pass 4: thinking indicator did not appear before stream text');
+    await page.waitForSelector('[data-streaming-bubble="true"]', { timeout: 4000 });
+    const lengths = [];
+    for (let i = 0; i < 4; i += 1) {
+      lengths.push(await page.locator('[data-streaming-bubble="true"] .chat-streaming-text').innerText().then(t => t.length).catch(() => 0));
+      await page.waitForTimeout(150);
+    }
+    const increases = lengths.slice(1).filter((len, idx) => len > lengths[idx]).length;
+    if (increases < 2) fail(`Pass 4: streaming text did not progressively increase enough (${lengths.join(',')})`);
+    await waitForStreamingDone(page);
+    const finalKiawamururu = await page.getByText('Kiawamururu', { exact: false }).count();
+    const assistantBubbles = await page.locator('img[alt="Professor Ruphus"]').count();
+    if (assistantBubbles < 2 || finalKiawamururu < 1) fail('Pass 4: final streamed message was not committed');
+    else console.log('OK  streaming: loader, progressive text, committed final message');
+    await page.close();
+
+    const errorPage = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    await errorPage.goto(streamUrl('&error=mid'), { waitUntil: 'networkidle' });
+    await errorPage.getByText('What should I brew today?', { exact: true }).first().click();
+    await errorPage.waitForSelector('[data-chat-errored="true"]', { timeout: 6000 });
+    const partial = await errorPage.getByText('Kiawamururu', { exact: false }).count();
+    const retry = await errorPage.getByText("Didn't finish — tap to retry", { exact: true }).count();
+    if (partial < 1 || retry < 1) fail('Pass 4: mid-stream error did not keep partial text with retry affordance');
+    else console.log('OK  streaming: mid-stream error keeps partial + retry');
+    await errorPage.close();
+
+    const reducePage = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    await reducePage.goto(streamUrl(), { waitUntil: 'networkidle' });
+    await reducePage.getByText('What should I brew today?', { exact: true }).first().click();
+    await reducePage.waitForSelector('[data-streaming-bubble="true"]', { timeout: 4000 });
+    const reducedLengths = [];
+    for (let i = 0; i < 4; i += 1) {
+      reducedLengths.push(await reducePage.locator('[data-streaming-bubble="true"] .chat-streaming-text').innerText().then(t => t.length).catch(() => 0));
+      await reducePage.waitForTimeout(150);
+    }
+    const reducedIncreases = reducedLengths.slice(1).filter((len, idx) => len > reducedLengths[idx]).length;
+    if (reducedIncreases < 2) fail(`Pass 4: reduced-motion streaming did not progressively render (${reducedLengths.join(',')})`);
+    else console.log('OK  streaming: reduced-motion still streams text');
+    await reducePage.close();
   }
 
   await browser.close();

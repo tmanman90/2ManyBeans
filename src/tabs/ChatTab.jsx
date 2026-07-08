@@ -1,12 +1,14 @@
 // Chat tab -- with photo scanning, Aiden brew, and save-to-inventory
 import { useState, useEffect, useRef, memo } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Send, Camera, X, Coffee, BookOpen, Save } from 'lucide-react';
+import { Send, Camera, X, Coffee, BookOpen, Save, ChevronDown } from 'lucide-react';
 import { AnimatePresence, useReducedMotion } from 'framer-motion';
 import { C, fonts, glass, shadows, radius, type as typeScale, motion as motionTokens } from '../styles/theme';
 import { m, spring, fadeUp, popIn } from '../lib/motion';
 import { haptic } from '../lib/haptics';
-import { buildChatContext, sendChatMessage, compressImage } from '../lib/claude';
+import { buildChatContext, compressImage, prepareChatMessagesForClaude } from '../lib/claude';
+import { API_BASE } from '../lib/apiBase';
+import { streamWithAuth, resolveTerminal } from '../lib/streamChat';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
 import { Toast } from '../components/Toast';
@@ -22,6 +24,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { RuphusThinking } from '../components/tasting/RuphusThinking';
 import { ChatMessage } from '../components/chat/ChatMessage';
+import { StreamingBubble } from '../components/chat/StreamingBubble';
 import { parseBeanScan, trimApiMessages } from '../lib/chatParse';
 
 const MAX_API_MESSAGES = 20;
@@ -79,11 +82,11 @@ function getStarterPrompts(beans, isDemo) {
 
 // "Ruphus is thinking" — reuse the tasting wizard's compact canvas dot-matrix loader
 // so AI waits feel like the same little piece of alien coffee hardware across the app.
-const TypingIndicator = ({ reduce }) => (
+const TypingIndicator = ({ reduce, captions }) => (
   <m.div {...(reduce ? {} : fadeUp)} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, alignSelf: 'flex-start' }}>
     <m.img
       src="/images/ruphus-avatar.png"
-      alt="Ruphus"
+      alt="Professor Ruphus"
       animate={reduce ? {} : { y: [0, -2, 0] }}
       transition={reduce ? {} : { duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
       style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0 }}
@@ -94,7 +97,7 @@ const TypingIndicator = ({ reduce }) => (
       boxShadow: shadows.e1, padding: '10px 11px',
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
-      <RuphusThinking reduce={reduce} />
+      <RuphusThinking reduce={reduce} captions={captions} />
     </div>
   </m.div>
 );
@@ -312,6 +315,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const [photos, setPhotos] = useState([]); // { base64, mediaType, previewUrl }
   const [scannedBean, setScannedBean] = useState(null);
   const [guidedSaving, setGuidedSaving] = useState(false);
+  const [thinkingCaptions, setThinkingCaptions] = useState(null);
+  const [streamingSlot, setStreamingSlot] = useState(null);
+  const [showJumpLatest, setShowJumpLatest] = useState(false);
   const [toast, setToast] = useState(null);
   // Disable keyboard hook when tab is hidden to prevent double-counting
   // keyboard events and corrupting the shared tab bar hide counter.
@@ -324,6 +330,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   // call immediately in the same event loop tick.
   const sendingRef = useRef(false);
   const handoffRef = useRef(false);
+  const streamingBubbleRef = useRef(null);
+  const streamRawRef = useRef('');
+  const pendingStreamRef = useRef('');
+  const stickRef = useRef(true);
+  const retryingRef = useRef(false);
   // Blob URLs only (never DataURL strings). DataURL strings don't need
   // revoking and pushing them here would pin huge base64 payloads for the
   // entire session, which is a real memory leak on native.
@@ -358,8 +369,53 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const handBrew = useHandBrew(ephemeralUpdateBean);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+    if (!streamingSlot && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, streamingSlot]);
+
+  const scrollToBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  };
+
+  const distanceFromBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return 0;
+    return el.scrollHeight - el.scrollTop - el.clientHeight;
+  };
+
+  const handleScrollIntent = () => {
+    if (!streamingSlot) return;
+    if (distanceFromBottom() > 80) {
+      stickRef.current = false;
+      setShowJumpLatest(true);
+    }
+  };
+
+  const handleThreadScroll = () => {
+    if (!streamingSlot) return;
+    if (distanceFromBottom() <= 24) {
+      stickRef.current = true;
+      setShowJumpLatest(false);
+    }
+  };
+
+  const handleStreamingFlush = () => {
+    if (stickRef.current) scrollToBottom();
+  };
+
+  const jumpToLatest = () => {
+    stickRef.current = true;
+    setShowJumpLatest(false);
+    scrollToBottom();
+  };
+
+  useEffect(() => {
+    if (!streamingSlot || !streamingBubbleRef.current || !pendingStreamRef.current) return;
+    const pending = pendingStreamRef.current;
+    pendingStreamRef.current = '';
+    streamingBubbleRef.current.append(pending);
+  }, [streamingSlot]);
 
   // Scroll to bottom when tab becomes visible again. display:none elements
   // can lose scroll position in WebKit (bug 72852). requestAnimationFrame
@@ -444,6 +500,18 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     }
   };
 
+  const commitAssistantMessage = (assistantMsg) => {
+    setMessages(prev => {
+      const updated = [...prev, assistantMsg];
+      if (updated.length > MAX_DISPLAY_MESSAGES) {
+        const pruned = updated.slice(0, updated.length - MAX_DISPLAY_MESSAGES);
+        pruned.forEach(m => m.photos?.forEach(url => safeRevokeBlobUrl(url)));
+        return updated.slice(-MAX_DISPLAY_MESSAGES);
+      }
+      return updated;
+    });
+  };
+
   const handleCoachStarter = () => {
     if (isDemo) { onDemoAction?.(); return; }
     const firstActive = beans
@@ -473,6 +541,157 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     handleSend(hint);
   };
 
+  const sendTurn = async ({ text, turnPhotos = [], appendUser = true, apiMsgOverride = null, retryTurn = null } = {}) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    stickRef.current = true;
+    setShowJumpLatest(false);
+    streamRawRef.current = '';
+    pendingStreamRef.current = '';
+
+    // Build display message
+    const displayMsg = retryTurn?.displayMsg || {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      photos: turnPhotos.map(p => p.previewUrl),
+    };
+    if (appendUser) setMessages(prev => [...prev, displayMsg]);
+
+    // Build API message with base64 images
+    let apiContent;
+    if (apiMsgOverride) {
+      apiContent = apiMsgOverride.content;
+    } else if (turnPhotos.length > 0) {
+      apiContent = [
+        ...turnPhotos.map(p => ({
+          type: 'image',
+          source: { type: 'base64', media_type: p.mediaType, data: p.base64 },
+        })),
+        { type: 'text', text: text || 'What can you tell me about this coffee?' },
+      ];
+      // Clear scanned bean when sending new photos
+      setScannedBean(null);
+    } else {
+      apiContent = text;
+    }
+
+    const apiMsg = apiMsgOverride || { role: 'user', content: apiContent };
+    if (appendUser) apiMessages.current = [...apiMessages.current, apiMsg];
+
+    // NOTE: input state lives in ChatInputBar child; it clears its own field
+    // after onSend(text) resolves, so no setInput call here.
+    // Clear pending photos from the input bar. Do NOT revoke blob URLs here:
+    // sent photo preview URLs are still referenced by messages in the display
+    // list (displayMsg.photos). Revoking them would cause broken image
+    // thumbnails. Blob URLs are cleaned up on full page unload via the
+    // unmount effect (blobUrlsRef). Data URLs (native camera) need no cleanup.
+    if (appendUser) setPhotos([]);
+    setLoading(true);
+    setThinkingCaptions(null);
+    setStreamingSlot(null);
+
+    const finishLoading = () => {
+      setLoading(false);
+      setThinkingCaptions(null);
+      setStreamingSlot(null);
+      sendingRef.current = false;
+    };
+
+    await new Promise((resolve) => {
+      const complete = () => {
+        finishLoading();
+        resolve();
+      };
+
+      (async () => {
+        try {
+      const systemPrompt = buildChatContext(beans, tastings, preferences, firstName);
+          const history = apiMessages.current.filter(m => m.role !== 'system');
+          const prepared = await prepareChatMessagesForClaude(history, {
+            onImageDescribeStart: () => setThinkingCaptions(['Reading your labels']),
+          });
+
+          await streamWithAuth({
+            url: `${API_BASE}/api/claude-stream`,
+            body: {
+              system: systemPrompt,
+              messages: prepared.messages,
+              maxTokens: prepared.hasImages ? 2600 : 800,
+              model: 'claude-sonnet-5',
+              feature: 'chat',
+            },
+            onDelta: (delta) => {
+              streamRawRef.current += delta || '';
+              if (!streamingSlot) setStreamingSlot({ id: 'streaming' });
+              if (streamingBubbleRef.current) {
+                streamingBubbleRef.current.append(delta);
+              } else {
+                pendingStreamRef.current += delta || '';
+              }
+            },
+            onDone: ({ stopReason } = {}) => {
+              const terminal = resolveTerminal(streamRawRef.current);
+              const rawText = terminal.text;
+              const scan = parseBeanScan(rawText, { stopReason });
+              if (scan.scannedBean) setScannedBean(scan.scannedBean);
+
+              const assistantMsg = newMessage({
+                role: 'assistant',
+                content: scan.cleanText,
+              });
+              commitAssistantMessage(assistantMsg);
+              apiMessages.current = [...apiMessages.current, { role: 'assistant', content: rawText }];
+
+              // Cap and trim apiMessages to prevent unbounded memory growth
+              if (apiMessages.current.length > MAX_API_MESSAGES) {
+                apiMessages.current = apiMessages.current.slice(-MAX_API_MESSAGES);
+              }
+              apiMessages.current = trimApiMessages(apiMessages.current);
+              haptic.light();
+              complete();
+            },
+            onError: (err) => {
+      // Server-side gate: chat is Pro-only. If a free user somehow bypassed
+      // the local check (race, stale context), surface the paywall and
+      // strip the optimistic user message.
+              const hadStreamText = streamRawRef.current.length > 0;
+              if (!hadStreamText && (err?.code === 'subscription_required' || err?.code === 'free_tier_exhausted')) {
+                if (appendUser) setMessages(prev => prev.slice(0, -1));
+                if (appendUser) apiMessages.current = apiMessages.current.slice(0, -1);
+        openPaywall({
+          feature: 'generic',
+          promote: err.tier === 'ultra' ? 'ultra' : 'pro',
+        });
+                complete();
+                return;
+      }
+      // Error bubbles are for the user only. Do NOT inject them into
+      // apiMessages.current -- otherwise the model reads "Couldn't reach the AI..."
+      // as canonical assistant history on the next retry, which mangles context.
+              if (hadStreamText) {
+                const terminal = resolveTerminal(streamRawRef.current);
+                const scan = parseBeanScan(terminal.text);
+                commitAssistantMessage(newMessage({
+                  role: 'assistant',
+                  content: scan.cleanText || "Couldn't reach the AI. Try again in a sec.",
+                  errored: true,
+                  retryTurn: { text, displayMsg, apiMsg },
+                }));
+              } else {
+                commitAssistantMessage(newMessage({ role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." }));
+              }
+              complete();
+            },
+          });
+        } catch (err) {
+          commitAssistantMessage(newMessage({ role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." }));
+          complete();
+        }
+      })();
+    });
+  };
+
   // Text comes from ChatInputBar (child owns the input state).
   const handleSend = async (text) => {
     if (sendingRef.current) return;
@@ -485,98 +704,23 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       return;
     }
 
-    sendingRef.current = true;
+    await sendTurn({ text, turnPhotos: [...photos], appendUser: true });
+  };
 
-    const currentPhotos = [...photos];
-
-    // Build display message
-    const displayMsg = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      photos: currentPhotos.map(p => p.previewUrl),
-    };
-    setMessages(prev => [...prev, displayMsg]);
-
-    // Build API message with base64 images
-    let apiContent;
-    if (currentPhotos.length > 0) {
-      apiContent = [
-        ...currentPhotos.map(p => ({
-          type: 'image',
-          source: { type: 'base64', media_type: p.mediaType, data: p.base64 },
-        })),
-        { type: 'text', text: text || 'What can you tell me about this coffee?' },
-      ];
-      // Clear scanned bean when sending new photos
-      setScannedBean(null);
-    } else {
-      apiContent = text;
-    }
-
-    const apiMsg = { role: 'user', content: apiContent };
-    apiMessages.current = [...apiMessages.current, apiMsg];
-
-    // NOTE: input state lives in ChatInputBar child; it clears its own field
-    // after onSend(text) resolves, so no setInput call here.
-    // Clear pending photos from the input bar. Do NOT revoke blob URLs here:
-    // sent photo preview URLs are still referenced by messages in the display
-    // list (displayMsg.photos). Revoking them would cause broken image
-    // thumbnails. Blob URLs are cleaned up on full page unload via the
-    // unmount effect (blobUrlsRef). Data URLs (native camera) need no cleanup.
-    setPhotos([]);
-    setLoading(true);
-
+  const handleRetryErrored = async (msg) => {
+    if (retryingRef.current || sendingRef.current || !msg?.retryTurn) return;
+    retryingRef.current = true;
+    setMessages(prev => prev.filter(item => item.id !== msg.id));
     try {
-      const systemPrompt = buildChatContext(beans, tastings, preferences, firstName);
-      const history = apiMessages.current.filter(m => m.role !== 'system');
-      const { text: rawText, stopReason } = await sendChatMessage(systemPrompt, history);
-
-      // Parse scan markers
-      const { cleanText, scannedBean: parsed } = parseBeanScan(rawText, { stopReason });
-      if (parsed) setScannedBean(parsed);
-
-      const assistantMsg = newMessage({ role: 'assistant', content: cleanText });
-      setMessages(prev => {
-        const updated = [...prev, assistantMsg];
-        if (updated.length > MAX_DISPLAY_MESSAGES) {
-          // Revoke blob URLs from pruned messages before discarding
-          const pruned = updated.slice(0, updated.length - MAX_DISPLAY_MESSAGES);
-          pruned.forEach(m => m.photos?.forEach(url => safeRevokeBlobUrl(url)));
-          return updated.slice(-MAX_DISPLAY_MESSAGES);
-        }
-        return updated;
+      await sendTurn({
+        text: msg.retryTurn.text,
+        appendUser: false,
+        apiMsgOverride: msg.retryTurn.apiMsg,
+        retryTurn: msg.retryTurn,
       });
-      apiMessages.current = [...apiMessages.current, { role: 'assistant', content: rawText }];
-
-      // Cap and trim apiMessages to prevent unbounded memory growth
-      if (apiMessages.current.length > MAX_API_MESSAGES) {
-        apiMessages.current = apiMessages.current.slice(-MAX_API_MESSAGES);
-      }
-      apiMessages.current = trimApiMessages(apiMessages.current);
-    } catch (err) {
-      // Server-side gate: chat is Pro-only. If a free user somehow bypassed
-      // the local check (race, stale context), surface the paywall and
-      // strip the optimistic user message.
-      if (err?.code === 'subscription_required' || err?.code === 'free_tier_exhausted') {
-        setMessages(prev => prev.slice(0, -1));
-        apiMessages.current = apiMessages.current.slice(0, -1);
-        openPaywall({
-          feature: 'generic',
-          promote: err.tier === 'ultra' ? 'ultra' : 'pro',
-        });
-        setLoading(false);
-        sendingRef.current = false;
-        return;
-      }
-      // Error bubbles are for the user only. Do NOT inject them into
-      // apiMessages.current -- otherwise the model reads "Couldn't reach the AI..."
-      // as canonical assistant history on the next retry, which mangles context.
-      const errMsg = newMessage({ role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." });
-      setMessages(prev => [...prev, errMsg]);
+    } finally {
+      retryingRef.current = false;
     }
-    setLoading(false);
-    sendingRef.current = false;
   };
 
   const handleBrewScanned = () => {
@@ -665,6 +809,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       <div
         ref={scrollRef}
         onClick={() => { if (inputRef.current) inputRef.current.blur(); }}
+        onTouchStart={handleScrollIntent}
+        onWheel={handleScrollIntent}
+        onScroll={handleThreadScroll}
+        role="log"
+        aria-live="polite"
         style={{
           overflowY: 'auto',
           display: 'flex',
@@ -736,15 +885,55 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
             if (isIntroState && i === 0) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                <ChatMessage msg={msg} />
+                <ChatMessage
+                  msg={msg}
+                  onRetryErrored={handleRetryErrored}
+                />
               </m.div>
             );
           })}
         </AnimatePresence>
 
         {/* Typing / loading indicator */}
-        {loading && <TypingIndicator reduce={reduceMotion} />}
+        {loading && !streamingSlot && <TypingIndicator reduce={reduceMotion} captions={thinkingCaptions || undefined} />}
+        {streamingSlot && (
+          <StreamingBubble
+            ref={streamingBubbleRef}
+            onFlush={handleStreamingFlush}
+          />
+        )}
       </div>
+
+      {showJumpLatest && streamingSlot && (
+        <button
+          type="button"
+          onClick={jumpToLatest}
+          style={{
+            position: 'fixed',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: keyboardHeight > 0
+              ? keyboardHeight + 76
+              : `calc(80px + env(safe-area-inset-bottom, 0px) + 76px)`,
+            zIndex: 51,
+            minHeight: 44,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '9px 13px',
+            background: C.cream,
+            border: `1px solid ${C.hairline}`,
+            borderRadius: radius.pill,
+            boxShadow: shadows.e1,
+            ...typeScale.caption,
+            color: C.text,
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronDown size={14} color={C.accent} />
+          Jump to latest
+        </button>
+      )}
 
       {/* Scanned bean — refined result card with its actions */}
       {scannedBean && !loading && (

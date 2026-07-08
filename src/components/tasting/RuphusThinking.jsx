@@ -8,13 +8,14 @@ import { C, fonts, radius } from '../../styles/theme';
 const CAPTIONS = ['Reading your cup', 'Considering the roast', 'Comparing your notes', 'Writing back'];
 const DOT = { gap: 8, radius: 1.7, accent: [162, 99, 47], ink: [93, 73, 56] };
 
-export function RuphusThinking({ reduce = false }) {
+export function RuphusThinking({ reduce = false, captions = CAPTIONS }) {
+  const lines = Array.isArray(captions) && captions.length > 0 ? captions : CAPTIONS;
   const [i, setI] = useState(0);
   useEffect(() => {
     if (reduce) return;
-    const id = setInterval(() => setI(n => (n + 1) % CAPTIONS.length), 3500);
+    const id = setInterval(() => setI(n => (n + 1) % lines.length), 3500);
     return () => clearInterval(id);
-  }, [reduce]);
+  }, [reduce, lines.length]);
 
   return (
     <div
@@ -40,7 +41,7 @@ export function RuphusThinking({ reduce = false }) {
           color: C.textMuted, whiteSpace: 'nowrap',
         }}
       >
-        {CAPTIONS[reduce ? 0 : i]}…
+        {lines[reduce ? 0 : i % lines.length]}…
       </span>
     </div>
   );

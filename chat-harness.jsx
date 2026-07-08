@@ -18,13 +18,29 @@ const PRO = {
 
 const beans = [
   { id: 'b1', roaster: 'Arcane', name: 'Kotowa Estate', origin: 'Panama', process: 'Washed', status: 'ACTIVE', jarSlot: 1, openDate: '2026-06-25', roastDate: '2026-06-10', degasMin: 7, peakStart: 14, peakEnd: 45 },
-  { id: 'b2', roaster: 'Onyx', name: 'Geometry Blend', origin: 'Ethiopia', process: 'Natural', status: 'SEALED' },
+  { id: 'b2', roaster: 'Nyeri Labs', name: 'Kiawamururu', origin: 'Kenya', process: 'Washed', status: 'ACTIVE', jarSlot: 2, openDate: '2026-06-28', roastDate: '2026-06-12', degasMin: 7, peakStart: 14, peakEnd: 45, bagNotes: 'Blackcurrant, citrus, molasses' },
+  { id: 'b3', roaster: 'Onyx', name: 'Geometry Blend', origin: 'Ethiopia', process: 'Natural', status: 'SEALED' },
 ];
 const tastings = [{ id: 't1', beanId: 'b1', date: '2026-06-20', rating: 5, oneWord: 'Silky' }];
 const noop = () => {};
 const noopAsync = async () => {};
 
 window.__SPY__ = { startedTasting: null, navigatedToTasting: 0, addedBeans: [] };
+window.__STREAM_TEST__ = { enabled: new URLSearchParams(window.location.search).get('stream') === '1' };
+if (window.__STREAM_TEST__.enabled) {
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+    if (url.pathname === '/api/claude-stream') {
+      const params = new URLSearchParams(window.location.search);
+      const target = new URL('http://localhost:5197/api/claude-stream');
+      if (params.get('error')) target.searchParams.set('error', params.get('error'));
+      if (params.get('recipe')) target.searchParams.set('recipe', params.get('recipe'));
+      return originalFetch(target.toString(), init);
+    }
+    return originalFetch(input, init);
+  };
+}
 const addBean = async (bean) => {
   window.__SPY__.addedBeans.push(bean);
   return 'new-bean-id';

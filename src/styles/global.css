@@ -146,7 +146,7 @@ input[type="date"]::-webkit-datetime-edit {
 
 .btnp-primary {
   color: #fff; font-size: 13px; padding: 13px 22px; border-radius: 14px;
-  background: #A2632F;
+  background: var(--chat-caret-color);
   box-shadow:
     0 1px 0 rgba(255,255,255,0.18) inset,
     0 1px 2px rgba(74,47,30,0.16),
@@ -218,6 +218,28 @@ input[type="date"]::-webkit-datetime-edit {
 @keyframes ruphusFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 .ruphus-float { animation: wizPop 260ms cubic-bezier(0.34,1.4,0.64,1), ruphusFloat 4.2s ease-in-out 260ms infinite; }
 @media (prefers-reduced-motion: reduce) { .wiz-pop, .ruphus-float { animation: none; } }
+
+/* Chat streaming bubble entrance — visible by default, following the .wiz-* motion convention. */
+@keyframes chatBubbleIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.chat-bubble-in { animation: chatBubbleIn 200ms ease-out; }
+
+@keyframes chatCaretBlink { 0%, 48% { opacity: 0.6; } 49%, 100% { opacity: 0; } }
+.chat-streaming-text::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--chat-caret-color);
+  opacity: 0.6;
+  animation: chatCaretBlink 900ms steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble-in { animation: none; }
+  .chat-streaming-text::after { display: none; animation: none; }
+}
 
 /* Ruphus chat thread — the coaching bubble fades away after the AI reaction replaces the loader.
    The dot-matrix loader itself is a canvas rAF; no CSS breathing-dot animation ships. */

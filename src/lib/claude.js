@@ -597,7 +597,7 @@ ${recentTastings || '  (none)'}${originContext}`;
   ];
 }
 
-export async function sendChatMessage(systemPrompt, history) {
+export async function prepareChatMessagesForClaude(history, { onImageDescribeStart } = {}) {
   // Route images through Gemini for vision, then pass text description to Claude
   const recentMessages = history.slice(-8);
   const lastMsg = recentMessages[recentMessages.length - 1];
@@ -607,6 +607,7 @@ export async function sendChatMessage(systemPrompt, history) {
     hasImages = lastMsg.content.some(block => block.type === 'image');
     if (hasImages) {
       try {
+        onImageDescribeStart?.();
         const { describeImage } = await import('./gemini');
         const photos = lastMsg.content
           .filter(block => block.type === 'image')
@@ -626,6 +627,12 @@ export async function sendChatMessage(systemPrompt, history) {
       }
     }
   }
+
+  return { messages: recentMessages, hasImages };
+}
+
+export async function sendChatMessage(systemPrompt, history) {
+  const { messages: recentMessages, hasImages } = await prepareChatMessagesForClaude(history);
 
   const data = await callClaude({
     system: systemPrompt,

@@ -1,6 +1,6 @@
 import { C, radius, shadows, type as typeScale } from '../../styles/theme';
 
-export function ChatMessage({ msg }) {
+export function ChatMessage({ msg, onRetryErrored }) {
   return (
     <>
       {msg.photos && msg.photos.length > 0 && (
@@ -29,9 +29,13 @@ export function ChatMessage({ msg }) {
       )}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
         {msg.role === 'assistant' && (
-          <img src="/images/ruphus-avatar.png" alt="Ruphus" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }} />
+          <img src="/images/ruphus-avatar.png" alt="Professor Ruphus" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }} />
         )}
         <div
+          onClick={msg.errored ? () => onRetryErrored?.(msg) : undefined}
+          role={msg.errored ? 'button' : undefined}
+          tabIndex={msg.errored ? 0 : undefined}
+          data-chat-errored={msg.errored ? 'true' : undefined}
           style={{
             maxWidth: '82%',
             background: msg.role === 'user' ? C.accent : C.cream,
@@ -41,13 +45,20 @@ export function ChatMessage({ msg }) {
               : `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
             padding: '12px 16px',
             ...typeScale.bodyL,
-            border: msg.role === 'user' ? 'none' : `1px solid ${C.hairline}`,
+            border: msg.role === 'user' ? 'none' : `1px solid ${msg.errored ? C.accentSoft : C.hairline}`,
             boxShadow: msg.role === 'user' ? shadows.button : shadows.e1,
             whiteSpace: 'pre-wrap',
             lineHeight: 1.55,
+            cursor: msg.errored ? 'pointer' : undefined,
+            minHeight: msg.errored ? 44 : undefined,
           }}
         >
           {msg.content}
+          {msg.errored && (
+            <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: 8, lineHeight: 1.3 }}>
+              Didn't finish — tap to retry
+            </div>
+          )}
         </div>
       </div>
     </>
