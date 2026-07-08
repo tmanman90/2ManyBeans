@@ -940,7 +940,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
             };
           }
           commitAssistantMessage(first.message);
-          recordAssistantForApi(first.rawText);
+          // A needsSearch turn must never park the raw marker in model
+          // history — a later turn would read it as canonical output and
+          // could re-emit it. Record what the user actually saw instead.
+          recordAssistantForApi(first.type === 'needsSearch'
+            ? (first.message?.content || SEARCH_DISCLAIMER)
+            : first.rawText);
           haptic.light();
           complete();
         } catch (err) {
@@ -963,7 +968,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           // as canonical assistant history on the next retry, which mangles context.
           if (err?.hadStreamText) {
             const search = parseNeedsSearch(err.terminalText);
-            const scan = parseBeanScan(search.cleanText || err.terminalText);
+            // When a marker WAS found, cleanText is authoritative even when
+            // empty — falling back to terminalText would resurface the raw
+            // marker in the errored bubble.
+            const strippedErrText = search.found ? search.cleanText : err.terminalText;
+            const scan = parseBeanScan(strippedErrText);
             const recipe = parseRecipeCard(scan.cleanText);
             commitAssistantMessage(newMessage({
               role: 'assistant',
