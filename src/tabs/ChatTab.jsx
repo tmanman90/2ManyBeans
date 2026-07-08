@@ -33,6 +33,9 @@ import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatPars
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
 const STATIC_STARTERS = ['What should I brew today?', 'Scan a bag', 'Coach my tasting'];
+// Chat-context loader captions — the RuphusThinking defaults are tasting-wizard
+// copy ("Reading your cup") that reads as nonsense on a brew question.
+const CHAT_THINKING_CAPTIONS = ['Checking your rotation', 'Thinking it over', 'Weighing the options'];
 const INTRO_TEXT = "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you.";
 const SEARCH_DISCLAIMER = "Couldn't check the web — answering from what I know.";
 const NEEDS_SEARCH_RE = /---NEEDS_SEARCH---([\s\S]*?)---END_SEARCH---/;
@@ -1239,7 +1242,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         </AnimatePresence>
 
         {/* Typing / loading indicator */}
-        {loading && !streamingSlot && <TypingIndicator reduce={reduceMotion} captions={thinkingCaptions || undefined} />}
+        {loading && !streamingSlot && <TypingIndicator reduce={reduceMotion} captions={thinkingCaptions || CHAT_THINKING_CAPTIONS} />}
         {streamingSlot && (
           <StreamingBubble
             ref={streamingBubbleRef}

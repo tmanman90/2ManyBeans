@@ -6,13 +6,30 @@ import { stripMarkdown } from '../../lib/textFormat';
 export const StreamingBubble = forwardRef(function StreamingBubble({ onFlush }, ref) {
   const textRef = useRef('');
   const rafRef = useRef(0);
+  const revealedRef = useRef(0);
   const [display, setDisplay] = useState('');
 
+  // Anthropic streams in bursty multi-word chunks; rendering them raw reads
+  // as lag-then-lump. Smooth the reveal: each frame advances a character
+  // cursor toward the safe (hold-back-scanned) target at a rate proportional
+  // to the backlog, so text flows steadily and catches up when behind.
   const flush = useCallback(() => {
     rafRef.current = 0;
-    const next = stripMarkdown(holdBackScan(textRef.current).display);
-    setDisplay(next);
+    const safe = stripMarkdown(holdBackScan(textRef.current).display);
+    const backlog = safe.length - revealedRef.current;
+    if (backlog > 0) {
+      const step = Math.max(2, Math.ceil(backlog / 12));
+      revealedRef.current = Math.min(safe.length, revealedRef.current + step);
+    } else {
+      // Hold-back can shrink the safe target (a marker opened) — never
+      // display beyond it.
+      revealedRef.current = safe.length;
+    }
+    setDisplay(safe.slice(0, revealedRef.current));
     onFlush?.();
+    if (revealedRef.current < safe.length) {
+      rafRef.current = requestAnimationFrame(flush);
+    }
   }, [onFlush]);
 
   const schedule = useCallback(() => {
