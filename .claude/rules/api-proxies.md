@@ -12,14 +12,14 @@ Four Vercel serverless proxies. Each follows the same pattern:
 - Every proxy has `maxRetries: 2` server-side via the SDK.
 
 ## Model Fallback Chains
-- `/api/claude`: Haiku 4.5 primary (with prompt caching), Haiku 4.5 fallback on 429/529. Response includes `usage` for cache monitoring.
+- `/api/claude`: Sonnet 4.6 server default, Sonnet 5 for chat when the client requests it, Haiku 4.5 fallback on 429/529. Response includes `usage` for cache monitoring. Sonnet 5 attempts send `thinking: { type: 'disabled' }`; Haiku fallback attempts rebuild params without `thinking`.
 - `/api/openai`: GPT-5.4 primary, GPT-5.4 Mini fallback
 - `/api/gemini`: Gemini 2.5 Flash (no fallback)
 - `/api/aiden`: GPT-5.4 (Fellow Aiden brew profiles, no fallback)
 
 ## Proxy-Specific Options
 - OpenAI proxy supports `responseFormat` param for structured JSON output
-- Gemini proxy supports `tools: [{ googleSearchRetrieval: {} }]` for search grounding
+- Gemini proxy supports `tools: [{ googleSearch: {} }]` for search grounding
 - Aiden proxy is two-step: researchBean() then generateAidenRecipe()
 
 ## Client-Side Retry

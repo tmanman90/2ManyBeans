@@ -4,6 +4,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 // Per-million-token rates in USD. Update when models or pricing change.
 const RATES = {
   'claude-sonnet-4-6':              { input: 3.00,  output: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
+  // intro pricing through 2026-08-31 — re-check then
+  'claude-sonnet-5':                { input: 2.00,  output: 10.00, cacheRead: 0.20, cacheWrite: 2.50 },
   'claude-haiku-4-5-20251001':      { input: 0.80,  output: 4.00,  cacheRead: 0.08, cacheWrite: 1.00 },
   'gpt-5.4':                        { input: 2.50,  output: 10.00 },
   'gpt-5.4-mini':                   { input: 0.15,  output: 0.60  },

@@ -11,7 +11,8 @@ Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with
 ## Tech Stack
 - React 19 + Vite + Capacitor 8 (iOS native app)
 - Multi-model AI architecture:
-  - Anthropic Claude Sonnet 4.6 — tasting coach, general chat
+  - Anthropic Claude Sonnet 5 — general chat
+  - Anthropic Claude Sonnet 4.6 / Haiku 4.5 — proxy default / fallback and tasting coach
   - OpenAI GPT-5.4 — Professor Ruphus stories, Aiden brew recipes
   - OpenAI GPT-5.4 Mini — tasting score extraction
   - Google Gemini 2.5 Flash — bean photo scanning, web search enrichment (with Reddit), chat image analysis
@@ -23,7 +24,7 @@ Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with
 ```
 api/
   aiden.js              # Fellow Aiden brew profile proxy (GPT-5.4)
-  claude.js             # Anthropic proxy (Sonnet 4.6 → Haiku 4.5 fallback)
+  claude.js             # Anthropic proxy (Sonnet 5 for chat, Sonnet 4.6 default → Haiku 4.5 fallback)
   gemini.js             # Google proxy (Gemini 2.5 Flash + search grounding)
   openai.js             # OpenAI proxy (GPT-5.4 → Mini fallback)
 docs/

@@ -5,7 +5,7 @@ import { withCorsAuthMetered } from './_lib/cors-auth.js';
 import { logApiUsage } from './_lib/costLogger.js';
 
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
-const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'];
 const MAX_TOKENS_CAP = 4000;
 const RATE_LIMIT = { key: 'claude', limit: 120, windowMs: 60 * 60 * 1000 };
 
@@ -27,15 +27,20 @@ export default withCorsAuthMetered(async (req, res, decodedToken) => {
     const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'claude-sonnet-4-6';
     const safeMaxTokens = Math.min(maxTokens || 1000, MAX_TOKENS_CAP);
 
-    const params = {
-      model,
-      max_tokens: safeMaxTokens,
-      messages,
+    const buildParams = (attemptModel) => {
+      const next = {
+        model: attemptModel,
+        max_tokens: safeMaxTokens,
+        messages,
+      };
+      if (system) next.system = system;
+      if (attemptModel === 'claude-sonnet-5') {
+        next.thinking = { type: 'disabled' };
+      }
+      return next;
     };
 
-    if (system) {
-      params.system = system;
-    }
+    let params = buildParams(model);
 
     let response;
     try {
@@ -44,7 +49,7 @@ export default withCorsAuthMetered(async (req, res, decodedToken) => {
       // On overload/rate-limit, fall back to Haiku
       if ([429, 529].includes(primaryError.status) && model !== FALLBACK_MODEL) {
         console.warn(`Primary model ${model} unavailable (${primaryError.status}), falling back to ${FALLBACK_MODEL}`);
-        params.model = FALLBACK_MODEL;
+        params = buildParams(FALLBACK_MODEL);
         response = await client.messages.create(params);
       } else {
         throw primaryError;

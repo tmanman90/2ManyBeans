@@ -600,6 +600,7 @@ export async function sendChatMessage(systemPrompt, history) {
     system: systemPrompt,
     messages: recentMessages,
     maxTokens: 800,
+    model: 'claude-sonnet-5',
     feature: 'chat',
   });
   const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';

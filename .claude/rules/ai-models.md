@@ -13,7 +13,8 @@ paths:
 Multi-model system. Each model has a specific role. Do not mix them.
 
 ## Model Assignments
-- **Claude Haiku 4.5** (`src/lib/claude.js`): Tasting coach, general chat. Uses prompt caching (system prompt is array with cache_control on static blocks). Step-by-step coaching with scaffolded options for the user (novice taster). Never vague open-ended questions.
+- **Claude Sonnet 5** (`src/lib/claude.js`): General chat only, selected by the chat client param. Uses prompt caching (system prompt is array with cache_control on static blocks). The Claude proxy disables `thinking` only for Sonnet 5 attempts.
+- **Claude Haiku 4.5** (`src/lib/claude.js`): Tasting coach, recommendations, wizard reactions, and chat fallback. Do not send the Sonnet 5 `thinking` param on Haiku attempts. Step-by-step coaching with scaffolded options for the user (novice taster). Never vague open-ended questions.
 - **GPT-5.4** (`src/lib/openai.js`): Aiden brew recipes
 - **GPT-5.4 Mini** (`src/lib/professorRuphus.js`): Professor Ruphus stories + tasting score extraction
 - **Gemini 2.5 Flash** (`src/lib/gemini.js`): Bean photo scanning, web search enrichment (with Reddit), chat image analysis
