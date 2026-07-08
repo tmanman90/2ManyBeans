@@ -17,12 +17,20 @@ const PRO = {
 };
 
 const beans = [
-  { id: 'b1', roaster: 'Arcane', name: 'Kotowa Estate', origin: 'Panama', process: 'Washed', status: 'ACTIVE', jarSlot: 1 },
+  { id: 'b1', roaster: 'Arcane', name: 'Kotowa Estate', origin: 'Panama', process: 'Washed', status: 'ACTIVE', jarSlot: 1, openDate: '2026-06-25', roastDate: '2026-06-10', degasMin: 7, peakStart: 14, peakEnd: 45 },
   { id: 'b2', roaster: 'Onyx', name: 'Geometry Blend', origin: 'Ethiopia', process: 'Natural', status: 'SEALED' },
 ];
 const tastings = [{ id: 't1', beanId: 'b1', date: '2026-06-20', rating: 5, oneWord: 'Silky' }];
 const noop = () => {};
 const noopAsync = async () => {};
+
+window.__SPY__ = { startedTasting: null, navigatedToTasting: 0, addedBeans: [] };
+const addBean = async (bean) => {
+  window.__SPY__.addedBeans.push(bean);
+  return 'new-bean-id';
+};
+const onStartTastingSession = (beanId) => { window.__SPY__.startedTasting = beanId; };
+const onNavigateToTasting = () => { window.__SPY__.navigatedToTasting += 1; };
 
 createRoot(document.getElementById('root')).render(
   <AuthContext value={{ user: null, logOut: () => {} }}>
@@ -31,8 +39,9 @@ createRoot(document.getElementById('root')).render(
         <UserPreferencesProvider value={{ preferences: { brewMethod: 'aiden', canisterCount: 3 } }}>
           <ChatTab
             beans={beans} tastings={tastings}
-            addBean={noopAsync} updateBean={noopAsync} addTasting={noopAsync} updateTasting={noopAsync}
-            isActive={true} onStartTastingSession={noop} isDemo={false} onDemoAction={noop}
+            addBean={addBean} updateBean={noopAsync} addTasting={noopAsync} updateTasting={noopAsync}
+            profile={{ displayName: 'Tal M' }} uid="harness-user"
+            isActive={true} onStartTastingSession={onStartTastingSession} onNavigateToTasting={onNavigateToTasting} isDemo={false} onDemoAction={noop}
           />
         </UserPreferencesProvider>
       </PaywallProvider>

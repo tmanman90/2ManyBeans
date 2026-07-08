@@ -16,6 +16,7 @@ import { useHandBrew } from '../hooks/useHandBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { getBrewMethod } from '../lib/brewMethods';
 import { buildNewBeanData } from '../lib/beanBuilder';
+import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { usePreferences } from '../hooks/useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
@@ -25,9 +26,43 @@ import { parseBeanScan, trimApiMessages } from '../lib/chatParse';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
+const STATIC_STARTERS = ['What should I brew today?', 'Scan a bag', 'Coach my tasting'];
 
 function newMessage(fields) {
   return { id: crypto.randomUUID(), ...fields };
+}
+
+function clipStarterLabel(text, maxLen = 42) {
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
+}
+
+function getStarterPrompts(beans, isDemo) {
+  const activeBeans = beans
+    .filter(bean => bean.status === 'ACTIVE')
+    .sort((a, b) => (Number(a.jarSlot) || 99) - (Number(b.jarSlot) || 99));
+
+  if (isDemo || activeBeans.length === 0) return STATIC_STARTERS;
+
+  const prompts = [];
+  activeBeans.forEach(bean => {
+    if (prompts.length >= 1) return;
+    const name = clipStarterLabel(bean.name || 'this coffee', 18);
+    const peak = getPeakStatus(bean);
+    if (Number.isFinite(peak.days) && Number.isFinite(bean.peakStart) && peak.days === bean.peakStart) {
+      prompts.push(clipStarterLabel(`Jar ${bean.jarSlot} ${name} hits peak today — brew it?`));
+      return;
+    }
+    const openDays = daysOpen(bean.openDate);
+    if (Number.isFinite(openDays) && openDays >= 10) {
+      prompts.push(clipStarterLabel(`${name} has been open ${openDays} days — check on it?`));
+    }
+  });
+
+  prompts.push('What should I brew today?');
+  prompts.push('Coach my tasting');
+  if (!prompts.includes('Scan a bag')) prompts.push('Scan a bag');
+  return prompts.slice(0, 4);
 }
 
 // "Ruphus is thinking" — reuse the tasting wizard's compact canvas dot-matrix loader
@@ -245,7 +280,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, isDemo, onDemoAction }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction }) => {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
@@ -264,6 +299,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const [loading, setLoading] = useState(false);
   const [photos, setPhotos] = useState([]); // { base64, mediaType, previewUrl }
   const [scannedBean, setScannedBean] = useState(null);
+  const [guidedSaving, setGuidedSaving] = useState(false);
   const [toast, setToast] = useState(null);
   // Disable keyboard hook when tab is hidden to prevent double-counting
   // keyboard events and corrupting the shared tab bar hide counter.
@@ -275,6 +311,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   // calls can slip past it on rapid Enter+Send. This ref blocks the second
   // call immediately in the same event loop tick.
   const sendingRef = useRef(false);
+  const handoffRef = useRef(false);
   // Blob URLs only (never DataURL strings). DataURL strings don't need
   // revoking and pushing them here would pin huge base64 payloads for the
   // entire session, which is a real memory leak on native.
@@ -384,6 +421,43 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       if (prev[idx]?.previewUrl) safeRevokeBlobUrl(prev[idx].previewUrl);
       return prev.filter((_, i) => i !== idx);
     });
+  };
+
+  const handlePickPhoto = () => {
+    if (Capacitor.isNativePlatform()) {
+      takeNativePhoto();
+    } else {
+      fileRef.current?.click();
+    }
+  };
+
+  const handleCoachStarter = () => {
+    if (isDemo) { onDemoAction?.(); return; }
+    const firstActive = beans
+      .filter(bean => bean.status === 'ACTIVE')
+      .sort((a, b) => (Number(a.jarSlot) || 99) - (Number(b.jarSlot) || 99))[0];
+    if (firstActive?.id) {
+      onStartTastingSession?.(firstActive.id);
+      return;
+    }
+    const content = "No beans in your rotation yet — let's get one set up.";
+    setMessages(prev => [...prev, newMessage({ role: 'assistant', content })]);
+    apiMessages.current = [...apiMessages.current, { role: 'assistant', content }];
+    onNavigateToTasting?.();
+  };
+
+  const handleStarter = (hint) => {
+    haptic.light();
+    if (hint === 'Scan a bag') {
+      if (isDemo) { onDemoAction?.(); return; }
+      handlePickPhoto();
+      return;
+    }
+    if (hint === 'Coach my tasting') {
+      handleCoachStarter();
+      return;
+    }
+    handleSend(hint);
   };
 
   // Text comes from ChatInputBar (child owns the input state).
@@ -502,10 +576,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     }
   };
 
-  const handleSaveToInventory = async () => {
-    if (!scannedBean) return;
-    try {
-      const beanData = buildNewBeanData({
+  const buildScannedBeanData = () => (
+    buildNewBeanData({
         name: scannedBean.name || 'Unknown',
         roaster: scannedBean.roaster || 'Unknown',
         origin: scannedBean.origin || '',
@@ -524,7 +596,13 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         sourcedBy: scannedBean.sourcedBy || '',
         roastedIn: scannedBean.roastedIn || '',
         sourceInsights: scannedBean.sourceInsights || null,
-      });
+      })
+  );
+
+  const handleSaveToInventory = async () => {
+    if (!scannedBean) return;
+    try {
+      const beanData = buildScannedBeanData();
       await addBean(beanData);
       setToast(`${scannedBean.name || 'Bean'} saved to inventory!`);
       setScannedBean(null);
@@ -534,17 +612,32 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     }
   };
 
-  const handleGuidedTasting = () => {
-    if (!scannedBean) return;
-    const beanName = scannedBean.name || 'this coffee';
-    const prompt = `Let's do a guided tasting of ${beanName} by ${scannedBean.roaster || 'the roaster'}. Walk me through it step by step.`;
-    setScannedBean(null);
-    // Send the prompt directly instead of pre-filling the input box.
-    handleSend(prompt);
+  const handleGuidedTasting = async () => {
+    if (!scannedBean || handoffRef.current) return;
+    handoffRef.current = true;
+    setGuidedSaving(true);
+    try {
+      const scanName = (scannedBean.name || '').trim().toLowerCase();
+      const scanRoaster = (scannedBean.roaster || '').trim().toLowerCase();
+      const existing = scanName && scanRoaster ? beans.find(bean =>
+        (bean.name || '').trim().toLowerCase() === scanName &&
+        (bean.roaster || '').trim().toLowerCase() === scanRoaster
+      ) : null;
+      const beanId = existing?.id || await addBean(buildScannedBeanData());
+      setScannedBean(null);
+      onStartTastingSession?.(beanId);
+    } catch (err) {
+      console.error('Guided tasting handoff failed:', err);
+      setToast('Failed to save. Try again.');
+    } finally {
+      setGuidedSaving(false);
+      handoffRef.current = false;
+    }
   };
 
   // Is this the intro/empty state (only the first assistant message, no user turns)?
   const isIntroState = messages.length === 1 && messages[0].role === 'assistant';
+  const starterPrompts = getStarterPrompts(beans, isDemo);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -599,10 +692,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
             </div>
             {/* Tappable starter prompts — send the prompt on tap */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 4 }}>
-              {['What should I brew today?', 'Scan a bag', 'Coach my tasting'].map(hint => (
+              {starterPrompts.map(hint => (
                 <m.button
                   key={hint}
-                  onClick={() => { haptic.light(); handleSend(hint); }}
+                  onClick={() => handleStarter(hint)}
                   whileTap={reduceMotion ? undefined : { scale: 0.96 }}
                   transition={spring.snappy}
                   style={{
@@ -610,6 +703,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
                     border: `1px solid ${C.border}`,
                     borderRadius: radius.pill,
                     padding: '7px 14px',
+                    minHeight: 44,
                     ...typeScale.caption,
                     color: C.text,
                     cursor: 'pointer',
@@ -657,7 +751,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <Btn variant="small" onClick={handleBrewScanned}><Coffee size={12} /> {brewMethod.label}</Btn>
-            <Btn variant="small" onClick={handleGuidedTasting}><BookOpen size={12} /> Guided Tasting</Btn>
+            <Btn variant="small" onClick={handleGuidedTasting} disabled={guidedSaving} style={{ minHeight: 44, opacity: guidedSaving ? 0.45 : undefined }}><BookOpen size={12} /> {guidedSaving ? 'Saving…' : 'Guided Tasting'}</Btn>
             <Btn variant="small" onClick={handleSaveToInventory}><Save size={12} /> Save to Inventory</Btn>
           </div>
         </m.div>
@@ -668,7 +762,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         photos={photos}
         keyboardHeight={keyboardHeight}
         onSend={handleSend}
-        onPickPhoto={() => Capacitor.isNativePlatform() ? takeNativePhoto() : fileRef.current?.click()}
+        onPickPhoto={handlePickPhoto}
         onRemovePhoto={removePhoto}
         fileInputRef={fileRef}
         inputRef={inputRef}

@@ -65,6 +65,31 @@ try {
     if (!starter) fail('R4: starter prompts are not tappable buttons');
     else console.log('OK  tappable starter prompts');
 
+    const rotationStarter = await page.evaluate(() =>
+      [...document.querySelectorAll('button')].some(b => /Jar \d|open \d+ days/.test(b.textContent || ''))
+    );
+    if (!rotationStarter) fail('R4/R19: rotation-derived starter missing');
+    else console.log('OK  rotation-aware starter prompt');
+
+    await page.evaluate(() => {
+      window.__FILE_INPUT_CLICKS__ = 0;
+      document.addEventListener('click', (event) => {
+        if (event.target?.matches?.('input[type="file"]')) window.__FILE_INPUT_CLICKS__ += 1;
+      }, { capture: true, once: false });
+    });
+    await page.getByText('Scan a bag', { exact: true }).first().click();
+    await page.waitForTimeout(100);
+    const scanState = await page.evaluate(() => {
+      const userBubbles = [...document.querySelectorAll('div')].filter(d => {
+        const s = getComputedStyle(d);
+        return (s.backgroundColor || '').replace(/\s/g, '') === 'rgb(162,99,47)' && !(s.backgroundImage || '').includes('gradient');
+      }).length;
+      return { clicks: window.__FILE_INPUT_CLICKS__ || 0, userBubbles };
+    });
+    if (scanState.clicks < 1) fail('R5: scan starter did not trigger file input');
+    else if (scanState.userBubbles > 0) fail('R5: scan starter created a user bubble');
+    else console.log('OK  scan starter opens picker without sending');
+
     if (errors.length) fail('console/page errors on render: ' + JSON.stringify(errors.slice(0, 6)));
     await page.close();
   }
@@ -76,11 +101,11 @@ try {
     await page.route('**/api/**', async route => { await new Promise(r => setTimeout(r, 2500)); route.abort(); });
     await page.goto(URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(700);
-    // tap a starter to send (reaches handleSend → optimistic user bubble + loading=true,
+    // tap a text starter to send (reaches handleSend → optimistic user bubble + loading=true,
     // BEFORE the network await). The harness AI call 404s fast, so poll tightly for the
     // indicator + bubble during the brief loading window.
     let userBubbleSolid = false, thinking = false;
-    await page.getByText('Scan a bag', { exact: false }).first().click().catch(() => {});
+    await page.getByText('What should I brew today?', { exact: true }).first().click().catch(() => {});
     for (let i = 0; i < 60; i++) {
       const state = await page.evaluate(() => {
         const bubble = [...document.querySelectorAll('div')].some(d => {

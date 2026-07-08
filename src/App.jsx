@@ -284,6 +284,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
                 uid={uid}
                 isActive={tab === 'chat'}
                 onStartTastingSession={handleStartTastingSession}
+                onNavigateToTasting={() => setTab('tasting')}
                 isDemo={isDemo}
                 onDemoAction={onDemoAction}
               />
