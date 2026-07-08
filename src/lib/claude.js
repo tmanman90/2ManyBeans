@@ -178,7 +178,7 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
   // ORIGIN CONTEXT block
   const originContext = getOriginContext(selectedBean?.origin);
   const originSection = originContext
-    ? `\nORIGIN CONTEXT FOR ${(selectedBean.origin || '').toUpperCase()}:\n${originContext}\n`
+    ? `\nORIGIN CONTEXT FOR ${sanitize(selectedBean.origin || '', 60).toUpperCase()}:\n${originContext}\n`
     : '';
 
   // PAST TASTINGS block
@@ -306,7 +306,7 @@ For rating, suggest 1-5 stars based on enthusiasm. 0 if unclear.
 Keep values concise (2-8 words). Use "" for fields not discussed.`;
 
   // Dynamic block: bean-specific data (uncached, changes per session)
-  const dynamicBlock = `The pre-selected bean is: ${beanName}.${beanList}
+  const dynamicBlock = `The pre-selected bean is: ${sanitize(beanName, 80)}.${beanList}
 ${beanSection}${originSection}${pastSection}`;
 
   return [
