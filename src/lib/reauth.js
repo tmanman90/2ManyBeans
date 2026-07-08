@@ -7,7 +7,8 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider, appleProvider } from '../firebase';
 
-const GOOGLE_IOS_CLIENT_ID = '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com';
+// Variant-selected in vite.config.js (dev app ships only the dev client's URL scheme).
+const GOOGLE_IOS_CLIENT_ID = __GOOGLE_IOS_CLIENT_ID__;
 
 function generateNonce(length = 32) {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

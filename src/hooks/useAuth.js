@@ -68,7 +68,10 @@ export const useAuth = () => {
   const signInWithGoogle = useCallback(async () => {
     if (Capacitor.isNativePlatform()) {
       const { SocialLogin } = await import('@capgo/capacitor-social-login');
-      await SocialLogin.initialize({ google: { iOSClientId: '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com' } });
+      // Variant-selected in vite.config.js — the dev app's Info.plist only
+      // carries the dev client's URL scheme, so a hardcoded prod id makes
+      // GIDSignIn throw NSInvalidArgumentException on any fresh sign-in.
+      await SocialLogin.initialize({ google: { iOSClientId: __GOOGLE_IOS_CLIENT_ID__ } });
       const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
       const idToken = result?.result?.idToken;
       if (!idToken) throw new Error('No idToken from Google sign-in');
