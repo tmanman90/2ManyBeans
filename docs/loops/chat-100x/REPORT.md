@@ -27,9 +27,8 @@ Two real bugs found and fixed during the run: (1) dev-app Google sign-in crashed
 
 ## Outstanding (needs Tal)
 
-1. **Sim evidence frames (tier ab/c)**: the simulator reinstall reset the session; live-stream/persistence/search frames need a one-time Google sign-in on the booted iPhone 17 Pro sim (it runs the loop branch via vite on :5173; the ios config override + vite server are still up — revert `ios/App/App/capacitor.config.json` after). Captured so far: real-device demo frames (boot, demo rotation, chat intro/starters).
-2. **v5 device sign-off** on the dev app (bundle label above, check Settings → OTA line): greeting uses YOUR name; starters reference your jars; Scan a bag opens camera; a question streams token-by-token; scroll-up mid-stream → jump pill; keyboard during stream; background+return mid-stream → partial+retry; recipe card → Brew/Save; kill+relaunch → conversation restored; New chat; roaster question → "Searching the web" + sourced answer.
-3. **Known accepted outcomes**: pass-one marker turns record user-visible text (not raw marker) into model history; typing stays enabled mid-stream (send blocked, camera guarded); 2026-08-31 Sonnet 5 pricing recheck is a dated TODO.
+1. **v5 device sign-off** on the dev app (bundle label above, check Settings → OTA line): greeting uses YOUR name; starters reference your jars; Scan a bag opens camera; a question streams token-by-token; scroll-up mid-stream → jump pill; keyboard during stream; background+return mid-stream → partial+retry; recipe card → Brew/Save; kill+relaunch → conversation restored; New chat; roaster question → "Searching the web" + sourced answer.
+2. **Known accepted outcomes**: pass-one marker turns record user-visible text (not raw marker) into model history; typing stays enabled mid-stream (send blocked, camera guarded); 2026-08-31 Sonnet 5 pricing recheck is a dated TODO.
 
 ## Overnight incident (root-caused, fixed)
 
