@@ -6,11 +6,18 @@ function text(value) {
   return String(value || '').slice(0, 200).trim();
 }
 
+// A bare number is ambiguous on a brew card; degrees are always Celsius here.
+function tempLabel(value) {
+  const raw = text(value);
+  if (!raw) return '';
+  return /^\d+(\.\d+)?$/.test(raw) ? `${raw}°C` : raw;
+}
+
 export function recipeSummary(recipe) {
   const steps = Array.isArray(recipe?.steps) ? recipe.steps.slice(0, 12).map(text).filter(Boolean) : [];
   return [
     `Recipe: ${text(recipe?.title)}`,
-    `Method: ${text(recipe?.method)} | Ratio: ${text(recipe?.ratio)} | Temp: ${text(recipe?.temp)} | Grind: ${text(recipe?.grind)}`,
+    `Method: ${text(recipe?.method)} | Ratio: ${text(recipe?.ratio)} | Temp: ${tempLabel(recipe?.temp)} | Grind: ${text(recipe?.grind)}`,
     steps.length ? `Steps: ${steps.join(' / ')}` : '',
     text(recipe?.reasoning) ? `Why: ${text(recipe.reasoning)}` : '',
   ].filter(Boolean).join('\n');
@@ -22,7 +29,7 @@ export function RecipeCard({ recipe, brewBean, saveBean, onBrew, onSave, saving 
   const meta = [
     ['Method', recipe.method],
     ['Ratio', recipe.ratio],
-    ['Temp', recipe.temp],
+    ['Temp', tempLabel(recipe.temp)],
     ['Grind', recipe.grind],
   ].filter(([, value]) => text(value));
   const steps = Array.isArray(recipe.steps) ? recipe.steps.slice(0, 12).map(text).filter(Boolean) : [];
