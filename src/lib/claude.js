@@ -16,6 +16,7 @@ import { formatSourceInsightsForPrompt, summarizeSourceInsights } from './source
 import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { stripMarkdown } from './textFormat';
+import { buildPalateSummary } from './palateSummary.js';
 
 // Preference enum whitelists. Firestore does not enforce types, so a tampered
 // doc could put any string in preferences.brewMethod / preferences.grinder.
@@ -558,6 +559,7 @@ RECIPE_CARD marker:
 - If the answer is general advice, troubleshooting, a scan summary, or a question, do not emit this marker.
 
 Past tastings: if RECENT TASTINGS below shows prior tastings of an active bean, reference them for continuity when dialing in. Example: "you got muddled last time at 5.2 and liked it coarser."
+Palate summary: use the dynamic PALATE block to shape recommendations, never recite it back.
 
 Be concise, warm, and opinionated. If recommending a bean, explain why based on timing and variety.
 
@@ -589,6 +591,9 @@ Rules for photo scanning:
 ${firstName ? `  User first name: ${sanitize(firstName, 30)}\n` : ''}
 
 TODAY: ${today()}
+
+PALATE:
+${buildPalateSummary(tastings) || '  (none yet)'}
 
 ACTIVE ROTATION (Jars):
 ${active || '  (none)'}

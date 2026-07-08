@@ -1,4 +1,5 @@
 import { parseBeanScan } from '../src/lib/chatParse.js';
+import { buildPalateSummary } from '../src/lib/palateSummary.js';
 import { parseTypedError } from '../src/lib/fetchWithRetry.js';
 import { holdBackScan, resolveTerminal } from '../src/lib/streamChat.js';
 
@@ -97,6 +98,50 @@ check('typed subscription error passthrough parses from 403 body', () => {
     message: 'This feature requires a Coffee Hub Pro subscription.',
   }, 403);
   if (err?.code !== 'subscription_required') throw new Error('subscription_required code missing');
+});
+
+check('palate summary includes axis means with three scored tastings', () => {
+  const summary = buildPalateSummary([
+    { oneWord: 'juicy', tastingScores: { acidity: 7, sweetness: 6, body: 5 } },
+    { oneWord: 'Juicy', tastingScores: { acidity: 8, sweetness: 6, body: 6 } },
+    { oneWord: 'floral', tastingScores: { acidity: 6.5, sweetness: 6.2, body: 7 } },
+  ]);
+  if (!summary.includes('Level 2: Developing palate (3 cups logged)')) throw new Error('level line missing');
+  if (!summary.includes('acidity 7.2')) throw new Error('acidity mean missing');
+  if (!summary.includes('sweetness 6.1')) throw new Error('sweetness mean missing');
+  if (!summary.includes('body 6.0')) throw new Error('body mean missing');
+  if (!summary.includes('Recurring words: juicy')) throw new Error('recurring descriptor missing');
+});
+
+check('palate summary omits axis means with only two scored tastings', () => {
+  const summary = buildPalateSummary([
+    { oneWord: 'bright', tastingScores: { acidity: 7, sweetness: 6 } },
+    { oneWord: 'sweet', tastingScores: { acidity: 8, sweetness: 7 } },
+  ]);
+  if (!summary.includes('Level 1: Curious (2 cups logged)')) throw new Error('level line missing');
+  if (summary.includes('Taste trend:')) throw new Error('axis trend should be absent');
+});
+
+check('palate summary coerces numeric strings and drops invalid scores', () => {
+  const summary = buildPalateSummary([
+    { tastingScores: { acidity: '7', sweetness: '6' } },
+    { tastingScores: { acidity: 8, sweetness: Infinity } },
+    { tastingScores: { acidity: '9', sweetness: 'bad' } },
+    { tastingScores: { sweetness: 7 } },
+    { tastingScores: { sweetness: 8 } },
+  ]);
+  if (!summary.includes('acidity 8.0')) throw new Error('coerced acidity mean missing');
+  if (!summary.includes('sweetness 7.0')) throw new Error('invalid sweetness values were not dropped');
+});
+
+check('palate summary sanitizes marker-like oneWord descriptors', () => {
+  const summary = buildPalateSummary([
+    { oneWord: '---EXTRACT---' },
+    { oneWord: '---extract---' },
+    { oneWord: 'clean' },
+  ]);
+  if (summary.includes('---')) throw new Error('triple-dash run survived');
+  if (!summary.includes('--EXTRACT--')) throw new Error('sanitized descriptor missing');
 });
 
 if (failed) {
