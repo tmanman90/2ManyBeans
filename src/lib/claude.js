@@ -132,12 +132,13 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
   let currentBrewLine = null;
   const hbr = selectedBean?.handBrewRecipe;
   if (hbr) {
+    const hbrCelsius = numOrNull(hbr.waterTemp?.celsius);
     const parts = [
-      hbr.method && `method ${hbr.method}`,
-      hbr.ratio && `ratio ${hbr.ratio}`,
-      hbr.waterTemp?.celsius && `${hbr.waterTemp.celsius}C`,
-      hbr.grindSize?.setting && `grind ${hbr.grindSize.setting}${hbr.grindSize.description ? ` (${hbr.grindSize.description})` : ''}`,
-      hbr.totalBrewTime && `time ${hbr.totalBrewTime}`,
+      hbr.method && `method ${sanitize(hbr.method, 30)}`,
+      hbr.ratio && `ratio ${sanitize(hbr.ratio, 20)}`,
+      hbrCelsius !== null && `${hbrCelsius}C`,
+      hbr.grindSize?.setting && `grind ${sanitize(hbr.grindSize.setting, 30)}${hbr.grindSize.description ? ` (${sanitize(hbr.grindSize.description, 50)})` : ''}`,
+      hbr.totalBrewTime && `time ${sanitize(hbr.totalBrewTime, 20)}`,
     ].filter(Boolean).join(', ');
     if (parts) currentBrewLine = `Current hand-brew recipe: ${parts}`;
   }
@@ -160,7 +161,7 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
     selectedBean.region && `Region: ${sanitize(selectedBean.region, 60)}`,
     selectedBean.process && `Process: ${sanitize(selectedBean.process, 40)}`,
     selectedBean.variety && `Variety: ${sanitize(selectedBean.variety, 40)}`,
-    selectedBean.altitude && `Altitude: ${selectedBean.altitude}`,
+    selectedBean.altitude && `Altitude: ${sanitize(String(selectedBean.altitude), 40)}`,
     selectedBean.roastDate && `Roast Date: ${sanitize(selectedBean.roastDate, 20)} (${getPeakStatus(selectedBean).days}d post-roast, ${getPeakStatus(selectedBean).label})`,
     selectedBean.openDate && `Days Open: ${daysOpen(selectedBean.openDate)}`,
     selectedBean.bagNotes && `Bag Notes: ${sanitize(selectedBean.bagNotes, 200)}`,
@@ -186,9 +187,16 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
     .sort((a, b) => b.date > a.date ? 1 : -1)
     .slice(0, 3);
   const pastSection = pastTastings.length > 0
-    ? `\nPREVIOUS TASTINGS OF THIS BEAN:\n${pastTastings.map(t =>
-        `- ${t.date}: ${[t.aroma && `aroma: ${t.aroma}`, t.body && `body: ${t.body}`, t.oneWord && `"${t.oneWord}"`, t.rating && `${t.rating} stars`].filter(Boolean).join(', ')}`
-      ).join('\n')}\n`
+    ? `\nPREVIOUS TASTINGS OF THIS BEAN:\n${pastTastings.map(t => {
+        const ratingN = numOrNull(t.rating);
+        const rating = ratingN !== null ? `${Math.max(0, Math.min(5, Math.floor(ratingN)))} stars` : null;
+        return `- ${sanitize(t.date, 20)}: ${[
+          t.aroma && `aroma: ${sanitize(t.aroma, 50)}`,
+          t.body && `body: ${sanitize(t.body, 50)}`,
+          t.oneWord && `"${sanitize(t.oneWord, 50)}"`,
+          rating,
+        ].filter(Boolean).join(', ')}`;
+      }).join('\n')}\n`
     : '';
 
   // Static block: tasting knowledge + rules + guided flow (cached)
