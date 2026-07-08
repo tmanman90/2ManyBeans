@@ -279,12 +279,13 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, isActive, onStartTastingSession, isDemo, onDemoAction }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, isDemo, onDemoAction }) => {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
+  const firstName = profile?.displayName?.trim().split(/\s+/)[0] || '';
   const [messages, setMessages] = useState([
     newMessage({ role: 'assistant', content: "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you." }),
   ]);
@@ -474,7 +475,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     setLoading(true);
 
     try {
-      const systemPrompt = buildChatContext(beans, tastings, preferences);
+      const systemPrompt = buildChatContext(beans, tastings, preferences, firstName);
       const history = apiMessages.current.filter(m => m.role !== 'system');
       const rawText = await sendChatMessage(systemPrompt, history);
 

@@ -2,6 +2,7 @@
 // No Anthropic SDK in the browser. No API key in client code.
 import { today, getPeakStatus, daysOpen } from './peakStatus';
 import {
+  RUPHUS_KNOWLEDGE,
   TASTING_KNOWLEDGE,
   BREWING_KNOWLEDGE,
   FELLOW_AIDEN_KNOWLEDGE,
@@ -443,7 +444,7 @@ function formatHandBrewRecipeLine(bean) {
   return reasoning ? `${line} Reasoning: ${reasoning}` : line;
 }
 
-export function buildChatContext(beans, tastings, preferences) {
+export function buildChatContext(beans, tastings, preferences, firstName) {
   // Null-safe preference resolution with enum validation. Firestore is
   // free-form, so validate before any interpolation.
   const prefs = preferences || {};
@@ -480,6 +481,23 @@ export function buildChatContext(beans, tastings, preferences) {
     `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | Finished: ${sanitize(b.finishDate, 20)}`
   ).join('\n');
 
+  const originLines = [];
+  const seenOrigins = new Set();
+  beans
+    .filter(b => b.status === 'ACTIVE')
+    .forEach(b => {
+      const origin = sanitize(b.origin, 60);
+      const key = origin.toLowerCase();
+      if (!origin || seenOrigins.has(key) || originLines.length >= 3) return;
+      const context = getOriginContext(origin);
+      if (!context) return;
+      seenOrigins.add(key);
+      originLines.push(`  ${origin}: ${sanitize(context, 500)}`);
+    });
+  const originContext = originLines.length
+    ? `\n\nORIGIN CONTEXT:\n${originLines.join('\n')}`
+    : '';
+
   const recentTastings = tastings.slice(0, 5).map(t => {
     const bean = beans.find(x => x.id === t.beanId);
     // Clamp rating to [0,5] integer before String.repeat — tampered Firestore
@@ -501,6 +519,8 @@ ${FELLOW_AIDEN_KNOWLEDGE}
 ${HANDBREW_BREWER_KNOWLEDGE}
 ${GRINDER_KNOWLEDGE}
 ${BREW_TROUBLESHOOTING_RULES}
+${RUPHUS_KNOWLEDGE}
+${TASTING_KNOWLEDGE}
 
 Rotation rules:
 - Keep 3 beans active (Jar #1-#3)
@@ -512,6 +532,7 @@ Rotation rules:
 - Do not suggest beans that are already finished or opened. Only recommend from sealed inventory.
 
 User setup: the dynamic USER SETUP block below names the user's brewer and grinder. Read the matching FELLOW AIDEN or HAND-BREW entry and the matching GRINDERS entry above before giving any brew advice.
+If a user first name is provided in the dynamic block, greet them by first name naturally when appropriate, not every turn.
 
 Recipe recall and action handoff: when the user asks about "my recipe" or "the current brew" for an active jar, cite the full stored recipe verbatim by parameter (not paraphrased). Example: "your Aiden profile for jar 2 is 1:17, 2.5x bloom at 94C for 45s, three SS pulses at 95/94/93C every 22s, Ode grind SS 4.5." Ruphus is advisory; any suggested change is applied by tapping the Brew button on the bean card to regenerate, or by editing the Aiden manually. Do not imply you can write recipes to the device.
 
@@ -546,6 +567,7 @@ Rules for photo scanning:
   Brewer: ${brewerLabel} -- read the ${brewerRef} entry in the static block above.
   Grinder: ${grinderLabel} -- read the matching entry under GRINDERS above.
   Canister count: ${canisterCount}
+${firstName ? `  User first name: ${sanitize(firstName, 30)}\n` : ''}
 
 TODAY: ${today()}
 
@@ -559,7 +581,7 @@ RECENTLY FINISHED:
 ${finished || '  (none)'}
 
 RECENT TASTINGS:
-${recentTastings || '  (none)'}`;
+${recentTastings || '  (none)'}${originContext}`;
 
   return [
     { type: 'text', text: staticBlock, cache_control: { type: 'ephemeral' } },

@@ -280,6 +280,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
                 updateBean={updateBean}
                 addTasting={addTasting}
                 updateTasting={updateTasting}
+                profile={profile}
+                uid={uid}
                 isActive={tab === 'chat'}
                 onStartTastingSession={handleStartTastingSession}
                 isDemo={isDemo}
