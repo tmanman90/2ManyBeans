@@ -100,6 +100,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Chat conversation: a single rolling-window doc per user. The doc id is
+    // pinned to 'active' so a buggy or modified client cannot mint unbounded
+    // docs under the subcollection. Rules cannot iterate the messages array,
+    // so per-message text caps are client-side; the 1MB doc limit is the
+    // platform backstop. Delete is allowed for the "New chat" affordance.
+    match /users/{userId}/chatSessions/{sessionId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && sessionId == 'active'
+        && request.resource.data.keys().hasOnly(['messages', 'updatedAt'])
+        && request.resource.data.messages is list
+        && request.resource.data.messages.size() <= 50
+        && request.resource.data.updatedAt is number;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Redemption codes & ledger: Admin SDK only. Default-deny would already
     // cover these in rules_version 2, but declaring explicit blocks makes the
     // intent grep-able and protects against a future catch-all rule being
