@@ -2,8 +2,8 @@
 // to-end over a committed harness and proves the deterministic contract (no live AI):
 //   R1 full Hoffmann spine — 8 beats incl. explicit Flavor + Balance + technique cues
 //      (break-the-crust / slurp / taste-warm / linger)
-//   R2 predict-then-confirm — intro shows a structured EXPECTED profile; sliders show Ruphus's
-//      expected ghost marker
+//   R2 predict-then-confirm — intro shows a structured EXPECTED profile; sliders reveal Ruphus's
+//      expected bone marker only when Next commits the user's blind guess
 //   R3 tap-first + type — flavor naming is gated flavor-wheel chips (Tier-3 LOCKED at palate L1,
 //      family-first path works), free-text field always present
 //   R4 real fingerprint — slider values feed the 6-axis tastingScores; saved record carries them
@@ -36,12 +36,18 @@ function waitForServer(url, timeoutMs = 20000) {
 const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
 const cleanup = () => { try { vite.kill('SIGKILL'); } catch { /* noop */ } };
 
-const STEP_PAUSE = 700; // AnimatePresence mode="wait": exit+enter serialize
+const STEP_PAUSE = 700; // CSS stage entry / normal page changes
+const REVEAL_ADVANCE_PAUSE = 1450; // bone reveal hold + next page entry
 
 try {
   await waitForServer(URL);
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 402, height: 880 }, deviceScaleFactor: 2 });
+  await page.route('**/api/claude', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ content: [{ type: 'text', text: 'That tracks. Your read lands right where this cup starts to sparkle.' }] }),
+  }));
   await page.emulateMedia({ reducedMotion: 'reduce' }); // deterministic, also exercises R10
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
@@ -50,16 +56,30 @@ try {
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
 
-  const clickFooter = async (name) => {
+  const clickFooter = async (name, pause = STEP_PAUSE) => {
     await page.getByRole('button', { name, exact: true }).first().click();
-    await page.waitForTimeout(STEP_PAUSE);
+    await page.waitForTimeout(pause);
   };
   const clickSlider = async () => {
-    const s = page.getByRole('slider').last();
-    await s.click(); // center → value ~5
+    const sliders = page.locator('[role="slider"]');
+    const index = await sliders.evaluateAll(els => {
+      const visible = els
+        .map((el, i) => ({ el, i, rect: el.getBoundingClientRect(), style: getComputedStyle(el) }))
+        .filter(({ rect, style }) => rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden');
+      return visible.length ? visible[visible.length - 1].i : -1;
+    });
+    if (index < 0) throw new Error('No visible slider to click');
+    const s = sliders.nth(index);
+    await s.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'nearest' }));
+    await page.waitForTimeout(50);
+    const box = await s.boundingBox();
+    if (!box) throw new Error('Visible slider had no bounding box');
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); // center → value ~5
     await page.waitForTimeout(180);
   };
   const techniqueText = async () => (await page.locator('body').innerText()).toLowerCase();
+  const stepVisible = (key) => page.locator(`[data-wizard-step="${key}"]`).isVisible().catch(() => false);
+  const waitStep = (key, timeout = 1800) => page.locator(`[data-wizard-step="${key}"]`).waitFor({ state: 'visible', timeout });
 
   // ---- R8: wizard REPLACES the guided entry ----
   const cta = page.getByText('Start guided tasting', { exact: false }).first();
@@ -82,7 +102,7 @@ try {
   await clickFooter("Let's taste it");
 
   // ---- STEP 1: Smell — break-the-crust cue + gated flavor wheel (R1, R3) ----
-  if (!(await page.getByText('Smell', { exact: true }).first().isVisible().catch(() => false))) fail('R1: Smell step did not open');
+  if (!(await stepVisible('smell'))) fail('R1: Smell step did not open');
   const smellTxt = await techniqueText();
   if (!smellTxt.includes('break') || !smellTxt.includes('crust')) fail('R1: Smell step missing break-the-crust technique cue');
   else ok('R1 Smell step has break-the-crust cue');
@@ -106,7 +126,7 @@ try {
   if (berryFilled) ok('R4 multi-select chip carries its own accent fill overlay');
   else fail('R4 multi-select chip fill overlay missing');
   await clickSlider(); // aroma intensity → fragranceAroma score
-  await clickFooter('Next');
+  await clickFooter('Next', REVEAL_ADVANCE_PAUSE);
 
   // ---- STEP 2: First sip — slurp + taste-warm cue (R1) ----
   const sipTxt = await techniqueText();
@@ -130,43 +150,173 @@ try {
   else fail(`R3 single-select slide: pressed=${p1}/${p2} highlight=${h1}/${h2}`);
   await clickFooter('Next');
 
-  // ---- STEP 3: Acidity — subtle predict marker (R2/R5) + slider (R4) ----
-  if (!(await page.getByText('Acidity', { exact: true }).first().isVisible().catch(() => false))) fail('R1: Acidity step missing');
-  const marker = await page.evaluate(() => [...document.querySelectorAll('span')].some(s => s.textContent.trim() === '◆'));
-  if (!marker) fail('R2/R5: subtle ◆ expected marker missing on axis slider');
-  else ok('R2/R5 axis slider shows a subtle ◆ expected marker (no prominent name label)');
-  await clickSlider();
-  await clickFooter('Next');
+  // ---- STEP 3: Acidity — bone marker hidden until Next commits the guess + instant thread loader ----
+  if (!(await stepVisible('acidity'))) fail('R1: Acidity step missing');
+  const beforeBone = await page.evaluate(() => {
+    const marker = document.querySelector('[data-expected-marker="bone"]');
+    if (!marker) return null;
+    const style = getComputedStyle(marker);
+    return {
+      revealed: marker.getAttribute('data-revealed'),
+      opacity: Number(style.opacity),
+      hasSvg: !!marker.querySelector('svg'),
+      hasDiamond: [...document.querySelectorAll('span')].some(s => s.textContent.trim() === '◆'),
+    };
+  });
+  if (!beforeBone?.hasSvg || beforeBone.revealed !== 'false' || beforeBone.opacity !== 0 || beforeBone.hasDiamond) {
+    fail('R1/R5: bone marker must exist, replace ◆, and be hidden before touch: ' + JSON.stringify(beforeBone));
+  } else ok('R1 bone expected marker is present but hidden before the user answers');
 
-  // ---- STEP 4: Sweetness ----
   await clickSlider();
-  await clickFooter('Next');
+
+  const afterTouchBone = await page.evaluate(() => {
+    const marker = document.querySelector('[data-expected-marker="bone"]');
+    if (!marker) return null;
+    const style = getComputedStyle(marker);
+    return { revealed: marker.getAttribute('data-revealed'), opacity: Number(style.opacity), hasSvg: !!marker.querySelector('svg') };
+  });
+  if (!afterTouchBone?.hasSvg || afterTouchBone.revealed !== 'false' || afterTouchBone.opacity !== 0) {
+    fail('R1: bone marker revealed too early on slider touch: ' + JSON.stringify(afterTouchBone));
+  } else ok('R1 bone marker stays hidden while the user sets their value');
+
+  const loaderStartedAt = Date.now();
+  await page.getByRole('button', { name: 'Next', exact: true }).first().click();
+  await page.waitForTimeout(60);
+  const afterNextBone = await page.evaluate(() => {
+    const marker = document.querySelector('[data-expected-marker="bone"]');
+    if (!marker) return null;
+    const style = getComputedStyle(marker);
+    return { revealed: marker.getAttribute('data-revealed'), opacity: Number(style.opacity), hasSvg: !!marker.querySelector('svg') };
+  });
+  if (!afterNextBone?.hasSvg || afterNextBone.revealed !== 'true' || afterNextBone.opacity < 0.95) {
+    fail('R1: bone marker did not reveal when Next committed the answer: ' + JSON.stringify(afterNextBone));
+  } else ok('R1 bone marker reveals when Next commits the user value');
+  await page.getByRole('button', { name: 'Next', exact: true }).first().click();
+  await page.waitForTimeout(80);
+  if (!(await stepVisible('acidity'))) {
+    fail('R1: rapid second Next during bone reveal skipped past the current step');
+  } else ok('R1 rapid second Next is ignored while the bone reveal auto-advances');
+
+  await page.locator('[data-ruphus-bubble="loader"]').waitFor({ state: 'visible', timeout: 250 }).catch(() => fail('R2: loader bubble did not appear immediately after answer commit'));
+  const loaderDelay = Date.now() - loaderStartedAt;
+  const threadState = await page.evaluate(() => ({
+    thread: document.querySelector('[data-ruphus-thread="true"]') != null,
+    coach: document.querySelector('[data-ruphus-bubble="coach"]') != null,
+    loader: document.querySelector('[data-ruphus-bubble="loader"]') != null,
+    matrix: document.querySelector('[data-dot-matrix-loader="true"] canvas') != null,
+  }));
+  if (!threadState.thread || !threadState.coach || !threadState.loader || !threadState.matrix) {
+    fail('R2/R3: chat thread must show coach bubble plus separate canvas loader bubble: ' + JSON.stringify(threadState));
+  } else ok(`R2/R3 immediate chat-thread loader appears in ${loaderDelay}ms with canvas dot-matrix`);
+
+  await page.locator('[data-ruphus-bubble="reaction"]').waitFor({ state: 'visible', timeout: 950 }).catch(() => fail('R2: reaction bubble did not replace the loader before auto-advance'));
+  await page.waitForTimeout(40);
+  const reactionState = await page.evaluate(() => ({
+    reaction: document.querySelector('[data-ruphus-bubble="reaction"]')?.textContent || '',
+    loader: document.querySelector('[data-ruphus-bubble="loader"]') != null,
+    coach: document.querySelector('[data-ruphus-bubble="coach"]') != null,
+  }));
+  if (!reactionState.reaction.includes('sparkle') || reactionState.loader || reactionState.coach) {
+    fail('R2: reaction must replace loader and coach bubble must fade/remove: ' + JSON.stringify(reactionState));
+  } else ok('R2 reaction replaces the loader and the coaching bubble fades out');
+
+  await waitStep('sweetness', 1600).catch(() => fail('R1: one Next did not auto-advance after the bone reveal hold'));
+  if (!(await stepVisible('sweetness'))) {
+    fail('R1: expected to land on Sweetness after one-press Acidity commit');
+  } else ok('R1 one Next reveals the bone, waits, then auto-advances to the next page');
+
+  await clickSlider();
+  await page.getByRole('button', { name: 'Next', exact: true }).first().click();
+  await page.waitForTimeout(80);
+  const sweetnessReveal = await page.evaluate(() => {
+    const marker = document.querySelector('[data-expected-marker="bone"]');
+    if (!marker) return null;
+    const style = getComputedStyle(marker);
+    return { revealed: marker.getAttribute('data-revealed'), opacity: Number(style.opacity), hasSvg: !!marker.querySelector('svg') };
+  });
+  if (!sweetnessReveal?.hasSvg || sweetnessReveal.revealed !== 'true' || sweetnessReveal.opacity < 0.95) {
+    fail('R1: Sweetness Next did not reveal before auto-advancing: ' + JSON.stringify(sweetnessReveal));
+  } else ok('R1 Sweetness Next reveals before the timed auto-advance');
+  await clickSlider();
+  const afterRevisionBone = await page.evaluate(() => {
+    const marker = document.querySelector('[data-expected-marker="bone"]');
+    if (!marker) return null;
+    const style = getComputedStyle(marker);
+    return { revealed: marker.getAttribute('data-revealed'), opacity: Number(style.opacity), hasSvg: !!marker.querySelector('svg') };
+  });
+  if (!afterRevisionBone?.hasSvg || afterRevisionBone.revealed !== 'false' || afterRevisionBone.opacity !== 0) {
+    fail('R1: revising a revealed slider must hide the bone again: ' + JSON.stringify(afterRevisionBone));
+  } else ok('R1 revising a revealed slider hides the bone again');
+  await page.getByRole('button', { name: 'Next', exact: true }).first().click();
+  await page.waitForTimeout(80);
+  const stillSweetnessAfterRevision = await stepVisible('sweetness');
+  const afterRecommit = await page.evaluate(() => {
+    const marker = document.querySelector('[data-expected-marker="bone"]');
+    if (!marker) return null;
+    const style = getComputedStyle(marker);
+    return {
+      revealed: marker.getAttribute('data-revealed'),
+      opacity: Number(style.opacity),
+    };
+  });
+  if (!stillSweetnessAfterRevision || afterRecommit?.revealed !== 'true' || afterRecommit.opacity < 0.95) {
+    fail('R1: Next after revision must re-reveal on the same step before timed auto-advance: ' + JSON.stringify({ stillSweetnessAfterRevision, ...afterRecommit }));
+  } else ok('R1 Next after revision re-reveals before timed auto-advance');
+
+  await page.getByRole('button', { name: 'Close', exact: true }).first().click();
+  await page.waitForTimeout(180);
+  if (!(await page.getByText('Leave this tasting?', { exact: true }).isVisible().catch(() => false))) fail('R4: close with progress did not show confirm');
+  else ok('R4 close with progress shows a confirm instead of discarding');
+  await page.getByRole('button', { name: 'Leave', exact: true }).first().click();
+  await page.waitForTimeout(400);
+  if (!(await page.getByText('Resume your Geometry Blend tasting', { exact: false }).first().isVisible().catch(() => false))) fail('R4: guided entry did not offer Resume after exit');
+  else ok('R4 guided entry offers Resume while the in-session draft exists');
+  await page.evaluate(() => window.__SET_TASTING_TAB_MOUNTED__?.(false));
+  await page.waitForTimeout(160);
+  await page.evaluate(() => window.__SET_TASTING_TAB_MOUNTED__?.(true));
+  await page.waitForTimeout(400);
+  if (!(await page.getByText('Resume your Geometry Blend tasting', { exact: false }).first().isVisible().catch(() => false))) fail('R4: App-level draft did not survive TastingTab unmount/remount');
+  else ok('R4 in-session draft survives TastingTab unmount/remount');
+  await page.getByText('Resume your Geometry Blend tasting', { exact: false }).first().click();
+  await page.waitForTimeout(STEP_PAUSE);
+  if (!(await stepVisible('sweetness'))) fail('R4: resume did not restore the active Sweetness step');
+  const resumedBone = await page.evaluate(() => document.querySelector('[data-expected-marker="bone"]')?.getAttribute('data-revealed'));
+  if (resumedBone !== 'true') fail('R4/R1: resume did not restore the touched slider draft');
+  else ok('R4 resume restores the step and touched slider draft');
+
+  await clickSlider();
+  await clickFooter('Next', REVEAL_ADVANCE_PAUSE);
+
   // ---- STEP 5: Body ----
   await clickSlider();
-  await clickFooter('Next');
+  await clickFooter('Next', REVEAL_ADVANCE_PAUSE);
 
   // ---- STEP 6: Flavor — explicit Flavor beat + gated chips (R1, R3) ----
-  if (!(await page.getByText('Flavor', { exact: true }).first().isVisible().catch(() => false))) fail('R1: explicit Flavor step missing');
+  if (!(await stepVisible('flavor'))) fail('R1: explicit Flavor step missing');
   else ok('R1 explicit Flavor step present');
-  await page.getByRole('button', { name: 'Fruity', exact: true }).first().click();
+  const flavorFruity = page.getByRole('button', { name: 'Fruity', exact: true }).first();
+  await flavorFruity.scrollIntoViewIfNeeded();
+  await flavorFruity.click();
   await page.waitForTimeout(300);
-  await page.getByRole('button', { name: 'Berry', exact: true }).first().click();
+  const flavorBerry = page.getByRole('button', { name: 'Berry', exact: true }).first();
+  await flavorBerry.scrollIntoViewIfNeeded();
+  await flavorBerry.click();
   await page.waitForTimeout(150);
   await clickSlider(); // flavor intensity → flavor score
-  await clickFooter('Next');
+  await clickFooter('Next', REVEAL_ADVANCE_PAUSE);
 
   // ---- STEP 7: Finish — linger cue (R1) ----
   const finishTxt = await techniqueText();
   if (!finishTxt.includes('linger')) fail('R1: Finish step missing linger cue');
   else ok('R1 Finish step has linger cue');
   await clickSlider();
-  await clickFooter('Next');
+  await clickFooter('Next', REVEAL_ADVANCE_PAUSE);
 
   // ---- STEP 8: Balance — explicit Balance beat (R1) ----
-  if (!(await page.getByText('Balance', { exact: true }).first().isVisible().catch(() => false))) fail('R1: explicit Balance step missing');
+  if (!(await stepVisible('balance'))) fail('R1: explicit Balance step missing');
   else ok('R1 explicit Balance step present');
   await clickSlider();
-  await clickFooter('See your cup');
+  await clickFooter('See your cup', REVEAL_ADVANCE_PAUSE);
 
   // ---- REVEAL: found-vs-expected + palate (R5, R7) ----
   const revealOk = await page.getByText('found vs', { exact: false }).first().isVisible().catch(() => false);
@@ -209,6 +359,31 @@ try {
     if (!formOpen) fail('R8: manual tasting form did not open');
     else ok('R8 manual entry preserved (form opens)');
   }
+
+  // ---- R4: switching beans after leaving a draft starts fresh instead of trapping Resume ----
+  const switchPage = await browser.newPage({ viewport: { width: 402, height: 880 }, deviceScaleFactor: 2 });
+  await switchPage.emulateMedia({ reducedMotion: 'reduce' });
+  await switchPage.goto(`${URL}?evidence=draft-switch`, { waitUntil: 'networkidle' });
+  await switchPage.waitForTimeout(700);
+  if (!(await switchPage.getByText('Resume your Geometry Blend tasting', { exact: false }).first().isVisible().catch(() => false))) {
+    fail('R4: seeded draft did not show Resume CTA');
+  }
+  await switchPage.getByLabel('Pick bean to taste').selectOption('b2');
+  await switchPage.waitForTimeout(300);
+  const freshSwitch = {
+    start: await switchPage.getByText('Start guided tasting', { exact: false }).first().isVisible().catch(() => false),
+    resume: await switchPage.getByText('Resume your Geometry Blend tasting', { exact: false }).first().isVisible().catch(() => false),
+    bean: await switchPage.getByText('Kenya Karinga', { exact: false }).first().isVisible().catch(() => false),
+  };
+  if (!freshSwitch.start || freshSwitch.resume || !freshSwitch.bean) {
+    fail('R4: switching bean with a draft must clear Resume and expose fresh start: ' + JSON.stringify(freshSwitch));
+  } else ok('R4 switching beans clears draft and exposes fresh guided start');
+  await switchPage.getByText('Start guided tasting', { exact: false }).first().click();
+  await switchPage.waitForTimeout(STEP_PAUSE);
+  if (!(await switchPage.getByText('Kenya Karinga', { exact: false }).first().isVisible().catch(() => false))) {
+    fail('R4: fresh guided start after draft switch did not open the selected bean');
+  } else ok('R4 fresh guided start opens the selected bean after draft switch');
+  await switchPage.close();
 
   // ---- R10: zero console/page errors across the reduced-motion flow ----
   if (errors.length) fail('R10: console/page errors: ' + JSON.stringify(errors.slice(0, 8)));

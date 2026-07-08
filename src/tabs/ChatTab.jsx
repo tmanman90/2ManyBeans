@@ -20,6 +20,7 @@ import { buildSourceContextHash, normalizeSourceInsights } from '../lib/sourceIn
 import { usePreferences } from '../hooks/useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
+import { RuphusThinking } from '../components/tasting/RuphusThinking';
 
 // Parse ---BEAN_SCAN---{json}---END_SCAN--- from assistant text
 function parseBeanScan(text) {
@@ -58,8 +59,8 @@ function trimApiMessages(messages, keepRecent = 6) {
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
 
-// "Ruphus is thinking" — the mascot present with a calm, characterful pulse (the dots
-// fade in sequence via opacity only; the avatar breathes). Reduced-motion: static.
+// "Ruphus is thinking" — reuse the tasting wizard's compact canvas dot-matrix loader
+// so AI waits feel like the same little piece of alien coffee hardware across the app.
 const TypingIndicator = ({ reduce }) => (
   <m.div {...(reduce ? {} : fadeUp)} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, alignSelf: 'flex-start' }}>
     <m.img
@@ -69,19 +70,13 @@ const TypingIndicator = ({ reduce }) => (
       transition={reduce ? {} : { duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
       style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0 }}
     />
-    <div style={{
+    <div data-chat-typing="true" style={{
       background: C.cream, border: `1px solid ${C.hairline}`,
       borderRadius: `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
-      boxShadow: shadows.e1, padding: '12px 16px',
+      boxShadow: shadows.e1, padding: '10px 11px',
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
-      <span style={{ ...typeScale.caption, color: C.textLight, fontStyle: 'italic' }}>Ruphus is thinking</span>
-      <span style={{ display: 'inline-flex', gap: 3 }}>
-        {[0, 1, 2].map(i => (
-          <span key={i} style={{ display: 'block', width: 5, height: 5, borderRadius: '50%', background: C.accentLight, animation: reduce ? 'none' : `chatPulse 1.3s ease-in-out ${i * 0.18}s infinite` }} />
-        ))}
-      </span>
-      <style>{`@keyframes chatPulse { 0%, 70%, 100% { opacity: 0.35 } 35% { opacity: 1 } }`}</style>
+      <RuphusThinking reduce={reduce} />
     </div>
   </m.div>
 );

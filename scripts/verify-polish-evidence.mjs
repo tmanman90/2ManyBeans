@@ -14,13 +14,11 @@ const MIN_WIDTH = 600;      // real screenshot width; reject 1x1 / tiny fabricat
 
 // Each required frame = one changed element on one surface. Capture these during the loop.
 const REQUIRED = [
-  { f: 'loader.png',        what: 'liquid-glass thinking loader visible while an AI reaction loads' },
-  { f: 'slide.png',         what: 'single-select highlight mid-slide between quick-picks (layoutId)' },
-  { f: 'fill.png',          what: 'multi-select flavor chips with the premium per-chip fill' },
-  { f: 'marker.png',        what: 'slider showing the de-emphasized expected marker' },
-  { f: 'tap-inventory.png', what: 'full TastingDetailCard opened from a bean card in INVENTORY' },
-  { f: 'tap-rotation.png',  what: 'full TastingDetailCard opened from a bean card in ROTATION' },
-  { f: 'tap-archive.png',   what: 'full TastingDetailCard opened from a bean card in ARCHIVE' },
+  { f: 'bone-hidden.png',    what: 'slider before commit with Ruphus expected bone hidden' },
+  { f: 'bone-revealed.png',  what: 'slider after Next commit with the lucide Bone marker revealed' },
+  { f: 'loader-matrix.png',  what: 'frosted-glass canvas dot-matrix loader visible immediately after answer commit' },
+  { f: 'chat-thread.png',    what: 'Ruphus chat thread with coaching bubble plus separate loader/reaction bubble' },
+  { f: 'resume-prompt.png',  what: 'guided-tasting entry offering Resume for the in-session draft' },
 ];
 
 const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

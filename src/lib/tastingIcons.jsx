@@ -41,31 +41,36 @@ export function tastingIcon(note) {
 const IMAGE_ICONS = {
   // === compound / disambiguating keys FIRST (includes() matches in insertion order) ===
   'blue raspberry': 'blue-raspberry',
+  'red berries': 'raspberry', 'red berry': 'raspberry', 'sweet berry wine': 'raspberry',
   'dark chocolate': 'dark-chocolate', 'milk chocolate': 'cacao',
   'black pepper': 'black-pepper', 'white pepper': 'black-pepper', 'pink peppercorn': 'black-pepper',
   'green tea': 'green-tea', 'matcha': 'green-tea',
   'earl grey': 'earl-grey', 'earl gray': 'earl-grey', 'black tea': 'earl-grey',
-  'cacao nib': 'cacao', 'orange blossom': 'rose', 'brown sugar': 'caramel',
+  'white tea': 'white-tea',
+  'cacao nib': 'cacao', 'orange blossom': 'orange-blossom', 'brown sugar': 'caramel',
+  'sugar cane': 'sugar-cane', sugarcane: 'sugar-cane',
+  'lemon grass': 'lemongrass',
   'passion fruit': 'passionfruit', 'graham cracker': 'graham',
+  'round mouthfeel': 'round',
   // === florals ===
   chamomile: 'chamomile', jasmine: 'jasmine', lavender: 'lavender', violet: 'lavender',
-  hibiscus: 'hibiscus', rose: 'rose', honeysuckle: 'jasmine', elderflower: 'jasmine',
-  blossom: 'rose', floral: 'rose', flower: 'rose',
+  hibiscus: 'hibiscus', daisy: 'daisy', rose: 'rose', honeysuckle: 'jasmine', elderflower: 'jasmine',
+  blossom: 'orange-blossom', floral: 'rose', flower: 'rose',
   // === berries (specific before generic 'berry') ===
   strawberry: 'strawberry', blueberry: 'blueberry', blackberry: 'blackberry',
-  raspberry: 'raspberry', cranberry: 'cranberry', blackcurrant: 'cranberry', currant: 'cranberry',
-  cherry: 'cherry', pomegranate: 'cranberry', berry: 'raspberry',
+  raspberry: 'raspberry', cranberry: 'cranberry', blackcurrant: 'blackcurrant', currant: 'cranberry',
+  cherry: 'cherry', pomegranate: 'cranberry', berries: 'raspberry', berry: 'raspberry',
   // === stone / pome fruit (pineapple before apple) ===
   apricot: 'apricot', nectarine: 'peach', peach: 'peach', plum: 'plum',
   pear: 'pear', quince: 'pear', apple: 'apple',
   // === citrus ===
   bergamot: 'earl-grey', grapefruit: 'grapefruit', pomelo: 'grapefruit',
   mandarin: 'orange', tangerine: 'orange', marmalade: 'orange', orange: 'orange',
-  lemon: 'lemon', lime: 'lime', yuzu: 'lemon', citrus: 'orange',
+  lemongrass: 'lemongrass', lemon: 'lemon', lime: 'lime', yuzu: 'yuzu', citrus: 'orange',
   // === tropical ===
   pineapple: 'pineapple', lychee: 'lychee', passionfruit: 'passionfruit', passion: 'passionfruit',
-  banana: 'banana', kiwi: 'kiwi', melon: 'melon', papaya: 'mango', guava: 'mango',
-  starfruit: 'kiwi', tropical: 'mango', mango: 'mango',
+  watermelon: 'watermelon', banana: 'banana', kiwi: 'kiwi', melon: 'melon', rambutan: 'rambutan',
+  papaya: 'mango', guava: 'guava', starfruit: 'starfruit', tropical: 'mango', mango: 'mango',
   // === grape / vinous (grapefruit handled above) ===
   muscat: 'grape', raisin: 'grape', riesling: 'grape', wine: 'grape', fig: 'fig', grape: 'grape',
   // === chocolate (dark handled above) ===
@@ -80,11 +85,12 @@ const IMAGE_ICONS = {
   honey: 'honey', toffee: 'toffee', butterscotch: 'toffee', caramel: 'caramel',
   molasses: 'caramel', maple: 'caramel', marshmallow: 'marshmallow',
   vanilla: 'vanilla', custard: 'vanilla', cream: 'vanilla',
-  candy: 'candy', gummy: 'candy', bubblegum: 'candy',
+  skittles: 'skittles', candy: 'candy', gummy: 'candy', bubblegum: 'candy',
   // === bakery / grain ===
   graham: 'graham', biscuit: 'graham', shortbread: 'graham', malt: 'malt',
   cereal: 'malt', grain: 'malt', oat: 'malt',
   // === other ===
+  bright: 'bright', juicy: 'juice-box', round: 'round', sweet: 'sugar-cane',
   tobacco: 'tobacco', cola: 'cola',
   // === fun ===
   punchy: 'punchy', punch: 'punchy',

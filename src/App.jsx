@@ -58,6 +58,9 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // Mirrors pendingAddBeanMode: set here, consumed by TastingTab which
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
+  // In-session tasting wizard draft. Kept above TastingTab so tab navigation
+  // cannot discard an unfinished guided tasting; never persisted to Firebase.
+  const [tastingWizardDraft, setTastingWizardDraft] = useState(null);
   const [tourActive, setTourActive] = useState(() => {
     if (new URLSearchParams(window.location.search).has('tour')) return true;
     return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
@@ -255,6 +258,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               onUpdateTasting={updateTasting}
               onDeleteTasting={deleteTasting}
               updateBean={updateBean}
+              wizardDraft={tastingWizardDraft}
+              onWizardDraftChange={setTastingWizardDraft}
               pendingTastingBeanId={pendingTastingBeanId}
               onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
               isDemo={isDemo}

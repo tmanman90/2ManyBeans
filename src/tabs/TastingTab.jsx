@@ -435,7 +435,7 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
   );
 };
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, pendingTastingBeanId, onPendingTastingConsumed, isDemo, onDemoAction }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, onPendingTastingConsumed, isDemo, onDemoAction }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -466,6 +466,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [editForm, setEditForm] = useState(null);
   // Intelligent tasting wizard — the guided-tasting experience (replaces the chat takeover).
   const [wizardOpen, setWizardOpen] = useState(false);
+  const setWizardDraft = onWizardDraftChange;
 
   // Chat tasting state
   const [chatMessages, setChatMessages] = useState([]);
@@ -589,7 +590,13 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       return;
     }
     haptic.medium();
+    if (wizardDraft?.beanId) setSel(wizardDraft.beanId);
     setWizardOpen(true);
+  };
+
+  const closeWizard = (opts = {}) => {
+    if (opts.clearDraft) setWizardDraft(null);
+    setWizardOpen(false);
   };
 
   // Wizard saved a tasting — it already wrote tastingScores directly (real fingerprint), so we
@@ -597,6 +604,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const saveWizardTasting = async (record) => {
     try {
       await onAddTasting(record);
+      setWizardDraft(null);
       setWizardOpen(false);
       setMode('list');
     } catch (err) {
@@ -630,10 +638,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       onPendingTastingConsumed?.();
       return;
     }
+    if (wizardDraft?.beanId && wizardDraft.beanId !== pendingTastingBeanId) setWizardDraft(null);
     setSel(pendingTastingBeanId);
     setWizardOpen(true);
     onPendingTastingConsumed?.();
-  }, [pendingTastingBeanId, beans, hasPro, freeUsage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingTastingBeanId, beans, hasPro, freeUsage, wizardDraft, setWizardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChatSend = async () => {
     if (!chatInput.trim() || chatLoading) return;
@@ -841,6 +850,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const currentStep = chatExtracted ? TASTING_STEPS.length : stepWalk.maxIdx;
   const scorecard = scanScorecard(chatMessages);
   const selectedBean = beans.find(b => b.id === sel);
+  const draftBean = wizardDraft?.beanId ? beans.find(b => b.id === wizardDraft.beanId) : null;
 
   const exitChat = () => {
     setMode('list');
@@ -860,7 +870,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     }
   };
 
-  const wizardBean = beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
+  const wizardBean = (wizardOpen && draftBean) || beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
 
   return (
     <div>
@@ -872,9 +882,11 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           tastings={tastings}
           isPro={hasPro}
           reduce={reduceMotion}
+          draft={wizardDraft}
+          onDraftChange={setWizardDraft}
           onSave={saveWizardTasting}
-          onClose={() => setWizardOpen(false)}
-          onSwitchToManual={() => { setWizardOpen(false); setMode('form'); }}
+          onClose={closeWizard}
+          onSwitchToManual={() => { setWizardDraft(null); setWizardOpen(false); setMode('form'); }}
         />
       )}
 
@@ -906,8 +918,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
           {/* REDESIGN: guided-tasting invitation card (list mode only) */}
           {mode === 'list' && (() => {
-            const onDeck = beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
+            const hasDraft = !!draftBean;
+            const onDeck = draftBean || beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
             const hasBeans = !!onDeck;
+            const ctaLabel = hasDraft ? `Resume your ${draftBean.name} tasting` : (hasBeans ? 'Start guided tasting' : 'Add a bean to start');
             return (
               <>
                 <div data-tour="new-tasting" style={{
@@ -978,7 +992,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.2, color: C.textMuted, textTransform: 'uppercase' }}>
-                          {onDeck.jarSlot ? `On deck · Jar ${onDeck.jarSlot}` : 'On deck · Sealed'}
+                          {hasDraft ? 'Resume draft' : (onDeck.jarSlot ? `On deck · Jar ${onDeck.jarSlot}` : 'On deck · Sealed')}
                         </div>
                         <div style={{
                           fontFamily: fonts.heading, fontSize: 15, color: C.text, fontWeight: 500, lineHeight: 1.15,
@@ -995,8 +1009,12 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                       <select
-                        value={sel}
-                        onChange={e => setSel(e.target.value)}
+                        value={onDeck.id}
+                        onChange={e => {
+                          const nextBeanId = e.target.value;
+                          if (wizardDraft?.beanId && nextBeanId !== wizardDraft.beanId) setWizardDraft(null);
+                          setSel(nextBeanId);
+                        }}
                         aria-label="Pick bean to taste"
                         style={{
                           position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -1051,14 +1069,14 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
                       <span style={{ width: 30, height: 30, borderRadius: '50%', background: hasBeans ? 'rgba(255,255,255,0.20)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <MessageCircle size={16} />
                       </span>
-                      <span>{hasBeans ? 'Start guided tasting' : 'Add a bean to start'}</span>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctaLabel}</span>
                     </span>
                     {hasBeans && <ChevronRight size={20} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />}
                   </m.button>
 
                   {/* Quiet scaffolding line (no chrome) */}
                   <div style={{ marginTop: 10, textAlign: 'center', fontFamily: fonts.body, fontSize: 12, color: C.textLight, fontVariantNumeric: 'tabular-nums' }}>
-                    Ruphus predicts · you taste · auto-logged to your journal
+                    {hasDraft ? 'Progress saved in this session' : 'Ruphus predicts · you taste · auto-logged to your journal'}
                   </div>
                 </div>
 

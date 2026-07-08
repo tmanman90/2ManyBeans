@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tasting Hero Frames</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --paper: #f1eadf;
+        --paper-deep: #e7decf;
+        --surface: #fffefb;
+        --ink: #241710;
+        --muted: #6e5d4e;
+        --soft: #9c8a78;
+        --line: #e6d9c9;
+        --line-strong: rgba(70, 41, 26, 0.18);
+        --accent: #a2632f;
+        --accent-dark: #46291a;
+        --accent-soft: #f4e5d1;
+        --sage: #5b8762;
+        --sage-soft: #e8f0ea;
+        --clay: #b25741;
+        --shadow: 0 1px 2px rgba(46, 28, 16, 0.05), 0 5px 14px rgba(46, 28, 16, 0.07), 0 14px 32px rgba(46, 28, 16, 0.06);
+        --hair: 1px solid var(--line);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--paper-deep);
+        color: var(--ink);
+        font-family: "Nunito", system-ui, sans-serif;
+      }
+
+      .page {
+        width: min(100%, 2140px);
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .brief {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+
+      .brief h1 {
+        margin: 0;
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 34px;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .brief p {
+        max-width: 680px;
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      .badge {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: var(--hair);
+        border-radius: 999px;
+        padding: 0 14px;
+        color: var(--accent-dark);
+        background: rgba(255, 254, 251, 0.72);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .frames {
+        display: grid;
+        grid-template-columns: repeat(5, 390px);
+        gap: 18px;
+        align-items: start;
+        overflow-x: auto;
+        padding-bottom: 18px;
+      }
+
+      .frame-wrap {
+        display: grid;
+        gap: 10px;
+      }
+
+      .frame-label {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .phone {
+        width: 390px;
+        height: 844px;
+        border-radius: 28px;
+        padding: 10px;
+        background: #20130a;
+        box-shadow: 0 18px 50px rgba(33, 19, 10, 0.22);
+      }
+
+      .screen {
+        position: relative;
+        width: 370px;
+        height: 824px;
+        overflow: hidden;
+        border-radius: 22px;
+        background: var(--paper);
+        isolation: isolate;
+      }
+
+      .screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.22;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
+        mix-blend-mode: multiply;
+        z-index: 0;
+      }
+
+      .screen > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .topbar {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px 0;
+      }
+
+      .brand {
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .icon-button {
+        width: 44px;
+        height: 44px;
+        border: var(--hair);
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 254, 251, 0.78);
+        color: var(--accent-dark);
+      }
+
+      .icon-button svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .stepper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .stepper span {
+        width: 9px;
+        height: 9px;
+        border: 1px solid rgba(70, 41, 26, 0.32);
+        border-radius: 999px;
+        background: transparent;
+      }
+
+      .stepper .done,
+      .stepper .active {
+        border-color: var(--accent);
+        background: var(--accent);
+      }
+
+      .stepper .active {
+        width: 22px;
+      }
+
+      .panel {
+        border: var(--hair);
+        border-radius: var(--radius);
+        background: rgba(255, 254, 251, 0.86);
+        box-shadow: var(--shadow);
+      }
+
+      .label {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .headline {
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 42px;
+        font-weight: 650;
+        line-height: 0.98;
+        letter-spacing: 0;
+      }
+
+      .copy {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      .primary {
+        min-height: 52px;
+        border: 0;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--surface);
+        font: 800 15px/1 "Nunito", system-ui, sans-serif;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 7px 18px rgba(70, 41, 26, 0.18);
+      }
+
+      .secondary {
+        min-height: 48px;
+        border: var(--hair);
+        border-radius: 12px;
+        background: rgba(255, 254, 251, 0.78);
+        color: var(--accent-dark);
+        font: 800 14px/1 "Nunito", system-ui, sans-serif;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .ruphus {
+        position: absolute;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .path {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .path .node {
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        border: var(--hair);
+        background: rgba(255, 254, 251, 0.8);
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .path .node.active {
+        color: var(--surface);
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .path .line {
+        flex: 1;
+        height: 1px;
+        background: var(--line-strong);
+      }
+
+      .radar {
+        width: 116px;
+        height: 116px;
+      }
+
+      .radar text {
+        font: 700 8px/1 "Nunito", system-ui, sans-serif;
+        fill: var(--muted);
+      }
+
+      .chip-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .chip {
+        min-height: 48px;
+        border-radius: var(--radius);
+        border: var(--hair);
+        background: rgba(255, 254, 251, 0.72);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 9px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .chip.selected {
+        border-color: rgba(162, 99, 47, 0.55);
+        background: var(--accent-soft);
+      }
+
+      .chip img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+        flex: 0 0 auto;
+      }
+
+      .meter {
+        height: 42px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .track {
+        position: relative;
+        flex: 1;
+        height: 6px;
+        border-radius: 999px;
+        background: #dfd1bf;
+      }
+
+      .fill {
+        height: 100%;
+        width: 68%;
+        border-radius: inherit;
+        background: var(--accent);
+      }
+
+      .thumb {
+        position: absolute;
+        left: 68%;
+        top: 50%;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        transform: translate(-50%, -50%);
+        border: 4px solid var(--surface);
+        background: var(--accent);
+        box-shadow: 0 2px 8px rgba(70, 41, 26, 0.18);
+      }
+
+      .receipt-line {
+        height: 1px;
+        background: repeating-linear-gradient(90deg, rgba(70, 41, 26, 0.28) 0 8px, transparent 8px 14px);
+      }
+
+      .frame-one .hero {
+        padding: 18px 20px 0;
+        width: 210px;
+      }
+
+      .frame-one .headline {
+        margin-top: 8px;
+      }
+
+      .frame-one .copy {
+        margin-top: 12px;
+        width: 180px;
+      }
+
+      .frame-one .ruphus {
+        width: 252px;
+        right: -24px;
+        top: 120px;
+      }
+
+      .frame-one .goal {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        top: 414px;
+        padding: 16px;
+      }
+
+      .frame-one .goal h2 {
+        margin: 8px 0 6px;
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 23px;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .frame-one .path {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 142px;
+      }
+
+      .frame-one .primary {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 68px;
+      }
+
+      .frame-one .stats {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 18px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        text-align: center;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .frame-one .stats strong {
+        display: block;
+        color: var(--ink);
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .frame-two .intro {
+        padding: 18px 20px 0;
+      }
+
+      .frame-two .headline {
+        width: 250px;
+        margin-top: 20px;
+      }
+
+      .frame-two .copy {
+        width: 240px;
+        margin-top: 12px;
+      }
+
+      .frame-two .ruphus {
+        width: 252px;
+        left: -34px;
+        bottom: 122px;
+      }
+
+      .prediction {
+        position: absolute;
+        right: 20px;
+        top: 244px;
+        width: 188px;
+        padding: 16px 14px;
+      }
+
+      .prediction h2,
+      .finger-live h2 {
+        margin: 2px 0 12px;
+        font-size: 15px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .note-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        border: 1px solid rgba(162, 99, 47, 0.28);
+        flex: 0 0 auto;
+      }
+
+      .confidence {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .bar {
+        height: 7px;
+        border-radius: 999px;
+        background: #dfd1bf;
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        width: 72%;
+        height: 100%;
+        background: var(--accent);
+      }
+
+      .finger-live {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 146px;
+        display: grid;
+        grid-template-columns: 76px 1fr;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+      }
+
+      .fingerprint-mark {
+        width: 64px;
+        height: 64px;
+        border-radius: 999px;
+        border: 1px solid rgba(162, 99, 47, 0.3);
+        display: grid;
+        place-items: center;
+        background: var(--accent-soft);
+      }
+
+      .fingerprint-mark svg {
+        width: 36px;
+        height: 36px;
+      }
+
+      .frame-two .primary {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 68px;
+      }
+
+      .frame-three .topbar,
+      .frame-four .topbar,
+      .frame-five .topbar {
+        padding-top: 14px;
+      }
+
+      .frame-three .question {
+        text-align: center;
+        padding: 6px 20px 0;
+      }
+
+      .frame-three .headline {
+        font-size: 30px;
+        line-height: 1.06;
+        margin-top: 4px;
+      }
+
+      .frame-three .ruphus {
+        width: 166px;
+        left: 8px;
+        top: 176px;
+      }
+
+      .speech {
+        position: absolute;
+        left: 132px;
+        top: 188px;
+        width: 90px;
+        min-height: 66px;
+        border: var(--hair);
+        border-radius: 8px;
+        background: rgba(255, 254, 251, 0.82);
+        padding: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.18;
+      }
+
+      .mini-card {
+        position: absolute;
+        right: 20px;
+        top: 166px;
+        width: 134px;
+        padding: 10px;
+        text-align: center;
+      }
+
+      .mini-card .radar {
+        margin: 2px auto 0;
+      }
+
+      .frame-three .chip-grid {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        top: 366px;
+      }
+
+      .slider-panel {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 92px;
+        padding: 13px 14px;
+      }
+
+      .slider-panel .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+
+      .frame-three .primary {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 24px;
+      }
+
+      .frame-four .headline {
+        text-align: center;
+        font-size: 32px;
+        margin: 10px 20px 0;
+      }
+
+      .match {
+        position: absolute;
+        left: 117px;
+        top: 150px;
+        width: 136px;
+        height: 136px;
+        border-radius: 999px;
+        border: 1px solid rgba(162, 99, 47, 0.36);
+        background: rgba(255, 254, 251, 0.82);
+        display: grid;
+        place-items: center;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+
+      .match strong {
+        display: block;
+        color: var(--accent);
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 42px;
+        line-height: 0.9;
+      }
+
+      .compare {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        top: 308px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .compare .panel {
+        padding: 12px;
+        min-height: 198px;
+      }
+
+      .compare h2 {
+        margin: 0 0 10px;
+        color: var(--accent-dark);
+        font-size: 14px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .compare ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+
+      .compare li {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 8px;
+        align-items: center;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.15;
+      }
+
+      .compare img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+      }
+
+      .coach-note {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        top: 524px;
+        padding: 12px 14px;
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .coach-note strong {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--ink);
+        font-size: 14px;
+      }
+
+      .coach-note p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.32;
+      }
+
+      .frame-four .ruphus {
+        width: 188px;
+        right: -34px;
+        bottom: 84px;
+        z-index: 1;
+      }
+
+      .frame-four .topbar,
+      .frame-four .headline,
+      .frame-four .match,
+      .frame-four .compare,
+      .frame-four .coach-note,
+      .frame-four .secondary,
+      .frame-four .primary {
+        z-index: 2;
+      }
+
+      .frame-four .compare .panel,
+      .frame-four .coach-note {
+        background: rgba(255, 254, 251, 0.94);
+      }
+
+      .frame-four .secondary {
+        position: absolute;
+        left: 20px;
+        width: 142px;
+        bottom: 30px;
+      }
+
+      .frame-four .primary {
+        position: absolute;
+        left: 170px;
+        right: 20px;
+        bottom: 30px;
+      }
+
+      .frame-five .saved-copy {
+        padding: 20px 20px 0;
+        width: 222px;
+      }
+
+      .frame-five .headline {
+        font-size: 40px;
+        margin-top: 8px;
+      }
+
+      .frame-five .copy {
+        margin-top: 10px;
+      }
+
+      .frame-five .ruphus {
+        width: 180px;
+        right: -20px;
+        top: 84px;
+      }
+
+      .receipt {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 286px;
+        bottom: 84px;
+        padding: 18px 16px;
+      }
+
+      .coffee-title {
+        display: grid;
+        grid-template-columns: 74px 1fr;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .stamp {
+        width: 74px;
+        height: 74px;
+        border-radius: 8px;
+        background: var(--sage-soft);
+        border: 1px solid rgba(91, 135, 98, 0.28);
+        display: grid;
+        place-items: center;
+      }
+
+      .stamp img {
+        width: 54px;
+        height: 54px;
+        object-fit: contain;
+      }
+
+      .coffee-title h2 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      .coffee-title p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: 128px 1fr;
+        gap: 14px;
+        align-items: center;
+        margin: 14px 0;
+      }
+
+      .summary-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .summary-list div {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 8px;
+        align-items: center;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.18;
+      }
+
+      .summary-list img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+      }
+
+      .learned {
+        margin-top: 14px;
+      }
+
+      .learned strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--accent-dark);
+        font-size: 13px;
+        line-height: 1.2;
+      }
+
+      .learned p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .streak {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .checks {
+        display: flex;
+        gap: 6px;
+      }
+
+      .checks span {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: var(--sage);
+        color: white;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .frame-five .primary {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 24px;
+      }
+
+      .concepts {
+        margin-top: 32px;
+      }
+
+      .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(160px, 1fr));
+        gap: 12px;
+      }
+
+      .concept-grid img {
+        width: 100%;
+        border-radius: 8px;
+        border: var(--hair);
+        box-shadow: var(--shadow);
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 16px;
+        }
+
+        .brief {
+          display: grid;
+        }
+
+        .frames,
+        .concept-grid {
+          grid-template-columns: 390px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="brief" aria-labelledby="brief-title">
+        <div>
+          <h1 id="brief-title">Tasting as the MVP hero</h1>
+          <p>Five high-fidelity key frames for a more engaging, coach-led tasting flow: premium coffee journal, light learning-game progression, and Ruphus as the emotional engine.</p>
+        </div>
+        <div class="badge">Image 2 concepts + real Ruphus assets</div>
+      </section>
+
+      <section class="frames" aria-label="Tasting key frames">
+        <article class="frame-wrap">
+          <div class="frame-label"><span>01</span><span>Entry quest</span></div>
+          <div class="phone" data-frame="01-entry">
+            <div class="screen frame-one">
+              <div class="topbar">
+                <div class="brand">2manybeans</div>
+                <div class="icon-button" aria-label="Profile">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+              </div>
+              <section class="hero">
+                <div class="label">Today's tasting</div>
+                <div class="headline">Train your palate.</div>
+                <p class="copy">Ruphus will compare your notes with the roaster's clues as you taste.</p>
+              </section>
+              <img class="ruphus" src="../../../public/images/ruphus-animations/nobg/ruphus-cupping.png" alt="" />
+              <section class="goal panel">
+                <div class="label">Coffee on deck</div>
+                <h2>Honduras, Finca El Roble</h2>
+                <p class="copy">Expected: cherry, caramel, roasted almond</p>
+              </section>
+              <div class="path" aria-label="Tasting path">
+                <div class="node active">1</div><div class="line"></div>
+                <div class="node">2</div><div class="line"></div>
+                <div class="node">3</div><div class="line"></div>
+                <div class="node">4</div>
+              </div>
+              <button class="primary">Start guided tasting</button>
+              <div class="stats" aria-label="Progress">
+                <span><strong>7</strong>day streak</span>
+                <span><strong>24</strong>coffees</span>
+                <span><strong>3</strong>badges</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="frame-wrap">
+          <div class="frame-label"><span>02</span><span>Prediction</span></div>
+          <div class="phone" data-frame="02-prediction">
+            <div class="screen frame-two">
+              <div class="topbar">
+                <div class="icon-button" aria-label="Back">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="stepper" aria-label="Step 1 of 5"><span class="active"></span><span></span><span></span><span></span><span></span></div>
+                <div class="icon-button" aria-label="Notebook">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h9a3 3 0 0 1 3 3v13H8a2 2 0 0 1-2-2V4Z" stroke="currentColor" stroke-width="2"/><path d="M9 8h5M9 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+              </div>
+              <section class="intro">
+                <div class="label">Before you sip</div>
+                <div class="headline">Ruphus has a hunch.</div>
+                <p class="copy">Check the prediction, then taste blind enough to keep your own palate honest.</p>
+              </section>
+              <img class="ruphus" src="../../../public/images/ruphus-animations/nobg/ruphus-presenting.png" alt="" />
+              <section class="prediction panel">
+                <div class="label">Prediction</div>
+                <h2>Look for lift, sweetness, and a clean finish.</h2>
+                <div class="note-row"><span class="dot"></span>Stone fruit</div>
+                <div class="note-row"><span class="dot"></span>Cacao</div>
+                <div class="note-row"><span class="dot"></span>Silky body</div>
+                <div class="confidence"><span class="bar"><span></span></span><span>72%</span></div>
+              </section>
+              <section class="finger-live panel">
+                <div class="fingerprint-mark">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 12a6 6 0 0 1 12 0c0 5-3 8-6 8m-2-4c1-1 2-2 2-4a2 2 0 0 1 4 0c0 3-1 5-3 7M4 14c0-6 3-10 8-10s8 4 8 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                  <div class="label">Your taste, live</div>
+                  <h2>We will compare as you go.</h2>
+                </div>
+              </section>
+              <button class="primary">Begin tasting</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="frame-wrap">
+          <div class="frame-label"><span>03</span><span>Aroma input</span></div>
+          <div class="phone" data-frame="03-aroma">
+            <div class="screen frame-three">
+              <div class="topbar">
+                <div class="icon-button" aria-label="Back">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="stepper" aria-label="Step 2 of 5"><span class="done"></span><span class="active"></span><span></span><span></span><span></span></div>
+                <div class="icon-button" aria-label="Notes">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h16M6 16l10-10 2 2L8 18H6v-2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+              </div>
+              <section class="question">
+                <div class="label">Aroma</div>
+                <div class="headline">What do you smell?</div>
+                <p class="copy">Tap what jumps out first.</p>
+              </section>
+              <img class="ruphus" src="../../../public/images/ruphus-animations/nobg/ruphus-magnifying-glass.png" alt="" />
+              <div class="speech">Complex already. Nice nose.</div>
+              <section class="mini-card panel">
+                <div class="label">Live fingerprint</div>
+                <svg class="radar" viewBox="0 0 120 120" aria-hidden="true">
+                  <polygon points="60,12 101,36 101,84 60,108 19,84 19,36" fill="none" stroke="#d8cab8" />
+                  <polygon points="60,28 87,44 87,76 60,92 33,76 33,44" fill="none" stroke="#e2d6c6" />
+                  <polygon points="60,42 75,51 75,69 60,78 45,69 45,51" fill="none" stroke="#e2d6c6" />
+                  <line x1="60" y1="12" x2="60" y2="108" stroke="#e2d6c6" />
+                  <line x1="19" y1="36" x2="101" y2="84" stroke="#e2d6c6" />
+                  <line x1="101" y1="36" x2="19" y2="84" stroke="#e2d6c6" />
+                  <polygon points="60,29 82,47 78,74 60,82 40,72 38,46" fill="rgba(162,99,47,0.24)" stroke="#a2632f" stroke-width="2" />
+                </svg>
+              </section>
+              <div class="chip-grid">
+                <div class="chip selected"><img src="../../../public/images/tasting-icons/hibiscus.png" alt="" />Floral</div>
+                <div class="chip"><img src="../../../public/images/tasting-icons/grapefruit.png" alt="" />Citrus</div>
+                <div class="chip selected"><img src="../../../public/images/tasting-icons/raspberry.png" alt="" />Berry</div>
+                <div class="chip selected"><img src="../../../public/images/tasting-icons/apricot.png" alt="" />Stone fruit</div>
+                <div class="chip"><img src="../../../public/images/tasting-icons/cacao.png" alt="" />Cacao</div>
+                <div class="chip"><img src="../../../public/images/tasting-icons/almond.png" alt="" />Nutty</div>
+              </div>
+              <section class="slider-panel panel">
+                <div class="row"><span class="label">Aroma intensity</span><span class="copy">clear</span></div>
+                <div class="meter"><span class="copy">soft</span><div class="track"><div class="fill"></div><div class="thumb"></div></div><span class="copy">bold</span></div>
+              </section>
+              <button class="primary">Lock aroma notes</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="frame-wrap">
+          <div class="frame-label"><span>04</span><span>Reveal</span></div>
+          <div class="phone" data-frame="04-reveal">
+            <div class="screen frame-four">
+              <div class="topbar">
+                <div class="icon-button" aria-label="Back">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="stepper" aria-label="Step 4 of 5"><span class="done"></span><span class="done"></span><span class="done"></span><span class="active"></span><span></span></div>
+                <div class="icon-button" aria-label="Journal">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v16H7a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="2"/><path d="M9 9h6M9 13h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+              </div>
+              <div class="headline">Nice work. You found the signal.</div>
+              <div class="match"><div><span class="label">Match</span><strong>86%</strong></div></div>
+              <div class="compare">
+                <section class="panel">
+                  <h2>Expected</h2>
+                  <ul>
+                    <li><img src="../../../public/images/tasting-icons/cherry.png" alt="" />Cherry</li>
+                    <li><img src="../../../public/images/tasting-icons/caramel.png" alt="" />Caramel</li>
+                    <li><img src="../../../public/images/tasting-icons/almond.png" alt="" />Roasted almond</li>
+                    <li><img src="../../../public/images/tasting-icons/dark-chocolate.png" alt="" />Cacao finish</li>
+                  </ul>
+                </section>
+                <section class="panel">
+                  <h2>Your notes</h2>
+                  <ul>
+                    <li><img src="../../../public/images/tasting-icons/cherry.png" alt="" />Cherry</li>
+                    <li><img src="../../../public/images/tasting-icons/honey.png" alt="" />Honey</li>
+                    <li><img src="../../../public/images/tasting-icons/almond.png" alt="" />Almond</li>
+                    <li><img src="../../../public/images/tasting-icons/jasmine.png" alt="" />Jasmine</li>
+                  </ul>
+                </section>
+              </div>
+              <section class="coach-note panel">
+                <div class="fingerprint-mark">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M5 8c5 0 9 3 14 3M5 16c5 0 9-3 14-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                  <strong>Ruphus says</strong>
+                  <p>You caught the fruit and roast curve. Next time, separate floral from sweetness before the cup cools.</p>
+                </div>
+              </section>
+              <img class="ruphus" src="../../../public/images/ruphus-animations/nobg/ruphus-writing-notes.png" alt="" />
+              <button class="secondary">Review notes</button>
+              <button class="primary">Finish tasting</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="frame-wrap">
+          <div class="frame-label"><span>05</span><span>Saved payoff</span></div>
+          <div class="phone" data-frame="05-saved">
+            <div class="screen frame-five">
+              <div class="topbar">
+                <div class="brand">Journal</div>
+                <div class="icon-button" aria-label="Share">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6h14v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+              </div>
+              <section class="saved-copy">
+                <div class="label">Tasting saved</div>
+                <div class="headline">That one counts.</div>
+                <p class="copy">Your taste fingerprint just got sharper.</p>
+              </section>
+              <img class="ruphus" src="../../../public/images/ruphus-animations/nobg/ruphus-cupping.png" alt="" />
+              <section class="receipt panel">
+                <div class="coffee-title">
+                  <div class="stamp"><img src="../../../public/images/tasting-icons/coffee-cherry.png" alt="" onerror="this.src='../../../public/images/tasting-icons/cherry.png'" /></div>
+                  <div>
+                    <h2>Ethiopia Yirgacheffe</h2>
+                    <p>Washed process / logged today</p>
+                  </div>
+                </div>
+                <div class="receipt-line"></div>
+                <div class="summary-grid">
+                  <svg class="radar" viewBox="0 0 120 120" aria-label="Taste fingerprint">
+                    <polygon points="60,12 101,36 101,84 60,108 19,84 19,36" fill="none" stroke="#d8cab8" />
+                    <polygon points="60,28 87,44 87,76 60,92 33,76 33,44" fill="none" stroke="#e2d6c6" />
+                    <polygon points="60,42 75,51 75,69 60,78 45,69 45,51" fill="none" stroke="#e2d6c6" />
+                    <polygon points="60,22 92,42 84,78 60,88 32,76 40,42" fill="rgba(91,135,98,0.26)" stroke="#5b8762" stroke-width="2" />
+                    <text x="48" y="10">floral</text>
+                    <text x="88" y="40">fruit</text>
+                    <text x="78" y="104">sweet</text>
+                    <text x="16" y="104">body</text>
+                  </svg>
+                  <div class="summary-list">
+                    <div><img src="../../../public/images/tasting-icons/jasmine.png" alt="" />Jasmine and bergamot</div>
+                    <div><img src="../../../public/images/tasting-icons/blueberry.png" alt="" />Blueberry lift</div>
+                    <div><img src="../../../public/images/tasting-icons/honey.png" alt="" />Honey sweetness</div>
+                  </div>
+                </div>
+                <div class="receipt-line"></div>
+                <div class="learned">
+                  <strong>What you learned</strong>
+                  <p>Washed coffees often hide florals in the cooling cup. Your next prompt should ask for finish before sweetness.</p>
+                </div>
+                <div class="streak">
+                  <div>
+                    <div class="label">Tasting streak</div>
+                    <div class="checks" aria-label="Five tastings"><span>✓</span><span>✓</span><span>✓</span><span>✓</span><span>✓</span></div>
+                  </div>
+                  <div class="label">5 logged</div>
+                </div>
+              </section>
+              <button class="primary">Share tasting</button>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="concepts" aria-labelledby="concept-title">
+        <div class="brief">
+          <div>
+            <h1 id="concept-title">Image 2 exploration</h1>
+            <p>These are the raw generated references used for composition and emotional tone. The five product frames above are the refined, text-safe version.</p>
+          </div>
+        </div>
+        <div class="concept-grid">
+          <img src="generated-concepts/ig_0396c414f1dfd22d016a4350559ddc819a97d5f367b504318d.png" alt="Generated entry concept" />
+          <img src="generated-concepts/ig_0396c414f1dfd22d016a4350931fe0819a9119b37f5567f4ec.png" alt="Generated prediction concept" />
+          <img src="generated-concepts/ig_0396c414f1dfd22d016a4350d59c2c819abf1116753e87a7b6.png" alt="Generated aroma concept" />
+          <img src="generated-concepts/ig_0396c414f1dfd22d016a435118099c819abb303e8d791f08fe.png" alt="Generated reveal concept" />
+          <img src="generated-concepts/ig_0396c414f1dfd22d016a435156bcc4819aa152425eb2635e0e.png" alt="Generated saved concept" />
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

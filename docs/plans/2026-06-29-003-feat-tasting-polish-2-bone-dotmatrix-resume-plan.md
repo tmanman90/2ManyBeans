@@ -4,11 +4,12 @@
 
 ## Overview / Problem Frame
 A second round of tasting-wizard polish from Tal's review. Craft + UX only, no data/logic change:
-(1) the slider's expected marker should be a **dog-bone** glyph (mascot-fit) that is **hidden until
-the user sets their own value**, then fades in — so you guess unbiased, then compare (true
-predict-then-confirm; the always-visible marker was anchoring the answer). (2) Professor Ruphus's
+(1) the slider's expected marker should be a **dog-bone** glyph (mascot-fit) that stays **hidden while
+the user sets their own value**; the first **Next** press commits that blind guess, reveals the
+bone on the same page, holds for about a second, then auto-advances — so you guess unbiased,
+compare, and move on with one tap (true predict-then-confirm; the always-visible marker was anchoring the answer). (2) Professor Ruphus's
 AI reaction should read like a **chat thread**: his coaching line in one bubble, and the instant you
-answer a **loading bubble pops below it immediately** (no perceived lag), then his reaction replaces
+commit an answer a **loading bubble pops below it immediately** (no perceived lag), then his reaction replaces
 the loader and the coaching bubble fades out. (3) The loader itself should be **"alien hardware"** —
 a compact frosted-glass pill containing a **canvas dot-matrix with a scanning shimmer band** (the
 real "liquid glass + dots" look), replacing the simpler CSS breathing dots. (4) Quitting a tasting
@@ -21,10 +22,12 @@ pill), `motion-library.md`, `principles/05-motion.md` + `06-materials-depth.md`.
 shipped `RuphusThinking`/`RuphusReaction`/`AxisSlider`/`TastingWizard`.
 
 ## Requirements Trace
-- **R1 — Bone marker, revealed after answering.** The AxisSlider expected marker is a crisp **lucide
-  Bone icon** (not ◆, not emoji) at the predicted position. It is **hidden until the user has set a
-  value on that slider** (`touched`), then **fades in** (opacity only) so the user answers unbiased
-  and then sees how close they were. Stays revealed once shown; reduced-motion shows it instantly.
+- **R1 — Bone marker, revealed on Next commit.** The AxisSlider expected marker is a crisp **lucide
+  Bone icon** (not ◆, not emoji) at the predicted position. It stays **hidden before and while the
+  user sets a value**, including touch/drag, then the first **Next** press commits the blind guess,
+  **fades in** the bone (opacity only) on that same page, ignores rapid second taps, and auto-advances
+  after about a second so the user answers unbiased, sees how close they were, and moves on with one tap.
+  Stays revealed once shown; reduced-motion shows it instantly.
   The intro copy is reframed ("set yours first — then I'll show where I'd have landed, the 🦴").
 - **R2 — Chat-thread reaction with instant loading bubble.** Ruphus's coaching line sits in its
   bubble. The MOMENT the user commits an answer to the step, a separate **loading bubble appears
@@ -39,7 +42,7 @@ shipped `RuphusThinking`/`RuphusReaction`/`AxisSlider`/`TastingWizard`.
   Reduced-motion: a single calm static frame. `role="status"`. No SVG goo/feDisplacement filter, no
   animated backdrop-filter, no mix-blend sheen (all WKWebView-broken).
 - **R4 — Resume an exited tasting + confirm-on-exit.** The in-progress draft (answers, step index,
-  phase) is **lifted so it survives the wizard closing** and persists **in-session** (in-memory; NO
+  phase) is **lifted so it survives the wizard closing and tab navigation** and persists **in-session** (in-memory; NO
   Firebase, NO new persisted field). Tapping the wizard's ✕ **with real progress** shows a confirm
   ("Leave this tasting? Your progress is saved — pick it back up. [Keep tasting] [Leave]"). When a
   draft exists, the guided-tasting entry offers **Resume** (e.g. the CTA becomes "Resume your <bean>
@@ -66,8 +69,8 @@ shipped `RuphusThinking`/`RuphusReaction`/`AxisSlider`/`TastingWizard`.
 - Reuse existing mascot assets; no new Higgsfield assets. Dev channel only; no prod/main.
 
 ## Implementation Units
-- **U1 — Bone marker + reveal-after-answer** (`AxisSlider.jsx`): lucide `Bone` glyph at expected
-  position, gated on `touched`, opacity fade-in (CSS), reduced-motion instant; intro copy reframed in
+- **U1 — Bone marker + reveal-on-Next-commit** (`AxisSlider.jsx`): lucide `Bone` glyph at expected
+  position, gated on the step's committed/revealed state, opacity fade-in (CSS), reduced-motion instant; intro copy reframed in
   `TastingWizard.jsx`. (R1, R5)
 - **U2 — Canvas DotMatrix loader** (`RuphusThinking.jsx` rework or new `DotMatrixLoader.jsx` + CSS):
   glass pill + canvas dot-matrix scanning shimmer; DPR-cap, offscreen-pause, reduced-motion static;
@@ -75,8 +78,8 @@ shipped `RuphusThinking`/`RuphusReaction`/`AxisSlider`/`TastingWizard`.
 - **U3 — Chat-thread reaction** (`TastingWizard.jsx` + `RuphusReaction.jsx`): coaching bubble +
   immediate loading bubble on answer-commit (decouple loader visibility from the call debounce) +
   reaction replaces loader while coaching fades out. (R2)
-- **U4 — Resume + confirm-on-exit** (`TastingTab.jsx` + `TastingWizard.jsx`): lift draft state to
-  survive close (in-session), confirm dialog on ✕ with progress, Resume entry affordance, draft
+- **U4 — Resume + confirm-on-exit** (`App.jsx` + `TastingTab.jsx` + `TastingWizard.jsx`): lift draft state to
+  survive close and tab navigation (in-session), confirm dialog on ✕ with progress, Resume entry affordance, draft
   lifecycle (clear on save/leave/fresh-start). (R4)
 - **U5 — Verify + on-device evidence** (`scripts/verify-wizard.mjs`, `scripts/audit-wizard.mjs`,
   `scripts/verify-polish-evidence.mjs` updated for the new frames): harness assertions (bone hidden
@@ -85,7 +88,8 @@ shipped `RuphusThinking`/`RuphusReaction`/`AxisSlider`/`TastingWizard`.
 
 ## Verification Gates (for loop.yaml)
 - v1-build: `npx vite build` exit 0.
-- v2-harness: `node scripts/verify-wizard.mjs` (R1 bone hidden-until-touched, R2 thread + instant
+- v2-harness: `node scripts/verify-wizard.mjs` (R1 bone hidden before touch, still hidden after touch,
+  then revealed by one Next before timed auto-advance; R2 thread + instant
   loader, R3 canvas loader present, R4 resume restores draft — deterministic, no live AI).
 - v3-regression: verify-tasting + verify-inventory + verify-archive + verify-morph + verify-chat.
 - v4-audit: `node scripts/audit-wizard.mjs` (R5 design + frames).
@@ -93,7 +97,8 @@ shipped `RuphusThinking`/`RuphusReaction`/`AxisSlider`/`TastingWizard`.
   backdrop-filter; scope clean; no regression to shipped polish).
 - v7-evidence: `node scripts/verify-polish-evidence.mjs` (updated frame set: bone-hidden, bone-
   revealed, loader-matrix, thread, resume) — fails unless real fresh device screenshots exist.
-- v6-human: Tal on the dev app — bone reveals after you answer, the alien-hardware loader looks sick,
+- v6-human: Tal on the dev app — bone stays hidden while you answer, then reveals when Next commits
+  the guess, holds for about a second, and advances by itself; the alien-hardware loader looks sick,
   the chat-thread feels natural + instant, and an exited tasting resumes.
 
 ## Evidence Map

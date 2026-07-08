@@ -2,7 +2,7 @@
 // character requirements over a committed harness:
 //   R1 header de-slop (no "AI Chat" eyebrow, no gradient rule)
 //   R2 Ruphus present (mascot avatar) + solid user bubble (no gradient)
-//   R3 characterful "Ruphus is thinking" indicator on loading
+//   R3 characterful canvas dot-matrix Ruphus-thinking indicator on loading
 //   R4 tappable starter prompts (real buttons that send)
 //   R6 solid send button (no gradient chrome)
 //   R7-reduced-motion renders; zero console errors on the static render
@@ -87,7 +87,7 @@ try {
           const s = getComputedStyle(d);
           return (s.backgroundColor || '').replace(/\s/g, '') === 'rgb(162,99,47)' && !(s.backgroundImage || '').includes('gradient');
         });
-        const think = (document.body.innerText || '').includes('Ruphus is thinking');
+        const think = document.querySelector('[data-chat-typing="true"] [data-dot-matrix-loader="true"] canvas') != null;
         return { bubble, think };
       });
       if (state.bubble) userBubbleSolid = true;
@@ -96,8 +96,8 @@ try {
       await page.waitForTimeout(20);
     }
     if (!userBubbleSolid) fail('R2: solid (non-gradient) user bubble did not render after send');
-    else if (!thinking) fail('R3: "Ruphus is thinking" indicator did not render on loading');
-    else console.log('OK  solid user bubble + Ruphus-thinking indicator');
+    else if (!thinking) fail('R3: canvas dot-matrix Ruphus-thinking indicator did not render on loading');
+    else console.log('OK  solid user bubble + canvas dot-matrix Ruphus-thinking indicator');
     await page.close();
   }
 

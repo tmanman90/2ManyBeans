@@ -5,15 +5,17 @@
 // (predict-then-confirm), and a ghost "expected" marker where Ruphus predicts this bean should land.
 // transform/opacity-only motion; reduced-motion snaps. Value is 0–10 (null = untouched).
 import { useRef, useCallback } from 'react';
+import { Bone } from 'lucide-react';
 import { m } from '../../lib/motion';
 import { haptic } from '../../lib/haptics';
 import { notchLabel } from '../../lib/flavorWheel';
 import { C, fonts, radius, motion as M } from '../../styles/theme';
 
-export function AxisSlider({ axis, value, onChange, expected = null, reduce = false }) {
+export function AxisSlider({ axis, value, onChange, expected = null, expectedRevealed = false, reduce = false }) {
   const trackRef = useRef(null);
   const lastInt = useRef(value == null ? null : Math.round(value));
   const touched = value != null;
+  const showExpected = touched && expectedRevealed;
   const v = value == null ? 5 : value; // render mid when untouched, but styled as "ghost"
   const pct = (v / 10) * 100;
   const expPct = expected == null ? null : (Math.max(0, Math.min(10, expected)) / 10) * 100;
@@ -74,12 +76,30 @@ export function AxisSlider({ axis, value, onChange, expected = null, reduce = fa
           boxShadow: 'inset 0 1.5px 3px rgba(70,41,26,0.14), inset 0 -1px 0 rgba(255,255,255,0.5)',
         }} />
 
-        {/* expected marker — a faint ◆ tick at Professor Ruphus's predicted spot. Deliberately
-            SUBTLE (no repeated name label on every slider — the intro explains what ◆ means). */}
+        {/* expected marker — hidden through guessing, then revealed as Ruphus's bone on Next. */}
         {expPct != null && (
-          <div aria-hidden style={{ position: 'absolute', left: `${expPct}%`, top: '50%', transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
-            <span style={{ position: 'absolute', top: -14, fontSize: 8, lineHeight: 1, color: C.accentLight, opacity: 0.7 }}>◆</span>
-            <span style={{ width: 1.5, height: 18, borderRadius: 2, background: C.accentLight, opacity: 0.5, boxShadow: `0 0 0 2px ${C.bg}` }} />
+          <div
+            aria-hidden
+            data-expected-marker="bone"
+            data-revealed={showExpected ? 'true' : 'false'}
+            style={{
+              position: 'absolute', left: `${expPct}%`, top: '50%',
+              transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', pointerEvents: 'none',
+              opacity: showExpected ? 1 : 0,
+              transition: reduce ? 'none' : 'opacity 220ms cubic-bezier(0.22,1,0.36,1)',
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: -20, width: 22, height: 18, borderRadius: radius.pill,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: C.accent, background: 'rgba(255,254,251,0.72)',
+              border: `1px solid ${C.hairline}`,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.72), 0 1px 3px rgba(70,41,26,0.12)',
+            }}>
+              <Bone size={15} strokeWidth={2.45} />
+            </span>
+            <span style={{ width: 1.5, height: 18, borderRadius: 2, background: C.accentLight, opacity: 0.55, boxShadow: `0 0 0 2px ${C.bg}` }} />
           </div>
         )}
 

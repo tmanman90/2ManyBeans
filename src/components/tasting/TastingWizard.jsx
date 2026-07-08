@@ -8,7 +8,8 @@
 // motion gated, iOS safe-area + keyboard aware.
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { m, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
+import { m } from 'framer-motion';
 import { C, fonts, type, radius, shadows, glass, motion as M } from '../../styles/theme';
 import { haptic } from '../../lib/haptics';
 import { predict } from '../../lib/tastingExpectations';
@@ -40,17 +41,24 @@ const STEP_LENS = {
 };
 // Scaffolded quick-picks for the first-sip beat (so non-typers always have a path).
 const SIP_PICKS = ['Bright & light', 'Round & smooth', 'Bold & intense', 'Delicate & clean', 'Rich & syrupy'];
+const BONE_REVEAL_ADVANCE_MS = 1100;
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, reduce = false, isPro = true, onCharge }) {
-  const [phase, setPhase] = useState('intro'); // intro | steps | reveal
-  const [idx, setIdx] = useState(0);
-  const [answers, setAnswers] = useState(initialAnswers);
+export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge }) {
+  const [initialState] = useState(() => normalizeDraft(draft, bean?.id));
+
+  const [phase, setPhase] = useState(initialState.phase); // intro | steps | reveal
+  const [idx, setIdx] = useState(initialState.idx);
+  const [answers, setAnswers] = useState(initialState.answers);
+  const [revealedSteps, setRevealedSteps] = useState(initialState.revealedSteps);
   const [aiLine, setAiLine] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const [revealAdvanceKey, setRevealAdvanceKey] = useState(null);
   const aiSeq = useRef(0);
   const reactedIdx = useRef(-1);
+  const revealAdvancePending = useRef(false);
   // Keyboard height so the content area can pad out and the focused field scrolls clear of the keyboard.
   const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
@@ -60,10 +68,38 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   const scores = answers.scores;
   const captured = capturedScores(answers);
   const allCaptured = ['fragranceAroma', 'acidity', 'sweetness', 'body', 'flavor', 'balance'].every(k => captured[k] > 0);
+  const hasProgress = hasWizardProgress(phase, idx, answers);
+  const comparisonRevealed = phase === 'steps' && !!revealedSteps[step.key];
+  const needsComparisonReveal = phase === 'steps' && stepHasAxisAnswer(step, answers) && !comparisonRevealed;
+
+  useEffect(() => {
+    if (!onDraftChange || !bean?.id || !hasProgress) return;
+    onDraftChange({ beanId: bean.id, phase, idx, answers: cloneAnswers(answers), revealedSteps: { ...revealedSteps } });
+  }, [onDraftChange, bean?.id, phase, idx, answers, revealedSteps, hasProgress]);
 
   // --- answer mutators ---
-  const setScore = useCallback((key, v) => setAnswers(a => ({ ...a, scores: { ...a.scores, [key]: v } })), []);
-  const setFinish = useCallback((v) => setAnswers(a => ({ ...a, finishLevel: v })), []);
+  const resetStepReveal = useCallback((stepKey) => {
+    revealAdvancePending.current = false;
+    setRevealAdvanceKey(null);
+    setRevealedSteps(s => {
+      if (!s[stepKey]) return s;
+      const next = { ...s };
+      delete next[stepKey];
+      return next;
+    });
+    setAiLine(null);
+    setAiLoading(false);
+    aiSeq.current += 1;
+    reactedIdx.current = -1;
+  }, []);
+  const setScore = useCallback((key, v) => {
+    resetStepReveal(step.key);
+    setAnswers(a => ({ ...a, scores: { ...a.scores, [key]: v } }));
+  }, [resetStepReveal, step.key]);
+  const setFinish = useCallback((v) => {
+    resetStepReveal(step.key);
+    setAnswers(a => ({ ...a, finishLevel: v }));
+  }, [resetStepReveal, step.key]);
   const setText = useCallback((k, v) => setAnswers(a => ({ ...a, text: { ...a.text, [k]: v } })), []);
   const toggleChip = useCallback((field, label) => setAnswers(a => {
     const cur = a[field]; const next = cur.includes(label) ? cur.filter(x => x !== label) : [...cur, label];
@@ -76,14 +112,18 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   // (not the one you just left) keeps it coherent. Pro-gated; non-gating on failure. ---
   // Trigger off the NAMED input (what Ruphus reacts to), not mere step-completion — so naming a
   // flavor AFTER setting intensity still fires, and the debounce coalesces rapid edits.
-  const reactionInput = phase === 'steps' ? summarizeStepAnswer(step, answers) : '';
-  useEffect(() => { setAiLine(null); setAiLoading(false); }, [idx, phase]); // fresh per step
+  const reactionInput = phase === 'steps' && !needsComparisonReveal ? summarizeStepAnswer(step, answers) : '';
+  useEffect(() => { setAiLine(null); setAiLoading(false); aiSeq.current += 1; }, [idx, phase]); // fresh per step
   useEffect(() => {
-    if (!reactionInput || !isPro || phase !== 'steps' || reactedIdx.current === idx || typeof reactToTastingStep !== 'function') return;
+    if (!reactionInput || !isPro || phase !== 'steps' || reactedIdx.current === idx || typeof reactToTastingStep !== 'function') {
+      if (!reactionInput || !isPro || phase !== 'steps') setAiLoading(false);
+      return undefined;
+    }
     const seq = ++aiSeq.current;
+    setAiLine(null);
+    setAiLoading(true);
     const t = setTimeout(async () => {
       reactedIdx.current = idx;
-      setAiLoading(true);
       try {
         const line = await reactToTastingStep({ bean, step, userText: reactionInput, expected });
         if (seq === aiSeq.current && line) setAiLine(line);
@@ -93,15 +133,39 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     return () => clearTimeout(t);
   }, [reactionInput, idx, phase, isPro, bean, expected]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (phase !== 'steps' || !revealAdvanceKey || revealAdvanceKey !== step.key) return undefined;
+    const t = setTimeout(() => {
+      revealAdvancePending.current = false;
+      setRevealAdvanceKey(null);
+      setAiLine(null); setAiLoading(false); aiSeq.current += 1;
+      if (idx < TASTING_WIZARD_STEPS.length - 1) setIdx(i => (i === idx ? i + 1 : i));
+      else { setPhase('reveal'); haptic.success(); }
+    }, BONE_REVEAL_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [phase, idx, revealAdvanceKey, step.key]);
+
   const goNext = useCallback(() => {
+    if (revealAdvancePending.current) return;
     haptic.light();
-    setAiLine(null); setAiLoading(false); aiSeq.current++; // cancel any in-flight reaction
     if (phase === 'intro') { setPhase('steps'); return; }
+    if (needsComparisonReveal) {
+      setAiLine(null); setAiLoading(false); aiSeq.current++; // the reveal is the answer commit
+      setRevealedSteps(s => ({ ...s, [step.key]: true }));
+      revealAdvancePending.current = true;
+      setRevealAdvanceKey(step.key);
+      return;
+    }
+    revealAdvancePending.current = false;
+    setRevealAdvanceKey(null);
+    setAiLine(null); setAiLoading(false); aiSeq.current++; // cancel any in-flight reaction
     if (idx < TASTING_WIZARD_STEPS.length - 1) setIdx(i => i + 1);
     else { setPhase('reveal'); haptic.success(); }
-  }, [phase, idx]);
+  }, [phase, idx, needsComparisonReveal, step.key]);
 
   const goBack = useCallback(() => {
+    revealAdvancePending.current = false;
+    setRevealAdvanceKey(null);
     haptic.light(); setAiLine(null);
     if (phase === 'steps' && idx === 0) setPhase('intro');
     else if (phase === 'reveal') setPhase('steps');
@@ -116,6 +180,25 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     onSave?.(record);
   }, [answers, bean, onSave]);
 
+  const requestClose = useCallback(() => {
+    revealAdvancePending.current = false;
+    setRevealAdvanceKey(null);
+    if (hasProgress) {
+      haptic.light();
+      setExitConfirmOpen(true);
+      return;
+    }
+    onClose?.({ clearDraft: true });
+  }, [hasProgress, onClose]);
+
+  const leaveWithDraft = useCallback(() => {
+    revealAdvancePending.current = false;
+    setRevealAdvanceKey(null);
+    haptic.light();
+    setExitConfirmOpen(false);
+    onClose?.({ keepDraft: true });
+  }, [onClose]);
+
   // The overlay is a PLAIN div (opaque, opacity defaults to 1) so it is ALWAYS visible the instant
   // it mounts — never dependent on a JS/framer animation that could fail to fire on WKWebView and
   // leave it stuck invisible. A CSS keyframe (.wiz-overlay-in, in global.css) adds a safe fade that
@@ -129,7 +212,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
         paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={onClose} reduce={reduce} />
+      <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={requestClose} reduce={reduce} />
 
       {/* Content is plain-DOM + CSS-fade (keyed per phase/step so the fade re-runs). Visibility is
           NEVER gated on framer's animate — which does not reliably run inside the WKWebView portal,
@@ -146,6 +229,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
             <StepCard
               step={step} bean={bean} expected={expected} answers={answers} captured={captured}
               allCaptured={allCaptured} palate={palate} aiLine={aiLine} aiLoading={aiLoading} reduce={reduce}
+              expectedRevealed={comparisonRevealed}
               setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip}
             />
           </Stage>
@@ -164,6 +248,14 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
         phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} canAdvance={canAdvance}
         onBack={goBack} onNext={goNext} onSave={handleSave} onSwitchToManual={onSwitchToManual} reduce={reduce}
       />
+
+      {exitConfirmOpen && (
+        <ExitConfirm
+          reduce={reduce}
+          onKeep={() => setExitConfirmOpen(false)}
+          onLeave={leaveWithDraft}
+        />
+      )}
     </div>,
     document.body
   );
@@ -179,7 +271,9 @@ function WizardHeader({ bean, phase, idx, total, onClose, reduce }) {
           <div style={{ ...type.eyebrow, color: C.accent }}>Guided tasting</div>
           <div style={{ fontFamily: fonts.heading, fontSize: 17, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bean?.name || bean?.roaster || 'Your coffee'}</div>
         </div>
-        <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, border: 'none', background: 'transparent', color: C.textMuted, fontSize: 22, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>✕</button>
+        <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, border: 'none', background: 'transparent', color: C.textMuted, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <X size={22} strokeWidth={2.1} />
+        </button>
       </div>
       {/* progress rail — scaleX set DIRECTLY via style (not framer animate, which doesn't run in
           the WKWebView portal); a CSS transition animates it smoothly when it does work. */}
@@ -214,7 +308,7 @@ function IntroCard({ bean, expected, palate, reduce }) {
   return (
     <div>
       <RuphusReaction pose="presenting" reduce={reduce}
-        line={`I've studied this one. On each slider I'll mark a ◆ where I expect it to land — try to find it yourself, then we'll compare.`} />
+        line={`I've studied this one. Set yours first, then I'll show where I'd land with the bone marker — no anchoring before your palate speaks.`} />
       <div style={{ ...cardStyle, marginTop: 18 }}>
         <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 8 }}>What to expect</div>
         <p style={{ margin: 0, fontFamily: fonts.heading, fontSize: 20, fontWeight: 600, lineHeight: 1.3, color: C.text, letterSpacing: '-0.01em' }}>{expected.summary}</p>
@@ -238,17 +332,16 @@ function IntroCard({ bean, expected, palate, reduce }) {
 }
 
 // ---------------------------------------------------------------- step
-function StepCard({ step, bean, expected, answers, captured, allCaptured, palate, aiLine, aiLoading, reduce, setScore, setFinish, setText, toggleChip }) {
+function StepCard({ step, bean, expected, answers, captured, allCaptured, palate, aiLine, aiLoading, expectedRevealed, reduce, setScore, setFinish, setText, toggleChip }) {
   const cue = expected.cues[step.key] || step.prompt;
-  const line = aiLine || cue;
   return (
-    <div>
+    <div data-wizard-step={step.key}>
       {/* live radar building */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
         <RadarLightSweep scores={captured} size={184} complete={allCaptured} reduce={reduce} />
       </div>
 
-      <RuphusReaction pose={POSE_FOR[step.key] || 'magnifying'} reduce={reduce} line={line} loading={aiLoading} size={84} />
+      <RuphusReaction pose={POSE_FOR[step.key] || 'magnifying'} reduce={reduce} line={cue} reactionLine={aiLine} loading={aiLoading} size={84} />
 
       <div style={{ ...cardStyle, marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -259,7 +352,7 @@ function StepCard({ step, bean, expected, answers, captured, allCaptured, palate
         </div>
         <p style={{ margin: '0 0 14px', fontFamily: fonts.body, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5, color: C.textMuted }}>{step.technique}</p>
 
-        <StepInput step={step} bean={bean} expected={expected} answers={answers} palate={palate} reduce={reduce}
+        <StepInput step={step} bean={bean} expected={expected} answers={answers} palate={palate} expectedRevealed={expectedRevealed} reduce={reduce}
           setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip} />
 
         {/* free-text — ALWAYS available */}
@@ -269,17 +362,17 @@ function StepCard({ step, bean, expected, answers, captured, allCaptured, palate
   );
 }
 
-function StepInput({ step, expected, answers, palate, reduce, setScore, setFinish, setText, toggleChip }) {
+function StepInput({ step, expected, answers, palate, expectedRevealed, reduce, setScore, setFinish, setText, toggleChip }) {
   if (step.kind === 'slider') {
     const axis = AXIS_BY_KEY[step.axisKey];
     const isFinish = step.key === 'finish';
     const value = isFinish ? answers.finishLevel : answers.scores[step.scoreKey];
     const exp = expected.axes[step.axisKey]?.level ?? null;
-    return <AxisSlider axis={axis} value={value} expected={exp} reduce={reduce}
+    return <AxisSlider axis={axis} value={value} expected={exp} expectedRevealed={expectedRevealed} reduce={reduce}
       onChange={(v) => (isFinish ? setFinish(v) : setScore(step.scoreKey, v))} />;
   }
   if (step.kind === 'balance') {
-    return <AxisSlider axis={BALANCE_AXIS} value={answers.scores.balance} expected={expected.axes.balance?.level ?? null} reduce={reduce} onChange={(v) => setScore('balance', v)} />;
+    return <AxisSlider axis={BALANCE_AXIS} value={answers.scores.balance} expected={expected.axes.balance?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('balance', v)} />;
   }
   if (step.kind === 'aroma') {
     return (
@@ -287,7 +380,7 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
         <FlavorWheelPicker selected={answers.aromaChips} onToggle={(l) => toggleChip('aromaChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
-          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.fragranceAroma} expected={expected.axes.fragranceAroma?.level ?? null} reduce={reduce} onChange={(v) => setScore('fragranceAroma', v)} />
+          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.fragranceAroma} expected={expected.axes.fragranceAroma?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('fragranceAroma', v)} />
         </div>
       </div>
     );
@@ -307,7 +400,7 @@ function StepInput({ step, expected, answers, palate, reduce, setScore, setFinis
         <FlavorWheelPicker selected={answers.flavorChips} onToggle={(l) => toggleChip('flavorChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
-          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.flavor} expected={expected.axes.flavor?.level ?? null} reduce={reduce} onChange={(v) => setScore('flavor', v)} />
+          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.flavor} expected={expected.axes.flavor?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('flavor', v)} />
         </div>
       </div>
     );
@@ -493,8 +586,102 @@ function GlassCTA({ label, onClick, enabled, reduce }) {
   );
 }
 
+function ExitConfirm({ onKeep, onLeave, reduce }) {
+  return (
+    <div
+      data-wizard-exit-confirm="true"
+      className={reduce ? undefined : 'wiz-overlay-in'}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1002,
+        background: 'rgba(44,24,16,0.34)',
+        backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 22,
+      }}
+      onClick={onKeep}
+    >
+      <div
+        className={reduce ? undefined : 'wiz-pop'}
+        style={{
+          width: '100%', maxWidth: 360, background: C.card,
+          border: `1px solid ${C.borderLight}`, borderRadius: radius.xl,
+          boxShadow: shadows.modal, padding: 20,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontFamily: fonts.heading, fontSize: 22, fontWeight: 650, color: C.text, letterSpacing: '-0.01em', lineHeight: 1.15 }}>
+          Leave this tasting?
+        </div>
+        <p style={{ margin: '9px 0 18px', fontFamily: fonts.body, fontSize: 14.5, fontWeight: 600, lineHeight: 1.45, color: C.textMuted }}>
+          Your progress is saved. Pick it back up when you're ready.
+        </p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            onClick={onKeep}
+            style={{ flex: 1, minHeight: 48, borderRadius: radius.md, border: `1px solid ${C.border}`, background: C.cream, color: C.text, fontFamily: fonts.body, fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+          >
+            Keep tasting
+          </button>
+          <button
+            type="button"
+            onClick={onLeave}
+            style={{ flex: 1, minHeight: 48, borderRadius: radius.md, border: 'none', background: C.accent, color: C.cream, fontFamily: fonts.body, fontWeight: 800, fontSize: 14, cursor: 'pointer', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.34), 0 6px 18px rgba(120,70,34,0.24)' }}
+          >
+            Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- helpers
 const cardStyle = { background: C.card, borderRadius: radius.lg, border: `1px solid ${C.borderLight}`, boxShadow: shadows.card, padding: 18 };
+
+function normalizeDraft(draft, beanId) {
+  if (!draft || draft.beanId !== beanId) return { phase: 'intro', idx: 0, answers: initialAnswers(), revealedSteps: {} };
+  const phase = ['intro', 'steps', 'reveal'].includes(draft.phase) ? draft.phase : 'intro';
+  const maxIdx = TASTING_WIZARD_STEPS.length - 1;
+  const idx = Math.max(0, Math.min(maxIdx, Number.isFinite(draft.idx) ? draft.idx : 0));
+  return { phase, idx, answers: cloneAnswers(draft.answers), revealedSteps: { ...(draft.revealedSteps || {}) } };
+}
+
+function cloneAnswers(source) {
+  const fresh = initialAnswers();
+  if (!source) return fresh;
+  return {
+    ...fresh,
+    ...source,
+    scores: { ...fresh.scores, ...(source.scores || {}) },
+    text: { ...fresh.text, ...(source.text || {}) },
+    aromaChips: [...(source.aromaChips || [])],
+    flavorChips: [...(source.flavorChips || [])],
+  };
+}
+
+function hasWizardProgress(phase, idx, answers) {
+  if (phase !== 'intro' || idx > 0) return true;
+  if (!answers) return false;
+  return Object.values(answers.scores || {}).some(v => v != null)
+    || answers.finishLevel != null
+    || Object.values(answers.text || {}).some(v => String(v || '').trim())
+    || (answers.aromaChips || []).length > 0
+    || (answers.flavorChips || []).length > 0
+    || !!String(answers.oneWord || '').trim()
+    || !!String(answers.notes || '').trim()
+    || !!String(answers.changeTomorrow || '').trim()
+    || Number(answers.rating || 0) > 0;
+}
+
+function stepHasAxisAnswer(step, answers) {
+  if (!step || !answers) return false;
+  if (step.key === 'finish') return answers.finishLevel != null;
+  if (step.kind === 'slider' || step.kind === 'balance') return answers.scores?.[step.scoreKey] != null;
+  if (step.kind === 'aroma') return answers.scores?.fragranceAroma != null;
+  if (step.kind === 'flavor') return answers.scores?.flavor != null;
+  return false;
+}
 
 function summarizeStepAnswer(step, ans) {
   if (step.kind === 'slider') {

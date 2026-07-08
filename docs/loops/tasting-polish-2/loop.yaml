@@ -7,11 +7,13 @@ meta:
 goal:
   statement: >
     Second round of tasting-wizard craft polish (no data/logic change): (1) the slider's expected
-    marker becomes a crisp dog-BONE glyph that is HIDDEN until the user sets their own value, then
-    fades in — so they guess unbiased then compare (true predict-then-confirm); (2) Professor
+    marker becomes a crisp dog-BONE glyph that stays HIDDEN while the user sets their own value; the
+    first Next press commits that blind guess, reveals the bone on the same page, holds for about a
+    second, then auto-advances — so they guess unbiased, compare, and move on with one tap (true
+    predict-then-confirm); (2) Professor
     Ruphus's AI reaction reads as a CHAT THREAD — his coaching line in one bubble, and the instant
-    the user answers a loading bubble pops below it IMMEDIATELY (no perceived lag), then the reaction
-    replaces the loader and the coaching bubble fades out; (3) the loader is "alien hardware" — a
+    the user commits an answer a loading bubble pops below it IMMEDIATELY (no perceived lag), then
+    the reaction replaces the loader and the coaching bubble fades out; (3) the loader is "alien hardware" — a
     compact frosted-glass pill with a CANVAS DOT-MATRIX scanning shimmer (the real liquid-glass+dots
     look), replacing the CSS breathing dots; (4) quitting a tasting no longer loses progress — the
     draft persists IN-SESSION so the user can RESUME, plus a confirm-on-✕ so an accidental close
@@ -20,8 +22,9 @@ goal:
     gated, design-bank clean, one accent, verified on-device before done. Dev channel only.
   definition_of_done: >
     The AxisSlider expected marker is a lucide Bone icon at the predicted spot that does NOT show
-    until the user has set a value on that slider, then fades in (opacity-only, reduced-motion
-    instant) and stays; the intro copy reframes to "set yours first, then I'll show where I'd land".
+    before or while the user sets a value on that slider; the first Next press after a slider answer
+    commits the blind guess, reveals the bone on the same page (opacity-only, reduced-motion instant),
+    ignores rapid second taps, and auto-advances after about a second. The intro copy reframes to "set yours first, then I'll show where I'd land".
     Ruphus's reaction is a chat thread: the coaching bubble is shown, and the moment the user commits
     an answer a separate loading bubble appears IMMEDIATELY below it (loader visibility NOT gated on
     the call debounce), then when the reaction resolves it replaces the loader and the coaching bubble
@@ -30,13 +33,13 @@ goal:
     (static -webkit-backdrop-filter + inset rim sheen, never animated, never mix-blend) containing a
     canvas dot-matrix scanning shimmer (DPR-capped, offscreen-paused, reduced-motion single static
     frame, role=status); no SVG goo/feDisplacement filter ships. An exited in-progress tasting can be
-    resumed: the draft (answers, step index, phase) survives the wizard closing and persists in-
-    session in memory (NO Firebase, NO new persisted field); tapping ✕ with real progress shows a
+    resumed: the draft (answers, step index, phase) survives the wizard closing and tab navigation,
+    and persists in-session in memory (NO Firebase, NO new persisted field); tapping ✕ with real progress shows a
     confirm, and the guided-tasting entry offers Resume when a draft exists; manual entry still works.
     All new motion is transform/opacity/canvas-only, reduced-motion-gated, WKWebView-safe, one-accent,
-    design-bank clean. `npx vite build` exits 0; the wizard harness proves bone-hidden-until-touched +
-    reveal, the chat-thread + immediate loader, the canvas loader present, and resume restoring the
-    draft; verify-tasting/inventory/archive/morph/chat still pass; audit + codex are clean; real fresh
+    design-bank clean. `npx vite build` exits 0; the wizard harness proves bone hidden before touch,
+    still hidden after touch, then revealed by one Next before timed auto-advance, the chat-thread + immediate loader, the canvas loader present, and resume restoring the draft after tab unmount/remount; verify-tasting/inventory/archive/morph/chat
+    still pass; audit + codex are clean; real fresh
     device screenshots exist for every changed element (bone hidden, bone revealed, dot-matrix loader,
     chat-thread, resume prompt); and Tal signs off on device.
   requirements:
@@ -78,8 +81,10 @@ verification:
       Adversarially review the tasting-polish-2 diff. Treat the existing wizard (theme, Liquid Glass,
       the shipped loader/slide/fill/marker/tap-to-expand, CSS-driven visibility fixes, reaction-on-
       named-input trigger) as APPROVED. FAIL if: the slider expected marker is not a lucide Bone glyph
-      OR it is visible before the user sets a value (it must be hidden until touched, then fade in)
-      (R1); the AI reaction is not a chat thread with a SEPARATE loading bubble that appears
+      OR it is visible before the first Next commit after a slider answer (it must be hidden before
+      touch and while touched, then reveal on the same page when Next commits the blind guess, ignore
+      rapid second taps, and auto-advance after about a second) (R1);
+      the AI reaction is not a chat thread with a SEPARATE loading bubble that appears
       immediately on answer-commit (not gated on the call debounce), or the reaction does not replace
       the loader with the coaching bubble fading out (R2); the loader is not a canvas dot-matrix in a
       frosted-glass pill, OR it animates backdrop-filter / ships an SVG goo/feDisplacement filter /
@@ -91,7 +96,7 @@ verification:
       the AI-extraction output shape, rebuilds the API proxy, changes the deterministic coaching
       content or the step spine, or regresses the shipped polish. Ambient infinite loops (the dot-
       matrix scan) are EXEMPT from the 300ms rule; the loader glass backdrop-filter is static (correct).
-      PASS only when bone-reveals-after-answer, the chat-thread + instant canvas loader, and in-session
+      PASS only when bone-reveals-on-Next-commit-then-auto-advances, the chat-thread + instant canvas loader, and in-session
       resume + confirm-on-exit are all correct, WKWebView-safe, one-accent, and scope-clean.
   - id: v7-evidence
     type: programmatic
@@ -100,8 +105,9 @@ verification:
   - id: v6-human
     type: human
     prompt: >
-      On the dev app (device): start a guided tasting and confirm the slider marker (a 🦴) only
-      appears AFTER you set your own value, so you guess first then compare; complete a step and
+      On the dev app (device): start a guided tasting and confirm the slider marker (a 🦴) stays
+      hidden before and while you set your value, then appears when you press Next to commit the
+      guess, holds for about a second, and advances by itself without a second press. Complete a step and
       confirm the chat-thread — his coaching line, an immediate alien-hardware dot-matrix loading
       bubble below it, then his reaction replacing it; confirm the loader looks premium; then X out
       mid-tasting and confirm you can resume right where you left off (and that the confirm prevents
