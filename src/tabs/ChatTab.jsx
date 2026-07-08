@@ -21,6 +21,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { RuphusThinking } from '../components/tasting/RuphusThinking';
+import { ChatMessage } from '../components/chat/ChatMessage';
 
 // Parse ---BEAN_SCAN---{json}---END_SCAN--- from assistant text
 function parseBeanScan(text) {
@@ -58,6 +59,10 @@ function trimApiMessages(messages, keepRecent = 6) {
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
+
+function newMessage(fields) {
+  return { id: crypto.randomUUID(), ...fields };
+}
 
 // "Ruphus is thinking" — reuse the tasting wizard's compact canvas dot-matrix loader
 // so AI waits feel like the same little piece of alien coffee hardware across the app.
@@ -281,7 +286,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you." },
+    newMessage({ role: 'assistant', content: "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you." }),
   ]);
   // apiMessages stores the raw messages sent to the API (with base64 images)
   const apiMessages = useRef([
@@ -432,6 +437,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
 
     // Build display message
     const displayMsg = {
+      id: crypto.randomUUID(),
       role: 'user',
       content: text,
       photos: currentPhotos.map(p => p.previewUrl),
@@ -476,7 +482,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       const { cleanText, scannedBean: parsed } = parseBeanScan(rawText);
       if (parsed) setScannedBean(parsed);
 
-      const assistantMsg = { role: 'assistant', content: cleanText };
+      const assistantMsg = newMessage({ role: 'assistant', content: cleanText });
       setMessages(prev => {
         const updated = [...prev, assistantMsg];
         if (updated.length > MAX_DISPLAY_MESSAGES) {
@@ -512,7 +518,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       // Error bubbles are for the user only. Do NOT inject them into
       // apiMessages.current -- otherwise the model reads "Couldn't reach the AI..."
       // as canonical assistant history on the next retry, which mangles context.
-      const errMsg = { role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." };
+      const errMsg = newMessage({ role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." });
       setMessages(prev => [...prev, errMsg]);
     }
     setLoading(false);
@@ -655,57 +661,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
           {messages.map((msg, i) => {
             if (isIntroState && i === 0) return null;
             return (
-              <m.div key={i} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {/* Photo thumbnails for user messages */}
-                {msg.photos && msg.photos.length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    gap: 6,
-                    marginBottom: 5,
-                    justifyContent: 'flex-end',
-                  }}>
-                    {msg.photos.map((url, pi) => (
-                      <img
-                        key={pi}
-                        src={url}
-                        alt="Uploaded"
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: radius.sm,
-                          objectFit: 'cover',
-                          border: `1px solid ${C.hairline}`,
-                          boxShadow: shadows.e1,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  {/* Ruphus is present on his own turns */}
-                  {msg.role === 'assistant' && (
-                    <img src="/images/ruphus-avatar.png" alt="Ruphus" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: `1px solid ${C.borderLight}`, flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }} />
-                  )}
-                  <div
-                    style={{
-                      maxWidth: '82%',
-                      // User: solid accent. Assistant: cream card + hairline.
-                      background: msg.role === 'user' ? C.accent : C.cream,
-                      color: msg.role === 'user' ? C.cream : C.text,
-                      borderRadius: msg.role === 'user'
-                        ? `${radius.lg}px ${radius.lg}px ${radius.sm}px ${radius.lg}px`
-                        : `${radius.lg}px ${radius.lg}px ${radius.lg}px ${radius.sm}px`,
-                      padding: '12px 16px',
-                      ...typeScale.bodyL,
-                      border: msg.role === 'user' ? 'none' : `1px solid ${C.hairline}`,
-                      boxShadow: msg.role === 'user' ? shadows.button : shadows.e1,
-                      whiteSpace: 'pre-wrap',
-                      lineHeight: 1.55,
-                    }}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
+              <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
+                <ChatMessage msg={msg} />
               </m.div>
             );
           })}
