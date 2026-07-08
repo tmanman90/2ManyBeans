@@ -3,11 +3,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withCorsAuthMetered } from './_lib/cors-auth.js';
 import { logApiUsage } from './_lib/costLogger.js';
-
-const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
-const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'];
-const MAX_TOKENS_CAP = 4000;
-const RATE_LIMIT = { key: 'claude', limit: 120, windowMs: 60 * 60 * 1000 };
+import { ALLOWED_MODELS, FALLBACK_MODEL, RATE_LIMIT, buildClaudeParams } from './_lib/claudeShared.js';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -25,22 +21,7 @@ export default withCorsAuthMetered(async (req, res, decodedToken) => {
     }
 
     const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'claude-sonnet-4-6';
-    const safeMaxTokens = Math.min(maxTokens || 1000, MAX_TOKENS_CAP);
-
-    const buildParams = (attemptModel) => {
-      const next = {
-        model: attemptModel,
-        max_tokens: safeMaxTokens,
-        messages,
-      };
-      if (system) next.system = system;
-      if (attemptModel === 'claude-sonnet-5') {
-        next.thinking = { type: 'disabled' };
-      }
-      return next;
-    };
-
-    let params = buildParams(model);
+    let params = buildClaudeParams({ model, maxTokens, system, messages });
 
     let response;
     try {
@@ -49,7 +30,7 @@ export default withCorsAuthMetered(async (req, res, decodedToken) => {
       // On overload/rate-limit, fall back to Haiku
       if ([429, 529].includes(primaryError.status) && model !== FALLBACK_MODEL) {
         console.warn(`Primary model ${model} unavailable (${primaryError.status}), falling back to ${FALLBACK_MODEL}`);
-        params = buildParams(FALLBACK_MODEL);
+        params = buildClaudeParams({ model: FALLBACK_MODEL, maxTokens, system, messages });
         response = await client.messages.create(params);
       } else {
         throw primaryError;

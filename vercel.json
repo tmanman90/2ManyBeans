@@ -3,6 +3,10 @@
     "api/claude.js": {
       "maxDuration": 60
     },
+    "api/claude-stream.js": {
+      "maxDuration": 300,
+      "supportsCancellation": true
+    },
     "api/gemini.js": {
       "maxDuration": 60
     },
