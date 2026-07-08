@@ -122,7 +122,7 @@ FORMATTING: Plain text only. NO markdown. NEVER use asterisks (*), pound signs (
 
 export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, tastings) {
   const beanList = allBeans.length > 0
-    ? `\n\nAVAILABLE BEANS:\n${allBeans.map(b => `- "${b.name}" by ${b.roaster}`).join('\n')}`
+    ? `\n\nAVAILABLE BEANS:\n${allBeans.map(b => `- "${sanitize(b.name, 80)}" by ${sanitize(b.roaster, 60)}`).join('\n')}`
     : '';
 
   // Current brew recipe on the bean (Aiden Opus or hand-brew). Surfaces so the
@@ -154,19 +154,19 @@ export function buildTastingSystemPrompt(beanName, allBeans = [], selectedBean, 
 
   // BEAN PROFILE block
   const beanProfile = selectedBean ? [
-    selectedBean.roaster && `Roaster: ${selectedBean.roaster}`,
-    selectedBean.name && `Name: ${selectedBean.name}`,
-    selectedBean.origin && `Origin: ${selectedBean.origin}`,
-    selectedBean.region && `Region: ${selectedBean.region}`,
-    selectedBean.process && `Process: ${selectedBean.process}`,
-    selectedBean.variety && `Variety: ${selectedBean.variety}`,
+    selectedBean.roaster && `Roaster: ${sanitize(selectedBean.roaster, 60)}`,
+    selectedBean.name && `Name: ${sanitize(selectedBean.name, 80)}`,
+    selectedBean.origin && `Origin: ${sanitize(selectedBean.origin, 60)}`,
+    selectedBean.region && `Region: ${sanitize(selectedBean.region, 60)}`,
+    selectedBean.process && `Process: ${sanitize(selectedBean.process, 40)}`,
+    selectedBean.variety && `Variety: ${sanitize(selectedBean.variety, 40)}`,
     selectedBean.altitude && `Altitude: ${selectedBean.altitude}`,
-    selectedBean.roastDate && `Roast Date: ${selectedBean.roastDate} (${getPeakStatus(selectedBean).days}d post-roast, ${getPeakStatus(selectedBean).label})`,
+    selectedBean.roastDate && `Roast Date: ${sanitize(selectedBean.roastDate, 20)} (${getPeakStatus(selectedBean).days}d post-roast, ${getPeakStatus(selectedBean).label})`,
     selectedBean.openDate && `Days Open: ${daysOpen(selectedBean.openDate)}`,
-    selectedBean.bagNotes && `Bag Notes: ${selectedBean.bagNotes}`,
-    selectedBean.roastLevel && `Roast Level: ${selectedBean.roastLevel}`,
-    selectedBean.cupScore && `Cup Score: ${selectedBean.cupScore}`,
-    selectedBean.brewingRec && `Brewing Rec: ${selectedBean.brewingRec}`,
+    selectedBean.bagNotes && `Bag Notes: ${sanitize(selectedBean.bagNotes, 200)}`,
+    selectedBean.roastLevel && `Roast Level: ${sanitize(selectedBean.roastLevel, 30)}`,
+    selectedBean.cupScore && `Cup Score: ${sanitize(selectedBean.cupScore, 20)}`,
+    selectedBean.brewingRec && `Brewing Rec: ${sanitize(selectedBean.brewingRec, 200)}`,
     selectedBean.sourceInsights && formatSourceInsightsForPrompt(selectedBean, { maxChars: 700 }),
     currentBrewLine,
   ].filter(Boolean).join('\n- ') : '';
@@ -474,7 +474,7 @@ export function buildChatContext(beans, tastings, preferences, firstName) {
   const sealed = beans.filter(b => b.status === 'SEALED').map(b => {
     const ps = getPeakStatus(b);
     const sourceSummary = summarizeSourceInsights(b, { maxChars: 140 });
-    return `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${b.bagSize}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${sanitize(b.bagNotes, 200)}${sourceSummary ? ` | Source: ${sanitize(sourceSummary, 140)}` : ''}`;
+    return `  ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${numOrNull(b.bagSize)}g | ${ps.days}d post-roast (${ps.label}) | Notes: ${sanitize(b.bagNotes, 200)}${sourceSummary ? ` | Source: ${sanitize(sourceSummary, 140)}` : ''}`;
   }).join('\n');
 
   const finished = beans.filter(b => b.status === 'FINISHED').slice(0, 5).map(b =>

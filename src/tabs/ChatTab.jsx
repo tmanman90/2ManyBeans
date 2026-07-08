@@ -37,6 +37,14 @@ function clipStarterLabel(text, maxLen = 42) {
   return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
 }
 
+function shrinkStarterName(name, action, maxLen = 42) {
+  const fallbackName = name || 'this coffee';
+  const available = Math.max(1, maxLen - action.length);
+  if (fallbackName.length <= available) return fallbackName;
+  if (available <= 1) return '…';
+  return `${fallbackName.slice(0, available - 1).trimEnd()}…`;
+}
+
 function getStarterPrompts(beans, isDemo) {
   const activeBeans = beans
     .filter(bean => bean.status === 'ACTIVE')
@@ -47,15 +55,19 @@ function getStarterPrompts(beans, isDemo) {
   const prompts = [];
   activeBeans.forEach(bean => {
     if (prompts.length >= 1) return;
-    const name = clipStarterLabel(bean.name || 'this coffee', 18);
     const peak = getPeakStatus(bean);
     if (Number.isFinite(peak.days) && Number.isFinite(bean.peakStart) && peak.days === bean.peakStart) {
-      prompts.push(clipStarterLabel(`Jar ${bean.jarSlot} ${name} hits peak today — brew it?`));
+      const action = ` hits peak today: brew it?`;
+      const prefix = `Jar ${bean.jarSlot} `;
+      const name = shrinkStarterName(bean.name, `${prefix}${action}`);
+      prompts.push(clipStarterLabel(`${prefix}${name}${action}`));
       return;
     }
     const openDays = daysOpen(bean.openDate);
     if (Number.isFinite(openDays) && openDays >= 10) {
-      prompts.push(clipStarterLabel(`${name} has been open ${openDays} days — check on it?`));
+      const action = `: open ${openDays} days, check in?`;
+      const name = shrinkStarterName(bean.name, action);
+      prompts.push(clipStarterLabel(`${name}${action}`));
     }
   });
 
@@ -424,6 +436,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   };
 
   const handlePickPhoto = () => {
+    if (isDemo) { onDemoAction?.(); return; }
     if (Capacitor.isNativePlatform()) {
       takeNativePhoto();
     } else {
