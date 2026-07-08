@@ -1,6 +1,7 @@
 import { C, radius, shadows, type as typeScale } from '../../styles/theme';
+import { RecipeCard } from './RecipeCard';
 
-export function ChatMessage({ msg, onRetryErrored }) {
+export function ChatMessage({ msg, recipeActions, onRetryErrored }) {
   return (
     <>
       {msg.photos && msg.photos.length > 0 && (
@@ -61,6 +62,16 @@ export function ChatMessage({ msg, onRetryErrored }) {
           )}
         </div>
       </div>
+      {msg.role === 'assistant' && msg.recipeCard && (
+        <RecipeCard
+          recipe={msg.recipeCard}
+          brewBean={recipeActions?.getBrewBean?.(msg.recipeCard)}
+          saveBean={recipeActions?.getSaveBean?.(msg.recipeCard)}
+          onBrew={recipeActions?.onBrew}
+          onSave={recipeActions?.onSave}
+          saving={recipeActions?.savingKey === msg.recipeCard.title}
+        />
+      )}
     </>
   );
 }

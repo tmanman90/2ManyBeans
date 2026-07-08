@@ -25,7 +25,7 @@ const tastings = [{ id: 't1', beanId: 'b1', date: '2026-06-20', rating: 5, oneWo
 const noop = () => {};
 const noopAsync = async () => {};
 
-window.__SPY__ = { startedTasting: null, navigatedToTasting: 0, addedBeans: [] };
+window.__SPY__ = { startedTasting: null, navigatedToTasting: 0, addedBeans: [], updatedBeans: [] };
 window.__STREAM_TEST__ = { enabled: new URLSearchParams(window.location.search).get('stream') === '1' };
 if (window.__STREAM_TEST__.enabled) {
   const originalFetch = window.fetch.bind(window);
@@ -45,6 +45,10 @@ const addBean = async (bean) => {
   window.__SPY__.addedBeans.push(bean);
   return 'new-bean-id';
 };
+const updateBean = async (beanId, updates) => {
+  window.__SPY__.updatedBeans.push({ beanId, updates });
+  await new Promise(resolve => setTimeout(resolve, 300));
+};
 const onStartTastingSession = (beanId) => { window.__SPY__.startedTasting = beanId; };
 const onNavigateToTasting = () => { window.__SPY__.navigatedToTasting += 1; };
 
@@ -55,7 +59,7 @@ createRoot(document.getElementById('root')).render(
         <UserPreferencesProvider value={{ preferences: { brewMethod: 'aiden', canisterCount: 3 } }}>
           <ChatTab
             beans={beans} tastings={tastings}
-            addBean={addBean} updateBean={noopAsync} addTasting={noopAsync} updateTasting={noopAsync}
+            addBean={addBean} updateBean={updateBean} addTasting={noopAsync} updateTasting={noopAsync}
             profile={{ displayName: 'Tal M' }} uid="harness-user"
             isActive={true} onStartTastingSession={onStartTastingSession} onNavigateToTasting={onNavigateToTasting} isDemo={false} onDemoAction={noop}
           />

@@ -223,6 +223,22 @@ try {
     if (reducedIncreases < 2) fail(`Pass 4: reduced-motion streaming did not progressively render (${reducedLengths.join(',')})`);
     else console.log('OK  streaming: reduced-motion still streams text');
     await reducePage.close();
+
+    const recipePage = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    await recipePage.goto(streamUrl('&recipe=1'), { waitUntil: 'networkidle' });
+    await recipePage.getByText('What should I brew today?', { exact: true }).first().click();
+    await waitForStreamingDone(recipePage);
+    const recipeTitle = await recipePage.getByText('Kiawamururu Morning Pour', { exact: true }).count();
+    const gradientClean = await recipePage.evaluate(noGradient);
+    const tabular = await recipePage.locator('[data-recipe-card="true"]').evaluate(el => getComputedStyle(el.querySelector('li') || el).fontVariantNumeric.includes('tabular-nums')).catch(() => false);
+    if (recipeTitle < 1) fail('Pass 4: recipe card title did not render');
+    if (!tabular) fail('Pass 4: recipe card numerals are not tabular');
+    if (!gradientClean) fail('Pass 4: linear-gradient found after recipe card render');
+    await recipePage.getByText('Save to bean notes', { exact: true }).click();
+    const saving = await recipePage.getByText('Saving…', { exact: true }).isVisible().catch(() => false);
+    if (!saving) fail('Pass 4: Save to bean notes did not show saving state');
+    else console.log('OK  recipe card: title, tabular nums, no gradients, saving state');
+    await recipePage.close();
   }
 
   await browser.close();

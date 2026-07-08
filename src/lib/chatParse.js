@@ -3,6 +3,8 @@ import { MARKER_FAMILIES } from './streamChat.js';
 
 const BEAN_SCAN_MARKER = MARKER_FAMILIES.find(family => family.key === 'beanScan');
 const BEAN_SCAN_RE = new RegExp(`${BEAN_SCAN_MARKER.open}([\\s\\S]*?)${BEAN_SCAN_MARKER.close}`);
+const RECIPE_CARD_MARKER = MARKER_FAMILIES.find(family => family.key === 'recipeCard');
+const RECIPE_CARD_RE = new RegExp(`${RECIPE_CARD_MARKER.open}([\\s\\S]*?)${RECIPE_CARD_MARKER.close}`);
 
 export function parseBeanScan(text, { stopReason } = {}) {
   const source = String(text || '');
@@ -29,6 +31,48 @@ export function parseBeanScan(text, { stopReason } = {}) {
   } catch {
     const cleanText = source.replace(BEAN_SCAN_RE, '').trim();
     return { cleanText, scannedBean: null, scanMarkerStripped: true };
+  }
+}
+
+function capField(value, maxLen = 200) {
+  return String(value || '').slice(0, maxLen).trim();
+}
+
+export function parseRecipeCard(text) {
+  const source = String(text || '');
+  const openIdx = source.indexOf(RECIPE_CARD_MARKER.open);
+  if (openIdx === -1) return { cleanText: source, recipeCard: null, recipeMarkerStripped: false };
+
+  const match = source.match(RECIPE_CARD_RE);
+  if (!match) {
+    return {
+      cleanText: source.slice(0, openIdx).trim(),
+      recipeCard: null,
+      recipeMarkerStripped: true,
+    };
+  }
+
+  const cleanText = source.replace(RECIPE_CARD_RE, '').trim();
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    const steps = Array.isArray(parsed.steps)
+      ? parsed.steps.slice(0, 12).map(step => capField(step)).filter(Boolean)
+      : [];
+    const recipeCard = {
+      title: capField(parsed.title),
+      method: capField(parsed.method),
+      ratio: capField(parsed.ratio),
+      temp: capField(parsed.temp),
+      grind: capField(parsed.grind),
+      steps,
+      reasoning: capField(parsed.reasoning),
+    };
+    if (!recipeCard.title || !recipeCard.method || !steps.length) {
+      return { cleanText, recipeCard: null, recipeMarkerStripped: true };
+    }
+    return { cleanText, recipeCard, recipeMarkerStripped: true };
+  } catch {
+    return { cleanText, recipeCard: null, recipeMarkerStripped: true };
   }
 }
 

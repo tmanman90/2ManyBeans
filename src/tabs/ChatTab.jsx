@@ -25,7 +25,8 @@ import { usePaywall } from '../hooks/usePaywall.jsx';
 import { RuphusThinking } from '../components/tasting/RuphusThinking';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { StreamingBubble } from '../components/chat/StreamingBubble';
-import { parseBeanScan, trimApiMessages } from '../lib/chatParse';
+import { recipeSummary } from '../components/chat/RecipeCard';
+import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatParse';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
@@ -318,6 +319,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const [thinkingCaptions, setThinkingCaptions] = useState(null);
   const [streamingSlot, setStreamingSlot] = useState(null);
   const [showJumpLatest, setShowJumpLatest] = useState(false);
+  const [savingRecipeKey, setSavingRecipeKey] = useState(null);
   const [toast, setToast] = useState(null);
   // Disable keyboard hook when tab is hidden to prevent double-counting
   // keyboard events and corrupting the shared tab bar hide counter.
@@ -512,6 +514,44 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     });
   };
 
+  const activeBeans = () => beans
+    .filter(bean => bean.status === 'ACTIVE')
+    .sort((a, b) => (Number(a.jarSlot) || 99) - (Number(b.jarSlot) || 99));
+
+  const matchedRecipeBean = (recipe) => {
+    const title = String(recipe?.title || '').toLowerCase();
+    if (!title) return null;
+    return activeBeans().find(bean => title.includes(String(bean.name || '').toLowerCase()));
+  };
+
+  const brewRecipeBean = (recipe) => matchedRecipeBean(recipe) || activeBeans()[0] || null;
+
+  const handleBrewRecipe = (bean) => {
+    if (!bean) return;
+    if (isHandBrew) {
+      handBrew.handleBrewHandBrew(bean);
+    } else {
+      aiden.handleBrewWithAiden(bean);
+    }
+  };
+
+  const handleSaveRecipe = async (bean, recipe) => {
+    if (!bean?.id || !recipe || savingRecipeKey) return;
+    setSavingRecipeKey(recipe.title);
+    try {
+      const summary = recipeSummary(recipe);
+      const currentNotes = String(bean.bagNotes || '').trim();
+      const nextNotes = [currentNotes, summary].filter(Boolean).join('\n\n');
+      await updateBean(bean.id, { bagNotes: nextNotes });
+      setToast('Saved to bean notes');
+    } catch (err) {
+      console.error('Save recipe to bean notes failed:', err);
+      setToast('Failed to save. Try again.');
+    } finally {
+      setSavingRecipeKey(null);
+    }
+  };
+
   const handleCoachStarter = () => {
     if (isDemo) { onDemoAction?.(); return; }
     const firstActive = beans
@@ -635,10 +675,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
               const rawText = terminal.text;
               const scan = parseBeanScan(rawText, { stopReason });
               if (scan.scannedBean) setScannedBean(scan.scannedBean);
+              const recipe = parseRecipeCard(scan.cleanText);
 
               const assistantMsg = newMessage({
                 role: 'assistant',
-                content: scan.cleanText,
+                content: recipe.cleanText,
+                recipeCard: recipe.recipeCard,
               });
               commitAssistantMessage(assistantMsg);
               apiMessages.current = [...apiMessages.current, { role: 'assistant', content: rawText }];
@@ -672,9 +714,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
               if (hadStreamText) {
                 const terminal = resolveTerminal(streamRawRef.current);
                 const scan = parseBeanScan(terminal.text);
+                const recipe = parseRecipeCard(scan.cleanText);
                 commitAssistantMessage(newMessage({
                   role: 'assistant',
-                  content: scan.cleanText || "Couldn't reach the AI. Try again in a sec.",
+                  content: recipe.cleanText || "Couldn't reach the AI. Try again in a sec.",
+                  recipeCard: recipe.recipeCard,
                   errored: true,
                   retryTurn: { text, displayMsg, apiMsg },
                 }));
@@ -888,6 +932,13 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
                 <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
+                  recipeActions={{
+                    getBrewBean: brewRecipeBean,
+                    getSaveBean: matchedRecipeBean,
+                    onBrew: handleBrewRecipe,
+                    onSave: handleSaveRecipe,
+                    savingKey: savingRecipeKey,
+                  }}
                 />
               </m.div>
             );
