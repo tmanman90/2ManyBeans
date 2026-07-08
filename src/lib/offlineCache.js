@@ -15,6 +15,8 @@ const PREFIX = 'tmb_';
 const LAST_UID_KEY = `${PREFIX}lastUid`;
 const isNative = Capacitor.isNativePlatform();
 
+export const chatKey = (uid) => `chat_${uid}`;
+
 // Dedicated IDB database so we don't collide with Firestore's persistence IDB.
 const store = createStore('tmb-cache', 'kv');
 
@@ -88,6 +90,7 @@ export const cacheClear = (uid) => {
     idbDel(`${PREFIX}beans_${uid}`, store),
     idbDel(`${PREFIX}tastings_${uid}`, store),
     idbDel(`${PREFIX}profile_${uid}`, store),
+    idbDel(`${PREFIX}${chatKey(uid)}`, store),
   ]).catch(() => { /* silent */ });
   // Also clear any legacy localStorage entries from before the IDB migration.
   try {

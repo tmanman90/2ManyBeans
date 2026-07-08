@@ -51,6 +51,25 @@ const updateBean = async (beanId, updates) => {
 };
 const onStartTastingSession = (beanId) => { window.__SPY__.startedTasting = beanId; };
 const onNavigateToTasting = () => { window.__SPY__.navigatedToTasting += 1; };
+const chatStorageKey = (uid) => `chat_${uid}`;
+const loadHarnessSession = () => {
+  const raw = localStorage.getItem(chatStorageKey('harness-user'));
+  return raw ? JSON.parse(raw) : null;
+};
+const chatSessionAdapter = {
+  loadRemote: async () => loadHarnessSession(),
+  saveRemote: async (session) => {
+    localStorage.setItem(chatStorageKey('harness-user'), JSON.stringify(session));
+  },
+  deleteRemote: async () => {},
+  loadLocal: async () => loadHarnessSession(),
+  saveLocal: async (session) => {
+    localStorage.setItem(chatStorageKey('harness-user'), JSON.stringify(session));
+  },
+  deleteLocal: async () => {
+    localStorage.removeItem(chatStorageKey('harness-user'));
+  },
+};
 
 createRoot(document.getElementById('root')).render(
   <AuthContext value={{ user: null, logOut: () => {} }}>
@@ -61,6 +80,7 @@ createRoot(document.getElementById('root')).render(
             beans={beans} tastings={tastings}
             addBean={addBean} updateBean={updateBean} addTasting={noopAsync} updateTasting={noopAsync}
             profile={{ displayName: 'Tal M' }} uid="harness-user"
+            chatSessionAdapter={chatSessionAdapter}
             isActive={true} onStartTastingSession={onStartTastingSession} onNavigateToTasting={onNavigateToTasting} isDemo={false} onDemoAction={noop}
           />
         </UserPreferencesProvider>

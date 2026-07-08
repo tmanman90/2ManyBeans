@@ -57,6 +57,7 @@ async function waitForStreamingDone(page) {
   await page.waitForFunction(() => !document.querySelector('[data-streaming-bubble="true"]'), null, { timeout: 8000 });
 }
 
+killPortListeners(PORT);
 const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
 let streamMock = null;
 const cleanup = () => {
@@ -239,6 +240,58 @@ try {
     if (!saving) fail('Pass 4: Save to bean notes did not show saving state');
     else console.log('OK  recipe card: title, tabular nums, no gradients, saving state');
     await recipePage.close();
+  }
+
+  // ---- Pass 6: persistence round-trip + New chat clear ----
+  {
+    const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
+    const errors = [];
+    page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+    page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+    await page.goto(streamUrl(), { waitUntil: 'networkidle' });
+    await page.evaluate(() => localStorage.removeItem('chat_harness-user'));
+    await page.reload({ waitUntil: 'networkidle' });
+
+    await page.getByText('What should I brew today?', { exact: true }).first().click();
+    await waitForStreamingDone(page);
+    await page.waitForFunction(() => {
+      const raw = localStorage.getItem('chat_harness-user');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed.messages) && parsed.messages.length === 2;
+    }, null, { timeout: 4000 });
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForFunction(() => document.body.innerText.includes('Kiawamururu'), null, { timeout: 4000 });
+    const restoredOrder = await page.evaluate(() => {
+      const body = document.body.innerText;
+      return body.indexOf('What should I brew today?') >= 0
+        && body.indexOf('Kiawamururu') > body.indexOf('What should I brew today?');
+    });
+    const introSuppressed = await page.getByText("Ask me anything about your rotation", { exact: false }).count();
+    const starterSuppressed = await page.getByText('Scan a bag', { exact: true }).count();
+    if (!restoredOrder) fail('Pass 6: persisted user/assistant messages did not restore in order');
+    if (introSuppressed > 0 || starterSuppressed > 0) fail('Pass 6: intro card/starters were not suppressed after restore');
+
+    await page.getByPlaceholder('Ask Professor Ruphus...').fill('How should I dial this next?');
+    await page.keyboard.press('Enter');
+    await waitForStreamingDone(page);
+    const duplicateKeyErrors = errors.filter(error => /same key|Encountered two children/.test(error));
+    if (duplicateKeyErrors.length) fail('Pass 6: duplicate React key console error after resume-then-send: ' + duplicateKeyErrors[0]);
+
+    const newChatVisible = await page.getByText('New chat', { exact: true }).isVisible().catch(() => false);
+    if (!newChatVisible) fail('Pass 6: New chat action missing after restore');
+    page.on('dialog', dialog => dialog.accept());
+    await page.getByText('New chat', { exact: true }).click();
+    await page.waitForFunction(() => localStorage.getItem('chat_harness-user') === null, null, { timeout: 4000 });
+    const introReturned = await page.getByText('Professor Ruphus', { exact: true }).isVisible().catch(() => false);
+    const startersReturned = await page.getByText('Scan a bag', { exact: true }).isVisible().catch(() => false);
+    if (!introReturned || !startersReturned) fail('Pass 6: New chat did not restore intro + starters');
+    else console.log('OK  persistence: restore, resume send, New chat clears local session');
+    if (errors.filter(error => !/same key|Encountered two children/.test(error)).length) {
+      fail('Pass 6: console/page errors: ' + JSON.stringify(errors.slice(0, 6)));
+    }
+    await page.close();
   }
 
   await browser.close();

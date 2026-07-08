@@ -1,5 +1,5 @@
 // Chat tab -- with photo scanning, Aiden brew, and save-to-inventory
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Send, Camera, X, Coffee, BookOpen, Save, ChevronDown } from 'lucide-react';
 import { AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -16,6 +16,7 @@ import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
+import { useChatSession } from '../hooks/useChatSession';
 import { getBrewMethod } from '../lib/brewMethods';
 import { buildNewBeanData } from '../lib/beanBuilder';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
@@ -31,10 +32,24 @@ import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatPars
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
 const STATIC_STARTERS = ['What should I brew today?', 'Scan a bag', 'Coach my tasting'];
+const INTRO_TEXT = "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you.";
 
 function newMessage(fields) {
-  return { id: crypto.randomUUID(), ...fields };
+  return { id: crypto.randomUUID(), createdAt: Date.now(), ...fields };
 }
+
+function introMessage() {
+  return newMessage({ role: 'assistant', content: INTRO_TEXT });
+}
+
+const messagesForApi = (thread) => thread
+  .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+  .map(msg => ({ role: msg.role, content: String(msg.content || '') }))
+  .filter(msg => msg.content.trim());
+
+const threadForPersistence = (thread) => thread.filter((msg, idx) =>
+  !(idx === 0 && msg.role === 'assistant' && msg.content === INTRO_TEXT)
+);
 
 function clipStarterLabel(text, maxLen = 42) {
   if (text.length <= maxLen) return text;
@@ -296,20 +311,19 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter }) => {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
   const firstName = profile?.displayName?.trim().split(/\s+/)[0] || '';
-  const [messages, setMessages] = useState([
-    newMessage({ role: 'assistant', content: "Hey, I'm Professor Ruphus! Ask me anything about your rotation, what to brew, or send photos of coffee bags and I'll scan them for you." }),
-  ]);
+  const [messages, setMessages] = useState([introMessage()]);
   // apiMessages stores the raw messages sent to the API (with base64 images)
   const apiMessages = useRef([
     { role: 'assistant', content: messages[0].content },
   ]);
+  const { hydratedMessages, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
   // Input state lives in the ChatInputBar child so keystrokes don't
   // re-render the parent's message list on every character.
   const [loading, setLoading] = useState(false);
@@ -337,6 +351,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   const pendingStreamRef = useRef('');
   const stickRef = useRef(true);
   const retryingRef = useRef(false);
+  const hydrationSignatureRef = useRef('');
+  const userTouchedThreadRef = useRef(false);
   // Blob URLs only (never DataURL strings). DataURL strings don't need
   // revoking and pushing them here would pin huge base64 payloads for the
   // entire session, which is a real memory leak on native.
@@ -348,6 +364,62 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       URL.revokeObjectURL(url);
     }
   };
+
+  const resetIntroThread = useCallback(() => {
+    const nextIntro = introMessage();
+    setMessages([nextIntro]);
+    apiMessages.current = [{ role: 'assistant', content: nextIntro.content }];
+    setScannedBean(null);
+    setStreamingSlot(null);
+    setLoading(false);
+    sendingRef.current = false;
+    userTouchedThreadRef.current = false;
+  }, []);
+
+  const hydrateThread = useCallback((thread) => {
+    const restored = thread.map(msg => ({
+      id: msg.id || crypto.randomUUID(),
+      role: msg.role,
+      content: String(msg.content || ''),
+      createdAt: msg.createdAt,
+    }));
+    const last = restored[restored.length - 1];
+    const needsRetry = last?.role === 'user';
+    const display = needsRetry
+      ? [
+          ...restored,
+          newMessage({
+            role: 'assistant',
+            content: "Couldn't reach the AI. Try again in a sec.",
+            errored: true,
+            retryTurn: {
+              text: last.content,
+              displayMsg: last,
+              apiMsg: { role: 'user', content: last.content },
+            },
+          }),
+        ]
+      : restored;
+    setMessages(display);
+    apiMessages.current = messagesForApi(restored);
+    setScannedBean(null);
+  }, []);
+
+  useEffect(() => {
+    if (isDemo || (hydrationState !== 'local' && hydrationState !== 'hydrated')) return;
+    const signature = `${hydrationState}:${hydratedMessages.map(msg => `${msg.id}:${msg.role}:${msg.content}`).join('|')}`;
+    if (signature === hydrationSignatureRef.current) return;
+    hydrationSignatureRef.current = signature;
+
+    if (hydratedMessages.length > 0) {
+      hydrateThread(hydratedMessages);
+      userTouchedThreadRef.current = false;
+      return;
+    }
+    if (hydrationState === 'hydrated' && !userTouchedThreadRef.current) {
+      resetIntroThread();
+    }
+  }, [hydratedMessages, hydrationState, hydrateThread, isDemo, resetIntroThread]);
 
   // Scroll chat to bottom when the keyboard opens. Tab-bar hiding is now
   // handled centrally by useNativeKeyboard so ChatTab + TastingTab can't
@@ -508,8 +580,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       if (updated.length > MAX_DISPLAY_MESSAGES) {
         const pruned = updated.slice(0, updated.length - MAX_DISPLAY_MESSAGES);
         pruned.forEach(m => m.photos?.forEach(url => safeRevokeBlobUrl(url)));
-        return updated.slice(-MAX_DISPLAY_MESSAGES);
+        const trimmed = updated.slice(-MAX_DISPLAY_MESSAGES);
+        persist(threadForPersistence(trimmed));
+        return trimmed;
       }
+      persist(threadForPersistence(updated));
       return updated;
     });
   };
@@ -596,7 +671,14 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
       content: text,
       photos: turnPhotos.map(p => p.previewUrl),
     };
-    if (appendUser) setMessages(prev => [...prev, displayMsg]);
+    if (appendUser) {
+      userTouchedThreadRef.current = true;
+      setMessages(prev => {
+        const updated = [...prev, displayMsg];
+        persist(threadForPersistence(updated));
+        return updated;
+      });
+    }
 
     // Build API message with base64 images
     let apiContent;
@@ -767,6 +849,14 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     }
   };
 
+  const handleNewChat = () => {
+    if (isDemo || messages.length <= 1) return;
+    if (!window.confirm('Start a fresh conversation?')) return;
+    clear();
+    resetIntroThread();
+    haptic.light();
+  };
+
   const handleBrewScanned = () => {
     if (!scannedBean) return;
     const ephemeralBean = { ...scannedBean, status: 'SEALED' };
@@ -844,7 +934,27 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Masthead — calm editorial: Fraunces title + subtitle (no eyebrow, no gradient rule). */}
       <div data-masthead style={{ marginBottom: 10 }}>
-        <div style={{ ...typeScale.display, color: C.text }}>Chat</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ ...typeScale.display, color: C.text }}>Chat</div>
+          {!isDemo && messages.length > 1 && (
+            <button
+              type="button"
+              onClick={handleNewChat}
+              style={{
+                minHeight: 44,
+                padding: '0 2px',
+                background: 'none',
+                border: 'none',
+                ...typeScale.caption,
+                color: C.textMuted,
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              New chat
+            </button>
+          )}
+        </div>
         <div style={{ ...typeScale.body, color: C.textMuted, marginTop: 6 }}>
           Your rotation, your taste, your questions.
         </div>
