@@ -178,6 +178,12 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
     });
   });
 
+  // Flattened rail order for swipe-nav — same roaster-key sort + within-group order the
+  // render below uses, so siblings matches exactly what's on screen.
+  const railOrder = Object.keys(grouped)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    .flatMap(k => grouped[k]);
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -423,6 +429,8 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           bean={detailBean}
           tastings={tastings}
           originRect={morphRect}
+          siblings={railOrder}
+          onNavigate={(b) => openDetail(b, null)}
           onOpen={(b) => { closeDetail(); tryOpenBean(b); }}
           onClose={closeDetail}
           onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}

@@ -314,6 +314,17 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
   const handleRestore = (bean) => updateBean(bean.id, { status: 'SEALED', finishDate: null });
   const handleDelete = (bean) => { if (deleteBean) deleteBean(bean.id); };
 
+  // Swipe-nav siblings — the rendered order below: featured cups (only shown when no
+  // filters are active) first, then the chronological ledger, flattened across the
+  // year groups exactly as displayed. A 5★ bean renders in BOTH the featured carousel
+  // and the ledger; siblings needs unique ids (findIndex) so keep the FIRST (featured)
+  // occurrence only.
+  const archiveOrder = useMemo(() => {
+    const seen = new Set();
+    return [...(filtersActive === 0 ? bestCups : []), ...grouped.flatMap(g => g.items)]
+      .filter(b => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+  }, [filtersActive, bestCups, grouped]);
+
   return (
     <div style={{ background: C.bg, fontFamily: fonts.body, color: C.text }}>
 
@@ -428,6 +439,8 @@ export const ArchiveTab = ({ beans, tastings = [], updateBean, deleteBean, getBe
           tastings={tastings}
           originRect={morphRect}
           showBrewProfile
+          siblings={archiveOrder}
+          onNavigate={(b) => openDetail(b, null)}
           onClose={closeDetail}
           onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
           onRestore={(b) => { closeDetail(); handleRestore(b); }}

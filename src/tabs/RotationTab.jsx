@@ -170,6 +170,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const canisterCount = preferences.canisterCount || 3;
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const slots = slotNumbers.map(n => beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n) || null);
+  const jarOrder = slots.filter(Boolean); // swipe-nav siblings — jar order, empty slots dropped
   const recs = getRecommendations(beans);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
 
@@ -629,6 +630,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           bean={detailBean}
           tastings={tastings}
           originRect={morphRect}
+          siblings={jarOrder}
+          onNavigate={(b) => openDetail(b, null)}
           onClose={closeDetail}
           onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
           onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}

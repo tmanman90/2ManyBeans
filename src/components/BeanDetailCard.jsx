@@ -315,7 +315,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -380,6 +380,31 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
     setTimeout(() => haptic.medium(), 430); // settle on landing
   };
 
+  // ---- Swipe navigation (siblings + onNavigate optional; absent => today's y-only
+  // drag). x drives the card wrapper's style directly so framer's drag writes straight
+  // into it (release position feeds the fmAnimate below); rotateZ tracks it 1:1, capped
+  // to ±3deg — the only flourish, no color/shadow animation.
+  const x = useMotionValue(0);
+  const rotateZ = useTransform(x, [-260, 0, 260], [-3, 0, 3]);
+  // Commit race guards: a second swipe (or close/unmount) while the exit-fly promise is
+  // pending must not let the stale .then navigate or jump x afterwards. busy blocks
+  // re-commits mid-flight; the token invalidates a pending .then; stop() on unmount.
+  const swipeBusy = useRef(false);
+  const swipeToken = useRef(0);
+  const swipeAnim = useRef(null);
+  useEffect(() => () => { swipeToken.current++; swipeAnim.current?.stop(); }, []);
+
+  // Bean swap is parent-driven (no remount, per contract — a remount would kill the
+  // slide transition and replay the mount-scoped entrance haptic / hero-morph guard
+  // above). Reset the per-bean transient UI by hand instead. Flip resets instantly.
+  useEffect(() => {
+    if (!bean) return;
+    setFlipped(false);
+    flipP.set(0);
+    setInsightOpen(false);
+    if (backScrollRef.current) backScrollRef.current.scrollTop = 0;
+  }, [bean?.id]);
+
   // Pull-to-dismiss on the BACK: only engages when the stat sheet is scrolled to the
   // top, so normal scrolling is never hijacked. Rubber-bands the sheet, dismisses on a
   // sufficient pull. (Front uses framer drag on the whole card.)
@@ -401,6 +426,47 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
   };
 
   if (!bean) return null;
+
+  // Neighbor lookup — same order the calling surface renders (siblings is exactly
+  // that array). No wrap: rubber-bands at the ends via the elastic below.
+  const swipeEnabled = !!siblings && !!onNavigate;
+  const siblingIndex = swipeEnabled ? siblings.findIndex(b => b.id === bean.id) : -1;
+  const prevBean = swipeEnabled && siblingIndex > 0 ? siblings[siblingIndex - 1] : null;
+  const nextBean = swipeEnabled && siblingIndex >= 0 && siblingIndex < siblings.length - 1 ? siblings[siblingIndex + 1] : null;
+
+  // Fly the outgoing card off-screen, swap the bean (onNavigate — parent updates
+  // detailBean in place), then slide the incoming card in from the opposite edge.
+  // Reduced motion: skip both animations, swap instantly.
+  const commitSwipe = (target, goingNext) => {
+    haptic.selection();
+    if (reduce) { onNavigate(target); return; }
+    swipeBusy.current = true;
+    const token = ++swipeToken.current;
+    const fly = Math.min(window.innerWidth, 384) + 48;
+    const exitX = goingNext ? -fly : fly;
+    swipeAnim.current = fmAnimate(x, exitX, { duration: 0.2, ease: 'easeOut' });
+    swipeAnim.current.then(() => {
+      if (token !== swipeToken.current) return; // superseded or unmounted — stale, bail
+      swipeBusy.current = false;
+      onNavigate(target);
+      x.set(-exitX);
+      swipeAnim.current = fmAnimate(x, 0, spring.soft); // drag naturally interrupts this
+    });
+  };
+
+  // Dominant-axis branch: y keeps today's dismiss thresholds unchanged; x commits a
+  // navigate only past the threshold AND only if a neighbor exists in that direction
+  // (no neighbor => the elastic already rubber-banded it, nothing to commit).
+  const onFrontDragEnd = (e, info) => {
+    if (swipeBusy.current) return; // a commit is mid-flight — ignore until it lands
+    if (swipeEnabled && Math.abs(info.offset.x) > Math.abs(info.offset.y)) {
+      const goingNext = info.offset.x < 0;
+      const target = goingNext ? nextBean : prevBean;
+      if (target && (Math.abs(info.offset.x) > 90 || Math.abs(info.velocity.x) > 500)) commitSwipe(target, goingNext);
+      return;
+    }
+    if (info.offset.y > 110 || info.velocity.y > 650) onClose();
+  };
 
   const notes = parseNotes(bean.bagNotes);
   const beanTastings = tastings.filter(t => t.beanId === bean.id);
@@ -478,12 +544,12 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
           exit={reduce ? { opacity: 0, scale: 0.93, y: 12 } : { opacity: 0 }}
           transition={spring.soft}
           onClick={(e) => e.stopPropagation()}
-          drag={flipped ? false : 'y'}
+          drag={flipped ? false : (swipeEnabled ? true : 'y')}
           dragDirectionLock
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0, bottom: 0.6 }}
-          onDragEnd={(e, info) => { if (info.offset.y > 110 || info.velocity.y > 650) onClose(); }}
-          style={{ width: '100%', maxWidth: 384, height: 'min(90vh, 720px)', perspective: 2200, touchAction: flipped ? 'pan-y' : 'none' }}
+          dragConstraints={swipeEnabled ? { top: 0, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0 }}
+          dragElastic={swipeEnabled ? { top: 0, bottom: 0.6, left: nextBean ? 0.5 : 0.12, right: prevBean ? 0.5 : 0.12 } : { top: 0, bottom: 0.6 }}
+          onDragEnd={onFrontDragEnd}
+          style={{ width: '100%', maxWidth: 384, height: 'min(90vh, 720px)', perspective: 2200, touchAction: flipped ? 'pan-y' : 'none', x, rotateZ }}
         >
           <m.div
             animate={{ rotateY: flipped ? 180 : 0 }}
