@@ -157,3 +157,60 @@ grindText → today's Weight cell byte-identical.
 ## 4. Copy bank rule
 Every user-facing string in the diff must appear in the unit prompt (written by the
 orchestrator) or in this spec. Sonnet writes NO copy of its own invention.
+
+## Appendix A — Copy bank (orchestrator-authored, 2026-07-09; executors use verbatim)
+
+### A1. R03 goal acknowledgments (NoteBubble opening, keyed by goal)
+- Fellow Aiden: "The Aiden. Precision brewing, meet precision coaching. Now, what's getting in the way?"
+- V60 / Pour Over: "V60. A brewer after my own heart. Now, what's getting in the way?"
+- Aeropress: "The Aeropress. Small brewer, huge ceiling. Now, what's getting in the way?"
+- French Press: "French press. Honest, full-bodied brewing. Now, what's getting in the way?"
+- Espresso: "Espresso. The deep end. I like it. Now, what's getting in the way?"
+- All of them: "All of them. A true generalist. Now, what's getting in the way?"
+
+### A2. Palate archetypes (R11 headline + subtitle). Selection is DETERMINISTIC:
+take the two axes with the largest |value| in fixed axis order (sweetness, acidity, body,
+clean_funky, fruit_nutty) breaking ties by that order; match the first rule that applies,
+top to bottom; all-zero chart or no match falls through to 8.
+1. acidity>0 AND fruit_nutty<0 → "The Bright Side" / "Bright, fruity, alive in the cup."
+2. sweetness>0 AND body>0 → "Syrup & Structure" / "Sweet, heavy, dessert in a mug."
+3. fruit_nutty>0 AND body>0 → "The Comfort Classic" / "Chocolate, nuts, and a proper backbone."
+4. clean_funky>0 AND acidity>0 → "The Purist" / "Washed, precise, nothing to hide."
+5. clean_funky<0 → "The Wild Card" / "Naturals, ferments, the fun stuff."
+6. sweetness>0 AND acidity>0 → "Candy Apple" / "Sweetness riding on bright fruit."
+7. body<0 AND acidity>0 → "Tea & Light" / "Delicate, tea-like, floral-leaning."
+8. fallback → "The Open Palate" / "Still mapping. Every cup teaches me more."
+
+### A3. R11 prediction line ("First guess: you'll love {X}."), keyed by archetype number
+1 "washed Ethiopians: lemon and florals" · 2 "natural Brazils: caramel and body" ·
+3 "washed Colombians: cocoa and balance" · 4 "washed Kenyans: blackcurrant clarity" ·
+5 "anaerobic naturals: wild and jammy" · 6 "juicy naturals: berries and sweetness" ·
+7 "high-grown washed Geshas: jasmine and tea" · 8 "a washed Ethiopian: the perfect first test"
+
+### A4. R13 personalized value rows (exactly three, in this order)
+Goal row (by goal): Fellow Aiden "Aiden profiles tuned to every bag you scan" · V60 "Pour-over
+recipes dialed to your grinder" · Aeropress "Aeropress recipes dialed to your grinder" ·
+French Press "Immersion recipes dialed to your grinder" · Espresso "Dial-in guidance for every
+new bag" · All of them "Recipes for every brewer on your bench".
+Pain row (by pain): inconsistent "Step-by-step brews so every cup repeats" · forget-fresh
+"Peak-window tracking so you never drink a stale cup" · 2manybeans "Every bag, jar, and roast
+date on one shelf" · actually-taste "Guided tastings that train your palate cup by cup" ·
+brew-like-pro "Professor Ruphus coaching you from bag to cup".
+Palate row: "A coach who already knows your taste: {first phrase of palateSummaryLine}".
+Null-safety: missing goal/pain/palate → substitute the generic rows, in order: "Recipes tuned
+to how you actually brew" / "Peak-window tracking so you never drink a stale cup" / "A tasting
+coach that learns your palate".
+
+### A5. R10 scan-fallback sample card (fixed exemplar, eyebrow "SAMPLE")
+Roaster "MOVING COFFEE" · name "Bombe Bensa" · line "Ethiopia · Natural" · chips: "Apricot",
+"Lemon zest", "Rainier cherry" · NoteBubble: "A natural Ethiopian. Bright fruit, big
+sweetness. When you scan a real bag, I'll do this for yours."
+R10 scan-error toast copy: "Couldn't read that one. I'll get the next one on your shelf."
+
+### A6. Redemption strings (R13)
+Affordance: "Have an invite code?" · placeholder "2MANY-XXXXX" · button "Redeem" · success
+headline "You're in, brewer." · error line by RedeemError code: invalid "That code doesn't
+look right. Check it and try again." · already_redeemed "That code's already been used." ·
+expired "That code has expired." · network/other "Couldn't reach the cafe. Try again in a
+moment."
+NO em dashes anywhere in UI copy (house rule).
