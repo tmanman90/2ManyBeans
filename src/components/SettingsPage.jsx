@@ -1290,12 +1290,15 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             </div>
           </div>
 
-          {/* --- Dev Section (DEV-only, tree-shaken from prod) ---
-              Replay is LOCAL-ONLY now. It sets a localStorage flag that
-              Gate 5 in main.jsx reads and clears the uid-scoped state
-              blob. It does NOT mutate Firestore — a prior version did,
-              which caused the "dev replay strands user in prod" bug. */}
-          {import.meta.env.DEV && (
+          {/* --- Dev Section (dev builds only, tree-shaken from prod) ---
+              Visible on the vite dev server AND in the built dev app
+              (__APP_VARIANT__ 'dev' = the 2manybeans Dev bundle), never in
+              prod builds (the define makes the condition statically false).
+              Replay is LOCAL-ONLY: it sets a localStorage flag that Gate 5
+              in main.jsx reads and clears the uid-scoped state blob. It
+              does NOT mutate Firestore — a prior version did, which caused
+              the "dev replay strands user in prod" bug. */}
+          {(import.meta.env.DEV || __APP_VARIANT__ === 'dev') && (
             <>
               <div style={{ ...sectionHeaderStyle, paddingTop: 16 }}>Dev</div>
               <div style={groupStyle}>
