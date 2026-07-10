@@ -1,0 +1,276 @@
+{
+  "$schema": "getup/loop.resolved.v1",
+  "compiled_at": "2026-07-10T01:01:08+00:00",
+  "council": [
+    {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  ],
+  "council_by_id": {
+    "codex": {
+      "cli": "codex",
+      "id": "codex",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  },
+  "criteria_by_id": {
+    "v1-build": {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    "v2-onboarding": {
+      "check": [
+        "node",
+        "scripts/verify-onboarding.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-onboarding",
+      "type": "programmatic"
+    },
+    "v3-regression": {
+      "check": [
+        "bash",
+        "-c",
+        "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-wizard.mjs && node scripts/audit-wizard.mjs && node scripts/verify-chat.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v3-regression",
+      "type": "programmatic"
+    },
+    "v4-codex": {
+      "id": "v4-codex",
+      "judge": "codex",
+      "rubric": "Adversarially review the full onboarding-100x diff, whole-file behavior. PRE-BRIEF (do not false-positive): MascotStage autoplay videos are the established mascot pattern (now poster-gated under reduced motion \u2014 verify the gate, don't flag the videos); Liquid Glass tint/sheen gradients are approved material; ambient loops are exempt from the 300ms rule; CSS keyframes for entrance/visibility is the REQUIRED pattern in this WKWebView (framer animate is dead in portals \u2014 flag any NEW framer-gated visibility, not the CSS). FAIL if: any new read of onboarding answers is not null-safe for existing users, or user-derived text (goal/pain/displayName/prediction) reaches a system prompt unsanitized/uncapped, or palate bytes enter a cached static prompt block (R2); the R09 reveal shows anything other than the user's actual computed palateChart (R3); the R11 prediction is nondeterministic or can render empty (R4); ANY scan path can dead-end, block the flow, double-commit the bean, or commit before the profile write; scan fallbacks are incomplete (denied/skip/timeout/API error) or skip is ever hidden (R5); the paywall hides close at t=0, obscures pricing, changes the native purchase surface, or the hydration-timeout escape regressed (R6); the redemption path can leave the user stuck (no retry), skips entitlement refresh before celebrating, or invents a second redemption implementation instead of reusing redeemCode() (R7); R13b \"Maybe later\" still overwrites R11's scan intent (R8); any user-facing invented-human testimonial or bare \"Ruphus\" survives (R9); progress bar lacks rendered chapters or aria, or endowed start missing (R10); R08 lacks an explicit decline that writes denied and advances (R11); any onboarding video autoplays or keyframe runs under prefers-reduced-motion (R12); dead files remain imported or timing constants stay scattered (R13); the harness lacks any matrix row from the definition of done, can hang (browser not closed in finally / no process.exit), or mocks are wired so shallowly they don't exercise real component code (R14); evidence gate accepts stale or wrong-resolution frames (R15); any existing verify-* gate weakened, completion write shape changed non-additively, auth/free-tier/RC purchase mechanics touched, or the grind cell breaks sealed/finished cards or renders raw null (R1, R16); any anti-slop tell (second accent, glow shadows, purple, sub-44pt targets, em dashes in UI copy). PASS only when all requirement clusters hold and scope guards are respected.\n",
+      "type": "judge"
+    },
+    "v5-human": {
+      "id": "v5-human",
+      "prompt": "On the dev app, replay onboarding start to finish (fresh account or DEV replay flag). Confirm: every screen feels premium and personal (your goal/pain/palate visibly shape R09, R11, and the paywall recap); swipe deck is fun; the live scan reads a real bag and the result lands as the wow moment (then try again with camera denied \u2014 the flow must glide past it); the paywall reads as the natural next chapter with a visible close; enter a real invite code (2MB2026-VIP style) \u2014 it redeems inline, celebrates, and drops you into the app with the entitlement active and your scanned bean waiting; \"Maybe later\" everywhere never loses your scan intent; turn on iOS Reduce Motion and replay \u2014 no autoplaying videos, no animated fills; nothing anywhere feels broken, slow, or cheap. Then open an ACTIVE bean's card and confirm GRIND shows your grinder setting where Weight used to be (sealed bags still show Weight). Proving R1-R16 and the overall premium bar.\n",
+      "type": "human"
+    },
+    "v6-evidence": {
+      "check": [
+        "node",
+        "scripts/verify-onboarding-evidence.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v6-evidence",
+      "type": "programmatic"
+    }
+  },
+  "evidence_map": {
+    "R1": "v6-evidence",
+    "R10": "v2-onboarding",
+    "R11": "v2-onboarding",
+    "R12": "v2-onboarding",
+    "R13": "v4-codex",
+    "R14": "v2-onboarding",
+    "R15": "v6-evidence",
+    "R16": "v3-regression",
+    "R2": "v2-onboarding",
+    "R3": "v2-onboarding",
+    "R4": "v2-onboarding",
+    "R5": "v2-onboarding",
+    "R6": "v6-evidence",
+    "R7": "v2-onboarding",
+    "R8": "v2-onboarding",
+    "R9": "v4-codex"
+  },
+  "execution": {
+    "isolation": "branch",
+    "mode": "goal"
+  },
+  "gates": {
+    "delivery_gate": {
+      "criteria": [
+        "v1-build",
+        "v2-onboarding",
+        "v3-regression",
+        "v4-codex",
+        "v6-evidence",
+        "v5-human"
+      ],
+      "max_revisions": 3,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    },
+    "plan_gate": {
+      "criteria": [
+        "v4-codex"
+      ],
+      "max_revisions": 2,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "codex"
+    }
+  },
+  "goal": {
+    "context_sources": [
+      {
+        "file": "docs/plans/2026-07-09-003-feat-onboarding-100x-plan.md"
+      },
+      {
+        "file": "docs/research/2026-07-09-onboarding-audit.md"
+      },
+      {
+        "file": "lessons.md"
+      },
+      {
+        "file": "src/components/onboarding/OnboardingFlow.jsx"
+      },
+      {
+        "file": "src/components/onboarding/screens/OnboardingPrimitives.jsx"
+      },
+      {
+        "file": "src/components/onboarding/screens/R13Paywall.jsx"
+      },
+      {
+        "file": "src/components/onboarding/useOnboardingPaywall.js"
+      },
+      {
+        "file": "src/lib/redeemCode.js"
+      },
+      {
+        "file": "src/lib/onboardingPalate.js"
+      },
+      {
+        "file": "src/lib/gemini.js"
+      },
+      {
+        "file": "src/components/BeanDetailCard.jsx"
+      },
+      {
+        "file": "scripts/verify-polish-evidence.mjs"
+      },
+      {
+        "file": "docs/loops/chat-100x/loop.yaml"
+      }
+    ],
+    "definition_of_done": "All 16 plan requirements verified through the gate stack. npx vite build exits 0. The NEW verify-onboarding harness (Playwright WebKit, injected camera/RC/scan/storage mocks, browser closed in finally + explicit process.exit) proves: full fresh traversal; resume-mid-flow; back-nav incl. the R05 wipe guard also invalidating held scan+prediction; camera-denied path; every scan-fallback row; paywall skip; code redemption success (entitlement refresh reaches useSubscription before celebration) and failure (inline error, retry, never stuck); R13b both paths with R11 intent preserved; reduced-motion pass (videos poster-framed, keyframes gated); aria assertions (progressbar valuenow, 44pt targets); zero console errors; a grep gate proves zero bare-\"Ruphus\" and zero invented-human testimonials in user-facing onboarding copy. The NEW verify-onboarding-evidence gate fails unless fresh resolution-valid simulator frames exist for every screen and state (incl. scan aha, paywall recap, redemption input, R13b). All pre-existing verify-* gates stay green and the completion write shape is unchanged (additive fields only; existing users without answers behave identically at every new read site). Bean from the onboarding scan is committed exactly once, after profile commit, never duplicated on resume. Fresh codex passes the pre-briefed adversarial rubric. Tal signs off on device with an onboarding replay (fresh account or DEV flag): flow feels premium, nothing breaks, code redemption works end to end. Dev channel only; no prod deploy, no main merge.\n",
+    "requirements": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+      "R8",
+      "R9",
+      "R10",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16"
+    ],
+    "statement": "Rebuild the 13-screen onboarding into a premium, personal, unbreakable flow on the redesign branch (dev channel only), plus one card tweak. The personalization becomes REAL: onboarding answers (goal, pain, palate chart) are persisted additively and actually read by the app (chat dynamic context, Tasting Wizard expectation seeding, recommendations) through a single null-safe seam (src/lib/palateProfile.js); R09 visibly assembles the user's REAL palate chart (CSS keyframes, reduce-gated); R11 becomes \"Your coffee profile\" with a deterministic taste prediction that names the user's goal and pain. The aha moves BEFORE the paywall: camera- granted users live-scan their first bag (existing scanBeanLabel), with a hard fallback matrix (denied / skip / 12s timeout / API error all land on the prediction path; no dead ends; skip always visible); scanned data is held in onboarding state and committed via the existing bean pipeline only after finish() succeeds. The paywall becomes a narrative: page-one personalized recap continuous with the trial timeline, native RC sheet unchanged as the only purchase surface, close visible from t=0, and a prominent \"Have an invite code?\" path (reusing src/lib/redeemCode.js) with inline input (16px, keyboard-safe, uppercase-normalized) that on success celebrates and finishes straight into the app with completedVia 'code_redeemed' (additive). Craft debt paid in full: fabricated R04 testimonials replaced with honest verifiable credibility (no invented humans), all bare-\"Ruphus\" copy fixed, chaptered progress bar (\"You \u00b7 Your taste \u00b7 Your plan\", endowed start, role=progressbar), R08 gains an explicit \"Not now\" decline, MascotStage videos poster-gated and all onboarding CSS keyframes gated under prefers-reduced-motion, postCompleteAction overwrite bug fixed (R11 scan intent survives R13b \"Maybe later\"), dead files deleted (OnboardingScreenShell, RuphusSpeechBubble, SingleSelectList), timing constants centralized. Card tweak: BeanDetailCard front stat bar third cell shows GRIND (existing grindText) for ACTIVE beans, WEIGHT otherwise, Weight fallback when grindText is null. Everything design-bank clean and WKWebView-safe: CSS keyframes for entrance/visibility, framer only whileTap/layoutId/drag, no animated backdrop-filter, monochrome + one accent, 44pt targets, \"Professor Ruphus\" naming everywhere.\n"
+  },
+  "loop_control": {
+    "budget": {
+      "tokens": 15000000
+    },
+    "cycle_cap": 4,
+    "max_iterations": 13,
+    "no_progress": {
+      "action": "stop",
+      "max_stalled_iterations": 2
+    },
+    "quality_streak": 2
+  },
+  "meta": {
+    "name": "onboarding-100x",
+    "source_plan": "docs/plans/2026-07-09-003-feat-onboarding-100x-plan.md"
+  },
+  "model_policy": {
+    "orchestrator": "fable",
+    "review_cadence": "per_phase",
+    "reviewer": "codex",
+    "subagents": "sonnet"
+  },
+  "scope_guard": [
+    "PRE-FLIGHT (verify before iterating): Gate 5 mounts onboarding post-auth (scan path has an authed session); redeemCode() works from a harness stub; grep confirms no consumer validates the completedVia enum before adding 'code_redeemed'.",
+    "Additive-only data: onboardingAnswers keys may be added, never renamed/removed/retyped; the atomic createProfile/completeOnboarding commit stays atomic; the scanned bean commits AFTER the profile write, best-effort and non-fatal.",
+    "Do NOT touch: auth (useAuth/reauth), firestore.rules, api proxies, useNativeKeyboard/safe- area plumbing, RC purchase mechanics or the native sheet, tab surfaces beyond the R1 stat cell and the three additive R2 read sites (ChatTab dynamic block, tastingExpectations, recommendations).",
+    "Existing users are sacred: every new read of onboarding answers goes through src/lib/palateProfile.js and is null-safe; a user with no answers behaves byte-identically to today at every read site.",
+    "WKWebView motion law: CSS keyframes for all entrance/visibility; framer only for whileTap/layoutId/drag; no animated backdrop-filter; videos poster-gated under reduced motion; ambient loops exempt from the 300ms rule.",
+    "No new purchase UI and no second redemption implementation: native RC sheet is the only purchase surface; redemption reuses src/lib/redeemCode.js.",
+    "No fabricated humans anywhere in copy; \"Professor Ruphus\" (never bare \"Ruphus\") in all user-facing text; no em dashes in UI copy.",
+    "Harness hygiene (lessons.md): browser.close() in finally + process.exit; port-zombie sweep 5194-5199 before runs; verify in Playwright WebKit when engine fidelity matters; evidence frames come from the SIMULATOR; Tal's device is the human gate.",
+    "Dev channel only: no production Vercel deploy, no Capgo production channel, no main merge; dev bundle labels use the -devapp.<ts> convention; do not add video assets to the OTA bundle (CDN lesson).",
+    "Deferred (do NOT build): post-decline 24h welcome offer, real-user quote collection, push priming, localization, @google/genai migration."
+  ],
+  "source": "/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/docs/loops/onboarding-100x/loop.yaml",
+  "verification": [
+    {
+      "check": [
+        "npx",
+        "vite",
+        "build",
+        "--logLevel",
+        "error"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/verify-onboarding.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-onboarding",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "bash",
+        "-c",
+        "node scripts/verify-tasting.mjs && node scripts/verify-inventory.mjs && node scripts/verify-archive.mjs && node scripts/verify-morph.mjs && node scripts/verify-wizard.mjs && node scripts/audit-wizard.mjs && node scripts/verify-chat.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v3-regression",
+      "type": "programmatic"
+    },
+    {
+      "id": "v4-codex",
+      "judge": "codex",
+      "rubric": "Adversarially review the full onboarding-100x diff, whole-file behavior. PRE-BRIEF (do not false-positive): MascotStage autoplay videos are the established mascot pattern (now poster-gated under reduced motion \u2014 verify the gate, don't flag the videos); Liquid Glass tint/sheen gradients are approved material; ambient loops are exempt from the 300ms rule; CSS keyframes for entrance/visibility is the REQUIRED pattern in this WKWebView (framer animate is dead in portals \u2014 flag any NEW framer-gated visibility, not the CSS). FAIL if: any new read of onboarding answers is not null-safe for existing users, or user-derived text (goal/pain/displayName/prediction) reaches a system prompt unsanitized/uncapped, or palate bytes enter a cached static prompt block (R2); the R09 reveal shows anything other than the user's actual computed palateChart (R3); the R11 prediction is nondeterministic or can render empty (R4); ANY scan path can dead-end, block the flow, double-commit the bean, or commit before the profile write; scan fallbacks are incomplete (denied/skip/timeout/API error) or skip is ever hidden (R5); the paywall hides close at t=0, obscures pricing, changes the native purchase surface, or the hydration-timeout escape regressed (R6); the redemption path can leave the user stuck (no retry), skips entitlement refresh before celebrating, or invents a second redemption implementation instead of reusing redeemCode() (R7); R13b \"Maybe later\" still overwrites R11's scan intent (R8); any user-facing invented-human testimonial or bare \"Ruphus\" survives (R9); progress bar lacks rendered chapters or aria, or endowed start missing (R10); R08 lacks an explicit decline that writes denied and advances (R11); any onboarding video autoplays or keyframe runs under prefers-reduced-motion (R12); dead files remain imported or timing constants stay scattered (R13); the harness lacks any matrix row from the definition of done, can hang (browser not closed in finally / no process.exit), or mocks are wired so shallowly they don't exercise real component code (R14); evidence gate accepts stale or wrong-resolution frames (R15); any existing verify-* gate weakened, completion write shape changed non-additively, auth/free-tier/RC purchase mechanics touched, or the grind cell breaks sealed/finished cards or renders raw null (R1, R16); any anti-slop tell (second accent, glow shadows, purple, sub-44pt targets, em dashes in UI copy). PASS only when all requirement clusters hold and scope guards are respected.\n",
+      "type": "judge"
+    },
+    {
+      "check": [
+        "node",
+        "scripts/verify-onboarding-evidence.mjs"
+      ],
+      "expect": "exit_zero",
+      "id": "v6-evidence",
+      "type": "programmatic"
+    },
+    {
+      "id": "v5-human",
+      "prompt": "On the dev app, replay onboarding start to finish (fresh account or DEV replay flag). Confirm: every screen feels premium and personal (your goal/pain/palate visibly shape R09, R11, and the paywall recap); swipe deck is fun; the live scan reads a real bag and the result lands as the wow moment (then try again with camera denied \u2014 the flow must glide past it); the paywall reads as the natural next chapter with a visible close; enter a real invite code (2MB2026-VIP style) \u2014 it redeems inline, celebrates, and drops you into the app with the entitlement active and your scanned bean waiting; \"Maybe later\" everywhere never loses your scan intent; turn on iOS Reduce Motion and replay \u2014 no autoplaying videos, no animated fills; nothing anywhere feels broken, slow, or cheap. Then open an ACTIVE bean's card and confirm GRIND shows your grinder setting where Weight used to be (sealed bags still show Weight). Proving R1-R16 and the overall premium bar.\n",
+      "type": "human"
+    }
+  ],
+  "version": 1
+}
