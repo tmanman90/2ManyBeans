@@ -3,14 +3,13 @@ import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/
 import { m, listContainer, listItem, spring } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
+import { MARKETING_CONSENT_VERSION } from '../onboardingConstants';
 
 const TIMELINE_STEPS = [
   { dot: '✓', title: 'Today', body: 'Full access. Scan, taste, brew — see if we click.' },
   { dot: '★', title: 'In 3 days', body: "I'll check in and show you what we've tracked together." },
   { dot: '!', title: 'Day 7', body: "Trial ends. Cancel anytime before then and you won't be charged." },
 ];
-
-const MARKETING_CONSENT_VERSION = 'onboarding-v1-2026-04-12';
 
 export default function R12TrialTimeline() {
   const { dispatch, answers } = useOnboarding();
@@ -40,7 +39,7 @@ export default function R12TrialTimeline() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R12 · YOUR TRIAL" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-thumbs-up.mp4" height={220} />
 

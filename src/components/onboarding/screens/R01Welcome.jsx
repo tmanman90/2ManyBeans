@@ -17,7 +17,7 @@ export default function R01Welcome() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="" hideBack overlay />
+      <OnboardingTopBar hideBack overlay />
 
       {/* Mascot with warm vignette */}
       <div style={{

@@ -68,7 +68,7 @@ export default function R11ValueDelivery() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R11 · YOUR PALATE" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-cupping.mp4" height={410} />
 

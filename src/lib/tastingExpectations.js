@@ -156,3 +156,31 @@ export function predict(bean) {
 
   return { axes, heroDescriptors: hero, cues, summary, clean: proc ? proc.clean !== false : true };
 }
+
+// Additive onboarding-palate tie-break (src/lib/palateProfile.js getOnboardingPalate()
+// shape: { chart: { sweetness, acidity, body, clean_funky, fruit_nutty }, goal, pain }).
+// Nudges the sweetness/acidity/body axes (the ones with a direct 1:1 palate-chart
+// match) by +/-0.5 toward the palate sign, bounded to [0, 10]. Absent/invalid palate
+// returns the SAME prediction object unchanged (identity-preserving) so every caller
+// that doesn't pass onboarding data is byte-identical to pre-onboarding-100x behavior.
+export function applyPalateTiebreak(prediction, onboardingPalate) {
+  if (!onboardingPalate?.chart || !prediction?.axes) return prediction;
+
+  const bound = (n) => Math.max(0, Math.min(10, n));
+  const chart = onboardingPalate.chart;
+  const axes = { ...prediction.axes };
+  let changed = false;
+
+  for (const key of ['sweetness', 'acidity', 'body']) {
+    const sign = chart[key];
+    if (!sign) continue;
+    const axis = axes[key];
+    if (!axis || typeof axis.level !== 'number') continue;
+    const level = bound(axis.level + (sign > 0 ? 0.5 : -0.5));
+    if (level === axis.level) continue;
+    axes[key] = { ...axis, level, label: labelFor(key, level) };
+    changed = true;
+  }
+
+  return changed ? { ...prediction, axes } : prediction;
+}

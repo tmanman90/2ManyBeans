@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com</string>
+	<string>902243550931-oapf974v3f78m5plmoh4urqos01cj6v9.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.902243550931-jp7aur82tepcpi54r0er41sp2semqamp</string>
+	<string>com.googleusercontent.apps.902243550931-oapf974v3f78m5plmoh4urqos01cj6v9</string>
 	<key>API_KEY</key>
 	<string>AIzaSyApR_pDyCYL-AcbSLfAXgbWJrJ6UTp0X18</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.talmeltzer.coffeehub</string>
+	<string>com.talmeltzer.coffeehub.dev</string>
 	<key>PROJECT_ID</key>
 	<string>manybeans-7893c</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:902243550931:ios:7e17f3fd15b9be70e3b626</string>
+	<string>1:902243550931:ios:4615fbb41e6363f9e3b626</string>
 </dict>
 </plist>

@@ -435,7 +435,7 @@ const CupSheet = ({ scorecard, currentStep, stepCount, bean, onClose }) => {
   );
 };
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, onPendingTastingConsumed, isDemo, onDemoAction }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, onPendingTastingConsumed, onboardingPalate = null, isDemo, onDemoAction }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -880,6 +880,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           bean={wizardBean}
           beans={beans}
           tastings={tastings}
+          onboardingPalate={onboardingPalate}
           isPro={hasPro}
           reduce={reduceMotion}
           draft={wizardDraft}

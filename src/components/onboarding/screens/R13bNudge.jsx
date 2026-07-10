@@ -50,7 +50,7 @@ export default function R13bNudge() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R13b · ONE LAST THING" hideBack overlay />
+      <OnboardingTopBar hideBack overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-waving.mp4" height={320} />
 

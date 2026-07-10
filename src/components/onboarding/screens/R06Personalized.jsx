@@ -101,7 +101,7 @@ export default function R06Personalized() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-presenting.mp4" height={360} />
 

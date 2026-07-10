@@ -1,0 +1,15 @@
+chunks received: 11
+#1 +0ms bytes=41 {"type":"delta","i":1,"t":1783486467321}\n
+#2 +264ms bytes=41 {"type":"delta","i":2,"t":1783486467620}\n
+#3 +312ms bytes=41 {"type":"delta","i":3,"t":1783486467921}\n
+#4 +289ms bytes=41 {"type":"delta","i":4,"t":1783486468221}\n
+#5 +396ms bytes=41 {"type":"delta","i":5,"t":1783486468521}\n
+#6 +249ms bytes=41 {"type":"delta","i":6,"t":1783486468822}\n
+#7 +284ms bytes=41 {"type":"delta","i":7,"t":1783486469123}\n
+#8 +288ms bytes=41 {"type":"delta","i":8,"t":1783486469423}\n
+#9 +284ms bytes=41 {"type":"delta","i":9,"t":1783486469724}\n
+#10 +301ms bytes=42 {"type":"delta","i":10,"t":1783486470024}\n
+#11 +312ms bytes=34 {"type":"done","t":1783486470324}\n
+
+total spread: 2979ms across 11 chunks
+WEBKIT STREAMING: PASS (incremental)

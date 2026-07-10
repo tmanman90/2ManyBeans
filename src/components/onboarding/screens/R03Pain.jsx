@@ -25,7 +25,7 @@ export default function R03Pain() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-listening.mp4" height={260} />
 

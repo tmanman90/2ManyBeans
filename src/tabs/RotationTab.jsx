@@ -65,7 +65,7 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
   </m.button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, isDemo, onDemoAction }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -171,7 +171,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const slots = slotNumbers.map(n => beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n) || null);
   const jarOrder = slots.filter(Boolean); // swipe-nav siblings — jar order, empty slots dropped
-  const recs = getRecommendations(beans);
+  const recs = getRecommendations(beans, 3, onboardingPalate);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
 
   const openQuickRecipe = useCallback(() => {

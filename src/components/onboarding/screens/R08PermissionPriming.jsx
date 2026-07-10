@@ -5,8 +5,7 @@ import { m, fadeUp, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
-
-const IMPORT_TIMEOUT_MS = 4000;
+import { CAMERA_IMPORT_TIMEOUT_MS, CAMERA_PERMISSION_TIMEOUT_MS } from '../onboardingConstants';
 
 // Benefit rows that frame the "why"
 const BENEFITS = [
@@ -49,6 +48,15 @@ export default function R08PermissionPriming() {
     });
   };
 
+  // "Not now" — the user proactively opts out without ever hitting the OS
+  // prompt. Writes cameraPermission via the SAME advance() path the OS-denial
+  // branch uses below, but skips the deniedMessage banner (that stays tied
+  // to an actual OS/permission-API denial, not this proactive skip).
+  const handleNotNow = () => {
+    if (requesting) return;
+    advance('denied');
+  };
+
   const handleAllow = async () => {
     if (requesting) return;
     setRequesting(true);
@@ -63,7 +71,7 @@ export default function R08PermissionPriming() {
       const mod = await Promise.race([
         import('@capacitor/camera'),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('import_timeout')), IMPORT_TIMEOUT_MS)
+          setTimeout(() => reject(new Error('import_timeout')), CAMERA_IMPORT_TIMEOUT_MS)
         ),
       ]);
       const Camera = mod?.Camera;
@@ -72,7 +80,7 @@ export default function R08PermissionPriming() {
       const result = await Promise.race([
         Camera.requestPermissions({ permissions: ['camera'] }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('permission_timeout')), 8000)
+          setTimeout(() => reject(new Error('permission_timeout')), CAMERA_PERMISSION_TIMEOUT_MS)
         ),
       ]);
       const state = result?.camera || 'denied';
@@ -107,7 +115,7 @@ export default function R08PermissionPriming() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R8 · CAMERA" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-magnifying-glass.mp4" height={410} />
 
@@ -204,6 +212,10 @@ export default function R08PermissionPriming() {
         label={requesting ? 'Requesting...' : 'Allow Camera Access'}
         onClick={handleAllow}
         disabled={requesting}
+        secondary={{
+          label: 'Not now',
+          onClick: handleNotNow,
+        }}
       />
     </div>
   );

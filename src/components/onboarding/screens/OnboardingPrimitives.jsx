@@ -1,9 +1,11 @@
 import { ChevronLeft, Check } from 'lucide-react';
+import { useReducedMotion } from 'framer-motion';
 import { C, fonts, type, radius, shadows, motion as motionTokens, glass } from '../../../styles/theme';
 import { haptic } from '../../../lib/haptics';
 import { assetUrl } from '../../../lib/assetUrl';
 import { useOnboarding } from '../OnboardingContext';
 import { m, spring, listContainer, listItem } from '../../../lib/motion';
+import { CHAPTERS, ALL_STEPS } from '../onboardingConstants';
 
 // ─── Warm paper background value (used by screens as inline background) ───────
 // Subtle layered warm gradient — deep paper base with a soft vignette lift so
@@ -13,7 +15,30 @@ export const onboardingBg = `linear-gradient(160deg, ${C.bgDeep} 0%, ${C.bg} 45%
 // ─── MascotStage ──────────────────────────────────────────────────────────────
 // Framing-only refinement: warm radial glow behind the mascot for depth,
 // tighter bottom fade. Video pattern is UNCHANGED.
+//
+// Poster + reduced-motion: every mapped video has a same-folder
+// `<name>-poster.jpg` (ffmpeg-extracted first non-black frame, see
+// CREATIVE_SPEC.md §3). We derive it from `src` unless an explicit `poster`
+// override is passed. Under prefers-reduced-motion the <video> never mounts
+// (so it never autoplays) — we render the poster as a plain <img> instead,
+// same container/mask/dimensions.
+const stageMediaStyle = {
+  position: 'relative',
+  zIndex: 1,
+  width: '100%',
+  height: '100%',
+  objectFit: 'contain',
+  objectPosition: 'center bottom',
+  display: 'block',
+  WebkitMaskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
+  maskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
+};
+
 export function MascotStage({ src, height = 460, poster }) {
+  const reduce = useReducedMotion();
+  const posterPath = poster || (src ? src.replace('.mp4', '-poster.jpg') : null);
+  const posterSrc = posterPath ? assetUrl(posterPath) : undefined;
+
   return (
     <div style={{
       position: 'relative',
@@ -32,26 +57,24 @@ export function MascotStage({ src, height = 460, poster }) {
         pointerEvents: 'none',
         zIndex: 0,
       }} />
-      <video
-        src={assetUrl(src)}
-        poster={poster}
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          objectPosition: 'center bottom',
-          display: 'block',
-          WebkitMaskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
-          maskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
-        }}
-      />
+      {reduce ? (
+        <img
+          src={posterSrc}
+          alt=""
+          style={stageMediaStyle}
+        />
+      ) : (
+        <video
+          src={assetUrl(src)}
+          poster={posterSrc}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          style={stageMediaStyle}
+        />
+      )}
     </div>
   );
 }
@@ -94,19 +117,36 @@ export function NoteBubble({ children, style = {} }) {
 }
 
 // ─── OnboardingTopBar ─────────────────────────────────────────────────────────
-// Refined progress indicator: elegant segmented track + filled accent segments.
-// Back button: 44px glass pill (overlay mode) or transparent (inline mode).
-// Step string "R07" → parse to a number for segment fill when possible.
-function parseStepIndex(step) {
-  if (!step) return null;
-  // Matches "R01".."R13b" — extract numeric portion
-  const m = String(step).match(/R?0*(\d+)/i);
-  return m ? parseInt(m[1], 10) : null;
+// Three-chapter progress system (CREATIVE_SPEC.md §1): [You] [Your taste]
+// [Your plan], one pill segment per chapter, each filling left-to-right
+// within its own chapter as the user advances. The current chapter's label
+// renders as an eyebrow 10px right of the back button, cross-fading on
+// chapter change. Reads the step directly off the state machine — no more
+// per-screen `step` label prop.
+function chapterProgress(stepKey) {
+  const chapterIndex = CHAPTERS.findIndex((ch) => ch.steps.includes(stepKey));
+  const safeChapterIndex = chapterIndex === -1 ? 0 : chapterIndex;
+  const chapter = CHAPTERS[safeChapterIndex];
+  const posInChapter = Math.max(0, chapter.steps.indexOf(stepKey));
+
+  // Endowed start: R01 always renders segment 1 at 15%, regardless of the
+  // 1-of-4 fraction that would otherwise compute to 25%.
+  const currentFraction = stepKey === 'r1'
+    ? 0.15
+    : (posInChapter + 1) / chapter.steps.length;
+
+  const fractions = CHAPTERS.map((_, i) => {
+    if (i < safeChapterIndex) return 1;
+    if (i > safeChapterIndex) return 0;
+    return currentFraction;
+  });
+
+  const stepIndex = Math.max(0, ALL_STEPS.indexOf(stepKey));
+
+  return { chapterIndex: safeChapterIndex, label: chapter.label, fractions, stepIndex };
 }
 
-const TOTAL_STEPS = 13;
-
-export function OnboardingTopBar({ step, onBack, hideBack, overlay = false }) {
+export function OnboardingTopBar({ onBack, hideBack, overlay = false }) {
   const { dispatch, state } = useOnboarding();
 
   const handleBack = () => {
@@ -115,73 +155,113 @@ export function OnboardingTopBar({ step, onBack, hideBack, overlay = false }) {
     dispatch({ type: 'BACK' });
   };
 
-  const stepKey = step || state?.step || '';
-  const stepIndex = parseStepIndex(stepKey);
-  const filled = stepIndex ? Math.max(1, stepIndex) : 1;
+  const stepKey = state?.step || 'r1';
+  const { chapterIndex, label, fractions, stepIndex } = chapterProgress(stepKey);
 
   return (
     <div style={{
       position: overlay ? 'absolute' : 'relative',
       top: 0, left: 0, right: 0,
       display: 'flex',
-      alignItems: 'center',
-      minHeight: 44,
+      flexDirection: 'column',
+      gap: 8,
       padding: overlay
         ? `calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px`
         : '8px 16px',
       zIndex: 10,
-      gap: 12,
     }}>
-      {/* Back button — 44×44 minimum tap target */}
-      {!hideBack ? (
-        <button
-          onClick={handleBack}
-          aria-label="Back"
+      {/* Row 1 — back button + current chapter label (10px to its right) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}>
+        {!hideBack ? (
+          <button
+            onClick={handleBack}
+            aria-label="Back"
+            style={{
+              width: 44, height: 44,
+              borderRadius: radius.pill,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: overlay ? glass.chrome : `${C.cream}CC`,
+              backdropFilter: overlay ? glass.blur : 'none',
+              WebkitBackdropFilter: overlay ? glass.blur : 'none',
+              border: `1px solid ${C.hairline}`,
+              cursor: 'pointer',
+              flexShrink: 0,
+              boxShadow: shadows.e1,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <ChevronLeft size={20} color={C.textMuted} strokeWidth={2.5} />
+          </button>
+        ) : (
+          <div style={{ width: 44, height: 44, flexShrink: 0 }} />
+        )}
+
+        {/* Current chapter label — eyebrow, cross-fades 160ms on change */}
+        <div
+          key={chapterIndex}
+          className="onb-chapter-label"
           style={{
-            width: 44, height: 44,
-            borderRadius: radius.pill,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: overlay ? glass.chrome : `${C.cream}CC`,
-            backdropFilter: overlay ? glass.blur : 'none',
-            WebkitBackdropFilter: overlay ? glass.blur : 'none',
-            border: `1px solid ${C.hairline}`,
-            cursor: 'pointer',
-            flexShrink: 0,
-            boxShadow: shadows.e1,
-            WebkitTapHighlightColor: 'transparent',
+            fontFamily: fonts.body,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: C.textMuted,
+            opacity: 1,
           }}
         >
-          <ChevronLeft size={20} color={C.textMuted} strokeWidth={2.5} />
-        </button>
-      ) : (
-        <div style={{ width: 44, height: 44, flexShrink: 0 }} />
-      )}
+          {label}
+        </div>
+      </div>
 
-      {/* Segmented progress track — fills left-to-right with accent colour */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 3,
-        height: 4,
-      }}>
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+      {/* Row 2 — 3-segment chapter bar */}
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={ALL_STEPS.length - 1}
+        aria-valuenow={stepIndex}
+        aria-label="Setup progress"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          height: 3,
+        }}
+      >
+        {fractions.map((fraction, i) => (
           <div
             key={i}
             style={{
               flex: 1,
-              height: '100%',
+              height: 3,
               borderRadius: radius.pill,
-              background: i < filled ? C.accent : C.border,
-              transition: `background ${motionTokens.dur.base}s ${motionTokens.cssOut}`,
-              opacity: i < filled ? 1 : 0.5,
+              background: C.border,
+              overflow: 'hidden',
+              position: 'relative',
             }}
-          />
+          >
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: C.accent,
+              borderRadius: radius.pill,
+              transformOrigin: 'left center',
+              transform: `scaleX(${fraction})`,
+              transition: 'transform 200ms ease-out',
+            }} />
+          </div>
         ))}
       </div>
 
-      {/* Right spacer to balance the back button */}
-      <div style={{ width: 44, height: 44, flexShrink: 0 }} />
+      <style>{`
+        @media (prefers-reduced-motion: no-preference) {
+          @keyframes onb-chapter-fade {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+          }
+        }
+        .onb-chapter-label { animation: onb-chapter-fade 160ms ease-out; }
+      `}</style>
     </div>
   );
 }

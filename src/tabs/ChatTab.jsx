@@ -7,6 +7,7 @@ import { C, fonts, glass, shadows, radius, type as typeScale, motion as motionTo
 import { m, spring, fadeUp, popIn } from '../lib/motion';
 import { haptic } from '../lib/haptics';
 import { buildChatContext, compressImage, prepareChatMessagesForClaude } from '../lib/claude';
+import { getOnboardingPalate, palateSummaryLine } from '../lib/palateProfile';
 import { searchWeb } from '../lib/gemini';
 import { API_BASE } from '../lib/apiBase';
 import { streamWithAuth, resolveTerminal, holdBackScan } from '../lib/streamChat';
@@ -825,6 +826,13 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
             };
 
             const systemPrompt = buildChatContext(beans, tastings, preferences, firstName);
+            // Additive onboarding-palate seam (src/lib/palateProfile.js) — appended to
+            // the DYNAMIC block only (systemPrompt[1], no cache_control). Absent/invalid
+            // onboarding data (all pre-onboarding-100x users) leaves this a no-op.
+            const onboardingPalateLine = palateSummaryLine(getOnboardingPalate(profile));
+            if (onboardingPalateLine && systemPrompt[1]) {
+              systemPrompt[1] = { ...systemPrompt[1], text: `${systemPrompt[1].text}\n\n${onboardingPalateLine}` };
+            }
             const history = apiMessages.current.filter(m => m.role !== 'system');
             const passHistory = extraContext
               ? [...history, { role: 'user', content: extraContext }]

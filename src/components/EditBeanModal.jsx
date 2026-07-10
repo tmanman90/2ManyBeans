@@ -479,7 +479,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const rowStyle = { marginBottom: 14 };
   const filled = [f.roaster, f.name, f.origin, f.variety, f.process, f.bagSize, f.roastDate, f.bagNotes].filter(v => v && String(v).trim()).length;
   const total = 8;
-  const sourceSummary = summarizeSourceInsights(f, { maxChars: 260 });
+  const sourceSummary = summarizeSourceInsights(f, { maxChars: 420 });
 
   return (
     <Modal open={open} onClose={handleCancel} title={

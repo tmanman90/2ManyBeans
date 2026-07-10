@@ -6,11 +6,12 @@ import { normalizeSourceInsights } from './sourceInsights';
 
 const PROXY_URL = `${API_BASE}/api/gemini`;
 
-export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false, feature }) {
+export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false, feature, responseMimeType }) {
   const body = { model, contents, systemInstruction, maxTokens };
   if (tools) body.tools = tools;
   if (metered) body.metered = true;
   if (feature) body.feature = feature;
+  if (responseMimeType) body.responseMimeType = responseMimeType;
   return fetchWithRetry({ url: PROXY_URL, body, retries, serviceName: 'Gemini' });
 }
 
@@ -75,6 +76,7 @@ STEP 6 -- COFFEE NAME:
 
 STEP 7 -- STRUCTURED OUTPUT:
 Respond with ONLY a valid JSON object (no markdown, no backticks, no explanation):
+Keep all narrative sourceInsight fields concise. Do not transcribe full paragraphs from pamphlets/cards/inserts; summarize them.
 
 {
   "roaster": "roaster/brand name (or 'Curator (Roaster)' format if subscription)",
@@ -127,22 +129,29 @@ If a field is not visible, use an empty string (or 100 for bagSize). If no pamph
     contents: [{
       parts: [...imageParts, { text: scanPrompt }],
     }],
-    maxTokens: 2500,
+    maxTokens: 4000,
     metered: true,
     feature: 'beanScan',
+    responseMimeType: 'application/json',
   });
 
   const text = data.text || '';
-  const clean = text.replace(/```json|```/g, '').trim();
+  const clean = text.replace(/```(?:json)?/gi, '').trim();
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('Could not read the label. Please try a clearer photo.');
+    if (data.finishReason === 'MAX_TOKENS') {
+      throw new Error('The scan found a lot of label text and ran long. Please try again with fewer photos, or crop the insert closer.');
+    }
+    throw new Error('The scan result came back in a format I could not read. Please try again.');
   }
   let parsed;
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch {
-    throw new Error('Could not read the label. Please try a clearer photo.');
+    if (data.finishReason === 'MAX_TOKENS') {
+      throw new Error('The scan found a lot of label text and ran long. Please try again with fewer photos, or crop the insert closer.');
+    }
+    throw new Error('The scan result came back incomplete. Please try again.');
   }
 
   if (parsed.error) {

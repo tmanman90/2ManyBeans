@@ -1,6 +1,7 @@
 // App shell — warm Ghibli-inspired coffee journal
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { assetUrl } from "./lib/assetUrl";
+import { getOnboardingPalate } from './lib/palateProfile';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { C, fonts, shadows, glass } from './styles/theme';
 import { m, spring } from './lib/motion';
@@ -42,6 +43,8 @@ const tabs = [
 export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
+  // Onboarding palate seam (null for every pre-onboarding-100x profile).
+  const onboardingPalate = useMemo(() => getOnboardingPalate(profile), [profile]);
   const [openModal, setOpenModal] = useState(false);
   const [targetSlot, setTargetSlot] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -223,6 +226,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             getBeanById={getBeanById}
             onStartTastingSession={handleStartTastingSession}
             onAddBeanQuickAction={handleStartAddBeanScan}
+            onboardingPalate={onboardingPalate}
             isDemo={isDemo}
             onDemoAction={onDemoAction}
           />
@@ -262,6 +266,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               onWizardDraftChange={setTastingWizardDraft}
               pendingTastingBeanId={pendingTastingBeanId}
               onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
+              onboardingPalate={onboardingPalate}
               isDemo={isDemo}
               onDemoAction={onDemoAction}
             />

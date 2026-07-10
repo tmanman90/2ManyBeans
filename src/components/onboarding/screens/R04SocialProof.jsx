@@ -49,7 +49,7 @@ export default function R04SocialProof() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-reading-book.mp4" height={370} />
 

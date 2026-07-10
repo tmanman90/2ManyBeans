@@ -96,7 +96,7 @@ export default function R07Preferences() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R7 · YOUR KIT" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-holding-grinder.mp4" height={220} />
 

@@ -12,7 +12,7 @@ import { X } from 'lucide-react';
 import { m } from 'framer-motion';
 import { C, fonts, type, radius, shadows, glass, motion as M } from '../../styles/theme';
 import { haptic } from '../../lib/haptics';
-import { predict } from '../../lib/tastingExpectations';
+import { predict, applyPalateTiebreak } from '../../lib/tastingExpectations';
 import { palateLevel } from '../../lib/palate';
 import { AXES as SLIDER_AXES } from '../../lib/flavorWheel';
 import { TASTING_WIZARD_STEPS, initialAnswers, stepComplete, capturedScores, buildTastingFromAnswers } from '../../lib/tastingWizardSteps';
@@ -45,7 +45,7 @@ const BONE_REVEAL_ADVANCE_MS = 1100;
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge }) {
+export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge, onboardingPalate = null }) {
   const [initialState] = useState(() => normalizeDraft(draft, bean?.id));
 
   const [phase, setPhase] = useState(initialState.phase); // intro | steps | reveal
@@ -62,7 +62,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   // Keyboard height so the content area can pad out and the focused field scrolls clear of the keyboard.
   const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
-  const expected = useMemo(() => predict(bean), [bean]);
+  const expected = useMemo(() => applyPalateTiebreak(predict(bean), onboardingPalate), [bean, onboardingPalate]);
   const palate = useMemo(() => palateLevel(tastings), [tastings]);
   const step = TASTING_WIZARD_STEPS[idx];
   const scores = answers.scores;

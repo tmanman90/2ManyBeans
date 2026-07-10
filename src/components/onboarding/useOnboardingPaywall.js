@@ -23,8 +23,7 @@ import { Capacitor } from '@capacitor/core';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { usePaywall } from '../../hooks/usePaywall.jsx';
 import { isRevenueCatAvailable } from '../../lib/revenuecat';
-
-const DISMISS_DISAMBIG_MS = 500;
+import { PAYWALL_DISMISS_DISAMBIG_MS as DISMISS_DISAMBIG_MS } from './onboardingConstants';
 
 export function useOnboardingPaywall() {
   const { firestoreLoaded, rcHydrated, hasPro, hasUltra } = useSubscription();

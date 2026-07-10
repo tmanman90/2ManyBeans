@@ -1,0 +1,1 @@
+7290ec3 feat(chat): chatSessions rules block — owner-only, pinned active doc, 50-message cap (U8 backend)

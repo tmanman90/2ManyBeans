@@ -27,7 +27,7 @@ export default function R02Goal() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-thinking.mp4" height={260} />
 

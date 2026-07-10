@@ -18,7 +18,7 @@ export default function R10Demo() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R10 · SCAN DEMO" hideBack overlay />
+      <OnboardingTopBar hideBack overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-writing-notes.mp4" height={230} />
 
@@ -116,11 +116,13 @@ export default function R10Demo() {
           ))}
 
           <style>{`
-            @keyframes r10-scan {
-              0%   { top: 0%;  opacity: 0; }
-              8%   { opacity: 1; }
-              92%  { opacity: 1; }
-              100% { top: 96%; opacity: 0; }
+            @media (prefers-reduced-motion: no-preference) {
+              @keyframes r10-scan {
+                0%   { top: 0%;  opacity: 0; }
+                8%   { opacity: 1; }
+                92%  { opacity: 1; }
+                100% { top: 96%; opacity: 0; }
+              }
             }
           `}</style>
         </m.div>

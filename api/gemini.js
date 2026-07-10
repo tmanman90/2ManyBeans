@@ -19,6 +19,7 @@ function getClient() {
 // credit. See todos/008-pending-p1-legacy-productShot-in-gemini-proxy.md.
 
 const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-3.1-flash-image-preview'];
+const ALLOWED_RESPONSE_MIME_TYPES = new Set(['application/json']);
 const MAX_TOKENS_CAP = 4000;
 const RATE_LIMIT = { key: 'gemini', limit: 120, windowMs: 60 * 60 * 1000 };
 
@@ -29,6 +30,7 @@ async function handleText(req, res, feature, decodedToken) {
     systemInstruction,
     maxTokens = 1500,
     tools,
+    responseMimeType,
   } = req.body;
 
   if (!contents) {
@@ -37,22 +39,27 @@ async function handleText(req, res, feature, decodedToken) {
 
   const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'gemini-2.5-flash';
   const safeMaxTokens = Math.min(maxTokens || 1500, MAX_TOKENS_CAP);
+  const safeResponseMimeType = ALLOWED_RESPONSE_MIME_TYPES.has(responseMimeType) ? responseMimeType : undefined;
 
   const client = getClient();
   const generativeModel = client.getGenerativeModel({
     model,
     ...(systemInstruction && { systemInstruction }),
     ...(tools && { tools }),
-    generationConfig: { maxOutputTokens: safeMaxTokens },
+    generationConfig: {
+      maxOutputTokens: safeMaxTokens,
+      ...(safeResponseMimeType && { responseMimeType: safeResponseMimeType }),
+    },
   });
 
   const result = await generativeModel.generateContent({ contents });
   const response = result.response;
   const text = response.text();
   const groundingMetadata = response.candidates?.[0]?.groundingMetadata || null;
+  const finishReason = response.candidates?.[0]?.finishReason || null;
 
   logApiUsage({ uid: decodedToken?.uid, provider: 'gemini', model, feature, endpoint: '/api/gemini', usage: response.usageMetadata });
-  return res.status(200).json({ text, groundingMetadata });
+  return res.status(200).json({ text, groundingMetadata, finishReason });
 }
 
 // Gemini text/vision endpoint. Used for bean scan, AI Fill (research),

@@ -3,8 +3,8 @@ import { C, fonts, type as t, radius } from '../../../styles/theme';
 import { m, fadeUp } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, onboardingBg } from './OnboardingPrimitives';
+import { PROCESSING_MS } from '../onboardingConstants';
 
-const PROCESSING_MS = 3000;
 const QUIPS = [
   'Studying your palate...',
   'Calibrating recipes...',
@@ -69,7 +69,7 @@ export default function R09Processing() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="R9 · BUILDING YOUR PLAN" hideBack overlay />
+      <OnboardingTopBar hideBack overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-celebrating.mp4" height={410} />
 
@@ -149,9 +149,11 @@ export default function R09Processing() {
       </m.div>
 
       <style>{`
-        @keyframes r09-fill {
-          from { transform: scaleX(0); }
-          to   { transform: scaleX(1); }
+        @media (prefers-reduced-motion: no-preference) {
+          @keyframes r09-fill {
+            from { transform: scaleX(0); }
+            to   { transform: scaleX(1); }
+          }
         }
       `}</style>
     </div>

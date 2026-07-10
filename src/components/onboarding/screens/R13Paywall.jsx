@@ -7,8 +7,7 @@ import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
 import { useSubscription } from '../../../contexts/SubscriptionContext';
 import { usePaywall } from '../../../hooks/usePaywall.jsx';
 import { onboardingBg } from './OnboardingPrimitives';
-
-const HYDRATION_TIMEOUT_MS = 5000;
+import { PAYWALL_HYDRATION_TIMEOUT_MS as HYDRATION_TIMEOUT_MS } from '../onboardingConstants';
 
 // Visual plan card data — no logic, purely presentational labels
 const PLANS = [
@@ -208,9 +207,11 @@ export default function R13Paywall() {
               }} />
             </div>
             <style>{`
-              @keyframes onboarding-spinner {
-                from { transform: rotate(0deg); }
-                to   { transform: rotate(360deg); }
+              @media (prefers-reduced-motion: no-preference) {
+                @keyframes onboarding-spinner {
+                  from { transform: rotate(0deg); }
+                  to   { transform: rotate(360deg); }
+                }
               }
             `}</style>
             <div style={{ ...t.body, color: C.textMuted }}>

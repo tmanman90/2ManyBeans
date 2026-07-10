@@ -9,7 +9,7 @@
 // pending (real photos render as-is on the white card for now).
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight } from 'lucide-react';
+import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight, Settings2 } from 'lucide-react';
 import { splitTastingNotes } from '../lib/tastingHero';
 import { AnimatePresence, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
 import { m, spring } from '../lib/motion';
@@ -601,7 +601,9 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                     <div style={{ width: 1, alignSelf: 'stretch', background: HAIR, margin: '2px 0' }} />
                     <StatBarItem icon={<Leaf size={20} color={INK} />} label="Variety" value={bean.variety || '—'} />
                     <div style={{ width: 1, alignSelf: 'stretch', background: HAIR, margin: '2px 0' }} />
-                    <StatBarItem icon={<WeightIcon />} label="Weight" value={bean.bagSize ? `${bean.bagSize}g` : '—'} />
+                    {bean.status === 'ACTIVE' && grindText
+                      ? <StatBarItem icon={<Settings2 size={20} color={INK} />} label="Grind" value={grindText} />
+                      : <StatBarItem icon={<WeightIcon />} label="Weight" value={bean.bagSize ? `${bean.bagSize}g` : '—'} />}
                   </div>
 
                   {/* Sealed beans (opened from Inventory) lead with "Open into jar"; the

@@ -190,6 +190,18 @@ export function formatSourceInsightsForPrompt(beanOrSource, { maxChars = 1200 } 
   return lines.join('\n').slice(0, maxChars);
 }
 
+function truncateText(value, maxChars) {
+  const text = compactWhitespace(value);
+  if (!text || text.length <= maxChars) return text;
+
+  const clipped = text.slice(0, Math.max(0, maxChars - 1));
+  const lastBreak = clipped.search(/\s+\S*$/);
+  const trimmed = lastBreak > maxChars * 0.65
+    ? clipped.slice(0, lastBreak)
+    : clipped;
+  return `${trimmed.trimEnd()}…`;
+}
+
 export function summarizeSourceInsights(beanOrSource, { maxChars = 220 } = {}) {
   const source = normalizeSourceInsights(beanOrSource?.sourceInsights || beanOrSource);
   if (!source) return '';
@@ -198,7 +210,7 @@ export function summarizeSourceInsights(beanOrSource, { maxChars = 220 } = {}) {
     source.sensoryDescriptors.length ? source.sensoryDescriptors.slice(0, 6).join(' / ') : '',
     source.brewGuidance,
   ].filter(Boolean);
-  return sanitizeSourceText(parts.join(' '), maxChars);
+  return truncateText(sanitizeSourceText(parts.join(' '), maxChars + 80), maxChars);
 }
 
 export function sourceAxesToFlavorProfile(beanOrSource) {

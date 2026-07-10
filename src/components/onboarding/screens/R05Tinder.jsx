@@ -72,7 +72,7 @@ export default function R05Tinder() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <OnboardingTopBar step="" overlay />
+      <OnboardingTopBar overlay />
 
       <MascotStage src="/images/ruphus-animations/ruphus-sniffing-beans.mp4" height={210} />
 

@@ -19,6 +19,7 @@ import { OnboardingErrorBoundary } from './OnboardingErrorBoundary';
 import { clearState, loadState, saveState, setDevForceOnboarding } from './onboardingState';
 import { logOnboardingEvent } from '../../lib/onboardingAnalytics';
 import { LoadingScreen } from '../LoadingScreen';
+import { FINISH_TIMEOUT_MS } from './onboardingConstants';
 
 import R01Welcome from './screens/R01Welcome';
 import R02Goal from './screens/R02Goal';
@@ -248,7 +249,7 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
         Promise.race([
           promise,
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Network timeout — please try again.')), 12000)
+            setTimeout(() => reject(new Error('Network timeout — please try again.')), FINISH_TIMEOUT_MS)
           ),
         ]);
 
