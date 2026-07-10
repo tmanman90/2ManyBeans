@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ChevronLeft, Check } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { C, fonts, type, radius, shadows, motion as motionTokens, glass } from '../../../styles/theme';
@@ -158,6 +159,18 @@ export function OnboardingTopBar({ onBack, hideBack, overlay = false }) {
   const stepKey = state?.step || 'r1';
   const { chapterIndex, label, fractions, stepIndex } = chapterProgress(stepKey);
 
+  // True 160ms cross-fade on chapter change: the outgoing label stays mounted
+  // (absolutely stacked) fading out while the incoming one fades in.
+  const [prevLabel, setPrevLabel] = useState(null);
+  const [shownLabel, setShownLabel] = useState(label);
+  useEffect(() => {
+    if (label === shownLabel) return;
+    setPrevLabel(shownLabel);
+    setShownLabel(label);
+    const t = setTimeout(() => setPrevLabel(null), 160);
+    return () => clearTimeout(t);
+  }, [label, shownLabel]);
+
   return (
     <div style={{
       position: overlay ? 'absolute' : 'relative',
@@ -196,21 +209,41 @@ export function OnboardingTopBar({ onBack, hideBack, overlay = false }) {
           <div style={{ width: 44, height: 44, flexShrink: 0 }} />
         )}
 
-        {/* Current chapter label — eyebrow, cross-fades 160ms on change */}
-        <div
-          key={chapterIndex}
-          className="onb-chapter-label"
-          style={{
-            fontFamily: fonts.body,
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            color: C.textMuted,
-            opacity: 1,
-          }}
-        >
-          {label}
+        {/* Current chapter label — eyebrow, true 160ms cross-fade on change */}
+        <div style={{ position: 'relative' }}>
+          <div
+            key={shownLabel}
+            className="onb-chapter-label"
+            style={{
+              fontFamily: fonts.body,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: C.textMuted,
+              opacity: 1,
+            }}
+          >
+            {shownLabel}
+          </div>
+          {prevLabel && (
+            <div
+              aria-hidden
+              className="onb-chapter-label-out"
+              style={{
+                position: 'absolute', top: 0, left: 0,
+                fontFamily: fonts.body,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: C.textMuted,
+                pointerEvents: 'none',
+              }}
+            >
+              {prevLabel}
+            </div>
+          )}
         </div>
       </div>
 
@@ -259,8 +292,16 @@ export function OnboardingTopBar({ onBack, hideBack, overlay = false }) {
             from { opacity: 0; }
             to   { opacity: 1; }
           }
+          @keyframes onb-chapter-fade-out {
+            from { opacity: 1; }
+            to   { opacity: 0; }
+          }
         }
         .onb-chapter-label { animation: onb-chapter-fade 160ms ease-out; }
+        .onb-chapter-label-out { animation: onb-chapter-fade-out 160ms ease-out both; }
+        @media (prefers-reduced-motion: reduce) {
+          .onb-chapter-label-out { display: none; }
+        }
       `}</style>
     </div>
   );

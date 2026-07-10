@@ -199,7 +199,7 @@ export default function R09Processing() {
           .r09-beat {
             opacity: 0;
             animation: r09-beat-in 240ms cubic-bezier(0.22,1,0.36,1) both;
-            animation-delay: calc(var(--axis-i) * 600ms);
+            animation-delay: calc(var(--axis-i) * ${AXIS_BEAT_MS}ms);
           }
           .r09-line-fade {
             opacity: 0;
