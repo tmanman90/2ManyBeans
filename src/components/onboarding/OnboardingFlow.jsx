@@ -253,7 +253,7 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
         Promise.race([
           promise,
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Network timeout — please try again.')), FINISH_TIMEOUT_MS)
+            setTimeout(() => reject(new Error('Network timeout. Please try again.')), FINISH_TIMEOUT_MS)
           ),
         ]);
 

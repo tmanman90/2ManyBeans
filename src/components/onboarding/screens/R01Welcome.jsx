@@ -82,7 +82,7 @@ export default function R01Welcome() {
         <m.div variants={listItem} style={{ marginTop: 2 }}>
           <NoteBubble>
             I'm Professor Ruphus. Glad you're here. Give me a minute to learn how
-            you brew — I'll take good care of you.
+            you brew. I'll take good care of you.
           </NoteBubble>
         </m.div>
       </m.div>

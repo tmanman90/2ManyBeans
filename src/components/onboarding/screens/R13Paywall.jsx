@@ -603,8 +603,7 @@ export default function R13Paywall() {
                 <div style={{
                   ...t.caption,
                   color: C.textLight,
-                  textAlign: 'center',
-                  maxWidth: 260,
+                  textAlign: 'left',
                   lineHeight: 1.5,
                 }}>
                   Prices shown in the native payment sheet. Cancel anytime during your trial.

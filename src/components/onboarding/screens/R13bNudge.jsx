@@ -59,6 +59,7 @@ export default function R13bNudge() {
       await finish?.({ postCompleteAction: heldAction != null ? heldAction : 'none' });
     } catch (err) {
       setError(err?.message || 'Something went wrong. Please try again.');
+      busyRef.current = false;
       setBusy(false);
     }
   };

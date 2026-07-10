@@ -166,6 +166,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           console.warn('[App] Could not clear scan handoff; skipping bean create to avoid duplicates', err);
           return;
         }
+        // Cross-instance/second-device belt: if an identical onboarding bean
+        // already exists (another mount won the race), skip creation.
+        const dupe = beans.some(b => b.name === pendingScanBean.name && b.roaster === pendingScanBean.roaster);
+        if (dupe) { setTab('inventory'); return; }
         try {
           const beanData = buildNewBeanData({
             roaster: pendingScanBean.roaster,

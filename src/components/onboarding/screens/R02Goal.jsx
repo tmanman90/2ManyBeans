@@ -48,7 +48,7 @@ export default function R02Goal() {
         {/* Note bubble */}
         <m.div variants={listItem}>
           <NoteBubble>
-            Right — tell me what you're chasing. I'll tailor everything around it.
+            Right, tell me what you're chasing. I'll tailor everything around it.
           </NoteBubble>
         </m.div>
 
