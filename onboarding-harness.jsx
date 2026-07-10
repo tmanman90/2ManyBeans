@@ -42,6 +42,56 @@ async function defaultFinishProfile(answers) {
   window.__SAVED_PROFILE__ = answers;
 }
 
+// URL presets so the U12 SIMULATOR evidence capture can drive the harness by
+// tapping alone (no Playwright context to inject mocks). ?preset=scan|redeem
+// configures the scan/redeem seams; ?step=rN seeds the app's own resume
+// mechanism. Evidence-only sugar — verify-onboarding.mjs injects its own
+// mocks via addInitScript and never passes these params.
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const preset = params.get('preset');
+  const step = params.get('step');
+  if (!preset && !step) return;
+  const w = window;
+  w.__ONBOARDING_TEST__ = w.__ONBOARDING_TEST__ || {};
+  if (preset === 'scan') {
+    w.__ONBOARDING_TEST__.captureBagPhoto = async () => 'data:image/jpeg;base64,';
+    w.__ONBOARDING_TEST__.scanBeanLabel = async () => {
+      await new Promise((r) => setTimeout(r, 1400)); // let the loader frame exist
+      return {
+        roaster: 'MOVING COFFEE', name: 'Bombe Bensa', origin: 'Ethiopia',
+        variety: 'Heirloom & Landrace', process: 'Natural', roastDate: '2026-06-20',
+        bagNotes: 'Crunchy apricot / Lemon zest / Rainier cherry',
+      };
+    };
+  }
+  if (preset === 'redeem') {
+    w.__ONBOARDING_TEST__.redeemCode = async () => {
+      await new Promise((r) => setTimeout(r, 500));
+      // Flip the mock entitlement right after the "server" grants it, so the
+      // celebration beat is reachable by tapping alone.
+      setTimeout(() => w.__ONBOARDING_TEST__?.paywall?.simulateEntitlement?.(), 100);
+      return { ok: true };
+    };
+    w.__ONBOARDING_TEST__.paywall = { ...(w.__ONBOARDING_TEST__.paywall || {}), status: 'ready' };
+  }
+  if (step) {
+    const base = {
+      goal: 'v60', pain: 'inconsistent',
+      tinderCards: [
+        { id: 'c1_sweetness', swipe: 'yes' }, { id: 'c2_acidity', swipe: 'yes' },
+        { id: 'c3_body', swipe: 'no' }, { id: 'c4_clean_funky', swipe: 'yes' },
+        { id: 'c5_fruit_nutty', swipe: 'no' },
+      ],
+      preferences: { grinder: 'fellow-ode-gen2', grinderCustomName: null, brewMethod: 'v60', displayName: null },
+      cameraPermission: preset === 'scan' ? 'granted' : 'denied',
+      palateChart: { sweetness: 0.6, acidity: 0.6, body: -0.6, clean_funky: 0.6, fruit_nutty: -0.6 },
+      pendingScanBean: null, marketingConsent: false, completedVia: null, postCompleteAction: 'none',
+    };
+    localStorage.setItem('onboarding_state_v1_harness-uid', JSON.stringify({ step, answers: base }));
+  }
+})();
+
 function Harness() {
   const [hasPro, setHasPro] = useState(false);
 

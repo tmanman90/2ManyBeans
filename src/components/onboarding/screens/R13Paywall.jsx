@@ -90,20 +90,27 @@ function firstPalatePhrase(answers) {
 // size/position props for corner placement, so this renders the same
 // video+poster+reduced-motion pattern directly, scaled to h180 and pinned
 // to the top-right corner instead.
-const MASCOT_CORNER_HEIGHT = 180;
+const MASCOT_CORNER_HEIGHT = 120;
 function MascotCorner({ src, reduce }) {
   const posterSrc = assetUrl(src.replace('.mp4', '-poster.jpg'));
+  // Radial mask (MascotStage's pattern) feathers the video's paper-white
+  // background into the backdrop — without it the corner reads as a pasted
+  // white rectangle over the headline (sim evidence, D23).
+  const mask = 'radial-gradient(ellipse 62% 62% at center 46%, black 42%, transparent 92%)';
   return (
     <div
       aria-hidden
       style={{
         position: 'absolute',
-        top: 'calc(env(safe-area-inset-top, 0px) + 4px)',
-        right: 0,
+        top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
+        right: 4,
         width: MASCOT_CORNER_HEIGHT * 0.78,
         height: MASCOT_CORNER_HEIGHT,
-        zIndex: 2,
+        zIndex: 0,
         pointerEvents: 'none',
+        WebkitMaskImage: mask,
+        maskImage: mask,
+        opacity: 0.9,
       }}
     >
       {reduce ? (
@@ -345,7 +352,9 @@ export default function R13Paywall() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100dvh',
-        padding: '32px 24px calc(32px + env(safe-area-inset-bottom))',
+        // Top clears the status bar + the X/mascot header row so the eyebrow
+        // and headline never collide with either (sim evidence, D23).
+        padding: 'calc(env(safe-area-inset-top, 0px) + 64px) 24px calc(32px + env(safe-area-inset-bottom))',
         textAlign: 'center',
       }}>
         {finalizeError ? (

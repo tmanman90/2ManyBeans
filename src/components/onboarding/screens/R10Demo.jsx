@@ -372,7 +372,7 @@ export default function R10Demo() {
   // NoteBubble template (CREATIVE_SPEC.md §2 R10, exact): drop the first
   // sentence entirely when origin/process are missing.
   const noteLine = scanResult && scanResult.origin && scanResult.process
-    ? `A ${scanResult.origin} ${scanResult.process}. Right up your alley if you love ${prediction}. I'll keep the full breakdown for your shelf.`
+    ? `${scanResult.origin}, ${String(scanResult.process || '').toLowerCase()} process. Right up your alley if you love ${prediction}. I'll keep the full breakdown for your shelf.`
     : `Right up your alley if you love ${prediction}. I'll keep the full breakdown for your shelf.`;
 
   const resultLine = scanResult
