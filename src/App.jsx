@@ -141,6 +141,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // action with no held bean (the user skipped R10, or never scanned)
   // keeps launching the scan flow exactly as before.
   const handoffConsumedRef = useRef(false);
+  // Fresh beans at consume time — the async closure below would otherwise
+  // capture the render-time array (stale-empty on cold native starts).
+  const beansRef = useRef(beans);
+  beansRef.current = beans;
   useEffect(() => {
     if (handoffConsumedRef.current) return;
     if (tourActive) return;
@@ -168,7 +172,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
         }
         // Cross-instance/second-device belt: if an identical onboarding bean
         // already exists (another mount won the race), skip creation.
-        const dupe = beans.some(b => b.name === pendingScanBean.name && b.roaster === pendingScanBean.roaster);
+        const dupe = beansRef.current.some(b => b.name === pendingScanBean.name && b.roaster === pendingScanBean.roaster);
         if (dupe) { setTab('inventory'); return; }
         try {
           const beanData = buildNewBeanData({

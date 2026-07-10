@@ -166,13 +166,18 @@ async function scenario(name, fn) {
 // ---------------------------------------------------------------------------
 const HARNESS_UID_KEY = 'onboarding_state_v1_harness-uid';
 
+// Each scenario gets its OWN browser context (not just a new page/tab) — fully
+// isolated storage + its own Vite HMR WebSocket client, so nothing from a prior
+// scenario's page/connection can cross-contaminate the next one. Tracked in
+// openPages (holds {context} wrappers) and torn down in the scenario() finally.
 async function bootPage(browser, { reducedMotion, step, answers, adapter, viewport } = {}) {
-  const page = await browser.newPage({
+  const context = await browser.newContext({
     viewport: viewport || { width: 402, height: 900 },
     deviceScaleFactor: 2,
     reducedMotion,
   });
-  openPages.push(page);
+  const page = await context.newPage();
+  openPages.push(context);
   const consoleErrors = [];
   page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push('console: ' + m.text()); });
@@ -505,8 +510,11 @@ try {
     if (state?.answers?.pendingScanBean?.name !== 'Kirinyaga AA') throw new Error('pendingScanBean not held in state: ' + JSON.stringify(state?.answers?.pendingScanBean));
 
     await clickBtn(page, 'Keep going', 400);
+    // R11ValueDelivery.jsx's hasHeldScan (pendingScanBean truthy, which is now
+    // true since the scan just succeeded) overrides the canScan label — CTA
+    // reads "Continue", not "Scan my first bag".
     const r11text = await bodyText(page);
-    if (!r11text.includes('Scan my first bag')) throw new Error('no continue path after "Keep going" (expected R11 CTA)');
+    if (!r11text.includes('Continue')) throw new Error('no continue path after "Keep going" (expected R11 CTA)');
 
     if (consoleErrors.length) throw new Error('console/page errors: ' + JSON.stringify(consoleErrors.slice(0, 6)));
   });
