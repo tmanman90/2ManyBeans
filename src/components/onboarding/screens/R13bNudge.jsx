@@ -6,6 +6,7 @@ import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
 import { useSubscription } from '../../../contexts/SubscriptionContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 import RedemptionInline from './RedemptionInline';
+import { useNativeKeyboard } from '../../../hooks/useNativeKeyboard';
 import { haptic } from '../../../lib/haptics';
 import { REDEEM_CELEBRATE_MS } from '../onboardingConstants';
 
@@ -14,6 +15,7 @@ export default function R13bNudge() {
   const { hasPro, hasUltra } = useSubscription();
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false); // cross-handler finish guard (codex P23 finding 3)
+  const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
   const [error, setError] = useState(null);
   const [celebrating, setCelebrating] = useState(false);
 
@@ -151,6 +153,7 @@ export default function R13bNudge() {
           flexDirection: 'column',
           gap: 14,
           minHeight: 0,
+          paddingBottom: keyboardHeight ? keyboardHeight + 24 : 8,
           // Scrollable so the expanding invite-code input (and the keyboard
           // it summons) can never clip behind the CTA bar on short phones
           // (codex P23 finding 8).

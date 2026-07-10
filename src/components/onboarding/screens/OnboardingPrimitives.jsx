@@ -23,9 +23,18 @@ export const onboardingBg = `linear-gradient(160deg, ${C.bgDeep} 0%, ${C.bg} 45%
 // override is passed. Under prefers-reduced-motion the <video> never mounts
 // (so it never autoplays) — we render the poster as a plain <img> instead,
 // same container/mask/dimensions.
+// Mask lives on the CONTAINER, not the media element: WKWebView on real
+// devices drops CSS masks on composited (positioned) <video> layers — the
+// mask silently disappears and the video's white background renders as a
+// hard box (Tal's device review, 2026-07-09). Masking the parent div is the
+// established mascot pattern and survives compositing.
 const stageMediaStyle = {
-  position: 'relative',
-  zIndex: 1,
+  // NO position/zIndex here: positioning the <video> promotes it to its own
+  // compositing layer and real-device WKWebView drops CSS masks on composited
+  // video (the white-box regression). Unpositioned, the element-level mask
+  // feathers relative to the video's own box (per-video precision); the
+  // container mask above is the device-safe belt. The glow paints over the
+  // unpositioned video but is translucent by design.
   width: '100%',
   height: '100%',
   objectFit: 'contain',
@@ -34,6 +43,7 @@ const stageMediaStyle = {
   WebkitMaskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
   maskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
 };
+const stageMask = 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)';
 
 export function MascotStage({ src, height = 460, poster }) {
   const reduce = useReducedMotion();
@@ -48,7 +58,10 @@ export function MascotStage({ src, height = 460, poster }) {
       flexShrink: 0,
       overflow: 'hidden',
       background: 'transparent',
-      paddingTop: 'env(safe-area-inset-top, 0px)',
+      // No safe-area padding: the top bar is a real layout row above the
+      // stage now, so the stage never sits under the notch.
+      WebkitMaskImage: stageMask,
+      maskImage: stageMask,
     }}>
       {/* Warm ambient glow behind mascot */}
       <div style={{
@@ -172,15 +185,17 @@ export function OnboardingTopBar({ onBack, hideBack, overlay = false }) {
   }, [label, shownLabel]);
 
   return (
+    // Always a real layout row — never absolute. Overlay mode used to float
+    // the bar over the mascot video, slicing the mascot's face with the
+    // chapter progress line on device (Tal's review, 2026-07-09). `overlay`
+    // now only picks the glassier back-button chrome.
     <div style={{
-      position: overlay ? 'absolute' : 'relative',
+      position: 'relative',
       top: 0, left: 0, right: 0,
       display: 'flex',
       flexDirection: 'column',
       gap: 8,
-      padding: overlay
-        ? `calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px`
-        : '8px 16px',
+      padding: `calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px`,
       zIndex: 10,
     }}>
       {/* Row 1 — back button + current chapter label (10px to its right) */}

@@ -16,7 +16,7 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { OnboardingContext } from './OnboardingContext';
 import { OnboardingErrorBoundary } from './OnboardingErrorBoundary';
-import { clearState, loadState, saveState, setDevForceOnboarding } from './onboardingState';
+import { clearState, loadState, saveState, setDevForceOnboarding, isDevForceOnboarding } from './onboardingState';
 import { logOnboardingEvent } from '../../lib/onboardingAnalytics';
 import { LoadingScreen } from '../LoadingScreen';
 import { FINISH_TIMEOUT_MS } from './onboardingConstants';
@@ -307,9 +307,16 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
 
       if (uid) clearState(uid);
       // Clear the DEV replay flag (no-op in prod builds — the helper
-      // just tries/catches localStorage). This lets Gate 5 drop the
-      // user back into the main app on the next render.
+      // just tries/catches localStorage). Gate 5 reads the flag in a
+      // mount-scoped memo, so clearing localStorage alone leaves the
+      // replay session STRANDED on the final screen (Tal's device
+      // review) — a replay session must hard-reload to re-run the gate.
+      const wasDevReplay = isDevForceOnboarding();
       setDevForceOnboarding(false);
+      if (wasDevReplay) {
+        window.location.reload();
+        return;
+      }
       logOnboardingEvent('onboarding_completed', {
         completedVia: answers.completedVia || 'skipped_paywall',
       });

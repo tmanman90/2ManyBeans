@@ -11,6 +11,7 @@ import { usePaywall } from '../../../hooks/usePaywall.jsx';
 import { onboardingBg } from './OnboardingPrimitives';
 import { GlassButton } from '../../GlassButton';
 import RedemptionInline from './RedemptionInline';
+import { useNativeKeyboard } from '../../../hooks/useNativeKeyboard';
 import { assetUrl } from '../../../lib/assetUrl';
 import { haptic } from '../../../lib/haptics';
 import { palateArchetype } from '../../../lib/onboardingPalate';
@@ -148,6 +149,7 @@ export default function R13Paywall() {
   const [finalizeError, setFinalizeError] = useState(null);
   const [hydrationTimedOut, setHydrationTimedOut] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
+  const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
   useEffect(() => {
     if (status !== 'hydrating') return;
@@ -354,7 +356,12 @@ export default function R13Paywall() {
         minHeight: '100dvh',
         // Top clears the status bar + the X/mascot header row so the eyebrow
         // and headline never collide with either (sim evidence, D23).
-        padding: 'calc(env(safe-area-inset-top, 0px) + 64px) 24px calc(32px + env(safe-area-inset-bottom))',
+        maxHeight: '100dvh',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        padding: keyboardHeight
+          ? `calc(env(safe-area-inset-top, 0px) + 64px) 24px ${keyboardHeight + 24}px`
+          : 'calc(env(safe-area-inset-top, 0px) + 64px) 24px calc(32px + env(safe-area-inset-bottom))',
         textAlign: 'center',
       }}>
         {finalizeError ? (

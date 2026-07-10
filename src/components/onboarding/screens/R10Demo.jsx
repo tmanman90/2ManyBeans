@@ -302,7 +302,12 @@ export default function R10Demo() {
       const image = await Camera.getPhoto({
         quality: 85,
         resultType: CameraResultType.DataUrl,
-        source: CameraSource.Camera,
+        // Prompt = the native "Take Photo / Choose from Library" sheet, so a
+        // bag photo already in the album works too (Tal's device review).
+        source: CameraSource.Prompt,
+        promptLabelHeader: 'Scan your bag',
+        promptLabelPhoto: 'Choose from library',
+        promptLabelPicture: 'Take photo',
         width: 1200,
         height: 1200,
       });
