@@ -28,22 +28,20 @@ export const onboardingBg = `linear-gradient(160deg, ${C.bgDeep} 0%, ${C.bg} 45%
 // mask silently disappears and the video's white background renders as a
 // hard box (Tal's device review, 2026-07-09). Masking the parent div is the
 // established mascot pattern and survives compositing.
+// Portrait-card presentation: after two rounds of CSS masks silently failing
+// on composited <video> in real-device WKWebView (white-box regression), the
+// video's white background is now EMBRACED as a framed portrait: a small
+// centered card whose background is the videos' own backdrop color
+// (#FEFFFD, sampled from the poster frames), hairline border, soft shadow.
+// Zero compositing tricks = identical rendering on sim and device.
+const MASCOT_CARD_BG = '#FEFFFD'; // sampled from the mascot renders, not a palette color
+
 const stageMediaStyle = {
-  // NO position/zIndex here: positioning the <video> promotes it to its own
-  // compositing layer and real-device WKWebView drops CSS masks on composited
-  // video (the white-box regression). Unpositioned, the element-level mask
-  // feathers relative to the video's own box (per-video precision); the
-  // container mask above is the device-safe belt. The glow paints over the
-  // unpositioned video but is translucent by design.
   width: '100%',
   height: '100%',
-  objectFit: 'contain',
-  objectPosition: 'center bottom',
+  objectFit: 'cover',
   display: 'block',
-  WebkitMaskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
-  maskImage: 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)',
 };
-const stageMask = 'radial-gradient(ellipse 78% 58% at center 48%, black 55%, transparent 100%)';
 
 export function MascotStage({ src, height = 460, poster }) {
   const reduce = useReducedMotion();
@@ -54,41 +52,47 @@ export function MascotStage({ src, height = 460, poster }) {
     <div style={{
       position: 'relative',
       width: '100%',
-      height,
+      // Clamp: the mascot is an accent, never a hero that starves the copy
+      // (device review 2026-07-09: video ate 3/4 of the page).
+      height: `min(${height}px, 22dvh)`,
       flexShrink: 0,
-      overflow: 'hidden',
-      background: 'transparent',
-      // No safe-area padding: the top bar is a real layout row above the
-      // stage now, so the stage never sits under the notch.
-      WebkitMaskImage: stageMask,
-      maskImage: stageMask,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '6px 0 2px',
     }}>
-      {/* Warm ambient glow behind mascot */}
+      {/* Warm ambient glow behind the portrait */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: `radial-gradient(ellipse 70% 60% at 50% 60%, ${C.accentSoft} 0%, transparent 72%)`,
+        background: `radial-gradient(ellipse 55% 70% at 50% 50%, ${C.accentSoft} 0%, transparent 70%)`,
         pointerEvents: 'none',
-        zIndex: 0,
       }} />
-      {reduce ? (
-        <img
-          src={posterSrc}
-          alt=""
-          style={stageMediaStyle}
-        />
-      ) : (
-        <video
-          src={assetUrl(src)}
-          poster={posterSrc}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          style={stageMediaStyle}
-        />
-      )}
+      <div style={{
+        position: 'relative',
+        height: '100%',
+        aspectRatio: '3 / 4',
+        background: MASCOT_CARD_BG,
+        borderRadius: 18,
+        border: `1px solid ${C.hairline}`,
+        boxShadow: shadows.e2,
+        overflow: 'hidden',
+      }}>
+        {reduce ? (
+          <img src={posterSrc} alt="" style={stageMediaStyle} />
+        ) : (
+          <video
+            src={assetUrl(src)}
+            poster={posterSrc}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            style={stageMediaStyle}
+          />
+        )}
+      </div>
     </div>
   );
 }

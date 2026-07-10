@@ -42,20 +42,18 @@ export default function R04SocialProof() {
     }}>
       <OnboardingTopBar overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-reading-book.mp4" height={370} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-reading-book.mp4" height={170} />
 
       <m.div
         variants={listContainer}
         initial="initial"
         animate="animate"
         style={{
-          flex: 1,
           padding: '4px 24px 8px',
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
-          minHeight: 0,
-          overflowY: 'auto',
         }}
       >
         {/* Eyebrow */}
@@ -118,6 +116,7 @@ export default function R04SocialProof() {
           ))}
         </div>
       </m.div>
+      </div>
 
       <OnboardingCtaBar
         label="Continue"

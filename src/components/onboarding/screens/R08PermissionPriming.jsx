@@ -117,20 +117,18 @@ export default function R08PermissionPriming() {
     }}>
       <OnboardingTopBar overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-magnifying-glass.mp4" height={410} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-magnifying-glass.mp4" height={180} />
 
       <m.div
         variants={listContainer}
         initial="initial"
         animate="animate"
         style={{
-          flex: 1,
           padding: '4px 24px 8px',
           display: 'flex',
           flexDirection: 'column',
           gap: 14,
-          minHeight: 0,
-          overflowY: 'auto',
         }}
       >
         <m.div variants={listItem}>
@@ -207,6 +205,7 @@ export default function R08PermissionPriming() {
           </m.div>
         )}
       </m.div>
+      </div>
 
       <OnboardingCtaBar
         label={requesting ? 'Requesting...' : 'Allow Camera Access'}

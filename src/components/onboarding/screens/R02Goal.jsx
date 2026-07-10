@@ -29,20 +29,18 @@ export default function R02Goal() {
     }}>
       <OnboardingTopBar overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-thinking.mp4" height={260} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-thinking.mp4" height={150} />
 
       <m.div
         variants={listContainer}
         initial="initial"
         animate="animate"
         style={{
-          flex: 1,
           padding: '4px 20px 16px',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          minHeight: 0,
-          overflowY: 'auto',
         }}
       >
         {/* Note bubble */}
@@ -88,6 +86,7 @@ export default function R02Goal() {
           />
         </m.div>
       </m.div>
+      </div>
     </div>
   );
 }

@@ -135,11 +135,25 @@ export default function R13bNudge() {
           screen's mascot is already a full center-top hero (unlike R13's
           small corner treatment), so no separate poster-only fallback is
           needed here; MascotStage already handles poster + reduced-motion. */}
+      <div
+        className="onb-scroll"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          // Keyboard padding lives on the scroll div (it's the scroller now)
+          // so the expanding invite-code input (and the keyboard it summons)
+          // can never clip behind the CTA bar on short phones (codex P23
+          // finding 8).
+          paddingBottom: keyboardHeight ? keyboardHeight + 24 : 0,
+        }}
+      >
       <MascotStage
         src={celebrating
           ? '/images/ruphus-animations/ruphus-fist-pump.mp4'
           : '/images/ruphus-animations/ruphus-waving.mp4'}
-        height={320}
+        height={170}
       />
 
       <m.div
@@ -147,18 +161,10 @@ export default function R13bNudge() {
         initial="initial"
         animate="animate"
         style={{
-          flex: 1,
           padding: '4px 24px 8px',
           display: 'flex',
           flexDirection: 'column',
           gap: 14,
-          minHeight: 0,
-          paddingBottom: keyboardHeight ? keyboardHeight + 24 : 8,
-          // Scrollable so the expanding invite-code input (and the keyboard
-          // it summons) can never clip behind the CTA bar on short phones
-          // (codex P23 finding 8).
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
         }}
       >
         {/* Warm heading in Caveat — intentional rare accent use. Crossfades
@@ -255,6 +261,7 @@ export default function R13bNudge() {
           </>
         )}
       </m.div>
+      </div>
 
       {!celebrating && (
         <OnboardingCtaBar

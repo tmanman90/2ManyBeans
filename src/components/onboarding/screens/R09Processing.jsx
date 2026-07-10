@@ -95,21 +95,19 @@ export default function R09Processing() {
     }}>
       <OnboardingTopBar hideBack overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-examining-v3.mp4" height={330} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-examining-v3.mp4" height={140} />
 
       <m.div
         variants={listContainer}
         initial="initial"
         animate="animate"
         style={{
-          flex: 1,
           padding: '4px 24px 8px',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          minHeight: 0,
           alignItems: 'center',
-          overflowY: 'auto',
         }}
       >
         <m.div variants={listItem} style={{
@@ -188,6 +186,7 @@ export default function R09Processing() {
           Just a moment...
         </m.div>
       </m.div>
+      </div>
 
       <style>{`
         .r09-beat, .r09-line-fade { opacity: 1; }

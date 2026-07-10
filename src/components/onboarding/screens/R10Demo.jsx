@@ -398,16 +398,14 @@ export default function R10Demo() {
     }}>
       <OnboardingTopBar overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-first-bean.mp4" height={410} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-first-bean.mp4" height={180} />
 
       <div style={{
-        flex: 1,
         padding: '4px 24px 8px',
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
-        minHeight: 0,
-        overflowY: 'auto',
       }}>
         <div style={{ ...t.display, color: C.text, textAlign: 'center' }}>
           {headline}
@@ -447,6 +445,7 @@ export default function R10Demo() {
             </div>
           </>
         )}
+      </div>
       </div>
 
       <input type="file" accept="image/*" ref={fileRef} onChange={handleFileChange} style={{ display: 'none' }} />

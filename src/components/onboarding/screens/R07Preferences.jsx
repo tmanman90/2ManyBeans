@@ -98,7 +98,8 @@ export default function R07Preferences() {
     }}>
       <OnboardingTopBar overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-holding-grinder.mp4" height={220} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-holding-grinder.mp4" height={150} />
 
       <m.div
         variants={listContainer}
@@ -110,13 +111,10 @@ export default function R07Preferences() {
             document.activeElement?.blur();
         }}
         style={{
-          flex: 1,
           padding: '4px 20px 16px',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          minHeight: 0,
-          overflowY: 'auto',
         }}
       >
         <m.div variants={listItem}>
@@ -215,6 +213,7 @@ export default function R07Preferences() {
           </div>
         </m.div>
       </m.div>
+      </div>
 
       <OnboardingCtaBar
         label="Continue"

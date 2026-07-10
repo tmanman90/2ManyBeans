@@ -42,21 +42,19 @@ export default function R12TrialTimeline() {
     }}>
       <OnboardingTopBar overlay />
 
-      <MascotStage src="/images/ruphus-animations/ruphus-thumbs-up.mp4" height={220} />
+      <div className="onb-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <MascotStage src="/images/ruphus-animations/ruphus-thumbs-up.mp4" height={150} />
 
       <m.div
         variants={listContainer}
         initial="initial"
         animate="animate"
         style={{
-          flex: 1,
           padding: '4px 20px 16px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: 12,
-          minHeight: 0,
-          overflowY: 'auto',
         }}
       >
         {/* Content column — same max-width as R13's page-one recap so R12→R13
@@ -187,6 +185,7 @@ export default function R12TrialTimeline() {
           </m.div>
         </div>
       </m.div>
+      </div>
 
       <OnboardingCtaBar
         label="See my options"
