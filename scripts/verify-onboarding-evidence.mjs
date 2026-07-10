@@ -21,6 +21,7 @@ const REQUIRED = [
   { f: 'r03-pain.jpg',           what: 'R03 with the goal acknowledgment bubble (A1)' },
   { f: 'r04-credibility.jpg',    what: 'R04 credibility rows (no invented humans)' },
   { f: 'r05-palate-deck.jpg',    what: 'R05 swipe deck' },
+  { f: 'r06-plan.jpg',           what: 'R06 personalized plan preview' },
   { f: 'r07-kit.jpg',            what: 'R07 kit form' },
   { f: 'r08-camera.jpg',         what: 'R08 priming with explicit Not now' },
   { f: 'r09-assembly.jpg',       what: 'R09 mid-assembly: real palate chart + axis beats' },
