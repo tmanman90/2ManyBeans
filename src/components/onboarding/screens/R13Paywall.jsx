@@ -258,7 +258,19 @@ export default function R13Paywall() {
     // with completedVia: 'paywall') never double-fires once the
     // redemption's Firestore write propagates.
     flowCompletedRef.current = true;
-    await waitForEntitlementRefresh();
+    const confirmed = await waitForEntitlementRefresh();
+    if (!confirmed) {
+      // Never celebrate an unconfirmed entitlement: finish straight into the
+      // app (server-side redemption already succeeded; the listener will
+      // catch up there).
+      try {
+        await finish?.({ completedVia: 'code_redeemed' });
+      } catch (err) {
+        flowCompletedRef.current = false;
+        setFinalizeError(err?.message || 'Could not finish setting up your account.');
+      }
+      return;
+    }
     setCelebrating(true);
     haptic.medium();
     setTimeout(async () => {
@@ -462,13 +474,15 @@ export default function R13Paywall() {
             style={{
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
+              // Left-aligned like R12's column so R12 -> R13 reads as a
+              // page-turn, not a recomposition (codex P23 finding 10).
+              alignItems: 'stretch',
               gap: 16,
               width: '100%',
               maxWidth: 360,
             }}
           >
-            <div style={{ ...t.label, color: C.textLight }}>
+            <div style={{ ...t.label, color: C.textLight, textAlign: 'left' }}>
               YOUR PLAN IS READY
             </div>
 
@@ -482,7 +496,7 @@ export default function R13Paywall() {
                 lineHeight: 1.04,
                 letterSpacing: '-0.022em',
                 color: C.text,
-                textAlign: 'center',
+                textAlign: 'left',
               }}
             >
               {celebrating ? "You're in, brewer." : `${archetype.title}, meet your coach.`}

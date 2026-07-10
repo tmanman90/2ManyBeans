@@ -149,13 +149,13 @@ export default function R06Personalized() {
           textAlign: 'center',
           marginTop: -4,
         }}>
-          Focused on {painLabel} — starting today.
+          Focused on {painLabel}, starting today.
         </m.div>
 
         {/* Note bubble */}
         <m.div variants={listItem}>
           <NoteBubble style={{ marginTop: 2 }}>
-            Here's how I'll actually help — starting today.
+            Here's how I'll actually help, starting today.
           </NoteBubble>
         </m.div>
 

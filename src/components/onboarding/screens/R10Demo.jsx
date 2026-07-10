@@ -227,9 +227,14 @@ export default function R10Demo() {
     setPhase('scanning');
     const thisGen = ++genRef.current;
     try {
+      // Test seam (additive, no-op in prod): the onboarding harness can
+      // inject a fixture/timeout/error scanner plus a faster timeout knob
+      // (window.__ONBOARDING_TEST__ is undefined in production).
+      const scanImpl = window.__ONBOARDING_TEST__?.scanBeanLabel || scanBeanLabel;
+      const timeoutMs = window.__ONBOARDING_TEST__?.scanTimeoutMs ?? SCAN_TIMEOUT_MS;
       const parsed = await Promise.race([
-        scanBeanLabel([photo]),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('scan_timeout')), SCAN_TIMEOUT_MS)),
+        scanImpl([photo]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('scan_timeout')), timeoutMs)),
       ]);
       if (canceledRef.current || thisGen !== genRef.current) return;
 
@@ -316,7 +321,14 @@ export default function R10Demo() {
     if (busy) return;
     setBusy(true);
     try {
-      if (Capacitor.isNativePlatform()) {
+      // Test seam (additive, no-op in prod): skips the real camera
+      // plugin/file-input entirely when the harness supplies a fixture
+      // capture. Returning a falsy photo simulates a cancel/deny.
+      const testCapture = window.__ONBOARDING_TEST__?.captureBagPhoto;
+      if (testCapture) {
+        const photo = await testCapture();
+        if (photo) await runScan(photo); else setPhase('fallback');
+      } else if (Capacitor.isNativePlatform()) {
         await takeNativePhoto();
       } else {
         fileRef.current?.click();

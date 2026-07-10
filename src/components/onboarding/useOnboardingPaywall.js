@@ -40,6 +40,11 @@ export function useOnboardingPaywall() {
   const dismissTimerRef = useRef(null);
 
   const status = useMemo(() => {
+    // Test seam (additive, no-op in prod): forces a specific status so the
+    // onboarding harness can exercise R13's 'ready' recap + redemption paths
+    // without a real RevenueCat/native environment.
+    const forced = window.__ONBOARDING_TEST__?.paywall?.status;
+    if (forced) return forced;
     if (!firestoreLoaded || !rcHydrated) return 'hydrating';
     if (!Capacitor.isNativePlatform()) return 'skip_web';
     if (!isRevenueCatAvailable()) return 'skip_no_rc';

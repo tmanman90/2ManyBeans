@@ -152,6 +152,20 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
 
     if (action === 'scan' && pendingScanBean) {
       (async () => {
+        // AT-MOST-ONCE ordering (codex P23 finding 1): clear the held flags
+        // FIRST, then create the bean. A crash between the two loses the held
+        // bean (acceptable; the user can re-scan in-app) but can never create
+        // a duplicate on the next mount. If the clearing write fails we do
+        // NOT create, for the same reason.
+        const { pendingScanBean: _drop, ...restAnswers } = profile.onboardingAnswers;
+        try {
+          await updateProfile?.({
+            onboardingAnswers: { ...restAnswers, postCompleteAction: 'none' },
+          });
+        } catch (err) {
+          console.warn('[App] Could not clear scan handoff; skipping bean create to avoid duplicates', err);
+          return;
+        }
         try {
           const beanData = buildNewBeanData({
             roaster: pendingScanBean.roaster,
@@ -164,16 +178,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           });
           await addBean(beanData);
         } catch (err) {
-          // Never retry-loop a broken held bean — clear it below either way.
+          // Never retry-loop a broken held bean.
           console.error('[App] Failed to create bean from onboarding scan', err);
         }
         setTab('inventory');
-        const { pendingScanBean: _drop, ...restAnswers } = profile.onboardingAnswers;
-        updateProfile?.({
-          onboardingAnswers: { ...restAnswers, postCompleteAction: 'none' },
-        }).catch((err) => {
-          console.warn('[App] Failed to clear postCompleteAction', err);
-        });
       })();
       return;
     }

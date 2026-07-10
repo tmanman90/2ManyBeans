@@ -16,13 +16,17 @@ import { haptic } from '../../../lib/haptics';
 import { redeemCode, RedeemError } from '../../../lib/redeemCode';
 import { scrollOnFocus } from '../../../lib/formHelpers';
 
-// Appendix A6 (verbatim) — RedeemError.code -> user copy. Unknown/other
-// codes (including network failures with no code) fall through to the
-// generic line.
+// Appendix A6 (revised D15) keyed by the REAL api/redeem-code.js reason
+// codes (the server collapses code_exhausted/expired into invalid_code on
+// purpose). Unknown/other codes (including network failures with no code)
+// fall through to the generic line.
 const ERROR_COPY = {
-  invalid: "That code doesn't look right. Check it and try again.",
+  invalid_input: "That code doesn't look right. Check it and try again.",
+  invalid_code: "That code doesn't look right. Check it and try again.",
   already_redeemed: "That code's already been used.",
-  expired: 'That code has expired.',
+  has_active_subscription: 'You already have full access. Nothing to redeem.',
+  email_not_verified: 'Please verify your email address first.',
+  rate_limited: 'Too many attempts. Wait a bit and try again.',
 };
 const ERROR_COPY_GENERIC = 'Couldn\'t reach the cafe. Try again in a moment.';
 
@@ -59,7 +63,10 @@ export default function RedemptionInline({ onRedeemed }) {
     setBusy(true);
     setError(null);
     try {
-      await redeemCode(trimmed);
+      // Test seam (additive, no-op in prod): lets the onboarding harness
+      // inject success/failure fixtures without a live redeem-code call.
+      const redeem = window.__ONBOARDING_TEST__?.redeemCode || redeemCode;
+      await redeem(trimmed);
       // Success — collapse the input, hand off to the caller. The caller
       // (R13 / R13b) owns entitlement-refresh verification, the
       // celebration beat, and the terminal finish() call.

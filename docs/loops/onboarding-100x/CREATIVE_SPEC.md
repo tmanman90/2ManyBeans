@@ -169,9 +169,10 @@ orchestrator) or in this spec. Sonnet writes NO copy of its own invention.
 - All of them: "All of them. A true generalist. Now, what's getting in the way?"
 
 ### A2. Palate archetypes (R11 headline + subtitle). Selection is DETERMINISTIC:
-take the two axes with the largest |value| in fixed axis order (sweetness, acidity, body,
-clean_funky, fruit_nutty) breaking ties by that order; match the first rule that applies,
-top to bottom; all-zero chart or no match falls through to 8.
+the ordered sign rules below ARE the selection contract (first match top-to-bottom; all-zero
+or no match falls to 8). REVISED D15: the earlier "two largest axes" sentence was removed —
+onboarding charts are single-pass +/-0.6 per axis, so magnitude ranking is ill-defined and
+the rule ORDER encodes the intended priority.
 1. acidity>0 AND fruit_nutty<0 → "The Bright Side" / "Bright, fruity, alive in the cup."
 2. sweetness>0 AND body>0 → "Syrup & Structure" / "Sweet, heavy, dessert in a mug."
 3. fruit_nutty>0 AND body>0 → "The Comfort Classic" / "Chocolate, nuts, and a proper backbone."
@@ -207,10 +208,14 @@ Roaster "MOVING COFFEE" · name "Bombe Bensa" · line "Ethiopia · Natural" · c
 sweetness. When you scan a real bag, I'll do this for yours."
 R10 scan-error toast copy: "Couldn't read that one. I'll get the next one on your shelf."
 
-### A6. Redemption strings (R13)
+### A6. Redemption strings (R13) — REVISED D15 to the real api/redeem-code.js codes
 Affordance: "Have an invite code?" · placeholder "2MANY-XXXXX" · button "Redeem" · success
-headline "You're in, brewer." · error line by RedeemError code: invalid "That code doesn't
-look right. Check it and try again." · already_redeemed "That code's already been used." ·
-expired "That code has expired." · network/other "Couldn't reach the cafe. Try again in a
-moment."
+headline "You're in, brewer." · error line by RedeemError code: invalid_input AND invalid_code
+"That code doesn't look right. Check it and try again." · already_redeemed "That code's
+already been used." · has_active_subscription "You already have full access. Nothing to
+redeem." · email_not_verified "Please verify your email address first." · rate_limited "Too
+many attempts. Wait a bit and try again." · network/other "Couldn't reach the cafe. Try again
+in a moment." (The server intentionally collapses expired/exhausted into invalid_code.)
+R04 NoteBubble (orchestrator-authored in the U8 unit prompt, recorded here for traceability):
+"I'm not here to guess. Everything I coach comes from the real canon, and from your own shelf."
 NO em dashes anywhere in UI copy (house rule).

@@ -12,7 +12,7 @@ const BENEFITS = [
   {
     icon: '📦',
     title: 'Instant bag reading',
-    body: 'Point at the back label — origin, roast, process, all captured in seconds.',
+    body: 'Point at the back label: origin, roast, process, all captured in seconds.',
   },
   {
     icon: '🔒',

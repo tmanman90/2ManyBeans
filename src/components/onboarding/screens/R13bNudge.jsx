@@ -13,6 +13,7 @@ export default function R13bNudge() {
   const { finish, answers } = useOnboarding();
   const { hasPro, hasUltra } = useSubscription();
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false); // cross-handler finish guard (codex P23 finding 3)
   const [error, setError] = useState(null);
   const [celebrating, setCelebrating] = useState(false);
 
@@ -28,7 +29,8 @@ export default function R13bNudge() {
     : (canScan ? "Yes, let's scan" : 'Add a bag manually');
 
   const handlePrimary = async () => {
-    if (busy) return;
+    if (busy || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -39,12 +41,14 @@ export default function R13bNudge() {
       await finish?.({ postCompleteAction });
     } catch (err) {
       setError(err?.message || 'Something went wrong. Please try again.');
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const handleMaybeLater = async () => {
-    if (busy) return;
+    if (busy || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -79,13 +83,31 @@ export default function R13bNudge() {
   }), []);
 
   const handleRedeemed = useCallback(async () => {
-    await waitForEntitlementRefresh();
+    if (busyRef.current) return; // a finish is already in flight (Maybe later / primary)
+    busyRef.current = true;
+    setBusy(true);
+    const confirmed = await waitForEntitlementRefresh();
+    if (!confirmed) {
+      // Server-side redemption succeeded but the entitlement listener hasn't
+      // caught up: never show the celebration on an unconfirmed state. Finish
+      // straight into the app; the entitlement lands via the live listener.
+      try {
+        await finish?.({ completedVia: 'code_redeemed' });
+      } catch (err) {
+        busyRef.current = false;
+        setBusy(false);
+        setError(err?.message || 'Something went wrong. Please try again.');
+      }
+      return;
+    }
     setCelebrating(true);
     haptic.medium();
     setTimeout(async () => {
       try {
         await finish?.({ completedVia: 'code_redeemed' });
       } catch (err) {
+        busyRef.current = false;
+        setBusy(false);
         setCelebrating(false);
         setError(err?.message || 'Something went wrong. Please try again.');
       }
@@ -128,6 +150,11 @@ export default function R13bNudge() {
           flexDirection: 'column',
           gap: 14,
           minHeight: 0,
+          // Scrollable so the expanding invite-code input (and the keyboard
+          // it summons) can never clip behind the CTA bar on short phones
+          // (codex P23 finding 8).
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         {/* Warm heading in Caveat — intentional rare accent use. Crossfades

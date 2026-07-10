@@ -14,7 +14,7 @@ export const TINDER_CARDS = [
   {
     id: 'c2_acidity',
     axis: 'acidity',
-    prompt: 'I want bright, fruity acidity — lemon, apricot, berries.',
+    prompt: 'I want bright, fruity acidity: lemon, apricot, berries.',
   },
   {
     id: 'c3_body',

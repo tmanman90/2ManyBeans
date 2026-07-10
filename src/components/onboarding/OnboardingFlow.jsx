@@ -257,7 +257,12 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
           ),
         ]);
 
-      if (!profile) {
+      // Test seam (additive, no-op in prod): lets the onboarding harness
+      // capture the would-be terminal write instead of hitting Firestore.
+      const testFinish = window.__ONBOARDING_TEST__?.finishProfile;
+      if (testFinish) {
+        await withTimeout(testFinish(answers));
+      } else if (!profile) {
         if (!createProfile) throw new Error('createProfile not provided');
         await withTimeout(createProfile({
           displayName: user?.displayName || answerPrefs?.displayName || 'Coffee Lover',

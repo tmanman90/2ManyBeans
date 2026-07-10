@@ -7,21 +7,21 @@ import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboarding
 
 const GOAL_INTRO = {
   v60: "You're a V60 brewer who cares about every pour.",
-  aeropress: "You love the Aeropress — quick, forgiving, endlessly variable.",
+  aeropress: "You love the Aeropress. Quick, forgiving, endlessly variable.",
   french_press: "You're a French press brewer chasing that full, heavy cup.",
-  espresso: "Espresso is your thing — precision, shot after shot.",
+  espresso: "Espresso is your thing. Precision, shot after shot.",
   all: "You'll brew across every method, and you want each one to shine.",
 };
 
 const PAIN_BODY = {
   inconsistent:
-    "We'll lock in your routine so your next cup tastes like the last one — on purpose, not by luck.",
+    "We'll lock in your routine so your next cup tastes like the last one. On purpose, not by luck.",
   forget_freshness:
     "I'll watch the clock on every bag so you always know which one's in its window.",
   taste_more:
     "We'll work on your palate together. No vague questions, just clear, honest notes you can act on.",
   brew_like_pro:
-    "I'll push you — origin, grind size, recipe tweaks, the whole thing. You'll get there.",
+    "I'll push you: origin, grind size, recipe tweaks, the whole thing. You'll get there.",
 };
 
 // Feature highlight rows — trimmed to exactly two per CREATIVE_SPEC.md §2 R11
@@ -35,10 +35,13 @@ const FEATURES = [
 export default function R11ValueDelivery() {
   const { dispatch, answers } = useOnboarding();
 
-  const intro = GOAL_INTRO[answers?.goal] || "You care about your cup — and that's where we start.";
+  const intro = GOAL_INTRO[answers?.goal] || "You care about your cup, and that's where we start.";
   const body = PAIN_BODY[answers?.pain] || "We'll build you a routine you actually trust.";
   const canScan = answers?.cameraPermission === 'granted';
-  const ctaLabel = canScan ? 'Scan my first bag' : 'Add my first bag';
+  // A scan already happened in R10: the CTA is a plain continue (spec: the
+  // scan label only appears when no scan has happened yet).
+  const hasHeldScan = !!answers?.pendingScanBean;
+  const ctaLabel = hasHeldScan ? 'Continue' : (canScan ? 'Scan my first bag' : 'Add my first bag');
 
   const archetype = palateArchetype(answers?.palateChart);
   const prediction = palatePrediction(archetype.n);
@@ -171,7 +174,7 @@ export default function R11ValueDelivery() {
             borderRadius: radius.md,
             lineHeight: 1.45,
           }}>
-            Camera's off for now — I'll help you add bags by hand. You can flip
+            Camera's off for now. I'll help you add bags by hand. You can flip
             it back on anytime from Settings.
           </m.div>
         )}
