@@ -31,7 +31,11 @@ export default function R13bNudge() {
     setBusy(true);
     setError(null);
     try {
-      await finish?.({ postCompleteAction: 'none' });
+      // Preserve a postCompleteAction already set by R11 (e.g. a completed
+      // scan/manual-add) — "Maybe later" must never downgrade a held scan.
+      // Only fall back to 'none' when nothing was set yet (R8 fix).
+      const heldAction = answers?.postCompleteAction;
+      await finish?.({ postCompleteAction: heldAction != null ? heldAction : 'none' });
     } catch (err) {
       setError(err?.message || 'Something went wrong. Please try again.');
       setBusy(false);

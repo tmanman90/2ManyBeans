@@ -1,7 +1,8 @@
-import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
+import { C, fonts, type as t, radius, cardBase } from '../../../styles/theme';
 import { m, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { OnboardingPalateChart } from '../OnboardingPalateChart';
+import { palateArchetype, palatePrediction } from '../../../lib/onboardingPalate';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const GOAL_INTRO = {
@@ -23,38 +24,24 @@ const PAIN_BODY = {
     "I'll push you — origin, grind size, recipe tweaks, the whole thing. You'll get there.",
 };
 
-// Feature highlight rows
+// Feature highlight rows — trimmed to exactly two per CREATIVE_SPEC.md §2 R11
+// ("keep existing map, trim to 2"). Copy kept verbatim; the third row
+// ("Tasting log") is deleted, not just hidden.
 const FEATURES = [
   { icon: '⏱', label: 'Freshness tracking', body: 'Peak window always visible, per bag.' },
   { icon: '🎯', label: 'Dialed-in recipes', body: 'Brew settings tuned to your grinder and method.' },
-  { icon: '📓', label: 'Tasting log', body: 'Guided note-taking that builds your palate over time.' },
 ];
-
-function palateOneLiner(chart) {
-  if (!chart || typeof chart !== 'object') return '';
-  const axes = [
-    { key: 'sweetness', yes: 'sweet', no: 'sharp' },
-    { key: 'acidity', yes: 'bright and fruity', no: 'smooth and mellow' },
-    { key: 'body', yes: 'heavy-bodied', no: 'light and clean' },
-    { key: 'clean_funky', yes: 'washed and clean', no: 'wild and fermented' },
-    { key: 'fruit_nutty', yes: 'nutty and chocolatey', no: 'fruit-forward' },
-  ];
-  const ranked = axes
-    .map((a) => ({ ...a, score: chart[a.key] || 0 }))
-    .sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
-  const top = ranked.slice(0, 2).map((a) => (a.score >= 0 ? a.yes : a.no));
-  if (!top.length) return '';
-  return top.join(' · ');
-}
 
 export default function R11ValueDelivery() {
   const { dispatch, answers } = useOnboarding();
 
   const intro = GOAL_INTRO[answers?.goal] || "You care about your cup — and that's where we start.";
   const body = PAIN_BODY[answers?.pain] || "We'll build you a routine you actually trust.";
-  const snapshot = palateOneLiner(answers?.palateChart);
   const canScan = answers?.cameraPermission === 'granted';
   const ctaLabel = canScan ? 'Scan my first bag' : 'Add my first bag';
+
+  const archetype = palateArchetype(answers?.palateChart);
+  const prediction = palatePrediction(archetype.n);
 
   return (
     <div style={{
@@ -87,31 +74,48 @@ export default function R11ValueDelivery() {
         }}
       >
         <m.div variants={listItem} style={{
-          ...t.h1,
-          color: C.text,
+          ...t.eyebrow,
+          color: C.textLight,
           textAlign: 'center',
         }}>
-          Your palate, in five axes.
+          YOUR COFFEE PROFILE
         </m.div>
 
-        <m.div variants={listItem} style={{ marginTop: 4 }}>
+        <m.div variants={listItem} style={{
+          ...t.display,
+          color: C.text,
+          textAlign: 'center',
+          marginTop: -4,
+        }}>
+          {archetype.title}
+        </m.div>
+
+        <m.div variants={listItem} style={{
+          ...t.body,
+          fontSize: 15,
+          color: C.textMuted,
+          textAlign: 'center',
+          marginTop: -6,
+        }}>
+          {archetype.subtitle}
+        </m.div>
+
+        {/* Chart already assembled in R09 — renders complete here, single
+            240ms CSS fade only, no re-assembly/re-stagger. */}
+        <div className="r11-chart-fade" style={{ marginTop: 4 }}>
           <OnboardingPalateChart chart={answers?.palateChart} size={220} />
-        </m.div>
+        </div>
 
-        {snapshot && (
-          <m.div variants={listItem} style={{
-            textAlign: 'center',
-            fontFamily: fonts.heading,
-            fontSize: 15,
-            fontWeight: 600,
-            color: C.accent,
-            lineHeight: 1.3,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}>
-            {snapshot}
-          </m.div>
-        )}
+        <m.div variants={listItem} style={{
+          fontFamily: fonts.heading,
+          fontStyle: 'italic',
+          fontSize: 18,
+          color: C.text,
+          textAlign: 'center',
+          lineHeight: 1.35,
+        }}>
+          First guess: you'll love {prediction}.
+        </m.div>
 
         <m.div variants={listItem}>
           <NoteBubble>
@@ -119,7 +123,7 @@ export default function R11ValueDelivery() {
           </NoteBubble>
         </m.div>
 
-        {/* Feature highlight cards */}
+        {/* Feature highlight cards — exactly two */}
         <m.div variants={listItem} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
           {FEATURES.map((f) => (
             <div key={f.label} style={{
@@ -181,6 +185,20 @@ export default function R11ValueDelivery() {
           answersPatch: { postCompleteAction: canScan ? 'scan' : 'manual_add' },
         })}
       />
+
+      <style>{`
+        .r11-chart-fade { opacity: 1; }
+        @media (prefers-reduced-motion: no-preference) {
+          .r11-chart-fade {
+            opacity: 0;
+            animation: r11ChartIn 240ms cubic-bezier(0.22,1,0.36,1) both;
+          }
+          @keyframes r11ChartIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+          }
+        }
+      `}</style>
     </div>
   );
 }

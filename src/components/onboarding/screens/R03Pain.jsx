@@ -11,8 +11,22 @@ const PAIN_OPTIONS = [
   { key: 'brew_like_pro', label: 'I want to brew like a pro' },
 ];
 
+// Goal-keyed acknowledgment — CREATIVE_SPEC.md Appendix A1 (verbatim). Keyed
+// by R02Goal's stored goal answer values. Unknown/missing goal falls back to
+// the original bubble copy, unchanged.
+const GOAL_ACKNOWLEDGMENTS = {
+  aiden: "The Aiden. Precision brewing, meet precision coaching. Now, what's getting in the way?",
+  v60: "V60. A brewer after my own heart. Now, what's getting in the way?",
+  aeropress: "The Aeropress. Small brewer, huge ceiling. Now, what's getting in the way?",
+  french_press: "French press. Honest, full-bodied brewing. Now, what's getting in the way?",
+  espresso: "Espresso. The deep end. I like it. Now, what's getting in the way?",
+  all: "All of them. A true generalist. Now, what's getting in the way?",
+};
+const FALLBACK_ACKNOWLEDGMENT = "No judgement here. Pick the one that bugs you most. I've got you.";
+
 export default function R03Pain() {
   const { dispatch, answers } = useOnboarding();
+  const acknowledgment = GOAL_ACKNOWLEDGMENTS[answers?.goal] || FALLBACK_ACKNOWLEDGMENT;
   return (
     <div style={{
       width: '100%',
@@ -46,7 +60,7 @@ export default function R03Pain() {
         {/* Note bubble */}
         <m.div variants={listItem}>
           <NoteBubble>
-            No judgement here. Pick the one that bugs you most — I've got you.
+            {acknowledgment}
           </NoteBubble>
         </m.div>
 

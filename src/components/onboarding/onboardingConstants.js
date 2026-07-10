@@ -7,9 +7,14 @@
 // CHAPTERS map gives OnboardingTopBar a single place to read the
 // three-chapter progress structure from (see CREATIVE_SPEC.md §1).
 
-// R09Processing — auto-advance dwell before the "building your plan" beat
-// hands off to R10.
-export const PROCESSING_MS = 3000;
+// R09Processing — total palate-chart assembly sequence duration (5 axis
+// beats, 600ms apart, plus a short hold) before auto-advancing to R10.
+// Replaces the old PROCESSING_MS (grepped: unused elsewhere, removed).
+export const R09_ASSEMBLY_MS = 3200;
+
+// R09Processing — reduced-motion dwell: chart + labels render complete
+// instantly, single caption, then advance.
+export const R09_REDUCE_DWELL_MS = 800;
 
 // R08PermissionPriming — dynamic `@capacitor/camera` module import timeout.
 export const CAMERA_IMPORT_TIMEOUT_MS = 4000;

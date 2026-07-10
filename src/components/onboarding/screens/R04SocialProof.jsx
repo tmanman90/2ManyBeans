@@ -1,41 +1,32 @@
-import { C, fonts, type, shadows, radius, cardBase } from '../../../styles/theme';
+import { BookOpen, CircleDot, Package } from 'lucide-react';
+import { C, fonts, type, radius } from '../../../styles/theme';
 import { m, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar } from './OnboardingPrimitives';
 
-const TESTIMONIALS_BY_PAIN = {
-  inconsistent: [
-    { quote: "I was dialing in my V60 by vibes. Ruphus walked me through grind, dose, and pour, and every cup since has tasted like the last good one.", author: 'Dan R.' },
-    { quote: "Two weeks in and I'm hitting the same brew every morning. I didn't realize how much I was flying blind before.", author: 'Maya K.' },
-    { quote: "The recipes are tuned to my actual grinder and beans, not some generic ratio.", author: 'Sam T.' },
-  ],
-  forget_freshness: [
-    { quote: "I used to have four open bags and no idea which was fresh. Now Ruphus tells me which jar to grab every morning.", author: 'Maya K.' },
-    { quote: "Peak window notifications are quietly the killer feature. I drink my beans at their best now, every time.", author: 'Dan R.' },
-    { quote: "Coffee Hub caught a bag sliding past peak before I did. It saved a $24 Gesha from going stale.", author: 'Sam T.' },
-  ],
-  too_many_beans: [
-    { quote: "I literally had 2manybeans — a drawer stuffed with bags. Now I actually drink them all before they go stale.", author: 'Dan R.' },
-    { quote: "I stopped forgetting about the bags in the back of my freezer. Everything's in one place and every bag has a recipe waiting.", author: 'Maya K.' },
-    { quote: "I was a coffee hoarder. This is the first app that made my habit feel organized instead of chaotic.", author: 'Sam T.' },
-  ],
-  taste_more: [
-    { quote: "The palate chart made everything click. I buy better beans now and I actually enjoy them.", author: 'Sam T.' },
-    { quote: "Ruphus asks the right questions. I never knew what 'bright acidity' meant until I started tasting with this coach.", author: 'Maya K.' },
-    { quote: "I can finally tell you why I like a cup. That's not a small thing.", author: 'Dan R.' },
-  ],
-  brew_like_pro: [
-    { quote: "Ruphus nailed the tasting note I was missing. I finally know why my morning cup is so good.", author: 'Maya K.' },
-    { quote: "I've read Hoffmann's book twice. Coffee Hub actually turns all that theory into something I apply every morning.", author: 'Dan R.' },
-    { quote: "The recipes feel pro-level. They're tuned to my beans, my grinder, my water. That's the whole game.", author: 'Sam T.' },
-  ],
-};
-
-const DEFAULT_TESTIMONIALS = TESTIMONIALS_BY_PAIN.inconsistent;
+// Copy bank — CREATIVE_SPEC.md §2 R04 (contract law, verbatim). No invented
+// humans, no star ratings, no laurels we don't have — three hairline-bordered
+// credibility rows instead of testimonials.
+const CREDIBILITY_ROWS = [
+  {
+    Icon: BookOpen,
+    title: 'The Hoffmann tasting method',
+    body: 'Smell, slurp, structure. The same arc pros use, one beat at a time.',
+  },
+  {
+    Icon: CircleDot,
+    title: 'The SCA flavor wheel',
+    body: "Every note you'll ever taste, organized the way judges do it.",
+  },
+  {
+    Icon: Package,
+    title: 'Your actual shelf',
+    body: 'I read your bags, your roasters, your grinder. Advice about YOUR coffee, not coffee in general.',
+  },
+];
 
 export default function R04SocialProof() {
-  const { dispatch, answers } = useOnboarding();
-  const testimonials = TESTIMONIALS_BY_PAIN[answers?.pain] || DEFAULT_TESTIMONIALS;
+  const { dispatch } = useOnboarding();
 
   return (
     <div style={{
@@ -73,106 +64,79 @@ export default function R04SocialProof() {
           color: C.textLight,
           textAlign: 'center',
         }}>
-          Real brewers
+          YOUR COACH
         </m.div>
 
         {/* Headline */}
         <m.div variants={listItem} style={{
-          fontFamily: fonts.heading,
-          fontSize: type.h1.fontSize,
-          fontWeight: type.h1.fontWeight,
-          lineHeight: type.h1.lineHeight,
-          letterSpacing: type.h1.letterSpacing,
+          fontFamily: fonts.title,
+          fontSize: 34,
+          fontWeight: 600,
+          lineHeight: 1.04,
+          letterSpacing: '-0.022em',
           color: C.text,
           textAlign: 'center',
           marginTop: -4,
         }}>
-          You're in good company.
+          What I'm trained on.
         </m.div>
 
         {/* Note bubble */}
         <m.div variants={listItem}>
           <NoteBubble style={{ marginTop: 2 }}>
-            I'm not the only one who believes in this — look what brewers are saying.
+            I'm not here to guess. Everything I coach comes from the real canon, and from your own shelf.
           </NoteBubble>
         </m.div>
 
-        {/* Testimonial cards — staggered */}
-        <m.div
-          variants={listContainer}
-          style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}
-        >
-          {testimonials.map((t, i) => (
-            <m.div key={i} variants={listItem} style={{
-              ...cardBase,
-              borderRadius: radius.md,
-              padding: '14px 16px',
-              position: 'relative',
-            }}>
-              {/* Quote mark accent */}
-              <div style={{
-                position: 'absolute',
-                top: 10,
-                left: 14,
-                fontFamily: fonts.heading,
-                fontSize: 36,
-                lineHeight: 1,
-                color: C.accentLight,
-                opacity: 0.6,
-                userSelect: 'none',
-                pointerEvents: 'none',
-              }}>"</div>
-              <div style={{
-                ...type.body,
-                color: C.text,
-                marginBottom: 8,
-                paddingTop: 14,
-                lineHeight: 1.5,
-              }}>
-                {t.quote}
-              </div>
-              <div style={{
+        {/* Credibility rows — hairline-bordered, NOT cards-in-cards. Entrance
+            is CSS keyframe stagger per the motion law (entrances = CSS only). */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}>
+          {CREDIBILITY_ROWS.map(({ Icon, title, body }, i) => (
+            <div
+              key={title}
+              className="r04-row"
+              style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}>
-                {/* Avatar initial */}
-                <div style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: radius.pill,
-                  background: C.accentSoft,
-                  border: `1px solid ${C.accentLight}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  <span style={{
-                    ...type.caption,
-                    color: C.accent,
-                    fontWeight: 700,
-                  }}>
-                    {t.author.charAt(0)}
-                  </span>
+                alignItems: 'flex-start',
+                gap: 12,
+                border: `1px solid ${C.hairline}`,
+                borderRadius: radius.md,
+                padding: 14,
+                animationDelay: `${i * 60}ms`,
+              }}
+            >
+              <Icon size={18} color={C.text} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <div style={{ fontFamily: fonts.body, fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 2 }}>
+                  {title}
                 </div>
-                <div style={{
-                  ...type.caption,
-                  color: C.textMuted,
-                  fontWeight: 700,
-                }}>
-                  {t.author}
+                <div style={{ fontFamily: fonts.body, fontSize: 14, fontWeight: 500, color: C.textMuted, lineHeight: 1.4 }}>
+                  {body}
                 </div>
               </div>
-            </m.div>
+            </div>
           ))}
-        </m.div>
+        </div>
       </m.div>
 
       <OnboardingCtaBar
         label="Continue"
         onClick={() => dispatch({ type: 'ADVANCE', next: 'r5' })}
       />
+
+      <style>{`
+        .r04-row { opacity: 1; }
+        @media (prefers-reduced-motion: no-preference) {
+          .r04-row {
+            opacity: 0;
+            animation: r04RowIn 240ms cubic-bezier(0.22,1,0.36,1) both;
+          }
+          @keyframes r04RowIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        }
+      `}</style>
     </div>
   );
 }
