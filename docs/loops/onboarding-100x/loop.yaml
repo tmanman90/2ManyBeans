@@ -69,7 +69,10 @@ goal:
     - R16
   context_sources:
     - file: docs/plans/2026-07-09-003-feat-onboarding-100x-plan.md
+    - file: docs/loops/onboarding-100x/CREATIVE_SPEC.md
     - file: docs/research/2026-07-09-onboarding-audit.md
+    - file: docs/internal/liquid-glass-button-spec.md
+    - file: src/styles/theme.js
     - file: lessons.md
     - file: src/components/onboarding/OnboardingFlow.jsx
     - file: src/components/onboarding/screens/OnboardingPrimitives.jsx
@@ -126,8 +129,13 @@ verification:
       frames (R15); any existing verify-* gate weakened, completion write shape changed
       non-additively, auth/free-tier/RC purchase mechanics touched, or the grind cell breaks
       sealed/finished cards or renders raw null (R1, R16); any anti-slop tell (second accent,
-      glow shadows, purple, sub-44pt targets, em dashes in UI copy). PASS only when all
-      requirement clusters hold and scope guards are respected.
+      glow shadows, purple, sub-44pt targets, em dashes in UI copy). ALSO review against
+      docs/loops/onboarding-100x/CREATIVE_SPEC.md as contract law: FAIL if any screen deviates
+      from its spec section (layout skeleton, type scale, motion recipe, video mapping, copy
+      bank) without an orchestrator-decision note in the loop log, if any user-facing string
+      does not trace to the spec or a unit prompt, or if new hexes/fonts/assets were invented.
+      PASS only when all requirement clusters hold, the spec is honored, and scope guards are
+      respected.
   - id: v6-evidence
     type: programmatic
     check: ["node", "scripts/verify-onboarding-evidence.mjs"]
@@ -228,6 +236,17 @@ scope_guard:
     Dev channel only: no production Vercel deploy, no Capgo production channel, no main merge;
     dev bundle labels use the -devapp.<ts> convention; do not add video assets to the OTA
     bundle (CDN lesson).
+  - >-
+    CREATIVE COMMAND CHAIN (non-negotiable): docs/loops/onboarding-100x/CREATIVE_SPEC.md is
+    contract law. The orchestrator (Fable) excerpts the exact spec section + full copy strings
+    into EVERY implementation unit prompt before the executor starts; the executor (Sonnet)
+    implements verbatim with zero creative latitude — no invented copy, hexes, fonts, layout,
+    or motion; any gap or ambiguity in the spec goes BACK to the orchestrator for a written
+    decision in the loop log, never resolved by executor taste. Codex reviews against the spec.
+  - >-
+    Assets: NO AI-generated images or videos. New-to-flow beats use the six unused mascot
+    videos per the spec's video map; the only produced assets are ffmpeg poster frames
+    (build-prep). If a beat cannot be covered by the existing library, STOP and surface to Tal.
   - >-
     Deferred (do NOT build): post-decline 24h welcome offer, real-user quote collection, push
     priming, localization, @google/genai migration.
