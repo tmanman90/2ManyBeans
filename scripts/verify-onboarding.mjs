@@ -631,7 +631,9 @@ try {
     });
     await page.locator('input[placeholder="2MANY-XXXXX"]').fill('2MANY-BADCODE');
 
-    const redeemBtn = () => page.getByRole('button', { name: 'Redeem', exact: true });
+    // Non-exact: the button's accessible name changes to "Redeeming…" while
+    // busy, so an exact:'Redeem' locator matches nothing mid-flight.
+    const redeemBtn = () => page.getByRole('button', { name: /^Redeem/ });
     await redeemBtn().click();
     // Poll for the disabled state during the 150ms in-flight window rather
     // than a single fixed-delay check — more robust to scheduling jitter.
@@ -652,10 +654,24 @@ try {
     if (!retryEnabled) throw new Error('retry not allowed after failure');
 
     // Success + simulateEntitlement -> quick celebration -> finishProfile captured.
+    //
+    // Ordering matters: R13Paywall ALSO has a generic hasPro/hasUltra
+    // purchase-detection effect (for the native-purchase path) that fires
+    // finalizePurchase({completedVia:'paywall'}) the moment hasPro flips true
+    // AND flowCompletedRef.current is still false. handleRedeemed() claims
+    // flowCompletedRef.current=true SYNCHRONOUSLY as its first line — but only
+    // once RedemptionInline's onRedeemed() actually fires (after the redeem
+    // click resolves). Calling simulateEntitlement() BEFORE the redeem click
+    // flips hasPro while flowCompletedRef is still unclaimed, so the generic
+    // effect wins the race instead of the redemption path (completedVia ends
+    // up 'paywall', not 'code_redeemed', and no celebration ever shows since
+    // handleRedeemed short-circuits on an already-claimed flow). Clicking
+    // Redeem FIRST claims the flow immediately; simulateEntitlement() then
+    // only needs to land before handleRedeemed's own 3s poll deadline.
     await page.evaluate(() => { window.__ONBOARDING_TEST__.redeemCode = async () => ({ ok: true }); });
-    await page.evaluate(() => window.__ONBOARDING_TEST__.paywall.simulateEntitlement());
-    await page.waitForTimeout(150);
     await redeemBtn().click();
+    await page.waitForTimeout(120); // let onRedeemed()/handleRedeemed() claim flowCompletedRef
+    await page.evaluate(() => window.__ONBOARDING_TEST__.paywall.simulateEntitlement());
     await page.waitForTimeout(1700); // poll tick(s) + REDEEM_CELEBRATE_MS(900) + buffer
 
     const celebrateText = await bodyText(page);
@@ -667,7 +683,7 @@ try {
   });
 
   // ---- 7b: redemption — entitlement never flips (documented FINDING, not a harness bug) ----
-  await scenario('7b REDEMPTION entitlement-never-flips (finding)', async () => {
+  await scenario('7b REDEMPTION entitlement-never-flips', async () => {
     const { page, consoleErrors } = await bootPage(browser, {
       reducedMotion: 'reduce',
       step: 'r13',
@@ -684,25 +700,21 @@ try {
     await page.getByRole('button', { name: 'Redeem', exact: true }).click();
 
     await page.waitForTimeout(2500); // inside the 3s entitlement-poll window
-    let celebrateVisible = await page.getByText("You're in, brewer.", { exact: true }).isVisible().catch(() => false);
+    const celebrateVisible = await page.getByText("You're in, brewer.", { exact: true }).isVisible().catch(() => false);
     if (celebrateVisible) throw new Error('celebration appeared before the 3s entitlement-poll deadline (unexpected)');
 
-    // FINDING (documented, not fixed — real app behavior, see final report):
-    // R13Paywall.handleRedeemed() does `await waitForEntitlementRefresh(); setCelebrating(true);`
-    // unconditionally — it never inspects the resolved boolean. So once the 3s poll
-    // deadline hits (resolving false), the code STILL celebrates and STILL calls
-    // finish({completedVia:'code_redeemed'}) ~900ms later, even though hasPro/hasUltra
-    // never flipped true. This matches the surrounding code comment's stated intent
-    // ("if it never arrives we still proceed... rather than leaving the user stuck"),
-    // so it reads as intentional, not a regression — but it does mean the DoD's
-    // phrasing ("assert NO celebration within the poll window") only holds INSIDE the
-    // window, not after it. Asserting the real, current behavior below.
-    await page.waitForTimeout(1700); // past 3s deadline + REDEEM_CELEBRATE_MS(900) + buffer
-    celebrateVisible = await page.getByText("You're in, brewer.", { exact: true }).isVisible().catch(() => false);
-    if (!celebrateVisible) throw new Error('celebration never appeared even after the 3s deadline — behavior changed, re-check the FINDING note');
-    await page.waitForTimeout(300);
+    // R13Paywall.handleRedeemed()/R13bNudge.handleRedeemed() both branch on the
+    // waitForEntitlementRefresh() resolution: when it resolves false (3s
+    // deadline hit, entitlement never confirmed), they finish straight into
+    // the app WITHOUT ever setting celebrating=true — "never celebrate an
+    // unconfirmed entitlement" per the inline comment. So the correct
+    // assertion is celebration STAYS absent even well past the deadline, and
+    // finish() lands close to the 3s mark (not +900ms later).
+    await page.waitForTimeout(1000); // past the 3s deadline + buffer, well before any 900ms celebrate dwell would have fired
     const saved = await page.evaluate(() => window.__SAVED_PROFILE__);
-    if (saved?.completedVia !== 'code_redeemed') throw new Error('finish() not called after the never-flip celebration: ' + JSON.stringify(saved));
+    if (saved?.completedVia !== 'code_redeemed') throw new Error('finish() was not called after the unconfirmed-entitlement redemption: ' + JSON.stringify(saved));
+    const celebrateVisibleAfter = await page.getByText("You're in, brewer.", { exact: true }).isVisible().catch(() => false);
+    if (celebrateVisibleAfter) throw new Error('celebration appeared even though the entitlement never confirmed (should finish silently)');
 
     if (consoleErrors.length) throw new Error('console/page errors: ' + JSON.stringify(consoleErrors.slice(0, 6)));
   });
