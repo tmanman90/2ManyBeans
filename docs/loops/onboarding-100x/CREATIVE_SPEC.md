@@ -36,7 +36,13 @@ not against generic taste.
   celebrating: examining = "working on your profile") · R10-scan first-bean (NEW use: Ruphus
   meets your first bean) · R11 cupping · R12 thumbs-up · R13 confident (NEW use: paywall backdrop
   quiet confidence) · R13b waving · redemption-success fist-pump (NEW use) · post-purchase
-  brew-complete (NEW use, only if purchase path shows celebration beat).
+  brew-complete (NEW use, only if purchase path shows celebration beat) ·
+  OnboardingErrorBoundary empty-cup (NEW use: the reset screen gains the mascot, h200, with the
+  corrected "Professor Ruphus needs a quick reset" copy).
+  All six new-use videos were frame-verified against their beats on 2026-07-09 (orchestrator
+  review). Note: R08 magnifying-glass and R09 examining-v3 are both "inspection" poses
+  back-to-back — acceptable because R08 inspects a BAG and R09 inspects BEANS; the executor
+  must not swap them.
 
 ## 1. Progress system (U9)
 
