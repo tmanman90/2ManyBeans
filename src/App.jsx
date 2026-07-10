@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { assetUrl } from "./lib/assetUrl";
 import { getOnboardingPalate } from './lib/palateProfile';
+import { buildNewBeanData } from './lib/beanBuilder';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { C, fonts, shadows, glass } from './styles/theme';
 import { m, spring } from './lib/motion';
@@ -130,6 +131,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // readable. One-shot: consume + clear so a later profile refresh
   // or navigation doesn't re-trigger. Mirrors the `pendingAddBeanMode`
   // bridge but Firestore-backed so it survives a cross-device hand-off.
+  //
+  // R10's held scan (`pendingScanBean`, see LOOP_LOG D10): when the user
+  // scanned their first bag during onboarding, action === 'scan' AND a
+  // compact pendingScanBean is present. Instead of launching the scan
+  // flow again, we create the bean directly from the held fields —
+  // exactly once — then clear BOTH postCompleteAction and
+  // pendingScanBean in the SAME updateProfile write. A plain 'scan'
+  // action with no held bean (the user skipped R10, or never scanned)
+  // keeps launching the scan flow exactly as before.
   const handoffConsumedRef = useRef(false);
   useEffect(() => {
     if (handoffConsumedRef.current) return;
@@ -137,6 +147,37 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
     const action = profile?.onboardingAnswers?.postCompleteAction;
     if (!action || action === 'none') return;
     handoffConsumedRef.current = true;
+
+    const pendingScanBean = profile?.onboardingAnswers?.pendingScanBean;
+
+    if (action === 'scan' && pendingScanBean) {
+      (async () => {
+        try {
+          const beanData = buildNewBeanData({
+            roaster: pendingScanBean.roaster,
+            name: pendingScanBean.name,
+            origin: pendingScanBean.origin,
+            variety: pendingScanBean.variety,
+            process: pendingScanBean.process,
+            roastDate: pendingScanBean.roastDate,
+            bagNotes: Array.isArray(pendingScanBean.notes) ? pendingScanBean.notes.join(' / ') : '',
+          });
+          await addBean(beanData);
+        } catch (err) {
+          // Never retry-loop a broken held bean — clear it below either way.
+          console.error('[App] Failed to create bean from onboarding scan', err);
+        }
+        setTab('inventory');
+        const { pendingScanBean: _drop, ...restAnswers } = profile.onboardingAnswers;
+        updateProfile?.({
+          onboardingAnswers: { ...restAnswers, postCompleteAction: 'none' },
+        }).catch((err) => {
+          console.warn('[App] Failed to clear postCompleteAction', err);
+        });
+      })();
+      return;
+    }
+
     if (action === 'scan') {
       setTab('inventory');
       setPendingAddBeanMode('scan');
@@ -151,7 +192,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
     }).catch((err) => {
       console.warn('[App] Failed to clear postCompleteAction', err);
     });
-  }, [profile, updateProfile, tourActive]);
+  }, [profile, updateProfile, tourActive, addBean]);
 
   return (
     <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>

@@ -22,6 +22,17 @@ export const CAMERA_IMPORT_TIMEOUT_MS = 4000;
 // R08PermissionPriming — Camera.requestPermissions() timeout.
 export const CAMERA_PERMISSION_TIMEOUT_MS = 8000;
 
+// R10Demo — hard timeout wrapping the scanBeanLabel() Gemini call so a slow
+// network never strands the user on the RuphusThinking loader; timeout
+// routes silently to the variant-(b) fallback card (CREATIVE_SPEC.md §2 R10).
+export const SCAN_TIMEOUT_MS = 12000;
+
+// R05: hold after the 5th swipe before auto-advancing (CREATIVE_SPEC: 300ms).
+export const R05_LAST_SWIPE_HOLD_MS = 300;
+
+// R08: dwell on the denied message before auto-advancing.
+export const R08_DENIED_DWELL_MS = 800;
+
 // R13Paywall — how long we wait for RevenueCat/Firestore hydration before
 // offering a "continue without subscription" escape hatch.
 export const PAYWALL_HYDRATION_TIMEOUT_MS = 5000;
@@ -37,6 +48,11 @@ export const FINISH_TIMEOUT_MS = 12000;
 // R12TrialTimeline — marketing consent version tag persisted alongside the
 // consent checkbox answer.
 export const MARKETING_CONSENT_VERSION = 'onboarding-v1-2026-04-12';
+
+// R13Paywall / R13bNudge — redemption success celebration dwell (mascot
+// swaps to fist-pump, headline crossfades to "You're in, brewer.") before
+// finish() commits and hands off to the app.
+export const REDEEM_CELEBRATE_MS = 900;
 
 // Three-chapter progress map (CREATIVE_SPEC.md §1). Each step key matches
 // OnboardingFlow.STEPS. OnboardingTopBar derives the current chapter + its

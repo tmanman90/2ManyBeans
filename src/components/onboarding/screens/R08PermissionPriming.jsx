@@ -5,7 +5,7 @@ import { m, fadeUp, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { logOnboardingEvent } from '../../../lib/onboardingAnalytics';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
-import { CAMERA_IMPORT_TIMEOUT_MS, CAMERA_PERMISSION_TIMEOUT_MS } from '../onboardingConstants';
+import { CAMERA_IMPORT_TIMEOUT_MS, CAMERA_PERMISSION_TIMEOUT_MS, R08_DENIED_DWELL_MS } from '../onboardingConstants';
 
 // Benefit rows that frame the "why"
 const BENEFITS = [
@@ -88,12 +88,12 @@ export default function R08PermissionPriming() {
         advance('granted');
       } else {
         setDeniedMessage(
-          "No worries — you can still add bags manually, and you can turn the camera on later from Settings."
+          "No worries. You can still add bags manually, and you can turn the camera on later from Settings."
         );
         deniedTimerRef.current = setTimeout(() => {
           deniedTimerRef.current = null;
           advance('denied');
-        }, 800);
+        }, R08_DENIED_DWELL_MS);
       }
     } catch (err) {
       logOnboardingEvent('onboarding_permission_failed', {

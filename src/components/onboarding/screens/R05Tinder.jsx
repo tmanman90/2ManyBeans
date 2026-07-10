@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { C, fonts, type, shadows, radius } from '../../../styles/theme';
+import { R05_LAST_SWIPE_HOLD_MS } from '../onboardingConstants';
 import { haptic } from '../../../lib/haptics';
 import { useOnboarding } from '../OnboardingContext';
 import { TINDER_CARDS, computePalateChart } from '../../../lib/onboardingPalate';
@@ -203,7 +204,7 @@ function SwipeCardDeck({ cardKey, prompt, onCommit, flyRef }) {
       el.style.transform = `translateX(${target}px) rotate(${target / 16}deg)`;
       el.style.opacity = '0';
     }
-    setTimeout(() => onCommit(direction), 300);
+    setTimeout(() => onCommit(direction), R05_LAST_SWIPE_HOLD_MS);
   };
 
   useEffect(() => {

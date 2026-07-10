@@ -73,6 +73,7 @@ export const DEFAULT_ANSWERS = {
   },
   cameraPermission: null,
   palateChart: null,
+  pendingScanBean: null,
   marketingConsent: false,
   completedVia: null,
   postCompleteAction: 'none',
@@ -118,11 +119,14 @@ function onboardingReducer(state, action) {
       // Backing into R5 clears the swipes so the user actually redoes
       // the palate step. Without this, R5's alreadyComplete guard
       // immediately re-advances to R6 and the back press looks broken.
+      // Also clears pendingScanBean (R10's held scan) — its "you'll love
+      // this" reaction is derived from the palate chart, so a re-swiped
+      // palate invalidates any held reaction context (LOOP_LOG D10).
       if (prev === 'r5') {
         return {
           ...state,
           step: prev,
-          answers: { ...state.answers, tinderCards: [], palateChart: null },
+          answers: { ...state.answers, tinderCards: [], palateChart: null, pendingScanBean: null },
         };
       }
       return { ...state, step: prev };
