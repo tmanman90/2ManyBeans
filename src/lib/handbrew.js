@@ -565,7 +565,10 @@ export async function generateHandBrewRecipe(bean, research, preferences, device
 
   const family = research?.cupStructureFamily
     || classifyFamilyFallback(bean, DEFAULT_POUROVER_FAMILY);
-  const roastLevel = research?.roastLevel || '';
+  // Fall back to the bean's stored roast level when research fails — an empty
+  // string maps to the 'light' tier and would wrongly fines-bump medium/dark
+  // beans on restricted-flow devices (codex post-ship finding).
+  const roastLevel = research?.roastLevel || bean.roastLevel || '';
 
   let userContent = `Generate a ${(BREW_DEVICE_CONFIGS[device] || BREW_DEVICE_CONFIGS.v60).label} recipe for this bean:
 

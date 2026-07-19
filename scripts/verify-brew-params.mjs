@@ -229,6 +229,7 @@ check('handbrew repair uses normalizeStepTimes; maxTokens raised; light fallback
   assert.match(text, /normalizeStepTimes\(recipe\.steps\)/, 'repair not using shared normalizer');
   assert.match(text, /maxTokens: 1800/, 'maxTokens not raised (JSON truncation risk)');
   assert.match(text, /family === 'medium-washed' && grindTier === 'light'/, 'light medium-washed fallback fines bump missing');
+  assert.match(text, /research\?\.roastLevel \|\| bean\.roastLevel \|\| ''/, 'roastLevel must fall back to the bean record before empty string');
   assert.match(text, /strictly later than the previous step/, 'prompt missing strict-step-time rule');
 });
 check('iced start button gated on timerReady', () => {
