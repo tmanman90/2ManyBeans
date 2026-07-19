@@ -19,6 +19,7 @@ import { Btn } from './Btn';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+import { haptic } from '../lib/haptics';
 
 export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, addBean, updateBean }) => {
   const { hasPro, freeUsage } = useSubscription();
@@ -238,6 +239,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       }
 
       reset();
+      haptic.success();
       onBeanCreated(beanId, savedBean);
     } catch (err) {
       if (thisGen !== genCounter.current) return;

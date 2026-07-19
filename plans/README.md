@@ -7,7 +7,7 @@ Stamped at commit `ec777a5`. If the codebase has drifted, executors must stop an
 | # | Plan | Severity | Status |
 | --- | --- | --- | --- |
 | 001 | [Settings sheet presentation](001-settings-sheet-presentation.md) | HIGH | DONE (device pending) |
-| 002 | [Scan-save arrival (haptic + cascade)](002-scan-save-arrival.md) | MEDIUM | TODO |
+| 002 | [Scan-save arrival (haptic + cascade)](002-scan-save-arrival.md) | MEDIUM | DONE (device pending) |
 | 003 | [Success feedback wiring (haptics + toasts)](003-success-feedback-wiring.md) | MEDIUM | TODO |
 | 004 | [Card press feedback](004-card-press-feedback.md) | MEDIUM | DONE (device pending) |
 | 005 | [Ruphus slide-up symmetric exit](005-ruphus-slideup-exit.md) | MEDIUM | DONE (device pending) |

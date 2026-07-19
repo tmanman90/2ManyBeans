@@ -518,7 +518,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
       </div>
     }>
       {/* Photo section */}
-      <div style={{ marginBottom: 20 }}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ marginBottom: 20, ['--nb-i']: 0 }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={e => { if (e.target.files?.[0]) handlePhotoCapture(e.target.files[0]); }} style={{ display: 'none' }} />
 
         {/* Pending photo: show preview with choice buttons */}
@@ -652,36 +652,42 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         )}
       </div>
 
-      <ChapterHeader number="1" title="Identity" />
-      <div style={rowStyle}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ['--nb-i']: 1 }}>
+        <ChapterHeader number="1" title="Identity" />
+      </div>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ...rowStyle, ['--nb-i']: 2 }}>
         <label style={labelStyle}>Roaster *</label>
         <input value={f.roaster} onChange={e => setF(p => ({ ...p, roaster: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
       </div>
 
-      <div style={rowStyle}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ...rowStyle, ['--nb-i']: 2 }}>
         <label style={labelStyle}>Coffee Name *</label>
         <input value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
       </div>
 
       {f.roaster?.trim() && f.name?.trim() && (
-        <Btn
-          variant="ghost"
-          onClick={handleAiFill}
-          disabled={aiFilling}
-          style={{
-            width: '100%', justifyContent: 'center', marginBottom: 14,
-            fontSize: 13, fontWeight: 700,
-            background: C.accentSoft, border: `1px solid ${C.accentLight}`,
-            borderRadius: radius.md, padding: '10px 0', minHeight: 44,
-            color: C.accent,
-          }}
-        >
-          <Search size={13} /> {aiFilling ? 'Researching...' : 'AI Fill'}
-        </Btn>
+        <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ['--nb-i']: 2 }}>
+          <Btn
+            variant="ghost"
+            onClick={handleAiFill}
+            disabled={aiFilling}
+            style={{
+              width: '100%', justifyContent: 'center', marginBottom: 14,
+              fontSize: 13, fontWeight: 700,
+              background: C.accentSoft, border: `1px solid ${C.accentLight}`,
+              borderRadius: radius.md, padding: '10px 0', minHeight: 44,
+              color: C.accent,
+            }}
+          >
+            <Search size={13} /> {aiFilling ? 'Researching...' : 'AI Fill'}
+          </Btn>
+        </div>
       )}
 
-      <ChapterHeader number="2" title="Origin Story" subtitle="Where this coffee comes from" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ['--nb-i']: 3 }}>
+        <ChapterHeader number="2" title="Origin Story" subtitle="Where this coffee comes from" />
+      </div>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle, ['--nb-i']: 4 }}>
         <div>
           <label style={labelStyle}>Origin</label>
           <input value={f.origin} onChange={e => setF(p => ({ ...p, origin: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus} />
@@ -692,7 +698,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle }}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...rowStyle, ['--nb-i']: 4 }}>
         <div>
           <label style={labelStyle}>Process</label>
           <select value={f.process} onChange={e => setF(p => ({ ...p, process: e.target.value }))} style={inputStyle} onFocus={scrollOnFocus}>
@@ -710,8 +716,10 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         </div>
       </div>
 
-      <ChapterHeader number="3" title="On the Shelf" subtitle="Roast date sets the peak window" />
-      <div style={{ background: C.cream, borderRadius: radius.lg, padding: '16px 16px 12px', border: `1px solid ${C.hairline}`, marginBottom: 14, boxShadow: shadows.e2 }}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ['--nb-i']: 5 }}>
+        <ChapterHeader number="3" title="On the Shelf" subtitle="Roast date sets the peak window" />
+      </div>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ background: C.cream, borderRadius: radius.lg, padding: '16px 16px 12px', border: `1px solid ${C.hairline}`, marginBottom: 14, boxShadow: shadows.e2, ['--nb-i']: 6 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           <div style={{ minWidth: 0 }}>
             <label style={labelStyle}>Roast Date</label>
@@ -746,8 +754,10 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           peakEnd: parseShelfLifeDays(f.shelfLifeOverride) || bean.shelfLifeOverride || bean.peakEnd }} />
       </div>
 
-      <ChapterHeader number="4" title="Tasting Notes" subtitle="From the bag or what you're finding" />
-      <div style={{ marginBottom: 10 }}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ ['--nb-i']: 7 }}>
+        <ChapterHeader number="4" title="Tasting Notes" subtitle="From the bag or what you're finding" />
+      </div>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ marginBottom: 10, ['--nb-i']: 8 }}>
         <textarea
           value={f.bagNotes}
           onChange={e => setF(p => ({ ...p, bagNotes: e.target.value }))}
@@ -765,7 +775,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           onFocus={scrollOnFocus}
         />
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div className={isNewBean ? 'nb-reveal' : undefined} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, ['--nb-i']: 8 }}>
         {NOTE_CHIPS.map(chip => (
           <button
             key={chip}
@@ -782,7 +792,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         ))}
       </div>
       {sourceSummary && (
-        <div style={{
+        <div className={isNewBean ? 'nb-reveal' : undefined} style={{
           marginTop: 12,
           padding: '12px 14px',
           borderRadius: radius.md,
@@ -791,6 +801,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
           boxShadow: shadows.e1,
           color: C.text,
           lineHeight: 1.5,
+          ['--nb-i']: 8,
         }}>
           <div style={{ ...type.label, color: C.textLight, marginBottom: 5 }}>
             Source insight
