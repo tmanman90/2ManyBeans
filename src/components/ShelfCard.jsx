@@ -6,6 +6,7 @@
 import { useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { C, fonts, type, radius, shadows, cardBase } from '../styles/theme';
+import { m, cardPress } from '../lib/motion';
 import { getPeakStatus, lifePct } from '../lib/peakStatus';
 import { useStrippedBag, bagPhotoFor } from '../lib/stripBg';
 import { PeakGauge } from './visual/PeakGauge';
@@ -32,7 +33,7 @@ export function ShelfCard({ bean, actions, onOpenDetail }) {
       height: 448, // fixed so every carousel card is the exact same height
     }}>
       {/* Tappable body → flip detail */}
-      <div onClick={openDetail} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <m.div onClick={openDetail} {...cardPress} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* Hero image / editorial fallback — grows to absorb slack so there's no dead
             space between short content and the footer (and the bag reads bigger). */}
         <div style={{
@@ -73,7 +74,7 @@ export function ShelfCard({ bean, actions, onOpenDetail }) {
             {bean.process && <span>{bean.process}</span>}
           </div>
         </div>
-      </div>
+      </m.div>
 
       {actions}
     </div>

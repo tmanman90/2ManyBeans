@@ -165,7 +165,8 @@ function FeaturedCup({ bean, hero, onOpen, reduce }) {
 function CupCardSmall({ bean, hero, onOpen, reduce }) {
   const bagRef = useRef(null);
   return (
-    <button onClick={() => onOpen(bean, bagRef.current?.getBoundingClientRect())}
+    <m.button onClick={() => onOpen(bean, bagRef.current?.getBoundingClientRect())}
+      whileTap={reduce ? undefined : { scale: 0.985 }} transition={motionTokens.spring.soft}
       style={{ flexShrink: 0, width: 150, textAlign: 'left', padding: 12, cursor: 'pointer', background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, boxShadow: shadows.e2, fontFamily: fonts.body, WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ background: C.bgDeep, borderRadius: radius.md, padding: 8, display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
         <ParallaxBag bean={bean} size={88} innerRef={bagRef} reduce={reduce} range={5} />
@@ -183,7 +184,7 @@ function CupCardSmall({ bean, hero, onOpen, reduce }) {
               ? <span style={{ fontFamily: fonts.heading, fontStyle: 'italic', fontSize: 12.5, color: C.accentDark }}>“{hero.oneWord}”</span>
               : <span style={{ ...type.caption, ...num, color: C.textMuted }}>{metaLine(bean)}</span>)}
       </div>
-    </button>
+    </m.button>
   );
 }
 
@@ -198,7 +199,7 @@ function ArchiveEntry({ bean, hero, showMonth, onOpen, reduce, index }) {
     <m.div {...reveal} style={{ position: 'relative', marginBottom: 12 }}>
       {/* rail tick — a single gold dot for 5★, neutral otherwise */}
       <div style={{ position: 'absolute', left: -10, top: 30, width: 9, height: 9, borderRadius: '50%', background: (hero?.rating || 0) >= 5 ? C.accent : C.cream, border: `1.5px solid ${(hero?.rating || 0) >= 5 ? C.accent : C.border}`, zIndex: 1 }} />
-      <div role="button" tabIndex={0} onClick={open} onKeyDown={onKey}
+      <m.div role="button" whileTap={reduce ? undefined : { scale: 0.985 }} transition={motionTokens.spring.soft} tabIndex={0} onClick={open} onKeyDown={onKey}
         style={{ display: 'flex', gap: 14, padding: 14, minHeight: 44, background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, cursor: 'pointer', boxShadow: shadows.e1, WebkitTapHighlightColor: 'transparent' }}>
         <div style={{ flexShrink: 0, width: 72, height: 72, background: C.bgDeep, borderRadius: radius.md, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <ParallaxBag bean={bean} size={64} innerRef={bagRef} reduce={reduce} range={6} />
@@ -219,7 +220,7 @@ function ArchiveEntry({ bean, hero, showMonth, onOpen, reduce, index }) {
                 <div style={{ ...type.caption, ...num, color: C.textMuted, lineHeight: 1.4 }}>{metaLine(bean)}</div>
               ))}
         </div>
-      </div>
+      </m.div>
     </m.div>
   );
 }
