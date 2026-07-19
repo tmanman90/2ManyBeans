@@ -53,7 +53,9 @@ BY ALTITUDE:
 
 BREWING TROUBLESHOOTING:
 - Bitter/harsh = over-extracted. Fix: grind coarser or reduce contact time.
-- Sour/weak/astringent = under-extracted. Fix: grind finer or increase contact time.
+- Sour/sharp = under-extracted. Fix: grind finer, hotter water, or more contact time.
+- Astringent/drying = over-extracted. Fix: grind coarser or cooler water (never finer).
+- Weak but balanced = under-dosed. Fix: tighter ratio (more coffee), not the grind.
 - Change one variable at a time.
 `;
 
@@ -297,13 +299,13 @@ export function getOriginContext(origin) {
 // Trimmed version for hand brew prompts. Strips French Press and AeroPress sections
 // to save ~200 tokens per request while keeping all pour-over-relevant content.
 export const HANDBREW_POUROVER_KNOWLEDGE = `
-POUR-OVER METHODOLOGY (from James Hoffmann):
+POUR-OVER METHODOLOGY (Hoffmann-inspired, Atlas-derived, app-adapted):
 - Rinse paper filter under hot water (reduces paper taste, warms device). Use bleached white papers.
-- Bloom: Pour ~2x coffee weight in water. Pick up and swirl or stir to wet all grounds. Wait 30 seconds.
+- Bloom: Pour ~2x coffee weight in water. Pick up and swirl or stir to wet all grounds. Wait 30-45 seconds (Hoffmann's published V60 recipe blooms ~45s with staged pours; shorter suits darker roasts).
 - Slowly pour remainder of water directly onto coffee bed (NOT the walls). Weigh as you go.
 - When surface is 2-3cm below top, give gentle swirl (prevents grounds sticking to walls).
 - Diagnostic: flat, even bed = good extraction. Sloped/cratered bed = channeling (pour more evenly).
-- Troubleshooting: Bitter = grind coarser. Sour/weak/astringent = grind finer. Change ONE variable at a time.
+- Troubleshooting: Sour/under-extracted = grind finer or raise temp. Bitter = grind coarser or lower temp. Astringent/drying = grind coarser (over-extraction symptom, never finer). Weak but balanced = raise the dose (tighter ratio, e.g. 1:17 to 1:16) — strength is a ratio problem, not a grind problem. Change ONE variable at a time.
 - Drawdown diagnostics: stalled bed / water pooling / drawdown far past the device target = grind coarser 0.5-1 step, NOT a slower pour. Racing under target = grind finer.
 - Flat-bed brewers (Kalita): the device restricts flow, so grind coarser than V60 and recover extraction with hotter water and a swirl. Dense light washed beans shed fines that clog the flat bed if ground fine.
 

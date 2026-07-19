@@ -112,6 +112,39 @@ check('R15: clean-natural Aiden bloom warmed/shortened', () => {
   assert.match(block, /16\.5 to 17\.0|16\.5-17/, 'ratio not 16.5-17.0');
 });
 
+console.log('\n[R19] Iced transform preserves timer data (Tal device bug 2026-07-19)');
+const { transformPourOver, transformImmersion } = await import(join(ROOT, 'src', 'lib', 'flashBrewTransform.js'));
+const hotKalita = {
+  device: 'kalita', timerReady: true, coffeeGrams: 20, ratio: '1:16',
+  totalBrewTimeSeconds: 210, totalBrewTime: '3:30',
+  grindSize: { setting: '6', description: 'Medium-Coarse', microns: 715 },
+  waterTemp: { celsius: 96, fahrenheit: 205 },
+  steps: [
+    { time: '0:00', timeSeconds: 0, action: 'Bloom', waterTotal: 40 },
+    { time: '0:30-1:10', timeSeconds: 50, action: 'Pour to 200g', waterTotal: 200 }, // range time — the killer case
+    { time: '1:30', timeSeconds: 90, action: 'Final pour', waterTotal: 320 },
+  ],
+};
+check('iced pour-over keeps timerReady with range-format step times', () => {
+  const iced = transformPourOver(hotKalita, 20);
+  assert.equal(iced.timerReady, true, 'timerReady lost');
+  const secs = iced.steps.map((s) => s.timeSeconds);
+  assert.ok(secs.every((s) => typeof s === 'number'), `null timeSeconds: ${JSON.stringify(secs)}`);
+  for (let i = 1; i < secs.length; i++) assert.ok(secs[i] > secs[i - 1], 'not strictly ascending');
+  assert.ok(iced.totalBrewTimeSeconds > secs[secs.length - 1], 'total not beyond last step');
+});
+check('iced pour-over falls back gracefully when hot recipe lacks timer data', () => {
+  const iced = transformPourOver({ ...hotKalita, timerReady: false, steps: [{ time: 'whenever', action: 'x' }], totalBrewTimeSeconds: null }, 20);
+  assert.equal(iced.timerReady, false);
+});
+check('iced immersion ice step carries real timeSeconds', () => {
+  const iced = transformImmersion({ ...hotKalita, device: 'french-press' }, 20);
+  const last = iced.steps[iced.steps.length - 1];
+  assert.equal(typeof last.timeSeconds, 'number', 'ice step missing timeSeconds');
+  assert.ok(iced.totalBrewTimeSeconds > last.timeSeconds, 'total not beyond ice step');
+  assert.equal(iced.timerReady, true);
+});
+
 console.log('\n[Guard] Aiden deterministic grind + bands untouched (full pin in verify-grind-calibration)');
 check('FAMILY_GRIND_BANDS block unchanged', () => {
   assert.match(aiden, /'washed-floral-clarity':\s*\{ ssMin: 3\.2, ssMax: 3\.2, batchMin: 5,\s*batchMax: 6\.2 \}/);

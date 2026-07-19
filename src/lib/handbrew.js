@@ -7,7 +7,8 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { classifyFamilyFallback } from './beanFields';
-import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons } from './brewMethods';
+import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons, parseTimeString } from './brewMethods';
+export { parseTimeString } from './brewMethods';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -108,12 +109,12 @@ export const BREW_DEVICE_CONFIGS = {
     filterType: 'paper or metal disc',
     drainSpeed: 'user-controlled (plunge)',
     grindOffset: -1,
-    ratioRange: [10, 18],
+    ratioRange: [6, 18],
     tempRange: [80, 100],
     maxBrewTime: 210,
     defaultTechnique: 'standard',
     techniques: ['standard', 'inverted', 'bypass'],
-    promptContext: 'Short contact time with pressure. Finer grind than pour-over. Wide temp range (80-100C). Bypass brewing (concentrate + water) wins championships.',
+    promptContext: 'Short contact time with pressure. Finer grind than pour-over. Wide temp range (80-100C). Ratio is MODE-SPECIFIC: standard 1:12-1:18; inverted 1:10-1:14; bypass brews a ~1:6 concentrate then dilutes to taste (championship approach).',
   },
   'french-press': {
     label: 'French Press',
@@ -121,7 +122,7 @@ export const BREW_DEVICE_CONFIGS = {
     filterType: 'metal mesh (no paper)',
     drainSpeed: 'none (full immersion)',
     grindOffset: +0.5,
-    ratioRange: [13, 16],
+    ratioRange: [13, 17],
     tempRange: [95, 100],
     maxBrewTime: 720,
     defaultTechnique: 'hoffmann-french-press',
@@ -154,7 +155,7 @@ const FAMILY_POUROVER_DEFAULTS = {
     notes: 'Bright, juicy. Blackcurrant, tomato, grapefruit.',
   },
   'clean-natural-fruit': {
-    ratio: '1:15 to 1:15.5', tempC: '95-98', bloom: '2x, 30s',
+    ratio: '1:15.5 to 1:16.5', tempC: '95-98', bloom: '2x, 30s',
     grindDirection: 'slightly coarser than washed (lower density, drains faster)',
     technique: 'Kasuya 4:6 (flavor tuning controls sweetness/fruit balance)',
     notes: 'Higher solubility from fruit sugars. Gentler pours. Risk of over-extraction.',
@@ -172,10 +173,10 @@ const FAMILY_POUROVER_DEFAULTS = {
     notes: 'Balanced extraction. Good starting point.',
   },
   'dark-roast': {
-    ratio: '1:17 to 1:18', tempC: '88-93', bloom: '2x, 25s',
+    ratio: '1:15.5 to 1:16.5', tempC: '88-91', bloom: '2x, 25s',
     grindDirection: 'coarser end of pour-over range',
     technique: 'Hoffmann classic (gentle, prevent over-extraction)',
-    notes: 'Very porous. Low temp, coarse grind, wider ratio.',
+    notes: 'Highly soluble. Low temp and coarse grind prevent over-extraction; keep standard-strength ratio (census median 1:15.5 for dark).',
   },
 };
 
@@ -203,8 +204,22 @@ function getDeviceFamilyDefaults(device, family) {
 
   const result = { ...base };
 
+  // Intersect the family's temp band with the device's physical range — the
+  // family band carries the roast/process evidence (dark 88-91C etc.) and must
+  // survive device selection; the device range only clips it. (Audit R1: the
+  // old code REPLACED the family band, making all 7 bands dead code.)
   if (config.tempRange) {
-    result.tempC = `${config.tempRange[0]}-${config.tempRange[1]}`;
+    const [devLo, devHi] = config.tempRange;
+    const fam = String(base.tempC || '').match(/(\d+)\s*-\s*(\d+)/);
+    if (fam) {
+      const famLo = Number(fam[1]);
+      const famHi = Number(fam[2]);
+      const lo = Math.max(famLo, devLo);
+      const hi = Math.min(famHi, devHi);
+      result.tempC = lo <= hi ? `${lo}-${hi}` : `${devLo}-${devHi}`;
+    } else {
+      result.tempC = `${devLo}-${devHi}`;
+    }
   }
 
   // Restricted-flow flat beds invert the "finer end" guidance: the device
@@ -269,49 +284,6 @@ function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family) {
   return Math.max(floor, Math.min(grinder.validRange.max, adjusted));
 }
 
-export function parseTimeString(str) {
-  if (str == null) return null;
-  const s = String(str).trim();
-  if (!s) return null;
-
-  const frag = /(?<!\d)(\d{1,2}):(\d{2})(?!\d)/;
-
-  const rangeMatch = s.match(new RegExp(frag.source + String.raw`\s*[-–—]\s*` + frag.source));
-  if (rangeMatch) {
-    const m1 = parseInt(rangeMatch[1], 10);
-    const s1 = parseInt(rangeMatch[2], 10);
-    const m2 = parseInt(rangeMatch[3], 10);
-    const s2 = parseInt(rangeMatch[4], 10);
-    if (s1 >= 60 || s2 >= 60) return null;
-    const a = m1 * 60 + s1;
-    const b = m2 * 60 + s2;
-    return Math.round((a + b) / 2);
-  }
-
-  if (/\d+:\d+\s*[-–—]\s*\d+:\d+/.test(s)) return null;
-
-  const mmss = s.match(frag);
-  if (mmss) {
-    const mins = parseInt(mmss[1], 10);
-    const secs = parseInt(mmss[2], 10);
-    if (secs >= 60) return null;
-    return mins * 60 + secs;
-  }
-
-  const minsMatch = s.match(/([\d.]+)\s*(?:minutes?|mins?|m)\b/i);
-  if (minsMatch) {
-    const val = parseFloat(minsMatch[1]);
-    if (!isNaN(val) && val >= 0 && val <= 99) return Math.round(val * 60);
-  }
-
-  const secsMatch = s.match(/([\d.]+)\s*(?:seconds?|secs?|s)\b/i);
-  if (secsMatch) {
-    const val = parseFloat(secsMatch[1]);
-    if (!isNaN(val) && val >= 0 && val <= 99 * 60) return Math.round(val);
-  }
-
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Post-generation enforcement with device-specific rules
@@ -573,7 +545,7 @@ RESPOND WITH ONLY THE JSON OBJECT.`;
 function buildTechniqueBlock(config) {
   const blocks = {
     hoffmann: 'Hoffmann Classic: all-rounder, bloom then 2-3 pours to target weight, gentle swirl after each pour, target 2:30-3:30.',
-    'kasuya-46': 'Kasuya 4:6: best for naturals, slightly coarser grind, 5 pours at 45s intervals. First 2 pours control sweetness/acidity, last 3 control strength.',
+    'kasuya-46': 'Kasuya 4:6: 93C water, medium-coarse grind, 1:15 base. Pour when the previous pour has drained (~30-45s cadence, watch the bed not the clock). First 40% in 2 pours controls sweetness/acidity; last 60% in 1-3 pours controls strength (fewer = stronger) — the original uses 3 (5 pours total), the medium-strength variant 2 (4 pours total).',
     'center-pour': 'Center-Pour: steady pour in center, avoid hitting paper walls. The device controls flow rate. More forgiving technique.',
     'hoffmann-chemex': 'Hoffmann Chemex: adapted for thick filter. Higher temp compensates glass heat loss. Pre-rinse filter AND glass body. Coarser grind. 3:30-5:00 total.',
     standard: 'Standard: add water, stir, steep 1-2 min, press. Quick and clean.',
