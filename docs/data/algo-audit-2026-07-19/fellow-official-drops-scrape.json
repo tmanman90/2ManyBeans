@@ -1,0 +1,336 @@
+[
+ {
+  "title": "Indonesia Natural Mount Ijen",
+  "meta": "Light roast",
+  "ratio": "1:16",
+  "bloom": "199F/30s",
+  "temps": [
+   199,
+   199,
+   199,
+   199
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "Natural Geisha",
+  "meta": "Light roast",
+  "ratio": "1:16.5",
+  "bloom": "199F/40s",
+  "temps": [
+   199,
+   199,
+   199,
+   196
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "30",
+   "30"
+  ]
+ },
+ {
+  "title": "Ethiopia Regessa",
+  "meta": "Light roast",
+  "ratio": "1:16.5",
+  "bloom": "205F/45s",
+  "temps": [
+   205,
+   205,
+   205,
+   205
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "20",
+   "20"
+  ]
+ },
+ {
+  "title": "Guatemala SP",
+  "meta": "Medium roast",
+  "ratio": "1:16",
+  "bloom": "205F/35s",
+  "temps": [
+   205,
+   205,
+   205,
+   205
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "Panama Gissell Garrido",
+  "meta": "Light roast",
+  "ratio": "1:15.5",
+  "bloom": "205F/30s",
+  "temps": [
+   205,
+   196,
+   196,
+   196
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "KILONOVA",
+  "meta": "Light roast",
+  "ratio": "1:17",
+  "bloom": "203F/45s",
+  "temps": [
+   203,
+   201,
+   198,
+   194
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "30",
+   "30"
+  ]
+ },
+ {
+  "title": "Colombia Asobombo",
+  "meta": "Light roast",
+  "ratio": "1:16",
+  "bloom": "205F/40s",
+  "temps": [
+   205,
+   205,
+   205,
+   205
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "Little Italy Blend",
+  "meta": "Medium-Dark roast",
+  "ratio": "1:16",
+  "bloom": "209F/30s",
+  "temps": [
+   209,
+   185,
+   185,
+   185
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "Candy Hearts",
+  "meta": "Medium-Light roast",
+  "ratio": "1:16",
+  "bloom": "199F/30s",
+  "temps": [
+   199,
+   203,
+   198
+  ],
+  "shape": "MIXED",
+  "pauses": [
+   "",
+   "23"
+  ]
+ },
+ {
+  "title": "Esteban Zamora Cinnamon",
+  "meta": "Medium-Light roast",
+  "ratio": "1:14",
+  "bloom": "204F/40s",
+  "temps": [
+   204,
+   204,
+   204,
+   204
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "22",
+   "22"
+  ]
+ },
+ {
+  "title": "- Esteban Zamora Cinnamon Anaerobic",
+  "meta": "Light roast",
+  "ratio": "1:14",
+  "bloom": "204F/40s",
+  "temps": [
+   204,
+   204,
+   204,
+   204
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "22",
+   "22"
+  ]
+ },
+ {
+  "title": "Painkiller",
+  "meta": "Medium-Light roast",
+  "ratio": "1:15",
+  "bloom": "175F/30s",
+  "temps": [
+   175,
+   205,
+   201
+  ],
+  "shape": "MIXED",
+  "pauses": [
+   "",
+   "15"
+  ]
+ },
+ {
+  "title": "Club Burundi Turaco Medium-Dark",
+  "meta": "Medium-Dark roast",
+  "ratio": "1:14",
+  "bloom": "198F/40s",
+  "temps": [
+   198,
+   196,
+   194,
+   192
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "30",
+   "30"
+  ]
+ },
+ {
+  "title": "Mulugeta Muntasha",
+  "meta": "Light roast",
+  "ratio": "1:16",
+  "bloom": "190F/45s",
+  "temps": [
+   190,
+   190,
+   190,
+   190
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "Rwanda Cyesha Natural",
+  "meta": "Light roast",
+  "ratio": "1:16.5",
+  "bloom": "203F/30s",
+  "temps": [
+   203,
+   203,
+   203
+  ],
+  "shape": "FLAT",
+  "pauses": [
+   "",
+   "30"
+  ]
+ },
+ {
+  "title": "Spring Breakers Coffee Box",
+  "meta": "Light roast",
+  "ratio": "1:15",
+  "bloom": "199F/35s",
+  "temps": [
+   199,
+   192,
+   189,
+   185
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "PB&J",
+  "meta": "Medium-Light roast",
+  "ratio": "1:15",
+  "bloom": "199F/35s",
+  "temps": [
+   199,
+   194,
+   190,
+   187
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ },
+ {
+  "title": "Rafael Vinhal Pi\u00f1a Colada",
+  "meta": "Medium-Light roast",
+  "ratio": "1:15",
+  "bloom": "176F/30s",
+  "temps": [
+   176,
+   205,
+   201
+  ],
+  "shape": "MIXED",
+  "pauses": [
+   "",
+   "15"
+  ]
+ },
+ {
+  "title": "Hambela EA Decaf",
+  "meta": "Light roast",
+  "ratio": "1:15.5",
+  "bloom": "208F/30s",
+  "temps": [
+   208,
+   208,
+   205,
+   205
+  ],
+  "shape": "DECLINING",
+  "pauses": [
+   "",
+   "23",
+   "23"
+  ]
+ }
+]
