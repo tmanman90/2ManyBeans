@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { assetUrl } from "../lib/assetUrl";
 import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
+import { GlassButton } from '../components/GlassButton';
 import { C, fonts, type, shadows, radius, glass, journalCard, cardBase } from '../styles/theme';
 import { getPeakStatus, daysOpen, today, daysBetween } from '../lib/peakStatus';
 import { getRecommendations } from '../lib/recommendations';
@@ -27,6 +28,7 @@ import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { useLongPress } from '../hooks/useLongPress';
+import { haptic } from '../lib/haptics';
 import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
@@ -183,6 +185,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     setQuickRecipeOpen(true);
   }, [isDemo, onDemoAction]);
 
+  const tapQuickRecipe = useCallback((event) => {
+    haptic.light();
+    openQuickRecipe(event);
+  }, [openQuickRecipe]);
+
   const openAddBean = useCallback(() => {
     if (isDemo) {
       onDemoAction?.();
@@ -193,7 +200,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   }, [isDemo, onAddBeanQuickAction, onDemoAction]);
 
   const quickRecipeLongPressHandlers = useLongPress({
-    onTap: openQuickRecipe,
+    onTap: tapQuickRecipe,
     onLongPress: () => setQuickRecipeMenuOpen(true),
   });
 
@@ -271,14 +278,14 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
             </div>
           </div>
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <Btn
-              variant="primary"
+            <GlassButton
+              compact
               style={{ padding: '10px 16px', minHeight: 44 }}
               aria-label="Quick Recipe"
               {...quickRecipeLongPressHandlers}
             >
               <Camera size={14} /> Quick Recipe
-            </Btn>
+            </GlassButton>
             <QuickRecipeActionMenu
               open={quickRecipeMenuOpen}
               onClose={() => setQuickRecipeMenuOpen(false)}
@@ -314,7 +321,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           />
           <div style={{ fontFamily: fonts.heading, fontSize: 18, color: C.text, marginBottom: 6 }}>Your rotation is empty</div>
           <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Add your first coffee bag to get started</div>
-          <Btn variant="primary" onClick={() => onOpenBean(null, 1)}><Plus size={16} /> Add Bean</Btn>
+          <GlassButton onClick={() => { haptic.light(); onOpenBean(null, 1); }}><Plus size={16} /> Add Bean</GlassButton>
         </m.div>
       )}
 

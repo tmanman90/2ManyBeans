@@ -107,13 +107,53 @@ const rowValueStyle = {
   flexShrink: 0,
 };
 
+// Compact controls sit inside rows or inline forms, so they need their own
+// minimum hit area rather than relying on the surrounding row's height.
+const compactActionStyle = {
+  minWidth: 44,
+  minHeight: 44,
+  boxSizing: 'border-box',
+};
+
+const compactInputStyle = {
+  minHeight: 44,
+  boxSizing: 'border-box',
+};
+
+const inlineEditStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flex: '1 1 auto',
+  minWidth: 0,
+};
+
+// Keep the field label legible while the editor consumes the remaining row
+// width on narrow phones. The input itself is still allowed to shrink.
+const inlineEditLabelStyle = {
+  flex: '0 0 72px',
+  minWidth: 72,
+  whiteSpace: 'nowrap',
+};
+
+const inlineEditInputStyle = {
+  flex: '1 1 150px',
+  minWidth: 0,
+  ...compactInputStyle,
+};
+
+const inlineEditSaveStyle = {
+  ...compactActionStyle,
+  flexShrink: 0,
+};
+
 const selectStyle = {
   fontFamily: fonts.body, fontSize: 15, color: C.textMuted,
   background: 'transparent', border: 'none',
   appearance: 'none', WebkitAppearance: 'none',
   cursor: 'pointer', textAlign: 'right',
   paddingRight: 0, paddingLeft: 8,
-  width: 'auto',
+  width: 'auto', minWidth: 44, minHeight: 44, boxSizing: 'border-box',
 };
 
 export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans, refetchBeans }) => {
@@ -571,7 +611,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   if (!open) return null;
 
   return createPortal(
-    <div style={{
+    <div
+      data-settings-page
+      style={{
       position: 'fixed', inset: 0,
       background: glass.scrim,
       backdropFilter: glass.blur,
@@ -639,7 +681,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               fontWeight: 700,
               color: C.accent,
               minWidth: 44,
-              minHeight: 36,
+              ...compactActionStyle,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -689,9 +731,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             <div style={separatorStyle} />
             {/* Name row */}
             <div style={rowStyle}>
-              <span style={rowLabelStyle}>Name</span>
+              <span style={editingDisplayName ? { ...rowLabelStyle, ...inlineEditLabelStyle } : rowLabelStyle}>Name</span>
               {editingDisplayName ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={inlineEditStyle}>
                   <input
                     type="text"
                     value={displayNameValue}
@@ -703,8 +745,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     style={{
                       fontFamily: fonts.body, fontSize: 16, color: C.text,
                       background: C.bgDeep, border: `1px solid ${C.border}`,
-                      borderRadius: radius.sm, padding: '8px 12px', width: 150,
-                      outline: 'none',
+                      borderRadius: radius.sm, padding: '8px 12px',
+                      outline: 'none', ...inlineEditInputStyle,
                     }}
                   />
                   <button
@@ -713,7 +755,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       background: C.accent, color: '#fff', border: 'none',
                       borderRadius: radius.sm, padding: '8px 16px', cursor: 'pointer',
                       fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
-                      minHeight: 36,
+                      ...inlineEditSaveStyle,
                     }}
                   >
                     Save
@@ -722,7 +764,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               ) : (
                 <button
                   onClick={handleDisplayNameEdit}
-                  style={{ ...rowValueStyle, background: 'none', border: 'none', cursor: 'pointer', padding: 0, minHeight: 44 }}
+                  style={{ ...rowValueStyle, background: 'none', border: 'none', cursor: 'pointer', padding: 0, ...compactActionStyle }}
                 >
                   <span>{profile?.displayName || 'Set name'}</span>
                   <ChevronRight size={16} color={C.textLight} />
@@ -732,9 +774,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             <div style={separatorStyle} />
             {/* Username row */}
             <div style={rowStyle}>
-              <span style={rowLabelStyle}>Username</span>
+              <span style={editingUsername ? { ...rowLabelStyle, ...inlineEditLabelStyle } : rowLabelStyle}>Username</span>
               {editingUsername ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={inlineEditStyle}>
                   <input
                     type="text"
                     value={usernameValue}
@@ -746,8 +788,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     style={{
                       fontFamily: fonts.body, fontSize: 16, color: C.text,
                       background: C.bgDeep, border: `1px solid ${C.border}`,
-                      borderRadius: radius.sm, padding: '8px 12px', width: 140,
-                      outline: 'none',
+                      borderRadius: radius.sm, padding: '8px 12px',
+                      outline: 'none', ...inlineEditInputStyle,
                     }}
                   />
                   <button
@@ -756,7 +798,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       background: C.accent, color: '#fff', border: 'none',
                       borderRadius: radius.sm, padding: '8px 16px', cursor: 'pointer',
                       fontFamily: fonts.body, fontSize: 14, fontWeight: 700,
-                      minHeight: 36,
+                      ...inlineEditSaveStyle,
                     }}
                   >
                     Save
@@ -765,7 +807,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               ) : (
                 <button
                   onClick={handleUsernameEdit}
-                  style={{ ...rowValueStyle, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  style={{ ...rowValueStyle, background: 'none', border: 'none', cursor: 'pointer', padding: 0, ...compactActionStyle }}
                 >
                   <span>{profile?.username ? `@${profile.username}` : 'Set username'}</span>
                   <ChevronRight size={16} color={C.textLight} />
@@ -826,7 +868,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       background: C.bgDeep, border: `1px solid ${C.border}`,
                       borderRadius: radius.sm, padding: '8px 12px', flex: 1,
                       textAlign: 'right', outline: 'none',
-                      minWidth: 0,
+                      minWidth: 0, ...compactInputStyle,
                     }}
                   />
                 </div>
@@ -911,7 +953,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                         fontWeight: 700,
                         color: C.red,
                         opacity: fellowLoading ? 0.5 : 1,
-                        minHeight: 36,
+                        ...compactActionStyle,
                       }}
                     >
                       {fellowLoading ? 'Disconnecting...' : 'Disconnect'}
@@ -934,6 +976,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,
                         fontSize: 16, background: C.bgDeep, color: C.text,
                         boxSizing: 'border-box', marginBottom: 10, outline: 'none',
+                        ...compactInputStyle,
                       }}
                     />
                     <input
@@ -948,6 +991,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                         border: `1px solid ${C.border}`, fontFamily: fonts.body,
                         fontSize: 16, background: C.bgDeep, color: C.text,
                         boxSizing: 'border-box', marginBottom: fellowError ? 10 : 14, outline: 'none',
+                        ...compactInputStyle,
                       }}
                     />
                     {fellowError && (
@@ -963,6 +1007,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                           border: `1px solid ${C.border}`, background: C.bgDeep,
                           fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
                           color: C.textMuted, cursor: 'pointer',
+                          ...compactActionStyle,
                         }}
                       >
                         Cancel
@@ -977,6 +1022,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                           color: '#fff', cursor: 'pointer',
                           opacity: (fellowLoading || !fellowEmailInput.trim() || !fellowPasswordInput) ? 0.5 : 1,
                           boxShadow: shadows.button,
+                          ...compactActionStyle,
                         }}
                       >
                         {fellowLoading ? 'Connecting...' : 'Connect'}
@@ -1003,7 +1049,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                         fontWeight: 700,
                         flexShrink: 0,
                         boxShadow: shadows.button,
-                        minHeight: 40,
+                        ...compactActionStyle,
                       }}
                     >
                       Connect
@@ -1096,6 +1142,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                             border: `1px solid ${C.border}`, background: C.bgDeep,
                             fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
                             color: C.textMuted, cursor: 'pointer',
+                            ...compactActionStyle,
                           }}
                         >
                           Close
@@ -1133,6 +1180,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                             letterSpacing: 2,
                             textTransform: 'uppercase',
                             outline: 'none',
+                            ...compactInputStyle,
                           }}
                         />
                         {redeemError && (
@@ -1148,6 +1196,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                               border: `1px solid ${C.border}`, background: C.bgDeep,
                               fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
                               color: C.textMuted, cursor: 'pointer',
+                              ...compactActionStyle,
                             }}
                           >
                             Cancel
@@ -1162,6 +1211,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                               color: '#fff', cursor: 'pointer',
                               opacity: (redeemLoading || !redeemInput.trim()) ? 0.5 : 1,
                               boxShadow: shadows.button,
+                              ...compactActionStyle,
                             }}
                           >
                             {redeemLoading ? 'Redeeming...' : 'Redeem'}
@@ -1454,6 +1504,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       border: `1px solid ${C.border}`, background: C.bgDeep,
                       fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
                       color: C.textMuted, cursor: 'pointer',
+                      ...compactActionStyle,
                     }}
                   >
                     Cancel
@@ -1466,6 +1517,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                       color: '#fff', cursor: 'pointer',
                       boxShadow: `0 2px 8px ${C.red}40`,
+                      ...compactActionStyle,
                     }}
                   >
                     Continue
@@ -1508,6 +1560,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     outline: 'none', boxSizing: 'border-box',
                     letterSpacing: 2,
                     transition: `border-color ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
+                    ...compactInputStyle,
                   }}
                 />
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -1518,6 +1571,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       border: `1px solid ${C.border}`, background: C.bgDeep,
                       fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
                       color: C.textMuted, cursor: 'pointer',
+                      ...compactActionStyle,
                     }}
                   >
                     Cancel
@@ -1533,6 +1587,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                       color: deleteInput === 'DELETE' ? '#fff' : C.textMuted,
                       cursor: deleteInput === 'DELETE' ? 'pointer' : 'not-allowed',
                       transition: `background ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
+                      ...compactActionStyle,
                     }}
                   >
                     Delete Account
@@ -1610,6 +1665,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   border: `1px solid ${C.border}`, background: C.bgDeep,
                   fontFamily: fonts.body, fontSize: 15, fontWeight: 600,
                   color: C.textMuted, cursor: 'pointer',
+                  ...compactActionStyle,
                 }}
               >
                 Cancel
@@ -1622,6 +1678,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   fontFamily: fonts.body, fontSize: 15, fontWeight: 700,
                   color: '#fff', cursor: 'pointer',
                   boxShadow: shadows.button,
+                  ...compactActionStyle,
                 }}
               >
                 Confirm

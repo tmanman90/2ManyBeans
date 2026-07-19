@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { C, fonts, radius, shadows } from '../styles/theme';
 import SteamGradient from './visual/SteamGradient';
-
-const wordmark = '/images/wordmark@2x.png';
+import { Wordmark } from './Wordmark';
 
 // ─────────────────────────────────────────────────────────────
 // SignInScreen — V2 "Your beans were never meant for a spreadsheet"
@@ -122,17 +121,7 @@ export const SignInScreen = ({ onSignInWithGoogle, onSignInWithApple, onExploreD
           zIndex: 2,
         }}
       >
-        <img
-          src={wordmark}
-          alt="2manybeans"
-          style={{
-            width: '68%',
-            maxWidth: 280,
-            height: 'auto',
-            display: 'block',
-            filter: 'drop-shadow(0 2px 0 rgba(91,61,46,0.08))',
-          }}
-        />
+        <Wordmark variant="hero" />
         <div
           style={{
             fontFamily: fonts.heading,

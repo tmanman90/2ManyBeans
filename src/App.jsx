@@ -239,7 +239,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             height: '100%', paddingBottom: 14,
           }}>
             <div>
-              <Wordmark />
+              <Wordmark variant="chrome" />
               <div style={{ fontSize: 13, color: C.textMuted, fontFamily: fonts.body, fontWeight: 600, marginTop: 3 }}>{greeting}</div>
             </div>
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} className="glass" style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${glass.chromeBorder}`, borderRadius: '50%', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginBottom: 2, boxShadow: shadows.e1 }} aria-label="Settings">
@@ -257,7 +257,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
           zIndex: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Wordmark />
+            <Wordmark variant="chrome" />
             <button onClick={() => { haptic.selection(); setSettingsOpen(true); }} style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Settings">
               <SettingsIcon size={20} color={C.textMuted} />
             </button>
@@ -266,7 +266,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: (tab === 'inventory' || tab === 'rotation') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, overflowY: (tab === 'inventory' || tab === 'rotation') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : tab === 'archive' ? `12px 0 calc(100px + env(safe-area-inset-bottom, 0px))` : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             uid={uid}

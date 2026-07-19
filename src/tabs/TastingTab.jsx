@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { assetUrl } from "../lib/assetUrl";
 import { createPortal } from 'react-dom';
 import { MessageCircle, Plus, Check, Send, Pencil, Trash2, Share2, ChevronRight } from 'lucide-react';
-import { C, fonts, type, shadows, radius, glass, cardBase, motion } from '../styles/theme';
+import { C, fonts, type, shadows, radius, glass, cardBase } from '../styles/theme';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 import { AnimatePresence, useReducedMotion } from 'framer-motion';
 import { TasteFingerprint } from '../components/TasteFingerprint';
@@ -16,6 +16,7 @@ import { buildTastingSystemPrompt, sendTastingMessage } from '../lib/claude';
 import { convertTastingScores } from '../lib/professorRuphus';
 import { StarRating } from '../components/StarRating';
 import { Btn } from '../components/Btn';
+import { GlassButton } from '../components/GlassButton';
 import { Toast } from '../components/Toast';
 import { scrollOnFocus } from '../lib/formHelpers';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
@@ -1040,40 +1041,23 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
 
                   {/* Big primary CTA — Liquid Glass (iOS 26): tinted-glass body + specular rim
                       sheen + inner glow + floating shadow; press scales + brightens + springs. */}
-                  <m.button
+                  <GlassButton
+                    fullWidth
                     onClick={hasBeans ? startWizard : undefined}
                     disabled={!hasBeans}
                     whileTap={reduceMotion || !hasBeans ? undefined : { scale: 0.975, filter: 'brightness(1.08)' }}
-                    transition={motion.spring.snappy}
+                    trailing={<ChevronRight size={20} style={{ opacity: hasBeans ? 0.85 : 0 }} />}
                     style={{
-                      position: 'relative', overflow: 'hidden', isolation: 'isolate', width: '100%',
-                      border: hasBeans ? '1px solid rgba(255,255,255,0.30)' : `1px solid ${C.border}`,
-                      cursor: hasBeans ? 'pointer' : 'not-allowed',
-                      background: hasBeans
-                        ? 'linear-gradient(176deg, rgba(184,120,70,0.96) 0%, rgba(150,90,48,0.97) 45%, rgba(120,72,40,0.98) 100%)'
-                        : C.cardMuted,
-                      WebkitBackdropFilter: 'blur(14px) saturate(170%)', backdropFilter: 'blur(14px) saturate(170%)',
-                      color: hasBeans ? '#FFF7EE' : C.textLight,
                       padding: '15px 16px 15px 15px', borderRadius: radius.lg,
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                      fontFamily: fonts.body, fontSize: 15, fontWeight: 700, letterSpacing: '0.01em',
-                      textShadow: hasBeans ? '0 1px 2px rgba(40,20,8,0.30)' : 'none',
-                      boxShadow: hasBeans
-                        ? 'inset 0 1px 0 rgba(255,255,255,0.52), inset 0 -2px 7px rgba(40,20,8,0.30), 0 1px 2px rgba(70,41,26,0.20), 0 12px 30px rgba(120,70,34,0.36)'
-                        : 'none',
-                      WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    {hasBeans && <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '52%', borderRadius: 'inherit', background: 'linear-gradient(180deg, rgba(255,255,255,0.36) 0%, rgba(255,255,255,0.04) 100%)', pointerEvents: 'none', zIndex: 0 }} />}
-                    {hasBeans && <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(130% 90% at 16% -10%, rgba(255,238,214,0.24), transparent 58%)', pointerEvents: 'none', zIndex: 0 }} />}
-                    <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                       <span style={{ width: 30, height: 30, borderRadius: '50%', background: hasBeans ? 'rgba(255,255,255,0.20)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <MessageCircle size={16} />
                       </span>
                       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctaLabel}</span>
                     </span>
-                    {hasBeans && <ChevronRight size={20} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />}
-                  </m.button>
+                  </GlassButton>
 
                   {/* Quiet scaffolding line (no chrome) */}
                   <div style={{ marginTop: 10, textAlign: 'center', fontFamily: fonts.body, fontSize: 12, color: C.textLight, fontVariantNumeric: 'tabular-nums' }}>

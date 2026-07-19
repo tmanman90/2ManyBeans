@@ -87,7 +87,7 @@ try {
     await page.close();
   }
 
-  // ---- Pass 3b: "Open into jar" is the blue glass button with a jar icon ----
+  // ---- Pass 3b: "Open into jar" is the shared warm glass button with a jar icon ----
   {
     const page = await browser.newPage({ viewport: { width: 402, height: 900 }, deviceScaleFactor: 2 });
     await page.goto(URL, { waitUntil: 'networkidle' });
@@ -97,14 +97,23 @@ try {
       if (!btns.length) return { found: false };
       const b = btns[0];
       const bg = getComputedStyle(b).backgroundImage || '';
-      const blue = /20,\s*150,\s*212/.test(bg);     // the trading-card blue, not the old green
+      const glass = b.getAttribute('data-glass-button') === 'primary';
+      const warm = /184,\s*120,\s*70/.test(bg);      // canonical warm prominent glass tint
       const jar = !!b.querySelector('img[src*="jar"]'); // jar icon, not the Container glyph
-      return { found: true, count: btns.length, blue, jar };
+      return { found: true, count: btns.length, glass, warm, jar };
     });
     if (!open.found) fail('no "OPEN INTO JAR" button rendered on the rail');
-    else if (!open.blue) fail('"OPEN INTO JAR" is not the blue glass button');
+    else if (!open.glass || !open.warm) fail('"OPEN INTO JAR" is not the shared warm glass button');
     else if (!open.jar) fail('"OPEN INTO JAR" is missing its jar icon');
-    else console.log(`OK  open-into-jar is blue + jar icon (${open.count} rails)`);
+    else console.log(`OK  open-into-jar is shared warm glass + jar icon (${open.count} rails)`);
+
+    await page.getByRole('button', { name: /OPEN INTO JAR/i }).first().click();
+    const openCalls = await page.evaluate(() => window.__inventoryOpenCalls || []);
+    if (openCalls.length !== 1 || openCalls[0][0] !== 'a1' || openCalls[0][1] !== 1) {
+      fail(`open-into-jar callback drifted: ${JSON.stringify(openCalls)}`);
+    } else {
+      console.log('OK  open-into-jar callback fires once for first free slot');
+    }
 
     // Brew / Learn / Freeze must be a uniform height (Brew's menu wrapper used to
     // leave it short next to the taller Ruphus-avatar Learn pill).

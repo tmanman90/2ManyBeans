@@ -8,11 +8,12 @@ import { PaywallProvider } from './src/hooks/usePaywall.jsx';
 import { AuthContext } from './src/contexts/AuthContext';
 import { TastingTab } from './src/tabs/TastingTab';
 
-const beans = [
+const fixtureBeans = [
   { id: 'b1', roaster: 'Arcane', name: 'Kotowa Estate', origin: 'Panama', process: 'Washed', status: 'ACTIVE', jarSlot: 1, photoUrl: '/images/demo/bags/stereoscope-card-v3.png' },
   { id: 'b2', roaster: 'Onyx', name: 'Geometry Blend', origin: 'Ethiopia', process: 'Natural', status: 'ACTIVE', jarSlot: 2 },
   { id: 'b3', roaster: 'Sey', name: 'Kenya Karinga', origin: 'Kenya', process: 'Washed', status: 'SEALED' },
 ];
+const beans = new URLSearchParams(window.location.search).has('empty') ? [] : fixtureBeans;
 
 // Varied tastings: one with real 6-axis tastingScores (full fingerprint), one with only
 // qualitative axes (presence fingerprint), one sparse (rating only → no fingerprint, degrade).

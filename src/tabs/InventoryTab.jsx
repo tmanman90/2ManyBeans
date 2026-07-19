@@ -11,6 +11,7 @@ import { BrewMethodMenu } from '../components/BrewMethodMenu';
 import { useBeanDetail } from '../hooks/useBeanDetail';
 import { useLongPress } from '../hooks/useLongPress';
 import { Btn } from '../components/Btn';
+import { GlassButton } from '../components/GlassButton';
 import { ScanSheet } from '../components/ScanSheet';
 import { ManualEntrySheet } from '../components/ManualEntrySheet';
 import { EditBeanModal } from '../components/EditBeanModal';
@@ -24,6 +25,7 @@ import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
+import { haptic } from '../lib/haptics';
 
 // Secondary Liquid-Glass pill for the rail card footer (matches the Rotation footer).
 // Spreads ...rest so long-press handlers (Brew) pass through.
@@ -49,14 +51,16 @@ const BrewPill = ({ bean, isHandBrew, isDemo, onDemoAction, aiden, handBrew }) =
   );
 };
 
-// Primary "Open into jar" — blue glass (matches the trading-card blue button) + jar icon.
+// Primary "Open into jar" — shared warm prominent glass + jar icon.
 const OpenJarBtn = ({ onClick }) => (
-  <m.button onClick={onClick} whileTap={{ scale: 0.97, y: 1 }} transition={{ type: 'spring', stiffness: 700, damping: 30, mass: 0.6 }}
-    style={{ position: 'relative', overflow: 'hidden', width: '100%', border: '1px solid rgba(255,255,255,0.45)', borderRadius: 14, padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(86,196,240,0.94) 0%, rgba(20,150,212,0.96) 55%, rgba(12,120,180,0.97) 100%)', WebkitBackdropFilter: 'blur(12px) saturate(170%)', backdropFilter: 'blur(12px) saturate(170%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 6px rgba(8,60,95,0.28), 0 2px 4px rgba(16,90,130,0.22), 0 8px 20px rgba(24,165,224,0.40)' }}>
-    <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '52%', background: 'linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.04))', borderTopLeftRadius: 13, borderTopRightRadius: 13, pointerEvents: 'none' }} />
-    <img src="/images/jar-full.webp" alt="" style={{ width: 20, height: 20, objectFit: 'contain', position: 'relative', zIndex: 1, filter: 'brightness(0) invert(1) drop-shadow(0 1px 1px rgba(8,50,80,0.3))' }} />
-    <span style={{ position: 'relative', zIndex: 1, fontFamily: fonts.body, fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', color: '#fff', textShadow: '0 1px 2px rgba(8,50,80,0.35)' }}>OPEN INTO JAR</span>
-  </m.button>
+  <GlassButton
+    fullWidth
+    onClick={onClick}
+    style={{ padding: '13px', borderRadius: 14, gap: 9, fontSize: 13, letterSpacing: '0.08em' }}
+  >
+    <img src="/images/jar-full.webp" alt="" style={{ width: 20, height: 20, objectFit: 'contain', filter: 'brightness(0) invert(1) drop-shadow(0 1px 1px rgba(40,20,8,0.3))' }} />
+    OPEN INTO JAR
+  </GlassButton>
 );
 
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
@@ -200,7 +204,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
       }}>
         {/* Title row + Add Bean CTA */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-          <div>
+          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
             {/* Eyebrow label */}
             <div style={{
               ...type.label,
@@ -221,14 +225,14 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
               Patiently waiting
             </div>
           </div>
-          <Btn
-            variant="primary"
-            onClick={() => isDemo ? onDemoAction?.() : setScanOpen(true)}
-            style={{ padding: '10px 16px', minHeight: 44, marginTop: 2 }}
+          <GlassButton
+            compact
+            onClick={() => { haptic.light(); if (isDemo) onDemoAction?.(); else setScanOpen(true); }}
+            style={{ padding: '10px 16px', minHeight: 44, marginTop: 2, flexShrink: 0, whiteSpace: 'nowrap' }}
             data-tour="add-bean"
           >
             <Plus size={15} /> Add Bean
-          </Btn>
+          </GlassButton>
         </div>
 
         {/* Stats row — inline pills with dot separators */}
@@ -396,13 +400,13 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
             }}>
               Add your sealed bags and track every bean before it hits peak.
             </div>
-            <Btn
-              variant="primary"
-              onClick={() => isDemo ? onDemoAction?.() : setScanOpen(true)}
-              style={{ minHeight: 44, padding: '10px 20px' }}
+            <GlassButton
+              compact
+              onClick={() => { haptic.light(); if (isDemo) onDemoAction?.(); else setScanOpen(true); }}
+              style={{ minHeight: 44, padding: '10px 20px', flexShrink: 0, whiteSpace: 'nowrap' }}
             >
               <Plus size={15} /> Add Bean
-            </Btn>
+            </GlassButton>
           </m.div>
         )}
 

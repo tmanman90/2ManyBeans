@@ -25,6 +25,8 @@ const beans = [
   mk('m1', 'Stereoscope', 'Colombia El Diviso – Ombligon'),
 ];
 const noop = () => {};
+window.__inventoryOpenCalls = [];
+const recordOpenBean = (...args) => window.__inventoryOpenCalls.push(args);
 
 createRoot(document.getElementById('root')).render(
   <AuthContext value={{ user: null, logOut: () => {} }}>
@@ -33,7 +35,7 @@ createRoot(document.getElementById('root')).render(
         <UserPreferencesProvider value={{ preferences: { brewMethod: 'aiden', canisterCount: 3 } }}>
           <InventoryTab
             uid="harness" beans={beans} tastings={[]}
-            onOpenBean={noop} onAddBean={noop} updateBean={noop} deleteBean={noop} onFinishBean={noop}
+            onOpenBean={recordOpenBean} onAddBean={noop} updateBean={noop} deleteBean={noop} onFinishBean={noop}
             addTasting={noop} updateTasting={noop} getBeanById={(id) => beans.find(b => b.id === id)}
             onStartTastingSession={noop} isDemo={false} onDemoAction={noop}
           />
