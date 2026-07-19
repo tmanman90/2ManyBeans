@@ -8,6 +8,7 @@ import { fadeUp, popIn, spring } from '../lib/motion';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline } from '../lib/gemini';
 import { ENRICHABLE_FIELDS } from '../lib/beanFields';
+import { haptic } from '../lib/haptics';
 import { ensurePhotoLibraryAccess, galleryPhotosToScanPhotos, isPhotoPickerCancel } from '../lib/photoPicker';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
@@ -331,6 +332,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     const beanId = savedBeanId;
     if (!beanId || !addTasting) return;
     await addTasting({ beanId, rating, notes });
+    haptic.success();
+    setToast('Rating saved');
   };
 
   const handleRuphusTasting = async () => {

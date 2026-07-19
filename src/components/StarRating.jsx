@@ -1,6 +1,7 @@
 // Interactive 5-bean rating widget — coffee bean icons
 import { useState } from 'react';
 import { m, spring, popIn } from '../lib/motion';
+import { haptic } from '../lib/haptics';
 import { C } from '../styles/theme';
 
 // Refined coffee bean SVG — crisp filled/unfilled states using design tokens
@@ -43,7 +44,7 @@ export const StarRating = ({ value, onChange, size = 22 }) => {
         return (
           <m.span
             key={n}
-            onClick={() => onChange?.(value === n ? 0 : n)}
+            onClick={() => { if (onChange) { haptic.selection(); onChange(value === n ? 0 : n); } }}
             onMouseEnter={() => isInteractive && setHover(n)}
             onMouseLeave={() => setHover(0)}
             // Spring pop on selection; subtle press scale for interactivity

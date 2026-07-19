@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { assetUrl } from "../lib/assetUrl";
 import { ArrowLeft } from 'lucide-react';
 import { C, fonts, type, radius } from '../styles/theme';
+import { haptic } from '../lib/haptics';
 import { today } from '../lib/peakStatus';
 import { convertTastingScores } from '../lib/professorRuphus';
 import { Modal } from './Modal';
@@ -46,6 +47,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
         sweetness: '', body: '', finish: '', notes: '', changeTomorrow: '',
       });
       await onFinish(bean.id);
+      haptic.success();
       setCelebrating(true);
       setTimeout(() => onClose('Saved & finished!'), 2200);
     } catch (err) {
@@ -75,6 +77,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       }
 
       await onFinish(bean.id);
+      haptic.success();
       setCelebrating(true);
       setView('prompt');
       setTimeout(() => onClose('Saved & finished!'), 2200);

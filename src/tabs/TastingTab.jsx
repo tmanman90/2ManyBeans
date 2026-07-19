@@ -528,6 +528,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
     const tastingData = { date: today(), ...formData };
     try {
       const tastingId = await onAddTasting(tastingData);
+      haptic.success();
       if (tastingId) convertScoresInBackground(tastingId, tastingData);
       setMode('list');
     } catch (err) {

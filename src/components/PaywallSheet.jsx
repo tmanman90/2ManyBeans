@@ -17,6 +17,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
+import { haptic } from '../lib/haptics';
 import { m, spring, fadeUp, sheet as sheetVariant, scrim, popIn } from '../lib/motion';
 import { AnimatePresence } from 'framer-motion';
 import {
@@ -255,6 +256,7 @@ export function PaywallSheet({ open, context, onClose }) {
       }
       // Success — purchasePackage publishes customerInfo so SubscriptionContext unlocks immediately.
       // Close the paywall after a short delay so the user sees the state flip.
+      haptic.success();
       setToast('Subscription active');
       closeTimerRef.current = setTimeout(() => {
         if (!mountedRef.current) return;
@@ -278,6 +280,7 @@ export function PaywallSheet({ open, context, onClose }) {
       if (!mountedRef.current) return;
       const { hasPro, hasUltra } = deriveEntitlements(info);
       if (hasPro || hasUltra) {
+        haptic.success();
         setToast('Subscription restored');
         closeTimerRef.current = setTimeout(() => {
           if (!mountedRef.current) return;
