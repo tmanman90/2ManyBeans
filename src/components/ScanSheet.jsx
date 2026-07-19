@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { X, Search, Camera, Image } from 'lucide-react';
+import { m, fadeUp, popIn } from '../lib/motion';
 import { C, fonts, type, shadows, radius, glass } from '../styles/theme';
 import { compressImage } from '../lib/claude';
 import { scanBeanLabel, researchBeanOnline, generateProductShot, deleteProductShot } from '../lib/gemini';
@@ -271,7 +272,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
 
       {/* STEP: Photo capture */}
       {step === 'photo' && (
-        <div style={{ padding: '8px 0 12px' }}>
+        <m.div {...fadeUp} style={{ padding: '8px 0 12px' }}>
           {photos.length === 0 ? (
             <div
               style={{
@@ -401,21 +402,21 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
           )}
 
           {scanError && (
-            <div style={{
+            <m.div {...popIn} style={{
               padding: '10px 14px', borderRadius: radius.md,
               ...type.body, fontSize: 13, background: C.amberBg,
               color: C.amber, marginTop: 14,
               border: `1px solid ${C.accentLight}`,
             }}>
               {scanError}
-            </div>
+            </m.div>
           )}
-        </div>
+        </m.div>
       )}
 
       {/* STEP: Scanning */}
       {step === 'scanning' && (
-        <div style={{ textAlign: 'center' }}>
+        <m.div {...fadeUp} style={{ textAlign: 'center' }}>
           {photos.length > 0 && (
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 20, paddingTop: 8 }}>
               {photos.map((photo, idx) => (
@@ -429,21 +430,21 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
             </div>
           )}
           <Spinner label={`Reading ${photos.length > 1 ? 'labels' : 'label'}...`} />
-        </div>
+        </m.div>
       )}
 
       {/* STEP: Researching */}
       {step === 'researching' && (
-        <div style={{ textAlign: 'center' }}>
+        <m.div {...fadeUp} style={{ textAlign: 'center' }}>
           <Spinner label="Researching online..." />
-        </div>
+        </m.div>
       )}
 
       {/* STEP: Saving */}
       {step === 'saving' && (
-        <div style={{ textAlign: 'center' }}>
+        <m.div {...fadeUp} style={{ textAlign: 'center' }}>
           <Spinner label="Saving bean..." />
-        </div>
+        </m.div>
       )}
     </Modal>
   );
