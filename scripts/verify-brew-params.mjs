@@ -106,7 +106,7 @@ check('R14: batch pulse fallback = 4', () => {
   assert.match(aiden, /batchPulsesNumber \?\? 4/, 'fallback not unified at 4');
 });
 check('R15: clean-natural Aiden bloom warmed/shortened', () => {
-  const block = aiden.match(/CLEAN NATURAL FRUIT[\s\S]{0,700}/)[0];
+  const block = aiden.match(/\nCLEAN NATURAL FRUIT\nExamples:[\s\S]{0,700}/)[0];
   assert.match(block, /94-96°C|94-96C/, 'bloom temp not 94-96');
   assert.match(block, /35-45s/, 'bloom time not 35-45s');
   assert.match(block, /16\.5 to 17\.0|16\.5-17/, 'ratio not 16.5-17.0');
