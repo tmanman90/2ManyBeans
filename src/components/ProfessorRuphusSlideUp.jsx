@@ -1,4 +1,5 @@
 // Professor Ruphus — full-screen slide-up educational lesson
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { assetUrl } from "../lib/assetUrl";
 import { X, RefreshCw } from 'lucide-react';
@@ -70,10 +71,24 @@ const Spinner = () => (
 );
 
 export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, researching, error, onRetry, onRefresh, tastingScores }) => {
-  if (!open) return null;
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef(null);
+  const finishClose = () => {
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    setClosing(false);
+    onClose();
+  };
+  const startClose = () => {
+    if (closing) return;
+    setClosing(true);
+    closeTimerRef.current = setTimeout(finishClose, 300); // reduced-motion fallback: animationend never fires when animation:none
+  };
+
+  if (!open) { if (closing) setClosing(false); return null; }
 
   return createPortal(
     <div
+      className={closing ? 'ruphus-scrim-out' : undefined}
       style={{
         position: 'fixed', inset: 0, zIndex: 1100,
         background: glass.scrim,
@@ -81,9 +96,10 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
         WebkitBackdropFilter: glass.blur,
         animation: 'ruphusFadeIn 0.2s ease-out',
       }}
-      onClick={onClose}
+      onClick={startClose}
     >
       <div
+        className={closing ? 'ruphus-sheet-out' : undefined}
         style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
           height: '100%',
@@ -99,9 +115,10 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
           paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
         onClick={e => e.stopPropagation()}
+        onAnimationEnd={(e) => { if (closing && e.target === e.currentTarget) finishClose(); }}
       >
         {loading && researching ? (
-          <ResearchLoadingScreen onClose={onClose} />
+          <ResearchLoadingScreen onClose={startClose} />
         ) : (
         <>
         {/* Header bar — grabber + action row */}
@@ -140,7 +157,7 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={startClose}
               aria-label="Close"
               style={{
                 background: 'rgba(0,0,0,0.04)',
