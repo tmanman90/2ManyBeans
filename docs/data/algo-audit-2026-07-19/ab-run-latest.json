@@ -1,0 +1,250 @@
+[
+  {
+    "bean": "Kenya Gichathaini AA",
+    "family": "washed-kenya-clarity",
+    "baseline": {
+      "profileType": 0,
+      "ratio": 17.5,
+      "bloomEnabled": true,
+      "bloomRatio": 3,
+      "bloomDuration": 50,
+      "bloomTemperature": 95.5,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 22,
+      "ssPulseTemperatures": [
+        95.5,
+        95,
+        94
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 28,
+      "batchPulseTemperatures": [
+        95.5,
+        95,
+        94.5,
+        93.5
+      ],
+      "grindRecommendation": {
+        "singleServe": 3,
+        "batch": 5.1
+      }
+    },
+    "current": {
+      "profileType": 0,
+      "ratio": 17.5,
+      "bloomEnabled": true,
+      "bloomRatio": 3,
+      "bloomDuration": 50,
+      "bloomTemperature": 95.5,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 22,
+      "ssPulseTemperatures": [
+        95.5,
+        95,
+        94.5
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 30,
+      "batchPulseTemperatures": [
+        95.5,
+        95,
+        94.5,
+        94.5
+      ],
+      "grindRecommendation": {
+        "singleServe": 3,
+        "batch": 5.1
+      }
+    }
+  },
+  {
+    "bean": "El Triangulo",
+    "family": "washed-floral-clarity",
+    "baseline": {
+      "profileType": 0,
+      "ratio": 17.5,
+      "bloomEnabled": true,
+      "bloomRatio": 3,
+      "bloomDuration": 50,
+      "bloomTemperature": 95.5,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 22,
+      "ssPulseTemperatures": [
+        95.5,
+        95,
+        94.5
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 28,
+      "batchPulseTemperatures": [
+        95.5,
+        95,
+        94.5,
+        94
+      ],
+      "grindRecommendation": {
+        "singleServe": 3.2,
+        "batch": 5.2
+      }
+    },
+    "current": {
+      "profileType": 0,
+      "ratio": 17,
+      "bloomEnabled": true,
+      "bloomRatio": 3,
+      "bloomDuration": 50,
+      "bloomTemperature": 96,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 22,
+      "ssPulseTemperatures": [
+        96,
+        95.5,
+        95
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 29,
+      "batchPulseTemperatures": [
+        96,
+        95.5,
+        95,
+        94.5
+      ],
+      "grindRecommendation": {
+        "singleServe": 3.2,
+        "batch": 5.2
+      }
+    }
+  },
+  {
+    "bean": "Chelbesa Natural",
+    "family": "clean-natural-fruit",
+    "baseline": {
+      "profileType": 0,
+      "ratio": 17,
+      "bloomEnabled": true,
+      "bloomRatio": 2.5,
+      "bloomDuration": 50,
+      "bloomTemperature": 93.5,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 27,
+      "ssPulseTemperatures": [
+        93.5,
+        93,
+        92.5
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 30,
+      "batchPulseTemperatures": [
+        93.5,
+        93,
+        92.5,
+        92
+      ],
+      "grindRecommendation": {
+        "singleServe": 4.2,
+        "batch": 6.2
+      }
+    },
+    "current": {
+      "profileType": 0,
+      "ratio": 17,
+      "bloomEnabled": true,
+      "bloomRatio": 2.5,
+      "bloomDuration": 40,
+      "bloomTemperature": 95,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 27,
+      "ssPulseTemperatures": [
+        95,
+        95,
+        94
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 30,
+      "batchPulseTemperatures": [
+        95,
+        95,
+        94,
+        94
+      ],
+      "grindRecommendation": {
+        "singleServe": 4.2,
+        "batch": 6.2
+      }
+    }
+  },
+  {
+    "bean": "Mulish",
+    "family": "washed-ethiopia-clarity",
+    "baseline": {
+      "profileType": 0,
+      "ratio": 17.5,
+      "bloomEnabled": true,
+      "bloomRatio": 3,
+      "bloomDuration": 50,
+      "bloomTemperature": 95.5,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 22,
+      "ssPulseTemperatures": [
+        95.5,
+        95,
+        94
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 29,
+      "batchPulseTemperatures": [
+        95.5,
+        95,
+        94.5,
+        94
+      ],
+      "grindRecommendation": {
+        "singleServe": 3.2,
+        "batch": 5.2
+      }
+    },
+    "current": {
+      "profileType": 0,
+      "ratio": 17.5,
+      "bloomEnabled": true,
+      "bloomRatio": 3,
+      "bloomDuration": 50,
+      "bloomTemperature": 96,
+      "ssPulsesEnabled": true,
+      "ssPulsesNumber": 3,
+      "ssPulsesInterval": 22,
+      "ssPulseTemperatures": [
+        96,
+        95.5,
+        95
+      ],
+      "batchPulsesEnabled": true,
+      "batchPulsesNumber": 4,
+      "batchPulsesInterval": 30,
+      "batchPulseTemperatures": [
+        96,
+        95.5,
+        95,
+        94.5
+      ],
+      "grindRecommendation": {
+        "singleServe": 3.2,
+        "batch": 5.2
+      }
+    }
+  }
+]
