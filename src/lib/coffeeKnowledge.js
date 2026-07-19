@@ -228,26 +228,36 @@ with fresh research.
 // src/lib/handbrew.js (machine data). Both must enumerate the same grinder
 // keys. Dynamic USER SETUP block names which blurb is active.
 export const GRINDER_KNOWLEDGE = `
-GRINDERS:
+GRINDERS (micron calibrations per Honest Coffee Guide measured ranges):
 Fellow Ode Gen 2: scale 1-11 with 0.1/0.2 sub-steps (e.g. 4.1, 4.2). Lower
-  number = finer grind. Pour-over range roughly 4-8; light roast starts
-  around 4.5. Note: Aiden light-roast recipes use 3.1-4.0 on the Ode, which
-  is too fine for manual pour-over.
-Fellow Opus: scale 1-6 with 10 clicks per whole number (e.g. 4.0 base, 4.5
-  is five clicks coarser). Lower number = finer grind. Pour-over range
-  about 3-6.5; light roast starts around 4.0.
+  number = finer grind. ~275µm at 1, ~88µm per whole number (5 ≈ 630µm,
+  6 ≈ 720µm, 7 ≈ 805µm). V60 range roughly 4-6; light roast V60 starts
+  around 4.5. Flat-bed brewers (Kalita) run COARSER: light roast starts
+  5.5-6.5 — the device restricts flow, and dense light washed beans shed
+  fines that stall the flat bed if ground fine. Note: Aiden light-roast
+  recipes use 3.1-4.0 on the Ode, which is too fine for manual pour-over.
+Fellow Opus: dial 1-11 with quarter-step clicks. Lower number = finer.
+  ~230µm at 1, ~93µm per whole number. Pour-over range about 3-8.5; light
+  roast starts around 4.5.
 Baratza Encore ESP: 40-step scale, 1-40. Lower number = finer grind.
-  Pour-over range 10-32; light roast around 15, medium 20, dark 25.
+  ~29µm per step. Pour-over range 16-30; light roast around 16, medium 20,
+  dark 25.
 Comandante C40 MK4: around 40 clicks from zero. More clicks = coarser
-  grind. Pour-over range 18-38; light roast around 22, medium 28, dark 32.
-1Zpresso JX-Pro: around 200 clicks from zero. More clicks = coarser grind.
-  Pour-over range 70-150; light roast around 90, medium 110, dark 130.
+  grind, ~30µm per click. Pour-over range 18-38; light roast around 22,
+  medium 28, dark 32.
+1Zpresso JX-Pro: ~200 clicks from zero (rotations.number.tick, 1 rotation =
+  40 clicks). More clicks = coarser, ~4.6µm per click. Pour-over range
+  90-180; light roast around 105, medium 125, dark 145.
 Baratza Virtuoso+: 40-step scale, 1-40. Lower number = finer grind.
-  Pour-over range 10-32; light roast around 15, medium 20, dark 25.
+  ~25µm per step. Pour-over range 10-32; light roast around 15, medium 20,
+  dark 25.
 Other or custom grinder: most electric burr grinders use lower number =
   finer; most manual hand grinders use more clicks = coarser. If advising a
   numeric change, first confirm the user's direction convention, then give
   the change in words (finer/coarser) along with the number.
+Grinder settings are STARTING POINTS: burr calibration varies unit to unit
+  (Fellow ships burrs aligned 5 clicks after chirp; self-calibrated units
+  read up to half a number different). Correct by drawdown time and taste.
 `;
 
 // --- BREW TROUBLESHOOTING RULES ---
@@ -260,6 +270,10 @@ Brew troubleshooting (apply per brewer):
 - Bitter / harsh / astringent: grind coarser; or on Aiden, lower the final
   pulse temperatures 1-2C; on hand-brew, lower water temp or shorten
   contact.
+- Stalled / choked pour-over (water pooling, drawdown way past target —
+  V60 2:30-3:30, Kalita 3:00-3:45, Chemex 3:30-5:00): grind coarser 0.5-1
+  step. Dense light washed beans on a flat-bed (Kalita) are the classic
+  case — never fix a stall by pouring slower or grinding finer.
 - Weak / watery / thin: higher dose (stronger ratio, e.g. 1:16 instead of
   1:17).
 - Cup is fine: keep the current recipe.
@@ -290,6 +304,8 @@ POUR-OVER METHODOLOGY (from James Hoffmann):
 - When surface is 2-3cm below top, give gentle swirl (prevents grounds sticking to walls).
 - Diagnostic: flat, even bed = good extraction. Sloped/cratered bed = channeling (pour more evenly).
 - Troubleshooting: Bitter = grind coarser. Sour/weak/astringent = grind finer. Change ONE variable at a time.
+- Drawdown diagnostics: stalled bed / water pooling / drawdown far past the device target = grind coarser 0.5-1 step, NOT a slower pour. Racing under target = grind finer.
+- Flat-bed brewers (Kalita): the device restricts flow, so grind coarser than V60 and recover extraction with hotter water and a swirl. Dense light washed beans shed fines that clog the flat bed if ground fine.
 
 EXTRACTION SCIENCE:
 - Target: 18-22% extraction of ground coffee by weight.

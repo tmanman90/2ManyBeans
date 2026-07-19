@@ -8,7 +8,7 @@ import { Btn } from './Btn';
 import { DoseStepperCard } from './DoseStepperCard';
 import { ExternalLink, Coffee, RefreshCw, AlertTriangle, Share2, Snowflake, ArrowLeft } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
-import { GRINDER_LABELS } from '../lib/brewMethods';
+import { GRINDER_LABELS, formatAidenGrindValues } from '../lib/brewMethods';
 import { Capacitor } from '@capacitor/core';
 import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
 import { shareImage } from '../lib/share';
@@ -269,23 +269,28 @@ const GrindColumn = ({ label, value, divider }) => (
   </div>
 );
 
-const GrindCard = ({ recipe, grinderName }) => (
-  <div style={{
-    background: PAPER_GRAD,
-    borderRadius: radius.lg,
-    padding: '16px 18px 18px',
-    border: `1px solid ${GRIND_BORDER}`,
-    marginBottom: 20,
-    boxShadow: shadows.e1,
-    position: 'relative',
-  }}>
-    <SectionLabel style={{ marginBottom: 12 }}>Grind · {grinderName}</SectionLabel>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12 }}>
-      <GrindColumn label="single serve" value={recipe.grindRecommendation.singleServe} />
-      <GrindColumn label="batch" value={recipe.grindRecommendation.batch} divider />
+const GrindCard = ({ recipe, grinderName, preferences }) => {
+  // Aiden grind is stored in Ode Gen 2 steps — translate for non-Ode grinders
+  const grind = formatAidenGrindValues(recipe.grindRecommendation, preferences);
+  if (!grind) return null;
+  return (
+    <div style={{
+      background: PAPER_GRAD,
+      borderRadius: radius.lg,
+      padding: '16px 18px 18px',
+      border: `1px solid ${GRIND_BORDER}`,
+      marginBottom: 20,
+      boxShadow: shadows.e1,
+      position: 'relative',
+    }}>
+      <SectionLabel style={{ marginBottom: 12 }}>Grind · {grind.grinderName || grinderName}</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12 }}>
+        <GrindColumn label="single serve" value={grind.singleServe} />
+        <GrindColumn label="batch" value={grind.batch} divider />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const AidenPrimaryButton = ({ onClick, leading, children }) => (
   <m.button
@@ -470,7 +475,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           <TempCard recipe={recipe} />
 
           {recipe.grindRecommendation && (
-            <GrindCard recipe={recipe} grinderName={grinderName} />
+            <GrindCard recipe={recipe} grinderName={grinderName} preferences={preferences} />
           )}
 
           {/* Fellow push state */}
@@ -722,23 +727,27 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
             </div>
           </div>
 
-          {/* Grind card (iced) */}
-          {icedRecipe.grindRecommendation && (
-            <div style={{
-              background: ICE_PAPER_GRAD,
-              borderRadius: radius.lg,
-              padding: '14px 18px 16px',
-              border: `1px solid ${ICE_GRIND_BORDER}`,
-              marginBottom: 14,
-              boxShadow: shadows.e1,
-            }}>
-              <SectionLabel style={{ marginBottom: 12 }}>Grind (finer for iced) · {grinderName}</SectionLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12 }}>
-                <GrindColumn label="single serve" value={icedRecipe.grindRecommendation.singleServe} />
-                <GrindColumn label="batch" value={icedRecipe.grindRecommendation.batch} divider />
+          {/* Grind card (iced) — translated for the user's grinder like the hot card */}
+          {icedRecipe.grindRecommendation && (() => {
+            const icedGrind = formatAidenGrindValues(icedRecipe.grindRecommendation, preferences);
+            if (!icedGrind) return null;
+            return (
+              <div style={{
+                background: ICE_PAPER_GRAD,
+                borderRadius: radius.lg,
+                padding: '14px 18px 16px',
+                border: `1px solid ${ICE_GRIND_BORDER}`,
+                marginBottom: 14,
+                boxShadow: shadows.e1,
+              }}>
+                <SectionLabel style={{ marginBottom: 12 }}>Grind (finer for iced) · {icedGrind.grinderName || grinderName}</SectionLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'end', gap: 12 }}>
+                  <GrindColumn label="single serve" value={icedGrind.singleServe} />
+                  <GrindColumn label="batch" value={icedGrind.batch} divider />
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Temp card (iced, +1C) */}
           <TempCard recipe={icedRecipe} />

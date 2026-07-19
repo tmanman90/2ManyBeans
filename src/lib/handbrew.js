@@ -7,7 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { classifyFamilyFallback } from './beanFields';
-import { GRINDER_MICRON_SCALES } from './brewMethods';
+import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons } from './brewMethods';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -24,14 +24,14 @@ const GRINDER_POUROVER_STARTS = {
   },
   'fellow-opus': {
     label: 'Fellow Opus',
-    scale: '1-6 with 10 clicks per number',
-    pourOverStart: { light: 4.0, medium: 5.0, dark: 6.0 },
-    validRange: { min: 3, max: 6.5 },
+    scale: '1-11 dial with quarter-step clicks',
+    pourOverStart: { light: 4.5, medium: 5.5, dark: 6.5 },
+    validRange: { min: 3, max: 8.5 },
   },
   'baratza-encore-esp': {
     label: 'Baratza Encore ESP',
     scale: '40 steps, 1-40',
-    pourOverStart: { light: 15, medium: 20, dark: 25 },
+    pourOverStart: { light: 16, medium: 20, dark: 25 },
     validRange: { min: 10, max: 32 },
   },
   'comandante-c40': {
@@ -42,9 +42,9 @@ const GRINDER_POUROVER_STARTS = {
   },
   '1zpresso-jx-pro': {
     label: '1Zpresso JX-Pro',
-    scale: '~200 clicks, 0-200',
-    pourOverStart: { light: 90, medium: 110, dark: 130 },
-    validRange: { min: 70, max: 150 },
+    scale: '~200 clicks from zero (rotations.number.tick, 1 rotation = 40 clicks)',
+    pourOverStart: { light: 105, medium: 125, dark: 145 },
+    validRange: { min: 90, max: 180 },
   },
   'baratza-virtuoso-plus': {
     label: 'Baratza Virtuoso+',
@@ -68,6 +68,7 @@ export const BREW_DEVICE_CONFIGS = {
     ratioRange: [15, 17],
     tempRange: [92, 100],
     maxBrewTime: 240,
+    drawdownTarget: '2:30-3:30',
     defaultTechnique: 'hoffmann',
     techniques: ['hoffmann', 'kasuya-46'],
     promptContext: 'Fast-draining cone. Grind and pour technique control extraction. Baseline device.',
@@ -77,13 +78,15 @@ export const BREW_DEVICE_CONFIGS = {
     type: 'pourover',
     filterType: 'wavy paper flat-bed',
     drainSpeed: 'restricted (3 small holes)',
-    grindOffset: +0.5,
+    grindOffset: +1.0,
+    restrictedFlow: true,
     ratioRange: [15, 17],
     tempRange: [93, 100],
     maxBrewTime: 240,
+    drawdownTarget: '3:00-3:45',
     defaultTechnique: 'center-pour',
     techniques: ['center-pour'],
-    promptContext: 'Flat-bed brewer with restricted flow. More forgiving than V60. Center-pour technique, avoid hitting walls.',
+    promptContext: 'Flat-bed brewer with restricted flow (3 tiny exit holes). The DEVICE controls flow rate, so do NOT grind fine to slow the flow — fine grinds shed fines that clog the flat bed and stall the brew, especially dense light roasts. Grind coarser than V60 and recover extraction with hotter water and a swirl. Center-pour technique, avoid hitting walls.',
   },
   chemex: {
     label: 'Chemex',
@@ -94,6 +97,7 @@ export const BREW_DEVICE_CONFIGS = {
     ratioRange: [15, 17],
     tempRange: [96, 100],
     maxBrewTime: 360,
+    drawdownTarget: '3:30-5:00',
     defaultTechnique: 'hoffmann-chemex',
     techniques: ['hoffmann-chemex'],
     promptContext: 'Thick filter removes oils, produces clean cup. Coarser grind compensates slow flow. Higher temp compensates glass heat loss. Pre-rinse filter AND glass body.',
@@ -203,6 +207,12 @@ function getDeviceFamilyDefaults(device, family) {
     result.tempC = `${config.tempRange[0]}-${config.tempRange[1]}`;
   }
 
+  // Restricted-flow flat beds invert the "finer end" guidance: the device
+  // already restricts flow, and dense washed lights shed fines that stall it.
+  if (config.restrictedFlow && HIGH_FINES_FAMILIES.has(family)) {
+    result.grindDirection = 'coarse end of pour-over range — the device restricts flow; recover extraction with hotter water and a swirl, never a finer grind';
+  }
+
   // Only override family technique for non-V60 devices (V60 preserves family-specific choices like Kasuya for naturals)
   if (device !== 'v60') {
     result.technique = config.defaultTechnique;
@@ -224,18 +234,36 @@ function roastToGrindTier(roastLevel) {
   return 'light';
 }
 
-// Apply device grind offset to a grinder's pour-over start point.
-// For immersion devices (Aeropress), allow going below the pour-over floor
-// since shorter contact time permits finer grinds.
-function getDeviceAdjustedGrindStart(grinderKey, grindTier, device) {
+// High fines-risk cup-structure families: dense, high-grown washed clarity
+// beans shed the most fines on flat burrs — the ones that clog restricted-flow
+// flat-bed brewers (Kalita). They get a coarser start on those devices.
+const HIGH_FINES_FAMILIES = new Set([
+  'washed-floral-clarity',
+  'washed-ethiopia-clarity',
+  'washed-kenya-clarity',
+]);
+
+// Ode Gen 2 µm-per-step — device grindOffsets are defined in Ode steps, so
+// converting an offset to another grinder's native units goes through this.
+const ODE_PER_STEP = GRINDER_MICRON_SCALES['fellow-ode-gen2'].perStep;
+
+// Apply device grind offset (plus a fines-risk bump on restricted-flow
+// devices) to a grinder's pour-over start point. For immersion devices
+// (Aeropress), allow going below the pour-over floor since shorter contact
+// time permits finer grinds.
+function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   if (!grinder) return null;
   const config = BREW_DEVICE_CONFIGS[device];
-  const rawOffset = config?.grindOffset || 0;
+  let rawOffset = config?.grindOffset || 0;
+  // Dense washed lights on a restricted-flow flat bed: extra half step coarser
+  if (config?.restrictedFlow && family && HIGH_FINES_FAMILIES.has(family)) {
+    rawOffset += 0.5;
+  }
   const base = grinder.pourOverStart[grindTier] || grinder.validRange.min;
-  const targetPerStep = GRINDER_MICRON_SCALES[grinderKey]?.perStep || 70;
-  const nativeOffset = (rawOffset * 70) / targetPerStep;
-  const adjusted = base + nativeOffset;
+  const targetPerStep = GRINDER_MICRON_SCALES[grinderKey]?.perStep || ODE_PER_STEP;
+  const nativeOffset = (rawOffset * ODE_PER_STEP) / targetPerStep;
+  const adjusted = Math.round((base + nativeOffset) * 10) / 10;
   // Immersion devices can go finer than pour-over floor (use absolute grinder min, not pour-over min)
   const floor = (config?.type === 'immersion-pressure') ? 1 : grinder.validRange.min;
   return Math.max(floor, Math.min(grinder.validRange.max, adjusted));
@@ -297,7 +325,7 @@ export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, dev
   if (grinder && recipe.grindSize?.setting != null) {
     const setting = parseFloat(recipe.grindSize.setting);
     const grindTier = roastToGrindTier(roastLevel);
-    const floor = getDeviceAdjustedGrindStart(grinderKey, grindTier, device);
+    const floor = getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family);
     if (!isNaN(setting) && floor != null) {
       if (setting < floor) {
         recipe.grindSize.setting = String(floor);
@@ -307,6 +335,19 @@ export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, dev
         recipe.grindSize.setting = String(grinder.validRange.max);
         repairs.push(`Grind clamped from ${setting} to ${grinder.validRange.max} (above range)`);
       }
+    }
+
+    // Reconcile microns with the (possibly clamped) setting via the grinder's
+    // calibration — the model's freehand micron estimate is often on a
+    // different scale, and UI must never show a setting/micron contradiction.
+    const finalSetting = parseFloat(recipe.grindSize.setting);
+    const trueMicrons = grinderSettingToMicrons(finalSetting, grinderKey);
+    if (trueMicrons != null) {
+      if (recipe.grindSize.microns != null && Math.abs(recipe.grindSize.microns - trueMicrons) > trueMicrons * 0.12) {
+        repairs.push(`Microns ${recipe.grindSize.microns} inconsistent with setting ${finalSetting} (~${trueMicrons}µm); corrected`);
+      }
+      recipe.grindSize.microns = trueMicrons;
+      recipe.grindSize.description = recipe.grindSize.description || descriptorForMicrons(trueMicrons);
     }
   }
 
@@ -441,18 +482,28 @@ function buildHandBrewPrompt(preferences, family, roastLevel, device = 'v60') {
   // Build grinder context with device-adjusted start point
   let grinderContext;
   if (grinder) {
-    const startAt = getDeviceAdjustedGrindStart(grinderKey, grindTier, device);
+    const startAt = getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family);
+    const scale = GRINDER_MICRON_SCALES[grinderKey];
+    const startMicrons = grinderSettingToMicrons(startAt, grinderKey);
     grinderContext = `GRINDER: ${grinder.label} (${grinder.scale})
-- ${config.label} start point for ${grindTier} roast: ${startAt}
+- ${config.label} start point for ${grindTier} roast: ${startAt} (~${startMicrons} microns)
+- CALIBRATION: setting-to-microns is linear — each whole step ≈ ${Math.round(scale.perStep)} microns. Your grindSize.microns MUST match your grindSize.setting via this calibration.
 - Valid range: ${grinder.validRange.min} to ${grinder.validRange.max}
 ${grinder.aidenNote ? `- ${grinder.aidenNote}` : ''}
 - Recommend grind in this grinder's native notation (e.g., "${startAt}")
-- Also include approximate micron value`;
+- Treat the setting as a STARTING POINT: burr calibration varies unit to unit, so the tips should tell the user to correct by drawdown time and taste, not treat the number as absolute`;
   } else {
     const customName = sanitize(preferences?.grinderCustomName, 60) || 'Custom grinder';
+    const customBands = config.restrictedFlow
+      ? 'Light roast: 600-750 microns. Medium: 650-800. Dark: 750-900. (Flat-bed: the device restricts flow — do not grind fine to slow it.)'
+      : config.type === 'pourover'
+        ? 'Light roast: 450-600 microns. Medium: 550-700. Dark: 650-800.'
+        : config.type === 'immersion-pressure'
+          ? 'Light roast: 400-550 microns. Medium: 450-600. Dark: 550-700.'
+          : 'Light roast: 550-750 microns. Medium: 650-800. Dark: 750-900.';
     grinderContext = `GRINDER: ${customName} (custom)
 - No specific setting data available. Recommend grind in MICRONS only.
-- Light roast: 400-500 microns. Medium: 500-650. Dark: 650-800.`;
+- ${customBands}`;
   }
 
   // Device-specific method description
@@ -509,10 +560,12 @@ OUTPUT FORMAT (JSON only, no markdown, no backticks):
 FINAL CHECKLIST (verify before outputting):
 - Ratio MUST be within ${config.ratioRange[0]}-${config.ratioRange[1]} range for ${config.label}.
 - Grind setting MUST be within the grinder's valid range provided above.
+- grindSize.microns MUST be consistent with grindSize.setting per the CALIBRATION line.
 - Water temperature MUST be within ${config.tempRange[0]}-${config.tempRange[1]}C for ${config.label}.
 - Technique should be appropriate for ${config.label}.
 - Steps must have ascending waterTotal values.
-- Total brew time must match the device's typical range.
+- Total brew time must match the device's typical range.${config.drawdownTarget ? `
+- Target total drawdown: ${config.drawdownTarget}. The tips MUST include: if the brew stalls or runs past this window, grind coarser (0.5-1 step); if it races under, grind finer.` : ''}
 
 RESPOND WITH ONLY THE JSON OBJECT.`;
 }

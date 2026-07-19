@@ -91,7 +91,8 @@ export function transformPourOver(hotRecipe, userDose) {
     waterGrams: hotWater,
     iceGrams,
     steps: icedSteps,
-    grindSize: shiftGrindFiner(hotRecipe.grindSize, 1.5),
+    // Kalita's restricted flat bed stalls if pushed too fine — cap the iced shift
+    grindSize: shiftGrindFiner(hotRecipe.grindSize, device === 'kalita' ? 1 : 1.5),
     waterTemp: bumpTemp(hotRecipe.waterTemp),
     isIced: true,
     icePlacement,

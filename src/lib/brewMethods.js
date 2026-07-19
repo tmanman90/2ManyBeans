@@ -31,19 +31,35 @@ export const GRINDER_LABELS = {
   'baratza-virtuoso-plus': 'Virtuoso+',
 };
 
-// Grinder micron scales — data-driven, not per-grinder formulas
+// Grinder micron scales — THE single source of truth for setting↔micron math.
+// Semantics: microns(setting) = base + (setting - 1) * perStep, where `base`
+// is the micron value AT setting/click 1. Calibrated against Honest Coffee
+// Guide measured ranges (2026-07); click grinders use per-click values.
+//   ode-gen2:  275-1160µm over dial 1-11
+//   opus:      230-1160µm over dial 1-11 (quarter-step clicks)
+//   encore-esp: 230-1380µm over 0-40  (base = value at 1)
+//   comandante: ~30µm/click, 0-1090µm
+//   jx-pro:    ~4.6µm/click, 0-915µm over ~200 clicks
+//   virtuoso+: 200-1200µm over 0-40 (base = value at 1)
 export const GRINDER_MICRON_SCALES = {
-  'fellow-ode-gen2': { base: 200, perStep: 70 },
-  'fellow-opus': { base: 150, perStep: 150 },
-  'baratza-encore-esp': { base: 100, perStep: 29.5 },
-  'comandante-c40': { base: 25, perStep: 25 },
-  '1zpresso-jx-pro': { base: -4, perStep: 5.2 },
-  'baratza-virtuoso-plus': { base: 150, perStep: 29.5 },
+  'fellow-ode-gen2': { base: 275, perStep: 88.5 },
+  'fellow-opus': { base: 230, perStep: 93 },
+  'baratza-encore-esp': { base: 259, perStep: 28.75 },
+  'comandante-c40': { base: 30, perStep: 30 },
+  '1zpresso-jx-pro': { base: 4.6, perStep: 4.6 },
+  'baratza-virtuoso-plus': { base: 225, perStep: 25 },
 };
 
-// Approximate micron value for Ode Gen 2 step (linear: ~200µm at 1, +70µm per step)
+// Approximate microns for any known grinder's setting (linear per scale above)
+export function grinderSettingToMicrons(setting, grinderKey) {
+  const g = GRINDER_MICRON_SCALES[grinderKey];
+  if (!g || setting == null || isNaN(setting)) return null;
+  return Math.round(g.base + (setting - 1) * g.perStep);
+}
+
+// Approximate micron value for Ode Gen 2 step (derived from the scale table)
 export function odeStepToMicrons(step) {
-  return Math.round(200 + (step - 1) * 70);
+  return grinderSettingToMicrons(step, 'fellow-ode-gen2');
 }
 
 // Translate Ode Gen 2 step to another grinder's setting via micron intermediary
@@ -76,7 +92,7 @@ export function odeStepToGrinderSetting(odeStep, grinderKey) {
   return { setting: display, label: GRINDER_LABELS[grinderKey], microns };
 }
 
-function descriptorForMicrons(microns) {
+export function descriptorForMicrons(microns) {
   if (microns < 300) return 'Fine';
   if (microns < 500) return 'Medium-Fine';
   if (microns < 700) return 'Medium';
@@ -84,27 +100,55 @@ function descriptorForMicrons(microns) {
   return 'Coarse';
 }
 
-// Format grind label for aiden grind data (singleServe/batch steps)
-function formatAidenGrind(bean, preferences) {
-  if (!bean.aidenGrind) return null;
+// Resolve aiden grind (stored as Ode Gen 2 steps) into display values for the
+// user's grinder + display mode. Single source for BeanCard, BeanDetailCard,
+// and AidenModal — never render aidenGrind steps directly in UI.
+export function formatAidenGrindValues(aidenGrind, preferences) {
+  if (!aidenGrind) return null;
   const useMicrons = preferences?.grindSizeDisplay === 'microns';
   const grinderKey = preferences?.grinder;
   const grinderName = GRINDER_LABELS[grinderKey] || preferences?.grinderCustomName || 'Grinder';
 
   if (useMicrons) {
-    const ssMicrons = odeStepToMicrons(bean.aidenGrind.singleServe);
-    const batchMicrons = odeStepToMicrons(bean.aidenGrind.batch);
-    return `SS ~${ssMicrons}µm / Batch ~${batchMicrons}µm`;
+    const ss = `~${odeStepToMicrons(aidenGrind.singleServe)}µm`;
+    const batch = `~${odeStepToMicrons(aidenGrind.batch)}µm`;
+    return { grinderName, singleServe: ss, batch, singleServeText: ss, batchText: batch, mode: 'microns' };
   }
 
   // Translate to user's grinder if not Ode Gen 2
   if (grinderKey && grinderKey !== 'fellow-ode-gen2' && GRINDER_MICRON_SCALES[grinderKey]) {
-    const ss = odeStepToGrinderSetting(bean.aidenGrind.singleServe, grinderKey);
-    const batch = odeStepToGrinderSetting(bean.aidenGrind.batch, grinderKey);
-    return `${grinderName}: SS ~${ss.setting} / Batch ~${batch.setting}`;
+    const ss = odeStepToGrinderSetting(aidenGrind.singleServe, grinderKey);
+    const batch = odeStepToGrinderSetting(aidenGrind.batch, grinderKey);
+    return {
+      grinderName,
+      singleServe: String(ss.setting),
+      batch: String(batch.setting),
+      singleServeText: `~${ss.setting}`,
+      batchText: `~${batch.setting}`,
+      mode: 'grinder',
+    };
   }
 
-  return `${grinderName}: SS ${bean.aidenGrind.singleServe} / Batch ${bean.aidenGrind.batch}`;
+  return {
+    grinderName,
+    singleServe: String(aidenGrind.singleServe),
+    batch: String(aidenGrind.batch),
+    singleServeText: String(aidenGrind.singleServe),
+    batchText: String(aidenGrind.batch),
+    mode: 'ode',
+  };
+}
+
+export function formatAidenGrindLabel(aidenGrind, preferences) {
+  const v = formatAidenGrindValues(aidenGrind, preferences);
+  if (!v) return null;
+  if (v.mode === 'microns') return `SS ${v.singleServeText} / Batch ${v.batchText}`;
+  return `${v.grinderName}: SS ${v.singleServeText} / Batch ${v.batchText}`;
+}
+
+// Format grind label for aiden grind data (singleServe/batch steps)
+function formatAidenGrind(bean, preferences) {
+  return formatAidenGrindLabel(bean.aidenGrind, preferences);
 }
 
 // Format grind label for hand brew recipe data (has setting, description, and optional microns)
