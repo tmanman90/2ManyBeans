@@ -109,11 +109,12 @@ check('R12b: Kenya/interval/ratio mandates softened in checklist + origin block'
   assert.ok(!/bloom MUST be 2\.5–3\.0x/.test(aiden), 'Kenya bloom hard mandate still present');
   assert.ok(!/is ratio ≥ 1:16\.5 \(prefer ~1:17\)\?/.test(aiden), 'checklist ratio floor still present');
   assert.ok(!/20–25s intervals ONLY/.test(aiden), 'interval ONLY mandate still present');
+  assert.ok(!/NEVER default to 35s\+/.test(aiden), 'NEVER-35s interval mandate still present');
   assert.match(aiden, /sanity guards|guards absurd|sourced recipe.{0,80}overrides/is, 'no sourced-recipe override language');
 });
 check('R12c: enforcement keeps sanity guards (bloom 20-90s, interval 15-40s)', () => {
   assert.match(aiden, /clamp\(recipe\.bloomDuration, 20, 90\)/, 'bloom sanity guard missing');
-  assert.match(aiden, /clamp\(recipe\.ssPulsesInterval, 15, 40\)/, 'interval sanity guard missing');
+  assert.match(aiden, /clamp\(recipe\.ssPulsesInterval, 15, 50\)/, 'interval sanity guard missing or clips sourced 45s profiles');
 });
 check('R14: batch pulse fallback = 4', () => {
   assert.match(aiden, /batchPulsesNumber \?\? 4/, 'fallback not unified at 4');
@@ -189,6 +190,10 @@ check('timerReady:true ALWAYS implies the BrewTimer gate accepts (collision case
   }, 20);
   assert.ok(!edge.timerReady || gateAccepts(edge), 'immersion: timerReady lies to the gate');
   assert.equal(gateAccepts(transformPourOver(hotKalita, 20)), true, 'happy path must stay gate-valid');
+  // Codex rev-2 case: non-finite totals must demote timerReady in both transforms
+  const inf = { ...hotKalita, totalBrewTimeSeconds: Infinity };
+  assert.equal(transformPourOver(inf, 20).timerReady, false, 'pour-over accepts Infinity total');
+  assert.equal(transformImmersion({ ...inf, device: 'french-press' }, 20).timerReady, false, 'immersion accepts Infinity total');
 });
 check('iced immersion ice step carries real timeSeconds', () => {
   const iced = transformImmersion({ ...hotKalita, device: 'french-press' }, 20);

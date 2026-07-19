@@ -125,7 +125,7 @@ Rules for energy vs grind:
 - Light natural (fruit-forward): 25–30s intervals — slightly longer for fruit development.
 - Honey / anaerobic: 25–35s intervals — moderate pace for complexity.
 - Medium / dark: 25–30s intervals.
-- Match the closest reference profile's interval. NEVER default to 35s+ for light roasts.
+- Match the closest reference profile's interval; without a reference signal, keep light-roast intervals under ~30s.
 - For clarity-first single-serve, default 2–4 pulses unless the reference profile strongly suggests more.
 
 ### Origin-Specific Defaults
@@ -509,7 +509,8 @@ function enforceClarityRules(recipe, bean) {
     recipe.bloomDuration = Math.round(clamp(recipe.bloomDuration, 20, 90));
   }
   if (recipe.ssPulsesInterval != null) {
-    recipe.ssPulsesInterval = Math.round(clamp(recipe.ssPulsesInterval, 15, 40));
+    // 50s ceiling: La Cabra Kiamugumo's sourced 45s interval must survive
+    recipe.ssPulsesInterval = Math.round(clamp(recipe.ssPulsesInterval, 15, 50));
   }
   if (isWashed(bean)) {
     if (recipe.ratio < 15) recipe.ratio = 15;

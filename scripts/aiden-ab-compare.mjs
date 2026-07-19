@@ -98,13 +98,13 @@ for (const bean of BEANS) {
   for (const [label, mod] of [['baseline', baseline], ['current', current]]) {
     process.stderr.write(`  ${label}...\n`);
     try { row[label] = await mod.generateAidenRecipe(bean, research); }
-    catch (e) { row[label] = { error: e.message }; }
+    catch (e) { row[label] = { error: e.message || String(e) || 'unknown error' }; }
   }
-  if (ASSERT && (row.baseline?.error || row.current?.error)) {
+  if (ASSERT && (('error' in (row.baseline || {})) || ('error' in (row.current || {})))) {
     invariantFailures++;
     console.error(`GENERATION ERROR ${bean.name}: baseline=${row.baseline?.error || 'ok'} current=${row.current?.error || 'ok'}`);
   }
-  if (ASSERT && !row.baseline?.error && !row.current?.error) {
+  if (ASSERT && !('error' in (row.baseline || {})) && !('error' in (row.current || {}))) {
     const bKeys = Object.keys(row.baseline).sort().join(',');
     const cKeys = Object.keys(row.current).sort().join(',');
     if (bKeys !== cKeys) { invariantFailures++; console.error(`SHAPE MISMATCH ${bean.name}:\n  baseline: ${bKeys}\n  current:  ${cKeys}`); }
@@ -128,7 +128,7 @@ for (const r of results) {
 writeFileSync(join(ROOT, 'docs', 'data', 'algo-audit-2026-07-19', `ab-run-${stamp}.md`), md.join('\n'));
 console.log(`report -> docs/data/algo-audit-2026-07-19/ab-run-${stamp}.md`);
 
-const compared = results.filter((r) => r.baseline && !r.baseline.error && r.current && !r.current.error).length;
+const compared = results.filter((r) => r.baseline && !('error' in r.baseline) && r.current && !('error' in r.current)).length;
 if (ASSERT && compared === 0) { console.error('zero successful comparisons — assertion vacuous'); process.exit(1); }
 if (ASSERT && invariantFailures > 0) { console.error(`${invariantFailures} invariant failure(s)`); process.exit(1); }
 console.log(ASSERT ? `invariants OK (${compared} pairs: shape + grind identical across variants)` : 'done');

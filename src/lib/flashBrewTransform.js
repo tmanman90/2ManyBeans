@@ -89,7 +89,7 @@ export function transformPourOver(hotRecipe, userDose) {
 
   // Ice-prep shift moves every step +10s, so the total must move with it or
   // the timer gate (total > last step start) rejects the recipe.
-  const totalSeconds = typeof hotRecipe.totalBrewTimeSeconds === 'number'
+  const totalSeconds = Number.isFinite(hotRecipe.totalBrewTimeSeconds)
     ? hotRecipe.totalBrewTimeSeconds + ICE_PREP_DURATION
     : null;
   if (totalSeconds == null) timerIntact = false;
@@ -137,7 +137,7 @@ export function transformImmersion(hotRecipe, userDose) {
   // rejects the whole recipe (every step must have STRICTLY ascending
   // timeSeconds) — place it strictly after the final hot step even when
   // that step starts at the recipe's total time.
-  const hotTotal = typeof hotRecipe.totalBrewTimeSeconds === 'number'
+  const hotTotal = Number.isFinite(hotRecipe.totalBrewTimeSeconds)
     ? hotRecipe.totalBrewTimeSeconds
     : null;
   const lastHotSecs = icedSteps.reduce(
