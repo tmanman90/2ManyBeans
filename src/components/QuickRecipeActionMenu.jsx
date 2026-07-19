@@ -1,7 +1,9 @@
 // Floating Quick Recipe action menu — appears on long-press of the header CTA.
 import { useEffect, useRef } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Camera, Plus } from 'lucide-react';
 import { C, fonts, shadows } from '../styles/theme';
+import { m, popIn } from '../lib/motion';
 
 export const QuickRecipeActionMenu = ({ open, onClose, onQuickRecipe, onAddBean }) => {
   const menuRef = useRef(null);
@@ -21,8 +23,6 @@ export const QuickRecipeActionMenu = ({ open, onClose, onQuickRecipe, onAddBean 
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-
   const rowStyle = {
     display: 'flex',
     alignItems: 'center',
@@ -36,6 +36,8 @@ export const QuickRecipeActionMenu = ({ open, onClose, onQuickRecipe, onAddBean 
     color: C.text,
     minHeight: 44,
     whiteSpace: 'nowrap',
+    transition: 'background 0.14s ease',
+    WebkitTapHighlightColor: 'transparent',
   };
 
   const choose = (action) => {
@@ -44,31 +46,37 @@ export const QuickRecipeActionMenu = ({ open, onClose, onQuickRecipe, onAddBean 
   };
 
   return (
-    <div
-      ref={menuRef}
-      style={{
-        position: 'absolute',
-        top: '100%',
-        right: 0,
-        marginTop: 6,
-        background: C.card,
-        borderRadius: 14,
-        boxShadow: shadows.modal,
-        border: `1px solid ${C.borderLight}`,
-        overflow: 'hidden',
-        zIndex: 20,
-        minWidth: 178,
-      }}
-    >
-      <div onClick={() => choose(onQuickRecipe)} style={rowStyle}>
-        <Camera size={16} color={C.accent} />
-        Quick Recipe
-      </div>
-      <div style={{ height: 1, background: C.borderLight }} />
-      <div onClick={() => choose(onAddBean)} style={rowStyle}>
-        <Plus size={16} color={C.accent} />
-        Add Bean
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <m.div
+          ref={menuRef}
+          {...popIn}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            marginTop: 6,
+            background: C.card,
+            borderRadius: 14,
+            boxShadow: shadows.modal,
+            border: `1px solid ${C.borderLight}`,
+            overflow: 'hidden',
+            zIndex: 20,
+            minWidth: 178,
+            transformOrigin: 'top right',
+          }}
+        >
+          <m.div whileTap={{ scale: 0.97 }} onClick={() => choose(onQuickRecipe)} style={rowStyle}>
+            <Camera size={16} color={C.accent} />
+            Quick Recipe
+          </m.div>
+          <div style={{ height: 1, background: C.borderLight }} />
+          <m.div whileTap={{ scale: 0.97 }} onClick={() => choose(onAddBean)} style={rowStyle}>
+            <Plus size={16} color={C.accent} />
+            Add Bean
+          </m.div>
+        </m.div>
+      )}
+    </AnimatePresence>
   );
 };

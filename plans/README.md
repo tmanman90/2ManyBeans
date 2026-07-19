@@ -11,7 +11,7 @@ Stamped at commit `ec777a5`. If the codebase has drifted, executors must stop an
 | 003 | [Success feedback wiring (haptics + toasts)](003-success-feedback-wiring.md) | MEDIUM | TODO |
 | 004 | [Card press feedback](004-card-press-feedback.md) | MEDIUM | DONE (device pending) |
 | 005 | [Ruphus slide-up symmetric exit](005-ruphus-slideup-exit.md) | MEDIUM | TODO |
-| 006 | [Quick Recipe menu pop-in](006-quick-recipe-menu-popin.md) | MEDIUM | TODO |
+| 006 | [Quick Recipe menu pop-in](006-quick-recipe-menu-popin.md) | MEDIUM | DONE (device pending) |
 | 007 | [ScanSheet step transitions](007-scan-sheet-step-transitions.md) | LOW | TODO |
 
 ## Recommended execution order
