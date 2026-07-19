@@ -275,7 +275,15 @@ const ODE_PER_STEP = GRINDER_MICRON_SCALES['fellow-ode-gen2'].perStep;
 // devices) to a grinder's pour-over start point. For immersion devices
 // (Aeropress), allow going below the pour-over floor since shorter contact
 // time permits finer grinds.
-function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family) {
+// Ground-truth washed check from the bean record's process field — immune to
+// the research model's cup-structure judgment (which can classify a washed
+// bean as processed-clarity and silently skip the flat-bed fines bump).
+export function isPureWashedProcess(process) {
+  const p = (process || '').toLowerCase();
+  return p.includes('washed') && !/natural|honey|anaerobic|co-ferment|carbonic|lactic/.test(p);
+}
+
+function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family, washedProcess = false) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   if (!grinder) return null;
   const config = BREW_DEVICE_CONFIGS[device];
@@ -283,8 +291,9 @@ function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family) {
   // Dense washed lights on a restricted-flow flat bed: extra half step coarser.
   // Also applies to a LIGHT bean that fell back to medium-washed (research
   // failure / sparse bag notes) — it's still a light washed bean shedding fines.
-  if (config?.restrictedFlow && family
-    && (HIGH_FINES_FAMILIES.has(family) || (family === 'medium-washed' && grindTier === 'light'))) {
+  if (config?.restrictedFlow
+    && ((family && HIGH_FINES_FAMILIES.has(family))
+      || (grindTier === 'light' && (family === 'medium-washed' || washedProcess)))) {
     rawOffset += 0.5;
   }
   const base = grinder.pourOverStart[grindTier] || grinder.validRange.min;
@@ -300,7 +309,7 @@ function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family) {
 // ---------------------------------------------------------------------------
 // Post-generation enforcement with device-specific rules
 // ---------------------------------------------------------------------------
-export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, device = 'v60') {
+export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, device = 'v60', washedProcess = false) {
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   const repairs = [];
   const config = BREW_DEVICE_CONFIGS[device] || BREW_DEVICE_CONFIGS.v60;
@@ -309,7 +318,7 @@ export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, dev
   if (grinder && recipe.grindSize?.setting != null) {
     const setting = parseFloat(recipe.grindSize.setting);
     const grindTier = roastToGrindTier(roastLevel);
-    const floor = getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family);
+    const floor = getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family, washedProcess);
     if (!isNaN(setting) && floor != null) {
       if (setting < floor) {
         recipe.grindSize.setting = String(floor);
@@ -442,7 +451,7 @@ function sanitize(str, maxLen = 100) {
   return (str || '').slice(0, maxLen).replace(/[^\w .\-',()/]/g, '');
 }
 
-function buildHandBrewPrompt(preferences, family, roastLevel, device = 'v60') {
+function buildHandBrewPrompt(preferences, family, roastLevel, device = 'v60', washedProcess = false) {
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
   const grinder = GRINDER_POUROVER_STARTS[grinderKey];
   const familyDefaults = getDeviceFamilyDefaults(device, family);
@@ -452,7 +461,7 @@ function buildHandBrewPrompt(preferences, family, roastLevel, device = 'v60') {
   // Build grinder context with device-adjusted start point
   let grinderContext;
   if (grinder) {
-    const startAt = getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family);
+    const startAt = getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family, washedProcess);
     const scale = GRINDER_MICRON_SCALES[grinderKey];
     const startMicrons = grinderSettingToMicrons(startAt, grinderKey);
     grinderContext = `GRINDER: ${grinder.label} (${grinder.scale})
@@ -591,7 +600,8 @@ BEAN CLASSIFICATION:
     userContent += `\nExtraction notes: ${sanitize(research.extractionNotes, 200)}`;
   }
 
-  const systemPrompt = buildHandBrewPrompt(preferences, family, roastLevel, device);
+  const washedProcess = isPureWashedProcess(bean.process);
+  const systemPrompt = buildHandBrewPrompt(preferences, family, roastLevel, device, washedProcess);
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
 
   const data = await fetchWithRetry({
@@ -628,7 +638,7 @@ BEAN CLASSIFICATION:
     }
   }
 
-  repairHandBrewRecipe(parsed, grinderKey, family, roastLevel, device);
+  repairHandBrewRecipe(parsed, grinderKey, family, roastLevel, device, washedProcess);
 
   return validateRecipe(parsed);
 }
