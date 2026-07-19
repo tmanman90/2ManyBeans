@@ -1,6 +1,7 @@
 // Settings page — iOS grouped table style, full-screen page sheet modal
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence } from 'framer-motion';
 import { ChevronRight, LogOut, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
 import { doc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -22,6 +23,7 @@ import { scrollOnFocus } from '../lib/formHelpers';
 import { redeemCode } from '../lib/redeemCode';
 import { sanitizeUserText } from '../lib/sanitizeUserText';
 import { reauthenticateForAccountDeletion } from '../lib/reauth';
+import { m, scrim, sheet, popIn } from '../lib/motion';
 
 // Reason-code -> user copy for the inline redeem row. Unknown codes fall
 // back to a generic message. Kept here (consumer) instead of the helper
@@ -608,35 +610,37 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     ? (status === 'trial' ? `${planLabel || 'Pro'} (Trial)` : (planLabel || 'Pro'))
     : 'Free';
 
-  if (!open) return null;
-
   return createPortal(
-    <div
-      data-settings-page
-      style={{
-      position: 'fixed', inset: 0,
-      background: glass.scrim,
-      backdropFilter: glass.blur,
-      WebkitBackdropFilter: glass.blur,
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-    }}>
-      <div
-        style={{
-          background: C.bgDeep,
-          borderRadius: `${radius.xl}px ${radius.xl}px 0 0`,
-          width: '100%',
-          maxWidth: 480,
-          maxHeight: '95dvh',
-          boxShadow: shadows.modal,
+    <AnimatePresence>
+      {open && (
+        <m.div
+          {...scrim}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          data-settings-page
+          style={{
+          position: 'fixed', inset: 0,
+          background: glass.scrim,
+          backdropFilter: glass.blur,
+          WebkitBackdropFilter: glass.blur,
+          zIndex: 1000,
           display: 'flex',
-          flexDirection: 'column',
-          transition: `transform ${motionTokens.dur.base}s ${motionTokens.cssOut}`,
-        }}
-        onClick={e => e.stopPropagation()}
-      >
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+        }}>
+          <m.div
+            {...sheet}
+            style={{
+              background: C.bgDeep,
+              borderRadius: `${radius.xl}px ${radius.xl}px 0 0`,
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '95dvh',
+              boxShadow: shadows.modal,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
         {/* Grabber handle */}
         <div style={{
           width: 36, height: 4,
@@ -1419,35 +1423,39 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           </div>
 
         </div>
-      </div>
+          </m.div>
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
 
       {/* Delete Account: step 1 (warning) and step 2 (type DELETE) */}
-      {deleteStep && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1200,
-            background: glass.scrim,
-            backdropFilter: glass.blur,
-            WebkitBackdropFilter: glass.blur,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
-          }}
-          onClick={() => {
-            if (deleteStep !== 'deleting') resetDeleteFlow();
-          }}
-        >
-          <div
+      <AnimatePresence>
+        {deleteStep && (
+          <m.div
+            {...scrim}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              background: C.card,
-              borderRadius: radius.xl,
+              position: 'fixed', inset: 0, zIndex: 1200,
+              background: glass.scrim,
+              backdropFilter: glass.blur,
+              WebkitBackdropFilter: glass.blur,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               padding: 24,
-              maxWidth: 360, width: '100%',
-              boxShadow: shadows.e3,
-              border: `1px solid ${C.hairline}`,
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => {
+              if (deleteStep !== 'deleting') resetDeleteFlow();
+            }}
           >
+            <m.div
+              {...popIn}
+              style={{
+                background: C.card,
+                borderRadius: radius.xl,
+                padding: 24,
+                maxWidth: 360, width: '100%',
+                boxShadow: shadows.e3,
+                border: `1px solid ${C.hairline}`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
             {deleteStep === 'warn' && (
               <>
                 <div style={{
@@ -1612,28 +1620,33 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       {/* Canister decrease confirmation */}
-      {canisterConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 1100,
-          background: glass.scrim,
-          backdropFilter: glass.blur,
-          WebkitBackdropFilter: glass.blur,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 24,
-        }} onClick={() => setCanisterConfirm(null)}>
-          <div style={{
-            background: C.card,
-            borderRadius: radius.xl,
+      <AnimatePresence>
+        {canisterConfirm && (
+          <m.div
+            {...scrim}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+            position: 'fixed', inset: 0, zIndex: 1100,
+            background: glass.scrim,
+            backdropFilter: glass.blur,
+            WebkitBackdropFilter: glass.blur,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
-            maxWidth: 340, width: '100%',
-            boxShadow: shadows.e3,
-            border: `1px solid ${C.hairline}`,
-          }} onClick={e => e.stopPropagation()}>
+          }} onClick={() => setCanisterConfirm(null)}>
+            <m.div {...popIn} style={{
+              background: C.card,
+              borderRadius: radius.xl,
+              padding: 24,
+              maxWidth: 340, width: '100%',
+              boxShadow: shadows.e3,
+              border: `1px solid ${C.hairline}`,
+            }} onClick={e => e.stopPropagation()}>
             <div style={{
               fontFamily: fonts.heading,
               fontSize: typeScale.h3.fontSize,
@@ -1684,10 +1697,13 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 Confirm
               </button>
             </div>
-          </div>
-        </div>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
+        </m.div>
       )}
-    </div>,
+    </AnimatePresence>,
     document.body
   );
 };
