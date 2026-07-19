@@ -228,3 +228,49 @@ export const getBrewMethod = (brewMethodKey) => BREW_METHODS[brewMethodKey] || B
 
 // Helper: check if a brew method key is a manual (non-aiden) method
 export const isManualBrewMethod = (key) => key !== 'aiden' && BREW_METHODS[key];
+
+// Parse "m:ss", "m:ss-m:ss" ranges (midpoint), "90s", "2 min" into seconds.
+// Single source — handbrew repair and flashBrewTransform both consume this.
+export function parseTimeString(str) {
+  if (str == null) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+
+  const frag = /(?<!\d)(\d{1,2}):(\d{2})(?!\d)/;
+
+  const rangeMatch = s.match(new RegExp(frag.source + String.raw`\s*[-–—]\s*` + frag.source));
+  if (rangeMatch) {
+    const m1 = parseInt(rangeMatch[1], 10);
+    const s1 = parseInt(rangeMatch[2], 10);
+    const m2 = parseInt(rangeMatch[3], 10);
+    const s2 = parseInt(rangeMatch[4], 10);
+    if (s1 >= 60 || s2 >= 60) return null;
+    const a = m1 * 60 + s1;
+    const b = m2 * 60 + s2;
+    return Math.round((a + b) / 2);
+  }
+
+  if (/\d+:\d+\s*[-–—]\s*\d+:\d+/.test(s)) return null;
+
+  const mmss = s.match(frag);
+  if (mmss) {
+    const mins = parseInt(mmss[1], 10);
+    const secs = parseInt(mmss[2], 10);
+    if (secs >= 60) return null;
+    return mins * 60 + secs;
+  }
+
+  const minsMatch = s.match(/([\d.]+)\s*(?:minutes?|mins?|m)\b/i);
+  if (minsMatch) {
+    const val = parseFloat(minsMatch[1]);
+    if (!isNaN(val) && val >= 0 && val <= 99) return Math.round(val * 60);
+  }
+
+  const secsMatch = s.match(/([\d.]+)\s*(?:seconds?|secs?|s)\b/i);
+  if (secsMatch) {
+    const val = parseFloat(secsMatch[1]);
+    if (!isNaN(val) && val >= 0 && val <= 99 * 60) return Math.round(val);
+  }
+
+  return null;
+}
