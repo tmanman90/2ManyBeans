@@ -229,6 +229,42 @@ export const getBrewMethod = (brewMethodKey) => BREW_METHODS[brewMethodKey] || B
 // Helper: check if a brew method key is a manual (non-aiden) method
 export const isManualBrewMethod = (key) => key !== 'aiden' && BREW_METHODS[key];
 
+// Normalize recipe step times for the BrewTimer contract: parse each step's
+// time into strictly ascending timeSeconds. Models often emit two steps at
+// the same moment ("0:00 rinse filter" + "0:00 add coffee") — nudge small
+// overlaps (<=15s) forward by 5s instead of discarding the whole timer;
+// demote timerReady only for genuinely broken sequences.
+export function normalizeStepTimes(steps) {
+  const repairs = [];
+  let timerReady = true;
+  let last = -1;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const parsed = parseTimeString(step.time);
+    if (parsed == null) {
+      timerReady = false;
+      repairs.push(`Step ${i} has unparseable time "${step.time}"`);
+      step.timeSeconds = null;
+      continue;
+    }
+    let assigned = parsed;
+    if (assigned <= last) {
+      if (last - assigned <= 15) {
+        assigned = last + 5;
+        repairs.push(`Step ${i} time "${step.time}" nudged to ${assigned}s (same-moment or overlapping step)`);
+      } else {
+        timerReady = false;
+        repairs.push(`Step ${i} time "${step.time}" is not strictly after previous (${last}s)`);
+        step.timeSeconds = null;
+        continue;
+      }
+    }
+    step.timeSeconds = assigned;
+    last = assigned;
+  }
+  return { timerReady, lastStepSeconds: last >= 0 ? last : null, repairs };
+}
+
 // Parse "m:ss", "m:ss-m:ss" ranges (midpoint), "90s", "2 min" into seconds.
 // Single source — handbrew repair and flashBrewTransform both consume this.
 export function parseTimeString(str) {

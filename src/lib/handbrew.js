@@ -7,7 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { classifyFamilyFallback } from './beanFields';
-import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons, parseTimeString } from './brewMethods';
+import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons, parseTimeString, normalizeStepTimes } from './brewMethods';
 export { parseTimeString } from './brewMethods';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
@@ -280,8 +280,11 @@ function getDeviceAdjustedGrindStart(grinderKey, grindTier, device, family) {
   if (!grinder) return null;
   const config = BREW_DEVICE_CONFIGS[device];
   let rawOffset = config?.grindOffset || 0;
-  // Dense washed lights on a restricted-flow flat bed: extra half step coarser
-  if (config?.restrictedFlow && family && HIGH_FINES_FAMILIES.has(family)) {
+  // Dense washed lights on a restricted-flow flat bed: extra half step coarser.
+  // Also applies to a LIGHT bean that fell back to medium-washed (research
+  // failure / sparse bag notes) — it's still a light washed bean shedding fines.
+  if (config?.restrictedFlow && family
+    && (HIGH_FINES_FAMILIES.has(family) || (family === 'medium-washed' && grindTier === 'light'))) {
     rawOffset += 0.5;
   }
   const base = grinder.pourOverStart[grindTier] || grinder.validRange.min;
@@ -362,30 +365,16 @@ export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, dev
     }
   }
 
-  // 5. Parse step.time -> step.timeSeconds with strictly ascending order
+  // 5. Parse step.time -> strictly ascending step.timeSeconds (same-moment
+  // steps get nudged forward rather than costing the whole timer — see
+  // normalizeStepTimes in brewMethods.js)
   recipe.timerReady = true;
   let lastStepSeconds = null;
   if (Array.isArray(recipe.steps)) {
-    let lastSeconds = -1;
-    for (let i = 0; i < recipe.steps.length; i++) {
-      const step = recipe.steps[i];
-      const parsed = parseTimeString(step.time);
-      if (parsed == null) {
-        recipe.timerReady = false;
-        repairs.push(`Step ${i} has unparseable time "${step.time}"`);
-        step.timeSeconds = null;
-        continue;
-      }
-      if (parsed <= lastSeconds) {
-        recipe.timerReady = false;
-        repairs.push(`Step ${i} time ${step.time} is not strictly after previous (${lastSeconds}s)`);
-        step.timeSeconds = null;
-        continue;
-      }
-      step.timeSeconds = parsed;
-      lastSeconds = parsed;
-      lastStepSeconds = parsed;
-    }
+    const norm = normalizeStepTimes(recipe.steps);
+    recipe.timerReady = norm.timerReady;
+    lastStepSeconds = norm.lastStepSeconds;
+    repairs.push(...norm.repairs);
   }
 
   // 6. Normalize totalBrewTime -> totalBrewTimeSeconds
@@ -545,6 +534,8 @@ FINAL CHECKLIST (verify before outputting):
 - Water temperature MUST be within ${config.tempRange[0]}-${config.tempRange[1]}C for ${config.label}.
 - Technique should be appropriate for ${config.label}.
 - Steps must have ascending waterTotal values.
+- Every step's time MUST be strictly later than the previous step's (put the filter rinse at 0:00 and start the bloom at 0:10 or later — never two steps at the same time).
+- If the bean is light roast and the family temperature band is broad, prefer the TOP of the band (light roasts extract best hot).
 - Total brew time must match the device's typical range.${config.drawdownTarget ? `
 - Target total drawdown: ${config.drawdownTarget}. The tips MUST include: if the brew stalls or runs past this window, grind coarser (0.5-1 step); if it races under, grind finer.` : ''}
 
@@ -608,7 +599,7 @@ BEAN CLASSIFICATION:
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
       ],
-      maxTokens: 1000,
+      maxTokens: 1800,
       feature: 'handBrewRecipe',
     },
     retries: 2,

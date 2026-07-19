@@ -596,7 +596,14 @@ export const HandBrewModal = ({
             iceAccent={C.frost}
           />
 
-          {/* Start Iced Brew button */}
+          {/* Start Iced Brew button — gated on timer data like the hot flow,
+              so a non-timer-ready recipe never opens the missing-data screen */}
+          {!icedRecipe.timerReady && (
+            <div style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginBottom: 10, fontFamily: fonts.body }}>
+              This recipe is missing timer data — regenerate the hot recipe to enable the iced timer.
+            </div>
+          )}
+          {icedRecipe.timerReady && (
           <m.button
             onClick={handleStartIcedBrew}
             aria-label="Start iced brew timer"
@@ -625,6 +632,7 @@ export const HandBrewModal = ({
           >
             <Snowflake size={16} /> Start Iced Brew
           </m.button>
+          )}
 
           {onRegenerate && (
             <Btn variant="ghost" onClick={handleRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate recipe (returns to hot)">

@@ -203,6 +203,40 @@ check('iced immersion ice step carries real timeSeconds', () => {
   assert.equal(iced.timerReady, true);
 });
 
+console.log('\n[R20] Same-moment steps must not cost the timer (Tal device bug #2)');
+const { normalizeStepTimes } = await import(join(ROOT, 'src', 'lib', 'brewMethods.js'));
+check('two 0:00 steps nudge forward, timer stays ready', () => {
+  const steps = [
+    { time: '0:00', action: 'Rinse filter' },
+    { time: '0:00', action: 'Add coffee, start timer' },
+    { time: '0:35', action: 'Bloom' },
+  ];
+  const n = normalizeStepTimes(steps);
+  assert.equal(n.timerReady, true, 'timer demoted on same-moment steps');
+  assert.deepEqual(steps.map((s) => s.timeSeconds), [0, 5, 35]);
+});
+check('genuinely broken sequences still demote', () => {
+  const steps = [
+    { time: '2:00', action: 'a' },
+    { time: '0:30', action: 'b' },
+  ];
+  assert.equal(normalizeStepTimes(steps).timerReady, false);
+  const bad = [{ time: 'whenever', action: 'c' }];
+  assert.equal(normalizeStepTimes(bad).timerReady, false);
+});
+check('handbrew repair uses normalizeStepTimes; maxTokens raised; light fallback fines bump', () => {
+  const text = read('src/lib/handbrew.js');
+  assert.match(text, /normalizeStepTimes\(recipe\.steps\)/, 'repair not using shared normalizer');
+  assert.match(text, /maxTokens: 1800/, 'maxTokens not raised (JSON truncation risk)');
+  assert.match(text, /family === 'medium-washed' && grindTier === 'light'/, 'light medium-washed fallback fines bump missing');
+  assert.match(text, /strictly later than the previous step/, 'prompt missing strict-step-time rule');
+});
+check('iced start button gated on timerReady', () => {
+  const modal = read('src/components/HandBrewModal.jsx');
+  assert.match(modal, /\{!icedRecipe\.timerReady && \(/, 'no fallback message for non-timer-ready iced');
+  assert.match(modal, /\{icedRecipe\.timerReady && \(\s*<m\.button\s*onClick=\{handleStartIcedBrew\}/, 'iced start not gated');
+});
+
 console.log('\n[Guard] Aiden deterministic grind + bands untouched (full pin in verify-grind-calibration)');
 check('FAMILY_GRIND_BANDS block unchanged', () => {
   assert.match(aiden, /'washed-floral-clarity':\s*\{ ssMin: 3\.2, ssMax: 3\.2, batchMin: 5,\s*batchMax: 6\.2 \}/);
