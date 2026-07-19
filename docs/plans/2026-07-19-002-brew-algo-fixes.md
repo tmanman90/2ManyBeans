@@ -40,3 +40,39 @@ Ground rules (Tal-set, non-negotiable):
 - Aiden micron divergence vs census (750um) — logged as taste experiment, no code change.
 - peakStatus/roasterProfiles freshness windows (roaster-sourced; keep).
 - Aiden temp ceiling 99 vs 98.5C (needs Fellow device spec confirmation).
+
+## Requirements Trace
+- R1: getDeviceFamilyDefaults intersects family tempC with device tempRange (family bands live, never replaced)
+- R2: HANDBREW_POUROVER_KNOWLEDGE troubleshooting split into sour->finer/hotter, weak-but-balanced->dose/ratio, astringent->coarser/cooler
+- R3: Kasuya 4:6 blocks match the published method (93C, medium-coarse, ~30s or drain cadence, 4- and 5-pour variants)
+- R4: French press ratioRange [13,17]
+- R5: Dark-roast hand-brew family: ratio 1:15.5-1:16.5, temp 88-91C, "wider ratio" note removed
+- R6: Clean-natural hand-brew family: ratio 1:15.5-1:16.5, temp band hot (95C-class, census-backed)
+- R7: Aeropress prompt gives mode-specific ratios incl. ~1:6 bypass concentrate
+- R8: Knowledge attribution reads Hoffmann-inspired/Atlas-derived/app-adapted; V60 Ultimate bloom 2x/~45s staged pours
+- R9: GRINDER_KNOWLEDGE distinguishes recommended starts from enforcement limits
+- R10: Aiden temp-curve rule = match closest reference profile shape; flat when no signal; decline/cool-bloom only with stated cause
+- R11: Aiden washed clarity enforcement scoped to light roasts
+- R12: Kenya override softened to guard floors (bloomRatio >= 2, ratio >= 15)
+- R13: Bean-age auto-deltas removed from Aiden prompt (freshness -> reasoning only)
+- R14: Aiden batch pulse repair fallback = 4
+- R15: Aiden clean-natural bloom defaults 94-96C / 35-45s / ratio 16.5-17.0
+- R16: FAMILY_GRIND_BANDS + enforceDeterministicGrind + nearestOdeStep byte-identical to main@1abc587
+- R17: Real-pipeline A/B rerun documents legacy-vs-new diffs for 4 test beans; saved-recipe shape untouched; diff report committed for Tal review
+- R18: Dev ship complete: Vercel preview + Capgo dev bundle with -devapp.<ts> label; prod untouched
+
+## Scope Boundaries
+- NEVER modify FAMILY_GRIND_BANDS values, enforceDeterministicGrind, ODE_GEN2_STEPS/nearestOdeStep, or GRINDER_MICRON_SCALES (locked by verify-grind-calibration)
+- NEVER touch saved-recipe persistence, Firestore schemas, useAppData/useAidenBrew write paths
+- NO changes to classifyFamilyFallback, gemini.js, professorRuphus.js, tasting wizard, onboarding, UI components
+- NO production deploy (/ship); dev channel only
+- NO pushToAiden calls or anything that touches Tal's physical brewer
+
+## Implementation Units
+- U1: Phase 1 P0 fixes (R1-R4)
+- U2: scripts/verify-brew-params.mjs harness covering R1-R9 + R16 pin (gate must FAIL before fixes where applicable, PASS after)
+- U3: Phase 2 P1 fixes (R5-R9)
+- U4: Phase 3 P2 Aiden edits (R10-R15) with patch-anchor safety (exact-match string edits, throw on drift)
+- U5: A/B rerun harness promoted to scripts/aiden-ab-compare.mjs + baseline diff report (R17)
+- U6: Full verification pass: both verify harnesses, build, all regression suites (R16)
+- U7: /ship-dev + docs/memory/lessons updates (R18)

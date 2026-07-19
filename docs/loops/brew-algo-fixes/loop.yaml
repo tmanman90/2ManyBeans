@@ -1,0 +1,151 @@
+version: 1
+
+meta:
+  name: brew-algo-fixes
+  source_plan: docs/plans/2026-07-19-002-brew-algo-fixes.md
+
+goal:
+  statement: >
+    Fix every defect and evidence-backed miscalibration the 2026-07-19 brew algorithm
+    audit found, across the hand-brew recipe engine (dead family temp bands, wrong
+    troubleshooting directions, unfaithful Kasuya, dark/natural family values) and the
+    Aiden prompt rules (curve mandate, over-broad washed/Kenya enforcement, unsupported
+    age deltas), with the census-calibrated numbers, while leaving Tal's dialed-in Aiden
+    grind path and all saved recipes byte-for-byte untouched.
+  definition_of_done: >
+    R1-R15 implemented and proven by the verify harnesses; R16 pin green (Aiden grind
+    tables byte-identical to main@1abc587); the real-pipeline A/B diff report committed
+    showing exactly what changes for newly generated recipes and that saved shapes are
+    untouched (R17); build and all regression suites green; dev-channel ship live with a
+    -devapp timestamped bundle (R18); prod untouched.
+  requirements:
+    - R1
+    - R2
+    - R3
+    - R4
+    - R5
+    - R6
+    - R7
+    - R8
+    - R9
+    - R10
+    - R11
+    - R12
+    - R13
+    - R14
+    - R15
+    - R16
+    - R17
+    - R18
+  context_sources:
+    - file: docs/plans/2026-07-19-002-brew-algo-fixes.md
+    - file: docs/data/algo-audit-2026-07-19/REPORT.md
+    - file: docs/data/algo-audit-2026-07-19/census-addendum.md
+    - file: docs/data/algo-audit-2026-07-19/fellow-official-drops-addendum.md
+    - file: docs/data/algo-audit-2026-07-19/aiden-legacy-vs-proposed.md
+    - file: lessons.md
+
+verification:
+  - id: v1-grind-pin
+    type: programmatic
+    check: ["node", "scripts/verify-grind-calibration.mjs"]
+    expect: exit_zero
+  - id: v2-brew-params
+    type: programmatic
+    check: ["node", "scripts/verify-brew-params.mjs"]
+    expect: exit_zero
+  - id: v3-build
+    type: programmatic
+    check: ["npm", "run", "build"]
+    expect: exit_zero
+  - id: v4-regressions
+    type: programmatic
+    check: ["bash", "-c", "for t in scripts/*regression*.test.mjs; do node \"$t\" || exit 1; done"]
+    expect: exit_zero
+  - id: v5-ab-compare
+    type: programmatic
+    check: ["node", "scripts/aiden-ab-compare.mjs", "--assert-invariants"]
+    expect: exit_zero
+  - id: v6-codex-review
+    type: judge
+    judge: codex
+    rubric: >
+      Adversarially verify per phase: (a) every changed value matches the audit evidence
+      exactly (dark 1:15.5-16.5 + 88-91C, natural 1:15.5-16.5 hot, Kasuya 93C/30s/4-5 pour,
+      FP [13,17], census-backed Aiden softenings); (b) scope guard intact — FAMILY_GRIND_BANDS,
+      enforceDeterministicGrind, ODE_GEN2_STEPS, GRINDER_MICRON_SCALES, classifyFamilyFallback,
+      persistence paths, UI components all byte-unchanged; (c) prompt edits are anchored
+      exact-string patches, no drift, no accidental mandate inversions (flat must NOT become a
+      new mandate — the rule is match-reference-shape); (d) worst case to hunt: a P2 edit that
+      silently changes deterministic enforcement output for a bean family Tal brews (Kenya
+      washed, washed floral, clean natural). Known-good context: Liquid Glass gradients are
+      intentional material; ambient loops exempt from the 300ms motion rule.
+  - id: v7-shipdev
+    type: programmatic
+    check: ["bash", "-c", "npx @capgo/cli@latest channel currentBundle dev com.talmeltzer.coffeehub.dev | grep -q devapp"]
+    expect: exit_zero
+
+evidence_map:
+  R1: v2-brew-params
+  R2: v2-brew-params
+  R3: v2-brew-params
+  R4: v2-brew-params
+  R5: v2-brew-params
+  R6: v2-brew-params
+  R7: v2-brew-params
+  R8: v2-brew-params
+  R9: v2-brew-params
+  R10: v6-codex-review
+  R11: v2-brew-params
+  R12: v2-brew-params
+  R13: v2-brew-params
+  R14: v2-brew-params
+  R15: v2-brew-params
+  R16: v1-grind-pin
+  R17: v5-ab-compare
+  R18: v7-shipdev
+
+council:
+  - id: codex
+    role: judge
+    cli: codex
+
+gates:
+  plan_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v6-codex-review]
+    max_revisions: 2
+  delivery_gate:
+    verdict_policy: revise_until_clean
+    verdict_source: codex
+    criteria: [v1-grind-pin, v2-brew-params, v3-build, v4-regressions, v6-codex-review]
+    max_revisions: 3
+
+loop_control:
+  max_iterations: 7
+  cycle_cap: 4
+  quality_streak: 2
+  no_progress:
+    max_stalled_iterations: 2
+    action: stop
+  budget:
+    tokens: 12000000
+
+scope_guard:
+  - NEVER modify FAMILY_GRIND_BANDS values, enforceDeterministicGrind, ODE_GEN2_STEPS/nearestOdeStep, or GRINDER_MICRON_SCALES
+  - NEVER touch saved-recipe persistence, Firestore schemas, useAppData/useAidenBrew write paths
+  - NO changes to classifyFamilyFallback, gemini.js, professorRuphus.js, tasting wizard, onboarding, UI components
+  - NO production deploy; dev channel only; never bump package version for dev
+  - NO pushToAiden calls or anything touching the physical brewer
+  - Harness-first ordering — verify-brew-params.mjs (U2) lands before the fixes it gates where feasible
+
+execution:
+  mode: goal
+  isolation: branch
+
+model_policy:
+  orchestrator: fable
+  subagents: sonnet
+  reviewer: codex
+  review_cadence: per_phase
