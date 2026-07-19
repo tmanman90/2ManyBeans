@@ -1,0 +1,227 @@
+{
+  "$schema": "getup/loop.resolved.v1",
+  "compiled_at": "2026-07-19T00:02:40+00:00",
+  "council": [
+    {
+      "cli": "claude",
+      "id": "fable",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  ],
+  "council_by_id": {
+    "fable": {
+      "cli": "claude",
+      "id": "fable",
+      "role": "judge",
+      "scope": [
+        "plan",
+        "delivery"
+      ]
+    }
+  },
+  "criteria_by_id": {
+    "v1-build": {
+      "check": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    "v2-branch-structure": {
+      "check": [
+        "bash",
+        "-lc",
+        "git log --oneline | grep -q 'wip(pre-existing-baseline)' && git ls-tree -r HEAD --name-only | grep -q '^plans/README.md'"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-branch-structure",
+      "type": "programmatic"
+    },
+    "v3-codex-provenance": {
+      "id": "v3-codex-provenance",
+      "judge": "fable",
+      "rubric": "Every source-code edit in every unit commit traces to a codex:codex-rescue task whose forwarded flags were exactly --model <U1-pinned GPT-5.6 Sol identifier> --effort high --write --wait. FAIL and re-run the unit if any task ran with a different model, a different effort, or defaulted either flag; silent fallback to another model is a contract violation, not a recoverable warning. FAIL if Fable itself authored any source edit (orchestrator-only rule): the only files Fable may write are plans/README.md, docs/loops/**, and commit metadata. Worst case to catch: a Codex CLI that rejects the model string and silently runs its default model.\n",
+      "type": "judge"
+    },
+    "v4-diff-boundaries": {
+      "id": "v4-diff-boundaries",
+      "judge": "fable",
+      "rubric": "Per unit: the diff touches only the Files listed in that unit's source plan; every Boundaries bullet holds (no new dependencies; no drag-to-dismiss on the Settings grabber; data-settings-page preserved; scale 0.985 only on cards; no AnimatePresence between ScanSheet steps; cascade only when isNewBean; no haptics on error paths; tasting wizard untouched); the plan's verbatim excerpts are the drift authority, not the ec777a5 stamp; a Codex STOP-on-drift report halts the unit and is surfaced, never improvised around. Worst case to catch: an edit bleeding into the pre-existing wip-baseline hunks in SettingsPage.jsx or TastingTab.jsx \u2014 revert and re-task fresh.\n",
+      "type": "judge"
+    },
+    "v5-readme-status": {
+      "check": [
+        "bash",
+        "-lc",
+        "! grep -qE '\\|[[:space:]]*TODO[[:space:]]*\\|' plans/README.md"
+      ],
+      "expect": "exit_zero",
+      "id": "v5-readme-status",
+      "type": "programmatic"
+    },
+    "v6-device-signoff": {
+      "id": "v6-device-signoff",
+      "prompt": "Tal confirms on his iPhone (dev-channel bundle from /ship-dev, label reported in Settings OTA line) the risk-ordered checklist: Settings sheet visible after 5 consecutive opens (R1, the WKWebView gate); Ruphus close with iOS Reduce Motion ON dismisses within ~300ms (R5 timeout fallback); Ruphus exit symmetry (R5); haptics on scan-save (R2), tasting save, bag finish, star taps, paywall sandbox (R3); new-bean cascade (R2); Quick Recipe menu pop-in (R6); ScanSheet steps (R7); card presses (R4); Reduce Motion pass across remaining surfaces. This is the terminal gate proving R12.\n",
+      "type": "human"
+    }
+  },
+  "evidence_map": {
+    "R1": "v4-diff-boundaries",
+    "R10": "v2-branch-structure",
+    "R11": "v1-build",
+    "R12": "v6-device-signoff",
+    "R13": "v5-readme-status",
+    "R2": "v4-diff-boundaries",
+    "R3": "v4-diff-boundaries",
+    "R4": "v4-diff-boundaries",
+    "R5": "v4-diff-boundaries",
+    "R6": "v4-diff-boundaries",
+    "R7": "v4-diff-boundaries",
+    "R8": "v3-codex-provenance",
+    "R9": "v4-diff-boundaries"
+  },
+  "execution": {
+    "isolation": "branch",
+    "mode": "goal"
+  },
+  "gates": {
+    "delivery_gate": {
+      "criteria": [
+        "v1-build",
+        "v2-branch-structure",
+        "v3-codex-provenance",
+        "v4-diff-boundaries",
+        "v5-readme-status",
+        "v6-device-signoff"
+      ],
+      "max_revisions": 3,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "fable"
+    },
+    "plan_gate": {
+      "criteria": [
+        "v4-diff-boundaries"
+      ],
+      "max_revisions": 2,
+      "verdict_policy": "revise_until_clean",
+      "verdict_source": "fable"
+    }
+  },
+  "goal": {
+    "context_sources": [
+      {
+        "file": "docs/plans/2026-07-18-001-feat-animation-polish-master-plan.md"
+      },
+      {
+        "file": "plans/README.md"
+      },
+      {
+        "file": "lessons.md"
+      }
+    ],
+    "definition_of_done": "All seven plans landed as their own commits on the fresh branch, every edit authored by a codex:codex-rescue task run with the pinned GPT-5.6 Sol model at effort high (never any other model or effort), every unit diff verified within its source plan's Boundaries by Fable, npm run build green at HEAD, wip-baseline and plans/ commits at the branch root, plans/README.md statuses updated with no TODO remaining, /ship-dev completed with the -devapp bundle label reported and the risk-ordered device checklist delivered to Tal. Terminal acceptance beyond the loop: Tal's on-device sign-off.\n",
+    "requirements": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+      "R8",
+      "R9",
+      "R10",
+      "R11",
+      "R12",
+      "R13"
+    ],
+    "statement": "Execute the seven self-contained animation plans in plans/ (repo root) as one coordinated run on a fresh branch: SettingsPage sheet presentation, scan-save arrival, success-feedback wiring, card press feedback, Ruphus slide-up exit, Quick Recipe menu pop-in, and ScanSheet step transitions. Claude Fable 5 orchestrates ONLY (preflight, spawning, diff review, builds, commits, README statuses, ship, final review) and never writes or edits source code. Every implementation edit is made by a Codex subagent (GPT-5.6 Sol, effort high), one fresh agent per unit, serial order U1..U9.\n"
+  },
+  "loop_control": {
+    "budget": {
+      "tokens": 1000000
+    },
+    "cycle_cap": 4,
+    "max_iterations": 9,
+    "no_progress": {
+      "action": "stop",
+      "max_stalled_iterations": 2
+    },
+    "quality_streak": 2
+  },
+  "meta": {
+    "name": "animation-polish-master",
+    "source_plan": "docs/plans/2026-07-18-001-feat-animation-polish-master-plan.md"
+  },
+  "model_policy": {
+    "orchestrator": "fable-5",
+    "review_cadence": "per_unit",
+    "reviewer": "fable-5",
+    "subagents": "codex-gpt-5.6-sol--effort-high"
+  },
+  "scope_guard": [
+    "Only the seven plans' changes; no new animation decisions, no scope additions, no cleanup of adjacent code.",
+    "Pre-existing changes are parked in the wip(pre-existing-baseline) root commit \u2014 never edited, never mixed into an animation commit (exception - the plans/ directory is committed in U1).",
+    "Fable never writes or edits source code; all implementation edits come from Codex tasks.",
+    "No production ship; /ship-dev only. Merging waits for Tal's device sign-off.",
+    "Deferred items stay deferred (jar-slot enter/exit, EditBeanModal accordions, empty-state fadeUp; the plan-001 CSS fallback rework is its own follow-up if the device gate fails)."
+  ],
+  "source": "/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/docs/loops/animation-polish-master/loop.yaml",
+  "verification": [
+    {
+      "check": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "expect": "exit_zero",
+      "id": "v1-build",
+      "type": "programmatic"
+    },
+    {
+      "check": [
+        "bash",
+        "-lc",
+        "git log --oneline | grep -q 'wip(pre-existing-baseline)' && git ls-tree -r HEAD --name-only | grep -q '^plans/README.md'"
+      ],
+      "expect": "exit_zero",
+      "id": "v2-branch-structure",
+      "type": "programmatic"
+    },
+    {
+      "id": "v3-codex-provenance",
+      "judge": "fable",
+      "rubric": "Every source-code edit in every unit commit traces to a codex:codex-rescue task whose forwarded flags were exactly --model <U1-pinned GPT-5.6 Sol identifier> --effort high --write --wait. FAIL and re-run the unit if any task ran with a different model, a different effort, or defaulted either flag; silent fallback to another model is a contract violation, not a recoverable warning. FAIL if Fable itself authored any source edit (orchestrator-only rule): the only files Fable may write are plans/README.md, docs/loops/**, and commit metadata. Worst case to catch: a Codex CLI that rejects the model string and silently runs its default model.\n",
+      "type": "judge"
+    },
+    {
+      "id": "v4-diff-boundaries",
+      "judge": "fable",
+      "rubric": "Per unit: the diff touches only the Files listed in that unit's source plan; every Boundaries bullet holds (no new dependencies; no drag-to-dismiss on the Settings grabber; data-settings-page preserved; scale 0.985 only on cards; no AnimatePresence between ScanSheet steps; cascade only when isNewBean; no haptics on error paths; tasting wizard untouched); the plan's verbatim excerpts are the drift authority, not the ec777a5 stamp; a Codex STOP-on-drift report halts the unit and is surfaced, never improvised around. Worst case to catch: an edit bleeding into the pre-existing wip-baseline hunks in SettingsPage.jsx or TastingTab.jsx \u2014 revert and re-task fresh.\n",
+      "type": "judge"
+    },
+    {
+      "check": [
+        "bash",
+        "-lc",
+        "! grep -qE '\\|[[:space:]]*TODO[[:space:]]*\\|' plans/README.md"
+      ],
+      "expect": "exit_zero",
+      "id": "v5-readme-status",
+      "type": "programmatic"
+    },
+    {
+      "id": "v6-device-signoff",
+      "prompt": "Tal confirms on his iPhone (dev-channel bundle from /ship-dev, label reported in Settings OTA line) the risk-ordered checklist: Settings sheet visible after 5 consecutive opens (R1, the WKWebView gate); Ruphus close with iOS Reduce Motion ON dismisses within ~300ms (R5 timeout fallback); Ruphus exit symmetry (R5); haptics on scan-save (R2), tasting save, bag finish, star taps, paywall sandbox (R3); new-bean cascade (R2); Quick Recipe menu pop-in (R6); ScanSheet steps (R7); card presses (R4); Reduce Motion pass across remaining surfaces. This is the terminal gate proving R12.\n",
+      "type": "human"
+    }
+  ],
+  "version": 1
+}
