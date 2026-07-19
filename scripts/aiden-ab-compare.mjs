@@ -100,6 +100,10 @@ for (const bean of BEANS) {
     try { row[label] = await mod.generateAidenRecipe(bean, research); }
     catch (e) { row[label] = { error: e.message }; }
   }
+  if (ASSERT && (row.baseline?.error || row.current?.error)) {
+    invariantFailures++;
+    console.error(`GENERATION ERROR ${bean.name}: baseline=${row.baseline?.error || 'ok'} current=${row.current?.error || 'ok'}`);
+  }
   if (ASSERT && !row.baseline?.error && !row.current?.error) {
     const bKeys = Object.keys(row.baseline).sort().join(',');
     const cKeys = Object.keys(row.current).sort().join(',');
@@ -124,5 +128,7 @@ for (const r of results) {
 writeFileSync(join(ROOT, 'docs', 'data', 'algo-audit-2026-07-19', `ab-run-${stamp}.md`), md.join('\n'));
 console.log(`report -> docs/data/algo-audit-2026-07-19/ab-run-${stamp}.md`);
 
+const compared = results.filter((r) => r.baseline && !r.baseline.error && r.current && !r.current.error).length;
+if (ASSERT && compared === 0) { console.error('zero successful comparisons — assertion vacuous'); process.exit(1); }
 if (ASSERT && invariantFailures > 0) { console.error(`${invariantFailures} invariant failure(s)`); process.exit(1); }
-console.log(ASSERT ? 'invariants OK (shape + grind identical across variants)' : 'done');
+console.log(ASSERT ? `invariants OK (${compared} pairs: shape + grind identical across variants)` : 'done');

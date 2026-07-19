@@ -98,9 +98,22 @@ check('R11: washed clarity enforcement scoped to light', () => {
 check('R12: Kenya override softened to guard floors', () => {
   assert.ok(!/if \(recipe\.ratio < 17\) recipe\.ratio = 17;/.test(aiden), 'Kenya ratio hard floor still present');
 });
-check('R13: age auto-deltas removed', () => {
+check('R13: age auto-deltas removed from EVERY prompt location', () => {
   assert.ok(!/Fading \/ Past Peak: ratio \+0\.5/.test(aiden), 'age delta table still present');
   assert.ok(!/Stale: ratio \+1 to \+1\.5/.test(aiden), 'stale delta still present');
+  assert.ok(!/did you add ratio \+0\.5/.test(aiden), 'checklist age mandate still present');
+  assert.ok(!/MUST add \+0\.5 to \+1\.0 to the ratio/.test(aiden), 'critical-reminder age mandate still present');
+  assert.ok(!/MUST apply the grind percentile rule, age adjustments/.test(aiden), 'reference preamble still mandates age adjustments');
+});
+check('R12b: Kenya/interval/ratio mandates softened in checklist + origin block', () => {
+  assert.ok(!/bloom MUST be 2\.5–3\.0x/.test(aiden), 'Kenya bloom hard mandate still present');
+  assert.ok(!/is ratio ≥ 1:16\.5 \(prefer ~1:17\)\?/.test(aiden), 'checklist ratio floor still present');
+  assert.ok(!/20–25s intervals ONLY/.test(aiden), 'interval ONLY mandate still present');
+  assert.match(aiden, /sanity guards|guards absurd|sourced recipe.{0,80}overrides/is, 'no sourced-recipe override language');
+});
+check('R12c: enforcement keeps sanity guards (bloom 20-90s, interval 15-40s)', () => {
+  assert.match(aiden, /clamp\(recipe\.bloomDuration, 20, 90\)/, 'bloom sanity guard missing');
+  assert.match(aiden, /clamp\(recipe\.ssPulsesInterval, 15, 40\)/, 'interval sanity guard missing');
 });
 check('R14: batch pulse fallback = 4', () => {
   assert.match(aiden, /batchPulsesNumber \?\? 4/, 'fallback not unified at 4');
@@ -136,6 +149,46 @@ check('iced pour-over keeps timerReady with range-format step times', () => {
 check('iced pour-over falls back gracefully when hot recipe lacks timer data', () => {
   const iced = transformPourOver({ ...hotKalita, timerReady: false, steps: [{ time: 'whenever', action: 'x' }], totalBrewTimeSeconds: null }, 20);
   assert.equal(iced.timerReady, false);
+});
+// Replica of useBrewTimer's buildTimerSteps gate contract — any recipe with
+// timerReady:true MUST satisfy this, or the UI hits the missing-data screen.
+const gateAccepts = (recipe) => {
+  if (!recipe?.timerReady) return false;
+  const steps = recipe.steps || [];
+  if (steps.length === 0) return false;
+  const total = recipe.totalBrewTimeSeconds;
+  if (typeof total !== 'number' || total <= 0) return false;
+  for (let i = 0; i < steps.length; i++) {
+    const start = steps[i].timeSeconds;
+    if (typeof start !== 'number') return false;
+    const next = i + 1 < steps.length ? steps[i + 1].timeSeconds : total;
+    if (typeof next !== 'number' || next <= start) return false;
+  }
+  return true;
+};
+check('timerReady:true ALWAYS implies the BrewTimer gate accepts (collision cases)', () => {
+  // Codex-reproduced case: overlapping range midpoints -> colliding timeSeconds
+  const colliding = transformPourOver({
+    ...hotKalita,
+    steps: [
+      { time: '0:00', timeSeconds: 0, action: 'Bloom', waterTotal: 40 },
+      { time: '0:05-0:15', action: 'Pour A', waterTotal: 150 }, // midpoint 10
+      { time: '0:00-0:20', action: 'Pour B', waterTotal: 320 }, // midpoint 10 — collision
+    ],
+  }, 20);
+  assert.ok(!colliding.timerReady || gateAccepts(colliding), 'pour-over: timerReady lies to the gate');
+  // Codex-reproduced case: final hot step starts at the recipe total
+  const edge = transformImmersion({
+    ...hotKalita,
+    device: 'french-press',
+    totalBrewTimeSeconds: 120,
+    steps: [
+      { time: '0:00', timeSeconds: 0, action: 'Pour', waterTotal: 320 },
+      { time: '2:00', timeSeconds: 120, action: 'Plunge gently' },
+    ],
+  }, 20);
+  assert.ok(!edge.timerReady || gateAccepts(edge), 'immersion: timerReady lies to the gate');
+  assert.equal(gateAccepts(transformPourOver(hotKalita, 20)), true, 'happy path must stay gate-valid');
 });
 check('iced immersion ice step carries real timeSeconds', () => {
   const iced = transformImmersion({ ...hotKalita, device: 'french-press' }, 20);

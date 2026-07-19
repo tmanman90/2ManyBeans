@@ -216,7 +216,16 @@ function getDeviceFamilyDefaults(device, family) {
       const famHi = Number(fam[2]);
       const lo = Math.max(famLo, devLo);
       const hi = Math.min(famHi, devHi);
-      result.tempC = lo <= hi ? `${lo}-${hi}` : `${devLo}-${devHi}`;
+      if (lo <= hi) {
+        result.tempC = `${lo}-${hi}`;
+      } else if (famHi < devLo) {
+        // Family wants cooler than the device allows (dark on Chemex):
+        // pin to the device's coolest edge, never the full range.
+        result.tempC = `${devLo}-${Math.min(devLo + 1, devHi)}`;
+      } else {
+        // Family wants hotter than the device allows: pin to the hottest edge.
+        result.tempC = `${Math.max(devHi - 1, devLo)}-${devHi}`;
+      }
     } else {
       result.tempC = `${devLo}-${devHi}`;
     }

@@ -121,16 +121,16 @@ Rules for energy vs grind:
 
 ### Pulse Interval Guidelines — MANDATORY
 
-- Light washed (high clarity): 20–25s intervals ONLY — fast pulses preserve brightness. NEVER default to 35s+ for light washed.
+- Light washed (high clarity): usually 18–28s intervals — fast pulses preserve brightness. Go longer only when the matched reference profile does.
 - Light natural (fruit-forward): 25–30s intervals — slightly longer for fruit development.
 - Honey / anaerobic: 25–35s intervals — moderate pace for complexity.
 - Medium / dark: 25–30s intervals.
 - Match the closest reference profile's interval. NEVER default to 35s+ for light roasts.
 - For clarity-first single-serve, default 2–4 pulses unless the reference profile strongly suggests more.
 
-### Origin-Specific Overrides — MANDATORY
+### Origin-Specific Defaults
 
-- Washed Kenya: bloom MUST be 2.5–3.0x, bloom time 40–55s, pulse intervals 20–25s. These benefit from high early energy and fast clean pulses. A bloom of 2.0x or below is WRONG for washed Kenya.
+- Washed Kenya: prefer bloom 2.5–3.0x, bloom time 40–55s, pulse intervals 20–25s — high early energy and fast clean pulses suit these. A sourced or closely matched reference recipe (e.g. Kieni, Kapsokiso) overrides these defaults; do not rewrite its parameters.
 
 ### Ratio Sanity — MANDATORY
 
@@ -246,7 +246,7 @@ Defaults:
 ## REFERENCE PROFILES (from Fellow Brew Talks)
 ## ═══════════════════════════════════════════════
 
-The MANDATORY RULES above constrain how you use this data — you MUST apply the grind percentile rule, age adjustments, interval guidelines, and origin overrides to every recipe.
+The rules above constrain how you use this data — apply the grind percentile rule, interval guidelines, and origin defaults to every recipe (bean age is reasoning context only, never a parameter shift).
 
 Each profile: Name | Origin | Roast | Process | Varietal
 ratio X | bloom X/Xs/X°C | SS NxXs [temps] | Batch NxXs [temps] | Ode G2 grind SS X / Batch X
@@ -374,10 +374,10 @@ ratio 15.5 | bloom 2.5/30s/93°C | SS 4x30s [93,93,89,89] | Batch 4x30s [93,93,8
 ## ═══════════════════════════════════════════════
 
 Before returning your JSON, confirm ALL of the following:
-1. **AGE:** If Past Peak or Fading: did you add ratio +0.5 to +1.0, bloom ratio +0.5, early temps up?
-2. **INTERVALS:** Light washed = 20–25s? (35s+ is WRONG for light washed)
-3. **KENYA BLOOM:** Washed Kenya = 2.5–3.0x bloom? (2.0 or below is WRONG)
-4. **RATIO SANITY:** For light/washed clarity profiles, is ratio ≥ 1:16.5 (prefer ~1:17)?
+1. **AGE:** Freshness stage mentioned in reasoning only — NO automatic ratio/bloom/temp shifts for age.
+2. **INTERVALS:** Light washed usually 18–28s; longer only when the matched reference profile uses longer.
+3. **KENYA BLOOM:** Washed Kenya prefers 2.5–3.0x bloom unless a sourced/reference recipe specifies otherwise.
+4. **RATIO SANITY:** LIGHT washed clarity around 1:16.5–1:17; a sourced/reference recipe may run stronger. Medium/dark washed follow their own family defaults.
 5. **ENERGY FIRST:** For dense/high-altitude beans, use hotter bloom + early pulses + shorter intervals before reaching for finer grind.
 6. **DRYNESS STOP-LOSS:** Avoid "fine + slow + hot." If intervals are long, counterbalance with shorter intervals / cooler late pulses.
 7. **FAMILY CHECK:** Did I classify the coffee into the correct cup-structure family first, and did I avoid letting a generic country/process reference override that family?
@@ -392,8 +392,8 @@ Your grindRecommendation values MUST be chosen from this EXACT list. Do NOT inte
 1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2, 5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2, 9, 9.1, 9.2, 10, 10.1, 10.2, 11
 Values like 4.8, 5.6, 3.5, 6.8 are INVALID. Pick the nearest valid step from the list above.
 
-### Past Peak / Fading Beans MUST Have Higher Ratio
-If the bean is Past Peak or Fading, you MUST add +0.5 to +1.0 to the ratio above the family baseline default. For example: if the family baseline is 17.0, past peak ratio should be 17.5. If baseline is 16.0, past peak should be 16.5-17.0. Never use the standard baseline ratio for an aged bean.
+### Bean Age Is Context, Not a Delta
+Freshness stage (fading, past peak, stale) belongs in the reasoning field. Do NOT shift ratio, bloom, or temperatures for age — the user's taste feedback drives any adjustment.
 
 RESPOND WITH ONLY THE JSON OBJECT. No other text.`;
 
@@ -502,7 +502,15 @@ function enforceDeterministicGrind(recipe, bean, research) {
 function enforceClarityRules(recipe, bean) {
   // Light-clarity ratio/interval guidance now lives in the prompt (audit R11/R12:
   // hard floors rewrote exact reference recipes like Kieni 1:15.5 and hit medium/
-  // dark washed beans). Enforcement only guards absurd outputs.
+  // dark washed beans; roast scoping is enforced at the prompt checklist level).
+  // Enforcement keeps only sanity guards wide enough that any sourced recipe
+  // survives, but absurd model output cannot.
+  if (recipe.bloomDuration != null) {
+    recipe.bloomDuration = Math.round(clamp(recipe.bloomDuration, 20, 90));
+  }
+  if (recipe.ssPulsesInterval != null) {
+    recipe.ssPulsesInterval = Math.round(clamp(recipe.ssPulsesInterval, 15, 40));
+  }
   if (isWashed(bean)) {
     if (recipe.ratio < 15) recipe.ratio = 15;
   }

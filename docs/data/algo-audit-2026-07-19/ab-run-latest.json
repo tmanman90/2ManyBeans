@@ -14,17 +14,17 @@
       "ssPulsesInterval": 22,
       "ssPulseTemperatures": [
         95.5,
-        95,
-        94
+        94.5,
+        93.5
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
       "batchPulsesInterval": 28,
       "batchPulseTemperatures": [
         95.5,
-        95,
         94.5,
-        93.5
+        93.5,
+        92.5
       ],
       "grindRecommendation": {
         "singleServe": 3,
@@ -33,27 +33,27 @@
     },
     "current": {
       "profileType": 0,
-      "ratio": 17.5,
+      "ratio": 17,
       "bloomEnabled": true,
       "bloomRatio": 3,
-      "bloomDuration": 50,
-      "bloomTemperature": 95.5,
+      "bloomDuration": 45,
+      "bloomTemperature": 94,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
       "ssPulsesInterval": 22,
       "ssPulseTemperatures": [
-        95.5,
-        95,
-        94.5
+        94,
+        94,
+        93
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
-      "batchPulsesInterval": 30,
+      "batchPulsesInterval": 28,
       "batchPulseTemperatures": [
-        95.5,
-        95,
-        94.5,
-        94.5
+        94,
+        94,
+        93,
+        92.5
       ],
       "grindRecommendation": {
         "singleServe": 3,
@@ -66,27 +66,27 @@
     "family": "washed-floral-clarity",
     "baseline": {
       "profileType": 0,
-      "ratio": 17.5,
+      "ratio": 17,
       "bloomEnabled": true,
       "bloomRatio": 3,
       "bloomDuration": 50,
-      "bloomTemperature": 95.5,
+      "bloomTemperature": 96,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
       "ssPulsesInterval": 22,
       "ssPulseTemperatures": [
-        95.5,
+        96,
         95,
-        94.5
+        94
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
       "batchPulsesInterval": 28,
       "batchPulseTemperatures": [
-        95.5,
+        96,
         95,
-        94.5,
-        94
+        94,
+        93
       ],
       "grindRecommendation": {
         "singleServe": 3.2,
@@ -102,20 +102,20 @@
       "bloomTemperature": 96,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
-      "ssPulsesInterval": 22,
+      "ssPulsesInterval": 23,
       "ssPulseTemperatures": [
         96,
-        95.5,
-        95
+        95,
+        94
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
-      "batchPulsesInterval": 29,
+      "batchPulsesInterval": 30,
       "batchPulseTemperatures": [
         96,
-        95.5,
+        96,
         95,
-        94.5
+        94
       ],
       "grindRecommendation": {
         "singleServe": 3.2,
@@ -128,27 +128,27 @@
     "family": "clean-natural-fruit",
     "baseline": {
       "profileType": 0,
-      "ratio": 17,
+      "ratio": 17.5,
       "bloomEnabled": true,
       "bloomRatio": 2.5,
-      "bloomDuration": 50,
-      "bloomTemperature": 93.5,
+      "bloomDuration": 45,
+      "bloomTemperature": 93,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
-      "ssPulsesInterval": 27,
+      "ssPulsesInterval": 28,
       "ssPulseTemperatures": [
-        93.5,
         93,
-        92.5
+        92,
+        91.5
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
       "batchPulsesInterval": 30,
       "batchPulseTemperatures": [
-        93.5,
         93,
-        92.5,
-        92
+        92,
+        91.5,
+        91
       ],
       "grindRecommendation": {
         "singleServe": 4.2,
@@ -164,11 +164,11 @@
       "bloomTemperature": 95,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
-      "ssPulsesInterval": 27,
+      "ssPulsesInterval": 28,
       "ssPulseTemperatures": [
         95,
         95,
-        94
+        94.5
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
@@ -176,7 +176,7 @@
       "batchPulseTemperatures": [
         95,
         95,
-        94,
+        94.5,
         94
       ],
       "grindRecommendation": {
@@ -194,23 +194,23 @@
       "bloomEnabled": true,
       "bloomRatio": 3,
       "bloomDuration": 50,
-      "bloomTemperature": 95.5,
+      "bloomTemperature": 95,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
-      "ssPulsesInterval": 22,
+      "ssPulsesInterval": 23,
       "ssPulseTemperatures": [
-        95.5,
         95,
-        94
+        94,
+        93
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
-      "batchPulsesInterval": 29,
+      "batchPulsesInterval": 30,
       "batchPulseTemperatures": [
-        95.5,
         95,
         94.5,
-        94
+        93.5,
+        92.5
       ],
       "grindRecommendation": {
         "singleServe": 3.2,
@@ -219,27 +219,27 @@
     },
     "current": {
       "profileType": 0,
-      "ratio": 17.5,
+      "ratio": 17,
       "bloomEnabled": true,
       "bloomRatio": 3,
       "bloomDuration": 50,
-      "bloomTemperature": 96,
+      "bloomTemperature": 95,
       "ssPulsesEnabled": true,
       "ssPulsesNumber": 3,
       "ssPulsesInterval": 22,
       "ssPulseTemperatures": [
-        96,
-        95.5,
-        95
+        95,
+        95,
+        94.5
       ],
       "batchPulsesEnabled": true,
       "batchPulsesNumber": 4,
       "batchPulsesInterval": 30,
       "batchPulseTemperatures": [
-        96,
-        95.5,
         95,
-        94.5
+        95,
+        94.5,
+        94
       ],
       "grindRecommendation": {
         "singleServe": 3.2,

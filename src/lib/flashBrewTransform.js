@@ -94,6 +94,18 @@ export function transformPourOver(hotRecipe, userDose) {
     : null;
   if (totalSeconds == null) timerIntact = false;
 
+  // The BrewTimer gate requires STRICTLY ascending timeSeconds and
+  // total > last step. Range-midpoint parsing can produce collisions
+  // ([0,20,20]) — if the final sequence violates the gate, demote
+  // timerReady so the UI degrades gracefully instead of hard-failing.
+  if (timerIntact) {
+    const secs = icedSteps.map((s) => s.timeSeconds);
+    for (let i = 1; i < secs.length; i++) {
+      if (typeof secs[i] !== 'number' || secs[i] <= secs[i - 1]) { timerIntact = false; break; }
+    }
+    if (timerIntact && !(totalSeconds > secs[secs.length - 1])) timerIntact = false;
+  }
+
   return {
     ...hotRecipe,
     coffeeGrams: dose,
@@ -122,14 +134,21 @@ export function transformImmersion(hotRecipe, userDose) {
   }));
 
   // The press-onto-ice step needs real timer data or the BrewTimer gate
-  // rejects the whole recipe (every step must have ascending timeSeconds).
+  // rejects the whole recipe (every step must have STRICTLY ascending
+  // timeSeconds) — place it strictly after the final hot step even when
+  // that step starts at the recipe's total time.
   const hotTotal = typeof hotRecipe.totalBrewTimeSeconds === 'number'
     ? hotRecipe.totalBrewTimeSeconds
     : null;
+  const lastHotSecs = icedSteps.reduce(
+    (max, s) => (typeof s.timeSeconds === 'number' && s.timeSeconds > max ? s.timeSeconds : max),
+    -1
+  );
+  const iceStepAt = hotTotal != null ? Math.max(hotTotal, lastHotSecs + 10) : null;
   const ICE_POUR_DURATION = 15;
   icedSteps.push({
-    time: hotTotal != null ? formatTime(hotTotal) : null,
-    timeSeconds: hotTotal,
+    time: iceStepAt != null ? formatTime(iceStepAt) : null,
+    timeSeconds: iceStepAt,
     action: `Press/pour onto ${iceGrams}g ice`,
     isIceStep: true,
   });
@@ -140,9 +159,10 @@ export function transformImmersion(hotRecipe, userDose) {
     waterGrams: hotWater,
     iceGrams,
     steps: icedSteps,
-    totalBrewTimeSeconds: hotTotal != null ? hotTotal + ICE_POUR_DURATION : null,
-    totalBrewTime: hotTotal != null ? formatTime(hotTotal + ICE_POUR_DURATION) : hotRecipe.totalBrewTime,
-    timerReady: hotRecipe.timerReady === true && hotTotal != null,
+    totalBrewTimeSeconds: iceStepAt != null ? iceStepAt + ICE_POUR_DURATION : null,
+    totalBrewTime: iceStepAt != null ? formatTime(iceStepAt + ICE_POUR_DURATION) : hotRecipe.totalBrewTime,
+    timerReady: hotRecipe.timerReady === true && iceStepAt != null
+      && icedSteps.every((s, i) => typeof s.timeSeconds === 'number' && (i === 0 || s.timeSeconds > icedSteps[i - 1].timeSeconds)),
     grindSize: shiftGrindFiner(hotRecipe.grindSize, 1),
     waterTemp: bumpTemp(hotRecipe.waterTemp),
     isIced: true,
