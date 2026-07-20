@@ -31,3 +31,4 @@ android/
 !public/images/*.png
 !public/images/**/*.png
 !assets/*.png
+demo-recordings/
