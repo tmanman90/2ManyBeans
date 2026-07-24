@@ -28,10 +28,30 @@ export function parseRatioDivisor(ratioStr) {
   return divisor;
 }
 
-// Return a new recipe object with coffeeGrams / waterGrams / steps[n].waterTotal
-// scaled for `newDose`. Everything else (steps[n].time, step actions, grind,
-// temp, technique, totalBrewTime, totalBrewTimeSeconds, timerReady) is copied
-// through unchanged.
+// Scale positive integer or decimal quantities followed by a whole gram-unit
+// token. Preserve the generated copy's original whitespace and unit spelling.
+function scaleActionGrams(action, scaleFactor) {
+  if (typeof action !== 'string') return action;
+  return action.replace(
+    /(?<![\w.])(\d+(?:\.\d+)?)(\s*)(grams?|g)\b/gi,
+    (match, quantity, spacing, unit, offset, source) => {
+      if (
+        source[offset - 1] === '-'
+        && !/(?:^|[^\w.-])\d+(?:\.\d+)?\s*(?:grams?|g)$/i.test(source.slice(0, offset - 1))
+      ) {
+        return match;
+      }
+      const grams = Number(quantity);
+      if (grams <= 0) return match;
+      return `${Math.round(grams * scaleFactor)}${spacing}${unit}`;
+    }
+  );
+}
+
+// Return a new recipe object with coffeeGrams / waterGrams /
+// steps[n].waterTotal and explicit gram quantities in step actions scaled for
+// `newDose`. Everything else (steps[n].time, grind, temp, technique,
+// totalBrewTime, totalBrewTimeSeconds, timerReady) is copied through unchanged.
 //
 // Rounding: nearest whole gram for water and every step's waterTotal.
 // Fractional grams never escape this function.
@@ -57,11 +77,14 @@ export function scaleRecipeForDose(recipe, newDose) {
   const newSteps = Array.isArray(recipe.steps)
     ? recipe.steps.map((step) => {
         if (step == null) return step;
-        if (typeof step.waterTotal !== 'number') return { ...step };
-        return {
-          ...step,
-          waterTotal: Math.round(step.waterTotal * scaleFactor),
-        };
+        const scaledStep = { ...step };
+        if (typeof step.action === 'string') {
+          scaledStep.action = scaleActionGrams(step.action, scaleFactor);
+        }
+        if (typeof step.waterTotal === 'number') {
+          scaledStep.waterTotal = Math.round(step.waterTotal * scaleFactor);
+        }
+        return scaledStep;
       })
     : recipe.steps;
 

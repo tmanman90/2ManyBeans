@@ -1,7 +1,7 @@
 {
   "name": "coffee-hub",
   "private": true,
-  "version": "1.1.234",
+  "version": "1.1.235",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "cap:sync": "node scripts/patch-social-login.mjs && npm run build:ios && PATH=/usr/local/bin:$PATH npx cap sync && node scripts/configure-ios-variant.mjs prod",
     "cap:sync:dev": "node scripts/patch-social-login.mjs && npm run build:ios:dev && TMB_APP_VARIANT=dev PATH=/usr/local/bin:$PATH npx cap sync && node scripts/configure-ios-variant.mjs dev",
     "cap:open": "PATH=/usr/local/bin:$PATH npx cap open ios",
+    "test:recipe-scaling": "node scripts/recipe-scaling.test.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
