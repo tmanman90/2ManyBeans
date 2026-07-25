@@ -18,8 +18,12 @@ export function RadarLightSweep({ scores, size = 240, complete = false, reduce =
   const start = useRef(0);
   const bloom = useRef({ active: false, t0: 0 });
   const prevComplete = useRef(false);
+  // The canvas rAF loop reads the latest scores without re-subscribing. Mirror
+  // them in an effect rather than during render -- nothing reads this ref while
+  // rendering, so the post-commit sync is equivalent and keeps StrictMode's
+  // double-render from writing a ref mid-render.
   const scoresRef = useRef(scores);
-  scoresRef.current = scores;
+  useEffect(() => { scoresRef.current = scores; }, [scores]);
 
   useEffect(() => {
     if (complete && !prevComplete.current) bloom.current = { active: true, t0: -1 };

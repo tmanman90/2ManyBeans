@@ -142,9 +142,11 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
   // keeps launching the scan flow exactly as before.
   const handoffConsumedRef = useRef(false);
   // Fresh beans at consume time — the async closure below would otherwise
-  // capture the render-time array (stale-empty on cold native starts).
+  // capture the render-time array (stale-empty on cold native starts). Synced
+  // in an effect, not during render: the closure only reads this after an
+  // await, so it always sees the latest committed value either way.
   const beansRef = useRef(beans);
-  beansRef.current = beans;
+  useEffect(() => { beansRef.current = beans; }, [beans]);
   useEffect(() => {
     if (handoffConsumedRef.current) return;
     if (tourActive) return;
