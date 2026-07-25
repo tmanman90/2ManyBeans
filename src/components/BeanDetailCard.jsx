@@ -70,6 +70,12 @@ const lbl = { fontFamily: G, fontWeight: 700, letterSpacing: '0.14em', textTrans
 function FitText({ children, max, min = 7, style }) {
   const ref = useRef(null);
   const [size, setSize] = useState(max);
+  // Intentionally dependency-free: the whole point is to re-measure after EVERY
+  // render, because `children` (a bean name, a roaster) is what changes width.
+  // Adding the [max, min] deps eslint suggests would freeze the size on the
+  // first measurement and let long names overflow. Converges because setSize
+  // with an unchanged value bails out of a re-render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -403,6 +409,11 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
     flipP.set(0);
     setInsightOpen(false);
     if (backScrollRef.current) backScrollRef.current.scrollTop = 0;
+    // Keyed on the id ALONE on purpose. `bean` is a fresh object on every
+    // Firestore refetch, so depending on it would un-flip the card and reset
+    // the reader's scroll position mid-view every poll. `flipP` is a framer
+    // MotionValue and is already stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bean?.id]);
 
   // Pull-to-dismiss on the BACK: only engages when the stat sheet is scrolled to the

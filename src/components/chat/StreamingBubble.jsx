@@ -7,7 +7,15 @@ export const StreamingBubble = forwardRef(function StreamingBubble({ onFlush }, 
   const textRef = useRef('');
   const rafRef = useRef(0);
   const revealedRef = useRef(0);
+  const flushRef = useRef(null);
   const [display, setDisplay] = useState('');
+
+  // The rAF chain below outlives the render that scheduled it, so it must not
+  // close over `onFlush` directly -- a mid-stream prop change would leave the
+  // running chain calling the old callback for the rest of the message. Read
+  // it through a ref instead so the next frame picks up the current one.
+  const onFlushRef = useRef(onFlush);
+  useEffect(() => { onFlushRef.current = onFlush; }, [onFlush]);
 
   // Anthropic streams in bursty multi-word chunks; rendering them raw reads
   // as lag-then-lump. Smooth the reveal: each frame advances a character
@@ -26,11 +34,17 @@ export const StreamingBubble = forwardRef(function StreamingBubble({ onFlush }, 
       revealedRef.current = safe.length;
     }
     setDisplay(safe.slice(0, revealedRef.current));
-    onFlush?.();
+    onFlushRef.current?.();
     if (revealedRef.current < safe.length) {
-      rafRef.current = requestAnimationFrame(flush);
+      // Re-enter through the ref rather than naming `flush` inside its own
+      // initializer. `flush` is stable (no deps), so the ref always points at
+      // this same instance; it is assigned on mount, well before `append()`
+      // can start a chain.
+      rafRef.current = requestAnimationFrame(() => flushRef.current?.());
     }
-  }, [onFlush]);
+  }, []);
+
+  useEffect(() => { flushRef.current = flush; }, [flush]);
 
   const schedule = useCallback(() => {
     if (rafRef.current) return;
