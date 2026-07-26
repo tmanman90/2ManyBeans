@@ -10,7 +10,7 @@ origin: docs/brainstorms/2026-07-25-recipe-tasting-feedback-loop.md
 
 ## Summary
 
-Capture how the cup was actually brewed at the **start** of a guided tasting, default it from the saved brew preference but make it visibly changeable, and let that choice inform what Professor Ruphus expects and what he coaches the taster to notice. Persist the method on the tasting record so past cups stay readable and same-bean-different-method entries stop reading as contradictions.
+Capture how the cup was actually brewed at the **start** of a guided tasting — seeded from the real device when a brew just finished, from the saved preference otherwise, and visibly changeable either way — and let that choice inform what Professor Ruphus expects and what he coaches the taster to notice. Persist the method *and the recipe that produced the cup* on the tasting record, from every live write path, so past cups stay readable and same-bean-different-method entries stop reading as contradictions.
 
 The whole feature hangs off one seam: `src/components/tasting/TastingWizard.jsx:65` computes a single `expected` object that already feeds the intro summary, the per-step coaching cues, the slider ghost markers, the found-vs-expected reveal, and the AI reaction. A brew-method modifier layered onto that object propagates to every surface without touching any of them individually.
 
@@ -49,6 +49,9 @@ Filter material drives body and clarity. That is the axis the model encodes.
 - **R6.** Past tastings display their method where they are read; records without one degrade gracefully rather than guessing.
 - **R7.** No existing tasting is backfilled or inferred.
 - **R8.** `scripts/verify-wizard.mjs` stays green and is extended to cover the new behavior.
+- **R9.** When the tasting is entered from a completed brew, the method is seeded from the device that was actually brewed, not from the global preference.
+- **R10.** Every live path that writes a tasting captures the method, so a blank method means "logged before this feature" and nothing else.
+- **R11.** The tasting also records the recipe that was live for that bean and method at save time, so the cup can later be explained by what produced it.
 
 ---
 
@@ -58,7 +61,8 @@ One modifier layer, many downstream surfaces. This is the reason the change stay
 
 ```mermaid
 flowchart TD
-    P[preferences.brewMethod<br/>global default] -->|seeds| M[Method choice<br/>on wizard intro]
+    BT["Completed brew<br/>HandBrewModal knows the device"] -->|"seeds (R9)"| M
+    P[preferences.brewMethod<br/>global default] -->|"fallback seed"| M[Method choice<br/>intro picker / manual form]
     M -->|user can override| M
     B[bean] --> PR["predict(bean)"]
     PR --> AM["applyBrewMethod(prediction, method)"]
@@ -70,15 +74,18 @@ flowchart TD
     E --> S2[Per-step coaching cues]
     E --> S3[Slider ghost markers]
     E --> S4[Found-vs-expected reveal]
-    E --> S5[AI step reaction]
+    E --> S5["AI step reaction<br/>(via cues, no signature change)"]
 
-    M --> REC[tasting record<br/>brewMethod field]
+    M --> REC[tasting record]
+    RS["bean.handBrewRecipes[method]<br/>/ bean.aidenRecipe"] -->|"trimmed snapshot (R11)"| REC
     REC --> D1[Journal cards]
     REC --> D2[Tasting detail]
     REC --> D3[Bean detail: Your Tastings]
 ```
 
 The `expected` memo at `src/components/tasting/TastingWizard.jsx:65` is the single junction. Its dependency array is load-bearing: omitting the method there is the one mistake that makes the whole feature silently inert.
+
+Note the two seeds. A tasting entered from a completed brew takes its method from the device that was actually used; a tasting entered cold from the list falls back to the global preference. Only the second is a guess.
 
 **Directional guidance, not implementation specification** — the cup-effect model's shape:
 
@@ -182,13 +189,17 @@ Each entry carries category, filter class, small signed axis deltas, per-step cu
 
 **Goal:** Ask for the method first, seeded from preferences, visibly changeable, and wire it into the expectations seam and the draft.
 
-**Requirements:** R1, R2, R3, R4
+**Requirements:** R1, R2, R3, R4, R9
 
 **Dependencies:** U1, U2
 
 **Files:**
 - `src/components/tasting/TastingWizard.jsx` (draft shape: the local `normalizeDraft` at line 642)
 - `src/lib/tastingWizardSteps.js` (`initialAnswers`)
+- `src/components/HandBrewModal.jsx` (widen the `onStartTasting` payload)
+- `src/components/BrewTimer.jsx` (pass the device through the completion CTA)
+- `src/App.jsx` (`handleStartTastingSession`, the `pendingTastingBeanId` bridge)
+- `src/tabs/TastingTab.jsx` (consume the seeded method)
 
 **Approach:** Render a `SlideSelect` of the six methods on `IntroCard`, seeded from `usePreferences().brewMethod` (the wizard currently takes props only and does not read preferences; the harness already wraps in `UserPreferencesProvider`, so the hook works there). Hold the choice in wizard state, thread it into the `expected` memo **and its dependency array**, and persist it into the draft so a resumed tasting keeps its method. A resumed older draft with no method falls back to the preference default.
 
@@ -204,6 +215,10 @@ Each entry carries category, filter class, small signed axis deltas, per-step cu
 
 **Tap targets.** `SlideSelect` chips are `minHeight: 40`, under the project's own 44pt iOS minimum (`.claude/rules/ios-layout.md`). Raise this instance to 44 — a mis-tap here silently records the wrong method, the exact error class the feature exists to prevent.
 
+**Seed from the brew that actually happened (R9).** `HandBrewModal.jsx:200` already holds `const device = deviceKey || recipe?.device || 'v60'` and renders `BrewTimer`, but its `onStartTasting` at line 652 forwards only `beanId`; `BrewTimer.jsx:755` likewise calls `onStartTasting(bean?.id)`, and `App.jsx:84 handleStartTastingSession(beanId)` accepts only that. On this path the app knows the ground truth and currently discards it, so seeding from the global preference would guess wrong on the one entry point that cannot be wrong. Widen the payload to carry the device alongside the bean id, store it beside `pendingTastingBeanId`, and have the wizard prefer it over `preferences.brewMethod`. The plain list-CTA entry (no brew just happened) still falls back to the preference. The Aiden path has no equivalent signal — pushing a profile to Fellow is not evidence a brew occurred — so it keeps the preference default.
+
+A seeded value is a strong default, not a lock: keep the picker visible and editable, since the user may have deviated from the recipe.
+
 **Patterns to follow:** `SlideSelect` usage already in the wizard's step inputs; the eyebrow-label treatment on the existing "What to expect" / "Your palate" intro cards; the draft round-trip through `onDraftChange` / `normalizeDraft`.
 
 **Test scenarios:** (harness-level, see U6, plus component-reachable assertions)
@@ -217,14 +232,18 @@ Each entry carries category, filter class, small signed axis deltas, per-step cu
 - A draft saved before this feature (no method key) restores without error and falls back to the preference.
 - Backing out of step 0 returns to intro with the chosen method still selected.
 - Reduced motion: the control renders and selects without animation error.
+- Entering from a completed Kalita brew seeds the picker to Kalita, not to the `aiden` preference.
+- Entering from the plain list CTA (no preceding brew) seeds from the preference.
+- A seeded method is still editable, and editing it moves the ghost markers like any other change.
+- A stale seed does not leak: starting a brew-entered tasting, abandoning it, then entering from the list CTA seeds from the preference rather than the previous brew's device.
 
 ---
 
-### U4. Persist the method on the tasting record
+### U4. Persist the method and the live recipe on the tasting record
 
-**Goal:** Store the method additively so the record explains itself later.
+**Goal:** Store the method and the recipe that produced the cup, additively, so the record explains itself later.
 
-**Requirements:** R5, R7
+**Requirements:** R5, R7, R11
 
 **Dependencies:** U3
 
@@ -235,13 +254,21 @@ Each entry carries category, filter class, small signed axis deltas, per-step cu
 
 **Approach:** Add a single `brewMethod` string field holding the canonical `BREW_METHODS` key. Omit the field entirely when unknown rather than writing an empty string, so absence is distinguishable from "recorded as unset". No Firestore rules change is needed: the tastings rule caps at 100 top-level fields and this is one more on a record well under that. No migration, no backfill.
 
-**The existing gate is a strict allowlist and will go red.** `scripts/verify-wizard.mjs:335` holds `const ALLOWED = new Set(['beanId','date',...,'tastingScores'])` and then `if (extra.length) fail('R8: saved record has non-schema fields: ...')`. Adding `brewMethod` therefore **fails R8 the moment U4 lands** unless the allowlist is widened in the same unit. This is why the gate script is in U4's file list rather than deferred to U6 — an implementer working unit-by-unit would otherwise ship a red gate and debug a failure the plan told them could not happen.
+**Also stamp the recipe (R11).** Recipes are latest-wins: regenerating overwrites `bean.handBrewRecipes[device]` with no version history (see origin note). Combined with R7's no-backfill rule, any tasting saved without a stamp can *never* be told what recipe produced it, because that recipe no longer exists to reconstruct. Since the method key is known at exactly the moment of save, select the matching slot and write a compact snapshot onto the record: `bean.handBrewRecipes[method]` for hand-brew methods, `bean.aidenRecipe` for `aiden`.
+
+Store a **trimmed** snapshot, not the whole object — the fields that explain a cup (grind setting and microns, dose, ratio, water temp, total time, technique, and the recipe's own `generatedAt`). The full recipe carries prose (`tips`, `reasoning`, step arrays) that would bloat every tasting doc. Omit the field entirely when the bean has no recipe for that method, exactly as with an unknown `brewMethod`.
+
+**The existing gate is a strict allowlist and will go red.** `scripts/verify-wizard.mjs:335` holds `const ALLOWED = new Set(['beanId','date',...,'tastingScores'])` and then `if (extra.length) fail('R8: saved record has non-schema fields: ...')`. Adding `brewMethod` and `brewRecipe` therefore **fails R8 the moment U4 lands** unless the allowlist is widened in the same unit. This is why the gate script is in U4's file list rather than deferred to U6 — an implementer working unit-by-unit would otherwise ship a red gate and debug a failure the plan told them could not happen.
 
 **Test scenarios:**
 - A tasting saved with a method includes `brewMethod` set to the canonical method key.
 - A tasting saved without a method omits the key rather than writing empty or null.
 - All pre-existing record fields are unchanged in shape and value.
-- The save-shape allowlist accepts `brewMethod` and still fails on any other unexpected key.
+- The save-shape allowlist accepts `brewMethod` and `brewRecipe` and still fails on any other unexpected key.
+- A bean with a Kalita recipe, tasted as Kalita, stamps that recipe's parameters and not the V60 slot's.
+- A bean with no recipe for the chosen method omits `brewRecipe` rather than writing null or an empty object.
+- The stamped snapshot carries only the trimmed parameter fields, not the recipe's prose or step array.
+- Firestore doc size stays well inside the 100-field cap with the snapshot attached.
 
 ---
 
@@ -278,13 +305,42 @@ Per-surface specifics, because the three cards genuinely differ:
 
 ---
 
+### U7. Capture the method on the manual tasting form
+
+**Goal:** Close the other live write paths so a blank method means "logged before this feature" and nothing else.
+
+**Requirements:** R10, R5
+
+**Dependencies:** U4 (record shape settled)
+
+**Files:**
+- `src/components/TastingForm.jsx`
+- `src/components/FinishBagPrompt.jsx` (passes the bean through to the form)
+
+**Approach:** The manual form is not a legacy path. It is reachable from three live places: `FinishBagPrompt.jsx:152` renders it as "Save & Finish" when a bag is finished, `TastingTab.jsx:420` offers "or log a tasting manually", and the wizard's own `onSwitchToManual` (`TastingTab.jsx:234`) routes into it. Without this unit, a cup logged through any of them produces a method-less record, which makes a blank method ambiguous on precisely the surfaces U5 builds — the reader cannot tell pre-feature from manually-logged.
+
+Add the same method control to the form, seeded from `preferences.brewMethod`, writing the same `brewMethod` key through the same field contract as U4. Apply the same recipe stamp (R11) so both entry paths produce identical record shapes.
+
+The form is a plain field list rather than a coached flow, so the control does not need the intro's eyebrow framing or CTA-naming treatment — but it does need the same `allowDeselect={false}` and 44pt sizing.
+
+**Patterns to follow:** the existing field rows in `TastingForm.jsx`; the record contract established in U4.
+
+**Test scenarios:**
+- A tasting saved from the manual form carries `brewMethod`.
+- A tasting saved from the finish-bag flow carries `brewMethod`.
+- Switching from the wizard to manual mid-tasting carries the already-chosen method into the form rather than resetting to the preference.
+- The manual and wizard paths produce the same record shape for the same inputs.
+- The form's method control cannot be cleared by re-tapping.
+
+---
+
 ### U6. Extend the wizard verification gate
 
 **Goal:** Lock the new behavior into the existing permanent gate.
 
 **Requirements:** R8
 
-**Dependencies:** U3, U4, U5
+**Dependencies:** U3, U4, U5, U7
 
 **Files:**
 - `scripts/verify-wizard.mjs`
@@ -312,17 +368,16 @@ Per-surface specifics, because the three cards genuinely differ:
 
 ## Scope Boundaries
 
-**In scope:** method capture on the wizard intro, method-aware expectations and cues, persistence, display on the three read surfaces, harness coverage.
+**In scope:** method capture on the wizard intro and the manual form, device seeding from a completed brew, method-aware expectations and cues, persistence of both method and recipe snapshot, display on the three read surfaces, harness coverage.
 
 **Not in scope:**
-- Changing how recipes are generated. Feeding tasting history back into `generateHandBrewRecipe` / the Aiden path remains parked in the origin note.
+- Changing how recipes are *generated*. Feeding tasting history back into `generateHandBrewRecipe` / the Aiden path remains parked in the origin note. This plan makes that possible by recording the inputs; it does not consume them yet.
 - Any backfill or inference of method onto existing tastings (R7).
-- The manual `TastingForm` path. The wizard is the guided flow this targets; adding the field to the manual form is a small follow-up once the record shape is settled.
 
 ### Deferred to Follow-Up Work
 
-- **Recipe snapshot stamping.** Attaching `bean.handBrewRecipes[method]` / `bean.aidenRecipe` to the tasting. Cheap once the method is known, deliberately held back to keep this record change to one field. This is the piece that unlocks the fuller feedback loop in the origin note.
-- **Technique capture.** `BREW_DEVICE_CONFIGS` already tracks per-device technique variants (V60 Hoffmann vs. Kasuya 4:6; Aeropress standard / inverted / bypass). Tal's original note said "recipe/technique," so this is wanted eventually, but it adds a second tap on every tasting and a second dimension to the model.
+- **Consuming the stamped history.** Now that method and recipe land on the record, the follow-up is feeding the last few tastings plus their `changeTomorrow` notes into recipe generation. That is the payoff the origin note describes, and it is a separate change to the generators.
+- **Technique capture.** `BREW_DEVICE_CONFIGS` already tracks per-device technique variants (V60 Hoffmann vs. Kasuya 4:6; Aeropress standard / inverted / bypass). Tal's original note said "recipe/technique," so this is wanted eventually, but it adds a second tap on every tasting and a second dimension to the model. Partly mitigated by R11: the stamped recipe already carries the technique that was live.
 - **Same-bean-different-method comparison view.** Once methods accumulate, an explicit "this bean, by method" surface in Archive or on the bean detail.
 - **Method-aware `changeTomorrow`.** Advice should eventually differ by brew method.
 
@@ -352,12 +407,9 @@ Per-surface specifics, because the three cards genuinely differ:
 - Exact delta magnitudes per method, settled against the U1 relative-ordering tests rather than guessed up front.
 - Whether the method label reads better as a chip or an inline meta line on each of the three display surfaces; decide against the real cards.
 
-**Blocking on Tal — these change what gets built (see review round 1, 2026-07-26):**
-- **Should the BrewTimer bridge carry the real device?** `HandBrewModal.jsx:200` knows the exact device and discards it at line 652; `App.jsx:84` accepts only a bean id. On the one entry path where ground truth exists, the plan as written would guess from the global preference. Widening the bridge touches `HandBrewModal.jsx`, `App.jsx`, and `TastingTab.jsx`. Recommended.
-- **Should the manual `TastingForm` be in scope?** It is reachable from three live paths (`FinishBagPrompt.jsx:152`, the "or log a tasting manually" link at `TastingTab.jsx:420`, and the wizard's own `onSwitchToManual` at line 234). Leaving it out means blank method stays ambiguous — pre-feature, manual, or wizard-without-method.
-- **Should recipe stamping move into U4 now rather than a follow-up?** Recipes are latest-wins with no version history, so every tasting logged before the follow-up permanently loses the recipe that produced it.
+**Resolved in review round 1 (2026-07-26), now folded into the units:** the BrewTimer bridge carries the real device (R9, U3); the manual `TastingForm` is in scope (R10, U7); recipe stamping moves into the same write as the method (R11, U4).
 
-**Product question, not blocking:** should choosing a non-default method offer to update the global `preferences.brewMethod`? Probably not, since the point is that method varies cup to cup. A stronger variant surfaced in review: default to the last method used *on this bean* rather than the global preference.
+**Product question, not blocking:** should choosing a non-default method offer to update the global `preferences.brewMethod`? Probably not, since the point is that method varies cup to cup. A stronger variant surfaced in review: default to the last method used *on this bean* rather than the global preference — worth revisiting once there is enough stamped history to tell which produces fewer corrections.
 
 ---
 
