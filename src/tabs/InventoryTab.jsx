@@ -518,6 +518,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        onKalitaSizeChange={handBrew.handleKalitaSizeChange}
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}

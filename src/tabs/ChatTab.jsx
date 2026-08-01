@@ -1355,6 +1355,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        onKalitaSizeChange={handBrew.handleKalitaSizeChange}
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}

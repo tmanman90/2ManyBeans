@@ -559,6 +559,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        onKalitaSizeChange={handBrew.handleKalitaSizeChange}
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}

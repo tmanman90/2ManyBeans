@@ -39,6 +39,75 @@ const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
   </div>
 );
 
+const KalitaSizeSwitch = ({ value, onChange, disabled }) => {
+  const selected = value === '155' ? '155' : '185';
+  return (
+    <div
+      role="group"
+      aria-label="Kalita Wave size"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '10px 12px',
+        marginBottom: 14,
+        background: C.amberBg,
+        border: `1px solid ${C.accentLight}`,
+        borderRadius: radius.lg,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <SectionLabel style={{ color: C.accent }}>Wave size</SectionLabel>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexShrink: 0,
+          padding: 3,
+          gap: 2,
+          background: C.card,
+          border: `1px solid ${C.borderLight}`,
+          borderRadius: radius.pill,
+          boxShadow: shadows.e1,
+        }}
+      >
+        {['155', '185'].map((size) => {
+          const active = selected === size;
+          return (
+            <m.button
+              key={size}
+              type="button"
+              onClick={() => onChange?.(size)}
+              disabled={disabled || active}
+              whileTap={disabled || active ? undefined : { scale: 0.94 }}
+              transition={spring.snappy}
+              aria-pressed={active}
+              aria-label={`Use Kalita Wave ${size}`}
+              style={{
+                minWidth: 52,
+                minHeight: 44,
+                padding: '0 12px',
+                border: 'none',
+                borderRadius: radius.pill,
+                background: active ? C.accent : 'transparent',
+                color: active ? C.cream : C.textMuted,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: disabled || active ? 'default' : 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {size}
+            </m.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const TECHNIQUE_LABELS = {
   hoffmann: 'Hoffmann Classic',
   'kasuya-46': 'Kasuya 4:6',
@@ -174,7 +243,7 @@ export const HandBrewModal = ({
   open, onClose, recipe, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
-  deviceKey,
+  deviceKey, onKalitaSizeChange,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -305,6 +374,14 @@ export const HandBrewModal = ({
               </div>
             )}
           </div>
+
+          {recipe.device === 'kalita' && (
+            <KalitaSizeSwitch
+              value={recipe.kalitaSize}
+              onChange={onKalitaSizeChange}
+              disabled={loading}
+            />
+          )}
 
           {/* Param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
