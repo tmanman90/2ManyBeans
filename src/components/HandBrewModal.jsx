@@ -514,7 +514,7 @@ export const HandBrewModal = ({
               marginBottom: 14,
               paddingTop: 4,
             }}>
-              Guide finish: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
+              Target drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
             </div>
           )}
 
