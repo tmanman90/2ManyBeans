@@ -86,7 +86,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     drawdownTarget: `${timeLabel(totalBrewTimeSeconds - 25)}-${timeLabel(totalBrewTimeSeconds + 20)}`,
     steps, totalBrewTime: timeLabel(totalBrewTimeSeconds), totalBrewTimeSeconds, timerReady: true,
     reasonCodes, confidence: intent.confidence || 'low', evidenceHash: intent.evidenceHash || null,
-    reasoning: `Wave ${config.size} uses a ${technique.key.replaceAll('-', ' ')} profile for this ${intent.confidence || 'low'}-confidence extraction intent. Adjust one lever at a time from drawdown and taste.`,
+    reasoning: `Wave ${config.size} uses a ${technique.key.replaceAll('-', ' ')} profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.`,
     tips: `Aim for ${timeLabel(totalBrewTimeSeconds - 25)} to ${timeLabel(totalBrewTimeSeconds + 20)}. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.`,
     title: `Kalita Wave ${config.size} recipe`,
   };
