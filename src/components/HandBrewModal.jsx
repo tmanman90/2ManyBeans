@@ -398,6 +398,22 @@ export const HandBrewModal = ({
             </div>
           )}
 
+          {recipe.device === 'kalita' && recipe.techniqueInstruction && (
+            <div
+              role="note"
+              style={{
+                background: C.amberBg,
+                borderRadius: radius.lg,
+                padding: '12px 16px',
+                marginBottom: 14,
+                border: `1px solid ${C.accentLight}`,
+              }}
+            >
+              <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Pouring technique</SectionLabel>
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.techniqueInstruction}</div>
+            </div>
+          )}
+
           {/* Grind card */}
           {recipe.grindSize && (
             <div style={{
@@ -457,7 +473,7 @@ export const HandBrewModal = ({
               marginBottom: 14,
               paddingTop: 4,
             }}>
-              Target brew time: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
+              Guide finish: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
             </div>
           )}
 

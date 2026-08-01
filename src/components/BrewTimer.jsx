@@ -631,7 +631,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
               marginTop: 4,
               letterSpacing: '0.01em',
             }}>
-              of {formatMMSS(totalMs)}
+              guide finish {formatMMSS(totalMs)}
             </div>
           </div>
         </div>

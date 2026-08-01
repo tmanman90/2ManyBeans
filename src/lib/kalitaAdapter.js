@@ -1,7 +1,7 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
 
-export const KALITA_ENGINE_VERSION = 'kalita-engine-v1';
-export const KALITA_RULES_VERSION = 'kalita-rules-v1';
+export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
+export const KALITA_RULES_VERSION = 'kalita-rules-v2';
 
 const GRINDER_RANGES = {
   'fellow-ode-gen2': [4, 8], 'fellow-opus': [3, 8.5], 'baratza-encore-esp': [10, 32],
@@ -43,6 +43,19 @@ function techniqueFor(intent) {
   return { key: 'low-agitation-no-swirl', code: 'CONSERVATIVE_UNKNOWN_TECHNIQUE', finalSwirl: false };
 }
 
+function techniqueInstructionFor(key) {
+  if (key === 'center-to-spiral-pulse') {
+    return 'Start in the center, then use a controlled spiral outward. Keep the stream on the coffee bed, not the paper walls.';
+  }
+  if (key === 'bloom-led-pulse') {
+    return 'Let the bloom do the work, then use two restrained center pulses. Keep the stream on the coffee bed; do not use a wide spiral.';
+  }
+  if (key === 'low-agitation-no-swirl') {
+    return 'Use slow, centered pours with a low stream. Do not spiral or swirl.';
+  }
+  return 'Pour slowly and directly into the center with a low stream. Do not spiral or swirl.';
+}
+
 export function validateKalitaCandidate(recipe) {
   const errors = [];
   if (!Number.isFinite(recipe?.coffeeGrams) || !Number.isFinite(recipe?.waterGrams)) errors.push('non-finite-dose-or-water');
@@ -67,6 +80,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     : intent.desiredStrength === 'stronger' ? 15.5 : config.doseProfile === 'large-185' ? 16.5 : 16;
   const waterGrams = Math.round(config.dose * ratio);
   const technique = techniqueFor(intent);
+  const techniqueInstruction = techniqueInstructionFor(technique.key);
   const temperature = clamp(Number.isFinite(intent.targetTemperatureC)
     ? intent.targetTemperatureC
     : intent.energyTendency === 'lower' ? 93 : intent.energyTendency === 'higher' ? 97 : 96, 93, 100);
@@ -84,9 +98,17 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   ].filter(Boolean);
   const steps = [
     { time: '0:00', timeSeconds: 0, action: `Add ${config.dose}g coffee and level the bed.`, waterTotal: 0 },
-    { time: '0:30', timeSeconds: 30, action: `Bloom with ${bloom}g water; ${technique.key.includes('low-agitation') ? 'do not swirl.' : 'give one gentle settling swirl.'}`, waterTotal: bloom },
-    { time: '1:00', timeSeconds: 60, action: `Pour to ${first}g total with a ${technique.key === 'center-to-spiral-pulse' ? 'center-to-spiral' : 'low, centered'} stream.`, waterTotal: first },
-    { time: timeLabel(finalStepAt), timeSeconds: finalStepAt, action: `Finish at ${waterGrams}g total${technique.finalSwirl ? '; one gentle finishing swirl only if the bed is uneven.' : '; keep the final pour low-agitation.'}`, waterTotal: waterGrams },
+    { time: '0:30', timeSeconds: 30, action: `Bloom with ${bloom}g water; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom },
+    { time: '1:00', timeSeconds: 60, action: technique.key === 'center-to-spiral-pulse'
+      ? `Start in the center, then pour in a controlled spiral outward to ${first}g total; keep the stream on the coffee bed, not the paper walls.`
+      : technique.key === 'bloom-led-pulse'
+        ? `Pour from the center in a restrained pulse to ${first}g total; keep the stream on the coffee bed and away from the paper walls.`
+        : `Pour slowly and directly into the center to ${first}g total; keep the stream low and do not spiral.`, waterTotal: first },
+    { time: timeLabel(finalStepAt), timeSeconds: finalStepAt, action: technique.key === 'center-to-spiral-pulse'
+      ? `Finish at ${waterGrams}g total with a gentle center-to-outward spiral; ${technique.finalSwirl ? 'swirl once only if the bed is uneven.' : 'do not swirl.'}`
+      : technique.key === 'bloom-led-pulse'
+        ? `Finish with a second restrained center pulse to ${waterGrams}g total; do not use a wide spiral or stir.`
+        : `Finish at ${waterGrams}g total with another low, centered pour; do not spiral or swirl.`, waterTotal: waterGrams },
   ];
   const recipe = {
     method: 'pour-over', device: 'kalita', kalitaSize: config.size, doseProfile: config.doseProfile,
@@ -95,7 +117,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     coffeeGrams: config.dose, waterGrams, ratio: `1:${ratio}`, waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) },
     grindSize: buildGrind(configuration.grinder || 'fellow-ode-gen2', targetMicrons), technique: technique.key,
     drawdownTarget: `${timeLabel(totalBrewTimeSeconds - 25)}-${timeLabel(totalBrewTimeSeconds + 20)}`,
-    steps, totalBrewTime: timeLabel(totalBrewTimeSeconds), totalBrewTimeSeconds, timerReady: true,
+    steps, techniqueInstruction, totalBrewTime: timeLabel(totalBrewTimeSeconds), totalBrewTimeSeconds, timerReady: true,
     reasonCodes, confidence: intent.confidence || 'low', evidenceHash: intent.evidenceHash || null,
     reasoning: `Wave ${config.size} uses a ${technique.key.replaceAll('-', ' ')} profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.`,
     tips: `Aim for ${timeLabel(totalBrewTimeSeconds - 25)} to ${timeLabel(totalBrewTimeSeconds + 20)}. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.`,

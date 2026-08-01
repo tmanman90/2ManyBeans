@@ -10,6 +10,9 @@ assert.deepEqual(r155, generateKalitaRecipe(washed, { size: '155', dose: 15, gri
 assert.notEqual(r155.totalBrewTimeSeconds, r185.totalBrewTimeSeconds);
 assert.notEqual(r185.totalBrewTimeSeconds, r30.totalBrewTimeSeconds);
 assert.equal(r155.technique, 'low-agitation-center');
+assert.match(r155.techniqueInstruction, /center/i);
+assert.match(r155.steps[2].action, /do not spiral/i);
+assert.match(r155.steps[3].action, /do not spiral or swirl/i);
 assert.equal(r155Extended.doseProfile, '155-extended');
 assert.equal(r155Extended.waterGrams, 320);
 assert.ok(r155Extended.totalBrewTimeSeconds > r155.totalBrewTimeSeconds);
