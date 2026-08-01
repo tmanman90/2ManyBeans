@@ -9,4 +9,5 @@ const recipe = {
 assert.equal(compareRecipes(recipe, { ...recipe, reasoning: 'Different words' }).deltas[0].type, 'explanation-only');
 assert.equal(compareRecipes(recipe, { ...recipe, coffeeGrams: 15 }).deltas[0].type, 'physical');
 assert.equal(compareRecipes(recipe, { ...recipe, totalBrewTimeSeconds: 90 }).outcome, 'unknown');
+assert.deepEqual(compareRecipes(recipe, { ...recipe, waterTemp: { celsius: 99 } }, { legacyVariance: { temperature: [94, 97] } }).reviewFlags, ['candidate-temperature-outside-legacy-variance']);
 console.log('kalita recipe comparator passed');

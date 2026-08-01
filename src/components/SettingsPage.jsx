@@ -347,6 +347,17 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     }
   };
 
+  const handleKalitaEngineChange = async (e) => {
+    try {
+      await updatePreferences({ kalitaRecipeEngine: e.target.value });
+      haptic.light();
+      setToast(e.target.value === 'shadow' ? 'Kalita shadow comparison enabled' : 'Kalita legacy engine enabled');
+    } catch (err) {
+      console.error('[Settings] Kalita engine update failed:', err);
+      setToast('Failed to save, try again');
+    }
+  };
+
   const handleGrindDisplayChange = async (e) => {
     const val = e.target.value;
     try {
@@ -916,6 +927,17 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                     <select value={preferences.kalitaSize || '185'} onChange={handleKalitaSizeChange} style={selectStyle}>
                       <option value="155">155 — 12–18g</option>
                       <option value="185">185 — 18–30g</option>
+                    </select>
+                    <ChevronRight size={16} color={C.textLight} />
+                  </div>
+                </div>
+                <div style={separatorStyle} />
+                <div style={rowStyle}>
+                  <span style={rowLabelStyle}>Kalita Engine</span>
+                  <div style={rowValueStyle}>
+                    <select value={preferences.kalitaRecipeEngine || 'legacy'} onChange={handleKalitaEngineChange} style={selectStyle}>
+                      <option value="legacy">Legacy recipe</option>
+                      <option value="shadow">Shadow compare</option>
                     </select>
                     <ChevronRight size={16} color={C.textLight} />
                   </div>

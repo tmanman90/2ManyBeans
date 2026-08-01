@@ -12,14 +12,21 @@ export function normalizeRecipe(recipe) {
   };
 }
 
-export function compareRecipes(current, candidate) {
+export function compareRecipes(current, candidate, { legacyVariance = {} } = {}) {
   const left = normalizeRecipe(current);
   const right = normalizeRecipe(candidate);
   if (left.state !== 'valid' || right.state !== 'valid') return { outcome: 'unknown', current: left, candidate: right, deltas: [] };
   const physicalFields = ['dose', 'water', 'ratio', 'temperature', 'grindSetting', 'grindMicrons', 'technique', 'steps', 'totalDuration', 'drawdownTarget'];
   const deltas = physicalFields.filter((key) => JSON.stringify(left[key]) !== JSON.stringify(right[key])).map((key) => ({ field: key, type: 'physical' }));
   if (!deltas.length && left.rationale !== right.rationale) deltas.push({ field: 'rationale', type: 'explanation-only' });
-  return { outcome: 'compared', current: left, candidate: right, deltas };
+  const reviewFlags = [];
+  for (const [field, range] of Object.entries(legacyVariance)) {
+    const value = right[field];
+    if (Array.isArray(range) && range.length === 2 && Number.isFinite(value) && (value < range[0] || value > range[1])) {
+      reviewFlags.push(`candidate-${field}-outside-legacy-variance`);
+    }
+  }
+  return { outcome: 'compared', current: left, candidate: right, deltas, reviewFlags };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
