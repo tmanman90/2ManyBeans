@@ -42,6 +42,11 @@ const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
 const TECHNIQUE_LABELS = {
   hoffmann: 'Hoffmann Classic',
   'kasuya-46': 'Kasuya 4:6',
+  'center-pour': 'Center Pour',
+  'low-agitation-center': 'Low-Agitation Center Pour',
+  'center-to-spiral-pulse': 'Center-to-Spiral Pulse',
+  'bloom-led-pulse': 'Bloom-Led Pulse',
+  'low-agitation-no-swirl': 'Low-Agitation, No Swirl',
 };
 
 const phaseMessages = {
@@ -307,6 +312,14 @@ export const HandBrewModal = ({
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
+
+          {recipe.device === 'kalita' && (
+            <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
+              Wave {recipe.kalitaSize || '185'} · {recipe.doseProfile || 'legacy profile'}
+              {recipe.candidate ? ' · Bean-specific engine' : ''}
+              {recipe.generationStatus === 'fallback' ? ' · GPT fallback' : ''}
+            </div>
+          )}
 
           {/* Grind card */}
           {recipe.grindSize && (

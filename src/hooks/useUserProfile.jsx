@@ -9,6 +9,9 @@ const DEFAULT_PREFERENCES = {
   grinder: 'fellow-ode-gen2',
   grinderCustomName: null,
   brewMethod: 'aiden',
+  kalitaSize: '185',
+  // Legacy remains the default until the shadow/trial gate approves cutover.
+  kalitaRecipeEngine: 'legacy',
   grindSizeDisplay: 'default',
   canisterCount: 3,
 };

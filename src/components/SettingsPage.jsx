@@ -336,6 +336,17 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     }
   };
 
+  const handleKalitaSizeChange = async (e) => {
+    try {
+      await updatePreferences({ kalitaSize: e.target.value });
+      haptic.light();
+      setToast('Kalita Wave size updated');
+    } catch (err) {
+      console.error('[Settings] Kalita size update failed:', err);
+      setToast('Failed to save, try again');
+    }
+  };
+
   const handleGrindDisplayChange = async (e) => {
     const val = e.target.value;
     try {
@@ -897,6 +908,21 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               </div>
             </div>
             <div style={separatorStyle} />
+            {preferences.brewMethod === 'kalita' && (
+              <>
+                <div style={rowStyle}>
+                  <span style={rowLabelStyle}>Kalita Wave Size</span>
+                  <div style={rowValueStyle}>
+                    <select value={preferences.kalitaSize || '185'} onChange={handleKalitaSizeChange} style={selectStyle}>
+                      <option value="155">155 — 12–18g</option>
+                      <option value="185">185 — 18–30g</option>
+                    </select>
+                    <ChevronRight size={16} color={C.textLight} />
+                  </div>
+                </div>
+                <div style={separatorStyle} />
+              </>
+            )}
             {/* Grind Size Display */}
             <div style={rowStyle}>
               <span style={rowLabelStyle}>Grind Size Display</span>
