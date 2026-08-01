@@ -96,5 +96,11 @@ export function scaleRecipeForDose(recipe, newDose) {
     iceGrams: typeof recipe.iceGrams === 'number'
       ? Math.round(recipe.iceGrams * scaleFactor)
       : undefined,
+    // Candidate schedules are generated for a physical dose profile. Preserve
+    // that lineage when the existing UI's render-time dose stepper is used;
+    // legacy recipes retain their byte-for-byte timing behavior and metadata.
+    ...(recipe.candidate === true && recipe.doseTimingPolicy === 'generated-dose-v1'
+      ? { doseTiming: { policy: recipe.doseTimingPolicy, generatedDose: originalDose, displayedDose: newDose } }
+      : {}),
   };
 }

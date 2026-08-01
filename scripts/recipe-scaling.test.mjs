@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildTimerSteps } from '../src/hooks/useBrewTimer.js';
+import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
 import { scaleRecipeForDose } from '../src/lib/recipeScaling.js';
 
 function makeRecipe(overrides = {}) {

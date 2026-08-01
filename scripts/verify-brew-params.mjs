@@ -245,6 +245,15 @@ check('FAMILY_GRIND_BANDS block unchanged', () => {
   assert.match(aiden, /'washed-floral-clarity':\s*\{ ssMin: 3\.2, ssMax: 3\.2, batchMin: 5,\s*batchMax: 6\.2 \}/);
   assert.match(aiden, /'dark-roast':\s*\{ ssMin: 5,\s*ssMax: 9,\s*batchMin: 6,\s*batchMax: 9\.2 \}/);
 });
+
+console.log('\n[Kalita candidate] Adapter output remains independently timer-valid');
+const { generateKalitaRecipe, validateKalitaCandidate } = await import(join(ROOT, 'src', 'lib', 'kalitaAdapter.js'));
+check('candidate negative controls reject non-finite and timer-invalid output', () => {
+  const candidate = generateKalitaRecipe({ confidence: 'low', reasonCodes: [] }, { size: '185', dose: 20, grinder: 'fellow-ode-gen2' });
+  assert.equal(validateKalitaCandidate(candidate).valid, true);
+  assert.equal(validateKalitaCandidate({ ...candidate, totalBrewTimeSeconds: candidate.steps.at(-1).timeSeconds }).valid, false);
+  assert.equal(validateKalitaCandidate({ ...candidate, waterTemp: { celsius: Infinity } }).valid, false);
+});
 check('deterministic grind enforcement functions present and unmodified in signature', () => {
   assert.match(aiden, /function enforceDeterministicGrind/);
   assert.match(aiden, /nearestOdeStep/);

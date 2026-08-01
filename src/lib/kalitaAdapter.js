@@ -81,6 +81,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const recipe = {
     method: 'pour-over', device: 'kalita', kalitaSize: config.size, doseProfile: config.doseProfile,
     engineVersion: KALITA_ENGINE_VERSION, rulesVersion: KALITA_RULES_VERSION, candidate: true,
+    doseTimingPolicy: 'generated-dose-v1',
     coffeeGrams: config.dose, waterGrams, ratio: `1:${ratio}`, waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) },
     grindSize: buildGrind(configuration.grinder || 'fellow-ode-gen2', targetMicrons), technique: technique.key,
     drawdownTarget: `${timeLabel(totalBrewTimeSeconds - 25)}-${timeLabel(totalBrewTimeSeconds + 20)}`,

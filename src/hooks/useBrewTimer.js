@@ -16,6 +16,8 @@
 // brief highlight); the hook does not need a separate phase for it.
 
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { buildTimerSteps } from '../lib/brewTimerSteps';
+export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
 
@@ -48,28 +50,6 @@ const initialState = { phase: 'idle', stepIndex: 0 };
 // entries suitable for the timer. Requires that every step has a numeric
 // `timeSeconds` (populated by repairHandBrewRecipe) and that totalBrewTimeSeconds
 // is > last step's timeSeconds.
-export function buildTimerSteps(recipe) {
-  if (!recipe?.timerReady) return null;
-  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
-  if (steps.length === 0) return null;
-  const total = recipe.totalBrewTimeSeconds;
-  if (typeof total !== 'number' || total <= 0) return null;
-  const out = [];
-  for (let i = 0; i < steps.length; i++) {
-    const start = steps[i].timeSeconds;
-    if (typeof start !== 'number') return null;
-    const nextStart = i + 1 < steps.length ? steps[i + 1].timeSeconds : total;
-    if (typeof nextStart !== 'number' || nextStart <= start) return null;
-    out.push({
-      index: i,
-      startSeconds: start,
-      durationSeconds: nextStart - start,
-      step: steps[i],
-    });
-  }
-  return out;
-}
-
 export function useBrewTimer(recipe) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
