@@ -62,7 +62,6 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const targetMicrons = 700 + (config.size === '185' ? 35 : 0) + (intent.finesRisk === 'high' ? 55 : 0) + (intent.solubilityRisk === 'high' ? 30 : 0);
   const bloom = Math.round(config.dose * 3);
   const first = Math.round(waterGrams * 0.45);
-  const second = Math.round(waterGrams * 0.75);
   const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '185-standard' ? 120 : 150;
   const drawdownSeconds = config.doseProfile === '155-small' ? 165 : config.doseProfile === '185-standard' ? 210 : 270;
   const totalBrewTimeSeconds = finalStepAt + drawdownSeconds - 30;
