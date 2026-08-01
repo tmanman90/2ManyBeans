@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { researchBean } from '../lib/beanResearch';
 import { generateHandBrewRecipe, repairHandBrewRecipe } from '../lib/handbrew';
-import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
+import { buildSourceContextHash } from '../lib/sourceInsights';
 import { normalizeRecipeEvidence } from '../lib/recipeEvidence';
 import { buildExtractionIntent } from '../lib/extractionIntent';
 import { generateKalitaRecipe, KALITA_ENGINE_VERSION, KALITA_RULES_VERSION } from '../lib/kalitaAdapter';
@@ -41,9 +41,9 @@ export function useHandBrew(updateBean) {
 
   const recipeMatchesSource = (bean, recipe) => {
     if (!recipe) return false;
-    if (!hasSourceInsights(bean)) return true;
     const hash = buildSourceContextHash(bean);
-    return Boolean(hash && recipe.sourceContextHash === hash);
+    if (!hash) return !recipe.sourceContextHash;
+    return recipe.sourceContextHash === hash;
   };
 
   const candidateMatchesConfiguration = (recipe, device, dose, activePreferences = preferences) => {
@@ -89,9 +89,11 @@ export function useHandBrew(updateBean) {
     const legacyRecipe = bean.handBrewRecipe;
     const cachedCandidate = keyedRecipe ||
       (legacyRecipe && (legacyRecipe.device || 'v60') === device ? legacyRecipe : null);
-    const cached = recipeMatchesSource(bean, cachedCandidate) && candidateMatchesConfiguration(cachedCandidate, device, candidateDose, activePreferences)
+    const kalitaCacheEligible = device !== 'kalita' || cachedCandidate?.candidate === true;
+    const cached = kalitaCacheEligible
+      && recipeMatchesSource(bean, cachedCandidate)
+      && candidateMatchesConfiguration(cachedCandidate, device, candidateDose, activePreferences)
       ? cachedCandidate : null;
-    const sourceHash = buildSourceContextHash(bean);
 
     if (!forceRegenerate && cached) {
       const cachedGrinder = cached.grinder || 'fellow-ode-gen2';
@@ -181,7 +183,7 @@ export function useHandBrew(updateBean) {
         generatedAt: new Date().toISOString(),
         grinder: grinderKey,
         device,
-        sourceContextHash: sourceHash,
+        sourceContextHash: buildSourceContextHash({ ...bean, beanResearch: research }),
         ...(recipe.candidate ? {
           engineVersion: recipe.engineVersion,
           rulesVersion: recipe.rulesVersion,

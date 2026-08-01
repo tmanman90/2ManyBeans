@@ -17,7 +17,7 @@ export function normalizeKalitaConfiguration(config = {}) {
   const size = rawSize === '155' || rawSize === '185' ? rawSize : requestedDose > 18 ? '185' : '155';
   const defaultDose = size === '155' ? 15 : 20;
   const dose = Number.isFinite(requestedDose) && requestedDose >= 12 && requestedDose <= 36 ? requestedDose : defaultDose;
-  const doseProfile = dose > 30 ? 'large-185' : size === '155' ? '155-small' : dose <= 22 ? '185-standard' : '185-large';
+  const doseProfile = dose > 30 ? 'large-185' : size === '155' ? (dose > 18 ? '155-extended' : '155-small') : dose <= 22 ? '185-standard' : '185-large';
   return { size, dose, doseProfile, defaultedSize: rawSize !== '155' && rawSize !== '185', defaultedDose: !Number.isFinite(requestedDose) };
 }
 
@@ -30,6 +30,13 @@ function buildGrind(grinder, targetMicrons) {
 }
 
 function techniqueFor(intent) {
+  if (['low-agitation-center', 'bloom-led-pulse', 'center-to-spiral-pulse', 'low-agitation-no-swirl'].includes(intent.techniquePreference)) {
+    return {
+      key: intent.techniquePreference,
+      code: `TECHNIQUE_${intent.techniquePreference.toUpperCase().replaceAll('-', '_')}`,
+      finalSwirl: intent.techniquePreference === 'center-to-spiral-pulse',
+    };
+  }
   if (intent.finesRisk === 'high') return { key: 'low-agitation-center', code: 'HIGH_FINES_LOW_AGITATION', finalSwirl: false };
   if (intent.solubilityRisk === 'high') return { key: 'bloom-led-pulse', code: 'HIGH_SOLUBILITY_PULSE_CONTROL', finalSwirl: false };
   if (intent.energyTendency === 'higher') return { key: 'center-to-spiral-pulse', code: 'HIGH_ENERGY_EXTRACTION', finalSwirl: true };
@@ -55,19 +62,23 @@ export function validateKalitaCandidate(recipe) {
 
 export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const config = normalizeKalitaConfiguration(configuration);
-  const ratio = intent.desiredStrength === 'stronger' ? 15.5 : config.doseProfile === 'large-185' ? 16.5 : 16;
+  const ratio = Number.isFinite(intent.targetRatio)
+    ? clamp(intent.targetRatio, 15.5, 19)
+    : intent.desiredStrength === 'stronger' ? 15.5 : config.doseProfile === 'large-185' ? 16.5 : 16;
   const waterGrams = Math.round(config.dose * ratio);
   const technique = techniqueFor(intent);
-  const temperature = clamp(intent.energyTendency === 'lower' ? 93 : intent.energyTendency === 'higher' ? 98 : 96, 93, 100);
-  const targetMicrons = 700 + (config.size === '185' ? 35 : 0) + (intent.finesRisk === 'high' ? 55 : 0) + (intent.solubilityRisk === 'high' ? 30 : 0);
+  const temperature = clamp(Number.isFinite(intent.targetTemperatureC)
+    ? intent.targetTemperatureC
+    : intent.energyTendency === 'lower' ? 93 : intent.energyTendency === 'higher' ? 97 : 96, 93, 100);
+  const targetMicrons = 700 + (config.size === '185' ? 35 : 0) + (intent.finesRisk === 'high' ? 55 : 0) + (intent.solubilityRisk === 'high' ? 30 : 0) + (intent.grindAdjustmentMicrons || 0);
   const bloom = Math.round(config.dose * 3);
   const first = Math.round(waterGrams * 0.45);
-  const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '185-standard' ? 120 : 150;
-  const drawdownSeconds = config.doseProfile === '155-small' ? 165 : config.doseProfile === '185-standard' ? 210 : 270;
-  const totalBrewTimeSeconds = finalStepAt + drawdownSeconds - 30;
+  const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '155-extended' || config.doseProfile === '185-standard' ? 120 : 150;
+  const drawdownSeconds = config.doseProfile === '155-small' ? 165 : config.doseProfile === '155-extended' ? 195 : config.doseProfile === '185-standard' ? 210 : 270;
+  const totalBrewTimeSeconds = finalStepAt + drawdownSeconds - 30 + clamp(intent.contactTimeAdjustmentSeconds || 0, -15, 30);
   const reasonCodes = [
     ...(intent.reasonCodes || []), technique.code,
-    config.size === '155' ? 'WAVE_155_SMALL_BED_PROFILE' : 'WAVE_185_DEEPER_BED_PROFILE',
+    config.doseProfile === '155-extended' ? 'WAVE_155_EXTENDED_DOSE_PROFILE' : config.size === '155' ? 'WAVE_155_SMALL_BED_PROFILE' : 'WAVE_185_DEEPER_BED_PROFILE',
     config.doseProfile === 'large-185' && 'LARGE_DOSE_EXTENDED_DRAWDOWN',
     config.defaultedSize && 'DEFAULTED_KALITA_SIZE', config.defaultedDose && 'DEFAULTED_KALITA_DOSE',
   ].filter(Boolean);

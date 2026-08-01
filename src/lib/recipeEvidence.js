@@ -2,7 +2,7 @@ import { buildSourceContextHash, normalizeSourceInsights, sanitizeSourceText } f
 
 const ALLOWED_FAMILIES = new Set([
   'washed-floral-clarity', 'washed-kenya-clarity', 'washed-ethiopia-clarity',
-  'clean-natural-fruit', 'processed-clarity', 'medium-washed', 'dark-roast', 'body-natural', 'generic-washed',
+  'washed-washed', 'clean-natural-fruit', 'processed-clarity', 'medium-washed', 'dark-roast', 'body-natural', 'generic-washed',
 ]);
 
 const clean = (value, max = 180) => sanitizeSourceText(value, max);
@@ -13,7 +13,7 @@ const modelFact = (field, value) => value ? { field, value: clean(value), source
 export function normalizeResearchResult(research) {
   if (!research || typeof research !== 'object' || Array.isArray(research)) return { value: null, failure: 'missing-or-malformed-research' };
   const result = {};
-  for (const key of ['roastLevel', 'processingNuance', 'densityEstimate', 'flavorExpectations', 'extractionNotes', 'cupStructureFamily']) {
+  for (const key of ['roastLevel', 'processingNuance', 'densityEstimate', 'flavorExpectations', 'extractionNotes', 'cupStructureFamily', 'roasterStyle', 'altitude']) {
     if (typeof research[key] === 'string' && clean(research[key])) result[key] = clean(research[key]);
   }
   if (result.cupStructureFamily && !ALLOWED_FAMILIES.has(result.cupStructureFamily)) return { value: null, failure: 'invalid-cup-structure-family' };
@@ -34,6 +34,8 @@ export function normalizeRecipeEvidence(bean = {}, research = null) {
     modelFact('densityEstimate', normalizedResearch.value?.densityEstimate),
     modelFact('extractionNotes', normalizedResearch.value?.extractionNotes),
     modelFact('flavorExpectations', normalizedResearch.value?.flavorExpectations),
+    modelFact('processingNuance', normalizedResearch.value?.processingNuance),
+    modelFact('roasterStyle', normalizedResearch.value?.roasterStyle),
   ].filter(Boolean);
   const conflicts = [];
   const sourceText = [source?.brewGuidance, bean.brewingRec, bean.bagNotes].filter(Boolean).join(' ').toLowerCase();
@@ -43,7 +45,7 @@ export function normalizeRecipeEvidence(bean = {}, research = null) {
   const confidence = source ? 'high' : normalizedResearch.value ? 'low' : 'low';
   return {
     version: 1,
-    sourceContextHash: buildSourceContextHash(bean),
+    sourceContextHash: buildSourceContextHash({ ...bean, beanResearch: normalizedResearch.value || bean.beanResearch }),
     facts,
     sourceInsights: source,
     research: normalizedResearch.value,
