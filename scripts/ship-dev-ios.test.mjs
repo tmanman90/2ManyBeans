@@ -10,6 +10,9 @@ assert.match(source, /build:ios:dev/);
 assert.match(source, /'--fail-on-incompatible'/);
 assert.match(source, /channel', 'currentBundle', DEV_CHANNEL, DEV_APP_ID/);
 assert.match(source, /-devapp\./);
+assert.match(source, /REQUIRED_BUILD_ENV/);
+assert.match(source, /VITE_FIREBASE_API_KEY/);
+assert.match(source, /valid Firebase config/);
 assert.doesNotMatch(source, /--send-update-notification/);
 
 console.log('Dev iOS ship guard contract passed.');

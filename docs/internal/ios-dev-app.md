@@ -41,6 +41,12 @@ verifies that Capgo's channel pointer moved to the exact uploaded bundle. Do
 not substitute the production app id (`com.talmeltzer.coffeehub`) for this
 command. Capgo push notifications are disabled for this app, so a successful
 upload is verified by the channel pointer rather than a notification response.
+The command also refuses to upload unless all six `VITE_FIREBASE_*` client
+configuration variables are present in the shell. A local build with blank
+Vite values can download successfully and then fail the Capgo ready check on
+the phone. To load the managed values without committing them, run
+`npx vercel env pull /tmp/coffeehub.env --environment=production --project 2manybeans`
+and source that file in the shell before running the guarded command.
 
 ## Physical device install
 

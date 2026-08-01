@@ -16,6 +16,14 @@ import { readFileSync } from 'node:fs';
 const DEV_APP_ID = 'com.talmeltzer.coffeehub.dev';
 const DEV_CHANNEL = 'dev';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const REQUIRED_BUILD_ENV = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+];
 
 function run(command, args, options = {}) {
   const { capture = false, ...execOptions } = options;
@@ -63,6 +71,13 @@ function nextDevBundle(packageVersion, currentBundle) {
 const capacitorConfig = readFileSync('capacitor.config.ts', 'utf8');
 if (!capacitorConfig.includes(DEV_APP_ID) || !capacitorConfig.includes("defaultChannel: 'dev'")) {
   throw new Error('Dev Capacitor config no longer points at the expected app ID/channel. Refusing upload.');
+}
+
+const missingBuildEnv = REQUIRED_BUILD_ENV.filter((name) => !process.env[name]);
+if (missingBuildEnv.length > 0) {
+  throw new Error(
+    `Missing ${missingBuildEnv.join(', ')}. Refusing OTA upload because the bundle would not have a valid Firebase config. Pull the Vercel production environment into the shell before shipping.`,
+  );
 }
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
