@@ -7,6 +7,6 @@ Status: required before any hot-Kalita cutover. Iced mode remains separately blo
 3. Record recipe engine/rules version, size, dose profile, drawdown observation, cup preference, clarity/body/sweetness notes, and exactly one allowed follow-up adjustment.
 4. Reject any cup with failed timer/water/grind structural gates before considering sensory preference.
 5. Mark absent, failed, or unknown sensory observations as unknown. They cannot improve a candidate score.
-6. Approve only when structural/runtime gates pass and representative blind trials are reviewed. Restore `kalitaRecipeEngine: legacy` for immediate rollback.
+6. Approve only when structural/runtime gates pass and representative blind trials are reviewed. For immediate rollback, restore the prior Dev deployment or temporarily route Kalita back through the legacy GPT path.
 
 No tasting history is read or written by this slice; this is a handoff format for the existing recipe-provenance work.

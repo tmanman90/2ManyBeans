@@ -66,7 +66,10 @@ export function useHandBrew(updateBean) {
   const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false, deviceOverride = null) => {
     const device = deviceOverride || getBrewDevice();
     const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
-    const candidateMode = device === 'kalita' ? preferences?.kalitaRecipeEngine || 'legacy' : 'legacy';
+    // Kalita is now automatically bean-specific. The legacy GPT path remains
+    // an invisible fallback if evidence normalization or candidate generation
+    // fails; users do not need to choose between engines.
+    const candidateMode = device === 'kalita' ? 'candidate' : 'legacy';
     const requestedDose = Number(bean.userCoffeeGrams || bean.handBrewRecipes?.[device]?.userCoffeeGrams);
     const defaultDose = (preferences?.kalitaSize || '185') === '155' ? 15 : 20;
     const candidateDose = Number.isFinite(requestedDose) && requestedDose > 0 ? requestedDose : defaultDose;
