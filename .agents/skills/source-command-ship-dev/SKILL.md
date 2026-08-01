@@ -49,7 +49,9 @@ npm run ship:dev:ios 2>&1
 This guarded command locks the app id to `com.talmeltzer.coffeehub.dev`, runs
 `scripts/patch-social-login.mjs` before the build, uses the `-devapp` version
 lineage, passes `--fail-on-incompatible`, and verifies the final channel
-pointer. Do not replace it with a raw upload command.
+pointer. It also fails closed when the six `VITE_FIREBASE_*` client variables
+are missing, preventing an OTA bundle with an invalid Firebase config from
+being uploaded. Do not replace it with a raw upload command.
 
 Confirm the dev channel pointer:
 
