@@ -26,6 +26,22 @@ This restores the native wrapper to production settings after dev testing.
 
 For a full plugin sync, use `npm run cap:sync:dev` or `npm run cap:sync` instead.
 
+## Dev OTA deployment
+
+From this checkout, use the guarded command below for a Capgo dev upload:
+
+```sh
+npm run ship:dev:ios
+```
+
+The command is intentionally locked to `com.talmeltzer.coffeehub.dev` / `dev`,
+applies the social-login native metadata patch before building, generates a
+unique `-devapp.<timestamp>` bundle label, passes `--fail-on-incompatible`, and
+verifies that Capgo's channel pointer moved to the exact uploaded bundle. Do
+not substitute the production app id (`com.talmeltzer.coffeehub`) for this
+command. Capgo push notifications are disabled for this app, so a successful
+upload is verified by the channel pointer rather than a notification response.
+
 ## Physical device install
 
 The first physical-device build may need Xcode to create an explicit provisioning profile for `com.talmeltzer.coffeehub.dev`, because wildcard profiles cannot include Sign in with Apple.
