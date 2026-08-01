@@ -18,7 +18,10 @@ Run from `/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build`.
 - Do not push to the Capgo production channel.
 - Production users are not affected.
 
-The Capgo `dev` channel is intended for devices assigned to dev, including Tal's iPhone device id `6739b956-7096-45b8-b0a7-76309c440c60`.
+The actual development app is `com.talmeltzer.coffeehub.dev` (display name
+`2manybeans Dev`). The production app is `com.talmeltzer.coffeehub`; never
+upload a dev OTA to that app's `dev` channel. The Capgo `dev` channel is
+intended for devices assigned to dev.
 
 ## Options
 
@@ -40,16 +43,24 @@ Capture and report the unique Vercel preview URL. Because this is dev-only, do n
 3. Upload the iOS OTA bundle to Capgo dev unless skipped:
 
 ```bash
-VERSION=$(node -p "require('./package.json').version") && DEV_BUNDLE="${VERSION}-dev.$(date -u +%Y%m%d.%H%M%S)" && npm run build:ios && npx @capgo/cli@latest bundle upload com.talmeltzer.coffeehub --path ./dist --channel dev --bundle "$DEV_BUNDLE" 2>&1
+npm run ship:dev:ios 2>&1
 ```
 
-Capture and report the bundle version and upload status.
+This guarded command locks the app id to `com.talmeltzer.coffeehub.dev`, runs
+`scripts/patch-social-login.mjs` before the build, uses the `-devapp` version
+lineage, passes `--fail-on-incompatible`, and verifies the final channel
+pointer. Do not replace it with a raw upload command.
 
 Confirm the dev channel pointer:
 
 ```bash
-npx @capgo/cli@latest channel currentBundle dev com.talmeltzer.coffeehub
+npx @capgo/cli@latest channel currentBundle dev com.talmeltzer.coffeehub.dev
 ```
+
+Capgo may return `push_update_disabled` after a successful upload because push
+notifications are disabled for this app. Treat the upload plus pointer
+verification as authoritative in that case; do not retry against the
+production app id.
 
 4. If one deploy target fails, still attempt the other target unless the user asked for only the failed target.
 

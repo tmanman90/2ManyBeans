@@ -13,7 +13,10 @@
     "cap:sync": "node scripts/patch-social-login.mjs && npm run build:ios && PATH=/usr/local/bin:$PATH npx cap sync && node scripts/configure-ios-variant.mjs prod",
     "cap:sync:dev": "node scripts/patch-social-login.mjs && npm run build:ios:dev && TMB_APP_VARIANT=dev PATH=/usr/local/bin:$PATH npx cap sync && node scripts/configure-ios-variant.mjs dev",
     "cap:open": "PATH=/usr/local/bin:$PATH npx cap open ios",
+    "ship:dev:ios": "node scripts/ship-dev-ios.mjs",
+    "test:ship-dev": "node scripts/ship-dev-ios.test.mjs",
     "test:recipe-scaling": "node scripts/recipe-scaling.test.mjs",
+    "test": "npm run test:recipe-scaling && npm run test:ship-dev",
     "lint": "eslint .",
     "preview": "vite preview"
   },
