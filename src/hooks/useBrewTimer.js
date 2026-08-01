@@ -65,11 +65,13 @@ export function useBrewTimer(recipe) {
   const pauseStartedAtRef = useRef(null);   // wall clock when current pause began
   const pausedAccumMsRef = useRef(0);       // total ms spent paused (global)
   const stepPausedAccumMsRef = useRef(0);   // ms paused within current step
+  const completionRef = useRef(null);
 
   // Display state — 10Hz MM:SS readout. Ring animation does NOT come from here;
   // the component reads refs directly via requestAnimationFrame.
   const [globalElapsedMs, setGlobalElapsedMs] = useState(0);
   const [stepElapsedMs, setStepElapsedMs] = useState(0);
+  const [completion, setCompletion] = useState(null);
 
   const totalMs = recipe?.totalBrewTimeSeconds != null
     ? recipe.totalBrewTimeSeconds * 1000
@@ -106,6 +108,21 @@ export function useBrewTimer(recipe) {
     return Math.max(0, base);
   }, []);
 
+  // One terminal transition for manual finish, natural completion, and final
+  // step skip. Capture a fresh wall-clock value before React state changes so
+  // persistence never relies on the 10Hz display snapshot.
+  const finish = useCallback((completionKind = 'natural') => {
+    if (state.phase !== 'running' && state.phase !== 'paused') return null;
+    if (completionRef.current) return completionRef.current.elapsedMs;
+    const elapsed = readGlobalMs();
+    const nextCompletion = { kind: completionKind, elapsedMs: elapsed };
+    completionRef.current = nextCompletion;
+    setCompletion(nextCompletion);
+    setGlobalElapsedMs(elapsed);
+    dispatch({ type: 'FINISH' });
+    return elapsed;
+  }, [state.phase, readGlobalMs]);
+
   // Low-frequency ticker — drives the numeric MM:SS readout AND owns step
   // advancement. Reads live from refs to avoid any stale-state off-by-one.
   useEffect(() => {
@@ -120,7 +137,7 @@ export function useBrewTimer(recipe) {
 
       if (currentStep && step >= currentStepDurationMs) {
         if (state.stepIndex + 1 >= (timerSteps?.length || 0)) {
-          dispatch({ type: 'FINISH' });
+          finish('natural');
         } else {
           // Roll step clock forward by the exact duration so residual overshoot
           // carries into the next step (e.g. tick arrived 150ms after the
@@ -141,7 +158,7 @@ export function useBrewTimer(recipe) {
       alive = false;
       clearInterval(id);
     };
-  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, readGlobalMs, readStepMs]);
+  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, readGlobalMs, readStepMs, finish]);
 
   // Recompute on visibility change so foreground resume doesn't wait up to
   // 100ms for the next interval fire. Matches Capacitor's JS suspension model.
@@ -158,6 +175,8 @@ export function useBrewTimer(recipe) {
 
   const start = useCallback(() => {
     if (!timerSteps) return;
+    completionRef.current = null;
+    setCompletion(null);
     dispatch({ type: 'START' });
   }, [timerSteps]);
 
@@ -169,6 +188,8 @@ export function useBrewTimer(recipe) {
     pauseStartedAtRef.current = null;
     pausedAccumMsRef.current = 0;
     stepPausedAccumMsRef.current = 0;
+    completionRef.current = null;
+    setCompletion(null);
     setGlobalElapsedMs(0);
     setStepElapsedMs(0);
     dispatch({ type: 'COUNTDOWN_DONE' });
@@ -202,14 +223,14 @@ export function useBrewTimer(recipe) {
   const skipForward = useCallback(() => {
     if (!timerSteps) return;
     if (state.stepIndex + 1 >= timerSteps.length) {
-      dispatch({ type: 'FINISH' });
+      finish('skipped');
       return;
     }
     stepStartedAtRef.current = stepNavAnchor();
     stepPausedAccumMsRef.current = 0;
     setStepElapsedMs(0);
     dispatch({ type: 'NEXT_STEP' });
-  }, [timerSteps, state.stepIndex]);
+  }, [timerSteps, state.stepIndex, finish]);
 
   const rewind = useCallback(() => {
     if (!timerSteps || state.stepIndex <= 0) return;
@@ -226,6 +247,8 @@ export function useBrewTimer(recipe) {
     pauseStartedAtRef.current = null;
     pausedAccumMsRef.current = 0;
     stepPausedAccumMsRef.current = 0;
+    completionRef.current = null;
+    setCompletion(null);
     setGlobalElapsedMs(0);
     setStepElapsedMs(0);
     dispatch({ type: 'RESET' });
@@ -248,6 +271,9 @@ export function useBrewTimer(recipe) {
     beginRunning,
     pause,
     resume,
+    finish,
+    completionKind: completion?.kind || null,
+    completionElapsedMs: completion?.elapsedMs ?? null,
     skipForward,
     rewind,
     reset,

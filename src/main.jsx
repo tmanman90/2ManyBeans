@@ -246,7 +246,7 @@ const Root = () => {
 
   const {
     beans, tastings,
-    addBean, updateBean, deleteBean,
+    addBean, updateBean, saveHandBrewTiming, deleteBean,
     addTasting, updateTasting, deleteTasting,
     openBean, finishBean, returnBean, getBeanById, seedTalData, refetch,
     loaded: dataLoaded,
@@ -359,6 +359,7 @@ const Root = () => {
                 tastings={tastings}
                 addBean={addBean}
                 updateBean={updateBean}
+                saveHandBrewTiming={saveHandBrewTiming}
                 deleteBean={deleteBean}
                 addTasting={addTasting}
                 updateTasting={updateTasting}

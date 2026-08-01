@@ -16,9 +16,10 @@ import { usePreferences } from './useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
 
-export function useHandBrew(updateBean) {
+export function useHandBrew(updateBean, saveHandBrewTiming) {
   const mountedRef = useRef(true);
   const activeRequestRef = useRef(null);
+  const timingSaveInFlightRef = useRef(null);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const { preferences, updatePreferences } = usePreferences();
@@ -262,6 +263,18 @@ export function useHandBrew(updateBean) {
     }
   }, [handBrewBean, handBrewRecipe, updateBean]);
 
+  const saveTimingEvent = useCallback(async (snapshot) => {
+    if (!handBrewBean?.id || !saveHandBrewTiming) return { status: 'ephemeral' };
+    if (timingSaveInFlightRef.current) return timingSaveInFlightRef.current;
+    const pending = saveHandBrewTiming(handBrewBean.id, snapshot);
+    timingSaveInFlightRef.current = pending;
+    try {
+      return await pending;
+    } finally {
+      if (timingSaveInFlightRef.current === pending) timingSaveInFlightRef.current = null;
+    }
+  }, [handBrewBean?.id, saveHandBrewTiming]);
+
   return {
     handBrewModal, handBrewRecipe, handBrewLoading, handBrewError,
     handBrewPhase, handBrewBean, handBrewResearch,
@@ -270,6 +283,7 @@ export function useHandBrew(updateBean) {
     userCoffeeGrams,
     setUserCoffeeGrams,
     persistDose,
+    saveTimingEvent,
     onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, false, handBrewRecipe?.device) : undefined,
     onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe?.device) : undefined,
   };

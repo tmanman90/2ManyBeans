@@ -10,7 +10,7 @@
 // for 60fps updates. The numeric MM:SS readout uses React state and updates at
 // ~10Hz via the hook's setInterval.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { assetUrl } from "../lib/assetUrl";
 import { createPortal } from 'react-dom';
 import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
@@ -19,6 +19,7 @@ import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
+import { timingContextFromRecipe } from '../lib/brewTimingMemory';
 
 const RING_SIZE = 280;
 const RING_STROKE = 10;
@@ -72,7 +73,7 @@ function Countdown({ onDone }) {
   );
 }
 
-function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
+function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone, saveState, onRetrySave }) {
   useEffect(() => {
     haptic.success().catch(() => {});
   }, []);
@@ -132,6 +133,15 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone }) {
       }}>
         {formatMMSS(totalElapsedMs)}
       </div>
+      {saveState === 'saving' && <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: -26, marginBottom: 20 }}>Saving brew timing…</div>}
+      {saveState === 'saved' && <div style={{ ...typeScale.caption, color: C.green, marginTop: -26, marginBottom: 20 }}>Brew timing saved</div>}
+      {saveState === 'ephemeral' && <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: -26, marginBottom: 20 }}>Timing is not saved for this quick recipe</div>}
+      {saveState === 'failed' && (
+        <div style={{ width: '100%', maxWidth: 320, marginTop: -26, marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ ...typeScale.caption, color: C.red, marginBottom: 8 }}>Timing was not saved.</div>
+          <button onClick={onRetrySave} style={{ minHeight: 44, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>
+        </div>
+      )}
       {onStartTasting && (
         <button
           onClick={onStartTasting}
@@ -254,19 +264,63 @@ function ControlButton({ onClick, children, ariaLabel, primary, disabled }) {
   );
 }
 
-export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
+export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveTimingEvent }) => {
   const timer = useBrewTimer(recipe);
   const {
     phase, stepIndex, timerSteps, currentStep, currentStepDurationMs,
     globalElapsedMs, stepElapsedMs, totalMs,
-    readStepMs,
-    start, beginRunning, pause, resume, skipForward, rewind, reset,
+    readGlobalMs, readStepMs,
+    start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs,
     isReady,
   } = timer;
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [saveState, setSaveState] = useState(null);
+  const sessionRef = useRef(null);
+  const reportedRef = useRef(false);
+
+  // Freeze the effective render-time recipe as the session opens. This is
+  // after HandBrewModal's dose scaling/iced transform and cannot be polluted
+  // by later regeneration or a changed dose control.
+  useEffect(() => {
+    if (!open) {
+      sessionRef.current = null;
+      reportedRef.current = false;
+      setSaveState(null);
+      return;
+    }
+    if (!sessionRef.current && recipe && bean?.id) {
+      const context = timingContextFromRecipe({ beanId: bean.id, recipe, mode: recipe.isIced ? 'iced' : 'hot' });
+      sessionRef.current = {
+        ...context,
+        sessionId: globalThis.crypto?.randomUUID?.() || `brew-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        createdAt: Date.now(),
+      };
+    }
+  }, [open, recipe, bean?.id]);
+
+  const persistCompletion = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session || !completionKind) {
+      setSaveState('ephemeral');
+      return;
+    }
+    setSaveState('saving');
+    const result = await onSaveTimingEvent?.({
+      ...session,
+      actualElapsedMs: completionElapsedMs ?? readGlobalMs(),
+      completionKind,
+    }) || { status: 'ephemeral' };
+    setSaveState(result.status);
+  }, [completionElapsedMs, completionKind, onSaveTimingEvent, readGlobalMs]);
+
+  useEffect(() => {
+    if (phase !== 'done' || reportedRef.current) return;
+    reportedRef.current = true;
+    persistCompletion();
+  }, [phase, persistCompletion]);
 
   // Auto-start countdown when the timer opens with a valid recipe.
   useEffect(() => {
@@ -390,7 +444,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
   }
 
   const handleCloseRequest = () => {
-    if (phase === 'running' || phase === 'paused') {
+    if (phase === 'countdown' || phase === 'running' || phase === 'paused') {
       setConfirmClose(true);
       return;
     }
@@ -405,6 +459,11 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
   const handleSkipForward = () => {
     haptic.heavy().catch(() => {});
     skipForward();
+  };
+
+  const handleFinishBrew = () => {
+    haptic.success().catch(() => {});
+    finish('manualEarly');
   };
 
   const handleRewind = () => {
@@ -636,6 +695,16 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
           </div>
         </div>
 
+        {(phase === 'running' || phase === 'paused') && (
+          <button
+            onClick={handleFinishBrew}
+            aria-label="Finish brew"
+            style={{ minHeight: 44, padding: '10px 18px', borderRadius: radius.pill, border: `1px solid ${C.accentLight}`, background: C.amberBg, color: C.accent, fontFamily: fonts.body, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Finish Brew
+          </button>
+        )}
+
         {/* Current step name + instruction */}
         <div style={{ textAlign: 'center', padding: '12px 8px 6px', width: '100%' }}>
           <div style={{
@@ -752,6 +821,8 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting }) => {
           <CompletionScreen
             bean={bean}
             totalElapsedMs={globalElapsedMs}
+            saveState={saveState}
+            onRetrySave={persistCompletion}
             onStartTasting={onStartTasting ? () => onStartTasting(bean?.id) : null}
             onDone={onClose}
           />
