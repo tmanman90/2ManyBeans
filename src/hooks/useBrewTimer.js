@@ -16,7 +16,7 @@
 // brief highlight); the hook does not need a separate phase for it.
 
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { advanceStepClock, buildTimerSteps, shouldFinishNaturally } from '../lib/brewTimerSteps';
+import { advanceStepClock, buildTimerSteps } from '../lib/brewTimerSteps';
 export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
@@ -137,9 +137,7 @@ export function useBrewTimer(recipe) {
 
       if (currentStep) {
         const isFinalStep = state.stepIndex + 1 >= (timerSteps?.length || 0);
-        if (shouldFinishNaturally(global, totalMs, isFinalStep)) {
-          finish('natural');
-        } else if (!isFinalStep && step >= currentStepDurationMs) {
+        if (!isFinalStep && step >= currentStepDurationMs) {
           // Roll step clock forward by the exact duration so residual overshoot
           // carries into the next step (e.g. tick arrived 150ms after the
           // boundary — next step starts with 150ms already elapsed).
@@ -163,7 +161,7 @@ export function useBrewTimer(recipe) {
       alive = false;
       clearInterval(id);
     };
-  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, totalMs, readGlobalMs, readStepMs, finish]);
+  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, readGlobalMs, readStepMs]);
 
   // Recompute on visibility change so foreground resume doesn't wait up to
   // 100ms for the next interval fire. Matches Capacitor's JS suspension model.
@@ -228,14 +226,13 @@ export function useBrewTimer(recipe) {
   const skipForward = useCallback(() => {
     if (!timerSteps) return;
     if (state.stepIndex + 1 >= timerSteps.length) {
-      finish('skipped');
       return;
     }
     stepStartedAtRef.current = stepNavAnchor();
     stepPausedAccumMsRef.current = 0;
     setStepElapsedMs(0);
     dispatch({ type: 'NEXT_STEP' });
-  }, [timerSteps, state.stepIndex, finish]);
+  }, [timerSteps, state.stepIndex]);
 
   const rewind = useCallback(() => {
     if (!timerSteps || state.stepIndex <= 0) return;

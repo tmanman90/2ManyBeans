@@ -25,12 +25,14 @@ export function advanceStepClock(stepStartedAtMs, durationMs, pausedMs = 0) {
   return stepStartedAtMs + durationMs + pausedMs;
 }
 
-export function shouldFinishNaturally(globalElapsedMs, totalMs, isFinalStep) {
-  return isFinalStep === true
-    && Number.isFinite(totalMs)
-    && totalMs > 0
-    && Number.isFinite(globalElapsedMs)
-    && globalElapsedMs >= totalMs;
+export function resolveGuideState(globalElapsedMs, totalMs) {
+  const safeGlobalElapsedMs = Number.isFinite(globalElapsedMs) ? Math.max(0, globalElapsedMs) : 0;
+  const safeTotalMs = Number.isFinite(totalMs) ? Math.max(0, totalMs) : 0;
+  return {
+    reached: safeTotalMs > 0 && safeGlobalElapsedMs >= safeTotalMs,
+    remainingMs: Math.max(0, safeTotalMs - safeGlobalElapsedMs),
+    overtimeMs: Math.max(0, safeGlobalElapsedMs - safeTotalMs),
+  };
 }
 
 // Manual navigation can enter the final instruction before its scheduled
@@ -51,9 +53,7 @@ export function resolveStepTiming({
       remainingMs: Math.max(0, durationMs - safeStepElapsedMs),
     };
   }
-  const safeTotalMs = Number.isFinite(totalMs) ? Math.max(0, totalMs) : 0;
-  const safeGlobalElapsedMs = Number.isFinite(globalElapsedMs) ? Math.max(0, globalElapsedMs) : 0;
-  const remainingMs = Math.max(0, safeTotalMs - safeGlobalElapsedMs);
+  const { remainingMs } = resolveGuideState(globalElapsedMs, totalMs);
   return {
     durationMs: Math.max(1, safeStepElapsedMs + remainingMs),
     remainingMs,

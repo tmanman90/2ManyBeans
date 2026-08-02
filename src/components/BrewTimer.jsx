@@ -20,7 +20,7 @@ import { haptic } from './../lib/haptics';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
-import { resolveStepTiming } from '../lib/brewTimerSteps';
+import { resolveGuideState, resolveStepTiming } from '../lib/brewTimerSteps';
 
 const RING_SIZE = 280;
 const RING_STROKE = 10;
@@ -282,6 +282,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   const sessionRef = useRef(null);
   const reportedRef = useRef(false);
   const isFinalStep = !!timerSteps && stepIndex + 1 >= timerSteps.length;
+  const guideState = resolveGuideState(globalElapsedMs, totalMs);
 
   // Freeze the effective render-time recipe as the session opens. This is
   // after HandBrewModal's dose scaling/iced transform and cannot be polluted
@@ -477,7 +478,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
 
   const handleFinishBrew = () => {
     haptic.success().catch(() => {});
-    finish('manualEarly');
+    finish('userFinished');
   };
 
   const handleRewind = () => {
@@ -704,7 +705,9 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
               marginTop: 4,
               letterSpacing: '0.01em',
             }}>
-              guide finish {formatMMSS(totalMs)}
+              {guideState.reached
+                ? `guide reached · +${formatMMSS(guideState.overtimeMs)}`
+                : `guide finish ${formatMMSS(totalMs)}`}
             </div>
           </div>
         </div>
@@ -715,7 +718,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
             aria-label="Finish brew"
             style={{ minHeight: 44, padding: '10px 18px', borderRadius: radius.pill, border: `1px solid ${C.accentLight}`, background: C.amberBg, color: C.accent, fontFamily: fonts.body, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
           >
-            Finish Brew
+            {guideState.reached ? 'Finish When Drawdown Ends' : 'Finish Brew'}
           </button>
         )}
 
@@ -785,7 +788,9 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
               stepElapsedMs,
             }).remainingMs;
             const timeLabel = status === 'current'
-              ? `${formatMMSS(remainingMs)} left`
+              ? (isFinalStep && guideState.reached
+                  ? `+${formatMMSS(guideState.overtimeMs)} over`
+                  : `${formatMMSS(remainingMs)} left`)
               : status === 'done'
                 ? `@${formatMMSS(ts.startSeconds * 1000)}`
                 : `@${formatMMSS(ts.startSeconds * 1000)}`;
@@ -830,7 +835,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
           <ControlButton
             onClick={handleSkipForward}
             ariaLabel="Next step"
-            disabled={phase === 'countdown'}
+            disabled={phase === 'countdown' || isFinalStep}
           >
             <SkipForward size={20} strokeWidth={2.5} />
           </ControlButton>
