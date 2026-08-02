@@ -27,9 +27,13 @@ Report the Vercel deployment URL.
 
 ### 2. Build and push iOS OTA (Capgo)
 ```bash
-cd "/Users/talmeltzer/Documents/VIBE CODING/Coffee App Build " && npm run build:ios && npx @capgo/cli@latest bundle upload --channel=production 2>&1
+cd "/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build" && npm run ship:prod:ios 2>&1
 ```
-Report the bundle version and upload status.
+The guarded command requires the six Firebase `VITE_` variables, requires the
+package patch version to advance the production channel, rejects native
+incompatibility, and verifies the final production channel pointer. Load the
+managed production environment into the shell before running it; never use a
+raw Capgo upload for production.
 
 ### 3. Summary
 After both complete, report:
