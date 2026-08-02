@@ -54,10 +54,15 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
     evidence.research?.roasterStyle,
   ].filter(Boolean).join(' ');
   const allGuidance = [sourceGuidance, storedGuidance, researchGuidance].filter(Boolean).join(' ').toLowerCase();
+  const trustedFlowGuidance = [sourceGuidance, storedGuidance].filter(Boolean).join(' ').toLowerCase();
   const dark = roast.includes('dark');
   const natural = /natural|anaerobic|honey|co-ferment/.test(`${process} ${evidence.research?.processingNuance || ''}`.toLowerCase());
   const washed = process.includes('washed');
-  const highFinesRisk = washed && !dark;
+  // Density can inform extraction and grind direction, but it is not evidence
+  // that a coffee will produce excess fines or stall a brewer. Reserve the
+  // flow-risk branch for explicit observations or guidance about flow.
+  const evidenceBackedFines = /\bfines?\b|\bstall(?:s|ed|ing)?\b|\bclog(?:s|ged|ging)?\b|\bchok(?:e|es|ed|ing)\b|(?:low|poor) permeability|slow drawdown/.test(trustedFlowGuidance);
+  const highFinesRisk = evidenceBackedFines;
   const sourceTemperature = firstHint(parseTemperatureBand, [sourceGuidance]);
   const storedTemperature = firstHint(parseTemperatureBand, [storedGuidance]);
   const researchTemperature = firstHint(parseTemperatureBand, [researchGuidance]);
@@ -77,13 +82,13 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   const explicitLowAgitation = /low[- ]agitation|reduce agitation|gentle (?:pour|agitation)|do not swirl|avoid(?:ing)?\s+(?:excessive|over-?aggressive)\s+agitation/.test(allGuidance);
   const explicitPulse = /pulse|staged pours?|multiple pours?/.test(allGuidance);
   const explicitModerate = /moderate agitation|steady drawdown|even saturation|center-to-spiral/.test(allGuidance);
-  const techniquePreference = natural
+  const techniquePreference = natural && explicitPulse
     ? 'bloom-led-pulse'
     : explicitLowAgitation
       ? 'low-agitation-center'
       : explicitPulse || explicitModerate || family.includes('floral') || family.includes('ethiopia')
         ? 'center-to-spiral-pulse'
-        : 'low-agitation-center';
+        : 'balanced';
   const explicitContactAdjustment = /extend contact|increase contact|longer contact|slow drawdown/.test(allGuidance)
     ? 15
     : /avoid over-?extended|shorten contact|shorter contact|reduce contact/.test(allGuidance)
@@ -93,7 +98,16 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   const lowEnergy = dark || /lower temperature|reduce temperature|avoid pushing too hot/.test(allGuidance) || targetTemperatureC <= 95;
   const energyTendency = lowEnergy ? 'lower' : washed ? 'higher' : 'conservative';
   const intent = {
-    version: 2,
+    version: 4,
+    methodNeutral: true,
+    // Adapters own technique names. These fields describe physical intent only
+    // and can be consumed by Kalita, hot V60, or iced V60 independently.
+    extractionDemand: dark ? 'lower-energy' : highFinesRisk ? 'careful-even-saturation' : energyTendency === 'higher' ? 'higher-energy' : 'balanced',
+    balancedCupGoal: 'balanced',
+    temperatureTendency: energyTendency,
+    agitationTendency: explicitLowAgitation ? 'low' : explicitPulse ? 'pulsed' : 'moderate',
+    bloomBehavior: natural ? 'freshness-restraint' : 'standard-wet-bed',
+    softPriors: { process: natural ? 'fruit-processed' : washed ? 'washed' : 'unknown', roast: dark ? 'developed' : roast || 'unknown' },
     family,
     cupDirection: dark || natural ? { clarity: 'balanced', body: 'supported', sweetness: 'high' } : { clarity: 'high', body: 'balanced', sweetness: 'high' },
     solubilityRisk: dark || natural ? 'high' : highFinesRisk ? 'moderate' : 'unknown',
@@ -109,7 +123,7 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
     uncertainty: evidence.unknowns,
     conflicts: evidence.conflicts,
     reasonCodes: [
-      highFinesRisk && 'WASHED_FLATBED_FINES_GUARD', natural && 'HIGH_SOLUBILITY_GENTLE_EXTRACTION',
+      highFinesRisk && 'EXPLICIT_FLOW_RISK_GUARD', natural && 'HIGH_SOLUBILITY_GENTLE_EXTRACTION',
       dark && 'DARK_ROAST_LOWER_ENERGY', sourceGuidance && 'SOURCE_GUIDANCE_PRESENT',
       (sourceTemperature || storedTemperature || researchTemperature) && 'TEMPERATURE_GUIDANCE_PRESENT',
       (sourceRatio || storedRatio || researchRatio) && 'RATIO_GUIDANCE_PRESENT',
@@ -119,6 +133,7 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
       evidence.confidence === 'low' && 'LOW_CONFIDENCE_DEFAULT',
     ].filter(Boolean),
     evidenceHash: evidence.sourceContextHash,
+    sourceRecipes: evidence.sourceInsights?.brewRecipes || [],
   };
   return stable(intent);
 }

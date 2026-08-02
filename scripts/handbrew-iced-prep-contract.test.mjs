@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
+const timer = readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8');
+const recipe = generateV60IcedRecipe({}, { dose: 16 });
+assert.equal(recipe.prepSteps.some((step) => /ice/i.test(step.action)), true);
+assert.equal(recipe.steps[0].timeSeconds, 0);
+assert.equal(recipe.postBrewSteps[0].untimed, true);
+assert.ok(buildTimerSteps(recipe));
+assert.match(timer, /CHILL &amp; SERVE/);
+assert.match(timer, /Coffee chilled/);
+assert.match(timer, /Chilling is untimed/);
+console.log('iced prep/post-brew contract passed');

@@ -116,7 +116,8 @@ Keep all narrative sourceInsight fields concise. Do not transcribe full paragrap
     "brewGuidance": "source brew guidance, ratios, temperatures, grind hints, or extraction advice if present",
     "provenance": "producer, farm, region, altitude, selection, or production story from the source",
     "extractedTextSummary": "bounded summary of other relevant source text",
-    "extractionWarnings": "ambiguity warnings, such as a sheet containing multiple coffees"
+    "extractionWarnings": "ambiguity warnings, such as a sheet containing multiple coffees",
+    "brewRecipes": [{"id":"source recipe id","mode":"hot or iced","device":"v60","configuration":"V60 02 if stated","status":"original | scaled | adapted | aggregated | corroboration","author":"original author","canonicalUrl":"canonical URL printed/verified in source, or empty","publication":"publication/version/date context","doseGrams": number,"ratio": number,"temperatureC": number or null,"grind":"exact description or empty","geometry":"pour geometry or empty","cadence":"timed cadence or empty","agitation":"agitation or empty","guideSeconds": number or null,"hotWaterGrams": number or null,"iceGrams": number or null,"finalWaterGrams": number or null,"steps":[{"timeSeconds":number,"waterTotal":number,"action":"exact timed pour copy"}],"postBrewInstruction":"untimed post-brew instruction or empty","adaptation":"changes made by the app or empty","changedFields":["field names"]}]
   }
 }
 

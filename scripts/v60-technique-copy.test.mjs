@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+const large = generateV60Recipe({}, { dose: 30 });
+assert.match(large.steps[0].action, /60g/);
+assert.match(large.steps[1].action, /300g/);
+assert.match(large.steps[3].action, /stir.*swirl/i);
+assert.doesNotMatch(large.steps[3].action, /do not swirl|off the paper/i);
+const rao = generateV60Recipe({ energyTendency: 'higher', finesRisk: 'low' }, { dose: 20 });
+assert.match(rao.steps[0].action, /spin.*firmly/i);
+assert.match(rao.steps[1].action, /gentle.*spin/i);
+assert.match(rao.steps[2].action, /gentle spin/i);
+const heart = generateV60Recipe({ finesRisk: 'high' }, { dose: 20 });
+assert.match(heart.steps[0].action, /50g/i);
+assert.match(heart.steps[0].action, /without stirring|do not stir/i);
+assert.match(heart.steps[1].action, /slow.*continuous center pour/i);
+assert.match(heart.steps[2].action, /without stirring/i);
+assert.equal(heart.sourceLineage.parameterSources.agitation, 'v60-adaptation-bounded-v1');
+const adapted = generateV60Recipe({ cupDirection: { body: 'supported' } }, { dose: 18 });
+assert.equal(adapted.sourceLineage.changedFields.includes('ratio'), true);
+assert.equal(adapted.sourceLineage.parameterSources.ratio, 'v60-adaptation-bounded-v1');
+const kasuya = generateV60Recipe({ techniquePreference: 'bloom-led-pulse' }, { dose: 20 });
+assert.deepEqual(kasuya.steps.map((step) => [step.timeSeconds, step.waterTotal]), [[0, 50], [45, 120], [90, 180], [130, 240], [160, 300]]);
+assert.equal(kasuya.sourceLineage.status, 'original');
+const oneCup = generateV60Recipe({}, { dose: 15 });
+assert.deepEqual(oneCup.steps.map((step) => step.timeSeconds), [0, 45, 60, 70, 80, 90, 100, 110, 120]);
+assert.deepEqual(oneCup.steps.filter((step) => /pour/i.test(step.name)).map((step) => step.waterTotal), [100, 150, 200, 250]);
+assert.deepEqual(oneCup.guideRangeSeconds, [165, 210]);
+const heartScaled = generateV60Recipe({ energyTendency: 'lower' }, { dose: 15 });
+assert.deepEqual(heartScaled.steps.map((step) => step.timeSeconds), [0, 20, 80]);
+assert.equal(heartScaled.steps[0].waterTotal, 45);
+assert.match(heartScaled.steps[1].action, /reach 245g around 1:20/i);
+assert.ok(heartScaled.guideRangeSeconds[1] - heartScaled.guideRangeSeconds[0] >= 40);
+for (const recipe of [oneCup, large, rao, heart, heartScaled, adapted, kasuya]) {
+  assert.ok(recipe.steps.every((step) => step.name && step.action));
+  assert.doesNotMatch(`${recipe.reasoning} ${recipe.steps.map((step) => step.action).join(' ')}`, /available extraction evidence|source bloom energy|source's final stir|bounded high-fines|small 12 18/i);
+}
+console.log('v60 technique copy/provenance passed (large, Rao, Heart, incomplete Kurasu adaptation)');

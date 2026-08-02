@@ -2,6 +2,7 @@
 // Deterministic, no AI calls, no side effects.
 
 import { nearestOdeStep, BREW_METHODS, parseTimeString } from './brewMethods.js';
+import { normalizeRecipePhases } from './brewTimerSteps.js';
 
 
 const ICE_FRACTION = 0.4;
@@ -53,7 +54,35 @@ function formatTime(totalSeconds) {
 }
 
 export function transformPourOver(hotRecipe, userDose) {
+  if (hotRecipe?.candidate === true && hotRecipe?.device === 'v60' && hotRecipe?.mode === 'hot') {
+    throw new Error('Deterministic hot V60 candidates require the independent iced V60 adapter');
+  }
   const { dose, hotWater, iceGrams } = computeIceSplit(hotRecipe, userDose);
+
+  // Versioned legacy phase recipes are still readable, but server ice is
+  // preparation, never a timed 0:00 step. Keep the stored guide and re-anchor
+  // only the first identifiable brew-water instruction.
+  if ((hotRecipe?.device || 'v60') === 'v60') {
+    const effective = normalizeRecipePhases(hotRecipe);
+    const sourceSteps = Array.isArray(effective?.steps) ? effective.steps : [];
+    const steps = sourceSteps.map((step) => {
+      const waterTotal = typeof step.waterTotal === 'number' ? Math.round(step.waterTotal * HOT_FRACTION) : step.waterTotal;
+      const action = typeof step.action === 'string'
+        ? step.action.replace(/(\d+(?:\.\d+)?)\s*(grams?|g)\b/gi, (_, value, unit) => `${Math.round(Number(value) * HOT_FRACTION)}${unit}`)
+        : step.action;
+      const timeSeconds = Number.isFinite(step.timeSeconds) ? step.timeSeconds : null;
+      return { ...step, timeSeconds, time: timeSeconds != null ? formatTime(timeSeconds) : step.time, waterTotal, action, phase: 'brew', isIceStep: false };
+    });
+    const timerReady = hotRecipe.timerReady === true && steps.length > 0 && steps.every((step, index) => Number.isFinite(step.timeSeconds) && (index === 0 || step.timeSeconds > steps[index - 1].timeSeconds));
+    return {
+      ...hotRecipe, coffeeGrams: dose, waterGrams: hotWater, iceGrams,
+      prepSteps: [...(effective?.prepSteps || hotRecipe.prepSteps || []), { action: `Add ${iceGrams}g brew ice to the server before brewing.`, phase: 'prep' }],
+      steps, postBrewSteps: [{ action: 'After Finish Brew, swirl until the brew ice melts; serve over fresh ice.', phase: 'post-brew', untimed: true }],
+      totalBrewTimeSeconds: Number.isFinite(effective?.totalBrewTimeSeconds) ? effective.totalBrewTimeSeconds : null,
+      timerReady: timerReady && Number.isFinite(effective?.totalBrewTimeSeconds) && effective.totalBrewTimeSeconds > steps.at(-1)?.timeSeconds,
+      isIced: true, mode: 'iced', phaseContractVersion: 1, icePlacement: 'server',
+    };
+  }
 
   // Prefer the repaired timeSeconds (handles range times like "0:30-1:10"
   // which the old naive parser returned null for — that null broke the

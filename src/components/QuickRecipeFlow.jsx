@@ -459,6 +459,10 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             open={open}
             onClose={onClose}
             recipe={handBrew.handBrewRecipe}
+            icedRecipe={handBrew.handBrewIcedRecipe}
+            icedLoading={handBrew.handBrewIcedLoading}
+            icedError={handBrew.handBrewIcedError}
+            onRetryIced={handBrew.onRetryIced}
             loading={handBrew.handBrewLoading}
             error={handBrew.handBrewError}
             phase={handBrew.handBrewPhase}
@@ -469,7 +473,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             bean={handBrew.handBrewBean}
             onStartTasting={handleBrewTimerStartTasting}
             userCoffeeGrams={handBrew.userCoffeeGrams}
-            onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
+            onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
             onPersistDose={handBrew.persistDose}
           />
         )}

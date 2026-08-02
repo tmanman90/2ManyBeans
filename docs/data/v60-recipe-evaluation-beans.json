@@ -1,0 +1,7 @@
+[
+  {"id":"fixture-washed-ordinary","class":"washed","roast":"light","finesRisk":"unknown","dose":15,"grinder":"fellow-ode-gen2"},
+  {"id":"fixture-washed-fines","class":"washed","roast":"light","finesRisk":"high","dose":20,"grinder":"fellow-ode-gen2"},
+  {"id":"fixture-natural","class":"natural","roast":"light-medium","finesRisk":"moderate","dose":18,"grinder":"comandante-c40"},
+  {"id":"fixture-developed","class":"washed","roast":"dark","finesRisk":"unknown","dose":30,"grinder":"baratza-encore-esp"},
+  {"id":"fixture-sparse","class":"unknown","roast":"unknown","finesRisk":"unknown","dose":12,"grinder":"other"}
+]

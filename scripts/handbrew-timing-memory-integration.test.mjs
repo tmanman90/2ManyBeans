@@ -8,7 +8,7 @@ assert.match(modal, /TimingMemoryHint/);
 assert.match(modal, /selectTimingMemory\(bean\?\.handBrewTimingMemory, timingContext\)/);
 assert.match(modal, /scaleRecipeForDose\(recipe, effectiveDose\)/);
 assert.match(modal, /onSaveTimingEvent=\{onSaveTimingEvent\}/);
-assert.match(modal, /current guide remains/);
+assert.match(modal, /different dose, so use this only as context/);
 assert.match(modal, /mode: 'iced'/);
 assert.match(modal, /TimingMemoryHint memory=\{icedTimingMemory\}/);
 assert.match(chat, /useHandBrew\(ephemeralUpdateBean, saveHandBrewTiming\)/);
@@ -18,7 +18,6 @@ const recipe = { device: 'kalita', kalitaSize: '155', coffeeGrams: 20, totalBrew
 const context = timingContextFromRecipe({ beanId: 'bombe', recipe });
 const prior = { sessionId: '15g', beanId: 'bombe', device: 'kalita', kalitaSize: '155', mode: 'hot', doseGrams: 15, actualElapsedMs: 182000, targetMs: 240000, completionKind: 'natural', createdAt: 1, lineage: context.lineage };
 const memory = selectTimingMemory([prior], context);
-assert.equal(memory.isExactDose, false);
-assert.equal(memory.event.doseGrams, 15);
+assert.equal(memory, null);
 assert.equal(selectTimingMemory([{ ...prior, beanId: 'other' }], context), null);
 console.log('handbrew timing memory integration passed');

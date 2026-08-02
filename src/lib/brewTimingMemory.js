@@ -19,6 +19,10 @@ function normalizeLineage(lineage) {
     engineVersion: stringOrNull(lineage.engineVersion),
     rulesVersion: stringOrNull(lineage.rulesVersion),
     sourceContextHash: stringOrNull(lineage.sourceContextHash),
+    sourceRegistryVersion: stringOrNull(lineage.sourceRegistryVersion),
+    configurationKey: stringOrNull(lineage.configurationKey),
+    technique: stringOrNull(lineage.technique),
+    phaseContractVersion: Number.isInteger(lineage.phaseContractVersion) ? lineage.phaseContractVersion : null,
   };
 }
 
@@ -35,10 +39,12 @@ export function buildTimingEvent(snapshot) {
   const targetMs = snapshot?.targetMs;
   const lineage = normalizeLineage(snapshot?.lineage);
   const kalitaSize = snapshot?.kalitaSize == null ? null : String(snapshot.kalitaSize);
+  const configurationKey = stringOrNull(snapshot?.configurationKey);
 
   if (!sessionId || !beanId || !device || !mode || !COMPLETION_KINDS.has(completionKind)
     || !finitePositive(doseGrams) || !finiteNonNegative(actualElapsedMs)
     || !finitePositive(targetMs) || !lineage
+    || (configurationKey && configurationKey.length > 120)
     || (kalitaSize != null && !['155', '185'].includes(kalitaSize))) {
     return null;
   }
@@ -50,6 +56,7 @@ export function buildTimingEvent(snapshot) {
     device,
     kalitaSize: device === 'kalita' ? kalitaSize : null,
     mode,
+    configurationKey,
     doseGrams,
     actualElapsedMs: Math.round(actualElapsedMs),
     targetMs: Math.round(targetMs),
@@ -90,6 +97,7 @@ export function timingContextFromRecipe({ beanId, recipe, mode = 'hot' } = {}) {
     device: stringOrNull(recipe?.device) || 'v60',
     kalitaSize: recipe?.device === 'kalita' && recipe?.kalitaSize != null ? String(recipe.kalitaSize) : null,
     mode: mode === 'iced' ? 'iced' : 'hot',
+    configurationKey: stringOrNull(recipe?.configurationKey || recipe?.sourceLineage?.configurationKey),
     doseGrams: finitePositive(doseGrams) ? doseGrams : null,
     targetMs: finitePositive(targetMs) ? targetMs : null,
     lineage: profile ? {
@@ -97,6 +105,10 @@ export function timingContextFromRecipe({ beanId, recipe, mode = 'hot' } = {}) {
       engineVersion: stringOrNull(recipe?.engineVersion),
       rulesVersion: stringOrNull(recipe?.rulesVersion),
       sourceContextHash: stringOrNull(recipe?.sourceContextHash),
+      sourceRegistryVersion: stringOrNull(recipe?.sourceRegistryVersion || recipe?.sourceLineage?.sourceRegistryVersion),
+      configurationKey: stringOrNull(recipe?.configurationKey || recipe?.sourceLineage?.configurationKey),
+      technique: stringOrNull(recipe?.technique || recipe?.sourceLineage?.technique),
+      phaseContractVersion: Number.isInteger(recipe?.phaseContractVersion) ? recipe.phaseContractVersion : null,
     } : null,
   };
 }
@@ -109,7 +121,11 @@ function sameBaseConfiguration(event, context) {
     && event.lineage.profile === context.lineage?.profile
     && event.lineage.engineVersion === context.lineage?.engineVersion
     && event.lineage.rulesVersion === context.lineage?.rulesVersion
-    && event.lineage.sourceContextHash === context.lineage?.sourceContextHash;
+    && event.lineage.sourceContextHash === context.lineage?.sourceContextHash
+    && event.configurationKey === context.lineage?.configurationKey
+    && event.lineage.sourceRegistryVersion === context.lineage?.sourceRegistryVersion
+    && event.lineage.technique === context.lineage?.technique
+    && event.lineage.phaseContractVersion === context.lineage?.phaseContractVersion;
 }
 
 export function selectTimingMemory(history, context) {
@@ -122,7 +138,10 @@ export function selectTimingMemory(history, context) {
   );
   if (!candidates.length) return null;
   const exact = candidates.filter((event) => event.doseGrams === context.doseGrams);
-  const mostRecent = exact[0] || candidates[0];
+  // Cross-dose timing remains stored for auditability, but v1 never shows it
+  // as a comparable "last brew" or uses it to train a different dose.
+  if (!exact.length) return null;
+  const mostRecent = exact[0];
   const values = exact.map((event) => event.actualElapsedMs).sort((a, b) => a - b);
   const range = values.length >= 3 ? {
     minMs: values[0],
@@ -132,7 +151,7 @@ export function selectTimingMemory(history, context) {
   } : null;
   return {
     event: mostRecent,
-    isExactDose: exact.length > 0,
+    isExactDose: true,
     range,
   };
 }

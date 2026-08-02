@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { normalizeRecipeEvidence } from '../src/lib/recipeEvidence.js';
+import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+import { timingContextFromRecipe, buildTimingEvent, selectTimingMemory } from '../src/lib/brewTimingMemory.js';
+
+const bean = { id: 'fixture', process: 'washed', roastLevel: 'light', sourceInsights: { brewGuidance: 'gentle pour' } };
+const evidence = normalizeRecipeEvidence(bean, { cupStructureFamily: 'washed-floral-clarity' });
+const intent = buildExtractionIntent(evidence);
+const hot = generateV60Recipe(intent, { dose: 15, grinder: 'fellow-ode-gen2' }, evidence);
+const iced = generateV60IcedRecipe(intent, { dose: 15, grinder: 'fellow-ode-gen2' });
+assert.notEqual(hot.technique, iced.technique);
+assert.notEqual(hot.configurationKey, iced.configurationKey);
+assert.equal(timingContextFromRecipe({ beanId: bean.id, recipe: hot }).lineage.configurationKey, 'v60:02:standard-paper');
+assert.equal(timingContextFromRecipe({ beanId: bean.id, recipe: iced, mode: 'iced' }).lineage.configurationKey, 'v60:02:standard-paper:direct-server');
+const context = timingContextFromRecipe({ beanId: bean.id, recipe: iced, mode: 'iced' });
+const event = buildTimingEvent({ ...context, sessionId: 'iced-1', actualElapsedMs: 162000, completionKind: 'userFinished' });
+assert.equal(event.configurationKey, 'v60:02:standard-paper:direct-server');
+assert.equal(selectTimingMemory([event], context).event.sessionId, 'iced-1');
+assert.equal(selectTimingMemory([event], { ...context, mode: 'hot' }), null);
+console.log('handbrew V60 integration passed (independent mode identity and timing lineage)');
