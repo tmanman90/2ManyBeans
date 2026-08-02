@@ -4,6 +4,7 @@
 // it never imports or calls a write API.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { evaluateAndRedactBeans } from '../src/lib/v60InventoryEvaluation.js';
 
 export function parseArgs(argv = []) {
@@ -64,4 +65,4 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1] || '')) main();
