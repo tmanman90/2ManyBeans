@@ -16,7 +16,7 @@
 // brief highlight); the hook does not need a separate phase for it.
 
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { advanceStepClock, buildTimerSteps } from '../lib/brewTimerSteps';
+import { advanceStepClock, buildTimerSteps, shouldFinishNaturally } from '../lib/brewTimerSteps';
 export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
@@ -135,10 +135,11 @@ export function useBrewTimer(recipe) {
       setGlobalElapsedMs(global);
       setStepElapsedMs(step);
 
-      if (currentStep && step >= currentStepDurationMs) {
-        if (state.stepIndex + 1 >= (timerSteps?.length || 0)) {
+      if (currentStep) {
+        const isFinalStep = state.stepIndex + 1 >= (timerSteps?.length || 0);
+        if (shouldFinishNaturally(global, totalMs, isFinalStep)) {
           finish('natural');
-        } else {
+        } else if (!isFinalStep && step >= currentStepDurationMs) {
           // Roll step clock forward by the exact duration so residual overshoot
           // carries into the next step (e.g. tick arrived 150ms after the
           // boundary — next step starts with 150ms already elapsed).
@@ -162,7 +163,7 @@ export function useBrewTimer(recipe) {
       alive = false;
       clearInterval(id);
     };
-  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, readGlobalMs, readStepMs, finish]);
+  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, totalMs, readGlobalMs, readStepMs, finish]);
 
   // Recompute on visibility change so foreground resume doesn't wait up to
   // 100ms for the next interval fire. Matches Capacitor's JS suspension model.

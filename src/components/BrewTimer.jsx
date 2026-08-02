@@ -20,6 +20,7 @@ import { haptic } from './../lib/haptics';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
+import { resolveStepTiming } from '../lib/brewTimerSteps';
 
 const RING_SIZE = 280;
 const RING_STROKE = 10;
@@ -280,6 +281,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   const [saveState, setSaveState] = useState(null);
   const sessionRef = useRef(null);
   const reportedRef = useRef(false);
+  const isFinalStep = !!timerSteps && stepIndex + 1 >= timerSteps.length;
 
   // Freeze the effective render-time recipe as the session opens. This is
   // after HandBrewModal's dose scaling/iced transform and cannot be polluted
@@ -361,11 +363,17 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   useEffect(() => {
     if (phase !== 'running' && phase !== 'paused') return;
     if (!ringRef.current) return;
-    const duration = currentStepDurationMs || 1;
     let raf = 0;
     const paint = () => {
       const stepMs = readStepMs();
-      const p = Math.min(1, Math.max(0, stepMs / duration));
+      const timing = resolveStepTiming({
+        isFinalStep,
+        nominalDurationMs: currentStepDurationMs,
+        totalMs,
+        globalElapsedMs: readGlobalMs(),
+        stepElapsedMs: stepMs,
+      });
+      const p = Math.min(1, Math.max(0, stepMs / timing.durationMs));
       if (ringRef.current) {
         ringRef.current.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - p));
       }
@@ -377,7 +385,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
     };
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [phase, currentStepDurationMs, stepIndex, readStepMs]);
+  }, [phase, currentStepDurationMs, totalMs, stepIndex, isFinalStep, readGlobalMs, readStepMs]);
 
   // Flicker-free ring reset on step boundary. Must run synchronously before
   // the next paint. We compute the new step's correct starting offset from
@@ -388,14 +396,20 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   useLayoutEffect(() => {
     if (!ringRef.current) return;
     ringRef.current.style.transition = 'none';
-    const duration = currentStepDurationMs || 1;
     const stepMs = readStepMs();
-    const p = Math.min(1, Math.max(0, stepMs / duration));
+    const timing = resolveStepTiming({
+      isFinalStep,
+      nominalDurationMs: currentStepDurationMs,
+      totalMs,
+      globalElapsedMs: readGlobalMs(),
+      stepElapsedMs: stepMs,
+    });
+    const p = Math.min(1, Math.max(0, stepMs / timing.durationMs));
     ringRef.current.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - p));
     // force reflow
     void ringRef.current.getBoundingClientRect();
     ringRef.current.style.transition = '';
-  }, [stepIndex, currentStepDurationMs, readStepMs]);
+  }, [stepIndex, currentStepDurationMs, totalMs, isFinalStep, readGlobalMs, readStepMs]);
 
   // Auto-scroll the step pills row to keep the current step visible.
   useEffect(() => {
@@ -763,7 +777,13 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
         >
           {(timerSteps || []).map((ts, i) => {
             const status = i < stepIndex ? 'done' : i === stepIndex ? 'current' : 'upcoming';
-            const remainingMs = Math.max(0, currentStepDurationMs - stepElapsedMs);
+            const remainingMs = resolveStepTiming({
+              isFinalStep,
+              nominalDurationMs: currentStepDurationMs,
+              totalMs,
+              globalElapsedMs,
+              stepElapsedMs,
+            }).remainingMs;
             const timeLabel = status === 'current'
               ? `${formatMMSS(remainingMs)} left`
               : status === 'done'

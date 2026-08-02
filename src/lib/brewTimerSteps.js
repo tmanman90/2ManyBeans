@@ -24,3 +24,38 @@ export function buildTimerSteps(recipe) {
 export function advanceStepClock(stepStartedAtMs, durationMs, pausedMs = 0) {
   return stepStartedAtMs + durationMs + pausedMs;
 }
+
+export function shouldFinishNaturally(globalElapsedMs, totalMs, isFinalStep) {
+  return isFinalStep === true
+    && Number.isFinite(totalMs)
+    && totalMs > 0
+    && Number.isFinite(globalElapsedMs)
+    && globalElapsedMs >= totalMs;
+}
+
+// Manual navigation can enter the final instruction before its scheduled
+// start. Keep that instruction's remaining time and progress ring anchored to
+// the global guide instead of the shortened relative step chain.
+export function resolveStepTiming({
+  isFinalStep,
+  nominalDurationMs,
+  totalMs,
+  globalElapsedMs,
+  stepElapsedMs,
+}) {
+  const safeStepElapsedMs = Number.isFinite(stepElapsedMs) ? Math.max(0, stepElapsedMs) : 0;
+  if (!isFinalStep) {
+    const durationMs = Number.isFinite(nominalDurationMs) ? Math.max(1, nominalDurationMs) : 1;
+    return {
+      durationMs,
+      remainingMs: Math.max(0, durationMs - safeStepElapsedMs),
+    };
+  }
+  const safeTotalMs = Number.isFinite(totalMs) ? Math.max(0, totalMs) : 0;
+  const safeGlobalElapsedMs = Number.isFinite(globalElapsedMs) ? Math.max(0, globalElapsedMs) : 0;
+  const remainingMs = Math.max(0, safeTotalMs - safeGlobalElapsedMs);
+  return {
+    durationMs: Math.max(1, safeStepElapsedMs + remainingMs),
+    remainingMs,
+  };
+}
