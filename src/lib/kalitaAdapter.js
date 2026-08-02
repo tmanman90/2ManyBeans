@@ -1,7 +1,8 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
-export const KALITA_RULES_VERSION = 'kalita-rules-v2';
+export const KALITA_RULES_VERSION = 'kalita-rules-v3-phase1';
+export const KALITA_PHASE_CONTRACT_VERSION = 1;
 
 const GRINDER_RANGES = {
   'fellow-ode-gen2': [4, 8], 'fellow-opus': [3, 8.5], 'baratza-encore-esp': [10, 32],
@@ -88,6 +89,8 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const bloom = Math.round(config.dose * 3);
   const first = Math.round(waterGrams * 0.45);
   const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '155-extended' || config.doseProfile === '185-standard' ? 120 : 150;
+  const secondStepAt = Math.max(75, finalStepAt - 30);
+  const secondTotal = Math.round((first + waterGrams) / 2);
   const drawdownSeconds = config.doseProfile === '155-small' ? 165 : config.doseProfile === '155-extended' ? 195 : config.doseProfile === '185-standard' ? 210 : 270;
   const totalBrewTimeSeconds = finalStepAt + drawdownSeconds - 30 + clamp(intent.contactTimeAdjustmentSeconds || 0, -15, 30);
   const reasonCodes = [
@@ -96,14 +99,20 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     config.doseProfile === 'large-185' && 'LARGE_DOSE_EXTENDED_DRAWDOWN',
     config.defaultedSize && 'DEFAULTED_KALITA_SIZE', config.defaultedDose && 'DEFAULTED_KALITA_DOSE',
   ].filter(Boolean);
+  const prepSteps = [
+    { action: 'Rinse and preheat the Wave 155/185 filter and server; discard rinse water.', phase: 'prep' },
+    { action: `Add ${config.dose}g coffee and level the bed.`, phase: 'prep' },
+  ];
   const steps = [
-    { time: '0:00', timeSeconds: 0, action: `Add ${config.dose}g coffee and level the bed.`, waterTotal: 0 },
-    { time: '0:30', timeSeconds: 30, action: `Bloom with ${bloom}g water; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom },
+    { time: '0:00', timeSeconds: 0, action: `Bloom with ${bloom}g water; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom, phase: 'brew' },
     { time: '1:00', timeSeconds: 60, action: technique.key === 'center-to-spiral-pulse'
       ? `Start in the center, then pour in a controlled spiral outward to ${first}g total; keep the stream on the coffee bed, not the paper walls.`
       : technique.key === 'bloom-led-pulse'
         ? `Pour from the center in a restrained pulse to ${first}g total; keep the stream on the coffee bed and away from the paper walls.`
         : `Pour slowly and directly into the center to ${first}g total; keep the stream low and do not spiral.`, waterTotal: first },
+    { time: timeLabel(secondStepAt), timeSeconds: secondStepAt, action: technique.key === 'center-to-spiral-pulse'
+      ? `Continue the controlled spiral to ${secondTotal}g total; keep the stream on the coffee bed.`
+      : `Continue with a low centered pour to ${secondTotal}g total; do not spiral or swirl.`, waterTotal: secondTotal },
     { time: timeLabel(finalStepAt), timeSeconds: finalStepAt, action: technique.key === 'center-to-spiral-pulse'
       ? `Finish at ${waterGrams}g total with a gentle center-to-outward spiral; ${technique.finalSwirl ? 'swirl once only if the bed is uneven.' : 'do not swirl.'}`
       : technique.key === 'bloom-led-pulse'
@@ -117,7 +126,8 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     coffeeGrams: config.dose, waterGrams, ratio: `1:${ratio}`, waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) },
     grindSize: buildGrind(configuration.grinder || 'fellow-ode-gen2', targetMicrons), technique: technique.key,
     drawdownTarget: `${timeLabel(totalBrewTimeSeconds - 25)}-${timeLabel(totalBrewTimeSeconds + 20)}`,
-    steps, techniqueInstruction, totalBrewTime: timeLabel(totalBrewTimeSeconds), totalBrewTimeSeconds, timerReady: true,
+    prepSteps, steps, postBrewSteps: [], phaseContractVersion: KALITA_PHASE_CONTRACT_VERSION,
+    techniqueInstruction, totalBrewTime: timeLabel(totalBrewTimeSeconds), totalBrewTimeSeconds, guideTargetSeconds: totalBrewTimeSeconds, timerReady: true,
     reasonCodes, confidence: intent.confidence || 'low', evidenceHash: intent.evidenceHash || null,
     reasoning: `For this bean, the Wave ${config.size} recipe uses a ${technique.key.replaceAll('-', ' ')} profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.`,
     tips: `Aim for ${timeLabel(totalBrewTimeSeconds - 25)} to ${timeLabel(totalBrewTimeSeconds + 20)}. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.`,

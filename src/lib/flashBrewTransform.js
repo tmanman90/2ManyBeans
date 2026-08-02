@@ -53,6 +53,9 @@ function formatTime(totalSeconds) {
 }
 
 export function transformPourOver(hotRecipe, userDose) {
+  if (hotRecipe?.candidate === true && hotRecipe?.device === 'v60' && hotRecipe?.mode === 'hot') {
+    throw new Error('Deterministic hot V60 candidates require the independent iced V60 adapter');
+  }
   const { dose, hotWater, iceGrams } = computeIceSplit(hotRecipe, userDose);
 
   // Prefer the repaired timeSeconds (handles range times like "0:30-1:10"

@@ -47,6 +47,33 @@ const RESEARCH_CONTEXT_FIELDS = [
   'cupStructureFamily',
 ];
 
+const RECIPE_MODE_VALUES = new Set(['hot', 'iced']);
+const RECIPE_STATUS_VALUES = new Set(['original', 'scaled', 'adapted', 'aggregated']);
+
+function normalizeBrewRecipes(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 12).map((recipe) => {
+    if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
+    const mode = RECIPE_MODE_VALUES.has(recipe.mode) ? recipe.mode : null;
+    const status = RECIPE_STATUS_VALUES.has(recipe.status) ? recipe.status : 'original';
+    const doseGrams = Number(recipe.doseGrams);
+    const ratio = Number(recipe.ratio);
+    const temperatureC = Number(recipe.temperatureC);
+    if (!mode || !recipe.device || !Number.isFinite(doseGrams) || !Number.isFinite(ratio)) return null;
+    return {
+      id: sanitizeSourceText(recipe.id, 80), mode, device: sanitizeSourceText(recipe.device, 40),
+      configuration: sanitizeSourceText(recipe.configuration, 80), status,
+      author: sanitizeSourceText(recipe.author, 120), canonicalUrl: sanitizeSourceText(recipe.canonicalUrl, 300),
+      publication: sanitizeSourceText(recipe.publication, 180), doseGrams,
+      ratio, temperatureC: Number.isFinite(temperatureC) ? temperatureC : null,
+      grind: sanitizeSourceText(recipe.grind, 120), geometry: sanitizeSourceText(recipe.geometry, 240),
+      cadence: sanitizeSourceText(recipe.cadence, 240), agitation: sanitizeSourceText(recipe.agitation, 180),
+      guideSeconds: Number.isFinite(Number(recipe.guideSeconds)) ? Number(recipe.guideSeconds) : null,
+      adaptation: sanitizeSourceText(recipe.adaptation, 400), changedFields: cleanTextArray(recipe.changedFields, 12, 80),
+    };
+  }).filter((recipe) => recipe?.id && recipe.author && recipe.canonicalUrl);
+}
+
 function compactWhitespace(str) {
   return String(str || '').replace(/\s+/g, ' ').trim();
 }
@@ -116,8 +143,9 @@ export function normalizeSourceInsights(input) {
   const source = typeof input === 'string' ? { extractedTextSummary: input } : input;
   if (typeof source !== 'object' || Array.isArray(source)) return null;
 
+  const brewRecipes = normalizeBrewRecipes(source.brewRecipes || source.recipes);
   const normalized = {
-    version: 1,
+    version: brewRecipes.length ? 2 : 1,
     sourceType: sanitizeSourceText(source.sourceType || source.type || 'pamphlet', 40) || 'pamphlet',
     sourceSummary: cleanText(source.sourceSummary || source.summary || source.overview, 'sourceSummary'),
     roasterContext: normalizeObjectText(source.roasterContext || source.roasterNotes, FIELD_LIMITS.roasterContext),
@@ -129,6 +157,7 @@ export function normalizeSourceInsights(input) {
     provenance: normalizeObjectText(source.provenance || source.originStory || source.productionContext, FIELD_LIMITS.provenance),
     extractedTextSummary: cleanText(source.extractedTextSummary || source.extractedText || source.rawSummary, 'extractedTextSummary'),
     extractionWarnings: cleanText(source.extractionWarnings || source.warnings, 'extractionWarnings'),
+    brewRecipes,
   };
 
   const hasText = [
@@ -142,7 +171,8 @@ export function normalizeSourceInsights(input) {
     normalized.extractionWarnings,
   ].some(Boolean);
   const hasStructured = normalized.sensoryDescriptors.length > 0
-    || Object.keys(normalized.sensoryAxes).length > 0;
+    || Object.keys(normalized.sensoryAxes).length > 0
+    || normalized.brewRecipes.length > 0;
 
   return hasText || hasStructured ? normalized : null;
 }
@@ -183,7 +213,7 @@ export function buildSourceContextHash(bean = {}) {
     if (Object.keys(research).length) relevant.beanResearch = research;
   }
   if (!Object.keys(relevant).length) return null;
-  return `source-v1:${hashString(stableStringify(relevant))}`;
+  return `${sourceInsights?.version >= 2 ? 'source-v2' : 'source-v1'}:${hashString(stableStringify(relevant))}`;
 }
 
 export function formatSourceInsightsForPrompt(beanOrSource, { maxChars = 1200 } = {}) {
@@ -202,6 +232,7 @@ export function formatSourceInsightsForPrompt(beanOrSource, { maxChars = 1200 } 
     source.provenance && `Provenance: ${source.provenance}`,
     source.extractedTextSummary && `Extracted source text summary: ${source.extractedTextSummary}`,
     source.extractionWarnings && `Extraction cautions: ${source.extractionWarnings}`,
+    source.brewRecipes.length ? `Structured brew recipes: ${source.brewRecipes.map((recipe) => `${recipe.author} ${recipe.mode} ${recipe.doseGrams}g 1:${recipe.ratio}`).join('; ')}` : null,
   ].filter(Boolean);
 
   return lines.join('\n').slice(0, maxChars);

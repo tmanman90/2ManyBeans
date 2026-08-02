@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { V60_SOURCES, V60_TECHNIQUES, validateV60Registry, V60_SOURCE_REGISTRY_VERSION } from '../src/data/v60SourceRegistry.js';
+const result = validateV60Registry();
+assert.equal(result.valid, true, result.errors.join(', '));
+assert.equal(V60_SOURCE_REGISTRY_VERSION, 'v60-hot-sources-v1');
+assert.ok(Object.keys(V60_TECHNIQUES).length >= 6);
+assert.ok(V60_SOURCES.every((source) => source.evidenceType === 'primary'));
+assert.match(readFileSync(new URL('../docs/data/v60-source-registry.md', import.meta.url), 'utf8'), /hoffmann-one-cup-v1/);
+console.log(`v60 source registry passed (${V60_SOURCES.length} sources, ${Object.keys(V60_TECHNIQUES).length} techniques)`);
