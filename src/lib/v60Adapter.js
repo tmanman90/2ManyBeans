@@ -193,7 +193,7 @@ export function validateV60Candidate(recipe) {
   if (!recipe?.sourceLineage?.sourceRegistryVersion || !recipe?.sourceLineage?.parameterSources) errors.push('missing-provenance');
   for (const [field, sourceId] of Object.entries(recipe?.sourceLineage?.parameterSources || {})) {
     const structuredAllowed = recipe?.sourceLineage?.structuredSource === true && recipe.sourceLineage.canonicalUrls?.every((url) => url && !/reddit\.com/i.test(url));
-    if (structuredAllowed && !isKnownV60ParameterSource(sourceId) && sourceId !== recipe.sourceLineage.sourceIds?.[0]) errors.push(`embedded-source-mismatch:${field}`);
+    if (structuredAllowed && sourceId !== recipe.sourceLineage.sourceIds?.[0]) errors.push(`embedded-source-mismatch:${field}`);
     if (!isKnownV60ParameterSource(sourceId) && !structuredAllowed) errors.push(`unknown-parameter-source:${field}`);
   }
   if (recipe?.sourceLineage?.status === 'original' && recipe.sourceLineage.changedFields?.length) errors.push('original-has-changed-fields');
