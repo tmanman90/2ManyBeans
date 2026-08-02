@@ -55,7 +55,7 @@ function normalizeBrewRecipes(value) {
   return value.slice(0, 12).map((recipe) => {
     if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
     const mode = RECIPE_MODE_VALUES.has(recipe.mode) ? recipe.mode : null;
-    const status = RECIPE_STATUS_VALUES.has(recipe.status) ? recipe.status : 'original';
+    const status = RECIPE_STATUS_VALUES.has(recipe.status) ? recipe.status : 'adapted';
     const doseGrams = Number(recipe.doseGrams);
     const ratio = Number(recipe.ratio);
     const temperatureC = Number(recipe.temperatureC);
@@ -79,6 +79,7 @@ function normalizeBrewRecipes(value) {
         if (!Number.isFinite(timeSeconds) || !Number.isFinite(waterTotal) || !sanitizeSourceText(step.action, 240)) return null;
         return { timeSeconds, waterTotal, action: sanitizeSourceText(step.action, 240) };
       }).filter(Boolean) : [],
+      postBrewInstruction: sanitizeSourceText(recipe.postBrewInstruction, 240),
       adaptation: sanitizeSourceText(recipe.adaptation, 400), changedFields: cleanTextArray(recipe.changedFields, 12, 80),
     };
   }).filter((recipe) => recipe?.id && recipe.author && recipe.canonicalUrl);

@@ -3,6 +3,7 @@ import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { validateV60Candidate } from '../src/lib/v60Adapter.js';
+import { validateV60IcedCandidate } from '../src/lib/v60IcedAdapter.js';
 
 assert.equal(generateV60Recipe({ finesRisk: 'high' }, { dose: 30 }).technique, 'hoffmann-large-batch');
 const plainNatural = buildExtractionIntent({ process: 'natural', roastLevel: 'light' }, { cupStructureFamily: 'clean-natural-fruit' });
@@ -38,4 +39,6 @@ const exactIcedStructured = generateV60IcedRecipe({ sourceRecipes: [{ id: 'roast
 assert.equal(exactIcedStructured.technique, 'direct-roaster-iced-v60');
 assert.deepEqual(exactIcedStructured.steps.map((step) => [step.timeSeconds, step.waterTotal]), [[0, 45], [45, 150]]);
 assert.equal(exactIcedStructured.sourceLineage.status, 'original');
+exactIcedStructured.sourceLineage.parameterSources.ratio = 'reddit';
+assert.equal(validateV60IcedCandidate(exactIcedStructured).valid, false);
 console.log('V60 selector/source counterexamples passed');
