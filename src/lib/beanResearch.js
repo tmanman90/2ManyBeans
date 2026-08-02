@@ -136,7 +136,11 @@ export async function researchBean(bean) {
   const text = data.text || '';
   const clean = text.replace(/```json|```/g, '').trim();
   try {
-    return JSON.parse(clean);
+    const parsed = JSON.parse(clean);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('invalid research shape');
+    }
+    return parsed;
   } catch {
     throw new Error('Bean research returned invalid data. Please try again.');
   }

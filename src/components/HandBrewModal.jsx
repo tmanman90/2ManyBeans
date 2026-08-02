@@ -12,6 +12,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
 import { scaleRecipeForDose } from '../lib/recipeScaling';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
+import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
@@ -21,6 +22,30 @@ const ICE_TILE_BG    = C.frostSoft;
 const SectionLabel = ({ children, style }) => (
   <div style={{ ...type.label, color: C.textMuted, ...style }}>{children}</div>
 );
+
+const TimingMemoryHint = ({ memory, context }) => {
+  if (!memory?.event) return null;
+  const event = memory.event;
+  const configuration = [
+    event.device === 'kalita' ? `Wave ${event.kalitaSize}` : event.device.toUpperCase(),
+    `${event.doseGrams}g`,
+    event.mode === 'iced' ? 'iced' : 'hot',
+  ].filter(Boolean).join(' · ');
+  return (
+    <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
+      <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Prior brew</SectionLabel>
+      <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>
+        Last brew: <strong>{formatTimingMs(event.actualElapsedMs)}</strong> at {configuration}
+        {!memory.isExactDose && ` — current guide remains ${formatTimingMs(context.targetMs)}`}
+      </div>
+      {memory.range && (
+        <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>
+          Your last {memory.range.sampleCount} comparable brews: {formatTimingMs(memory.range.minMs)}–{formatTimingMs(memory.range.maxMs)} (middle {formatTimingMs(memory.range.medianMs)})
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── Parameter tile ─────────────────────────────────────────────────────────────
 const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
@@ -39,9 +64,83 @@ const ParamCard = ({ label, value, sub, icon: Icon, iconColor }) => (
   </div>
 );
 
+const KalitaSizeSwitch = ({ value, onChange, disabled }) => {
+  const selected = value === '155' ? '155' : '185';
+  return (
+    <div
+      role="group"
+      aria-label="Kalita Wave size"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '10px 12px',
+        marginBottom: 14,
+        background: C.amberBg,
+        border: `1px solid ${C.accentLight}`,
+        borderRadius: radius.lg,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <SectionLabel style={{ color: C.accent }}>Wave size</SectionLabel>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexShrink: 0,
+          padding: 3,
+          gap: 2,
+          background: C.card,
+          border: `1px solid ${C.borderLight}`,
+          borderRadius: radius.pill,
+          boxShadow: shadows.e1,
+        }}
+      >
+        {['155', '185'].map((size) => {
+          const active = selected === size;
+          return (
+            <m.button
+              key={size}
+              type="button"
+              onClick={() => onChange?.(size)}
+              disabled={disabled || active}
+              whileTap={disabled || active ? undefined : { scale: 0.94 }}
+              transition={spring.snappy}
+              aria-pressed={active}
+              aria-label={`Use Kalita Wave ${size}`}
+              style={{
+                minWidth: 52,
+                minHeight: 44,
+                padding: '0 12px',
+                border: 'none',
+                borderRadius: radius.pill,
+                background: active ? C.accent : 'transparent',
+                color: active ? C.cream : C.textMuted,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: disabled || active ? 'default' : 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {size}
+            </m.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const TECHNIQUE_LABELS = {
   hoffmann: 'Hoffmann Classic',
   'kasuya-46': 'Kasuya 4:6',
+  'center-pour': 'Center Pour',
+  'low-agitation-center': 'Low-Agitation Center Pour',
+  'center-to-spiral-pulse': 'Center-to-Spiral Pulse',
+  'bloom-led-pulse': 'Bloom-Led Pulse',
+  'low-agitation-no-swirl': 'Low-Agitation, No Swirl',
 };
 
 const phaseMessages = {
@@ -169,7 +268,7 @@ export const HandBrewModal = ({
   open, onClose, recipe, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
-  deviceKey,
+  deviceKey, onKalitaSizeChange, onSaveTimingEvent,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -244,6 +343,22 @@ export const HandBrewModal = ({
   }, [icedRecipe]);
 
   const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
+  const timingContext = useMemo(
+    () => timingContextFromRecipe({ beanId: bean?.id, recipe: displayRecipe, mode: 'hot' }),
+    [bean?.id, displayRecipe]
+  );
+  const timingMemory = useMemo(
+    () => selectTimingMemory(bean?.handBrewTimingMemory, timingContext),
+    [bean?.handBrewTimingMemory, timingContext]
+  );
+  const icedTimingContext = useMemo(
+    () => timingContextFromRecipe({ beanId: bean?.id, recipe: icedRecipe, mode: 'iced' }),
+    [bean?.id, icedRecipe]
+  );
+  const icedTimingMemory = useMemo(
+    () => selectTimingMemory(bean?.handBrewTimingMemory, icedTimingContext),
+    [bean?.handBrewTimingMemory, icedTimingContext]
+  );
 
   return (
     <>
@@ -301,12 +416,44 @@ export const HandBrewModal = ({
             )}
           </div>
 
+          {recipe.device === 'kalita' && (
+            <KalitaSizeSwitch
+              value={recipe.kalitaSize}
+              onChange={onKalitaSizeChange}
+              disabled={loading}
+            />
+          )}
+
           {/* Param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
             <DoseStepperCard dose={displayRecipe.coffeeGrams} onChange={onCoffeeGramsChange} />
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
+
+          {recipe.device === 'kalita' && (
+            <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
+              Wave {recipe.kalitaSize || '185'} · {recipe.doseProfile || 'legacy profile'}
+              {recipe.candidate ? ' · Bean-specific engine' : ''}
+              {recipe.generationStatus === 'fallback' ? ' · GPT fallback' : ''}
+            </div>
+          )}
+
+          {recipe.device === 'kalita' && recipe.techniqueInstruction && (
+            <div
+              role="note"
+              style={{
+                background: C.amberBg,
+                borderRadius: radius.lg,
+                padding: '12px 16px',
+                marginBottom: 14,
+                border: `1px solid ${C.accentLight}`,
+              }}
+            >
+              <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Pouring technique</SectionLabel>
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.techniqueInstruction}</div>
+            </div>
+          )}
 
           {/* Grind card */}
           {recipe.grindSize && (
@@ -367,9 +514,11 @@ export const HandBrewModal = ({
               marginBottom: 14,
               paddingTop: 4,
             }}>
-              Target brew time: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
+              Target drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
             </div>
           )}
+
+          <TimingMemoryHint memory={timingMemory} context={timingContext} />
 
           {/* Tasting tip */}
           {recipe.tips && (
@@ -596,6 +745,8 @@ export const HandBrewModal = ({
             iceAccent={C.frost}
           />
 
+          <TimingMemoryHint memory={icedTimingMemory} context={icedTimingContext} />
+
           {/* Start Iced Brew button — gated on timer data like the hot flow,
               so a non-timer-ready recipe never opens the missing-data screen */}
           {!icedRecipe.timerReady && (
@@ -648,6 +799,7 @@ export const HandBrewModal = ({
       open={timerOpen}
       recipe={timerRecipe}
       bean={bean}
+      onSaveTimingEvent={onSaveTimingEvent}
       onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
       onStartTasting={(beanId) => {
         setTimerOpen(false);

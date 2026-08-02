@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, writeBatch,
-  serverTimestamp, query, where, getDoc, getDocs, limit, deleteField
+  serverTimestamp, query, where, getDoc, getDocs, limit, deleteField, runTransaction
 } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
@@ -9,6 +9,7 @@ import { today } from '../lib/peakStatus';
 import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
+import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -220,6 +221,33 @@ export const useAppData = (uid) => {
     await refetch();
   }, [uid, refetch]);
 
+  // Timing memory is deliberately an online-only, transaction-backed additive
+  // bean field. No optimistic local mutation: a rejected write must remain
+  // visibly retryable in the timer rather than looking saved.
+  const saveHandBrewTiming = useCallback(async (beanId, snapshot) => {
+    const event = buildTimingEvent(snapshot);
+    if (!uid || !beanId || !event || event.beanId !== beanId) {
+      return { status: 'failed', error: 'This brew timing record is incomplete.' };
+    }
+    try {
+      const beanRef = doc(db, 'users', uid, 'beans', beanId);
+      await runTransaction(db, async (transaction) => {
+        const current = await transaction.get(beanRef);
+        if (!current.exists()) throw new Error('This bean is no longer available.');
+        const history = mergeTimingEvent(current.data().handBrewTimingMemory, event);
+        transaction.update(beanRef, {
+          handBrewTimingMemory: history,
+          updatedAt: serverTimestamp(),
+        });
+      });
+      await refetch();
+      return { status: 'saved' };
+    } catch (error) {
+      console.warn('[timingMemory] save failed:', error?.message || error);
+      return { status: 'failed', error: 'Could not save brew timing. Try again.' };
+    }
+  }, [uid, refetch]);
+
   const deleteBean = useCallback(async (beanId) => {
     if (!uid) return;
     // Clean up Storage photo (non-blocking)
@@ -391,6 +419,7 @@ export const useAppData = (uid) => {
     tastings,
     addBean,
     updateBean,
+    saveHandBrewTiming,
     deleteBean,
     addTasting,
     updateTasting,

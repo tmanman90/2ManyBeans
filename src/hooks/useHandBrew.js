@@ -8,17 +8,21 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { researchBean } from '../lib/beanResearch';
 import { generateHandBrewRecipe, repairHandBrewRecipe } from '../lib/handbrew';
-import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
+import { buildSourceContextHash } from '../lib/sourceInsights';
+import { normalizeRecipeEvidence } from '../lib/recipeEvidence';
+import { buildExtractionIntent } from '../lib/extractionIntent';
+import { generateKalitaRecipe, KALITA_ENGINE_VERSION, KALITA_RULES_VERSION } from '../lib/kalitaAdapter';
 import { usePreferences } from './useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
 
-export function useHandBrew(updateBean) {
+export function useHandBrew(updateBean, saveHandBrewTiming) {
   const mountedRef = useRef(true);
   const activeRequestRef = useRef(null);
+  const timingSaveInFlightRef = useRef(null);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const { preferences } = usePreferences();
+  const { preferences, updatePreferences } = usePreferences();
   const { hasPro } = useSubscription();
   const { openPaywall } = usePaywall();
   const [handBrewModal, setHandBrewModal] = useState(false);
@@ -38,9 +42,18 @@ export function useHandBrew(updateBean) {
 
   const recipeMatchesSource = (bean, recipe) => {
     if (!recipe) return false;
-    if (!hasSourceInsights(bean)) return true;
     const hash = buildSourceContextHash(bean);
-    return Boolean(hash && recipe.sourceContextHash === hash);
+    if (!hash) return !recipe.sourceContextHash;
+    return recipe.sourceContextHash === hash;
+  };
+
+  const candidateMatchesConfiguration = (recipe, device, dose, activePreferences = preferences) => {
+    if (!recipe?.candidate) return true;
+    return recipe.device === device
+      && recipe.engineVersion === KALITA_ENGINE_VERSION
+      && recipe.rulesVersion === KALITA_RULES_VERSION
+      && recipe.kalitaSize === (activePreferences?.kalitaSize || '185')
+      && recipe.coffeeGrams === dose;
   };
 
   // Resolve the brew device from preferences (default to v60 for non-aiden methods)
@@ -51,17 +64,37 @@ export function useHandBrew(updateBean) {
     return m;
   };
 
-  const handleBrewHandBrew = async (bean, cachedResearch = null, forceRegenerate = false, deviceOverride = null) => {
+  const handleBrewHandBrew = async (
+    bean,
+    cachedResearch = null,
+    forceRegenerate = false,
+    deviceOverride = null,
+    generationOverrides = {},
+  ) => {
     const device = deviceOverride || getBrewDevice();
-    const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
+    const activePreferences = {
+      ...preferences,
+      ...(generationOverrides.kalitaSize ? { kalitaSize: generationOverrides.kalitaSize } : {}),
+    };
+    const grinderKey = activePreferences?.grinder || 'fellow-ode-gen2';
+    // Kalita is now automatically bean-specific. The legacy GPT path remains
+    // an invisible fallback if evidence normalization or candidate generation
+    // fails; users do not need to choose between engines.
+    const candidateMode = device === 'kalita' ? 'candidate' : 'legacy';
+    const requestedDose = generationOverrides.doseOverride ?? Number(bean.userCoffeeGrams || bean.handBrewRecipes?.[device]?.userCoffeeGrams);
+    const defaultDose = (activePreferences?.kalitaSize || '185') === '155' ? 15 : 20;
+    const candidateDose = Number.isFinite(requestedDose) && requestedDose > 0 ? requestedDose : defaultDose;
 
     // Check keyed cache first, fall back to legacy single-recipe field
     const keyedRecipe = bean.handBrewRecipes?.[device];
     const legacyRecipe = bean.handBrewRecipe;
     const cachedCandidate = keyedRecipe ||
       (legacyRecipe && (legacyRecipe.device || 'v60') === device ? legacyRecipe : null);
-    const cached = recipeMatchesSource(bean, cachedCandidate) ? cachedCandidate : null;
-    const sourceHash = buildSourceContextHash(bean);
+    const kalitaCacheEligible = device !== 'kalita' || cachedCandidate?.candidate === true;
+    const cached = kalitaCacheEligible
+      && recipeMatchesSource(bean, cachedCandidate)
+      && candidateMatchesConfiguration(cachedCandidate, device, candidateDose, activePreferences)
+      ? cachedCandidate : null;
 
     if (!forceRegenerate && cached) {
       const cachedGrinder = cached.grinder || 'fellow-ode-gen2';
@@ -123,21 +156,52 @@ export function useHandBrew(updateBean) {
     // Step 2: Generate recipe with device context
     setHandBrewPhase('recipe');
     try {
-      const recipe = await generateHandBrewRecipe(bean, research, preferences, device);
+      let recipe;
+      let shadowCandidate = null;
+      if (device === 'kalita' && (candidateMode === 'candidate' || candidateMode === 'shadow')) {
+        try {
+          const evidence = normalizeRecipeEvidence(bean, research);
+          const intent = buildExtractionIntent(evidence);
+          shadowCandidate = generateKalitaRecipe(intent, {
+            size: activePreferences?.kalitaSize,
+            dose: candidateDose,
+            grinder: grinderKey,
+          });
+          recipe = candidateMode === 'candidate' ? shadowCandidate : null;
+        } catch (candidateError) {
+          console.warn('[handBrew] Kalita candidate failed; falling back to GPT:', candidateError?.message || candidateError);
+        }
+      }
+      if (!recipe) {
+        recipe = await generateHandBrewRecipe(bean, research, activePreferences, device);
+        if (device === 'kalita' && candidateMode === 'candidate') {
+          recipe = { ...recipe, generationStatus: 'fallback', fallbackReason: 'kalita-candidate-unavailable' };
+        }
+      }
       if (!isActive(rid)) return;
       const recipeData = {
         ...recipe,
         generatedAt: new Date().toISOString(),
         grinder: grinderKey,
         device,
-        sourceContextHash: sourceHash,
+        sourceContextHash: buildSourceContextHash({ ...bean, beanResearch: research }),
+        ...(recipe.candidate ? {
+          engineVersion: recipe.engineVersion,
+          rulesVersion: recipe.rulesVersion,
+          evidenceHash: recipe.evidenceHash,
+        } : {}),
+        ...(candidateMode === 'shadow' && shadowCandidate ? { shadowCandidate } : {}),
       };
       setHandBrewRecipe(recipeData);
       setHandBrewError(null);
       if (bean.id) {
+        // Shadow candidates remain in memory only. The saved recipe stays on
+        // the legacy path until the separately gated cutover is enabled.
+        const persistedRecipe = { ...recipeData };
+        delete persistedRecipe.shadowCandidate;
         await updateBean(bean.id, {
-          handBrewRecipe: recipeData,
-          [`handBrewRecipes.${device}`]: recipeData,
+          handBrewRecipe: persistedRecipe,
+          [`handBrewRecipes.${device}`]: persistedRecipe,
         });
       }
     } catch (err) {
@@ -148,6 +212,28 @@ export function useHandBrew(updateBean) {
       setHandBrewLoading(false);
       setHandBrewPhase(null);
     }
+  };
+
+  const handleKalitaSizeChange = async (size) => {
+    const nextSize = String(size);
+    if (!['155', '185'].includes(nextSize) || handBrewRecipe?.device !== 'kalita' || !handBrewBean) return;
+
+    try {
+      await updatePreferences({ kalitaSize: nextSize });
+    } catch (err) {
+      console.warn('[handBrew] Kalita size preference failed:', err?.message || err);
+      setHandBrewError('Could not save the Wave size. Try again.');
+      return;
+    }
+
+    setUserCoffeeGrams(undefined);
+    await handleBrewHandBrew(
+      handBrewBean,
+      handBrewResearch,
+      true,
+      'kalita',
+      { kalitaSize: nextSize, doseOverride: nextSize === '155' ? 15 : 20 },
+    );
   };
 
   const closeHandBrewModal = () => {
@@ -177,13 +263,27 @@ export function useHandBrew(updateBean) {
     }
   }, [handBrewBean, handBrewRecipe, updateBean]);
 
+  const saveTimingEvent = useCallback(async (snapshot) => {
+    if (!handBrewBean?.id || !saveHandBrewTiming) return { status: 'ephemeral' };
+    if (timingSaveInFlightRef.current) return timingSaveInFlightRef.current;
+    const pending = saveHandBrewTiming(handBrewBean.id, snapshot);
+    timingSaveInFlightRef.current = pending;
+    try {
+      return await pending;
+    } finally {
+      if (timingSaveInFlightRef.current === pending) timingSaveInFlightRef.current = null;
+    }
+  }, [handBrewBean?.id, saveHandBrewTiming]);
+
   return {
     handBrewModal, handBrewRecipe, handBrewLoading, handBrewError,
     handBrewPhase, handBrewBean, handBrewResearch,
     handleBrewHandBrew, closeHandBrewModal,
+    handleKalitaSizeChange,
     userCoffeeGrams,
     setUserCoffeeGrams,
     persistDose,
+    saveTimingEvent,
     onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, false, handBrewRecipe?.device) : undefined,
     onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe?.device) : undefined,
   };

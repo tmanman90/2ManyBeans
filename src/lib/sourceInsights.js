@@ -38,6 +38,15 @@ const CONTEXT_FIELDS = [
   'sourcedBy',
 ];
 
+const RESEARCH_CONTEXT_FIELDS = [
+  'roastLevel',
+  'processingNuance',
+  'densityEstimate',
+  'extractionNotes',
+  'flavorExpectations',
+  'cupStructureFamily',
+];
+
 function compactWhitespace(str) {
   return String(str || '').replace(/\s+/g, ' ').trim();
 }
@@ -165,6 +174,14 @@ export function buildSourceContextHash(bean = {}) {
     if (val) relevant[key] = val;
   }
   if (sourceInsights) relevant.sourceInsights = sourceInsights;
+  if (bean.beanResearch && typeof bean.beanResearch === 'object' && !Array.isArray(bean.beanResearch)) {
+    const research = {};
+    for (const key of RESEARCH_CONTEXT_FIELDS) {
+      const value = sanitizeSourceText(bean.beanResearch[key], key === 'extractionNotes' || key === 'flavorExpectations' || key === 'processingNuance' ? 500 : 120);
+      if (value) research[key] = value;
+    }
+    if (Object.keys(research).length) relevant.beanResearch = research;
+  }
   if (!Object.keys(relevant).length) return null;
   return `source-v1:${hashString(stableStringify(relevant))}`;
 }

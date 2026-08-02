@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "mode": "offline-fixture-replay",
+  "generatedAt": null,
+  "recipes": [],
+  "note": "Populate only by explicitly running the networked capture outside deterministic tests; this frozen artifact is intentionally empty until a reviewed capture exists."
+}

@@ -1,0 +1,10 @@
+[
+  {"id":"washed-floral-155-hot","process":"washed","roastLevel":"light","size":"155","dose":15,"grinder":"fellow-ode-gen2","mode":"hot"},
+  {"id":"washed-kenya-185-hot","process":"washed","roastLevel":"light","size":"185","dose":20,"grinder":"fellow-opus","mode":"hot"},
+  {"id":"natural-185-iced","process":"natural","roastLevel":"light","size":"185","dose":20,"grinder":"comandante-c40","mode":"iced"},
+  {"id":"processed-185-hot","process":"anaerobic honey","roastLevel":"light-medium","size":"185","dose":30,"grinder":"baratza-encore-esp","mode":"hot"},
+  {"id":"medium-155-hot","process":"washed","roastLevel":"medium","size":"155","dose":15,"grinder":"baratza-virtuoso-plus","mode":"hot"},
+  {"id":"dark-185-hot","process":"natural","roastLevel":"dark","size":"185","dose":20,"grinder":"1zpresso-jx-pro","mode":"hot"},
+  {"id":"sparse-unknown","process":"","roastLevel":"","size":"","dose":null,"grinder":"unknown","mode":"hot"},
+  {"id":"contradictory-source","process":"washed natural","roastLevel":"light","size":"185","dose":20,"grinder":"fellow-ode-gen2","mode":"hot"}
+]

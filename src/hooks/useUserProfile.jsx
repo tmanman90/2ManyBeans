@@ -9,6 +9,7 @@ const DEFAULT_PREFERENCES = {
   grinder: 'fellow-ode-gen2',
   grinderCustomName: null,
   brewMethod: 'aiden',
+  kalitaSize: '185',
   grindSizeDisplay: 'default',
   canisterCount: 3,
 };

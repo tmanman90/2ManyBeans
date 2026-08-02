@@ -381,7 +381,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTiming, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter }) => {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
@@ -512,7 +512,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
   };
   const isHandBrew = preferences.brewMethod !== 'aiden';
   const aiden = useAidenBrew(ephemeralUpdateBean);
-  const handBrew = useHandBrew(ephemeralUpdateBean);
+  const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
 
   useEffect(() => {
     if (!streamingSlot && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -1355,11 +1355,13 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, addTasting, upda
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        onKalitaSizeChange={handBrew.handleKalitaSizeChange}
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
         onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
         onPersistDose={handBrew.persistDose}
+        onSaveTimingEvent={handBrew.saveTimingEvent}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>

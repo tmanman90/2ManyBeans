@@ -63,7 +63,7 @@ const OpenJarBtn = ({ onClick }) => (
   </GlassButton>
 );
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, saveHandBrewTiming, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const isHandBrew = preferences.brewMethod !== 'aiden';
   const canisterCount = preferences.canisterCount || 3;
@@ -99,7 +99,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const [toast, setToast] = useState(null);
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
-  const handBrew = useHandBrew(updateBean);
+  const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
   const [editBean, setEditBean] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
@@ -518,11 +518,13 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         phase={handBrew.handBrewPhase}
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
+        onKalitaSizeChange={handBrew.handleKalitaSizeChange}
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
         onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
         onPersistDose={handBrew.persistDose}
+        onSaveTimingEvent={handBrew.saveTimingEvent}
       />
       <FinishBagPrompt
         open={!!finishPrompt}

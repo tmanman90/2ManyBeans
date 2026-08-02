@@ -41,7 +41,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.webp' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, isDemo, onDemoAction }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTiming, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   // Onboarding palate seam (null for every pre-onboarding-100x profile).
@@ -278,6 +278,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
             onReturnBean={returnBean}
             onOpenBean={handleOpenBean}
             updateBean={updateBean}
+            saveHandBrewTiming={saveHandBrewTiming}
             deleteBean={deleteBean}
             addBean={addBean}
             addTasting={addTasting}
@@ -299,6 +300,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
               onOpenBean={handleOpenBean}
               onAddBean={addBean}
               updateBean={updateBean}
+              saveHandBrewTiming={saveHandBrewTiming}
               deleteBean={deleteBean}
               onFinishBean={finishBean}
               addTasting={addTasting}
@@ -342,6 +344,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, deleteBean, add
                 tastings={tastings}
                 addBean={addBean}
                 updateBean={updateBean}
+                saveHandBrewTiming={saveHandBrewTiming}
                 addTasting={addTasting}
                 updateTasting={updateTasting}
                 profile={profile}
