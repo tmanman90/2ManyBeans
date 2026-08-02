@@ -3,7 +3,7 @@
 // deterministic comparison contract.
 
 export const TIMING_MEMORY_LIMIT = 24;
-export const LEARNING_COMPLETION_KINDS = new Set(['natural', 'manualEarly']);
+export const LEARNING_COMPLETION_KINDS = new Set(['natural', 'manualEarly', 'userFinished']);
 const COMPLETION_KINDS = new Set([...LEARNING_COMPLETION_KINDS, 'skipped']);
 
 const finiteNonNegative = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;

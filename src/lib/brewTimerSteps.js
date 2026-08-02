@@ -17,3 +17,45 @@ export function buildTimerSteps(recipe) {
   }
   return out;
 }
+
+// Move a step's wall-clock anchor across one completed active interval.
+// Paused time belongs on the anchor too: once the per-step pause accumulator is
+// cleared, omitting it here would make the next step appear already elapsed.
+export function advanceStepClock(stepStartedAtMs, durationMs, pausedMs = 0) {
+  return stepStartedAtMs + durationMs + pausedMs;
+}
+
+export function resolveGuideState(globalElapsedMs, totalMs) {
+  const safeGlobalElapsedMs = Number.isFinite(globalElapsedMs) ? Math.max(0, globalElapsedMs) : 0;
+  const safeTotalMs = Number.isFinite(totalMs) ? Math.max(0, totalMs) : 0;
+  return {
+    reached: safeTotalMs > 0 && safeGlobalElapsedMs >= safeTotalMs,
+    remainingMs: Math.max(0, safeTotalMs - safeGlobalElapsedMs),
+    overtimeMs: Math.max(0, safeGlobalElapsedMs - safeTotalMs),
+  };
+}
+
+// Manual navigation can enter the final instruction before its scheduled
+// start. Keep that instruction's remaining time and progress ring anchored to
+// the global guide instead of the shortened relative step chain.
+export function resolveStepTiming({
+  isFinalStep,
+  nominalDurationMs,
+  totalMs,
+  globalElapsedMs,
+  stepElapsedMs,
+}) {
+  const safeStepElapsedMs = Number.isFinite(stepElapsedMs) ? Math.max(0, stepElapsedMs) : 0;
+  if (!isFinalStep) {
+    const durationMs = Number.isFinite(nominalDurationMs) ? Math.max(1, nominalDurationMs) : 1;
+    return {
+      durationMs,
+      remainingMs: Math.max(0, durationMs - safeStepElapsedMs),
+    };
+  }
+  const { remainingMs } = resolveGuideState(globalElapsedMs, totalMs);
+  return {
+    durationMs: Math.max(1, safeStepElapsedMs + remainingMs),
+    remainingMs,
+  };
+}

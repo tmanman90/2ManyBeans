@@ -23,6 +23,7 @@ const sample = (sessionId, overrides = {}) => ({
   assert.equal(event.lineage.profile, 'kalita-v1:r1');
   assert.equal(event.actualElapsedMs, 182000);
   assert.ok(buildTimingEvent(sample('natural', { completionKind: 'natural' })));
+  assert.ok(buildTimingEvent(sample('finished', { completionKind: 'userFinished' })));
 }
 
 // Bad, missing, and duplicate legacy data is harmless rather than becoming a
