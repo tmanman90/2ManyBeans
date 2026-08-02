@@ -17,3 +17,10 @@ export function buildTimerSteps(recipe) {
   }
   return out;
 }
+
+// Move a step's wall-clock anchor across one completed active interval.
+// Paused time belongs on the anchor too: once the per-step pause accumulator is
+// cleared, omitting it here would make the next step appear already elapsed.
+export function advanceStepClock(stepStartedAtMs, durationMs, pausedMs = 0) {
+  return stepStartedAtMs + durationMs + pausedMs;
+}

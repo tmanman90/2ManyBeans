@@ -16,7 +16,7 @@
 // brief highlight); the hook does not need a separate phase for it.
 
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { buildTimerSteps } from '../lib/brewTimerSteps';
+import { advanceStepClock, buildTimerSteps } from '../lib/brewTimerSteps';
 export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
@@ -142,7 +142,11 @@ export function useBrewTimer(recipe) {
           // Roll step clock forward by the exact duration so residual overshoot
           // carries into the next step (e.g. tick arrived 150ms after the
           // boundary — next step starts with 150ms already elapsed).
-          stepStartedAtRef.current = stepStartedAtRef.current + currentStepDurationMs;
+          stepStartedAtRef.current = advanceStepClock(
+            stepStartedAtRef.current,
+            currentStepDurationMs,
+            stepPausedAccumMsRef.current,
+          );
           stepPausedAccumMsRef.current = 0;
           // Reset the display state BEFORE dispatching so the next render sees
           // 0 against the new step duration instead of the overshoot value
