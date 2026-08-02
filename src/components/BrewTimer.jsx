@@ -313,6 +313,17 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   const reportedRef = useRef(false);
   const isFinalStep = !!timerSteps && stepIndex + 1 >= timerSteps.length;
   const guideState = resolveGuideState(globalElapsedMs, totalMs);
+  const guideRangeSeconds = Array.isArray(recipe?.guideRangeSeconds)
+    && recipe.guideRangeSeconds.length === 2
+    && recipe.guideRangeSeconds.every(Number.isFinite)
+    ? recipe.guideRangeSeconds
+    : null;
+  const guideWindowMs = guideRangeSeconds?.map((seconds) => seconds * 1000) || [totalMs, totalMs];
+  const guideWindowStarted = globalElapsedMs >= guideWindowMs[0];
+  const guideWindowPassed = globalElapsedMs > guideWindowMs[1];
+  const guideWindowText = guideRangeSeconds
+    ? `${formatMMSS(guideWindowMs[0])}–${formatMMSS(guideWindowMs[1])}`
+    : formatMMSS(totalMs);
 
   // Freeze the effective render-time recipe as the session opens. This is
   // after HandBrewModal's dose scaling/iced transform and cannot be polluted
@@ -738,9 +749,11 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
               marginTop: 4,
               letterSpacing: '0.01em',
             }}>
-              {guideState.reached
-                ? `guide reached · +${formatMMSS(guideState.overtimeMs)}`
-                : `guide finish ${formatMMSS(totalMs)}`}
+              {guideWindowPassed
+                ? `past expected window · +${formatMMSS(globalElapsedMs - guideWindowMs[1])}`
+                : guideWindowStarted
+                  ? 'in expected window · finish on drawdown'
+                  : `expected drawdown ${guideWindowText}`}
             </div>
           </div>
         </div>
@@ -751,7 +764,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
             aria-label="Finish brew"
             style={{ minHeight: 44, padding: '10px 18px', borderRadius: radius.pill, border: `1px solid ${C.accentLight}`, background: C.amberBg, color: C.accent, fontFamily: fonts.body, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
           >
-            {guideState.reached ? 'Finish When Drawdown Ends' : 'Finish Brew'}
+            {guideWindowStarted ? 'Finish When Drawdown Ends' : 'Finish Brew'}
           </button>
         )}
 
@@ -821,9 +834,15 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
               stepElapsedMs,
             }).remainingMs;
             const timeLabel = status === 'current'
-              ? (isFinalStep && guideState.reached
-                  ? `+${formatMMSS(guideState.overtimeMs)} over`
-                  : `${formatMMSS(remainingMs)} left`)
+              ? (isFinalStep && guideRangeSeconds
+                  ? guideWindowPassed
+                    ? `+${formatMMSS(globalElapsedMs - guideWindowMs[1])} past window`
+                    : guideWindowStarted
+                      ? 'finish on drawdown'
+                      : `${formatMMSS(guideWindowMs[0] - globalElapsedMs)} to window`
+                  : isFinalStep && guideState.reached
+                    ? `+${formatMMSS(guideState.overtimeMs)} over`
+                    : `${formatMMSS(remainingMs)} left`)
               : status === 'done'
                 ? `@${formatMMSS(ts.startSeconds * 1000)}`
                 : `@${formatMMSS(ts.startSeconds * 1000)}`;

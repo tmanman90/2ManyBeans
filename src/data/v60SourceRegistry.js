@@ -1,7 +1,7 @@
 // Machine-readable, human-audited hot V60 02 source registry.
 // Numeric fields are starting evidence, not universal guarantees. Adapters
 // record when a source recipe is scaled or bounded for the app.
-export const V60_SOURCE_REGISTRY_VERSION = 'v60-hot-sources-v1';
+export const V60_SOURCE_REGISTRY_VERSION = 'v60-hot-sources-v2';
 export const V60_RULES = Object.freeze({
   'v60-adaptation-bounded-v1': { allowedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'geometry', 'cadence', 'agitation', 'water', 'bloom', 'guide'], bounds: { dose: [12, 30], ratio: [15, 18.5] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1'] },
   'v60-dose-scaling-v1': { allowedFields: ['dose', 'water', 'bloom', 'cadence', 'guide'], bounds: { dose: [12, 30] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1'] },
@@ -13,8 +13,10 @@ export const V60_SOURCES = Object.freeze([
     id: 'hoffmann-one-cup-v1', author: 'James Hoffmann',
     canonicalUrl: 'https://www.youtube.com/watch?v=1oB1oDrDkHM', publication: 'one-cup V60',
     evidenceType: 'primary', status: 'original', brewer: 'V60 02', doseGrams: 15,
-    ratio: 16.67, temperatureC: 100, grind: 'medium-fine', guideSeconds: 210,
-    geometry: 'center bloom, controlled spiral, keep stream off paper', agitation: 'one gentle swirl after final pour', executableCadence: false,
+    ratio: 16.67, temperatureC: 100, grind: 'medium-fine', guideSeconds: 180, guideRangeSeconds: [165, 210],
+    bloomGrams: 50,
+    pourTargets: [{ seconds: 45, grams: 100 }, { seconds: 70, grams: 150 }, { seconds: 90, grams: 200 }, { seconds: 110, grams: 250 }],
+    geometry: 'center bloom, controlled spiral pulses, keep stream off paper', agitation: 'gentle bloom swirl and one gentle final swirl', executableCadence: true,
   },
   {
     id: 'hoffmann-large-batch-v1', author: 'James Hoffmann / Hario',
@@ -44,7 +46,8 @@ export const V60_SOURCES = Object.freeze([
     canonicalUrl: 'https://www.heartroasters.com/pages/v60', publication: 'V60 brew guide',
     evidenceType: 'primary', status: 'original', brewer: 'V60 02', doseGrams: 22,
     ratio: 360 / 22, temperatureC: 95, temperatureRangeC: [93, 96], grind: 'medium-fine', guideSeconds: 145, guideRangeSeconds: [140, 150], bloomRangeGrams: [40, 50],
-    geometry: 'vigorous bloom stir, slow center pour', agitation: 'vigorous bloom stir and final stir', executableCadence: false,
+    bloomRestSeconds: 20, pourEndRangeSeconds: [110, 120],
+    geometry: 'vigorous bloom stir, slow center pour', agitation: 'vigorous bloom stir and final stir', executableCadence: true,
   },
   {
     id: 'kurasu-controlled-pulses-v1', author: 'Kurasu',

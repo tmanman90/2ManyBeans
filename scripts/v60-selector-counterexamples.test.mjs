@@ -54,7 +54,7 @@ const partialStructured = generateV60Recipe({}, { dose: 15 }, {
   sourceInsights: { brewRecipes: [{ id: 'reddit-partial', mode: 'hot', device: 'v60', configuration: 'V60 02', status: 'original', author: 'Community', canonicalUrl: 'https://www.reddit.com/r/pourover', doseGrams: 15, ratio: 16, temperatureC: null, grind: '', geometry: 'vague', cadence: '', agitation: '', guideSeconds: null }] },
 });
 assert.notEqual(partialStructured.technique, 'direct-roaster-v60');
-assert.equal(partialStructured.sourceLineage.status, 'adapted');
+assert.equal(partialStructured.sourceLineage.status, 'original');
 const exactIcedIntent = { targetTemperatureC: 93, sourceRecipes: [{ id: 'partial-iced-first', mode: 'iced', device: 'v60', configuration: 'V60 02', status: 'original', canonicalUrl: 'https://roaster.example/partial-iced', doseGrams: 16 }, { id: 'roaster-iced', mode: 'iced', device: 'v60', configuration: 'V60 02', status: 'original', author: 'Roaster', canonicalUrl: 'https://roaster.example/iced', doseGrams: 16, ratio: 14, temperatureC: 96, grind: 'medium-fine', hotWaterGrams: 150, iceGrams: 74, finalWaterGrams: 224, guideSeconds: 130, steps: [{ timeSeconds: 0, waterTotal: 45, action: 'Bloom in a centered path.' }, { timeSeconds: 45, waterTotal: 150, action: 'Finish with a low center pulse.' }], geometry: 'center path', cadence: '45s', agitation: 'low' }] };
 const exactIcedResult = generateV60IcedWithFallback({ intent: exactIcedIntent, configuration: { dose: 16 } });
 assert.equal(exactIcedResult.usedFallback, false);

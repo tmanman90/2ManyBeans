@@ -8,7 +8,7 @@ assert.match(modal, /TimingMemoryHint/);
 assert.match(modal, /selectTimingMemory\(bean\?\.handBrewTimingMemory, timingContext\)/);
 assert.match(modal, /scaleRecipeForDose\(recipe, effectiveDose\)/);
 assert.match(modal, /onSaveTimingEvent=\{onSaveTimingEvent\}/);
-assert.match(modal, /current guide remains/);
+assert.match(modal, /different dose, so use this only as context/);
 assert.match(modal, /mode: 'iced'/);
 assert.match(modal, /TimingMemoryHint memory=\{icedTimingMemory\}/);
 assert.match(chat, /useHandBrew\(ephemeralUpdateBean, saveHandBrewTiming\)/);

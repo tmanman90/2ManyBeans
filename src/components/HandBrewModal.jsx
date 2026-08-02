@@ -38,7 +38,7 @@ const TimingMemoryHint = ({ memory, context }) => {
       <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Prior brew</SectionLabel>
       <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>
         Last brew: <strong>{formatTimingMs(event.actualElapsedMs)}</strong> at {configuration}
-        {!memory.isExactDose && ` — current guide remains ${formatTimingMs(context.targetMs)}`}
+        {!memory.isExactDose && ' — different dose, so use this only as context'}
       </div>
       {memory.range && (
         <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>
@@ -162,6 +162,14 @@ const renderTemp = (wt) => {
   return `${c}°C / ${f}°F`;
 };
 
+const renderGuideRange = (recipe) => {
+  const range = recipe?.guideRangeSeconds;
+  if (Array.isArray(range) && range.length === 2 && range.every(Number.isFinite)) {
+    return `${formatTimingMs(range[0] * 1000)}–${formatTimingMs(range[1] * 1000)}`;
+  }
+  return recipe?.totalBrewTime || null;
+};
+
 const GrindDisplay = ({ grindSize, grinderName, preferences, accentColor }) => {
   const hasMicrons = Number.isFinite(grindSize.microns);
   const isMicrons = preferences?.grindSizeDisplay === 'microns' && hasMicrons;
@@ -252,6 +260,11 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
                 {step.time}
               </div>
               <div style={{ flex: 1 }}>
+                {step.name && (
+                  <div style={{ ...type.caption, color: C.textMuted, fontWeight: 800, marginBottom: 2 }}>
+                    {step.name}
+                  </div>
+                )}
                 <div style={{ ...type.bodyL, color: C.text, lineHeight: 1.4 }}>{step.action}</div>
                 {step.waterTotal > 0 && (
                   <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>
@@ -301,6 +314,7 @@ export const HandBrewModal = ({
     [recipe, effectiveDose]
   );
   const displayRecipe = useMemo(() => normalizeRecipePhases(scaledRecipe), [scaledRecipe]);
+  const hotGuideRange = useMemo(() => renderGuideRange(displayRecipe), [displayRecipe]);
   const hotTimerSteps = useMemo(() => buildTimerSteps(displayRecipe), [displayRecipe]);
   const timerReady = Boolean(hotTimerSteps) && !doseUpdating;
 
@@ -415,7 +429,7 @@ export const HandBrewModal = ({
         <m.div ref={modalContentRef} {...fadeUp}>
           {/* Recipe header */}
           <div style={{ marginBottom: 16 }}>
-            <SectionLabel style={{ marginBottom: 6 }}>Hand Brew Recipe</SectionLabel>
+            <SectionLabel style={{ marginBottom: 6 }}>{recipe.device === 'v60' ? 'V60 02 · Hot' : 'Hand brew recipe'}</SectionLabel>
             <div style={{
               fontFamily: fonts.heading,
               fontSize: 24,
@@ -428,7 +442,7 @@ export const HandBrewModal = ({
             </div>
             {(recipe.techniqueLabel || (recipe.technique && TECHNIQUE_LABELS[recipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
-                {recipe.techniqueLabel || TECHNIQUE_LABELS[recipe.technique]} Method
+                {recipe.techniqueLabel || TECHNIQUE_LABELS[recipe.technique]} method
               </div>
             )}
           </div>
@@ -547,7 +561,7 @@ export const HandBrewModal = ({
               marginBottom: 14,
               paddingTop: 4,
             }}>
-              Target drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{displayRecipe.totalBrewTime}</strong>
+              Expected drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{hotGuideRange}</strong>
             </div>
           )}
 
@@ -563,7 +577,7 @@ export const HandBrewModal = ({
               border: `1px solid ${C.green}22`,
               boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ color: C.green, marginBottom: 6 }}>Tasting Tip</SectionLabel>
+              <SectionLabel style={{ color: C.green, marginBottom: 6 }}>{recipe.device === 'v60' ? 'Drawdown tip' : 'Tasting tip'}</SectionLabel>
               <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.tips}</div>
             </div>
           )}
@@ -699,7 +713,7 @@ export const HandBrewModal = ({
             </div>
             {(icedRecipe.techniqueLabel || (icedRecipe.technique && TECHNIQUE_LABELS[icedRecipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
-                {icedRecipe.techniqueLabel || TECHNIQUE_LABELS[icedRecipe.technique]} Method
+                {icedRecipe.techniqueLabel || TECHNIQUE_LABELS[icedRecipe.technique]} method
               </div>
             )}
             {icedRecipe.reasoning && (

@@ -25,4 +25,19 @@ assert.equal(fallback.grindSize.setting, null);
 assert.equal(fallback.fallbackReason, 'malformed-evidence');
 const intent = buildExtractionIntent({ process: 'washed', roastLevel: 'light' });
 assert.equal(generateV60Recipe(intent, { dose: 15 }).device, 'v60');
+
+const floralLowTemperature = buildExtractionIntent(
+  { process: 'washed', roastLevel: 'light', brewingRec: 'Use a center-to-spiral pour at 95C.' },
+  { cupStructureFamily: 'washed-floral-clarity', densityEstimate: 'high' },
+);
+assert.equal(generateV60Recipe(floralLowTemperature, { dose: 15 }).technique, 'hoffmann-small-pulses');
+
+const heart15 = generateV60Recipe({ finesRisk: 'high' }, { dose: 15 });
+const heart20 = generateV60Recipe({ finesRisk: 'high' }, { dose: 20 });
+assert.ok(heart15.guideTargetSeconds < heart20.guideTargetSeconds);
+assert.equal(heart15.ratio, '1:16.36');
+for (const recipe of [heart15, heart20]) {
+  assert.ok(recipe.guideRangeSeconds[0] <= recipe.guideTargetSeconds);
+  assert.ok(recipe.guideTargetSeconds <= recipe.guideRangeSeconds[1]);
+}
 console.log(`v60 adapter passed (${cases.length} branches + fallback)`);

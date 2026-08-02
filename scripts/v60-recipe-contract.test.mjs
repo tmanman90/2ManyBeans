@@ -5,10 +5,15 @@ for (const dose of [12, 15, 18, 20, 24, 25, 30]) {
   const recipe = generateV60Recipe({ reasonCodes: [] }, { dose, grinder: dose === 20 ? 'other' : 'fellow-ode-gen2' });
   assert.equal(validateV60Candidate(recipe).valid, true);
   assert.ok(recipe.guideTargetSeconds > recipe.steps.at(-1).timeSeconds);
+  assert.ok(recipe.guideRangeSeconds[0] <= recipe.guideTargetSeconds);
+  assert.ok(recipe.guideTargetSeconds <= recipe.guideRangeSeconds[1]);
   assert.ok(recipe.steps.every((step, i) => i === 0 || step.timeSeconds > recipe.steps[i - 1].timeSeconds));
   assert.ok(buildTimerSteps(recipe));
 }
 assert.equal(validateV60Candidate(generateV60Recipe({}, { dose: 15 })).valid, true);
 assert.equal(validateV60Candidate(generateV60Fallback({ dose: 15 }, 'test')).valid, true);
+const invalidRange = generateV60Recipe({}, { dose: 15 });
+invalidRange.guideRangeSeconds = [Number.NaN, invalidRange.guideTargetSeconds + 30];
+assert.equal(validateV60Candidate(invalidRange).valid, false);
 assert.equal(validateV60Candidate({}).valid, false);
 console.log('v60 recipe contract passed (7 doses + negative control)');

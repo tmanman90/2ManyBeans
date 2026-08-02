@@ -27,7 +27,16 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   const timingSaveInFlightRef = useRef(null);
   const doseDebounceRef = useRef(null);
   const requestedFingerprintRef = useRef(null);
-  useEffect(() => () => { mountedRef.current = false; if (doseDebounceRef.current) clearTimeout(doseDebounceRef.current); }, []);
+  useEffect(() => {
+    // React Strict Mode intentionally mounts, cleans up, and mounts effects
+    // again in development. Restore the live flag during setup so the second
+    // mount can finish a recipe request instead of leaving an empty modal.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (doseDebounceRef.current) clearTimeout(doseDebounceRef.current);
+    };
+  }, []);
 
   const { preferences, updatePreferences } = usePreferences();
   const { hasPro } = useSubscription();
