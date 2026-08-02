@@ -6,6 +6,7 @@ export const V60_RULES_VERSION = 'v60-hot-rules-v1';
 export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
+export const V60_SCALING_RULE_ID = 'v60-dose-scaling-v1';
 const MIN_DOSE = 12;
 const MAX_DOSE = 30;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -128,11 +129,14 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   const sourceIds = technique.sourceRecipe ? [technique.sourceRecipe.id] : technique.sourceIds;
   const sourceSupportsV60 = source.supportedV60_02 !== false;
   const parameterRule = sourceSupportsV60 ? sourceIds[0] : V60_ADAPTATION_RULE_ID;
+  const exactSourceDose = sourceSupportsV60 && config.dose === source.doseGrams;
+  const scaled = sourceSupportsV60 && !exactSourceDose;
+  const scalingFields = scaled ? ['dose', 'water', 'bloom', 'cadence', 'guide'] : [];
   const lineage = {
     method: 'v60', mode: 'hot', configurationKey: V60_CONFIGURATION_KEY, technique: technique.id,
-    sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, adaptation: technique.sourceRecipe ? 'Structured source bounded to V60 02 and requested dose.' : sourceSupportsV60 ? `App profile based on ${source.author}.` : `Adapted profile based on incomplete ${source.author} evidence; V60 02 fields use ${V60_ADAPTATION_RULE_ID}.`,
-    changedFields: [!sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', !sourceSupportsV60 && 'grind', technique.id === 'gentle-main-pour' && 'agitation'].filter(Boolean),
-    parameterSources: { ratio: sourceSupportsV60 ? sourceIds[0] : parameterRule, dose: sourceSupportsV60 ? sourceIds[0] : parameterRule, temperature: sourceSupportsV60 && source.temperatureC ? sourceIds[0] : parameterRule, grind: sourceSupportsV60 && source.grind ? sourceIds[0] : parameterRule, geometry: sourceIds[0], agitation: technique.id === 'gentle-main-pour' ? V60_ADAPTATION_RULE_ID : sourceIds[0], guide: sourceSupportsV60 ? sourceIds[0] : parameterRule },
+    sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, status: !sourceSupportsV60 ? 'adapted' : exactSourceDose ? 'original' : 'scaled', adaptation: technique.sourceRecipe ? 'Structured source bounded to V60 02 and requested dose.' : sourceSupportsV60 ? `App profile based on ${source.author}.` : `Adapted profile based on incomplete ${source.author} evidence; V60 02 fields use ${V60_ADAPTATION_RULE_ID}.`,
+    changedFields: [...scalingFields, !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', !sourceSupportsV60 && 'grind', technique.id === 'gentle-main-pour' && 'agitation'].filter(Boolean),
+    parameterSources: { ratio: sourceSupportsV60 ? sourceIds[0] : parameterRule, dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: sourceSupportsV60 && source.temperatureC ? sourceIds[0] : parameterRule, grind: sourceSupportsV60 && source.grind ? sourceIds[0] : parameterRule, geometry: sourceIds[0], agitation: technique.id === 'gentle-main-pour' ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : sourceIds[0], bloom: scaled ? V60_SCALING_RULE_ID : sourceIds[0], cadence: scaled ? V60_SCALING_RULE_ID : sourceIds[0], guide: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'hot', isIced: false, configurationKey: V60_CONFIGURATION_KEY,

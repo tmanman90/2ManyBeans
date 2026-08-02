@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+const refused = spawnSync(process.execPath, ['scripts/v60-evaluate-inventory.mjs'], { encoding: 'utf8' });
+assert.equal(refused.status, 2);
+assert.match(refused.stderr, /REFUSED/);
+const output = execFileSync(process.execPath, ['scripts/v60-evaluate-inventory.mjs', '--uid', 'redacted-target', '--credentials', 'operator-ref'], { encoding: 'utf8' });
+const report = JSON.parse(output);
+assert.equal(report.readOnly, true);
+assert.equal(report.uidRedacted, true);
+assert.equal(report.results.length, 5);
+assert.ok(report.results.every((result) => result.hot.valid && result.iced.valid));
+console.log('read-only V60 inventory evaluator passed (fail-closed + 5 redacted fixtures)');

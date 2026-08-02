@@ -5,6 +5,7 @@ export const V60_ICED_ENGINE_VERSION = 'v60-iced-engine-v1';
 export const V60_ICED_RULES_VERSION = 'v60-iced-rules-v1';
 export const V60_ICED_CONFIGURATION_KEY = 'v60:02:standard-paper:direct-server';
 export const V60_ICED_PHASE_CONTRACT_VERSION = 1;
+export const V60_ICED_SCALING_RULE_ID = 'v60-iced-dose-scaling-v1';
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const round = (value) => Math.round(value);
 const timeLabel = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -73,15 +74,20 @@ function buildRecipe(config, intent, technique, { fallback = false } = {}) {
   const steps = buildSteps(technique, config.dose, hotWaterGrams, source).map(([timeSeconds, waterTotal, action]) => ({ timeSeconds, time: timeLabel(timeSeconds), waterTotal, action, phase: 'brew' }));
   const guideTargetSeconds = clamp(round(source.guideSeconds || 180) + (config.dose > 20 ? 30 : 0), 140, 330);
   const sourceId = source.id;
+  const sourceRequiresAdaptation = source.id === 'kurasu-iced-staged-v1';
+  const exactSourceDose = config.dose === source.doseGrams;
+  const scaled = !exactSourceDose;
   const sourceLineage = {
     method: 'v60', mode: 'iced', configurationKey: V60_ICED_CONFIGURATION_KEY, technique: technique.id,
-    sourceIds: [sourceId], sourceRegistryVersion: V60_ICED_SOURCE_REGISTRY_VERSION,
+    sourceIds: [sourceId], sourceRegistryVersion: V60_ICED_SOURCE_REGISTRY_VERSION, status: sourceRequiresAdaptation ? 'adapted' : exactSourceDose ? 'original' : 'scaled',
     adaptation: `Independent iced profile based on ${source.author}; hot candidate is not used.`,
     changedFields: [
       config.dose !== source.doseGrams && 'doseGrams',
+      scaled && 'hotWaterGrams', scaled && 'initialBrewIceGrams', scaled && 'cadence',
+      sourceRequiresAdaptation && 'configuration',
       !Number.isFinite(source.guideSeconds) && 'guideSeconds',
     ].filter(Boolean),
-    parameterSources: { family: sourceId, dose: sourceId, hotWater: sourceId, brewIce: sourceId, ratio: sourceId, geometry: sourceId, agitation: sourceId, guide: sourceId },
+    parameterSources: { family: sourceId, dose: exactSourceDose ? sourceId : 'user-configuration', hotWater: scaled ? V60_ICED_SCALING_RULE_ID : sourceId, brewIce: scaled ? V60_ICED_SCALING_RULE_ID : sourceId, ratio: sourceId, geometry: sourceId, agitation: source.agitation ? sourceId : V60_ICED_SCALING_RULE_ID, guide: !Number.isFinite(source.guideSeconds) || scaled ? V60_ICED_SCALING_RULE_ID : sourceId },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'iced', isIced: true, configurationKey: V60_ICED_CONFIGURATION_KEY, v60Size: '02', doseProfile: config.doseProfile,
