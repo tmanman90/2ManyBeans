@@ -34,7 +34,7 @@ function grindFor(grinder) {
   return { setting: String(setting), microns, description: descriptorForMicrons(microns), grinderSpecific: true };
 }
 
-function buildSteps(technique, dose, hotWater) {
+function buildSteps(technique, dose, hotWater, source) {
   const bloom = round(dose * 3);
   if (technique.id === 'classic-60-40-flash') return [
     [0, bloom, `Bloom with ${bloom}g from the center; keep the stream on the bed and off the paper.`],
@@ -46,10 +46,15 @@ function buildSteps(technique, dose, hotWater) {
     [40, round(hotWater * 0.5), `Use a small-radius staged pour to ${round(hotWater * 0.5)}g; keep off paper.`],
     [95, hotWater, `Complete the staged pour to ${hotWater}g; stir only as directed after drawdown.`],
   ];
+  const finalAction = source?.id === 'partners-flash-6733-v1'
+    ? `Finish with a low pulse to ${hotWater}g; after drawdown give the gentle carafe swirl from the source.`
+    : source?.id === 'counterculture-flash-v1'
+      ? `Finish with a circular pulse to ${hotWater}g; do not infer an agitation step the source does not specify.`
+      : `Finish with a low pulse to ${hotWater}g; no final swirl.`;
   return [
     [0, bloom, `Bloom with ${bloom}g from the center; wet the bed evenly and do not swirl.`],
     [40, round(hotWater * 0.5), `Pulse in a restrained center-to-small-spiral pattern to ${round(hotWater * 0.5)}g; keep off paper.`],
-    [100, hotWater, `Finish with a low pulse to ${hotWater}g; no final swirl.`],
+    [100, hotWater, finalAction],
   ];
 }
 
@@ -58,18 +63,24 @@ function sourceFor(technique) { return technique.sourceRecipe || icedSourceById(
 function buildRecipe(config, intent, technique, { fallback = false } = {}) {
   const source = sourceFor(technique);
   const family = technique.id === 'classic-60-40-flash' ? 'classic-60-40' : 'pulse-67-33';
-  const hotFraction = family === 'classic-60-40' ? 0.6 : 2 / 3;
+  const hotFraction = Number.isFinite(source.hotWaterGrams) && Number.isFinite(source.finalWaterGrams)
+    ? source.hotWaterGrams / source.finalWaterGrams
+    : family === 'classic-60-40' ? 0.6 : 2 / 3;
   const totalWater = round(config.dose * clamp(Number(source.ratio) || 15, 13.5, 20));
   const hotWaterGrams = round(totalWater * hotFraction);
   const initialBrewIceGrams = totalWater - hotWaterGrams;
   const finalBeverageWaterTargetGrams = totalWater;
-  const steps = buildSteps(technique, config.dose, hotWaterGrams).map(([timeSeconds, waterTotal, action]) => ({ timeSeconds, time: timeLabel(timeSeconds), waterTotal, action, phase: 'brew' }));
+  const steps = buildSteps(technique, config.dose, hotWaterGrams, source).map(([timeSeconds, waterTotal, action]) => ({ timeSeconds, time: timeLabel(timeSeconds), waterTotal, action, phase: 'brew' }));
   const guideTargetSeconds = clamp(round(source.guideSeconds || 180) + (config.dose > 20 ? 30 : 0), 140, 330);
   const sourceId = source.id;
   const sourceLineage = {
     method: 'v60', mode: 'iced', configurationKey: V60_ICED_CONFIGURATION_KEY, technique: technique.id,
     sourceIds: [sourceId], sourceRegistryVersion: V60_ICED_SOURCE_REGISTRY_VERSION,
     adaptation: `Independent iced profile based on ${source.author}; hot candidate is not used.`,
+    changedFields: [
+      config.dose !== source.doseGrams && 'doseGrams',
+      !Number.isFinite(source.guideSeconds) && 'guideSeconds',
+    ].filter(Boolean),
     parameterSources: { family: sourceId, dose: sourceId, hotWater: sourceId, brewIce: sourceId, ratio: sourceId, geometry: sourceId, agitation: sourceId, guide: sourceId },
   };
   return {
@@ -100,6 +111,9 @@ export function validateV60IcedCandidate(recipe) {
   if (!Number.isFinite(recipe?.coffeeGrams) || recipe.coffeeGrams < 12 || recipe.coffeeGrams > 30) errors.push('invalid-dose');
   for (const key of ['hotWaterGrams', 'initialBrewIceGrams', 'finalBeverageWaterTargetGrams']) if (!Number.isFinite(recipe?.[key]) || recipe[key] <= 0) errors.push(`invalid-${key}`);
   if (recipe.hotWaterGrams + recipe.initialBrewIceGrams !== recipe.finalBeverageWaterTargetGrams) errors.push('beverage-math-mismatch');
+  if (Math.abs(recipe.finalBeverageWaterTargetGrams / recipe.coffeeGrams - Number(String(recipe.finalBeverageRatio).split(':')[1])) > 0.01) errors.push('final-ratio-mismatch');
+  const hotFraction = recipe.hotWaterGrams / recipe.finalBeverageWaterTargetGrams;
+  if (recipe.technique === 'classic-60-40-flash' && Math.abs(hotFraction - 0.6) > 0.01) errors.push('classic-fraction-mismatch');
   if (recipe.servingIceExcluded !== true || recipe.measuredMeltedIceGrams !== null) errors.push('ice-semantics-failure');
   if (!Array.isArray(recipe.prepSteps) || recipe.prepSteps.length < 3 || !Array.isArray(recipe.postBrewSteps) || !recipe.postBrewSteps.length) errors.push('missing-phase-steps');
   let lastTime = -1; let lastWater = -1;

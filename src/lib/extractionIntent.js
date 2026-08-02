@@ -93,7 +93,16 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   const lowEnergy = dark || /lower temperature|reduce temperature|avoid pushing too hot/.test(allGuidance) || targetTemperatureC <= 95;
   const energyTendency = lowEnergy ? 'lower' : washed ? 'higher' : 'conservative';
   const intent = {
-    version: 2,
+    version: 3,
+    methodNeutral: true,
+    // Adapters own technique names. These fields describe physical intent only
+    // and can be consumed by Kalita, hot V60, or iced V60 independently.
+    extractionDemand: dark ? 'lower-energy' : highFinesRisk ? 'careful-even-saturation' : energyTendency === 'higher' ? 'higher-energy' : 'balanced',
+    balancedCupGoal: 'balanced',
+    temperatureTendency: energyTendency,
+    agitationTendency: explicitLowAgitation ? 'low' : explicitPulse ? 'pulsed' : 'moderate',
+    bloomBehavior: natural ? 'freshness-restraint' : 'standard-wet-bed',
+    softPriors: { process: natural ? 'fruit-processed' : washed ? 'washed' : 'unknown', roast: dark ? 'developed' : roast || 'unknown' },
     family,
     cupDirection: dark || natural ? { clarity: 'balanced', body: 'supported', sweetness: 'high' } : { clarity: 'high', body: 'balanced', sweetness: 'high' },
     solubilityRisk: dark || natural ? 'high' : highFinesRisk ? 'moderate' : 'unknown',

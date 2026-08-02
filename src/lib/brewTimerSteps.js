@@ -1,6 +1,6 @@
 export const PHASE_CONTRACT_VERSION = 1;
 
-const WATER_ACTION = /\b(?:bloom|pour|add|pouring|water|hot water|pulse|finish)\b/i;
+const WATER_ACTION = /\b(?:bloom|pour|pouring|water|hot water|pulse|finish)\b/i;
 const PREP_ACTION = /\b(?:rinse|preheat|load|add\s+\d+(?:\.\d+)?\s*g\s*coffee|level the bed|server ice|brew ice|discard rinse)\b/i;
 
 // Read-time phase interpretation. It never mutates or persists legacy data.
@@ -18,18 +18,38 @@ export function normalizeRecipePhases(recipe) {
   }
   const rawSteps = Array.isArray(recipe.steps) ? recipe.steps : [];
   if (!rawSteps.length) return { ...recipe, prepSteps: [], postBrewSteps: [], phaseContractStatus: 'ambiguous', timerReady: false };
+  // A number of legacy recipes intentionally begin at 0:00 with loading the
+  // bed as a timed instruction. Without an explicit rinse/preheat/load phase
+  // marker, preserve that historical snapshot and its step identity.
+  const firstAction = String(rawSteps[0]?.action || '');
+  const explicitPrepMarker = /rinse|preheat|server ice|brew ice|discard rinse|^load\b/i.test(firstAction);
+  if (rawSteps[0]?.timeSeconds === 0 && /^add\s+\d+(?:\.\d+)?\s*g(?:rams?)?\s+coffee\b/i.test(firstAction) && !explicitPrepMarker) {
+    return recipe;
+  }
   const firstWaterIndex = rawSteps.findIndex((step) => WATER_ACTION.test(String(step?.action || '')) && Number.isFinite(step?.timeSeconds));
   if (firstWaterIndex < 0) return { ...recipe, prepSteps: [], postBrewSteps: [], phaseContractStatus: 'ambiguous', timerReady: false };
   const firstWaterTime = rawSteps[firstWaterIndex].timeSeconds;
   const prepSteps = rawSteps.slice(0, firstWaterIndex).filter((step) => PREP_ACTION.test(String(step?.action || '')) || !WATER_ACTION.test(String(step?.action || '')));
-  const steps = rawSteps.slice(firstWaterIndex).map((step, index) => ({
-    ...step,
-    timeSeconds: Math.max(0, step.timeSeconds - firstWaterTime),
-    time: index === 0 ? '0:00' : step.time,
-    phase: 'brew',
-  }));
+  const steps = rawSteps.slice(firstWaterIndex).map((step, index) => {
+    const normalized = {
+      ...step,
+      timeSeconds: Math.max(0, step.timeSeconds - firstWaterTime),
+      time: index === 0 ? '0:00' : step.time,
+      phase: 'brew',
+    };
+    // Keep downstream identity contracts intact: the timer owns normalized
+    // anchors, while consumers still receive the exact stored step object.
+    Object.defineProperty(normalized, '__sourceStep', { value: step, enumerable: false });
+    return normalized;
+  });
+  // Legacy records do not declare whether their guide includes setup. Preserve
+  // the stored guide by default; only an explicit phase marker authorizes a
+  // subtraction. This protects the manual-finish/overtime contract from the
+  // historical 4:42-vs-5:10 premature-end failure.
   const total = Number.isFinite(recipe.totalBrewTimeSeconds)
-    ? Math.max(1, recipe.totalBrewTimeSeconds - firstWaterTime)
+    ? (recipe.legacyTimingIncludesPrep === true
+      ? Math.max(1, recipe.totalBrewTimeSeconds - firstWaterTime)
+      : recipe.totalBrewTimeSeconds)
     : recipe.totalBrewTimeSeconds;
   const timerReady = recipe.timerReady === true && steps.length > 0 && steps.every((step, index) => index === 0 || step.timeSeconds > steps[index - 1].timeSeconds) && total > steps.at(-1).timeSeconds;
   return {
@@ -60,7 +80,7 @@ export function buildTimerSteps(recipe) {
     if (typeof start !== 'number') return null;
     const nextStart = i + 1 < steps.length ? steps[i + 1].timeSeconds : total;
     if (typeof nextStart !== 'number' || nextStart <= start) return null;
-    out.push({ index: i, startSeconds: start, durationSeconds: nextStart - start, step: steps[i] });
+    out.push({ index: i, startSeconds: start, durationSeconds: nextStart - start, step: steps[i].__sourceStep || steps[i] });
   }
   return out;
 }

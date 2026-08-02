@@ -58,6 +58,32 @@ export function transformPourOver(hotRecipe, userDose) {
   }
   const { dose, hotWater, iceGrams } = computeIceSplit(hotRecipe, userDose);
 
+  // Versioned legacy phase recipes are still readable, but server ice is
+  // preparation, never a timed 0:00 step. Keep the stored guide and re-anchor
+  // only the first identifiable brew-water instruction.
+  if (hotRecipe?.phaseContractVersion === 1 && (hotRecipe?.device || 'v60') === 'v60') {
+    const sourceSteps = Array.isArray(hotRecipe.steps) ? hotRecipe.steps : [];
+    const firstWater = sourceSteps.find((step) => Number.isFinite(step?.timeSeconds) && /bloom|pour|water|pulse/i.test(String(step.action || '')));
+    const firstTime = firstWater?.timeSeconds || 0;
+    const steps = sourceSteps.map((step, index) => {
+      const waterTotal = typeof step.waterTotal === 'number' ? Math.round(step.waterTotal * HOT_FRACTION) : step.waterTotal;
+      const action = typeof step.action === 'string'
+        ? step.action.replace(/(\d+(?:\.\d+)?)\s*(grams?|g)\b/gi, (_, value, unit) => `${Math.round(Number(value) * HOT_FRACTION)}${unit}`)
+        : step.action;
+      const timeSeconds = Number.isFinite(step.timeSeconds) ? Math.max(0, step.timeSeconds - firstTime) : null;
+      return { ...step, timeSeconds, time: timeSeconds != null ? formatTime(timeSeconds) : step.time, waterTotal, action, phase: 'brew', isIceStep: false };
+    });
+    const timerReady = hotRecipe.timerReady === true && steps.length > 0 && steps.every((step, index) => Number.isFinite(step.timeSeconds) && (index === 0 || step.timeSeconds > steps[index - 1].timeSeconds));
+    return {
+      ...hotRecipe, coffeeGrams: dose, waterGrams: hotWater, iceGrams,
+      prepSteps: [...(hotRecipe.prepSteps || []), { action: `Add ${iceGrams}g brew ice to the server before brewing.`, phase: 'prep' }],
+      steps, postBrewSteps: [{ action: 'After Finish Brew, swirl until the brew ice melts; serve over fresh ice.', phase: 'post-brew', untimed: true }],
+      totalBrewTimeSeconds: Number.isFinite(hotRecipe.totalBrewTimeSeconds) ? hotRecipe.totalBrewTimeSeconds : null,
+      timerReady: timerReady && Number.isFinite(hotRecipe.totalBrewTimeSeconds) && hotRecipe.totalBrewTimeSeconds > steps.at(-1)?.timeSeconds,
+      isIced: true, mode: 'iced', phaseContractVersion: 1, icePlacement: 'server',
+    };
+  }
+
   // Prefer the repaired timeSeconds (handles range times like "0:30-1:10"
   // which the old naive parser returned null for — that null broke the
   // BrewTimer's strict timer-data gate on every iced recipe with ranges).

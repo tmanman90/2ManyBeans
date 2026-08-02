@@ -189,6 +189,32 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone, saveSt
   );
 }
 
+function ChillServeScreen({ onCoffeeChilled, saveState, onRetrySave }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', padding: '0 28px',
+      background: C.bg, zIndex: 2, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    }}>
+      <SnowflakeIcon />
+      <div style={{ ...typeScale.label, color: C.frost, letterSpacing: '0.12em', marginBottom: 8 }}>CHILL &amp; SERVE</div>
+      <div style={{ fontFamily: fonts.heading, fontSize: 30, fontWeight: 600, color: C.text, textAlign: 'center', marginBottom: 10 }}>{saveState === 'saved' ? 'Your drawdown is saved' : 'Finish and serve'}</div>
+      <div style={{ ...typeScale.body, color: C.textMuted, lineHeight: 1.55, textAlign: 'center', maxWidth: 320, marginBottom: 18 }}>
+        Swirl or stir until the brew ice melts as directed, then serve over fresh ice. Chilling is untimed and does not change drawdown memory.
+      </div>
+      <div role="status" style={{ ...typeScale.caption, color: saveState === 'saved' ? C.green : saveState === 'failed' ? C.red : C.textMuted, marginBottom: 16 }}>
+        {saveState === 'saved' ? 'Drawdown saved' : saveState === 'failed' ? 'Timing not saved' : saveState === 'ephemeral' ? 'Timing not saved · Quick Recipe' : 'Saving drawdown…'}
+      </div>
+      {saveState === 'failed' && <button onClick={onRetrySave} style={{ minHeight: 44, marginBottom: 10, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>}
+      <button onClick={onCoffeeChilled} style={{ width: '100%', maxWidth: 320, minHeight: 52, border: 'none', borderRadius: radius.md, background: `linear-gradient(180deg, ${C.frost} 0%, #4E6878 100%)`, color: C.cream, fontFamily: fonts.body, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>Coffee chilled</button>
+    </div>
+  );
+}
+
+function SnowflakeIcon() {
+  return <div aria-hidden="true" style={{ fontSize: 34, color: C.frost, marginBottom: 10 }}>❄</div>;
+}
+
 function StepPill({ label, status, timeLabel }) {
   const bg =
     status === 'current' ? C.accent :
@@ -279,6 +305,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   const pillsScrollRef = useRef(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [saveState, setSaveState] = useState(null);
+  const [chilled, setChilled] = useState(false);
   const sessionRef = useRef(null);
   const reportedRef = useRef(false);
   const isFinalStep = !!timerSteps && stepIndex + 1 >= timerSteps.length;
@@ -292,6 +319,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
       sessionRef.current = null;
       reportedRef.current = false;
       setSaveState(null);
+      setChilled(false);
       return;
     }
     if (!sessionRef.current && recipe && bean?.id) {
@@ -842,7 +870,10 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
         </div>
 
         {/* Completion screen overlay */}
-        {phase === 'done' && (
+        {phase === 'done' && recipe?.isIced && !chilled && (
+          <ChillServeScreen onCoffeeChilled={() => setChilled(true)} saveState={saveState} onRetrySave={persistCompletion} />
+        )}
+        {phase === 'done' && (!recipe?.isIced || chilled) && (
           <CompletionScreen
             bean={bean}
             totalElapsedMs={globalElapsedMs}

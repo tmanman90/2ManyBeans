@@ -1350,6 +1350,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         open={handBrew.handBrewModal}
         onClose={handBrew.closeHandBrewModal}
         recipe={handBrew.handBrewRecipe}
+        icedRecipe={handBrew.handBrewIcedRecipe}
         loading={handBrew.handBrewLoading}
         error={handBrew.handBrewError}
         phase={handBrew.handBrewPhase}
@@ -1359,7 +1360,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
-        onCoffeeGramsChange={handBrew.setUserCoffeeGrams}
+        onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
       />

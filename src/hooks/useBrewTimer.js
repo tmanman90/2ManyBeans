@@ -16,7 +16,7 @@
 // brief highlight); the hook does not need a separate phase for it.
 
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { advanceStepClock, buildTimerSteps } from '../lib/brewTimerSteps';
+import { advanceStepClock, buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
@@ -55,7 +55,8 @@ export function useBrewTimer(recipe) {
 
   // Recompute when recipe changes (regenerate, different bean, etc.).
   // Wrapped in useMemo so it's stable within a single recipe identity.
-  const timerSteps = useMemo(() => buildTimerSteps(recipe), [recipe]);
+  const effectiveRecipe = useMemo(() => normalizeRecipePhases(recipe), [recipe]);
+  const timerSteps = useMemo(() => buildTimerSteps(effectiveRecipe), [effectiveRecipe]);
 
   // Refs — source of truth for time math. Never trigger re-renders.
   // Exposed on the return value so the component's rAF loop can read them
@@ -73,8 +74,8 @@ export function useBrewTimer(recipe) {
   const [stepElapsedMs, setStepElapsedMs] = useState(0);
   const [completion, setCompletion] = useState(null);
 
-  const totalMs = recipe?.totalBrewTimeSeconds != null
-    ? recipe.totalBrewTimeSeconds * 1000
+  const totalMs = effectiveRecipe?.totalBrewTimeSeconds != null
+    ? effectiveRecipe.totalBrewTimeSeconds * 1000
     : 0;
 
   const currentStep = timerSteps && state.stepIndex < timerSteps.length

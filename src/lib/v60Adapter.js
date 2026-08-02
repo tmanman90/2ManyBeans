@@ -5,6 +5,7 @@ export const V60_ENGINE_VERSION = 'v60-hot-engine-v1';
 export const V60_RULES_VERSION = 'v60-hot-rules-v1';
 export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
+export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
 const MIN_DOSE = 12;
 const MAX_DOSE = 30;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -73,12 +74,12 @@ function grindFor(grinder, technique, intent) {
   return { setting: String(setting), microns, description: descriptorForMicrons(microns), grinderSpecific: true };
 }
 
-function techniqueShape(technique, dose, water) {
+function techniqueShape(technique, dose, water, source, intent = {}) {
   const bloom = round(dose * 3);
   if (technique.id === 'hoffmann-large-batch') return [
-    [0, bloom, `Bloom with ${bloom}g from the center; wet the whole bed without touching the paper.`],
-    [45, round(water * 0.55), `Pour a low spiral to ${round(water * 0.55)}g total; keep the stream on the coffee bed.`],
-    [120, water, `Finish with a controlled outward spiral to ${water}g; keep water off the paper walls. Do not swirl.`],
+    [0, source.bloomGrams || 60, `Bloom with ${source.bloomGrams || 60}g from the center; wet the whole bed.`],
+    [45, round(water * 0.6), `Pour to ${round(water * 0.6)}g total with a controlled spiral; filter contact is acceptable in this source method.`],
+    [75, water, `Finish with a center pour at ${water}g, then stir and give one gentle settling swirl.`],
   ];
   if (technique.id === 'kasuya-coarse-pulses') return [
     [0, bloom, `Bloom with ${bloom}g in the center; no swirl.`],
@@ -87,13 +88,17 @@ function techniqueShape(technique, dose, water) {
     [115, water, `Final centered pulse to ${water}g; let it drain without a final swirl.`],
   ];
   if (technique.id === 'rao-two-stage') return [
-    [0, bloom, `Bloom aggressively to ${bloom}g from center; one settling spin only if the bed is even.`],
-    [45, round(water * 0.55), `Pour a steady center-to-spiral stream to ${round(water * 0.55)}g; keep off paper.`],
-    [100, water, `Complete the second controlled spiral to ${water}g; stop agitation and let it drain.`],
+    [0, source.bloomGrams || bloom, `Bloom aggressively to ${source.bloomGrams || bloom}g from center with the source spin.`],
+    [45, round(water * 0.55), `Pour a steady center-to-spiral stream to ${round(water * 0.55)}g, then use a gentle settling spin.`],
+    [100, water, `Complete the second controlled spiral to ${water}g, then use a second gentle settling spin.`],
   ];
   if (technique.id === 'gentle-main-pour') return [
-    [0, bloom, `Bloom gently with ${bloom}g in the center; do not swirl.`],
-    [45, water, `Use one low, continuous center-to-small-spiral pour to ${water}g; keep water off the paper.`],
+    [0, source.bloomRangeGrams ? source.bloomRangeGrams[0] : bloom, intent.finesRisk === 'high'
+      ? `Bloom the center with ${source.bloomRangeGrams ? `${source.bloomRangeGrams[0]}–${source.bloomRangeGrams[1]}` : bloom}g; use the bounded high-fines rule and do not stir.`
+      : `Stir the vigorous center bloom with ${source.bloomRangeGrams ? `${source.bloomRangeGrams[0]}–${source.bloomRangeGrams[1]}` : bloom}g, following the source bloom energy.`],
+    [45, water, intent.finesRisk === 'high'
+      ? `Use one slow center pour to ${water}g; finish without a final stir to limit fines migration.`
+      : `Use one slow center pour to ${water}g; finish with the source's final stir.`],
   ];
   if (technique.id === 'kurasu-controlled-pulses') return [
     [0, bloom, `Bloom with ${bloom}g in a small center circle; let the bed settle.`],
@@ -112,7 +117,7 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   const ratio = clamp(Number(source.ratio) || Number(intentValue(intent, 'targetRatio', 16.5)) || 16.5, 15, 18.5);
   const waterGrams = round(config.dose * ratio);
   const temperature = clamp(Number(intentValue(intent, 'targetTemperatureC', source.temperatureC || 96)) || 96, 92, 100);
-  const shape = techniqueShape(technique, config.dose, waterGrams);
+  const shape = techniqueShape(technique, config.dose, waterGrams, source, intent);
   const finalAt = shape.at(-1)[0];
   const guide = clamp(round((source.guideSeconds || 210) + (config.dose >= 25 ? 45 : 0) + (technique.id === 'gentle-main-pour' ? -10 : 0)), 150, 360);
   const prepSteps = [
@@ -121,10 +126,13 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   ];
   const steps = shape.map(([timeSeconds, waterTotal, action]) => ({ timeSeconds, time: timeLabel(timeSeconds), waterTotal, action, phase: 'brew' }));
   const sourceIds = technique.sourceRecipe ? [technique.sourceRecipe.id] : technique.sourceIds;
+  const sourceSupportsV60 = source.supportedV60_02 !== false;
+  const parameterRule = sourceSupportsV60 ? sourceIds[0] : V60_ADAPTATION_RULE_ID;
   const lineage = {
     method: 'v60', mode: 'hot', configurationKey: V60_CONFIGURATION_KEY, technique: technique.id,
-    sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, adaptation: technique.sourceRecipe ? 'Structured source bounded to V60 02 and requested dose.' : `App profile based on ${source.author}.`,
-    parameterSources: { ratio: sourceIds[0], dose: sourceIds[0], temperature: sourceIds[0], grind: sourceIds[0], geometry: sourceIds[0], agitation: sourceIds[0], guide: sourceIds[0] },
+    sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, adaptation: technique.sourceRecipe ? 'Structured source bounded to V60 02 and requested dose.' : sourceSupportsV60 ? `App profile based on ${source.author}.` : `Adapted profile based on incomplete ${source.author} evidence; V60 02 fields use ${V60_ADAPTATION_RULE_ID}.`,
+    changedFields: [!sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', !sourceSupportsV60 && 'grind', technique.id === 'gentle-main-pour' && 'agitation'].filter(Boolean),
+    parameterSources: { ratio: sourceSupportsV60 ? sourceIds[0] : parameterRule, dose: sourceSupportsV60 ? sourceIds[0] : parameterRule, temperature: sourceSupportsV60 && source.temperatureC ? sourceIds[0] : parameterRule, grind: sourceSupportsV60 && source.grind ? sourceIds[0] : parameterRule, geometry: sourceIds[0], agitation: technique.id === 'gentle-main-pour' ? V60_ADAPTATION_RULE_ID : sourceIds[0], guide: sourceSupportsV60 ? sourceIds[0] : parameterRule },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'hot', isIced: false, configurationKey: V60_CONFIGURATION_KEY,

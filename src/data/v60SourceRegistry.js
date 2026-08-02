@@ -15,8 +15,9 @@ export const V60_SOURCES = Object.freeze([
     id: 'hoffmann-large-batch-v1', author: 'James Hoffmann / Hario',
     canonicalUrl: 'https://www.hario-usa.com/blogs/recipes-and-more-from-friends/james-hoffmann-uitimate-v60-technique', publication: 'large-batch V60',
     evidenceType: 'primary', status: 'original', brewer: 'V60 02', doseGrams: 30,
-    ratio: 16.67, temperatureC: 100, grind: 'medium', guideSeconds: 300,
-    geometry: 'center bloom, staged spirals, avoid paper', agitation: 'controlled swirl only when bed is uneven',
+    ratio: 500 / 30, temperatureC: 100, grind: 'medium-fine', guideSeconds: 210, bloomGrams: 60,
+    pourTargets: [{ seconds: 45, grams: 300 }, { seconds: 75, grams: 500 }],
+    geometry: 'center bloom and staged spirals; source does not prohibit filter contact', agitation: 'stir and swirl after the final pour',
   },
   {
     id: 'kasuya-46-v1', author: 'Tetsu Kasuya / Hario',
@@ -29,22 +30,22 @@ export const V60_SOURCES = Object.freeze([
     id: 'rao-two-stage-v1', author: 'Scott Rao / Hario',
     canonicalUrl: 'https://www.hario.co.uk/blogs/hario-ambassadors/hario-v60-recipe-interview-with-hario-ambassador-scott-rao', publication: 'two-stage V60',
     evidenceType: 'primary', status: 'original', brewer: 'V60 02', doseGrams: 20,
-    ratio: 16.5, temperatureC: 98, grind: 'medium-fine', guideSeconds: 210,
-    geometry: 'aggressive bloom then two controlled spirals', agitation: 'one settling spin only for low-fines beds',
+    ratio: 330 / 20, temperatureC: 97, grind: null, guideSeconds: 255, guideRangeSeconds: [240, 270], bloomGrams: 60,
+    geometry: 'aggressive bloom spin then two gentle spins', agitation: 'aggressive bloom spin and two gentle spins',
   },
   {
     id: 'heart-continuous-v1', author: 'Heart Roasters',
     canonicalUrl: 'https://www.heartroasters.com/pages/v60', publication: 'V60 brew guide',
-    evidenceType: 'primary', status: 'original', brewer: 'V60 02', doseGrams: 20,
-    ratio: 16, temperatureC: 96, grind: 'medium', guideSeconds: 210,
-    geometry: 'low center-to-spiral stream, keep water off paper', agitation: 'low agitation, no final swirl',
+    evidenceType: 'primary', status: 'original', brewer: 'V60 02', doseGrams: 22,
+    ratio: 360 / 22, temperatureC: 95, temperatureRangeC: [93, 96], grind: 'medium-fine', guideSeconds: 145, guideRangeSeconds: [140, 150], bloomRangeGrams: [40, 50],
+    geometry: 'vigorous bloom stir, slow center pour', agitation: 'vigorous bloom stir and final stir',
   },
   {
     id: 'kurasu-controlled-pulses-v1', author: 'Kurasu',
     canonicalUrl: 'https://kurasu.kyoto/blogs/kurasu-journal/kurasu-coffee-brew-guide-2022', publication: 'controlled pulse guide',
-    evidenceType: 'primary', status: 'adapted', brewer: 'V60 02', doseGrams: 20,
-    ratio: 16, temperatureC: 94, grind: 'coarse-medium', guideSeconds: 210,
-    geometry: 'small-radius pulses, avoid paper walls', agitation: 'source-specific gentle agitation',
+    evidenceType: 'primary', status: 'adapted', brewer: 'V60 01', supportedV60_02: false, doseGrams: 14,
+    ratio: null, temperatureC: null, grind: null, guideSeconds: 150,
+    geometry: 'first and final spoon agitation', agitation: 'spoon agitation', changedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'cadence'],
   },
 ]);
 
@@ -65,8 +66,9 @@ export function validateV60Registry() {
     for (const key of ['id', 'author', 'canonicalUrl', 'publication', 'evidenceType', 'brewer', 'geometry', 'agitation']) {
       if (!source[key]) errors.push(`${source.id}:missing-${key}`);
     }
-    if (source.brewer !== 'V60 02') errors.push(`${source.id}:unsupported-brewer`);
-    if (!Number.isFinite(source.doseGrams) || !Number.isFinite(source.ratio) || !Number.isFinite(source.temperatureC)) errors.push(`${source.id}:non-finite-physical-field`);
+    if (source.supportedV60_02 !== false && source.brewer !== 'V60 02') errors.push(`${source.id}:unsupported-brewer`);
+    if (!Number.isFinite(source.doseGrams)) errors.push(`${source.id}:non-finite-dose`);
+    if (source.supportedV60_02 !== false && (!Number.isFinite(source.ratio) || !Number.isFinite(source.temperatureC))) errors.push(`${source.id}:non-finite-physical-field`);
   }
   for (const technique of Object.values(V60_TECHNIQUES)) {
     if (!technique.sourceIds.every((id) => sourceById(id))) errors.push(`${technique.id}:missing-source`);

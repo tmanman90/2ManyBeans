@@ -162,7 +162,7 @@ const renderTemp = (wt) => {
 
 const GrindDisplay = ({ grindSize, grinderName, preferences, accentColor }) => {
   const isMicrons = preferences?.grindSizeDisplay === 'microns' && grindSize.microns;
-  const primary = isMicrons ? `~${grindSize.microns}µm` : grindSize.setting;
+  const primary = isMicrons || !grindSize.setting ? `~${grindSize.microns}µm` : grindSize.setting;
   const secondary = isMicrons
     ? (grindSize.setting ? `${grinderName}: ${grindSize.setting}` : null)
     : (grindSize.microns ? `~${grindSize.microns}µm` : null);
@@ -265,7 +265,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 );
 
 export const HandBrewModal = ({
-  open, onClose, recipe, loading, error, phase, onRetry, onRegenerate,
+  open, onClose, recipe, icedRecipe: icedRecipeProp, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onSaveTimingEvent,
@@ -278,7 +278,6 @@ export const HandBrewModal = ({
   const [icedMode, setIcedMode] = useState(false);
   const [timerRecipeOverride, setTimerRecipeOverride] = useState(null);
   const modalContentRef = useRef(null);
-  const timerReady = recipe?.timerReady === true;
 
   useEffect(() => {
     if (open) {
@@ -290,17 +289,25 @@ export const HandBrewModal = ({
   const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
     ? userCoffeeGrams
     : recipe?.coffeeGrams;
+  const doseUpdating = recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
+  const timerReady = recipe?.timerReady === true && !doseUpdating;
 
   const displayRecipe = useMemo(
-    () => scaleRecipeForDose(recipe, effectiveDose),
+    () => (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1'
+      ? recipe
+      : scaleRecipeForDose(recipe, effectiveDose)),
     [recipe, effectiveDose]
   );
 
   const device = deviceKey || recipe?.device || 'v60';
 
   const icedRecipe = useMemo(
-    () => (icedMode && displayRecipe) ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null,
-    [icedMode, displayRecipe, device, effectiveDose]
+    () => {
+      if (!icedMode) return null;
+      if (icedRecipeProp?.candidate) return icedRecipeProp;
+      return displayRecipe ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null;
+    },
+    [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose]
   );
 
   const handleEnterIced = () => {
@@ -430,7 +437,6 @@ export const HandBrewModal = ({
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
-
           {recipe.device === 'kalita' && (
             <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
               Wave {recipe.kalitaSize || '185'} · {recipe.doseProfile || 'legacy profile'}
@@ -452,6 +458,14 @@ export const HandBrewModal = ({
             >
               <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Pouring technique</SectionLabel>
               <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.techniqueInstruction}</div>
+            </div>
+          )}
+
+          {recipe.candidate && recipe.reasoning && (
+            <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
+              <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Why this technique</SectionLabel>
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.reasoning}</div>
+              {recipe.sourceLineage?.adaptation && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{recipe.sourceLineage.adaptation}</div>}
             </div>
           )}
 
@@ -495,6 +509,15 @@ export const HandBrewModal = ({
                   {renderTemp(recipe.waterTemp)}
                 </div>
               </div>
+            </div>
+          )}
+
+          {displayRecipe.prepSteps?.length > 0 && (
+            <div role="note" style={{ background: C.cardMuted, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.borderLight}` }}>
+              <SectionLabel style={{ marginBottom: 6 }}>Prepare before the clock</SectionLabel>
+              <ol style={{ margin: 0, paddingLeft: 20, color: C.text, lineHeight: 1.5 }}>
+                {displayRecipe.prepSteps.map((step, index) => <li key={index}>{step.action}</li>)}
+              </ol>
             </div>
           )}
 
@@ -577,7 +600,7 @@ export const HandBrewModal = ({
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Play size={16} fill="#FFF8F0" strokeWidth={0} /> Start Brew
+              <Play size={16} fill="#FFF8F0" strokeWidth={0} /> {displayRecipe.phaseContractVersion ? 'Start Bloom & Timer' : 'Start Brew'}
             </m.button>
           )}
 
@@ -699,6 +722,11 @@ export const HandBrewModal = ({
               <div style={{ ...type.caption, color: C.textLight }}>{icedRecipe.icePlacement}</div>
             </div>
           </div>
+          {icedRecipe.finalBeverageWaterTargetGrams && (
+            <div role="note" style={{ ...type.caption, color: C.textMuted, lineHeight: 1.5, margin: '-4px 4px 14px' }}>
+              Hot extraction: {icedRecipe.hotWaterGrams}g · Brew ice: {icedRecipe.initialBrewIceGrams}g · Final beverage-water target: {icedRecipe.finalBeverageWaterTargetGrams}g. Serving ice is excluded.
+            </div>
+          )}
 
           {/* Iced grind card */}
           {icedRecipe.grindSize && (
@@ -710,7 +738,7 @@ export const HandBrewModal = ({
               border: `1px solid ${ICE_RULE}`,
               boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ marginBottom: 8 }}>{grinderName} Grind (finer for iced)</SectionLabel>
+              <SectionLabel style={{ marginBottom: 8 }}>{grinderName} Grind</SectionLabel>
               <GrindDisplay grindSize={icedRecipe.grindSize} grinderName={grinderName} preferences={preferences} accentColor={C.frost} />
             </div>
           )}
@@ -738,12 +766,27 @@ export const HandBrewModal = ({
           )}
 
           {/* Iced steps */}
+          {icedRecipe.prepSteps?.length > 0 && (
+            <div role="note" style={{ background: ICE_TILE_BG, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${ICE_RULE}` }}>
+              <SectionLabel style={{ color: C.frost, marginBottom: 6 }}>Prepare before the clock</SectionLabel>
+              <ol style={{ margin: 0, paddingLeft: 20, color: C.text, lineHeight: 1.5 }}>
+                {icedRecipe.prepSteps.map((step, index) => <li key={index}>{step.action}</li>)}
+              </ol>
+            </div>
+          )}
           <StepTimeline
             steps={icedRecipe.steps}
             timelineColor={ICE_RULE}
             accentColor={C.accent}
             iceAccent={C.frost}
           />
+
+          {icedRecipe.postBrewSteps?.length > 0 && (
+            <div role="note" style={{ background: ICE_TILE_BG, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${ICE_RULE}` }}>
+              <SectionLabel style={{ color: C.frost, marginBottom: 6 }}>After Finish Brew</SectionLabel>
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{icedRecipe.postBrewSteps[0].action}</div>
+            </div>
+          )}
 
           <TimingMemoryHint memory={icedTimingMemory} context={icedTimingContext} />
 
