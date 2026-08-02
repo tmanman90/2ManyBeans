@@ -18,14 +18,8 @@ export function normalizeRecipePhases(recipe) {
   }
   const rawSteps = Array.isArray(recipe.steps) ? recipe.steps : [];
   if (!rawSteps.length) return { ...recipe, prepSteps: [], postBrewSteps: [], phaseContractStatus: 'ambiguous', timerReady: false };
-  // A number of legacy recipes intentionally begin at 0:00 with loading the
-  // bed as a timed instruction. Without an explicit rinse/preheat/load phase
-  // marker, preserve that historical snapshot and its step identity.
-  const firstAction = String(rawSteps[0]?.action || '');
-  const explicitPrepMarker = /rinse|preheat|server ice|brew ice|discard rinse|^load\b/i.test(firstAction);
-  if (rawSteps[0]?.timeSeconds === 0 && /^add\s+\d+(?:\.\d+)?\s*g(?:rams?)?\s+coffee\b/i.test(firstAction) && !explicitPrepMarker) {
-    return recipe;
-  }
+  // An unambiguous coffee-load step is preparation, even when legacy records
+  // stored it at 0:00. Only water-bearing steps belong on the brew clock.
   const firstWaterIndex = rawSteps.findIndex((step) => WATER_ACTION.test(String(step?.action || '')) && Number.isFinite(step?.timeSeconds));
   if (firstWaterIndex < 0) return { ...recipe, prepSteps: [], postBrewSteps: [], phaseContractStatus: 'ambiguous', timerReady: false };
   const firstWaterTime = rawSteps[firstWaterIndex].timeSeconds;

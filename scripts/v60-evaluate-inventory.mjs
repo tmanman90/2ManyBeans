@@ -1,20 +1,67 @@
-// Read-only deterministic evaluator. It intentionally fails closed unless the
-// caller supplies an authorized target UID and credential reference.
+// Read-only current-inventory evaluator.
+// Required: --uid <target UID> --service-account <service-account.json>
+// This script imports only Firebase Admin initialization and Firestore reads;
+// it never imports or calls a write API.
 import { readFileSync } from 'node:fs';
-import { generateV60Recipe, validateV60Candidate } from '../src/lib/v60Adapter.js';
-import { generateV60IcedRecipe, validateV60IcedCandidate } from '../src/lib/v60IcedAdapter.js';
+import { resolve } from 'node:path';
+import { evaluateAndRedactBeans } from '../src/lib/v60InventoryEvaluation.js';
 
-const args = new Map(process.argv.slice(2).flatMap((value, index, values) => value.startsWith('--') ? [[value.slice(2), values[index + 1]]] : []));
-if (!args.get('uid') || !args.get('credentials')) {
-  console.error('REFUSED: supply --uid and --credentials to authorize a read-only inventory evaluation');
-  process.exitCode = 2;
-} else {
-  const fixtures = JSON.parse(readFileSync(new URL('../docs/data/v60-recipe-evaluation-beans.json', import.meta.url), 'utf8'));
-  const results = fixtures.map((fixture) => {
-    const intent = { finesRisk: fixture.finesRisk, family: fixture.class === 'natural' ? 'clean-natural-fruit' : '', energyTendency: fixture.roast === 'dark' ? 'lower' : 'conservative' };
-    const hot = generateV60Recipe(intent, { dose: fixture.dose, grinder: fixture.grinder });
-    const iced = generateV60IcedRecipe(intent, { dose: fixture.dose, grinder: fixture.grinder });
-    return { class: fixture.class, roast: fixture.roast, dose: fixture.dose, hot: { technique: hot.technique, valid: validateV60Candidate(hot).valid }, iced: { technique: iced.technique, valid: validateV60IcedCandidate(iced).valid } };
-  });
-  console.log(JSON.stringify({ readOnly: true, uidRedacted: true, credentialsUsed: true, results }, null, 2));
+export function parseArgs(argv = []) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const key = argv[index];
+    if (!key.startsWith('--')) continue;
+    const value = argv[index + 1];
+    if (!value || value.startsWith('--')) throw new Error(`${key} requires a value`);
+    options[key.slice(2)] = value;
+    index += 1;
+  }
+  return options;
 }
+
+function fail(message) {
+  console.error(`REFUSED: ${message}`);
+  process.exitCode = 2;
+}
+
+function loadServiceAccount(path) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(resolve(path), 'utf8'));
+  } catch (error) {
+    throw new Error(`could not read service-account JSON: ${error.message}`);
+  }
+  if (!parsed || typeof parsed !== 'object' || !parsed.project_id || !parsed.client_email || !parsed.private_key) {
+    throw new Error('service-account JSON must contain project_id, client_email, and private_key');
+  }
+  return parsed;
+}
+
+async function readTargetBeans(uid, serviceAccount) {
+  // Dynamic imports keep fail-closed argument/auth validation offline and make
+  // it impossible for the pure test lane to initialize a network client.
+  const [{ cert, initializeApp }, { getFirestore }] = await Promise.all([
+    import('firebase-admin/app'),
+    import('firebase-admin/firestore'),
+  ]);
+  const app = initializeApp({ credential: cert(serviceAccount) }, `v60-read-only-${Date.now()}`);
+  const snapshot = await getFirestore(app)
+    .collection('users').doc(uid).collection('beans').get();
+  return snapshot.docs.map((doc) => doc.data());
+}
+
+async function main(argv = process.argv.slice(2)) {
+  let options;
+  try {
+    options = parseArgs(argv);
+    if (!options.uid || !options['service-account']) throw new Error('supply --uid and --service-account <path>');
+    const serviceAccount = loadServiceAccount(options['service-account']);
+    const beans = await readTargetBeans(options.uid, serviceAccount);
+    const results = evaluateAndRedactBeans(beans);
+    console.log(JSON.stringify({ readOnly: true, targetUid: 'redacted', beanCount: results.length, results }, null, 2));
+  } catch (error) {
+    fail(error.message || 'inventory evaluation failed');
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();

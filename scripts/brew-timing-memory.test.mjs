@@ -62,10 +62,7 @@ const sample = (sessionId, overrides = {}) => ({
   ], context);
   assert.deepEqual(three.range, { minMs: 180000, maxMs: 184000, medianMs: 182000, sampleCount: 3 });
   assert.equal(selectTimingMemory([sample('skip-only', { completionKind: 'skipped' })], context), null);
-  const crossDose = selectTimingMemory([sample('twenty', { doseGrams: 20 })], context);
-  assert.equal(crossDose.isExactDose, false);
-  assert.equal(crossDose.event.doseGrams, 20);
-  assert.equal(crossDose.range, null);
+  assert.equal(selectTimingMemory([sample('twenty', { doseGrams: 20 })], context), null);
   assert.equal(selectTimingMemory([sample('other', { beanId: 'other' })], context), null);
   assert.equal(selectTimingMemory([sample('iced', { mode: 'iced' })], context), null);
   assert.equal(selectTimingMemory([sample('185', { kalitaSize: '185' })], context), null);

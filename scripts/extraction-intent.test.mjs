@@ -4,7 +4,7 @@ import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
 const input = { process: 'washed', roastLevel: 'light', sourceInsights: { brewGuidance: 'Gentle pour' } };
 const first = buildExtractionIntent(input, { cupStructureFamily: 'washed-floral-clarity' });
 assert.deepEqual(first, buildExtractionIntent(input, { cupStructureFamily: 'washed-floral-clarity' }));
-assert.equal(first.finesRisk, 'high');
+assert.equal(first.finesRisk, 'unknown');
 const floralGuidance = buildExtractionIntent({
   process: 'washed',
   roastLevel: 'light',
@@ -16,7 +16,7 @@ assert.equal(floralGuidance.techniquePreference, 'center-to-spiral-pulse');
 const natural = buildExtractionIntent({ process: 'Anaerobic Natural', roastLevel: 'light' }, {
   cupStructureFamily: 'clean-natural-fruit', extractionNotes: 'Grind slightly coarser and control contact time.',
 });
-assert.equal(natural.techniquePreference, 'bloom-led-pulse');
+assert.equal(natural.techniquePreference, 'balanced');
 assert.ok(natural.grindAdjustmentMicrons > 0);
 const sparse = buildExtractionIntent({}, null);
 assert.equal(sparse.confidence, 'low');

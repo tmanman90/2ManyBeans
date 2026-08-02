@@ -89,8 +89,8 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const bloom = Math.round(config.dose * 3);
   const first = Math.round(waterGrams * 0.45);
   const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '155-extended' || config.doseProfile === '185-standard' ? 120 : 150;
-  const secondStepAt = Math.max(75, finalStepAt - 30);
-  const secondTotal = Math.round((first + waterGrams) / 2);
+  const firstPourAt = 30;
+  const finalPourAt = finalStepAt - 30;
   const drawdownSeconds = config.doseProfile === '155-small' ? 165 : config.doseProfile === '155-extended' ? 195 : config.doseProfile === '185-standard' ? 210 : 270;
   const totalBrewTimeSeconds = finalStepAt + drawdownSeconds - 30 + clamp(intent.contactTimeAdjustmentSeconds || 0, -15, 30);
   const reasonCodes = [
@@ -105,15 +105,12 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   ];
   const steps = [
     { time: '0:00', timeSeconds: 0, action: `Bloom with ${bloom}g water; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom, phase: 'brew' },
-    { time: '1:00', timeSeconds: 60, action: technique.key === 'center-to-spiral-pulse'
+    { time: timeLabel(firstPourAt), timeSeconds: firstPourAt, action: technique.key === 'center-to-spiral-pulse'
       ? `Start in the center, then pour in a controlled spiral outward to ${first}g total; keep the stream on the coffee bed, not the paper walls.`
       : technique.key === 'bloom-led-pulse'
         ? `Pour from the center in a restrained pulse to ${first}g total; keep the stream on the coffee bed and away from the paper walls.`
         : `Pour slowly and directly into the center to ${first}g total; keep the stream low and do not spiral.`, waterTotal: first },
-    { time: timeLabel(secondStepAt), timeSeconds: secondStepAt, action: technique.key === 'center-to-spiral-pulse'
-      ? `Continue the controlled spiral to ${secondTotal}g total; keep the stream on the coffee bed.`
-      : `Continue with a low centered pour to ${secondTotal}g total; do not spiral or swirl.`, waterTotal: secondTotal },
-    { time: timeLabel(finalStepAt), timeSeconds: finalStepAt, action: technique.key === 'center-to-spiral-pulse'
+    { time: timeLabel(finalPourAt), timeSeconds: finalPourAt, action: technique.key === 'center-to-spiral-pulse'
       ? `Finish at ${waterGrams}g total with a gentle center-to-outward spiral; ${technique.finalSwirl ? 'swirl once only if the bed is uneven.' : 'do not swirl.'}`
       : technique.key === 'bloom-led-pulse'
         ? `Finish with a second restrained center pulse to ${waterGrams}g total; do not use a wide spiral or stir.`

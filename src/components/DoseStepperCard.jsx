@@ -59,11 +59,11 @@ export const DoseStepperCard = ({ dose, onChange, min = 10, max = 40 }) => {
   // Use the current `safeDose` (always fresh thanks to useRepeatPress's
   // latest-ref pattern pulling from the parent's useState on every tick).
   const handleDecrement = useCallback(() => {
-    onChange(Math.max(min, safeDose - 1));
+    onChange(Math.max(min, Math.min(max, safeDose - 1)));
   }, [onChange, safeDose, min]);
 
   const handleIncrement = useCallback(() => {
-    onChange(Math.min(max, safeDose + 1));
+    onChange(Math.max(min, Math.min(max, safeDose + 1)));
   }, [onChange, safeDose, max]);
 
   const canDec = useCallback(() => safeDose > min, [safeDose, min]);

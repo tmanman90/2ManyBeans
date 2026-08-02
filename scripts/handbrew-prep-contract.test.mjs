@@ -35,7 +35,8 @@ const historicalTimedLoad = normalizeRecipePhases({ timerReady: true, totalBrewT
   { timeSeconds: 30, time: '0:30', action: 'Bloom with 40g water.', waterTotal: 40 },
   { timeSeconds: 75, time: '1:15', action: 'Pour to 320g water.', waterTotal: 320 },
 ] });
-assert.equal(historicalTimedLoad.steps[1].timeSeconds, 30);
+assert.equal(historicalTimedLoad.steps[0].timeSeconds, 0);
+assert.equal(historicalTimedLoad.steps[1].timeSeconds, 45);
 const ambiguous = normalizeRecipePhases({ timerReady: true, totalBrewTimeSeconds: 180, steps: [{ timeSeconds: 0, action: 'Settle the bed', waterTotal: 0 }] });
 assert.equal(ambiguous.timerReady, false);
 console.log('handbrew prep/phase contract passed (versioned hot, Kalita, iced, legacy, ambiguous)');

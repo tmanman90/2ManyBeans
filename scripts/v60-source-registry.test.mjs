@@ -18,4 +18,10 @@ const kurasu = V60_SOURCES.find((source) => source.id === 'kurasu-controlled-pul
 assert.equal(kurasu.supportedV60_02, false);
 assert.equal(kurasu.ratio, null);
 assert.match(readFileSync(new URL('../docs/data/v60-source-registry.md', import.meta.url), 'utf8'), /hoffmann-one-cup-v1/);
+const audit = readFileSync(new URL('../docs/data/v60-source-registry.md', import.meta.url), 'utf8');
+for (const source of V60_SOURCES) {
+  assert.match(audit, new RegExp('`' + source.id + '`'));
+  assert.match(audit, new RegExp(source.canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(audit, new RegExp(`\\| ${source.status} \\|`));
+}
 console.log(`v60 source registry passed (${V60_SOURCES.length} sources, ${Object.keys(V60_TECHNIQUES).length} techniques)`);

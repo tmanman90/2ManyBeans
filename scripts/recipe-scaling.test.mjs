@@ -138,16 +138,15 @@ function makeRecipe(overrides = {}) {
   assert.deepEqual(
     timerSteps.map(({ startSeconds, durationSeconds }) => ({ startSeconds, durationSeconds })),
     [
-      { startSeconds: 0, durationSeconds: 30 },
-      { startSeconds: 30, durationSeconds: 45 },
-      { startSeconds: 75, durationSeconds: 45 },
+      { startSeconds: 0, durationSeconds: 45 },
+      { startSeconds: 45, durationSeconds: 75 },
     ]
   );
-  assert.strictEqual(timerSteps[1].step, scaled.steps[1]);
-  assert.equal(timerSteps[1].step.action, 'Bloom with 36 g water.');
-  assert.equal(timerSteps[1].step.waterTotal, 36);
-  assert.equal(timerSteps[1].step.time, recipe.steps[1].time);
-  assert.equal(timerSteps[1].step.timeSeconds, recipe.steps[1].timeSeconds);
+  assert.strictEqual(timerSteps[0].step, scaled.steps[1]);
+  assert.equal(timerSteps[0].step.action, 'Bloom with 36 g water.');
+  assert.equal(timerSteps[0].step.waterTotal, 36);
+  assert.equal(timerSteps[0].step.time, recipe.steps[1].time);
+  assert.equal(timerSteps[0].step.timeSeconds, recipe.steps[1].timeSeconds);
 }
 
 console.log('recipe scaling regression passed');

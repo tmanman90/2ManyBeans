@@ -57,7 +57,9 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   const dark = roast.includes('dark');
   const natural = /natural|anaerobic|honey|co-ferment/.test(`${process} ${evidence.research?.processingNuance || ''}`.toLowerCase());
   const washed = process.includes('washed');
-  const highFinesRisk = washed && !dark;
+  const evidenceBackedFines = /fines|stall|clog|permeability|high[- ]density|dense/.test(allGuidance)
+    || String(evidence.research?.densityEstimate || '').toLowerCase().includes('high');
+  const highFinesRisk = evidenceBackedFines;
   const sourceTemperature = firstHint(parseTemperatureBand, [sourceGuidance]);
   const storedTemperature = firstHint(parseTemperatureBand, [storedGuidance]);
   const researchTemperature = firstHint(parseTemperatureBand, [researchGuidance]);
@@ -77,13 +79,13 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   const explicitLowAgitation = /low[- ]agitation|reduce agitation|gentle (?:pour|agitation)|do not swirl|avoid(?:ing)?\s+(?:excessive|over-?aggressive)\s+agitation/.test(allGuidance);
   const explicitPulse = /pulse|staged pours?|multiple pours?/.test(allGuidance);
   const explicitModerate = /moderate agitation|steady drawdown|even saturation|center-to-spiral/.test(allGuidance);
-  const techniquePreference = natural
+  const techniquePreference = natural && explicitPulse
     ? 'bloom-led-pulse'
     : explicitLowAgitation
       ? 'low-agitation-center'
       : explicitPulse || explicitModerate || family.includes('floral') || family.includes('ethiopia')
         ? 'center-to-spiral-pulse'
-        : 'low-agitation-center';
+        : 'balanced';
   const explicitContactAdjustment = /extend contact|increase contact|longer contact|slow drawdown/.test(allGuidance)
     ? 15
     : /avoid over-?extended|shorten contact|shorter contact|reduce contact/.test(allGuidance)
@@ -128,6 +130,7 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
       evidence.confidence === 'low' && 'LOW_CONFIDENCE_DEFAULT',
     ].filter(Boolean),
     evidenceHash: evidence.sourceContextHash,
+    sourceRecipes: evidence.sourceInsights?.brewRecipes || [],
   };
   return stable(intent);
 }

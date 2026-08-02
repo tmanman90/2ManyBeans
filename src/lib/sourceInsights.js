@@ -48,7 +48,7 @@ const RESEARCH_CONTEXT_FIELDS = [
 ];
 
 const RECIPE_MODE_VALUES = new Set(['hot', 'iced']);
-const RECIPE_STATUS_VALUES = new Set(['original', 'scaled', 'adapted', 'aggregated']);
+const RECIPE_STATUS_VALUES = new Set(['original', 'scaled', 'adapted', 'aggregated', 'corroboration']);
 
 function normalizeBrewRecipes(value) {
   if (!Array.isArray(value)) return [];
@@ -66,9 +66,19 @@ function normalizeBrewRecipes(value) {
       author: sanitizeSourceText(recipe.author, 120), canonicalUrl: sanitizeSourceText(recipe.canonicalUrl, 300),
       publication: sanitizeSourceText(recipe.publication, 180), doseGrams,
       ratio, temperatureC: Number.isFinite(temperatureC) ? temperatureC : null,
+      hotWaterGrams: Number.isFinite(Number(recipe.hotWaterGrams)) ? Number(recipe.hotWaterGrams) : null,
+      iceGrams: Number.isFinite(Number(recipe.iceGrams)) ? Number(recipe.iceGrams) : null,
+      finalWaterGrams: Number.isFinite(Number(recipe.finalWaterGrams)) ? Number(recipe.finalWaterGrams) : null,
       grind: sanitizeSourceText(recipe.grind, 120), geometry: sanitizeSourceText(recipe.geometry, 240),
       cadence: sanitizeSourceText(recipe.cadence, 240), agitation: sanitizeSourceText(recipe.agitation, 180),
       guideSeconds: Number.isFinite(Number(recipe.guideSeconds)) ? Number(recipe.guideSeconds) : null,
+      steps: Array.isArray(recipe.steps) ? recipe.steps.slice(0, 12).map((step) => {
+        if (!step || typeof step !== 'object') return null;
+        const timeSeconds = Number(step.timeSeconds);
+        const waterTotal = Number(step.waterTotal);
+        if (!Number.isFinite(timeSeconds) || !Number.isFinite(waterTotal) || !sanitizeSourceText(step.action, 240)) return null;
+        return { timeSeconds, waterTotal, action: sanitizeSourceText(step.action, 240) };
+      }).filter(Boolean) : [],
       adaptation: sanitizeSourceText(recipe.adaptation, 400), changedFields: cleanTextArray(recipe.changedFields, 12, 80),
     };
   }).filter((recipe) => recipe?.id && recipe.author && recipe.canonicalUrl);

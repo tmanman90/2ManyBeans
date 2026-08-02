@@ -12,6 +12,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
 import { scaleRecipeForDose } from '../lib/recipeScaling';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
+import { isDeterministicV60Hot } from '../lib/v60Generation';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 
 const ICE_RULE       = C.frostBorder;
@@ -265,7 +266,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 );
 
 export const HandBrewModal = ({
-  open, onClose, recipe, icedRecipe: icedRecipeProp, loading, error, phase, onRetry, onRegenerate,
+  open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, onRetryIced, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onSaveTimingEvent,
@@ -305,6 +306,8 @@ export const HandBrewModal = ({
     () => {
       if (!icedMode) return null;
       if (icedRecipeProp?.candidate) return icedRecipeProp;
+      if (icedRecipeProp?.mode === 'iced' || icedRecipeProp?.isIced) return icedRecipeProp;
+      if (isDeterministicV60Hot(displayRecipe)) return null;
       return displayRecipe ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null;
     },
     [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose]
@@ -317,6 +320,7 @@ export const HandBrewModal = ({
 
   const handleBackToHot = () => {
     setIcedMode(false);
+    setTimerRecipeOverride(null);
     modalContentRef.current?.closest('[role="dialog"]')?.scrollTo?.({ top: 0 });
   };
 
@@ -350,6 +354,7 @@ export const HandBrewModal = ({
   }, [icedRecipe]);
 
   const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
+  const icedTimerReady = icedRecipe?.timerReady === true && !doseUpdating && icedRecipe.coffeeGrams === effectiveDose;
   const timingContext = useMemo(
     () => timingContextFromRecipe({ beanId: bean?.id, recipe: displayRecipe, mode: 'hot' }),
     [bean?.id, displayRecipe]
@@ -416,11 +421,13 @@ export const HandBrewModal = ({
             }}>
               {recipe.title || 'Pour-Over Recipe'}
             </div>
-            {recipe.technique && TECHNIQUE_LABELS[recipe.technique] && (
+            {(icedRecipe.techniqueLabel || (recipe.technique && TECHNIQUE_LABELS[recipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
-                {TECHNIQUE_LABELS[recipe.technique]} Method
+                {icedRecipe.techniqueLabel || TECHNIQUE_LABELS[recipe.technique]} Method
               </div>
             )}
+            {icedRecipe.reasoning && <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.5, marginTop: 8 }}>{icedRecipe.reasoning}</div>}
+            {icedRecipe.sourceLineage?.sourceIds?.length > 0 && <div style={{ ...type.caption, color: C.textLight, marginTop: 6 }}>Source lineage: {icedRecipe.sourceLineage.sourceIds.join(', ')}</div>}
           </div>
 
           {recipe.device === 'kalita' && (
@@ -433,7 +440,7 @@ export const HandBrewModal = ({
 
           {/* Param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <DoseStepperCard dose={displayRecipe.coffeeGrams} onChange={onCoffeeGramsChange} />
+            <DoseStepperCard dose={displayRecipe.coffeeGrams} onChange={onCoffeeGramsChange} {...(device === 'v60' ? { min: 12, max: 30 } : {})} />
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
@@ -559,7 +566,7 @@ export const HandBrewModal = ({
           )}
 
           {/* Reasoning */}
-          {recipe.reasoning && (
+          {recipe.reasoning && !recipe.candidate && (
             <div style={{
               ...type.caption,
               color: C.textMuted,
@@ -696,7 +703,7 @@ export const HandBrewModal = ({
 
           {/* Iced param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <DoseStepperCard dose={icedRecipe.coffeeGrams} onChange={onCoffeeGramsChange} />
+            <DoseStepperCard dose={icedRecipe.coffeeGrams} onChange={onCoffeeGramsChange} min={12} max={30} />
             <div style={{
               background: ICE_TILE_BG,
               borderRadius: radius.md,
@@ -757,7 +764,7 @@ export const HandBrewModal = ({
             }}>
               <Thermometer size={18} color={C.frost} />
               <div>
-                <SectionLabel>Water Temperature (+1C for iced)</SectionLabel>
+                <SectionLabel>Water Temperature</SectionLabel>
                 <div style={{ fontFamily: fonts.heading, fontSize: 16, fontWeight: 600, color: C.text, marginTop: 2 }}>
                   {renderTemp(icedRecipe.waterTemp)}
                 </div>
@@ -797,7 +804,7 @@ export const HandBrewModal = ({
               This recipe is missing timer data — regenerate the hot recipe to enable the iced timer.
             </div>
           )}
-          {icedRecipe.timerReady && (
+          {icedTimerReady && (
           <m.button
             onClick={handleStartIcedBrew}
             aria-label="Start iced brew timer"
@@ -835,6 +842,25 @@ export const HandBrewModal = ({
           )}
 
           {extraFooter}
+        </m.div>
+      )}
+      {recipe && icedMode && !icedRecipe && (
+        <m.div ref={modalContentRef} {...fadeUp} style={{ textAlign: 'center', padding: '36px 8px' }}>
+          <Snowflake size={30} color={C.frost} style={{ marginBottom: 14 }} />
+          <div style={{ fontFamily: fonts.heading, fontSize: 18, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+            {icedLoading ? 'Preparing iced recipe…' : 'Iced recipe unavailable'}
+          </div>
+          <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.5, marginBottom: 16 }}>
+            {icedLoading ? 'The hot recipe remains available while the independent iced profile loads.' : (icedError || 'Regenerate the independent iced profile to try again.')}
+          </div>
+          {!icedLoading && onRetryIced && (
+            <Btn variant="ghost" onClick={onRetryIced} style={{ width: '100%', justifyContent: 'center' }} aria-label="Retry iced recipe">
+              <RefreshCw size={14} /> Retry iced recipe
+            </Btn>
+          )}
+          <Btn variant="ghost" onClick={handleBackToHot} style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} aria-label="Back to hot recipe">
+            <ArrowLeft size={14} /> Back to hot recipe
+          </Btn>
         </m.div>
       )}
     </Modal>

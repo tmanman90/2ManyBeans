@@ -4,7 +4,7 @@ import { V60_ICED_SOURCES, V60_ICED_TECHNIQUES, V60_ICED_SOURCE_REGISTRY_VERSION
 const result = validateV60IcedRegistry();
 assert.equal(result.valid, true, result.errors.join(', '));
 assert.equal(V60_ICED_SOURCE_REGISTRY_VERSION, 'v60-iced-sources-v1');
-assert.equal(Object.keys(V60_ICED_TECHNIQUES).length, 3);
+assert.equal(Object.keys(V60_ICED_TECHNIQUES).length, 4);
 for (const source of V60_ICED_SOURCES) {
   assert.equal(source.hotWaterGrams + source.iceGrams, source.finalWaterGrams);
   assert.ok(Math.abs(source.finalWaterGrams / source.doseGrams - source.ratio) < 0.01);
@@ -14,4 +14,10 @@ assert.equal(V60_ICED_SOURCES.find((source) => source.id === 'kurasu-iced-staged
 assert.equal(V60_ICED_SOURCES.find((source) => source.id === 'counterculture-flash-v1').guideSeconds, null);
 assert.equal(V60_ICED_SOURCES.find((source) => source.id === 'counterculture-flash-v1').agitation, null);
 assert.match(readFileSync(new URL('../docs/data/v60-iced-source-registry.md', import.meta.url), 'utf8'), /classic 60\/40/i);
+const audit = readFileSync(new URL('../docs/data/v60-iced-source-registry.md', import.meta.url), 'utf8');
+for (const source of V60_ICED_SOURCES) {
+  assert.match(audit, new RegExp('`' + source.id + '`'));
+  assert.match(audit, new RegExp(source.canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(audit, new RegExp(`\\| ${source.status} \\|`));
+}
 console.log(`iced source registry passed (${V60_ICED_SOURCES.length} sources)`);

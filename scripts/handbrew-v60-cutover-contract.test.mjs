@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const hook = readFileSync(new URL('../src/hooks/useHandBrew.js', import.meta.url), 'utf8');
+const modal = readFileSync(new URL('../src/components/HandBrewModal.jsx', import.meta.url), 'utf8');
+assert.match(hook, /generateV60HotWithFallback/);
+assert.match(hook, /V60 regeneration unavailable/);
+const v60Branch = hook.slice(hook.indexOf("if (device === 'v60' && !recipe)"), hook.indexOf("if (!recipe) {", hook.indexOf("if (device === 'v60' && !recipe)")));
+assert.match(v60Branch, /V60 regeneration unavailable/);
+assert.doesNotMatch(v60Branch, /generateHandBrewRecipe/);
+assert.match(hook, /handBrewIcedLoading/);
+assert.match(hook, /handBrewIcedError/);
+assert.match(hook, /activeRequestRef\.current = null/);
+assert.match(modal, /isDeterministicV60Hot/);
+assert.match(modal, /Retry iced recipe/);
+assert.match(modal, /min=\{12\} max=\{30\}/);
+console.log('handbrew V60 cutover consumer contract passed (no GPT dose fallthrough, independent iced error path)');

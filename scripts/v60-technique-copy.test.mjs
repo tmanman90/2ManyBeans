@@ -17,4 +17,7 @@ assert.equal(heart.sourceLineage.parameterSources.agitation, 'v60-adaptation-bou
 const adapted = generateV60Recipe({ cupDirection: { body: 'supported' } }, { dose: 18 });
 assert.equal(adapted.sourceLineage.changedFields.includes('ratio'), true);
 assert.equal(adapted.sourceLineage.parameterSources.ratio, 'v60-adaptation-bounded-v1');
+const kasuya = generateV60Recipe({ techniquePreference: 'bloom-led-pulse' }, { dose: 20 });
+assert.deepEqual(kasuya.steps.map((step) => [step.timeSeconds, step.waterTotal]), [[0, 50], [45, 120], [90, 180], [130, 240], [160, 300]]);
+assert.equal(kasuya.sourceLineage.status, 'original');
 console.log('v60 technique copy/provenance passed (large, Rao, Heart, incomplete Kurasu adaptation)');

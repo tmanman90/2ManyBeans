@@ -138,7 +138,10 @@ export function selectTimingMemory(history, context) {
   );
   if (!candidates.length) return null;
   const exact = candidates.filter((event) => event.doseGrams === context.doseGrams);
-  const mostRecent = exact[0] || candidates[0];
+  // Cross-dose timing remains stored for auditability, but v1 never shows it
+  // as a comparable "last brew" or uses it to train a different dose.
+  if (!exact.length) return null;
+  const mostRecent = exact[0];
   const values = exact.map((event) => event.actualElapsedMs).sort((a, b) => a - b);
   const range = values.length >= 3 ? {
     minMs: values[0],
@@ -148,7 +151,7 @@ export function selectTimingMemory(history, context) {
   } : null;
   return {
     event: mostRecent,
-    isExactDose: exact.length > 0,
+    isExactDose: true,
     range,
   };
 }
