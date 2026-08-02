@@ -9,11 +9,14 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const PROD_APP_ID = 'com.talmeltzer.coffeehub';
 const PROD_CHANNEL = 'production';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const SOCIAL_LOGIN_PACKAGE = '@capgo/capacitor-social-login';
 const REQUIRED_BUILD_ENV = [
   'VITE_FIREBASE_API_KEY',
   'VITE_FIREBASE_AUTH_DOMAIN',
@@ -49,6 +52,28 @@ function compareVersions(left, right) {
   return 0;
 }
 
+function restorePublishedSocialLoginManifest() {
+  const packageRoot = 'node_modules/@capgo/capacitor-social-login';
+  const installed = JSON.parse(readFileSync(`${packageRoot}/package.json`, 'utf8'));
+  const staging = mkdtempSync(join(tmpdir(), 'coffee-hub-social-login-'));
+
+  try {
+    run(npmCommand, ['pack', `${SOCIAL_LOGIN_PACKAGE}@${installed.version}`, '--pack-destination', staging], { capture: true });
+    const archive = readdirSync(staging).find((name) => name.endsWith('.tgz'));
+    if (!archive) throw new Error(`Could not fetch the published ${SOCIAL_LOGIN_PACKAGE}@${installed.version} manifest.`);
+
+    const manifest = run('tar', ['-xOf', join(staging, archive), 'package/Package.swift'], { capture: true });
+    if (!manifest.includes('facebook-ios-sdk') || !manifest.includes('FacebookCore') || !manifest.includes('FacebookLogin')) {
+      throw new Error(`Published ${SOCIAL_LOGIN_PACKAGE}@${installed.version} has an unexpected Package.swift; refusing production upload.`);
+    }
+
+    writeFileSync(`${packageRoot}/Package.swift`, manifest, 'utf8');
+    console.log(`Restored published ${SOCIAL_LOGIN_PACKAGE}@${installed.version} native manifest for the production baseline.`);
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+}
+
 const capacitorConfig = readFileSync('capacitor.config.ts', 'utf8');
 if (!capacitorConfig.includes(`appId: isDevApp ? '${PROD_APP_ID}.dev' : '${PROD_APP_ID}'`)) {
   throw new Error('Production Capacitor app ID is not the expected Coffee Hub app. Refusing upload.');
@@ -79,9 +104,10 @@ console.log(`Previous bundle: ${currentBundle || '(none)'}`);
 console.log(`New bundle: ${bundleVersion}`);
 
 // Keep the production OTA metadata aligned with the installed production
-// wrapper. `patch-social-login.mjs` changes native Package.swift contents for a
-// future native/TestFlight build; applying it to a JS-only OTA makes Capgo
-// reject the bundle against the existing production native baseline.
+// wrapper. Dev intentionally removes Facebook from the same installed package,
+// so normalize Package.swift back to the published package before Capgo compares
+// this JS-only OTA with the existing production native baseline.
+restorePublishedSocialLoginManifest();
 run(npmCommand, ['run', 'build:ios']);
 
 capgo([
