@@ -98,7 +98,17 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     deviceOverride = null,
     generationOverrides = {},
   ) => {
+    if (doseDebounceRef.current) {
+      clearTimeout(doseDebounceRef.current);
+      doseDebounceRef.current = null;
+    }
+    requestedFingerprintRef.current = null;
     const device = deviceOverride || getBrewDevice();
+    const requestResearch = cachedResearch || bean.beanResearch || null;
+    // Replace, rather than retain, per-bean research before any cache path can
+    // return. A later dose change must never regenerate Bean B with Bean A's
+    // research left in hook state.
+    setHandBrewResearch(requestResearch);
     const activePreferences = {
       ...preferences,
       ...(generationOverrides.kalitaSize ? { kalitaSize: generationOverrides.kalitaSize } : {}),
@@ -142,7 +152,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
         }
         setHandBrewRecipe(hydrated);
         const cachedIced = bean.handBrewIcedRecipes?.[device];
-        const cachedIcedValid = icedCandidateMatchesConfiguration(cachedIced, candidateDose, bean, cachedResearch || bean.beanResearch || null);
+        const cachedIcedValid = icedCandidateMatchesConfiguration(cachedIced, candidateDose, bean, requestResearch);
         setHandBrewIcedRecipe(cachedIcedValid ? cachedIced : null);
         setHandBrewIcedError(cachedIcedValid ? null : 'Saved iced recipe is missing or stale; regenerate it.');
         setHandBrewIcedLoading(false);
@@ -191,7 +201,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     setHandBrewLoading(true);
 
     // Step 1: Research (skip if cached)
-    let research = cachedResearch || bean.beanResearch || null;
+    let research = requestResearch;
     if (!research) {
       setHandBrewPhase('research');
       try {
@@ -343,6 +353,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   };
 
   const closeHandBrewModal = () => {
+    if (doseDebounceRef.current) {
+      clearTimeout(doseDebounceRef.current);
+      doseDebounceRef.current = null;
+    }
+    requestedFingerprintRef.current = null;
     activeRequestRef.current = null;
     setHandBrewModal(false);
   };
@@ -375,11 +390,14 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     // persistence can observe the stale recipe. The next generation owns the
     // full dose/device/mode fingerprint.
     activeRequestRef.current = null;
-    requestedFingerprintRef.current = `${handBrewRecipe?.device || 'v60'}:${newDose}:${handBrewRecipe?.mode || 'hot'}:${preferences?.grinder || 'fellow-ode-gen2'}`;
+    const fingerprint = `${handBrewRecipe?.device || 'v60'}:${newDose}:${handBrewRecipe?.mode || 'hot'}:${preferences?.grinder || 'fellow-ode-gen2'}`;
+    requestedFingerprintRef.current = fingerprint;
     setUserCoffeeGrams(newDose);
     if (handBrewRecipe?.device === 'v60' && handBrewBean) {
       if (doseDebounceRef.current) clearTimeout(doseDebounceRef.current);
       doseDebounceRef.current = setTimeout(() => {
+        doseDebounceRef.current = null;
+        if (!mountedRef.current || requestedFingerprintRef.current !== fingerprint) return;
         handleBrewHandBrew(handBrewBean, handBrewResearch, true, 'v60', { doseOverride: newDose });
       }, 350);
     }

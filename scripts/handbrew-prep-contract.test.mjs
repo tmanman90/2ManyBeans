@@ -27,6 +27,7 @@ const legacy = normalizeRecipePhases({ timerReady: true, totalBrewTimeSeconds: 1
 ] });
 assert.equal(legacy.phaseContractStatus, 'legacy-normalized');
 assert.equal(legacy.prepSteps.length, 1);
+assert.deepEqual(legacy.steps.map((step) => [step.timeSeconds, step.time]), [[0, '0:00'], [60, '1:00']]);
 assert.equal(legacy.steps[0].timeSeconds, 0);
 assert.equal(legacy.totalBrewTimeSeconds, 180);
 assert.ok(buildTimerSteps(legacy));
@@ -37,6 +38,7 @@ const historicalTimedLoad = normalizeRecipePhases({ timerReady: true, totalBrewT
 ] });
 assert.equal(historicalTimedLoad.steps[0].timeSeconds, 0);
 assert.equal(historicalTimedLoad.steps[1].timeSeconds, 45);
+assert.equal(historicalTimedLoad.steps[1].time, '0:45');
 const ambiguous = normalizeRecipePhases({ timerReady: true, totalBrewTimeSeconds: 180, steps: [{ timeSeconds: 0, action: 'Settle the bed', waterTotal: 0 }] });
 assert.equal(ambiguous.timerReady, false);
 console.log('handbrew prep/phase contract passed (versioned hot, Kalita, iced, legacy, ambiguous)');

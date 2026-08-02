@@ -3,8 +3,8 @@
 // record when a source recipe is scaled or bounded for the app.
 export const V60_SOURCE_REGISTRY_VERSION = 'v60-hot-sources-v1';
 export const V60_RULES = Object.freeze({
-  'v60-adaptation-bounded-v1': { allowedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'geometry', 'cadence', 'agitation'], bounds: { dose: [12, 30], ratio: [15, 18.5] } },
-  'v60-dose-scaling-v1': { allowedFields: ['dose', 'water', 'bloom', 'cadence', 'guide'], bounds: { dose: [12, 30] } },
+  'v60-adaptation-bounded-v1': { allowedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'geometry', 'cadence', 'agitation', 'water', 'bloom', 'guide'], bounds: { dose: [12, 30], ratio: [15, 18.5] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1'] },
+  'v60-dose-scaling-v1': { allowedFields: ['dose', 'water', 'bloom', 'cadence', 'guide'], bounds: { dose: [12, 30] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1'] },
   'user-configuration': { allowedFields: ['dose', 'grinder'] },
 });
 

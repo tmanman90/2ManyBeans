@@ -65,7 +65,7 @@ export function transformPourOver(hotRecipe, userDose) {
   if ((hotRecipe?.device || 'v60') === 'v60') {
     const effective = normalizeRecipePhases(hotRecipe);
     const sourceSteps = Array.isArray(effective?.steps) ? effective.steps : [];
-    const steps = sourceSteps.map((step, index) => {
+    const steps = sourceSteps.map((step) => {
       const waterTotal = typeof step.waterTotal === 'number' ? Math.round(step.waterTotal * HOT_FRACTION) : step.waterTotal;
       const action = typeof step.action === 'string'
         ? step.action.replace(/(\d+(?:\.\d+)?)\s*(grams?|g)\b/gi, (_, value, unit) => `${Math.round(Number(value) * HOT_FRACTION)}${unit}`)

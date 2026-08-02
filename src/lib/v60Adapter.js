@@ -1,5 +1,5 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
-import { V60_SOURCE_REGISTRY_VERSION, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
+import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v1';
 export const V60_RULES_VERSION = 'v60-hot-rules-v1';
@@ -29,35 +29,42 @@ function intentValue(intent, key, fallback = null) {
   return intent && intent[key] != null ? intent[key] : fallback;
 }
 
-function sourceRecipeFor(evidence) {
+function sourceRecipesFor(evidence) {
   const recipes = evidence?.sourceInsights?.brewRecipes;
-  if (!Array.isArray(recipes)) return null;
-  return recipes.find((recipe) => recipe.mode === 'hot'
+  if (!Array.isArray(recipes)) return [];
+  return recipes.filter((recipe) => recipe.mode === 'hot'
     && String(recipe.device).toLowerCase() === 'v60'
-    && (!recipe.configuration || /v60\s*02|v60:02:standard-paper/i.test(String(recipe.configuration)))) || null;
+    && (!recipe.configuration || /v60\s*02|v60:02:standard-paper/i.test(String(recipe.configuration)))
+    && !/reddit\.com/i.test(recipe.canonicalUrl || ''));
 }
 
 function executableSourceRecipe(recipe) {
-  if (!recipe || recipe.status !== 'original' || !Number.isFinite(recipe.guideSeconds)) return null;
-  if (!Array.isArray(recipe.steps) || recipe.steps.length < 2) return null;
+  if (!recipe || recipe.status !== 'original' || !Number.isFinite(recipe.guideSeconds)
+    || !Number.isFinite(recipe.temperatureC) || !Number.isFinite(recipe.ratio)
+    || !recipe.grind || !recipe.geometry || !recipe.cadence || !recipe.agitation) return null;
+  if (!/v60\s*02|v60:02:standard-paper/i.test(String(recipe.configuration || ''))) return null;
+  if (recipe.temperatureC < 92 || recipe.temperatureC > 100) return null;
+  if (!Array.isArray(recipe.steps) || recipe.steps.length < 2 || recipe.steps[0].timeSeconds !== 0) return null;
   let lastTime = -1; let lastWater = -1;
   for (const step of recipe.steps) {
-    if (step.timeSeconds <= lastTime || step.waterTotal < lastWater) return null;
+    if (!Number.isFinite(step.timeSeconds) || !Number.isFinite(step.waterTotal)
+      || step.timeSeconds <= lastTime || step.waterTotal <= 0 || step.waterTotal < lastWater) return null;
     lastTime = step.timeSeconds; lastWater = step.waterTotal;
   }
-  return recipe.steps.at(-1).waterTotal > 0 ? recipe : null;
+  const expectedWater = round(recipe.doseGrams * recipe.ratio);
+  return recipe.steps.at(-1).waterTotal === expectedWater && recipe.guideSeconds > lastTime ? recipe : null;
 }
 
 export function selectV60Technique(intent = {}, configuration = {}, evidence = null) {
   const config = normalizeV60Configuration(configuration);
-  const structured = sourceRecipeFor(evidence);
-  const exact = executableSourceRecipe(structured);
-  if (exact && config.dose === exact.doseGrams) return { ...V60_TECHNIQUES.smallPulse, id: 'direct-roaster-v60', sourceIds: [exact.id], sourceRecipe: exact, reasonCode: 'EXACT_STRUCTURED_SOURCE' };
+  const structuredRecipes = sourceRecipesFor(evidence);
+  const exact = structuredRecipes.map(executableSourceRecipe).find((recipe) => recipe && config.dose === recipe.doseGrams) || null;
+  const structured = structuredRecipes[0] || null;
+  if (exact) return { ...V60_TECHNIQUES.smallPulse, id: 'direct-roaster-v60', sourceIds: [exact.id], sourceRecipe: exact, reasonCode: 'EXACT_STRUCTURED_SOURCE' };
   if (structured) return { ...V60_TECHNIQUES.smallPulse, structuredSource: structured, reasonCode: 'PARTIAL_STRUCTURED_SOURCE_ADAPTED' };
   const finesRisk = intentValue(intent, 'finesRisk', 'unknown');
   const energy = intentValue(intent, 'energyTendency', 'conservative');
   const cupDirection = intentValue(intent, 'cupDirection', {});
-  const family = String(intentValue(intent, 'family', '')).toLowerCase();
   if (config.dose >= 25) return { ...V60_TECHNIQUES.largeBatch, reasonCode: 'LARGE_DOSE_DEDICATED_PROFILE' };
   if (finesRisk === 'high') return { ...V60_TECHNIQUES.gentle, reasonCode: 'HIGH_FINES_LOW_AGITATION' };
   if (intentValue(intent, 'techniquePreference') === 'bloom-led-pulse') return { ...V60_TECHNIQUES.coarse46, reasonCode: 'COARSE_PULSE_SOLUBILITY_PROFILE' };
@@ -91,9 +98,7 @@ function grindFor(grinder, technique, intent) {
 function techniqueShape(technique, dose, water, source, intent = {}) {
   const bloom = round(dose * 3);
   if (technique.id === 'direct-roaster-v60' && technique.sourceRecipe?.steps?.length) {
-    const sourceWater = technique.sourceRecipe.steps.at(-1).waterTotal;
-    const scale = sourceWater > 0 ? water / sourceWater : 1;
-    return technique.sourceRecipe.steps.map((step) => [step.timeSeconds, round(step.waterTotal * scale), step.action]);
+    return technique.sourceRecipe.steps.map((step) => [step.timeSeconds, step.waterTotal, step.action]);
   }
   if (technique.id === 'hoffmann-large-batch') return [
     [0, source.bloomGrams || 60, `Bloom with ${source.bloomGrams || 60}g from the center; wet the whole bed.`],
@@ -140,7 +145,9 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   const source = technique.sourceRecipe || sourceById(technique.sourceIds[0]) || V60_SOURCES[0];
   const ratio = clamp(Number(source.ratio) || Number(intentValue(intent, 'targetRatio', 16.5)) || 16.5, 15, 18.5);
   const waterGrams = round(config.dose * ratio);
-  const temperature = clamp(Number(intentValue(intent, 'targetTemperatureC', source.temperatureC || 96)) || 96, 92, 100);
+  const temperature = technique.sourceRecipe
+    ? clamp(source.temperatureC, 92, 100)
+    : clamp(Number(intentValue(intent, 'targetTemperatureC', source.temperatureC || 96)) || 96, 92, 100);
   const shape = techniqueShape(technique, config.dose, waterGrams, source, intent);
   const finalAt = shape.at(-1)[0];
   const prepSteps = [
@@ -164,13 +171,15 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   const lineage = {
     method: 'v60', mode: 'hot', configurationKey: V60_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.sourceRecipe), canonicalUrls: technique.sourceRecipe ? [technique.sourceRecipe.canonicalUrl] : undefined,
     sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, status: !sourceSupportsV60 || adaptedTechnique || (exactSourceDose && !sourceCadenceExact) ? 'adapted' : exactSourceDose ? 'original' : 'scaled', adaptation: technique.sourceRecipe ? 'Executable structured source cadence reproduced; V60 02 boundary retained.' : technique.structuredSource ? `Partial structured source retained as evidence; closed ${technique.id} profile selected by ${V60_ADAPTATION_RULE_ID}.` : sourceSupportsV60 ? `App profile based on ${source.author}.` : `Adapted profile based on incomplete ${source.author} evidence; V60 02 fields use ${V60_ADAPTATION_RULE_ID}.`,
-    changedFields: [...scalingFields, ...cadenceFields, !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', !sourceSupportsV60 && 'grind', !sourceSupportsV60 && 'geometry', !sourceSupportsV60 && 'cadence', !sourceSupportsV60 && 'agitation', adaptedTechnique && 'agitation'].filter(Boolean),
-    parameterSources: { ratio: sourceSupportsV60 ? sourceIds[0] : parameterRule, dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: sourceSupportsV60 && source.temperatureC ? sourceIds[0] : parameterRule, grind: sourceSupportsV60 && source.grind ? sourceIds[0] : parameterRule, geometry: sourceSupportsV60 ? sourceIds[0] : parameterRule, agitation: adaptedTechnique || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), bloom: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), cadence: scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), guide: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
+    changedFields: [...scalingFields, ...cadenceFields, !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', (!sourceSupportsV60 || !source.grind) && 'grind', !sourceSupportsV60 && 'geometry', !sourceSupportsV60 && 'cadence', !sourceSupportsV60 && 'agitation', adaptedTechnique && 'agitation'].filter(Boolean),
+    parameterSources: { ratio: sourceSupportsV60 ? sourceIds[0] : parameterRule, dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: sourceSupportsV60 && source.temperatureC ? sourceIds[0] : parameterRule, grind: sourceSupportsV60 && source.grind ? sourceIds[0] : V60_ADAPTATION_RULE_ID, geometry: sourceSupportsV60 ? sourceIds[0] : parameterRule, agitation: adaptedTechnique || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), bloom: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], cadence: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], guide: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'hot', isIced: false, configurationKey: V60_CONFIGURATION_KEY,
     v60Size: '02', doseProfile: config.doseProfile, coffeeGrams: config.dose, waterGrams, ratio: `1:${ratio}`,
-    waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) }, grindSize: grindFor(config.grinder, technique, intent),
+    waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) }, grindSize: technique.sourceRecipe
+      ? { setting: null, microns: null, description: source.grind, grinderSpecific: false, sourceExact: true }
+      : grindFor(config.grinder, technique, intent),
     technique: technique.id, techniqueLabel: technique.label, techniqueInstruction: technique.id === 'direct-roaster-v60' ? `${source.geometry || 'Source cadence'}; ${source.agitation || 'source agitation'}.` : `${technique.label}: center start, low stream, keep water off the paper walls.`,
     prepSteps, steps, postBrewSteps: [], totalBrewTimeSeconds: guide, totalBrewTime: timeLabel(guide), guideTargetSeconds: guide,
     guideRangeSeconds: [Math.max(guide - 30, finalAt + 30), guide + 30], timerReady: true, phaseContractVersion: V60_PHASE_CONTRACT_VERSION,
@@ -189,12 +198,16 @@ export function validateV60Candidate(recipe) {
   if (!recipe || recipe.device !== 'v60' || recipe.mode !== 'hot' || recipe.isIced) errors.push('wrong-mode-or-device');
   if (recipe?.configurationKey !== V60_CONFIGURATION_KEY || recipe?.v60Size !== '02') errors.push('invalid-configuration');
   if (!Number.isFinite(recipe?.coffeeGrams) || recipe.coffeeGrams < MIN_DOSE || recipe.coffeeGrams > MAX_DOSE) errors.push('invalid-dose');
-  if (!Number.isFinite(recipe?.waterGrams) || recipe.waterGrams <= 0 || !Number.isFinite(recipe?.waterTemp?.celsius)) errors.push('invalid-physical-values');
+  if (!Number.isFinite(recipe?.waterGrams) || recipe.waterGrams <= 0 || !Number.isFinite(recipe?.waterTemp?.celsius)
+    || recipe.waterTemp.celsius < 92 || recipe.waterTemp.celsius > 100) errors.push('invalid-physical-values');
   if (!recipe?.sourceLineage?.sourceRegistryVersion || !recipe?.sourceLineage?.parameterSources) errors.push('missing-provenance');
   for (const [field, sourceId] of Object.entries(recipe?.sourceLineage?.parameterSources || {})) {
     const structuredAllowed = recipe?.sourceLineage?.structuredSource === true && recipe.sourceLineage.canonicalUrls?.every((url) => url && !/reddit\.com/i.test(url));
     if (structuredAllowed && sourceId !== recipe.sourceLineage.sourceIds?.[0]) errors.push(`embedded-source-mismatch:${field}`);
     if (!isKnownV60ParameterSource(sourceId) && !structuredAllowed) errors.push(`unknown-parameter-source:${field}`);
+    const rule = V60_RULES[sourceId];
+    if (!structuredAllowed && rule && !rule.allowedFields.includes(field)) errors.push(`rule-field-mismatch:${field}`);
+    if (!structuredAllowed && rule?.sourceIds?.length && !recipe.sourceLineage.sourceIds?.some((id) => rule.sourceIds.includes(id))) errors.push(`rule-source-mismatch:${field}`);
   }
   if (recipe?.sourceLineage?.status === 'original' && recipe.sourceLineage.changedFields?.length) errors.push('original-has-changed-fields');
   if (recipe?.sourceLineage?.status !== 'original' && !recipe?.sourceLineage?.changedFields?.length) errors.push('adaptation-missing-changed-fields');
@@ -203,7 +216,7 @@ export function validateV60Candidate(recipe) {
   if (!Array.isArray(recipe?.steps) || !recipe.steps.length) errors.push('missing-steps');
   for (const step of recipe?.steps || []) {
     if (!Number.isFinite(step.timeSeconds) || step.timeSeconds <= lastTime) errors.push('invalid-timer-sequence');
-    if (!Number.isFinite(step.waterTotal) || step.waterTotal < lastWater || !step.action || !/center|spiral|pulse/i.test(step.action)) errors.push('invalid-step-copy-or-water');
+    if (!Number.isFinite(step.waterTotal) || step.waterTotal <= 0 || step.waterTotal < lastWater || !step.action || !/center|spiral|pulse/i.test(step.action)) errors.push('invalid-step-copy-or-water');
     lastTime = step.timeSeconds; lastWater = step.waterTotal;
   }
   if (lastWater !== recipe?.waterGrams) errors.push('final-water-mismatch');

@@ -189,9 +189,11 @@ function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone, saveSt
   );
 }
 
-function ChillServeScreen({ onCoffeeChilled, saveState, onRetrySave, postBrewInstruction }) {
+function ChillServeScreen({ onCoffeeChilled, onDismiss, saveState, onRetrySave, postBrewInstruction }) {
+  const dialogRef = useRef(null);
+  useEffect(() => { dialogRef.current?.focus(); }, []);
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="chill-serve-heading" style={{
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="chill-serve-heading" style={{
       position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', padding: '0 max(28px, env(safe-area-inset-left, 0px)) 0 max(28px, env(safe-area-inset-right, 0px))',
       background: C.bg, zIndex: 2, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -207,6 +209,7 @@ function ChillServeScreen({ onCoffeeChilled, saveState, onRetrySave, postBrewIns
       </div>
       {saveState === 'failed' && <button onClick={onRetrySave} style={{ minHeight: 44, marginBottom: 10, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>}
       <button onClick={onCoffeeChilled} style={{ width: '100%', maxWidth: 320, minHeight: 52, border: 'none', borderRadius: radius.md, background: `linear-gradient(180deg, ${C.frost} 0%, #4E6878 100%)`, color: C.cream, fontFamily: fonts.body, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>Coffee chilled</button>
+      <button onClick={onDismiss} style={{ width: '100%', maxWidth: 320, minHeight: 48, marginTop: 10, border: `1px solid ${C.border}`, borderRadius: radius.md, background: C.card, color: C.textMuted, fontFamily: fonts.body, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Done</button>
     </div>
   );
 }
@@ -529,6 +532,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
 
   // Accent color for paused state
   const ringStrokeColor = phase === 'paused' ? C.accentLight : C.accent;
+  const completionOverlayVisible = phase === 'done';
 
   return createPortal(
     <div
@@ -563,7 +567,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
       `}</style>
 
       {/* Header — glass chrome */}
-      <div style={{
+      <div inert={completionOverlayVisible ? true : undefined} aria-hidden={completionOverlayVisible ? true : undefined} style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -643,6 +647,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
         position: 'relative',
         overflow: 'hidden',
       }}>
+        <div inert={completionOverlayVisible ? true : undefined} aria-hidden={completionOverlayVisible ? true : undefined} style={{ display: 'contents' }}>
         {/* Countdown overlay (covers the rest while active) */}
         {phase === 'countdown' && <Countdown onDone={beginRunning} />}
 
@@ -868,10 +873,11 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
             <SkipForward size={20} strokeWidth={2.5} />
           </ControlButton>
         </div>
+        </div>
 
         {/* Completion screen overlay */}
         {phase === 'done' && recipe?.isIced && !chilled && (
-          <ChillServeScreen postBrewInstruction={recipe?.postBrewSteps?.[0]?.action} onCoffeeChilled={() => setChilled(true)} saveState={saveState} onRetrySave={persistCompletion} />
+          <ChillServeScreen postBrewInstruction={recipe?.postBrewSteps?.[0]?.action} onCoffeeChilled={() => setChilled(true)} onDismiss={onClose} saveState={saveState} onRetrySave={persistCompletion} />
         )}
         {phase === 'done' && (!recipe?.isIced || chilled) && (
           <CompletionScreen

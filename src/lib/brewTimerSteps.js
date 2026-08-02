@@ -2,6 +2,7 @@ export const PHASE_CONTRACT_VERSION = 1;
 
 const WATER_ACTION = /\b(?:bloom|pour|pouring|water|hot water|pulse|finish)\b/i;
 const PREP_ACTION = /\b(?:rinse|preheat|load|add\s+\d+(?:\.\d+)?\s*g\s*coffee|level the bed|server ice|brew ice|discard rinse)\b/i;
+const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
 // Read-time phase interpretation. It never mutates or persists legacy data.
 // Ambiguous records remain viewable but are deliberately timer-disabled.
@@ -24,11 +25,12 @@ export function normalizeRecipePhases(recipe) {
   if (firstWaterIndex < 0) return { ...recipe, prepSteps: [], postBrewSteps: [], phaseContractStatus: 'ambiguous', timerReady: false };
   const firstWaterTime = rawSteps[firstWaterIndex].timeSeconds;
   const prepSteps = rawSteps.slice(0, firstWaterIndex).filter((step) => PREP_ACTION.test(String(step?.action || '')) || !WATER_ACTION.test(String(step?.action || '')));
-  const steps = rawSteps.slice(firstWaterIndex).map((step, index) => {
+  const steps = rawSteps.slice(firstWaterIndex).map((step) => {
+    const timeSeconds = Math.max(0, step.timeSeconds - firstWaterTime);
     const normalized = {
       ...step,
-      timeSeconds: Math.max(0, step.timeSeconds - firstWaterTime),
-      time: index === 0 ? '0:00' : step.time,
+      timeSeconds,
+      time: formatTime(timeSeconds),
       phase: 'brew',
     };
     // Keep downstream identity contracts intact: the timer owns normalized
@@ -52,6 +54,7 @@ export function normalizeRecipePhases(recipe) {
     steps,
     postBrewSteps: Array.isArray(recipe.postBrewSteps) ? recipe.postBrewSteps : [],
     totalBrewTimeSeconds: total,
+    totalBrewTime: Number.isFinite(total) ? formatTime(total) : recipe.totalBrewTime,
     phaseContractStatus: 'legacy-normalized',
     phaseContractVersion: undefined,
     timerReady,

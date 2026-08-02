@@ -19,6 +19,6 @@ assert.equal(partnersExact.sourceLineage.status, 'original');
 const partnersScaled = generateV60IcedRecipe({}, { dose: 18 });
 assert.equal(partnersScaled.sourceLineage.status, 'scaled');
 assert.equal(partnersScaled.sourceLineage.parameterSources.hotWater, 'v60-iced-dose-scaling-v1');
-const kurasuExact = generateV60IcedRecipe({ source: 'Kurasu staged iced' }, { dose: 16 });
+const kurasuExact = generateV60IcedRecipe({ finesRisk: 'high' }, { dose: 16 });
 assert.equal(kurasuExact.sourceLineage.status, 'adapted');
 console.log('V60 dose-scaling provenance passed (exact and scaled hot/iced source doses)');

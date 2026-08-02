@@ -9,7 +9,7 @@ assert.equal(small.hotWaterGrams + small.initialBrewIceGrams, small.finalBeverag
 const large = generateV60IcedRecipe({}, { dose: 30, grinder: 'other' });
 assert.equal(large.technique, 'classic-60-40-flash');
 assert.equal(large.grindSize.setting, null);
-const kurasu = generateV60IcedRecipe({ source: 'Kurasu staged iced' }, { dose: 16 });
+const kurasu = generateV60IcedRecipe({ finesRisk: 'high' }, { dose: 16 });
 assert.equal(kurasu.technique, 'kurasu-staged-flash');
 const fallback = generateV60IcedFallback({ dose: 20 }, 'invalid-evidence');
 assert.equal(fallback.fallback, true);

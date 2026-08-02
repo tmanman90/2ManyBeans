@@ -14,6 +14,7 @@ import { scaleRecipeForDose } from '../lib/recipeScaling';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
 import { isDeterministicV60Hot } from '../lib/v60Generation';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
+import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
@@ -162,11 +163,12 @@ const renderTemp = (wt) => {
 };
 
 const GrindDisplay = ({ grindSize, grinderName, preferences, accentColor }) => {
-  const isMicrons = preferences?.grindSizeDisplay === 'microns' && grindSize.microns;
-  const primary = isMicrons || !grindSize.setting ? `~${grindSize.microns}µm` : grindSize.setting;
+  const hasMicrons = Number.isFinite(grindSize.microns);
+  const isMicrons = preferences?.grindSizeDisplay === 'microns' && hasMicrons;
+  const primary = isMicrons ? `~${grindSize.microns}µm` : grindSize.setting || (hasMicrons ? `~${grindSize.microns}µm` : 'Source');
   const secondary = isMicrons
     ? (grindSize.setting ? `${grinderName}: ${grindSize.setting}` : null)
-    : (grindSize.microns ? `~${grindSize.microns}µm` : null);
+    : (hasMicrons ? `~${grindSize.microns}µm` : null);
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
       <div style={{
@@ -291,22 +293,24 @@ export const HandBrewModal = ({
     ? userCoffeeGrams
     : recipe?.coffeeGrams;
   const doseUpdating = recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
-  const timerReady = recipe?.timerReady === true && !doseUpdating;
 
-  const displayRecipe = useMemo(
+  const scaledRecipe = useMemo(
     () => (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1'
       ? recipe
       : scaleRecipeForDose(recipe, effectiveDose)),
     [recipe, effectiveDose]
   );
+  const displayRecipe = useMemo(() => normalizeRecipePhases(scaledRecipe), [scaledRecipe]);
+  const hotTimerSteps = useMemo(() => buildTimerSteps(displayRecipe), [displayRecipe]);
+  const timerReady = Boolean(hotTimerSteps) && !doseUpdating;
 
   const device = deviceKey || recipe?.device || 'v60';
 
   const icedRecipe = useMemo(
     () => {
       if (!icedMode) return null;
-      if (icedRecipeProp?.candidate) return icedRecipeProp;
-      if (icedRecipeProp?.mode === 'iced' || icedRecipeProp?.isIced) return icedRecipeProp;
+      if (icedRecipeProp?.candidate) return normalizeRecipePhases(icedRecipeProp);
+      if (icedRecipeProp?.mode === 'iced' || icedRecipeProp?.isIced) return normalizeRecipePhases(icedRecipeProp);
       if (isDeterministicV60Hot(displayRecipe)) return null;
       return displayRecipe ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null;
     },
@@ -354,7 +358,8 @@ export const HandBrewModal = ({
   }, [icedRecipe]);
 
   const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
-  const icedTimerReady = icedRecipe?.timerReady === true && !doseUpdating && icedRecipe.coffeeGrams === effectiveDose;
+  const icedTimerSteps = useMemo(() => buildTimerSteps(icedRecipe), [icedRecipe]);
+  const icedTimerReady = Boolean(icedTimerSteps) && !doseUpdating && icedRecipe.coffeeGrams === effectiveDose;
   const timingContext = useMemo(
     () => timingContextFromRecipe({ beanId: bean?.id, recipe: displayRecipe, mode: 'hot' }),
     [bean?.id, displayRecipe]
@@ -421,13 +426,11 @@ export const HandBrewModal = ({
             }}>
               {recipe.title || 'Pour-Over Recipe'}
             </div>
-            {(icedRecipe.techniqueLabel || (recipe.technique && TECHNIQUE_LABELS[recipe.technique])) && (
+            {(recipe.techniqueLabel || (recipe.technique && TECHNIQUE_LABELS[recipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
-                {icedRecipe.techniqueLabel || TECHNIQUE_LABELS[recipe.technique]} Method
+                {recipe.techniqueLabel || TECHNIQUE_LABELS[recipe.technique]} Method
               </div>
             )}
-            {icedRecipe.reasoning && <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.5, marginTop: 8 }}>{icedRecipe.reasoning}</div>}
-            {icedRecipe.sourceLineage?.sourceIds?.length > 0 && <div style={{ ...type.caption, color: C.textLight, marginTop: 6 }}>Source lineage: {icedRecipe.sourceLineage.sourceIds.join(', ')}</div>}
           </div>
 
           {recipe.device === 'kalita' && (
@@ -486,7 +489,7 @@ export const HandBrewModal = ({
               border: `1px solid ${C.accentLight}`,
               boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ marginBottom: 8 }}>{grinderName} Grind</SectionLabel>
+              <SectionLabel style={{ marginBottom: 8 }}>{recipe.grindSize.grinderSpecific === false ? 'Grind' : `${grinderName} Grind`}</SectionLabel>
               <GrindDisplay
                 grindSize={recipe.grindSize}
                 grinderName={grinderName}
@@ -536,7 +539,7 @@ export const HandBrewModal = ({
           />
 
           {/* Total brew time */}
-          {recipe.totalBrewTime && (
+          {displayRecipe.totalBrewTime && (
             <div style={{
               textAlign: 'center',
               ...type.body,
@@ -544,7 +547,7 @@ export const HandBrewModal = ({
               marginBottom: 14,
               paddingTop: 4,
             }}>
-              Target drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{recipe.totalBrewTime}</strong>
+              Target drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{displayRecipe.totalBrewTime}</strong>
             </div>
           )}
 
@@ -694,9 +697,17 @@ export const HandBrewModal = ({
               <Snowflake size={20} color={C.frost} />
               Iced Flash Brew
             </div>
-            {recipe.technique && TECHNIQUE_LABELS[recipe.technique] && (
+            {(icedRecipe.techniqueLabel || (icedRecipe.technique && TECHNIQUE_LABELS[icedRecipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
-                {TECHNIQUE_LABELS[recipe.technique]} Method
+                {icedRecipe.techniqueLabel || TECHNIQUE_LABELS[icedRecipe.technique]} Method
+              </div>
+            )}
+            {icedRecipe.reasoning && (
+              <div role="note" style={{ ...type.body, color: C.textMuted, lineHeight: 1.5, marginTop: 8 }}>
+                {icedRecipe.reasoning}
+                {icedRecipe.sourceLineage?.adaptation && (
+                  <div style={{ ...type.caption, color: C.textLight, marginTop: 5 }}>{icedRecipe.sourceLineage.adaptation}</div>
+                )}
               </div>
             )}
           </div>
@@ -745,7 +756,7 @@ export const HandBrewModal = ({
               border: `1px solid ${ICE_RULE}`,
               boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ marginBottom: 8 }}>{grinderName} Grind</SectionLabel>
+              <SectionLabel style={{ marginBottom: 8 }}>{icedRecipe.grindSize.grinderSpecific === false ? 'Grind' : `${grinderName} Grind`}</SectionLabel>
               <GrindDisplay grindSize={icedRecipe.grindSize} grinderName={grinderName} preferences={preferences} accentColor={C.frost} />
             </div>
           )}

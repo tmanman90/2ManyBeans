@@ -1,11 +1,14 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
-import { V60_ICED_SOURCE_REGISTRY_VERSION, V60_ICED_SOURCES, V60_ICED_TECHNIQUES, icedSourceById, isKnownV60IcedParameterSource } from '../data/v60IcedSourceRegistry.js';
+import { V60_ICED_SOURCE_REGISTRY_VERSION, V60_ICED_RULES, V60_ICED_SOURCES, V60_ICED_TECHNIQUES, icedSourceById, isKnownV60IcedParameterSource } from '../data/v60IcedSourceRegistry.js';
 
 export const V60_ICED_ENGINE_VERSION = 'v60-iced-engine-v1';
 export const V60_ICED_RULES_VERSION = 'v60-iced-rules-v1';
 export const V60_ICED_CONFIGURATION_KEY = 'v60:02:standard-paper:direct-server';
 export const V60_ICED_PHASE_CONTRACT_VERSION = 1;
 export const V60_ICED_SCALING_RULE_ID = 'v60-iced-dose-scaling-v1';
+export const V60_ICED_ADAPTATION_RULE_ID = 'v60-iced-adaptation-bounded-v1';
+export const V60_ICED_GRIND_RULE_ID = 'v60-iced-grind-baseline-v1';
+export const V60_ICED_TEMPERATURE_RULE_ID = 'v60-iced-temperature-bounds-v1';
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const round = (value) => Math.round(value);
 const timeLabel = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -16,15 +19,17 @@ export function normalizeV60IcedConfiguration(config = {}) {
   return { dose, grinder: config.grinder || 'fellow-ode-gen2', configurationKey: V60_ICED_CONFIGURATION_KEY, doseProfile: dose <= 20 ? 'single-cup-12-20' : 'larger-dose-21-30' };
 }
 
-function intentText(intent = {}) { return JSON.stringify(intent).toLowerCase(); }
-
 function executableIcedSource(recipe, dose) {
-  if (!recipe || recipe.status !== 'original' || recipe.doseGrams !== dose || !Number.isFinite(recipe.finalWaterGrams) || !Number.isFinite(recipe.guideSeconds)) return null;
+  if (!recipe || recipe.status !== 'original' || recipe.doseGrams !== dose || !Number.isFinite(recipe.finalWaterGrams)
+    || !Number.isFinite(recipe.guideSeconds) || !Number.isFinite(recipe.temperatureC)
+    || !recipe.grind || !recipe.geometry || !recipe.cadence || !recipe.agitation) return null;
+  if (recipe.temperatureC < 91 || recipe.temperatureC > 100) return null;
   if (recipe.hotWaterGrams + recipe.iceGrams !== recipe.finalWaterGrams || Math.abs(recipe.finalWaterGrams / recipe.doseGrams - recipe.ratio) > 0.01) return null;
   if (!Array.isArray(recipe.steps) || recipe.steps.length < 2 || recipe.steps[0].timeSeconds !== 0 || recipe.steps.at(-1).waterTotal !== recipe.hotWaterGrams || recipe.guideSeconds <= recipe.steps.at(-1).timeSeconds) return null;
   let lastTime = -1; let lastWater = -1;
   for (const step of recipe.steps) {
-    if (step.timeSeconds <= lastTime || step.waterTotal < lastWater) return null;
+    if (!Number.isFinite(step.timeSeconds) || !Number.isFinite(step.waterTotal)
+      || step.timeSeconds <= lastTime || step.waterTotal <= 0 || step.waterTotal < lastWater) return null;
     lastTime = step.timeSeconds; lastWater = step.waterTotal;
   }
   return recipe;
@@ -32,28 +37,20 @@ function executableIcedSource(recipe, dose) {
 
 export function selectV60IcedTechnique(intent = {}, config = {}) {
   const normalized = normalizeV60IcedConfiguration(config);
-  const text = intentText(intent);
-  const structured = intent.sourceRecipes?.find((recipe) => recipe.mode === 'iced'
+  const compatibleStructuredRecipes = (Array.isArray(intent.sourceRecipes) ? intent.sourceRecipes : []).filter((recipe) => recipe.mode === 'iced'
     && recipe.device === 'v60'
-    && recipe.status === 'original'
     && /v60\s*02|v60:02:standard-paper/i.test(String(recipe.configuration || ''))
-    && Number(recipe.doseGrams) === normalized.dose
-    && Number.isFinite(recipe.hotWaterGrams) && Number.isFinite(recipe.iceGrams)
-    && Number.isFinite(recipe.guideSeconds)
-    && recipe.steps?.length >= 2
-    && !/reddit\.com/i.test(recipe.canonicalUrl || '')) || null;
-  const executableStructured = executableIcedSource(structured, normalized.dose);
-  const structuredId = structured?.id;
-  const knownStructured = (structuredId && icedSourceById(structuredId))
-    || intent.sourceRecipes?.find((recipe) => recipe.mode === 'iced' && recipe.device === 'v60' && icedSourceById(recipe.id));
+    && !/reddit\.com/i.test(recipe.canonicalUrl || ''));
+  const structuredRecipes = compatibleStructuredRecipes.filter((recipe) => Number(recipe.doseGrams) === normalized.dose);
+  const executableStructured = structuredRecipes.map((recipe) => executableIcedSource(recipe, normalized.dose)).find(Boolean) || null;
+  const knownStructured = compatibleStructuredRecipes.map((recipe) => icedSourceById(recipe.id)).find(Boolean) || null;
   if (executableStructured) return { id: 'direct-roaster-iced-v60', sourceIds: [executableStructured.id], label: 'structured iced source cadence', sourceRecipe: executableStructured, reasonCode: 'EXACT_STRUCTURED_ICED_SOURCE', structuredSource: true };
   if (knownStructured?.id === 'counterculture-flash-v1') return { ...V60_ICED_TECHNIQUES.countercultureAdapted, reasonCode: 'COUNTERCULTURE_CORROBORATION_ADAPTED' };
   if (knownStructured?.id === 'partners-flash-6733-v1') return { ...V60_ICED_TECHNIQUES.pulse6733, reasonCode: 'STRUCTURED_PARTNERS_SOURCE_PROFILE' };
   if (knownStructured?.id === 'kurasu-iced-staged-v1') return { ...V60_ICED_TECHNIQUES.kurasuStaged, reasonCode: 'STRUCTURED_KURASU_SOURCE_PROFILE' };
   if (knownStructured?.id === 'hoffmann-flash-6040-v1') return { ...V60_ICED_TECHNIQUES.classic6040, reasonCode: 'STRUCTURED_HOFFMANN_SOURCE_PROFILE' };
   if (knownStructured?.id === 'counterculture-flash-v1') return { ...V60_ICED_TECHNIQUES.pulse6733, reasonCode: 'STRUCTURED_COUNTERCULTURE_SOURCE_PROFILE' };
-  if (text.includes('kurasu') || text.includes('staged iced') || intent.finesRisk === 'high' || intent.softPriors?.roast === 'developed') return { ...V60_ICED_TECHNIQUES.kurasuStaged, reasonCode: 'BOUNDED_LOW_AGITATION_ICE_PROFILE' };
-  if (intent.sourceRecipes?.some((recipe) => recipe.mode === 'iced' && recipe.id === 'counterculture-flash-v1')) return { ...V60_ICED_TECHNIQUES.countercultureAdapted, reasonCode: 'COUNTERCULTURE_CORROBORATION_ADAPTED' };
+  if (intent.finesRisk === 'high' || intent.softPriors?.roast === 'developed') return { ...V60_ICED_TECHNIQUES.kurasuStaged, reasonCode: 'BOUNDED_LOW_AGITATION_ICE_PROFILE' };
   if (normalized.dose > 20) return { ...V60_ICED_TECHNIQUES.classic6040, reasonCode: 'LARGER_DOSE_CLASSIC_6040_BUDGET' };
   return { ...V60_ICED_TECHNIQUES.pulse6733, reasonCode: 'SINGLE_CUP_PULSE_6733_BUDGET' };
 }
@@ -121,24 +118,37 @@ function buildRecipe(config, intent, technique, { fallback = false } = {}) {
   const sourceId = source.id;
   const sourceRequiresAdaptation = source.id === 'kurasu-iced-staged-v1' || source.status !== 'original';
   const scaled = !exactSourceDose;
+  const requestedTemperatureC = Number(intent?.targetTemperatureC);
+  const hasRequestedTemperature = Number.isFinite(requestedTemperatureC);
+  const usesIntentTemperature = hasRequestedTemperature && !exactStructured;
+  const temperatureC = exactStructured
+    ? source.temperatureC
+    : usesIntentTemperature
+    ? clamp(requestedTemperatureC, 91, 100)
+    : Number.isFinite(source.temperatureC) ? source.temperatureC : 96;
+  const temperatureAdapted = usesIntentTemperature && temperatureC !== source.temperatureC;
   const sourceLineage = {
     method: 'v60', mode: 'iced', configurationKey: V60_ICED_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.structuredSource), canonicalUrls: technique.sourceRecipe ? [technique.sourceRecipe.canonicalUrl] : undefined,
-    sourceIds: [sourceId], sourceRegistryVersion: V60_ICED_SOURCE_REGISTRY_VERSION, status: sourceRequiresAdaptation ? 'adapted' : exactSourceDose ? 'original' : 'scaled',
+    sourceIds: [sourceId], sourceRegistryVersion: V60_ICED_SOURCE_REGISTRY_VERSION, status: sourceRequiresAdaptation || temperatureAdapted ? 'adapted' : exactSourceDose ? 'original' : 'scaled',
     adaptation: `Independent iced profile based on ${source.author}; hot candidate is not used.`,
     changedFields: [
       config.dose !== source.doseGrams && 'doseGrams',
       scaled && 'hotWaterGrams', scaled && 'initialBrewIceGrams', scaled && 'cadence',
+      temperatureAdapted && 'temperatureC',
       sourceRequiresAdaptation && 'configuration',
+      !source.agitation && 'agitation',
       !Number.isFinite(source.guideSeconds) && 'guideSeconds',
     ].filter(Boolean),
-    parameterSources: { family: sourceId, dose: exactSourceDose ? sourceId : 'user-configuration', hotWater: scaled ? V60_ICED_SCALING_RULE_ID : sourceId, brewIce: scaled ? V60_ICED_SCALING_RULE_ID : sourceId, ratio: sourceId, geometry: sourceId, agitation: source.agitation ? sourceId : V60_ICED_SCALING_RULE_ID, guide: !Number.isFinite(source.guideSeconds) || scaled ? V60_ICED_SCALING_RULE_ID : sourceId },
+    parameterSources: { family: sourceId, configuration: sourceRequiresAdaptation ? V60_ICED_ADAPTATION_RULE_ID : sourceId, dose: exactSourceDose ? sourceId : 'user-configuration', hotWater: scaled ? V60_ICED_SCALING_RULE_ID : sourceId, brewIce: scaled ? V60_ICED_SCALING_RULE_ID : sourceId, ratio: sourceId, temperature: temperatureAdapted ? V60_ICED_TEMPERATURE_RULE_ID : sourceId, grind: exactStructured ? sourceId : V60_ICED_GRIND_RULE_ID, geometry: sourceId, agitation: source.agitation ? sourceId : V60_ICED_ADAPTATION_RULE_ID, guide: !Number.isFinite(source.guideSeconds) ? V60_ICED_ADAPTATION_RULE_ID : scaled ? V60_ICED_SCALING_RULE_ID : sourceId },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'iced', isIced: true, configurationKey: V60_ICED_CONFIGURATION_KEY, v60Size: '02', doseProfile: config.doseProfile,
-    coffeeGrams: config.dose, waterGrams: hotWaterGrams, hotWaterGrams, initialBrewIceGrams, iceGrams: initialBrewIceGrams,
+    coffeeGrams: config.dose, waterGrams: hotWaterGrams, hotWaterGrams, initialBrewIceGrams, iceGrams: initialBrewIceGrams, icePlacement: 'server',
     finalBeverageWaterTargetGrams, hotExtractionRatio: `1:${round(hotWaterGrams / config.dose * 100) / 100}`, finalBeverageRatio: `1:${round(finalBeverageWaterTargetGrams / config.dose * 100) / 100}`,
     servingIceExcluded: true, measuredMeltedIceGrams: null, actualFinalBeverageMassGrams: null, actualFinalTemperatureC: null,
-    ratio: `1:${round(finalBeverageWaterTargetGrams / config.dose * 100) / 100}`, waterTemp: (() => { const celsius = clamp(Number(intent?.targetTemperatureC) || 96, 92, 100); return { celsius, fahrenheit: Math.round(celsius * 9 / 5 + 32) }; })(), grindSize: grindFor(config.grinder),
+    ratio: `1:${round(finalBeverageWaterTargetGrams / config.dose * 100) / 100}`, waterTemp: { celsius: temperatureC, fahrenheit: Math.round(temperatureC * 9 / 5 + 32) }, grindSize: exactStructured
+      ? { setting: null, microns: null, description: source.grind, grinderSpecific: false, sourceExact: true }
+      : grindFor(config.grinder),
     technique: technique.id, techniqueLabel: technique.label, techniqueInstruction: `${technique.label}: brew hot directly over ice for rapid cooling; serving ice is separate.`,
     prepSteps: [
       { action: 'Rinse and preheat the V60 02 filter and server; discard rinse water.', phase: 'prep' },
@@ -159,6 +169,7 @@ export function validateV60IcedCandidate(recipe) {
   if (!recipe || recipe.device !== 'v60' || recipe.mode !== 'iced' || !recipe.isIced) errors.push('wrong-mode-or-device');
   if (recipe?.configurationKey !== V60_ICED_CONFIGURATION_KEY || recipe?.v60Size !== '02') errors.push('invalid-configuration');
   if (!Number.isFinite(recipe?.coffeeGrams) || recipe.coffeeGrams < 12 || recipe.coffeeGrams > 30) errors.push('invalid-dose');
+  if (!Number.isFinite(recipe?.waterTemp?.celsius) || recipe.waterTemp.celsius < 91 || recipe.waterTemp.celsius > 100) errors.push('invalid-temperature');
   for (const key of ['hotWaterGrams', 'initialBrewIceGrams', 'finalBeverageWaterTargetGrams']) if (!Number.isFinite(recipe?.[key]) || recipe[key] <= 0) errors.push(`invalid-${key}`);
   if (recipe.hotWaterGrams + recipe.initialBrewIceGrams !== recipe.finalBeverageWaterTargetGrams) errors.push('beverage-math-mismatch');
   if (Math.abs(recipe.finalBeverageWaterTargetGrams / recipe.coffeeGrams - Number(String(recipe.finalBeverageRatio).split(':')[1])) > 0.01) errors.push('final-ratio-mismatch');
@@ -169,7 +180,7 @@ export function validateV60IcedCandidate(recipe) {
   let lastTime = -1; let lastWater = -1;
   for (const step of recipe.steps || []) {
     if (!Number.isFinite(step.timeSeconds) || step.timeSeconds <= lastTime) errors.push('invalid-timer-sequence');
-    if (!Number.isFinite(step.waterTotal) || step.waterTotal < lastWater || !/center|spiral|pulse|staged/i.test(step.action)) errors.push('invalid-step-copy-or-water');
+    if (!Number.isFinite(step.waterTotal) || step.waterTotal <= 0 || step.waterTotal < lastWater || !/center|spiral|pulse|staged/i.test(step.action)) errors.push('invalid-step-copy-or-water');
     lastTime = step.timeSeconds; lastWater = step.waterTotal;
   }
   if (recipe.steps?.[0]?.timeSeconds !== 0 || lastWater !== recipe.hotWaterGrams || recipe.guideTargetSeconds <= lastTime) errors.push('invalid-guide-or-water');
@@ -178,6 +189,9 @@ export function validateV60IcedCandidate(recipe) {
     const structuredAllowed = recipe?.sourceLineage?.structuredSource === true && recipe.sourceLineage.canonicalUrls?.every((url) => url && !/reddit\.com/i.test(url));
     if (structuredAllowed && sourceId !== recipe.sourceLineage.sourceIds?.[0]) errors.push(`embedded-source-mismatch:${field}`);
     if (!isKnownV60IcedParameterSource(sourceId) && !structuredAllowed) errors.push(`unknown-parameter-source:${field}`);
+    const rule = V60_ICED_RULES[sourceId];
+    if (!structuredAllowed && rule && !rule.allowedFields.includes(field)) errors.push(`rule-field-mismatch:${field}`);
+    if (!structuredAllowed && rule?.sourceIds?.length && !recipe.sourceLineage.sourceIds?.some((id) => rule.sourceIds.includes(id))) errors.push(`rule-source-mismatch:${field}`);
   }
   if (recipe?.sourceLineage?.status === 'original' && recipe.sourceLineage.changedFields?.length) errors.push('original-has-changed-fields');
   if (recipe?.sourceLineage?.status !== 'original' && !recipe?.sourceLineage?.changedFields?.length) errors.push('adaptation-missing-changed-fields');

@@ -4,6 +4,7 @@ for (const dose of [12, 15, 20, 21, 30]) {
   const recipe = generateV60IcedRecipe({}, { dose });
   assert.equal(validateV60IcedCandidate(recipe).valid, true);
   assert.equal(recipe.prepSteps.some((step) => /ice/i.test(step.action)), true);
+  assert.equal(recipe.icePlacement, 'server');
   assert.equal(recipe.postBrewSteps[0].untimed, true);
   assert.ok(recipe.guideTargetSeconds > recipe.steps.at(-1).timeSeconds);
 }

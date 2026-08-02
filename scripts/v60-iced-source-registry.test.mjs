@@ -8,6 +8,8 @@ assert.equal(Object.keys(V60_ICED_TECHNIQUES).length, 4);
 for (const source of V60_ICED_SOURCES) {
   assert.equal(source.hotWaterGrams + source.iceGrams, source.finalWaterGrams);
   assert.ok(Math.abs(source.finalWaterGrams / source.doseGrams - source.ratio) < 0.01);
+  assert.ok(Number.isFinite(source.temperatureC));
+  assert.equal(source.grind, 'medium-fine');
 }
 assert.deepEqual(V60_ICED_SOURCES.find((source) => source.id === 'partners-flash-6733-v1').guideRangeSeconds, [160, 200]);
 assert.equal(V60_ICED_SOURCES.find((source) => source.id === 'kurasu-iced-staged-v1').guideSeconds, 130);
