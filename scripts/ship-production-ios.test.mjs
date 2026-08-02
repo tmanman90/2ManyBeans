@@ -11,5 +11,7 @@ assert.match(source, /build:ios/);
 assert.match(source, /'--fail-on-incompatible'/);
 assert.match(source, /channel', 'currentBundle', PROD_CHANNEL, PROD_APP_ID/);
 assert.match(source, /does not advance current Capgo bundle/);
+assert.match(source, /installed production[\s\S]*baseline/);
+assert.doesNotMatch(source, /run\('node', \['scripts\/patch-social-login\.mjs'\]\)/);
 
 console.log('Production iOS ship guard contract passed.');

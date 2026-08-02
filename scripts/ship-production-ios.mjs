@@ -78,7 +78,10 @@ console.log(`Production channel: ${PROD_CHANNEL}`);
 console.log(`Previous bundle: ${currentBundle || '(none)'}`);
 console.log(`New bundle: ${bundleVersion}`);
 
-run('node', ['scripts/patch-social-login.mjs']);
+// Keep the production OTA metadata aligned with the installed production
+// wrapper. `patch-social-login.mjs` changes native Package.swift contents for a
+// future native/TestFlight build; applying it to a JS-only OTA makes Capgo
+// reject the bundle against the existing production native baseline.
 run(npmCommand, ['run', 'build:ios']);
 
 capgo([
