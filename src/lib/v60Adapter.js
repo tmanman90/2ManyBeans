@@ -62,7 +62,7 @@ export function selectV60Technique(intent = {}, configuration = {}, evidence = n
   if (finesRisk === 'high') return { ...V60_TECHNIQUES.gentle, reasonCode: 'HIGH_FINES_LOW_AGITATION' };
   if (intentValue(intent, 'techniquePreference') === 'bloom-led-pulse') return { ...V60_TECHNIQUES.coarse46, reasonCode: 'COARSE_PULSE_SOLUBILITY_PROFILE' };
   if (energy === 'higher' && finesRisk !== 'high') return { ...V60_TECHNIQUES.twoStage, reasonCode: 'HIGH_ENERGY_LOW_FINES_PROFILE' };
-  if (cupDirection?.body === 'supported' || intentValue(intent, 'desiredStrength') === 'stronger') return { ...V60_TECHNIQUES.controlled, reasonCode: 'FULLER_CONTROLLED_PULSE_PROFILE' };
+  if ((cupDirection?.body === 'supported' && intentValue(intent, 'softPriors', {})?.process !== 'fruit-processed') || intentValue(intent, 'desiredStrength') === 'stronger') return { ...V60_TECHNIQUES.controlled, reasonCode: 'FULLER_CONTROLLED_PULSE_PROFILE' };
   if (energy === 'lower' || intentValue(intent, 'techniquePreference') === 'low-agitation-center') return { ...V60_TECHNIQUES.gentle, reasonCode: 'LOW_ENERGY_GENTLE_PROFILE' };
   return { ...V60_TECHNIQUES.smallPulse, reasonCode: 'BALANCED_SMALL_DOSE_PROFILE' };
 }
