@@ -12,6 +12,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { semverSafeDevTimestamp } from './ship-dev-version.mjs';
 
 const DEV_APP_ID = 'com.talmeltzer.coffeehub.dev';
 const DEV_CHANNEL = 'dev';
@@ -60,11 +61,7 @@ function nextDevBundle(packageVersion, currentBundle) {
     ? currentBase
     : packageBase;
   const next = [highest[0], highest[1], highest[2] + 1];
-  const timestamp = new Date().toISOString()
-    .replace(/[-:]/g, '')
-    .replace(/\.\d{3}Z$/, 'Z')
-    .replace('T', '.')
-    .replace('Z', '');
+  const timestamp = semverSafeDevTimestamp();
   return `${next.join('.')}-devapp.${timestamp}`;
 }
 

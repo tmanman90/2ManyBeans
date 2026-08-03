@@ -665,12 +665,14 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
         {/* Ring */}
         <div style={{
           position: 'relative',
-          width: RING_SIZE, height: RING_SIZE,
+          width: 'min(280px, calc(100vw - 40px), 34vh)',
+          aspectRatio: '1 / 1',
           flexShrink: 0,
         }}>
           <svg
-            width={RING_SIZE}
-            height={RING_SIZE}
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
             className={phase === 'running' ? 'brew-ring-active' : ''}
             style={{ willChange: 'filter' }}
           >
@@ -781,7 +783,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
           }}>
             {currentStep?.step?.name || currentStep?.step?.label || `Step ${stepIndex + 1}`}
           </div>
-          <div style={{
+          <div role="status" aria-live="polite" aria-atomic="true" style={{
             fontSize: 14,
             color: C.textMuted,
             lineHeight: 1.5,

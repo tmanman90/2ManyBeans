@@ -1,4 +1,5 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
 export const KALITA_RULES_VERSION = 'kalita-rules-v3-phase1';
@@ -13,13 +14,12 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const timeLabel = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
 export function normalizeKalitaConfiguration(config = {}) {
-  const rawSize = String(config.size || config.kalitaSize || '').replace('wave-', '');
   const requestedDose = Number(config.dose);
-  const size = rawSize === '155' || rawSize === '185' ? rawSize : requestedDose > 18 ? '185' : '155';
-  const defaultDose = size === '155' ? 15 : 20;
-  const dose = Number.isFinite(requestedDose) && requestedDose >= 12 && requestedDose <= 36 ? requestedDose : defaultDose;
+  const rawSize = String(config.size || config.kalitaSize || '').replace('wave-', '');
+  const size = normalizeKalitaSize(rawSize, requestedDose);
+  const dose = normalizeKalitaDose(size, config.dose);
   const doseProfile = dose > 30 ? 'large-185' : size === '155' ? (dose > 18 ? '155-extended' : '155-small') : dose <= 22 ? '185-standard' : '185-large';
-  return { size, dose, doseProfile, defaultedSize: rawSize !== '155' && rawSize !== '185', defaultedDose: !Number.isFinite(requestedDose) };
+  return { size, dose, doseProfile, defaultedSize: rawSize !== '155' && rawSize !== '185', defaultedDose: config.dose == null || !Number.isFinite(requestedDose) };
 }
 
 function buildGrind(grinder, targetMicrons) {
@@ -117,7 +117,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
         : `Finish at ${waterGrams}g total with another low, centered pour; do not spiral or swirl.`, waterTotal: waterGrams },
   ];
   const recipe = {
-    method: 'pour-over', device: 'kalita', kalitaSize: config.size, doseProfile: config.doseProfile,
+    method: 'pour-over', device: 'kalita', mode: 'hot', kalitaSize: config.size, configurationKey: `kalita:${config.size}:wave-paper:hot`, doseProfile: config.doseProfile,
     engineVersion: KALITA_ENGINE_VERSION, rulesVersion: KALITA_RULES_VERSION, candidate: true,
     doseTimingPolicy: 'generated-dose-v1',
     coffeeGrams: config.dose, waterGrams, ratio: `1:${ratio}`, waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) },

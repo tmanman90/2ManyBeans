@@ -13,6 +13,8 @@ import { GRINDER_LABELS } from '../lib/brewMethods';
 import { scaleRecipeForDose } from '../lib/recipeScaling';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
 import { isDeterministicV60Hot } from '../lib/v60Generation';
+import { isDeterministicKalitaHot } from '../lib/kalitaIcedAdapter';
+import { kalitaDoseBounds } from '../data/kalitaConfiguration';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 
@@ -130,6 +132,72 @@ const KalitaSizeSwitch = ({ value, onChange, disabled }) => {
             </m.button>
           );
         })}
+      </div>
+    </div>
+  );
+};
+
+const CHILLING_METHOD_LABELS = {
+  'brew-over-ice': 'Brew over ice',
+  'chill-after': 'Chill after',
+};
+
+const KalitaIcedChillingSwitch = ({ value, recommended, overrideApplied, fallback, onChange, disabled }) => {
+  const selected = CHILLING_METHOD_LABELS[value] ? value : 'chill-after';
+  const recommendedMethod = CHILLING_METHOD_LABELS[recommended] ? recommended : selected;
+  const isOverride = overrideApplied === true;
+  return (
+    <div
+      role="group"
+      aria-label="Kalita iced chilling method"
+      style={{
+        padding: 10,
+        marginBottom: 14,
+        background: ICE_TILE_BG,
+        border: `1px solid ${ICE_RULE}`,
+        borderRadius: radius.lg,
+      }}
+    >
+      <SectionLabel style={{ color: C.frost, margin: '0 2px 8px' }}>Chilling method</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {Object.entries(CHILLING_METHOD_LABELS).map(([method, label]) => {
+          const active = selected === method;
+          return (
+            <m.button
+              key={method}
+              type="button"
+              onClick={() => !active && onChange?.(method)}
+              disabled={disabled}
+              whileTap={disabled || active ? undefined : { scale: 0.97 }}
+              transition={spring.snappy}
+              aria-pressed={active}
+              aria-label={`${label}${recommendedMethod === method ? ', recommended starting point for this Wave size and dose' : ''}`}
+              style={{
+                minHeight: 44,
+                padding: '8px 10px',
+                border: `1px solid ${active ? C.frost : ICE_RULE}`,
+                borderRadius: radius.md,
+                background: active ? C.frost : C.card,
+                color: active ? C.cream : C.textMuted,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 750,
+                cursor: disabled || active ? 'default' : 'pointer',
+                opacity: disabled ? 0.65 : 1,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {label}
+            </m.button>
+          );
+        })}
+      </div>
+      <div aria-live="polite" style={{ ...type.caption, color: C.textMuted, lineHeight: 1.45, margin: '7px 2px 0' }}>
+        {fallback && !isOverride
+          ? 'Using the conservative fallback for this Wave size and dose.'
+          : isOverride
+          ? `Recommended for this Wave size and dose: ${CHILLING_METHOD_LABELS[recommendedMethod]}. Your choice uses its complete source-backed recipe.`
+          : 'Recommended starting point for this Wave size and dose.'}
       </div>
     </div>
   );
@@ -284,7 +352,7 @@ export const HandBrewModal = ({
   open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, onRetryIced, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
-  deviceKey, onKalitaSizeChange, onSaveTimingEvent,
+  deviceKey, onKalitaSizeChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -325,7 +393,7 @@ export const HandBrewModal = ({
       if (!icedMode) return null;
       if (icedRecipeProp?.candidate) return normalizeRecipePhases(icedRecipeProp);
       if (icedRecipeProp?.mode === 'iced' || icedRecipeProp?.isIced) return normalizeRecipePhases(icedRecipeProp);
-      if (isDeterministicV60Hot(displayRecipe)) return null;
+      if (isDeterministicV60Hot(displayRecipe) || isDeterministicKalitaHot(displayRecipe)) return null;
       return displayRecipe ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null;
     },
     [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose]
@@ -393,7 +461,11 @@ export const HandBrewModal = ({
 
   return (
     <>
-    <Modal open={open && !timerOpen} onClose={handleClose} title={icedMode ? 'Iced Flash Brew' : 'Hand Brew Recipe'}>
+    <Modal
+      open={open && !timerOpen}
+      onClose={handleClose}
+      title={icedMode ? (icedRecipe?.icedModeLabel || (device === 'kalita' ? 'Iced Kalita' : 'Iced Flash Brew')) : 'Hand Brew Recipe'}
+    >
       {/* Loading state */}
       {loading && !recipe && (
         <m.div {...fadeUp} style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -457,7 +529,14 @@ export const HandBrewModal = ({
 
           {/* Param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <DoseStepperCard dose={displayRecipe.coffeeGrams} onChange={onCoffeeGramsChange} {...(device === 'v60' ? { min: 12, max: 30 } : {})} />
+            <DoseStepperCard
+              dose={displayRecipe.coffeeGrams}
+              onChange={onCoffeeGramsChange}
+              {...(device === 'v60' ? { min: 12, max: 30 } : device === 'kalita' ? {
+                min: kalitaDoseBounds(displayRecipe.kalitaSize).minDose,
+                max: kalitaDoseBounds(displayRecipe.kalitaSize).maxDose,
+              } : {})}
+            />
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
@@ -661,7 +740,7 @@ export const HandBrewModal = ({
               }}
             >
               <Snowflake size={16} color={C.frost} />
-              Iced flash brew this bean
+              {icedRecipeProp?.icedEntryLabel || (device === 'kalita' ? 'Iced Kalita for this coffee' : 'Iced flash brew this bean')}
             </m.button>
           )}
 
@@ -697,7 +776,9 @@ export const HandBrewModal = ({
           </m.button>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ ...type.label, color: C.frost, marginBottom: 6 }}>Iced Mode</div>
+            <div style={{ ...type.label, color: C.frost, marginBottom: 6 }}>
+              {icedRecipe.device === 'kalita' ? `Wave ${icedRecipe.kalitaSize} · Iced` : 'Iced Mode'}
+            </div>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -709,7 +790,7 @@ export const HandBrewModal = ({
               letterSpacing: '-0.01em',
             }}>
               <Snowflake size={20} color={C.frost} />
-              Iced Flash Brew
+              {icedRecipe.icedModeLabel || 'Iced Flash Brew'}
             </div>
             {(icedRecipe.techniqueLabel || (icedRecipe.technique && TECHNIQUE_LABELS[icedRecipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
@@ -726,9 +807,30 @@ export const HandBrewModal = ({
             )}
           </div>
 
+          {icedRecipe.device === 'kalita' && (
+            <KalitaIcedChillingSwitch
+              value={icedRecipe.chillingMethod}
+              recommended={icedRecipe.recommendedChillingMethod}
+              overrideApplied={icedRecipe.chillingMethodOverrideApplied}
+              fallback={icedRecipe.fallback}
+              onChange={onKalitaIcedChillingMethodChange}
+              disabled={icedLoading || doseUpdating}
+            />
+          )}
+          {icedError && (
+            <div role="alert" style={{ ...type.caption, color: C.red, lineHeight: 1.45, margin: '-5px 4px 14px' }}>
+              {icedError}
+            </div>
+          )}
+
           {/* Iced param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <DoseStepperCard dose={icedRecipe.coffeeGrams} onChange={onCoffeeGramsChange} min={12} max={30} />
+            <DoseStepperCard
+              dose={icedRecipe.coffeeGrams}
+              onChange={onCoffeeGramsChange}
+              min={icedRecipe.device === 'kalita' ? kalitaDoseBounds(icedRecipe.kalitaSize).minDose : 12}
+              max={icedRecipe.device === 'kalita' ? kalitaDoseBounds(icedRecipe.kalitaSize).maxDose : 30}
+            />
             <div style={{
               background: ICE_TILE_BG,
               borderRadius: radius.md,
@@ -754,9 +856,12 @@ export const HandBrewModal = ({
               <div style={{ ...type.caption, color: C.textLight }}>{icedRecipe.icePlacement}</div>
             </div>
           </div>
-          {icedRecipe.finalBeverageWaterTargetGrams && (
+          {(icedRecipe.recipeIceGrams || icedRecipe.initialBrewIceGrams) && (
             <div role="note" style={{ ...type.caption, color: C.textMuted, lineHeight: 1.5, margin: '-4px 4px 14px' }}>
-              Hot extraction: {icedRecipe.hotWaterGrams}g · Brew ice: {icedRecipe.initialBrewIceGrams}g · Final beverage-water target: {icedRecipe.finalBeverageWaterTargetGrams}g. Serving ice is excluded.
+              Hot extraction: {icedRecipe.hotWaterGrams}g · Recipe ice: {icedRecipe.recipeIceGrams || icedRecipe.initialBrewIceGrams}g.
+              {icedRecipe.finalBeverageWaterTargetGrams
+                ? ` Final beverage-water target: ${icedRecipe.finalBeverageWaterTargetGrams}g.`
+                : ' Final beverage water depends on how much chill ice melts.'} Serving ice is excluded.
             </div>
           )}
 

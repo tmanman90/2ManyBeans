@@ -132,11 +132,12 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     : null;
 
   const handleSaveToInventory = async (data) => {
-    const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, photo, ...fields } = data;
+    const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, handBrewIcedRecipes, photo, ...fields } = data;
     const aidenData = aidenRecipe ? { aidenRecipe, aidenLink, aidenGrind } : undefined;
     const beanData = buildNewBeanData(fields, { aidenData });
     if (handBrewRecipe) beanData.handBrewRecipe = handBrewRecipe;
     if (handBrewRecipes) beanData.handBrewRecipes = handBrewRecipes;
+    if (handBrewIcedRecipes) beanData.handBrewIcedRecipes = handBrewIcedRecipes;
     try {
       const beanId = await addBean(beanData);
       setNewBeanEntry({ id: beanId, ...beanData });
@@ -564,6 +565,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
         onKalitaSizeChange={handBrew.handleKalitaSizeChange}
+        onKalitaIcedChillingMethodChange={handBrew.handleKalitaIcedChillingMethodChange}
         bean={handBrew.handBrewBean}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
