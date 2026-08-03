@@ -9,13 +9,14 @@ import {
   kalitaIcedSourceById,
 } from '../data/kalitaIcedSourceRegistry.js';
 
-export const KALITA_ICED_ENGINE_VERSION = 'kalita-iced-engine-v1';
-export const KALITA_ICED_RULES_VERSION = 'kalita-iced-rules-v1';
+export const KALITA_ICED_ENGINE_VERSION = 'kalita-iced-engine-v2';
+export const KALITA_ICED_RULES_VERSION = 'kalita-iced-rules-v2';
 export const KALITA_ICED_PHASE_CONTRACT_VERSION = 1;
 export const KALITA_ICED_SCALING_RULE_ID = 'kalita-iced-dose-scaling-v1';
 export const KALITA_ICED_GRIND_RULE_ID = 'kalita-iced-grind-translation-v1';
 export const KALITA_ICED_TEMPERATURE_RULE_ID = 'kalita-iced-temperature-range-v1';
 export const KALITA_ICED_FLOW_GUARD_RULE_ID = 'kalita-iced-explicit-flow-guard-v1';
+export const KALITA_ICED_CHILLING_SELECTION_RULE_ID = 'kalita-iced-chilling-selection-v1';
 
 const GRINDER_RANGES = {
   'fellow-ode-gen2': [1, 11], 'fellow-opus': [1, 11], 'baratza-encore-esp': [1, 40],
@@ -42,6 +43,9 @@ export function normalizeKalitaIcedConfiguration(configuration = {}) {
     size,
     dose,
     grinder: configuration.grinder || 'fellow-ode-gen2',
+    chillingMethod: ['brew-over-ice', 'chill-after'].includes(configuration.chillingMethod)
+      ? configuration.chillingMethod
+      : 'auto',
     configurationKey: kalitaIcedConfigurationKey(size),
     doseProfile: size === '155' ? 'wave-155-12-20' : dose > 30 ? 'wave-185-31-36' : 'wave-185-15-30',
     bounds,
@@ -56,13 +60,42 @@ function hasExplicitFlowRisk(intent = {}) {
 export function selectKalitaIcedTechnique(intent = {}, configuration = {}) {
   const config = normalizeKalitaIcedConfiguration(configuration);
   const flowGuard = hasExplicitFlowRisk(intent);
-  if (config.size === '155') return { ...KALITA_ICED_TECHNIQUES.kurasuIceAfter, flowGuard, reasonCode: flowGuard ? 'EXPLICIT_FLOW_RISK_GUARD' : 'WAVE_155_KURASU_SOURCE_ENVELOPE' };
-  if (config.dose > 30) return { ...KALITA_ICED_TECHNIQUES.frothyLargeDirect, flowGuard, reasonCode: flowGuard ? 'EXPLICIT_FLOW_RISK_GUARD' : 'WAVE_185_LARGE_SOURCE_ENVELOPE' };
-  return { ...KALITA_ICED_TECHNIQUES.espressoPartsDirect, flowGuard, reasonCode: flowGuard ? 'EXPLICIT_FLOW_RISK_GUARD' : 'WAVE_185_STANDARD_SOURCE_ENVELOPE' };
+  const directTechnique = config.size === '155'
+    ? KALITA_ICED_TECHNIQUES.yamatoya155Direct
+    : config.dose > 30
+      ? KALITA_ICED_TECHNIQUES.frothyLargeDirect
+      : KALITA_ICED_TECHNIQUES.espressoPartsDirect;
+  const recommended = config.size === '155'
+    ? KALITA_ICED_TECHNIQUES.kurasuIceAfter
+    : directTechnique;
+  const recommendedChillingMethod = recommended === KALITA_ICED_TECHNIQUES.kurasuIceAfter ? 'chill-after' : 'brew-over-ice';
+  const selected = config.chillingMethod === 'chill-after' ? KALITA_ICED_TECHNIQUES.kurasuIceAfter
+    : config.chillingMethod === 'brew-over-ice' ? directTechnique
+      : recommended;
+  const selectedChillingMethod = selected === KALITA_ICED_TECHNIQUES.kurasuIceAfter ? 'chill-after' : 'brew-over-ice';
+  const chillingMethodOverrideApplied = config.chillingMethod !== 'auto' && selectedChillingMethod !== recommendedChillingMethod;
+  const sourceEnvelopeCode = selected === KALITA_ICED_TECHNIQUES.yamatoya155Direct ? 'WAVE_155_DIRECT_CHILL_SOURCE_ENVELOPE'
+    : selected === KALITA_ICED_TECHNIQUES.kurasuIceAfter ? 'KURASU_POST_BREW_CHILL_SOURCE_ENVELOPE'
+      : selected === KALITA_ICED_TECHNIQUES.frothyLargeDirect ? 'WAVE_185_LARGE_SOURCE_ENVELOPE'
+        : 'WAVE_185_STANDARD_SOURCE_ENVELOPE';
+  return {
+    ...selected,
+    flowGuard,
+    recommendedTechniqueId: recommended.id,
+    recommendedChillingMethod,
+    selectedChillingMethod,
+    chillingMethodOverrideApplied,
+    reasonCodes: [
+      sourceEnvelopeCode,
+      chillingMethodOverrideApplied && 'USER_CHILLING_METHOD_OVERRIDE',
+      flowGuard && 'EXPLICIT_FLOW_RISK_GUARD',
+    ].filter(Boolean),
+  };
 }
 
 function grindFor(grinder, source, flowGuard) {
   const sourceMicrons = source.id === 'kurasu-wave-ice-after-v1' ? 912
+    : source.id === 'yamatoya-wave-155-direct-v1' ? 650
     : source.id === 'frothy-monkey-wave-large-direct-v1' ? 620 : 680;
   const grindBounds = KALITA_ICED_RULES[KALITA_ICED_GRIND_RULE_ID].bounds.microns;
   const flowGuardDelta = KALITA_ICED_RULES[KALITA_ICED_FLOW_GUARD_RULE_ID].defaultMicronDelta;
@@ -91,6 +124,12 @@ function scaledSteps(source, dose, hotWaterGrams, flowGuard) {
         : index === source.steps.length - 1
           ? `Finish to ${target}g total with the same small center circle; do not spiral or swirl, then let it drip through.`
           : `Repeat the same small center circle to ${target}g total; do not widen into a spiral or swirl.`;
+    } else if (source.id === 'yamatoya-wave-155-direct-v1') {
+      action = index === 0
+        ? `Pour slowly in a tight circle around the center to ${target}g; do not add a separate swirl, then bloom for 30 seconds.`
+        : index === source.steps.length - 1
+          ? `Finish to ${target}g total with the same tight center circle; do not add a separate stir or swirl, and finish pouring near 1:30.`
+          : `Continue with the same slow center circle to ${target}g total; do not add a separate stir or swirl, then pause for 30 seconds.`;
     } else if (source.id === 'espresso-parts-wave-185-direct-v1') {
       action = index === 0
         ? `Bloom from the center to ${target}g, wetting the bed evenly; do not add a separate stir or swirl.`
@@ -123,16 +162,19 @@ function buildRecipe(config, technique, { fallback = false } = {}) {
   const guideShift = exactDose ? 0 : round((config.dose - source.doseGrams) * 2);
   const guideTargetSeconds = clamp(source.guideSeconds + guideShift, steps.at(-1).timeSeconds + 20, 300);
   const guideRangeSeconds = source.guideRangeSeconds.map((seconds) => seconds + (guideTargetSeconds - source.guideSeconds));
-  const temperatureC = source.temperatureC;
+  const temperatureC = Number.isFinite(source.temperatureC)
+    ? source.temperatureC
+    : 94;
   const grindSize = grindFor(config.grinder, source, technique.flowGuard);
-  const sourceNeedsAdaptation = source.id === 'espresso-parts-wave-185-direct-v1' && Array.isArray(source.temperatureRangeC);
+  const sourceNeedsAdaptation = !Number.isFinite(source.temperatureC)
+    || (source.id === 'espresso-parts-wave-185-direct-v1' && Array.isArray(source.temperatureRangeC));
   const grindTranslated = !(source.id === 'kurasu-wave-ice-after-v1' && config.grinder === 'fellow-ode-gen2' && exactDose);
   const changedFields = [
     !exactDose && 'dose', !exactDose && 'hotWater', !exactDose && 'recipeIce', !exactDose && 'cadence', !exactDose && 'guide',
-    sourceNeedsAdaptation && 'temperature',
+    sourceNeedsAdaptation && 'temperature', source.guideRuleId && 'guide', technique.chillingMethodOverrideApplied && 'technique',
     technique.flowGuard && 'geometry', (technique.flowGuard || grindTranslated) && 'grind',
   ].filter(Boolean);
-  const status = technique.flowGuard || sourceNeedsAdaptation || (exactDose && grindTranslated)
+  const status = technique.flowGuard || sourceNeedsAdaptation || technique.chillingMethodOverrideApplied || (exactDose && grindTranslated)
     ? 'adapted'
     : !exactDose ? 'scaled' : 'original';
   const parameterSources = {
@@ -141,19 +183,23 @@ function buildRecipe(config, technique, { fallback = false } = {}) {
     hotWater: exactDose ? source.id : KALITA_ICED_SCALING_RULE_ID,
     recipeIce: exactDose ? source.id : KALITA_ICED_SCALING_RULE_ID,
     cadence: exactDose ? source.id : KALITA_ICED_SCALING_RULE_ID,
-    guide: exactDose ? source.id : KALITA_ICED_SCALING_RULE_ID,
+    guide: source.guideRuleId || (exactDose ? source.id : KALITA_ICED_SCALING_RULE_ID),
     temperature: sourceNeedsAdaptation ? KALITA_ICED_TEMPERATURE_RULE_ID : source.id,
     grind: technique.flowGuard ? KALITA_ICED_FLOW_GUARD_RULE_ID : grindTranslated ? KALITA_ICED_GRIND_RULE_ID : source.id,
     geometry: technique.flowGuard ? KALITA_ICED_FLOW_GUARD_RULE_ID : source.id,
     agitation: source.id,
+    technique: technique.chillingMethodOverrideApplied ? 'user-configuration' : KALITA_ICED_CHILLING_SELECTION_RULE_ID,
   };
   const personalizationApplied = Boolean(technique.flowGuard);
   const icePlacement = directOverIce ? 'server before brewing' : 'glass after brewing';
   const iceTiming = directOverIce ? 'prep' : 'post-brew';
   const titleLabel = directOverIce ? 'Iced Flash Brew' : 'Iced Pour Over';
-  const reasoning = personalizationApplied
-    ? `This source-backed Wave ${config.size} recipe keeps its pour tighter and grind slightly coarser because saved brew guidance explicitly warns about slow flow.`
-    : `Source-backed starting point for Wave ${config.size} at ${config.dose}g. Size and dose select the published recipe family.`;
+  const selectedMethodLabel = directOverIce ? 'brew over ice' : 'chill after brewing';
+  const reasoning = technique.chillingMethodOverrideApplied
+    ? `You chose ${selectedMethodLabel}; the app regenerated the complete source-backed recipe rather than only moving the ice step.`
+      : technique.flowGuard
+        ? `This source-backed Wave ${config.size} recipe keeps its pour tighter and grind slightly coarser because saved brew guidance explicitly warns about slow flow.`
+        : `Source-backed starting point for Wave ${config.size} at ${config.dose}g. Size and dose select the published recipe family.`;
   return {
     method: 'pour-over', device: 'kalita', mode: 'iced', isIced: true, kalitaSize: config.size,
     configurationKey: config.configurationKey, doseProfile: config.doseProfile,
@@ -164,6 +210,9 @@ function buildRecipe(config, technique, { fallback = false } = {}) {
     servingIceExcluded: true, measuredMeltedIceGrams: null, icePlacement, iceTiming,
     waterTemp: { celsius: temperatureC, fahrenheit: Math.round(temperatureC * 9 / 5 + 32) }, grindSize,
     technique: technique.id, techniqueLabel: technique.label,
+    chillingMethod: technique.selectedChillingMethod,
+    recommendedChillingMethod: technique.recommendedChillingMethod,
+    chillingMethodOverrideApplied: technique.chillingMethodOverrideApplied,
     techniqueInstruction: directOverIce
       ? source.requiresCompleteMelt
         ? `${technique.label}: brew directly over recipe ice, then melt it before serving over fresh ice.`
@@ -175,7 +224,9 @@ function buildRecipe(config, technique, { fallback = false } = {}) {
       { action: `Add ${config.dose}g coffee and level the bed.`, phase: 'prep' },
     ],
     steps,
-    postBrewSteps: [{ action: exactDose ? source.postBrewInstruction : directOverIce
+    postBrewSteps: [{ action: exactDose ? source.postBrewInstruction : source.id === 'yamatoya-wave-155-direct-v1'
+      ? `After Finish Brew, remove the dripper and stir the server in a figure-eight until the ${recipeIceGrams}g recipe ice has fully melted. Pour over fresh serving ice if desired.`
+      : directOverIce
       ? source.requiresCompleteMelt
         ? `After Finish Brew, swirl the server until the ${recipeIceGrams}g recipe ice has melted, then pour over fresh serving ice.`
         : `After Finish Brew, gently swirl the server to chill the coffee over the ${recipeIceGrams}g recipe ice, then pour over fresh serving ice. Complete melt is not assumed.`
@@ -193,7 +244,7 @@ function buildRecipe(config, technique, { fallback = false } = {}) {
         ? `Exact published ${source.author} recipe.`
         : `Source-backed ${source.author} profile with only versioned configuration changes.`,
     },
-    personalizationApplied, reasonCodes: [technique.reasonCode, fallback && 'KALITA_ICED_CONSERVATIVE_BASELINE'].filter(Boolean),
+    personalizationApplied, reasonCodes: [...(technique.reasonCodes || []), fallback && 'KALITA_ICED_CONSERVATIVE_BASELINE'].filter(Boolean),
     fallback: Boolean(fallback), generationStatus: fallback ? 'fallback' : 'candidate',
     reasoning, tips: `Guide finish ${timeLabel(guideTargetSeconds)} is a drawdown reference. Finish when dripping ends; the timer stays in overtime until you press Finish Brew.`,
     title: `Iced Kalita Wave ${config.size} recipe`, icedModeLabel: titleLabel,
@@ -215,6 +266,10 @@ export function validateKalitaIcedCandidate(recipe) {
     if (recipe.finalBeverageWaterTargetGrams !== recipe.hotWaterGrams + recipe.recipeIceGrams || !recipe.finalBeverageRatio) errors.push('complete-melt-math');
   } else if (recipe.finalBeverageWaterTargetGrams != null || recipe.finalBeverageRatio != null || recipe.ratio != null) errors.push('unsupported-melt-claim');
   if (recipe.servingIceExcluded !== true || recipe.measuredMeltedIceGrams !== null) errors.push('ice-semantics');
+  if (!['brew-over-ice', 'chill-after'].includes(recipe?.chillingMethod)
+    || !['brew-over-ice', 'chill-after'].includes(recipe?.recommendedChillingMethod)
+    || typeof recipe?.chillingMethodOverrideApplied !== 'boolean') errors.push('chilling-method');
+  if ((recipe.chillingMethod === 'brew-over-ice') !== hasInitialIce) errors.push('chilling-method-ice-timing');
   if (!Number.isFinite(recipe?.waterTemp?.celsius) || !Number.isFinite(recipe?.waterTemp?.fahrenheit) || recipe.waterTemp.celsius < 90 || recipe.waterTemp.celsius > 96) errors.push('temperature');
   if (!recipe?.grindSize || !Number.isFinite(recipe.grindSize.microns)) errors.push('grind');
   if (!Array.isArray(recipe?.prepSteps) || recipe.prepSteps.length < 2 || !Array.isArray(recipe?.postBrewSteps) || recipe.postBrewSteps.length !== 1) errors.push('phase-steps');
@@ -237,7 +292,8 @@ export function validateKalitaIcedCandidate(recipe) {
   }
   if (recipe?.sourceLineage?.status === 'original' && recipe.sourceLineage.changedFields?.length) errors.push('original-has-changes');
   if (recipe?.sourceLineage?.status !== 'original' && !recipe?.sourceLineage?.changedFields?.length) errors.push('adaptation-missing-changes');
-  if (recipe?.personalizationApplied !== recipe?.reasonCodes?.includes('EXPLICIT_FLOW_RISK_GUARD')) errors.push('personalization-truth');
+  const hasPersonalizationReason = recipe?.reasonCodes?.includes('EXPLICIT_FLOW_RISK_GUARD');
+  if (recipe?.personalizationApplied !== hasPersonalizationReason) errors.push('personalization-truth');
   if (!recipe.personalizationApplied && /bean-specific|tailored to this bean/i.test(`${recipe.reasoning} ${recipe.title}`)) errors.push('false-personalization-copy');
   if (!recipe.icedModeLabel || !recipe.icedEntryLabel) errors.push('missing-mode-labels');
   return { valid: errors.length === 0, errors };
@@ -253,7 +309,18 @@ export function generateKalitaIcedRecipe(intent = {}, configuration = {}) {
 
 export function generateKalitaIcedFallback(configuration = {}, reason = 'candidate-failed') {
   const config = normalizeKalitaIcedConfiguration(configuration);
-  const recipe = buildRecipe(config, { ...KALITA_ICED_TECHNIQUES.kurasuIceAfter, flowGuard: false, reasonCode: 'KALITA_ICED_CONSERVATIVE_BASELINE' }, { fallback: true });
+  const selected = selectKalitaIcedTechnique({}, config);
+  const technique = config.chillingMethod === 'auto'
+    ? {
+      ...KALITA_ICED_TECHNIQUES.kurasuIceAfter,
+      flowGuard: false,
+      selectedChillingMethod: 'chill-after',
+      recommendedChillingMethod: selected.recommendedChillingMethod,
+      chillingMethodOverrideApplied: false,
+      reasonCodes: ['KALITA_ICED_CONSERVATIVE_BASELINE'],
+    }
+    : { ...selected, flowGuard: false, reasonCodes: [...selected.reasonCodes, 'KALITA_ICED_CONSERVATIVE_BASELINE'] };
+  const recipe = buildRecipe(config, technique, { fallback: true });
   recipe.fallbackReason = reason;
   const validation = validateKalitaIcedCandidate(recipe);
   if (!validation.valid) throw new Error(`Kalita iced fallback contract failed: ${validation.errors.join(', ')}`);

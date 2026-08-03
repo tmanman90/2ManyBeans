@@ -38,10 +38,23 @@ try {
     await page.getByText(`Wave ${config.size} · Iced`, { exact: true }).waitFor();
     if (config.size === '155') {
       await page.getByText(/glass after brewing/i).waitFor();
-      assert.equal(await page.getByText(/server before brewing/i).count(), 0);
+      const direct = page.getByRole('button', { name: /^Brew over ice/ });
+      const chillAfter = page.getByRole('button', { name: /Chill after, recommended starting point for this Wave size and dose/ });
+      assert.equal(await chillAfter.getAttribute('aria-pressed'), 'true');
+      await direct.click();
+      await page.getByText(/server before brewing/i).first().waitFor();
+      await page.getByText(/figure-eight/i).waitFor();
+      assert.equal(await direct.getAttribute('aria-pressed'), 'true');
     } else {
       await page.getByText(/server before brewing/i).first().waitFor();
       await page.getByText(/complete melt is not assumed/i).waitFor();
+      const direct = page.getByRole('button', { name: /Brew over ice, recommended starting point for this Wave size and dose/ });
+      const chillAfter = page.getByRole('button', { name: /^Chill after/ });
+      assert.equal(await direct.getAttribute('aria-pressed'), 'true');
+      await chillAfter.click();
+      await page.getByText(/glass after brewing/i).waitFor();
+      await page.getByText(/Your choice uses its complete source-backed recipe/i).waitFor();
+      assert.equal(await chillAfter.getAttribute('aria-pressed'), 'true');
     }
     await page.getByRole('button', { name: 'Start iced brew timer' }).click();
     await page.getByText('BREWING', { exact: true }).waitFor({ timeout: 12000 });

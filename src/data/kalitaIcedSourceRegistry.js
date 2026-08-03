@@ -1,6 +1,6 @@
 import { kalitaDoseBounds } from './kalitaConfiguration.js';
 
-export const KALITA_ICED_SOURCE_REGISTRY_VERSION = 'kalita-iced-sources-v1';
+export const KALITA_ICED_SOURCE_REGISTRY_VERSION = 'kalita-iced-sources-v2';
 
 export const KALITA_ICED_SOURCES = Object.freeze([
   Object.freeze({
@@ -32,6 +32,37 @@ export const KALITA_ICED_SOURCES = Object.freeze([
       { timeSeconds: 60, waterTotal: 150, action: 'Finish to 150g total with the same slow center circle; do not spiral or swirl, then let the coffee drip through.' },
     ],
     postBrewInstruction: 'After Finish Brew, add 140g ice to a glass, pour the hot coffee over it, and stir until cold. The source does not require every gram of ice to melt.',
+  }),
+  Object.freeze({
+    id: 'yamatoya-wave-155-direct-v1',
+    author: 'Yamatoya Coffee / deepresso',
+    canonicalUrl: 'https://deepresso.yamato-ya.jp/2024/08/5946/',
+    publishedAt: '2024-08-07',
+    evidenceType: 'professional',
+    executable: true,
+    configuration: 'kalita:155:wave-paper',
+    sizes: ['155'],
+    doseGrams: 20,
+    hotWaterGrams: 180,
+    recipeIceGrams: 80,
+    initialBrewIceGrams: 80,
+    postBrewIceGrams: null,
+    finalBeverageWaterTargetGrams: 260,
+    requiresCompleteMelt: true,
+    temperatureC: null,
+    temperatureRuleId: 'kalita-iced-temperature-range-v1',
+    grind: 'medium-fine',
+    geometry: 'slow, tight circles around the center about the size of a small coin',
+    agitation: 'no separate slurry agitation; figure-eight stir after drawdown until recipe ice fully melts',
+    guideSeconds: 150,
+    guideRangeSeconds: [120, 180],
+    guideRuleId: 'kalita-iced-direct-155-drawdown-envelope-v1',
+    steps: [
+      { timeSeconds: 0, waterTotal: 30, action: 'Pour slowly in a tight circle around the center to 30g; do not add a separate swirl, then bloom for 30 seconds.' },
+      { timeSeconds: 30, waterTotal: 100, action: 'Continue with the same slow center circle to 100g total; do not add a separate stir or swirl, then pause for 30 seconds.' },
+      { timeSeconds: 60, waterTotal: 180, action: 'Finish to 180g total with the same tight center circle; do not add a separate stir or swirl, and finish pouring near 1:30.' },
+    ],
+    postBrewInstruction: 'After Finish Brew, remove the dripper and stir the server in a figure-eight until the 80g recipe ice has fully melted. Pour over fresh serving ice if desired.',
   }),
   Object.freeze({
     id: 'espresso-parts-wave-185-direct-v1',
@@ -117,25 +148,34 @@ export const KALITA_ICED_RULES = Object.freeze({
       '155': [kalitaDoseBounds('155').minDose, kalitaDoseBounds('155').maxDose],
       '185': [kalitaDoseBounds('185').minDose, kalitaDoseBounds('185').maxDose],
     },
-    sourceIds: ['kurasu-wave-ice-after-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
+    sourceIds: ['kurasu-wave-ice-after-v1', 'yamatoya-wave-155-direct-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
   }),
   'kalita-iced-grind-translation-v1': Object.freeze({
     allowedFields: ['grind'], bounds: { microns: [600, 1000] },
-    sourceIds: ['kurasu-wave-ice-after-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
+    sourceIds: ['kurasu-wave-ice-after-v1', 'yamatoya-wave-155-direct-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
   }),
   'kalita-iced-temperature-range-v1': Object.freeze({
     allowedFields: ['temperature'], bounds: { temperatureC: [90, 96] },
-    sourceIds: ['kurasu-wave-ice-after-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
+    sourceIds: ['kurasu-wave-ice-after-v1', 'yamatoya-wave-155-direct-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
   }),
   'kalita-iced-explicit-flow-guard-v1': Object.freeze({
     allowedFields: ['geometry', 'grind'], bounds: { micronDelta: [0, 40] }, defaultMicronDelta: 30,
-    sourceIds: ['kurasu-wave-ice-after-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
+    sourceIds: ['kurasu-wave-ice-after-v1', 'yamatoya-wave-155-direct-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
   }),
-  'user-configuration': Object.freeze({ allowedFields: ['dose', 'grinder', 'size'] }),
+  'kalita-iced-direct-155-drawdown-envelope-v1': Object.freeze({
+    allowedFields: ['guide'], bounds: { guideSeconds: [120, 180] },
+    sourceIds: ['yamatoya-wave-155-direct-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
+  }),
+  'kalita-iced-chilling-selection-v1': Object.freeze({
+    allowedFields: ['technique'],
+    sourceIds: ['kurasu-wave-ice-after-v1', 'yamatoya-wave-155-direct-v1', 'espresso-parts-wave-185-direct-v1', 'frothy-monkey-wave-large-direct-v1'],
+  }),
+  'user-configuration': Object.freeze({ allowedFields: ['dose', 'grinder', 'size', 'technique'] }),
 });
 
 export const KALITA_ICED_TECHNIQUES = Object.freeze({
   kurasuIceAfter: Object.freeze({ id: 'kurasu-center-circles-ice-after', sourceId: 'kurasu-wave-ice-after-v1', label: 'center circles, ice after brewing' }),
+  yamatoya155Direct: Object.freeze({ id: 'wave-155-center-circles-direct', sourceId: 'yamatoya-wave-155-direct-v1', label: 'tight center circles, brewed over ice' }),
   espressoPartsDirect: Object.freeze({ id: 'wave-185-controlled-circles-direct', sourceId: 'espresso-parts-wave-185-direct-v1', label: 'controlled circles over ice' }),
   frothyLargeDirect: Object.freeze({ id: 'wave-185-large-spiral-direct', sourceId: 'frothy-monkey-wave-large-direct-v1', label: 'large-dose spiral pulses over ice' }),
 });
@@ -153,7 +193,8 @@ export function validateKalitaIcedRegistry() {
   for (const source of KALITA_ICED_SOURCES.filter((entry) => entry.executable)) {
     if (!source.id || !source.author || !source.canonicalUrl || !['primary', 'professional'].includes(source.evidenceType)) errors.push(`${source.id || 'unknown'}:provenance`);
     if (!Array.isArray(source.sizes) || !source.sizes.length || !Number.isFinite(source.doseGrams)) errors.push(`${source.id}:configuration`);
-    for (const key of ['hotWaterGrams', 'recipeIceGrams', 'temperatureC', 'guideSeconds']) if (!Number.isFinite(source[key])) errors.push(`${source.id}:${key}`);
+    for (const key of ['hotWaterGrams', 'recipeIceGrams', 'guideSeconds']) if (!Number.isFinite(source[key])) errors.push(`${source.id}:${key}`);
+    if (!Number.isFinite(source.temperatureC) && !KALITA_ICED_RULES[source.temperatureRuleId]) errors.push(`${source.id}:temperatureC`);
     if (source.initialBrewIceGrams != null && source.postBrewIceGrams != null) errors.push(`${source.id}:ambiguous-ice-timing`);
     if (source.initialBrewIceGrams == null && source.postBrewIceGrams == null) errors.push(`${source.id}:missing-ice-timing`);
     if (source.requiresCompleteMelt && source.finalBeverageWaterTargetGrams !== source.hotWaterGrams + source.recipeIceGrams) errors.push(`${source.id}:final-water-math`);

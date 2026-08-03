@@ -137,6 +137,72 @@ const KalitaSizeSwitch = ({ value, onChange, disabled }) => {
   );
 };
 
+const CHILLING_METHOD_LABELS = {
+  'brew-over-ice': 'Brew over ice',
+  'chill-after': 'Chill after',
+};
+
+const KalitaIcedChillingSwitch = ({ value, recommended, overrideApplied, fallback, onChange, disabled }) => {
+  const selected = CHILLING_METHOD_LABELS[value] ? value : 'chill-after';
+  const recommendedMethod = CHILLING_METHOD_LABELS[recommended] ? recommended : selected;
+  const isOverride = overrideApplied === true;
+  return (
+    <div
+      role="group"
+      aria-label="Kalita iced chilling method"
+      style={{
+        padding: 10,
+        marginBottom: 14,
+        background: ICE_TILE_BG,
+        border: `1px solid ${ICE_RULE}`,
+        borderRadius: radius.lg,
+      }}
+    >
+      <SectionLabel style={{ color: C.frost, margin: '0 2px 8px' }}>Chilling method</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {Object.entries(CHILLING_METHOD_LABELS).map(([method, label]) => {
+          const active = selected === method;
+          return (
+            <m.button
+              key={method}
+              type="button"
+              onClick={() => !active && onChange?.(method)}
+              disabled={disabled}
+              whileTap={disabled || active ? undefined : { scale: 0.97 }}
+              transition={spring.snappy}
+              aria-pressed={active}
+              aria-label={`${label}${recommendedMethod === method ? ', recommended starting point for this Wave size and dose' : ''}`}
+              style={{
+                minHeight: 44,
+                padding: '8px 10px',
+                border: `1px solid ${active ? C.frost : ICE_RULE}`,
+                borderRadius: radius.md,
+                background: active ? C.frost : C.card,
+                color: active ? C.cream : C.textMuted,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 750,
+                cursor: disabled || active ? 'default' : 'pointer',
+                opacity: disabled ? 0.65 : 1,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {label}
+            </m.button>
+          );
+        })}
+      </div>
+      <div aria-live="polite" style={{ ...type.caption, color: C.textMuted, lineHeight: 1.45, margin: '7px 2px 0' }}>
+        {fallback && !isOverride
+          ? 'Using the conservative fallback for this Wave size and dose.'
+          : isOverride
+          ? `Recommended for this Wave size and dose: ${CHILLING_METHOD_LABELS[recommendedMethod]}. Your choice uses its complete source-backed recipe.`
+          : 'Recommended starting point for this Wave size and dose.'}
+      </div>
+    </div>
+  );
+};
+
 const TECHNIQUE_LABELS = {
   hoffmann: 'Hoffmann Classic',
   'kasuya-46': 'Kasuya 4:6',
@@ -286,7 +352,7 @@ export const HandBrewModal = ({
   open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, onRetryIced, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
-  deviceKey, onKalitaSizeChange, onSaveTimingEvent,
+  deviceKey, onKalitaSizeChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -740,6 +806,22 @@ export const HandBrewModal = ({
               </div>
             )}
           </div>
+
+          {icedRecipe.device === 'kalita' && (
+            <KalitaIcedChillingSwitch
+              value={icedRecipe.chillingMethod}
+              recommended={icedRecipe.recommendedChillingMethod}
+              overrideApplied={icedRecipe.chillingMethodOverrideApplied}
+              fallback={icedRecipe.fallback}
+              onChange={onKalitaIcedChillingMethodChange}
+              disabled={icedLoading || doseUpdating}
+            />
+          )}
+          {icedError && (
+            <div role="alert" style={{ ...type.caption, color: C.red, lineHeight: 1.45, margin: '-5px 4px 14px' }}>
+              {icedError}
+            </div>
+          )}
 
           {/* Iced param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>

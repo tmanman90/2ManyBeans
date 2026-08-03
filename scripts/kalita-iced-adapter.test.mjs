@@ -26,6 +26,67 @@ assert.equal(scaled155.hotWaterGrams, 188);
 assert.equal(scaled155.recipeIceGrams, 175);
 assert.equal(scaled155.icedModeLabel, 'Iced Pour Over');
 
+const clarity155 = generateKalitaIcedRecipe(
+  { cupDirection: { clarity: 'high', body: 'balanced', sweetness: 'high' } },
+  { size: '155', dose: 20, grinder: 'fellow-ode-gen2' },
+);
+assert.equal(clarity155.technique, 'kurasu-center-circles-ice-after');
+assert.equal(clarity155.chillingMethod, 'chill-after');
+assert.equal(clarity155.recommendedChillingMethod, 'chill-after');
+assert.equal(clarity155.chillingMethodOverrideApplied, false);
+assert.equal(clarity155.personalizationApplied, false);
+
+const clarityChillAfter = generateKalitaIcedRecipe(
+  { cupDirection: { clarity: 'high', body: 'balanced', sweetness: 'high' } },
+  { size: '155', dose: 16, grinder: 'fellow-ode-gen2', chillingMethod: 'chill-after' },
+);
+assert.equal(clarityChillAfter.technique, 'kurasu-center-circles-ice-after');
+assert.equal(clarityChillAfter.chillingMethod, 'chill-after');
+assert.equal(clarityChillAfter.recommendedChillingMethod, 'chill-after');
+assert.equal(clarityChillAfter.chillingMethodOverrideApplied, false);
+
+const direct155 = generateKalitaIcedRecipe(
+  { cupDirection: { clarity: 'high', body: 'balanced', sweetness: 'high' } },
+  { size: '155', dose: 20, grinder: 'fellow-ode-gen2', chillingMethod: 'brew-over-ice' },
+);
+assert.equal(direct155.technique, 'wave-155-center-circles-direct');
+assert.equal(direct155.chillingMethod, 'brew-over-ice');
+assert.equal(direct155.recommendedChillingMethod, 'chill-after');
+assert.equal(direct155.chillingMethodOverrideApplied, true);
+assert.equal(direct155.hotWaterGrams, 180);
+assert.equal(direct155.recipeIceGrams, 80);
+assert.equal(direct155.initialBrewIceGrams, 80);
+assert.equal(direct155.postBrewIceGrams, null);
+assert.equal(direct155.finalBeverageWaterTargetGrams, 260);
+assert.equal(direct155.finalBeverageRatio, '1:13');
+assert.deepEqual(direct155.steps.map((step) => [step.timeSeconds, step.waterTotal]), [[0, 30], [30, 100], [60, 180]]);
+assert.deepEqual(direct155.guideRangeSeconds, [120, 180]);
+assert.match(direct155.postBrewSteps[0].action, /figure-eight/i);
+assert.equal(direct155.waterTemp.celsius, 94);
+
+const bodyBrewOverIce = generateKalitaIcedRecipe(
+  { cupDirection: { clarity: 'balanced', body: 'supported', sweetness: 'high' } },
+  { size: '155', dose: 15, grinder: 'fellow-ode-gen2', chillingMethod: 'brew-over-ice' },
+);
+assert.equal(bodyBrewOverIce.technique, 'wave-155-center-circles-direct');
+assert.equal(bodyBrewOverIce.recommendedChillingMethod, 'chill-after');
+assert.equal(bodyBrewOverIce.chillingMethodOverrideApplied, true);
+assert.match(bodyBrewOverIce.postBrewSteps[0].action, /figure-eight/i);
+
+const bodyAuto155 = generateKalitaIcedRecipe(
+  { cupDirection: { clarity: 'balanced', body: 'supported', sweetness: 'high' } },
+  { size: '155', dose: 15, grinder: 'fellow-ode-gen2' },
+);
+assert.equal(bodyAuto155.technique, 'kurasu-center-circles-ice-after');
+assert.equal(bodyAuto155.personalizationApplied, false);
+
+const body185ChillAfter = generateKalitaIcedRecipe(
+  { cupDirection: { clarity: 'balanced', body: 'supported', sweetness: 'high' } },
+  { size: '185', dose: 20, grinder: 'fellow-ode-gen2', chillingMethod: 'chill-after' },
+);
+assert.equal(body185ChillAfter.technique, 'kurasu-center-circles-ice-after');
+assert.equal(body185ChillAfter.chillingMethod, 'chill-after');
+
 const standard185 = generateKalitaIcedRecipe({}, { size: '185', dose: 20, grinder: 'fellow-ode-gen2' });
 assert.equal(standard185.technique, 'wave-185-controlled-circles-direct');
 assert.equal(standard185.initialBrewIceGrams, 160);
@@ -58,5 +119,6 @@ assert.equal(validateKalitaIcedCandidate({ ...standard185, sourceLineage: { ...s
 assert.throws(() => generateKalitaIcedRecipe({}, { size: '155', dose: 21 }), /between 12g and 20g/);
 assert.throws(() => generateKalitaIcedRecipe({}, { size: '185', dose: 14 }), /between 15g and 36g/);
 assert.equal(generateKalitaIcedFallback({ size: '185', dose: 20 }).fallback, true);
+assert.equal(generateKalitaIcedFallback({ size: '155', dose: 20, chillingMethod: 'brew-over-ice' }).chillingMethod, 'brew-over-ice');
 
 console.log('kalita iced adapter passed');

@@ -266,6 +266,9 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             : {}),
         }
       : null;
+    const icedForSave = handBrew.handBrewIcedRecipe
+      ? { ...handBrew.handBrewIcedRecipe, generatedAt: handBrew.handBrewIcedRecipe.generatedAt || new Date().toISOString() }
+      : null;
     const saveData = {
       ...scanData,
       aidenRecipe: aiden.aidenRecipe,
@@ -273,6 +276,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       aidenGrind: aiden.aidenRecipe?.grindRecommendation || null,
       handBrewRecipe: handBrewForSave,
       ...(handBrewForSave ? { handBrewRecipes: { [handBrewForSave.device || 'v60']: handBrewForSave } } : {}),
+      ...(icedForSave ? { handBrewIcedRecipes: { [icedForSave.device || 'v60']: icedForSave } } : {}),
       photo: photos[0] || null,
       scanPhotos: photos,
     };
@@ -307,8 +311,13 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
           const dev = beanData.handBrewRecipe.device || 'v60';
           beanData.handBrewRecipes = { [dev]: beanData.handBrewRecipe };
         }
+        if (handBrew.handBrewIcedRecipe) {
+          const icedRecipe = { ...handBrew.handBrewIcedRecipe, generatedAt: handBrew.handBrewIcedRecipe.generatedAt || new Date().toISOString() };
+          beanData.handBrewIcedRecipes = { [icedRecipe.device || 'v60']: icedRecipe };
+        }
         const newId = await addBean(beanData);
         setSavedBeanId(newId);
+        handBrew.attachHandBrewBeanId(newId);
         setToast(`${scanData.name || 'Bean'} saved to inventory`);
         return newId;
       } catch (err) {
@@ -469,6 +478,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onRetry={handBrew.onRetry}
             onRegenerate={handBrew.onRegenerate}
             onKalitaSizeChange={handBrew.handleKalitaSizeChange}
+            onKalitaIcedChillingMethodChange={handBrew.handleKalitaIcedChillingMethodChange}
             extraFooter={actionButtons}
             bean={handBrew.handBrewBean}
             onStartTasting={handleBrewTimerStartTasting}

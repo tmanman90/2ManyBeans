@@ -173,6 +173,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
 
     const candidateIced = bean.handBrewIcedRecipes?.[device];
     const candidateIcedValid = icedCandidateMatchesConfiguration(candidateIced, device, candidateDose, bean, requestResearch, activePreferences);
+    const preservedChillingMethod = ['brew-over-ice', 'chill-after'].includes(generationOverrides.chillingMethod)
+      ? generationOverrides.chillingMethod
+      : ['brew-over-ice', 'chill-after'].includes(candidateIced?.chillingMethod)
+        ? candidateIced.chillingMethod
+        : undefined;
     if (canUseCachedHotRecipe({
       forceRegenerate,
       cachedRecipe: cached,
@@ -205,7 +210,12 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
           const evidence = normalizeRecipeEvidence(bean, requestResearch);
           const intent = buildExtractionIntent(evidence);
           const icedResult = device === 'kalita'
-            ? generateKalitaIcedWithFallback({ intent, configuration: { size: activePreferences?.kalitaSize, dose: candidateDose, grinder: grinderKey } })
+            ? generateKalitaIcedWithFallback({ intent, configuration: {
+              size: activePreferences?.kalitaSize,
+              dose: candidateDose,
+              grinder: grinderKey,
+              chillingMethod: preservedChillingMethod,
+            } })
             : generateV60IcedWithFallback({ intent, configuration: { dose: candidateDose, grinder: grinderKey } });
           if (icedResult.recipe) {
             const generatedAt = new Date().toISOString();
@@ -310,7 +320,12 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       if (device === 'kalita' && candidateMode === 'candidate') {
         const icedResult = generateKalitaIcedWithFallback({
           intent: sharedIntent,
-          configuration: { size: activePreferences?.kalitaSize, dose: candidateDose, grinder: grinderKey },
+          configuration: {
+            size: activePreferences?.kalitaSize,
+            dose: candidateDose,
+            grinder: grinderKey,
+            chillingMethod: preservedChillingMethod,
+          },
         });
         icedRecipe = icedResult.recipe;
         icedGenerationError = icedResult.recipe ? null : icedResult.error;
@@ -390,7 +405,12 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       const evidence = normalizeRecipeEvidence(handBrewBean, research);
       const intent = buildExtractionIntent(evidence);
       const result = device === 'kalita'
-        ? generateKalitaIcedWithFallback({ intent, configuration: { size, dose: candidateDose, grinder: grinderKey } })
+        ? generateKalitaIcedWithFallback({ intent, configuration: {
+          size,
+          dose: candidateDose,
+          grinder: grinderKey,
+          chillingMethod: handBrewIcedRecipe?.chillingMethod,
+        } })
         : generateV60IcedWithFallback({ intent, configuration: { dose: candidateDose, grinder: grinderKey } });
       if (!result.recipe) throw new Error(result.error?.message || 'deterministic candidate and fallback failed');
       if (!isActive(rid)) return;
@@ -401,6 +421,57 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
         .catch((writeError) => console.warn('[handBrew] iced recipe persistence failed:', writeError?.message || writeError));
     } catch (err) {
       if (isActive(rid)) setHandBrewIcedError(`Iced ${device === 'kalita' ? 'Kalita' : 'V60'} regeneration unavailable: ${err.message || err}`);
+    } finally {
+      if (isActive(rid)) setHandBrewIcedLoading(false);
+    }
+  };
+
+  const handleKalitaIcedChillingMethodChange = async (chillingMethod) => {
+    if (!['brew-over-ice', 'chill-after'].includes(chillingMethod)
+      || handBrewRecipe?.device !== 'kalita'
+      || !handBrewBean
+      || handBrewIcedRecipe?.chillingMethod === chillingMethod) return;
+
+    const size = handBrewIcedRecipe?.kalitaSize || preferences?.kalitaSize || '185';
+    const candidateDose = handBrewIcedRecipe?.coffeeGrams
+      || handBrewRecipe?.userCoffeeGrams
+      || handBrewRecipe?.coffeeGrams
+      || kalitaDefaultDose(size);
+    const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
+    const rid = Symbol('handbrew-iced-chilling-method');
+    activeRequestRef.current = rid;
+    setHandBrewIcedLoading(true);
+    setHandBrewIcedError(null);
+    try {
+      const research = handBrewResearch || handBrewBean.beanResearch || null;
+      const evidence = normalizeRecipeEvidence(handBrewBean, research);
+      const intent = buildExtractionIntent(evidence);
+      const result = generateKalitaIcedWithFallback({
+        intent,
+        configuration: { size, dose: candidateDose, grinder: grinderKey, chillingMethod },
+      });
+      if (!result.recipe) throw new Error(result.error?.message || 'deterministic candidate and fallback failed');
+      if (!isActive(rid)) return;
+      const hydrated = {
+        ...result.recipe,
+        generatedAt: new Date().toISOString(),
+        sourceContextHash: buildSourceContextHash({ ...handBrewBean, beanResearch: research }),
+        grinder: grinderKey,
+      };
+      setHandBrewIcedRecipe(hydrated);
+      if (handBrewBean.id) {
+        try {
+          await queueLatestRecipeWrite(handBrewBean.id, { 'handBrewIcedRecipes.kalita': hydrated });
+        } catch (writeError) {
+          if (isActive(rid)) {
+            setHandBrewIcedRecipe(handBrewIcedRecipe);
+            setHandBrewIcedError('Could not save the chilling method. Your previous recipe is still selected.');
+          }
+          console.warn('[handBrew] iced chilling method persistence failed:', writeError?.message || writeError);
+        }
+      }
+    } catch (err) {
+      if (isActive(rid)) setHandBrewIcedError(`Could not change the chilling method: ${err.message || err}`);
     } finally {
       if (isActive(rid)) setHandBrewIcedLoading(false);
     }
@@ -438,6 +509,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     setHandBrewModal(false);
   };
 
+  const attachHandBrewBeanId = useCallback((beanId) => {
+    if (!beanId) return;
+    setHandBrewBean((current) => current ? { ...current, id: beanId } : current);
+  }, []);
+
   const persistDose = useCallback(async (newDose) => {
     if (typeof newDose !== 'number' || newDose <= 0) return;
     setHandBrewRecipe((prev) =>
@@ -468,6 +544,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     activeRequestRef.current = null;
     const fingerprint = `${handBrewRecipe?.device || 'v60'}:${newDose}:${handBrewRecipe?.mode || 'hot'}:${preferences?.grinder || 'fellow-ode-gen2'}`;
     requestedFingerprintRef.current = fingerprint;
+    const chillingMethod = handBrewIcedRecipe?.chillingMethod;
     setUserCoffeeGrams(newDose);
     if (['v60', 'kalita'].includes(handBrewRecipe?.device) && handBrewBean) {
       setHandBrewIcedRecipe(null);
@@ -477,7 +554,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       doseDebounceRef.current = setTimeout(() => {
         doseDebounceRef.current = null;
         if (!mountedRef.current || requestedFingerprintRef.current !== fingerprint) return;
-        handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe.device, { doseOverride: newDose });
+        handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe.device, { doseOverride: newDose, chillingMethod });
       }, 350);
     }
   };
@@ -499,13 +576,19 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     handBrewPhase, handBrewBean, handBrewResearch,
     handleBrewHandBrew, closeHandBrewModal,
     handleKalitaSizeChange,
+    handleKalitaIcedChillingMethodChange,
+    attachHandBrewBeanId,
     userCoffeeGrams,
     setUserCoffeeGrams,
     handleCoffeeGramsChange,
     persistDose,
     saveTimingEvent,
     onRetryIced: regenerateIced,
-    onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, false, handBrewRecipe?.device) : undefined,
-    onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe?.device) : undefined,
+    onRetry: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, false, handBrewRecipe?.device, {
+      chillingMethod: handBrewRecipe?.device === 'kalita' ? handBrewIcedRecipe?.chillingMethod : undefined,
+    }) : undefined,
+    onRegenerate: handBrewBean ? () => handleBrewHandBrew(handBrewBean, handBrewResearch, true, handBrewRecipe?.device, {
+      chillingMethod: handBrewRecipe?.device === 'kalita' ? handBrewIcedRecipe?.chillingMethod : undefined,
+    }) : undefined,
   };
 }
