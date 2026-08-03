@@ -57,6 +57,9 @@ export function transformPourOver(hotRecipe, userDose) {
   if (hotRecipe?.candidate === true && hotRecipe?.device === 'v60' && hotRecipe?.mode === 'hot') {
     throw new Error('Deterministic hot V60 candidates require the independent iced V60 adapter');
   }
+  if (hotRecipe?.candidate === true && hotRecipe?.device === 'kalita' && (hotRecipe?.mode == null || hotRecipe.mode === 'hot')) {
+    throw new Error('Deterministic hot Kalita candidates require the independent iced Kalita adapter');
+  }
   const { dose, hotWater, iceGrams } = computeIceSplit(hotRecipe, userDose);
 
   // Versioned legacy phase recipes are still readable, but server ice is

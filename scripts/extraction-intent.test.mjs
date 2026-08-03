@@ -43,6 +43,14 @@ const explicitFlowRisk = buildExtractionIntent(
 assert.equal(explicitFlowRisk.finesRisk, 'high');
 assert.ok(explicitFlowRisk.reasonCodes.includes('EXPLICIT_FLOW_RISK_GUARD'));
 
+const negatedFlowRisk = buildExtractionIntent({
+  process: 'washed',
+  roastLevel: 'light',
+  bagNotes: "This coffee doesn't stall and has no fines issues.",
+});
+assert.equal(negatedFlowRisk.finesRisk, 'unknown');
+assert.equal(negatedFlowRisk.reasonCodes.includes('EXPLICIT_FLOW_RISK_GUARD'), false);
+
 const denseNatural = buildExtractionIntent(
   { process: 'natural', roastLevel: 'light' },
   { densityEstimate: 'high', cupStructureFamily: 'clean-natural-fruit' },

@@ -39,6 +39,14 @@ function firstHint(parser, sources) {
   return null;
 }
 
+function hasAffirmativeFlowRisk(text) {
+  const withoutNegatedClaims = String(text || '').replace(
+    /\b(?:no|not|never|without|doesn['’]?t|does not|didn['’]?t|did not|won['’]?t|will not)\s+(?:\w+\s+){0,2}(?:fines?|stall(?:s|ed|ing)?|clog(?:s|ged|ging)?|chok(?:e|es|ed|ing)|slow drawdown|(?:low|poor) permeability)\b/gi,
+    '',
+  );
+  return /\bfines?\b|\bstall(?:s|ed|ing)?\b|\bclog(?:s|ged|ging)?\b|\bchok(?:e|es|ed|ing)\b|(?:low|poor) permeability|slow drawdown/.test(withoutNegatedClaims);
+}
+
 export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   const evidence = evidenceOrBean?.facts ? evidenceOrBean : normalizeRecipeEvidence(evidenceOrBean, research);
   const process = factValue(evidence, 'process').toLowerCase();
@@ -61,7 +69,7 @@ export function buildExtractionIntent(evidenceOrBean = {}, research = null) {
   // Density can inform extraction and grind direction, but it is not evidence
   // that a coffee will produce excess fines or stall a brewer. Reserve the
   // flow-risk branch for explicit observations or guidance about flow.
-  const evidenceBackedFines = /\bfines?\b|\bstall(?:s|ed|ing)?\b|\bclog(?:s|ged|ging)?\b|\bchok(?:e|es|ed|ing)\b|(?:low|poor) permeability|slow drawdown/.test(trustedFlowGuidance);
+  const evidenceBackedFines = hasAffirmativeFlowRisk(trustedFlowGuidance);
   const highFinesRisk = evidenceBackedFines;
   const sourceTemperature = firstHint(parseTemperatureBand, [sourceGuidance]);
   const storedTemperature = firstHint(parseTemperatureBand, [storedGuidance]);

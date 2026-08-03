@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { normalizeRecipeEvidence } from '../src/lib/recipeEvidence.js';
+import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
+import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
+import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
+import { buildTimingEvent, selectTimingMemory, timingContextFromRecipe } from '../src/lib/brewTimingMemory.js';
+
+const bean = { id: 'fixture', process: 'washed', roastLevel: 'light', sourceInsights: { brewGuidance: 'This coffee has repeatedly stalled with slow drawdown.' } };
+const intent = buildExtractionIntent(normalizeRecipeEvidence(bean, null));
+const hot = generateKalitaRecipe(intent, { size: '155', dose: 15, grinder: 'fellow-ode-gen2' });
+const iced = generateKalitaIcedRecipe(intent, { size: '155', dose: 15, grinder: 'fellow-ode-gen2' });
+assert.notEqual(hot.configurationKey, iced.configurationKey);
+assert.equal(iced.personalizationApplied, true);
+assert.equal(iced.kalitaSize, '155');
+const context = timingContextFromRecipe({ beanId: bean.id, recipe: iced, mode: 'iced' });
+const event = buildTimingEvent({ ...context, sessionId: 'kalita-iced-1', actualElapsedMs: 101000, completionKind: 'userFinished' });
+assert.equal(event.configurationKey, 'kalita:155:wave-paper:iced');
+assert.equal(selectTimingMemory([event], context).event.sessionId, 'kalita-iced-1');
+assert.equal(selectTimingMemory([event], timingContextFromRecipe({ beanId: bean.id, recipe: hot, mode: 'hot' })), null);
+console.log('handbrew Kalita iced integration passed');
