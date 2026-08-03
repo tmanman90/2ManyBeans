@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { semverSafeDevTimestamp } from './ship-dev-version.mjs';
 
 const source = readFileSync(new URL('./ship-dev-ios.mjs', import.meta.url), 'utf8');
 
@@ -14,5 +15,7 @@ assert.match(source, /REQUIRED_BUILD_ENV/);
 assert.match(source, /VITE_FIREBASE_API_KEY/);
 assert.match(source, /valid Firebase config/);
 assert.doesNotMatch(source, /--send-update-notification/);
+assert.equal(semverSafeDevTimestamp(new Date('2026-08-03T02:08:12.000Z')), 'd20260803.t020812');
+assert.match(source, /semverSafeDevTimestamp/);
 
 console.log('Dev iOS ship guard contract passed.');
