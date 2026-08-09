@@ -216,21 +216,23 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
   // Terminal completion — branches on whether a profile doc already
   // exists:
   //
-  // - Existing profile → completeOnboarding(answers) does a single
+  // - Complete existing profile → completeOnboarding(answers) does a single
   //   atomic setDoc(merge:true) against the already-created doc.
-  // - Fresh user (profile === null) → createProfile() is the FIRST
-  //   write to /users/{uid} and fires Firestore's `allow create` rule,
-  //   which strictly requires displayName and uses a hasOnly()
-  //   allowlist. A merge-write without those fields would be rejected,
-  //   trapping fresh users at Gate 5 forever. createProfile includes
-  //   all the required create fields plus onboardingAnswers /
-  //   onboardingCompletedAt in one atomic write.
+  // - Fresh user or server-created redemption-only document →
+  //   createProfile() merges all required base fields plus onboardingAnswers /
+  //   onboardingCompletedAt. Checking the required profile shape instead of
+  //   only `profile !== null` closes the race where redemption creates the
+  //   server fields just before finish() runs.
   //
   // Optional `overrides` patch is merged into answers immediately
   // before persisting (used by R13b to set postCompleteAction in the
   // same atomic write). If marketingConsent is true on the final
   // blob, we also mirror to /emailList/{uid} in a follow-up write
   // (separate rule block, different doc).
+  const hasCompleteProfile = Boolean(
+    profile?.createdAt && typeof profile?.displayName === 'string'
+  );
+
   const finish = useCallback(async (overrides) => {
     if (finishing) return;
     setFinishing(true);
@@ -262,7 +264,7 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
       const testFinish = window.__ONBOARDING_TEST__?.finishProfile;
       if (testFinish) {
         await withTimeout(testFinish(answers));
-      } else if (!profile) {
+      } else if (!hasCompleteProfile) {
         if (!createProfile) throw new Error('createProfile not provided');
         await withTimeout(createProfile({
           displayName: user?.displayName || answerPrefs?.displayName || 'Coffee Lover',
@@ -331,7 +333,7 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
       setFinishing(false);
       throw err;
     }
-  }, [finishing, profile, createProfile, completeOnboarding, uid, user]);
+  }, [finishing, hasCompleteProfile, createProfile, completeOnboarding, uid, user]);
 
   const ctxValue = useMemo(() => ({
     state,

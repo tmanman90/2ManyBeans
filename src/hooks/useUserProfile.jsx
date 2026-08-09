@@ -180,7 +180,12 @@ export const useUserProfile = (uid) => {
     if (userData.onboardingComplete) {
       profileData.onboardingCompletedAt = serverTimestamp();
     }
-    await setDoc(profileRef, profileData);
+    // A successful onboarding invite redemption can create users/{uid} first
+    // with server-managed subscription/redemption fields. Merge the complete
+    // client profile into that document so those fields are never erased.
+    // For a truly absent document this is still a create with the full payload
+    // required by firestore.rules.
+    await setDoc(profileRef, profileData, { merge: true });
     clearPendingProviderDisplayName();
     // Optimistic local update + cache
     const localProfile = { id: uid, ...profileData, createdAt: new Date(), lastLoginAt: new Date() };
