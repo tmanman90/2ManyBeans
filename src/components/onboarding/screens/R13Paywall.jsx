@@ -16,6 +16,7 @@ import { assetUrl } from '../../../lib/assetUrl';
 import { haptic } from '../../../lib/haptics';
 import { palateArchetype } from '../../../lib/onboardingPalate';
 import { getOnboardingPalate, palateSummaryLine } from '../../../lib/palateProfile';
+import { readWarmedTrial } from '../../../lib/trialOffer';
 import {
   PAYWALL_HYDRATION_TIMEOUT_MS as HYDRATION_TIMEOUT_MS,
   REDEEM_CELEBRATE_MS,
@@ -149,6 +150,10 @@ export default function R13Paywall() {
   const [finalizeError, setFinalizeError] = useState(null);
   const [hydrationTimedOut, setHydrationTimedOut] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
+  // Trial length comes from the App Store Connect introductory offer via the
+  // warmed offerings cache — never hardcoded. Null means no free trial exists
+  // (or offerings never loaded), and the CTA must not promise one.
+  const [trial, setTrial] = useState(readWarmedTrial);
   const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
   useEffect(() => {
@@ -156,6 +161,14 @@ export default function R13Paywall() {
     const timer = setTimeout(() => setHydrationTimedOut(true), HYDRATION_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [status]);
+
+  // The warm (fired at R7) can still be in flight if the user raced through the
+  // flow. Re-read once hydration finishes so the CTA upgrades from the neutral
+  // "See my plans" to the real trial label instead of under-promising.
+  useEffect(() => {
+    if (trial || status === 'hydrating') return;
+    setTrial(readWarmedTrial());
+  }, [status, trial]);
 
   const finalizePurchase = useCallback(async () => {
     try {
@@ -622,11 +635,13 @@ export default function R13Paywall() {
                   textAlign: 'left',
                   lineHeight: 1.5,
                 }}>
-                  Prices shown in the native payment sheet. Cancel anytime during your trial.
+                  {trial
+                    ? 'Prices shown in the native payment sheet. Cancel anytime during your trial.'
+                    : 'Prices shown in the native payment sheet. Cancel anytime.'}
                 </div>
 
                 <GlassButton fullWidth onClick={handleStartTrial}>
-                  Start my 7-day free trial
+                  {trial ? `Start my ${trial.label}` : 'See my plans'}
                 </GlassButton>
 
                 <RedemptionInline onRedeemed={handleRedeemed} />
