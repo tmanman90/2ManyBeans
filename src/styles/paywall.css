@@ -541,6 +541,45 @@
   margin: 0;
 }
 
+/* Purchase/offerings error line. Semantic error color, deliberately NOT the
+   gold accent (semantic state and accent are separate systems). */
+.pw-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: #E4A08D;
+  text-align: center;
+  line-height: 1.45;
+  margin: 16px 0 0;
+}
+
+/* Pre-sized loading skeleton blocks (step 2 while offerings load). Base
+   state is fully visible; the pulse is gated below. */
+.pw-skel {
+  background: var(--pw-s2);
+}
+
+/* --------------------------------------------------------------------------
+   Toast (purchase/restore feedback) — CSS-only, visible by default. The
+   entrance keyframe lives in the reduced-motion block below.
+   -------------------------------------------------------------------------- */
+.pw-toast {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  z-index: 10;
+  max-width: calc(100% - 48px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--pw-s2);
+  border: 1px solid var(--pw-line-strong);
+  color: var(--pw-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Motion
    Base state is VISIBLE (opacity 1, no transform). Keyframes only exist
@@ -587,4 +626,14 @@
 
   .pw-cta.is-loading .pw-spinner { animation: pwSpin 800ms linear infinite; }
   @keyframes pwSpin { to { transform: rotate(360deg); } }
+
+  .pw-skel { animation: pwSkel 1.4s ease-in-out infinite; }
+  @keyframes pwSkel { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+  /* Toast entrance — transform/opacity only; base state above is visible. */
+  .pw-toast { animation: pwToastIn 240ms var(--pw-ease) both; }
+  @keyframes pwToastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
 }
