@@ -304,7 +304,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
 
     if (!hasPro) {
       activeRequestRef.current = null;
-      openPaywall({ feature: 'generic', promote: 'pro' });
+      openPaywall({ feature: 'recipe', promote: 'pro' });
       return;
     }
 

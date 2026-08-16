@@ -13,6 +13,7 @@ import { AiDataConsentModal } from './components/AiDataConsentModal';
 import { AuthContext } from './contexts/AuthContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
+import { paywallFlagOn } from './lib/paywallFlag';
 import { cacheClear, cacheClearLastUid } from './lib/offlineCache';
 import { logInRevenueCat, logOutRevenueCat } from './lib/revenuecat';
 import { C, fonts } from './styles/theme';
@@ -26,15 +27,31 @@ import GrainOverlay from './components/visual/GrainOverlay';
 // file is deleted in Phase 5 once the new flow is verified on TestFlight.
 const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'));
 const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
+const PaywallRoast = React.lazy(() => import('./components/paywall/PaywallRoast'));
+
+// Triggers that stay on the classic PaywallSheet regardless of the
+// pw_roast flag. R13 (onboarding) isn't repointed to PaywallRoast this
+// pass — see docs/plans for the paywall-roast rollout sequencing.
+const CLASSIC_TRIGGERS = new Set(['onboarding']);
 
 // Mounts the actual paywall UI. Kept out of <Root> so it can read the
 // PaywallContext without triggering extra renders of the app shell.
+//
+// Routes by trigger: onboarding (R13) always gets the classic PaywallSheet
+// (it's the rollback target); every other trigger gets PaywallRoast when
+// the pw_roast flag is on. Both lazy chunks are declared above so only the
+// one actually rendered downloads for a given session.
 function PaywallMount() {
   const { paywallContext, close } = usePaywall();
   const open = paywallContext !== null;
+  const useClassic = CLASSIC_TRIGGERS.has(paywallContext?.trigger) || !paywallFlagOn();
   return (
     <React.Suspense fallback={null}>
-      <PaywallSheet open={open} context={paywallContext} onClose={close} />
+      {useClassic ? (
+        <PaywallSheet open={open} context={paywallContext} onClose={close} />
+      ) : (
+        <PaywallRoast open={open} context={paywallContext} onClose={close} />
+      )}
     </React.Suspense>
   );
 }
