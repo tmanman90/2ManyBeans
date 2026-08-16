@@ -47,7 +47,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0 24px;
+  /* NO horizontal padding here. .pw-step-scroll below is an overflow:auto
+     container, and such a container clips its children's PAINT to its own
+     box even though negative margins still report a full-width layout rect.
+     That silently turned the full-bleed hero band into an inset rectangle
+     with hard left/right edges. Gutters now live on the individual blocks,
+     so nothing needs to escape the scroller. */
   overscroll-behavior: contain;
 }
 
@@ -69,6 +74,7 @@
 .pw-nav-row {
   flex: none;
   height: 44px;
+  padding: 0 24px;
   margin-top: calc(env(safe-area-inset-top, 0px) + 8px);
   display: flex;
   align-items: center;
@@ -117,7 +123,7 @@
 /* The headline tail phrase — one of the five sanctioned gold surfaces. */
 .pw-hl { color: var(--pw-gold); }
 
-.pw-head-c { text-align: center; }
+.pw-head-c { text-align: center; margin-left: 24px; margin-right: 24px; }
 
 .pw-sub {
   font-size: 15px;
@@ -144,7 +150,7 @@
    -------------------------------------------------------------------------- */
 .pw-hero-band {
   height: 224px;
-  margin: 35px -24px 0;
+  margin: 35px 0 0;
   flex: none;
   overflow: hidden;
   background: var(--pw-hero-bg);
@@ -169,7 +175,7 @@
   gap: 28px;
   margin: 57px auto 0;
   width: max-content;
-  max-width: 100%;
+  max-width: calc(100% - 48px);
 }
 
 .pw-vrow {
@@ -212,7 +218,6 @@
    -------------------------------------------------------------------------- */
 .pw-cta-bar {
   flex: none;
-  margin: 0 -24px;
   /* additive, see .pw-nav-row: a 0 inset must still leave real bottom padding */
   padding: 28px 24px calc(env(safe-area-inset-bottom, 0px) + 20px);
   display: flex;
@@ -322,7 +327,7 @@
 .pw-plan-grid {
   display: flex;
   gap: 12px;
-  margin-top: 24px;
+  margin: 24px 24px 0;
 }
 
 .pw-plan-card {
@@ -346,7 +351,8 @@
    Same reason .pw-badge-slot below reserves the badge line even when a
    row has no badge. Do not "simplify" either back to auto height. */
 .pw-plan-head {
-  height: 64px;
+  /* name (23) + gap (4) + badge slot (20) + gap (4) + two desc lines (33) */
+  height: 88px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -357,11 +363,8 @@
   font-family: Fraunces, 'Playfair Display', Georgia, serif;
   font-size: 19px;
   font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.02em;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
   margin: 0;
 }
 
@@ -394,8 +397,7 @@
 .pw-badge-slot {
   height: 20px;
   display: flex;
-  align-items: flex-start;
-  margin-bottom: 4px;
+  align-items: center;
 }
 
 .pw-sku {
@@ -470,7 +472,7 @@
    text-3. Gold does NOT appear in the matrix.
    -------------------------------------------------------------------------- */
 .pw-matrix {
-  margin-top: 16px;
+  margin: 16px 24px 0;
   border: 1px solid var(--pw-line);
   border-radius: 18px;
   overflow: hidden;
@@ -526,7 +528,7 @@
 .pw-mx-dash { color: var(--pw-text-3); font-weight: 600; }
 
 .pw-free-block {
-  margin-top: 12px;
+  margin: 12px 24px 0;
   border-radius: 18px;
   background: var(--pw-s1);
   border: 1px solid var(--pw-line);
