@@ -1,0 +1,11 @@
+[
+  {"id": "washed-floral-switch-hot", "process": "washed", "roastLevel": "light", "finesRisk": "low", "dose": 18, "grinder": "fellow-ode-gen2", "coneSize": "03", "mode": "hot"},
+  {"id": "washed-kenya-switch-hot", "process": "washed", "roastLevel": "light", "finesRisk": "moderate", "dose": 20, "grinder": "fellow-opus", "coneSize": "03", "mode": "hot"},
+  {"id": "natural-switch-hot", "process": "natural", "roastLevel": "light-medium", "finesRisk": "moderate", "dose": 20, "grinder": "comandante-c40", "coneSize": "03", "mode": "hot"},
+  {"id": "anaerobic-processed-switch-hot", "process": "anaerobic honey", "roastLevel": "light-medium", "finesRisk": "unknown", "dose": 18, "grinder": "baratza-encore-esp", "coneSize": "03", "mode": "hot"},
+  {"id": "medium-switch-hot", "process": "washed", "roastLevel": "medium", "finesRisk": "unknown", "dose": 18, "grinder": "baratza-virtuoso-plus", "coneSize": "03", "mode": "hot"},
+  {"id": "dark-switch-hot", "process": "natural", "roastLevel": "dark", "finesRisk": "unknown", "dose": 20, "grinder": "1zpresso-jx-pro", "coneSize": "03", "mode": "hot"},
+  {"id": "sparse-switch-unknown", "process": "", "roastLevel": "", "finesRisk": "unknown", "dose": null, "grinder": "unknown", "coneSize": "03", "mode": "hot"},
+  {"id": "contradictory-switch-source", "process": "washed natural", "roastLevel": "light", "finesRisk": "unknown", "dose": 20, "grinder": "fellow-ode-gen2", "coneSize": "03", "mode": "hot"},
+  {"id": "unknown-profile-switch", "process": "unknown", "roastLevel": "unknown", "finesRisk": "unknown", "dose": 16, "grinder": "unknown", "coneSize": "03", "mode": "hot"}
+]
