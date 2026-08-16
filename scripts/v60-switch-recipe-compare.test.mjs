@@ -23,29 +23,52 @@ assert.equal(det.perConfigByteEquivalent, true);
 assert.equal(det.wholeReportByteEquivalent, true);
 
 // --- Named-recipe comparison: known-good medium recipe stays sane ---------
+// Revision 2026-08-16: Chronicler is the primary, fully-graded target
+// (single kettle temperature now matches Chronicler's own stated 92C
+// exactly). Kasuya is a structure-only comparison — its temp dimension is
+// not-applicable-by-design, everything else stays graded.
 const named = namedRecipeReproductionSection();
-assert.ok(named.vsKasuyaResolved.applicableCount >= 5, 'Kasuya comparison must grade every stated dimension');
-// tempPhase2 and phase1WaterPct are the two axes each named recipe was
-// specifically chosen to validate (Kasuya = temp-split signature, Chronicler
-// = steep-window shape) — those must stay within tolerance on a healthy adapter.
-assert.ok(!named.vsKasuyaResolved.outsideTolerance.includes('tempPhase2C'), 'medium preset must reproduce Kasuya temp-split within tolerance');
+assert.equal(named.vsChronicler.mode, 'full');
+assert.equal(named.vsKasuyaResolved.mode, 'structural-only');
+assert.equal(named.vsChronicler.applicableCount, 5, 'Chronicler (full mode) must grade every stated dimension, including temperature');
+assert.equal(named.vsKasuyaResolved.applicableCount, 4, 'Kasuya (structural-only) must exclude the not-applicable temperature dimension from the applicable count');
+const kasuyaTempDim = named.vsKasuyaResolved.dimensions.find((d) => d.dimension === 'tempC');
+assert.equal(kasuyaTempDim.applicable, false, 'Kasuya\'s temperature dimension must be marked not-applicable-by-design, not graded');
+assert.ok(!named.vsKasuyaResolved.outsideTolerance.includes('tempC'), 'a not-applicable dimension must never appear in outsideTolerance');
+// The two axes this revision specifically claims: Chronicler's temperature
+// (exact match) and phase-1 split (steep-window shape) must stay within
+// tolerance on a healthy adapter.
+assert.ok(!named.vsChronicler.outsideTolerance.includes('tempC'), 'medium preset must match Chronicler\'s single temperature within tolerance');
 assert.ok(!named.vsChronicler.outsideTolerance.includes('phase1WaterPct'), 'medium preset must reproduce Chronicler phase-1 split within tolerance');
 
 // --- compareToNamedRecipe: not-applicable dimensions never silently pass as "within" ---
+// Chronicler now states a temperature (92C, exact match) — use a synthetic
+// partial target to independently exercise the not-stated-temperature path
+// (e.g. a source that never publishes a temperature at all).
+const noTempTarget = { label: 'synthetic-no-temp-target', mode: 'full', dose: 20, water: 300, ratio: 15, valveCloseSeconds: 45, valveOpenSeconds: 120, phase1WaterPct: 0.5 };
+const noTempCmp = compareToNamedRecipe(
+  generateV60SwitchRecipe({}, { dose: 20, roast: 'medium', process: 'washed' }),
+  noTempTarget,
+);
+const tempDim = noTempCmp.dimensions.find((d) => d.dimension === 'tempC');
+assert.equal(tempDim.applicable, false, 'a source that states no temperature must be marked not-applicable, not treated as a match');
+assert.equal(noTempCmp.applicableCount, 4, 'the not-stated temperature dimension must be excluded from the applicable count');
+
+// --- Chronicler itself: exact temperature match ---------------------------
 const chroniclerCmp = compareToNamedRecipe(
   generateV60SwitchRecipe({}, { dose: 20, roast: 'medium', process: 'washed' }),
   NAMED_RECIPE_TARGETS.chronicler,
 );
-const tempDim = chroniclerCmp.dimensions.find((d) => d.dimension === 'tempPhase1C');
-assert.equal(tempDim.applicable, false, 'a source that states no temperature must be marked not-applicable, not treated as a match');
-assert.equal(chroniclerCmp.applicableCount, 4, 'the two not-stated temperature dimensions must be excluded from the applicable count');
+const chroniclerTempDim = chroniclerCmp.dimensions.find((d) => d.dimension === 'tempC');
+assert.equal(chroniclerTempDim.applicable, true, 'Chronicler states a temperature — must be graded, not marked not-applicable');
+assert.equal(chroniclerTempDim.diff, 0, 'the medium preset\'s single temperature must match Chronicler\'s stated 92C exactly');
 
 // --- Fabricated wide-gap target is honestly flagged outside tolerance -----
 const gapCmp = compareToNamedRecipe(
   generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' }),
-  { label: 'fabricated-gap-target', dose: 20, water: 300, ratio: 30, tempPhase1C: 50, tempPhase2C: 10, valveCloseSeconds: 5, valveOpenSeconds: 5, phase1WaterPct: 0.99 },
+  { label: 'fabricated-gap-target', mode: 'full', dose: 20, water: 300, ratio: 30, tempC: 50, valveCloseSeconds: 5, valveOpenSeconds: 5, phase1WaterPct: 0.99 },
 );
-assert.ok(gapCmp.outsideTolerance.length >= 5, 'a wildly different target must produce multiple outside-tolerance dimensions');
+assert.ok(gapCmp.outsideTolerance.length >= 4, 'a wildly different target must produce multiple outside-tolerance dimensions');
 assert.ok(gapCmp.wildlyOff.length >= 1, 'a >2x tolerance gap must be flagged wildlyOff, not silently averaged away');
 
 // --- Unknown/malformed adapter output is reported as an error, not a win --

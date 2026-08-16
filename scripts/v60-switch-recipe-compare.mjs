@@ -28,24 +28,34 @@ export const TOLERANCES = Object.freeze({
   tempC: 3, timingSeconds: 20, ratio: 0.7, phaseSplitPct: 10,
 });
 
+// Revision 2026-08-16 (single-temperature mandate): Coffee Chronicler is now
+// the PRIMARY named comparison target for the medium preset — the adapter's
+// single kettle temperature (92C) is Chronicler's own stated constant
+// temperature, an exact match rather than a Kasuya/Chronicler blend. Kasuya's
+// resolved hybrid (still dual-temp in its own published form) is demoted to
+// a STRUCTURE-ONLY comparison: temp dimensions do not apply (there is no
+// dual-temp concept left in the adapter to compare against Kasuya's
+// phase1/phase2 split), so they are marked not-applicable-by-design rather
+// than graded pass/fail. See compareToNamedRecipeStructural() below.
 export const NAMED_RECIPE_TARGETS = Object.freeze({
-  kasuyaResolved: {
-    label: 'Kasuya resolved hybrid (comoricoffee.com + gota.cafe, 2-of-3 corroborated)',
-    sourceId: 'kasuya-hybrid-resolved',
-    dose: 20, water: 280, ratio: 14,
-    tempPhase1C: 90, tempPhase2C: 70,
-    valveCloseSeconds: 75, // 1:15
-    valveOpenSeconds: 105, // 1:45
-    phase1WaterPct: 120 / 280, // 0.4286
-  },
   chronicler: {
-    label: 'Coffee Chronicler (coffeechronicler.com, adapted-primary)',
+    label: 'Coffee Chronicler (coffeechronicler.com + timer.coffee, adapted-primary) — PRIMARY single-temp comparison target since Revision 2026-08-16',
     sourceId: 'chronicler-primary',
-    dose: 20, water: 320, ratio: 16,
-    tempPhase1C: null, tempPhase2C: null, // temperature not stated on source page
+    mode: 'full',
+    dose: 20, water: 300, ratio: 15,
+    tempC: 92, // [chronicler-primary] 92C constant — single-temp mandate finding
     valveCloseSeconds: 45, // 0:45
     valveOpenSeconds: 120, // 2:00
     phase1WaterPct: 0.5,
+  },
+  kasuyaResolved: {
+    label: 'Kasuya resolved hybrid (comoricoffee.com + gota.cafe, 2-of-3 corroborated, dual-temp) — STRUCTURE-ONLY since Revision 2026-08-16',
+    sourceId: 'kasuya-hybrid-resolved',
+    mode: 'structural-only',
+    dose: 20, water: 280, ratio: 14,
+    valveCloseSeconds: 75, // 1:15
+    valveOpenSeconds: 105, // 1:45
+    phase1WaterPct: 120 / 280, // 0.4286
   },
 });
 
@@ -67,9 +77,44 @@ export const SECONDARY_TARGETS = Object.freeze({
 
 const round2 = (value) => Math.round(value * 100) / 100;
 
-function distance(dimension, adapterValue, targetValue, tolerance, unit) {
+// --- (a) Named-recipe reproduction ----------------------------------------
+// `mode: 'full'` targets (Chronicler) are graded numerically on every stated
+// dimension. `mode: 'structural-only'` targets (Kasuya, since Revision
+// 2026-08-16) skip temperature dimensions entirely — the single-temp mandate
+// removed the dual-temp concept Kasuya's own recipe depends on, so grading a
+// temperature diff against it would be comparing two different things, not
+// a real miss.
+export function compareToNamedRecipe(recipe, target) {
+  const isStructural = target.mode === 'structural-only';
+  const phase1Grams = recipe.steps[0]?.waterTotal ?? null;
+  const valveCloseAt = recipe.steps.find((s) => /close the valve/i.test(s.action))?.timeSeconds ?? null;
+  const valveOpenAt = recipe.steps.find((s) => /open the valve/i.test(s.action))?.timeSeconds ?? null;
+  const adapterRatio = Number(recipe.ratio.split(':')[1]);
+  const adapterPhase1Pct = phase1Grams != null ? phase1Grams / recipe.waterGrams : null;
+
+  const dims = [
+    distance('ratio', adapterRatio, target.ratio, TOLERANCES.ratio, 'x:1'),
+    distance('tempC', recipe.waterTemp.celsius, isStructural ? null : target.tempC, TOLERANCES.tempC, '°C',
+      isStructural ? 'not applicable by design — structure-only comparison; single-temp mandate removed the dual-temp concept Kasuya\'s own recipe depends on' : undefined),
+    distance('valveCloseSeconds', valveCloseAt, target.valveCloseSeconds, TOLERANCES.timingSeconds, 's'),
+    distance('valveOpenSeconds', valveOpenAt, target.valveOpenSeconds, TOLERANCES.timingSeconds, 's'),
+    distance('phase1WaterPct', adapterPhase1Pct != null ? round2(adapterPhase1Pct * 100) : null, round2(target.phase1WaterPct * 100), TOLERANCES.phaseSplitPct, 'pp'),
+  ];
+  const applicableDims = dims.filter((d) => d.applicable);
+  const outsideTolerance = applicableDims.filter((d) => !d.withinTolerance);
+  return {
+    target: target.label, sourceId: target.sourceId, mode: target.mode || 'full',
+    dimensions: dims,
+    withinCount: applicableDims.length - outsideTolerance.length,
+    applicableCount: applicableDims.length,
+    outsideTolerance: outsideTolerance.map((d) => d.dimension),
+    wildlyOff: outsideTolerance.filter((d) => d.absDiff > d.tolerance * 2).map((d) => d.dimension),
+  };
+}
+
+function distance(dimension, adapterValue, targetValue, tolerance, unit, note) {
   if (targetValue == null || adapterValue == null) {
-    return { dimension, adapter: adapterValue ?? null, target: targetValue ?? null, applicable: false, note: 'not stated by source', unit };
+    return { dimension, adapter: adapterValue ?? null, target: targetValue ?? null, applicable: false, note: note || 'not stated by source', unit };
   }
   const diff = round2(adapterValue - targetValue);
   return {
@@ -79,47 +124,19 @@ function distance(dimension, adapterValue, targetValue, tolerance, unit) {
   };
 }
 
-// --- (a) Named-recipe reproduction ----------------------------------------
-export function compareToNamedRecipe(recipe, target) {
-  const phase1Grams = recipe.steps[0]?.waterTotal ?? null;
-  const valveCloseAt = recipe.steps.find((s) => /close the valve/i.test(s.action))?.timeSeconds ?? null;
-  const valveOpenAt = recipe.steps.find((s) => /open the valve/i.test(s.action))?.timeSeconds ?? null;
-  const adapterRatio = Number(recipe.ratio.split(':')[1]);
-  const adapterPhase1Pct = phase1Grams != null ? phase1Grams / recipe.waterGrams : null;
-
-  const dims = [
-    distance('ratio', adapterRatio, target.ratio, TOLERANCES.ratio, 'x:1'),
-    distance('tempPhase1C', recipe.waterTemp.celsius, target.tempPhase1C, TOLERANCES.tempC, '°C'),
-    distance('tempPhase2C', recipe.waterTemp2?.celsius ?? null, target.tempPhase2C, TOLERANCES.tempC, '°C'),
-    distance('valveCloseSeconds', valveCloseAt, target.valveCloseSeconds, TOLERANCES.timingSeconds, 's'),
-    distance('valveOpenSeconds', valveOpenAt, target.valveOpenSeconds, TOLERANCES.timingSeconds, 's'),
-    distance('phase1WaterPct', adapterPhase1Pct != null ? round2(adapterPhase1Pct * 100) : null, round2(target.phase1WaterPct * 100), TOLERANCES.phaseSplitPct, 'pp'),
-  ];
-  const applicableDims = dims.filter((d) => d.applicable);
-  const outsideTolerance = applicableDims.filter((d) => !d.withinTolerance);
-  return {
-    target: target.label, sourceId: target.sourceId,
-    dimensions: dims,
-    withinCount: applicableDims.length - outsideTolerance.length,
-    applicableCount: applicableDims.length,
-    outsideTolerance: outsideTolerance.map((d) => d.dimension),
-    wildlyOff: outsideTolerance.filter((d) => d.absDiff > d.tolerance * 2).map((d) => d.dimension),
-  };
-}
-
 export function namedRecipeReproductionSection() {
   const mediumRecipe = generateV60SwitchRecipe({}, { dose: 20, roast: 'medium', grinder: 'fellow-ode-gen2', process: 'washed' });
   return {
     adapterConfig: { dose: 20, roast: 'medium', grinder: 'fellow-ode-gen2', process: 'washed' },
     adapterOutputSummary: {
       ratio: mediumRecipe.ratio, waterGrams: mediumRecipe.waterGrams,
-      tempPhase1C: mediumRecipe.waterTemp.celsius, tempPhase2C: mediumRecipe.waterTemp2?.celsius ?? null,
+      tempC: mediumRecipe.waterTemp.celsius,
       totalBrewTimeSeconds: mediumRecipe.totalBrewTimeSeconds, reasonCodes: mediumRecipe.reasonCodes,
     },
-    vsKasuyaResolved: compareToNamedRecipe(mediumRecipe, NAMED_RECIPE_TARGETS.kasuyaResolved),
     vsChronicler: compareToNamedRecipe(mediumRecipe, NAMED_RECIPE_TARGETS.chronicler),
+    vsKasuyaResolved: compareToNamedRecipe(mediumRecipe, NAMED_RECIPE_TARGETS.kasuyaResolved),
     secondaryTargets: SECONDARY_TARGETS,
-    designNote: 'The adapter is a deliberate Chronicler-steep-window x Kasuya-temp-split blend (methodology brief §3) — it is expected to sit outside tolerance on ratio and full-steep-length dimensions vs both named recipes individually. Anything outside tolerance on temperature-split or phase-split dimensions (the two axes each named recipe was chosen to validate) would indicate a genuine contract bug.',
+    designNote: 'Since Revision 2026-08-16 (single-temperature mandate), the medium preset\'s single kettle temperature (92C) is Chronicler\'s own stated constant temperature — an exact match, not a blend. Chronicler is graded on every stated dimension as the primary target. Kasuya\'s resolved hybrid is a structure-only comparison: its own recipe is still dual-temp, so its temperature dimension is not-applicable-by-design rather than graded, while ratio/timing/phase-split dimensions stay graded normally (some expected to sit outside tolerance, since the adapter no longer targets reproducing Kasuya\'s numbers — see mode on each comparison).',
   };
 }
 
@@ -151,7 +168,7 @@ function structuralRow(id, config) {
     requestedDose: config.dose ?? null, requestedRoast: config.roast ?? null, requestedProcess: config.process ?? null, requestedGrinder: config.grinder ?? null,
     resolvedDose: recipe.coffeeGrams, resolvedRoastPreset: recipe.roastPreset, resolvedProcess: recipe.process,
     ratio: recipe.ratio, waterGrams: recipe.waterGrams, waterCapped: recipe.reasonCodes.includes('SWITCH_WATER_CAP_APPLIED'),
-    tempPhase1C: recipe.waterTemp.celsius, tempPhase2C: recipe.waterTemp2?.celsius ?? null,
+    tempC: recipe.waterTemp.celsius,
     valveCloseSeconds: valveCloseAt, valveOpenSeconds: valveOpenAt, steepDurationSeconds: valveOpenAt != null && valveCloseAt != null ? valveOpenAt - valveCloseAt : null,
     phase1WaterPct: phase1Grams != null ? round2((phase1Grams / recipe.waterGrams) * 100) : null,
     grindSetting: recipe.grindSize.setting, grindMicrons: recipe.grindSize.microns,
@@ -262,8 +279,8 @@ export function differentiationChecks(allRows) {
     if (!pair.anaerobic || !pair.baseline) continue;
     overridePairsChecked += 1;
     const { anaerobic, baseline } = pair;
-    if (anaerobic.tempPhase1C < V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMinC || anaerobic.tempPhase1C > V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMaxC) {
-      anomalies.push(`anaerobic-temp-out-of-band at ${key}: ${anaerobic.tempPhase1C}C`);
+    if (anaerobic.tempC < V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMinC || anaerobic.tempC > V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMaxC) {
+      anomalies.push(`anaerobic-temp-out-of-band at ${key}: ${anaerobic.tempC}C`);
     }
     if (anaerobic.grindMicrons <= baseline.grindMicrons) anomalies.push(`anaerobic-grind-not-coarsened at ${key}`);
     if (Number(anaerobic.ratio.split(':')[1]) < V60_SWITCH_PROCESS_OVERRIDE.anaerobicRatioMin) {
@@ -321,9 +338,18 @@ export function buildReport() {
       errorRows: errorRows.length,
       anomalyCount: differentiation.anomalies.length,
       determinismPass: determinism.perConfigByteEquivalent && determinism.wholeReportByteEquivalent,
-      namedRecipeOutsideToleranceKasuya: named.vsKasuyaResolved.outsideTolerance,
+      // Chronicler is the primary, fully-graded target since Revision
+      // 2026-08-16 — any outside-tolerance dimension here is a real signal.
       namedRecipeOutsideToleranceChronicler: named.vsChronicler.outsideTolerance,
-      namedRecipeWildlyOff: [...named.vsKasuyaResolved.wildlyOff, ...named.vsChronicler.wildlyOff],
+      namedRecipeWildlyOffChronicler: named.vsChronicler.wildlyOff,
+      // Kasuya is structure-only (informational, not gating — see
+      // compareToNamedRecipe's mode handling and the design note above):
+      // outside-tolerance dimensions here (typically ratio/timing, since the
+      // adapter no longer targets reproducing Kasuya's dual-temp numbers)
+      // are recorded for visibility, never treated as a stop-ship signal.
+      // Nothing in this report's exit-code check reads these two fields.
+      namedRecipeStructuralOnlyInfoKasuya: named.vsKasuyaResolved.outsideTolerance,
+      namedRecipeStructuralOnlyWildlyOffKasuya: named.vsKasuyaResolved.wildlyOff,
     },
   };
 }
@@ -342,10 +368,10 @@ export function renderMarkdown(report) {
   lines.push('');
   lines.push('## a. Named-recipe reproduction (medium preset, dose=20g, washed)');
   lines.push('');
-  lines.push(`Adapter output: ratio ${report.named.adapterOutputSummary.ratio}, temp ${report.named.adapterOutputSummary.tempPhase1C}C -> ${report.named.adapterOutputSummary.tempPhase2C}C, total ${report.named.adapterOutputSummary.totalBrewTimeSeconds}s`);
+  lines.push(`Adapter output: ratio ${report.named.adapterOutputSummary.ratio}, temp ${report.named.adapterOutputSummary.tempC}C (single kettle temperature), total ${report.named.adapterOutputSummary.totalBrewTimeSeconds}s`);
   lines.push('');
-  for (const cmp of [report.named.vsKasuyaResolved, report.named.vsChronicler]) {
-    lines.push(`### vs ${cmp.target}`);
+  for (const cmp of [report.named.vsChronicler, report.named.vsKasuyaResolved]) {
+    lines.push(`### vs ${cmp.target} [mode: ${cmp.mode}]`);
     for (const dim of cmp.dimensions) lines.push(`- ${fmt(dim)}`);
     lines.push(`- outside tolerance: ${cmp.outsideTolerance.length ? cmp.outsideTolerance.join(', ') : 'none'}`);
     lines.push(`- wildly off (>2x tolerance): ${cmp.wildlyOff.length ? cmp.wildlyOff.join(', ') : 'none'}`);

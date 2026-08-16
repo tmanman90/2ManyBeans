@@ -8,12 +8,18 @@ import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } 
 import {
   V60_SWITCH_SIZE, V60_SWITCH_CONFIGURATION_KEY, V60_SWITCH_DOSE_BOUNDS, V60_SWITCH_WATER_CAP_GRAMS,
   V60_SWITCH_CLASSIC_BASELINE_MICRONS, V60_SWITCH_ROAST_PRESETS, V60_SWITCH_PROCESS_OVERRIDE, V60_SWITCH_GUARDRAILS,
+  V60_SWITCH_VALVE_MODULATION_BOUNDS,
   normalizeSwitchDose, normalizeSwitchRoast, resolveSwitchWater,
 } from '../data/v60SwitchConfiguration.js';
 import { V60_SWITCH_SOURCE_REGISTRY_VERSION, sourceById } from '../data/v60SwitchSourceRegistry.js';
 
 export const V60_SWITCH_ENGINE_VERSION = 'v60-switch-engine-v1';
-export const V60_SWITCH_RULES_VERSION = 'v60-switch-rules-v1-phase1';
+// Bumped from 'v60-switch-rules-v1-phase1' by the 2026-08-16 single-temperature
+// revision (docs/research/2026-08-15-v60-switch-methodology-brief.md
+// "Revision 2026-08-16") — invalidates every cached dual-temp candidate
+// (which carried a non-null waterTemp2) so it regenerates under the new
+// single-temp + bean-driven-valve-timing rules on next read (R8).
+export const V60_SWITCH_RULES_VERSION = 'v60-switch-rules-v2-single-temp';
 export const V60_SWITCH_PHASE_CONTRACT_VERSION = 1;
 
 const GRINDER_RANGES = {
@@ -57,18 +63,86 @@ function isAnaerobicProcess(config, intent) {
   return /anaerobic|co-ferment/.test(raw);
 }
 
-function reasonForPreset(preset, isAnaerobic) {
+// Reasoning copy — rewritten for the 2026-08-16 single-temperature revision.
+// One kettle temperature throughout; valve-close timing and steep duration
+// are the extraction dial (Chronicler's sweet-version close-time shift,
+// Quan's steep-time dial), not a mid-brew temperature drop.
+function reasonForPreset(preset, isAnaerobic, valveTimingReasonCodes = []) {
+  const timingNote = valveTimingReasonCodes.includes('SWITCH_STEEP_SHORTENED_CLARITY')
+    ? ' This bean\'s clarity leans forward, so the valve stays open a touch longer and the closed steep runs shorter for a brighter, more percolation-driven cup.'
+    : valveTimingReasonCodes.includes('SWITCH_EARLY_CLOSE_SWEETNESS')
+      ? ' This bean leans toward body and sweetness, so the valve closes a little earlier for a fuller, rounder immersion phase.'
+      : '';
   if (preset.roast === 'light') {
-    return 'Light roasts stay hot through both phases (no temperature drop) since the shorter, gentler closed steep does not need the extra restraint a temperature split provides.';
+    return `Single kettle temperature throughout — no second temperature to manage. The valve-close timestamp and steep length are the extraction dial here, not a temperature drop.${timingNote}`;
   }
   if (preset.roast === 'medium') {
     return isAnaerobic
-      ? 'This coffee uses the Kasuya-style temperature drop for the closed-valve steep, with the anaerobic overrides layered on top to keep the longer immersion window from over-extracting.'
-      : 'This coffee uses the Kasuya-style temperature drop for the closed-valve steep: hot percolation, then a cooler pour keeps the immersion phase from over-extracting.';
+      ? `One steady kettle temperature runs the whole brew, with the anaerobic overrides layered on top to keep the closed-valve window from over-extracting.${timingNote}`
+      : `One steady kettle temperature runs the whole brew. The valve-close timing does the work Kasuya's temperature drop used to do — it's the real dial for strength and clarity here.${timingNote}`;
   }
   return isAnaerobic
-    ? 'Dark roast plus anaerobic process both push toward a cooler, coarser, more immersion-forward brew, so the overrides compound on the dark preset.'
-    : 'Dark roasts get an immersion-forward long steep at a cooler temperature so the closed-valve phase builds sweetness without pulling out ashy, over-extracted notes.';
+    ? `Dark roast plus anaerobic process both push toward a coarser, more immersion-forward brew at a single lower kettle temperature.${timingNote}`
+    : `Dark roasts get a single lower-temperature kettle and an immersion-forward steep, kept short enough that there's no cool second phase needed to protect it from over-extracting.${timingNote}`;
+}
+
+// Bean-driven valve-timing modulation — the differentiation fix (Revision
+// 2026-08-16). Pure function over the existing extractionIntent output; no
+// new evidence format, no new intent fields. Two independent, deterministic,
+// bounded axes (valve-close delta, steep-duration delta) driven by
+// cupDirection.clarity/body/sweetness, finesRisk/solubilityRisk, and
+// confidence. Low-confidence intent gets no modulation — a baseline preset
+// with an explicit reason code, not a missed signal.
+export function modulateSwitchValveTiming(preset, intent = {}) {
+  const bounds = V60_SWITCH_VALVE_MODULATION_BOUNDS;
+  const baselineClose = preset.valveCloseTimeSeconds;
+  const baselineSteep = preset.steepDurationSeconds;
+
+  const confidence = intent?.confidence;
+  if (!confidence || confidence === 'low') {
+    return {
+      valveCloseTimeSeconds: baselineClose,
+      steepDurationSeconds: baselineSteep,
+      reasonCodes: ['SWITCH_VALVE_TIMING_BASELINE_LOW_CONFIDENCE'],
+    };
+  }
+
+  const cupDirection = intent?.cupDirection || {};
+  const highRisk = intent?.finesRisk === 'high' || intent?.solubilityRisk === 'high';
+  // Clarity-leaning / high-acidity-desired: later close (more percolation),
+  // shorter steep (Quan's dial — [quan-secondary]).
+  const clarityLeaning = cupDirection.clarity === 'high';
+  // Body/sweetness-leaning, or high fines/solubility risk without a clarity
+  // lean: earlier close (Chronicler's sweet-variant logic —
+  // [chronicler-primary]), and a longer steep specifically when fines/
+  // solubility risk is high.
+  const bodySweetnessLeaning = !clarityLeaning
+    && (cupDirection.body === 'supported' || cupDirection.sweetness === 'high' || highRisk);
+
+  let closeDelta = 0;
+  let steepDelta = 0;
+  const reasonCodes = [];
+
+  if (clarityLeaning) {
+    closeDelta += bounds.clarityCloseDelaySeconds;
+    steepDelta -= bounds.claritySteepShortenSeconds;
+    reasonCodes.push('SWITCH_LATE_CLOSE_CLARITY', 'SWITCH_STEEP_SHORTENED_CLARITY');
+  } else if (bodySweetnessLeaning) {
+    closeDelta -= bounds.sweetnessCloseEarlySeconds;
+    reasonCodes.push('SWITCH_EARLY_CLOSE_SWEETNESS');
+    if (highRisk) {
+      steepDelta += bounds.bodySteepExtendSeconds;
+      reasonCodes.push('SWITCH_STEEP_EXTENDED_BODY');
+    }
+  }
+
+  if (!reasonCodes.length) reasonCodes.push('SWITCH_VALVE_TIMING_BASELINE_NEUTRAL_INTENT');
+
+  return {
+    valveCloseTimeSeconds: Math.max(15, baselineClose + closeDelta),
+    steepDurationSeconds: Math.max(30, baselineSteep + steepDelta),
+    reasonCodes,
+  };
 }
 
 export function validateV60SwitchCandidate(recipe) {
@@ -113,23 +187,29 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
     : preset.ratio;
   const { waterGrams, effectiveRatio, capped: waterCapped } = resolveSwitchWater(config.dose, presetRatio);
 
-  // Temperature: anaerobic caps both phases into the 88-91C band regardless
-  // of roast preset (brief §5); light's no-drop stays no-drop unless the cap
-  // itself forces a change.
-  const tempPhase1 = isAnaerobic
-    ? clamp(preset.tempPhase1C, V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMinC, V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMaxC)
-    : preset.tempPhase1C;
-  const tempPhase2 = preset.tempPhase2C == null
-    ? null
-    : isAnaerobic
-      ? clamp(preset.tempPhase2C, V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMinC, V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMaxC)
-      : preset.tempPhase2C;
+  // Temperature: single kettle temperature throughout (Revision 2026-08-16 —
+  // temp_phase2 removed entirely; the Kasuya-style temperature drop is
+  // unrealistic without a second kettle at home). Anaerobic still caps the
+  // one temperature into the 88-91C band regardless of roast preset (brief
+  // §5, unaffected by the revision).
+  const temp = isAnaerobic
+    ? clamp(preset.tempC, V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMinC, V60_SWITCH_PROCESS_OVERRIDE.anaerobicTempCapMaxC)
+    : preset.tempC;
 
-  // Guardrail: closed-valve dwell at >=90C without a temperature drop must
-  // not exceed the hot-steep bound (brief §6 astringency guardrail).
-  let steepDuration = config.forcedSteepDurationSeconds ?? preset.steepDurationSeconds;
+  // Bean-driven valve-timing modulation (Revision 2026-08-16 — the
+  // differentiation fix): close time + steep duration move from the
+  // extraction-intent signals, bounded and reason-coded. Low-confidence
+  // intent falls through to the preset baseline unchanged.
+  const modulation = modulateSwitchValveTiming(preset, intent);
+  const valveCloseTimeSeconds = modulation.valveCloseTimeSeconds;
+
+  // Guardrail: closed-valve dwell at >= the hot-steep threshold is capped
+  // hard (brief §6 astringency guardrail, adjusted for the single-temp world
+  // — there is no temperature-drop escape valve anymore, so this binds
+  // directly on the modulated steep duration).
+  let steepDuration = config.forcedSteepDurationSeconds ?? modulation.steepDurationSeconds;
   let hotSteepCapped = false;
-  if (tempPhase2 == null && tempPhase1 >= V60_SWITCH_GUARDRAILS.hotSteepThresholdC && steepDuration > V60_SWITCH_GUARDRAILS.hotSteepMaxSecondsAtFullTemp) {
+  if (temp >= V60_SWITCH_GUARDRAILS.hotSteepThresholdC && steepDuration > V60_SWITCH_GUARDRAILS.hotSteepMaxSecondsAtFullTemp) {
     steepDuration = V60_SWITCH_GUARDRAILS.hotSteepMaxSecondsAtFullTemp;
     hotSteepCapped = true;
   }
@@ -159,7 +239,7 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
   const phase1WaterGrams = round(waterGrams * preset.phase1WaterPct);
   const bloomGrams = round(config.dose * 2);
   const timeOffset = closedBloomSeconds > 0 ? closedBloomSeconds : 0;
-  const valveCloseAt = timeOffset + preset.valveCloseTimeSeconds;
+  const valveCloseAt = timeOffset + valveCloseTimeSeconds;
   const valveOpenAt = valveCloseAt + steepDuration;
   const totalBrewTimeSeconds = valveOpenAt + preset.drawdownBudgetSeconds;
 
@@ -175,9 +255,7 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
   }
   steps.push({
     time: timeLabel(valveCloseAt), timeSeconds: valveCloseAt,
-    action: tempPhase2 != null
-      ? `Close the valve. Pour to ${waterGrams}g using the cooler kettle at ${tempPhase2}°C.`
-      : `Close the valve. Pour to ${waterGrams}g.`,
+    action: `Close the valve. Pour to ${waterGrams}g.`,
     waterTotal: waterGrams, phase: 'immersion',
   });
   steps.push({
@@ -185,16 +263,17 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
     action: 'Open the valve and let it fully drain.', waterTotal: waterGrams, phase: 'drawdown',
   });
 
+  // Single kettle only (Revision 2026-08-16) — no second-kettle prep step.
   const prepSteps = [
-    { action: 'Rinse and preheat the V60 03 Switch filter and server; discard rinse water. Confirm the valve lever is OPEN before you start.', phase: 'prep' },
+    { action: `Rinse and preheat the V60 03 Switch filter and server; discard rinse water. Confirm the valve lever is OPEN before you start. Heat water to ${temp}°C — one kettle temperature runs the whole brew.`, phase: 'prep' },
     { action: `Add ${config.dose}g coffee and level the bed.`, phase: 'prep' },
-    tempPhase2 != null && { action: `Heat a second kettle (or let part of your first kettle cool) to ${tempPhase2}°C before you start — you'll use it for the closed-valve pour.`, phase: 'prep' },
-  ].filter(Boolean);
+  ];
 
   const reasonCodes = [
     ...(intent.reasonCodes || []),
     'SWITCH_HYBRID_DEFAULT',
     preset.reasonCode,
+    ...modulation.reasonCodes,
     preset.grindOffsetMicrons > 0 && 'SWITCH_IMMERSION_COARSENED',
     isAnaerobic && 'SWITCH_ANAEROBIC_OVERRIDE',
     waterCapped && 'SWITCH_WATER_CAP_APPLIED',
@@ -213,15 +292,18 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
     engineVersion: V60_SWITCH_ENGINE_VERSION, rulesVersion: V60_SWITCH_RULES_VERSION, candidate: true,
     doseTimingPolicy: 'generated-dose-v60-switch-v1',
     coffeeGrams: config.dose, waterGrams, ratio: `1:${displayRatio(effectiveRatio)}`,
-    waterTemp: { celsius: tempPhase1, fahrenheit: Math.round(tempPhase1 * 9 / 5 + 32) },
-    waterTemp2: tempPhase2 != null ? { celsius: tempPhase2, fahrenheit: Math.round(tempPhase2 * 9 / 5 + 32) } : null,
+    // Single kettle temperature only (Revision 2026-08-16) — no waterTemp2.
+    // Cached dual-temp candidates carrying waterTemp2 are invalidated by the
+    // rulesVersion bump; HandBrewModal's display tile stays tolerant of a
+    // stray waterTemp2 on any legacy object that slips through a stale cache.
+    waterTemp: { celsius: temp, fahrenheit: Math.round(temp * 9 / 5 + 32) },
     grindSize,
     prepSteps, steps, postBrewSteps: [], phaseContractVersion: V60_SWITCH_PHASE_CONTRACT_VERSION,
     totalBrewTime: timeLabel(totalBrewTimeSeconds), totalBrewTimeSeconds, guideTargetSeconds: totalBrewTimeSeconds, timerReady: true,
     reasonCodes, confidence: intent.confidence || 'low', evidenceHash: intent.evidenceHash || null,
     sourceRegistryVersion: V60_SWITCH_SOURCE_REGISTRY_VERSION, sourceIds,
-    reasoning: reasonForPreset(preset, isAnaerobic),
-    tips: 'The closed-valve steep is the strength dial here, not the pour. If it tastes thin, extend the steep in small (10-15s) steps before touching grind; if it tastes harsh, go one step coarser before shortening the steep.',
+    reasoning: reasonForPreset(preset, isAnaerobic, modulation.reasonCodes),
+    tips: 'The valve-close timestamp and closed-valve steep length are the strength/clarity dial here, not the pour or the temperature. If it tastes thin, extend the steep in small (10-15s) steps before touching grind; if it tastes harsh or muddled, close the valve a little earlier before shortening the steep.',
     title: 'V60 Switch 03 recipe',
   };
   const validation = validateV60SwitchCandidate(recipe);

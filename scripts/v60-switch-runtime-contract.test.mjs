@@ -75,9 +75,10 @@ for (const roast of ROASTS) {
             `${label}->${newDose}g: final step water (${scaled.steps.at(-1).waterTotal}) drifted too far from scaled waterGrams (${scaled.waterGrams})`
           );
 
-          // waterTemp2 survives scaling (structured dual-temp field, R4) —
-          // untouched by scaleRecipeForDose, so it must be identical.
-          assert.deepEqual(scaled.waterTemp2, recipe.waterTemp2, `${label}->${newDose}g: waterTemp2 did not survive scaling`);
+          // Single kettle temperature only (Revision 2026-08-16) — no
+          // candidate carries waterTemp2 anymore; assert it stays absent
+          // through scaling (never reintroduced) alongside waterTemp itself.
+          assert.equal(scaled.waterTemp2, undefined, `${label}->${newDose}g: scaling must not introduce a waterTemp2 field`);
           assert.deepEqual(scaled.waterTemp, recipe.waterTemp, `${label}->${newDose}g: waterTemp did not survive scaling`);
 
           // Timer steps must not degrade after scaling: times are untouched

@@ -690,10 +690,16 @@ export const HandBrewModal = ({
             </div>
           )}
 
-          {/* Temperature — Switch hybrid recipes may carry a second, cooler
-              temperature for the closed-valve pour (waterTemp2). Shown as a
-              "hot → cool" line in the same tile rather than a second card,
-              to keep the layout unchanged for every other device/recipe. */}
+          {/* Temperature — single kettle temperature only (Revision
+              2026-08-16): every freshly generated Switch recipe carries a
+              single waterTemp and no waterTemp2, so this tile always renders
+              the plain single-temperature line for current candidates. The
+              waterTemp2 branch is kept ONLY as tolerant legacy-cache display:
+              if a stale cached dual-temp candidate from before the
+              single-temp mandate ever surfaces (should not happen — the
+              rulesVersion bump invalidates them), it still renders its
+              phase-1/phase-2 "hot → cool" line instead of crashing. Do not
+              remove this branch; it is the crash guard, not a live feature. */}
           {displayRecipe.waterTemp && (
             <div style={{
               background: C.card,

@@ -22,7 +22,7 @@ export const V60_SWITCH_SOURCES = Object.freeze([
     evidenceType: 'adapted-secondary', evidenceTier: 'adapted-secondary', status: 'adapted', brewer: 'Switch 03',
     doseGrams: 20, ratio: 15, temperaturePhase1C: 90, temperaturePhase2C: 75,
     valveCloseTimeSeconds: 130, valveOpenTimeSeconds: 175, structure: 'closed-bloom-then-percolation-then-close',
-    notes: 'Chronologically distinct later Kasuya recipe: closed bloom 0:00-0:40, open percolation to ~200g by 1:30, close 2:10, open 2:55, drain ~3:30. Recorded as an alternate valid parameter point, not the shipped default (per plan Key Technical Decisions).',
+    notes: 'Chronologically distinct later Kasuya recipe: closed bloom 0:00-0:40, open percolation to ~200g by 1:30, close 2:10, open 2:55, drain ~3:30. Recorded as an alternate valid parameter point, not the shipped default (per plan Key Technical Decisions). 2026-08-16 addition (single-temp revision): Super Hybrid v2 uses a coarser grind than the original God/Devil recipe — precedent cited for the revised medium preset\'s "+1 coarser than the old dual-temp preset" grind offset.',
   },
   {
     id: 'chronicler-primary', author: 'Asser Christensen (Coffee Chronicler)',
@@ -30,7 +30,7 @@ export const V60_SWITCH_SOURCES = Object.freeze([
     evidenceType: 'adapted-primary', evidenceTier: 'adapted-primary', status: 'adapted', brewer: 'Switch 02',
     doseGrams: 20, ratio: 16, temperaturePhase1C: null, temperaturePhase2C: null,
     valveCloseTimeSeconds: 45, valveOpenTimeSeconds: 120, structure: 'percolation-first-hybrid',
-    notes: 'Closest published match to the owner-preferred default structure: pour 50% valve open at 0:00, pour remaining 50% valve closed at 0:45, open+drain at 2:00, total 2:45-3:15. Temperature not stated on the fetched page — never cited numerically for temp fields.',
+    notes: 'Closest published match to the owner-preferred default structure: pour 50% valve open at 0:00, pour remaining 50% valve closed at 0:45, open+drain at 2:00, total 2:45-3:15. Temperature not stated on the fetched page — never cited numerically for temp fields. 2026-08-16 addition (single-temp revision): 92C constant, 20g:300g (1:15) variant documented on timer.coffee; a "sweet version" closes the valve at 0:25 instead of 0:45 to reduce acidity, with no temperature change — direct evidence that valve-close timing is the acidity/smoothness lever, source for SWITCH_EARLY_CLOSE_SWEETNESS.',
   },
   {
     id: 'hoffmann-hybrid-secondary', author: 'James Hoffmann (transcribed by Raymond Brigleb)',
@@ -88,9 +88,24 @@ export const V60_SWITCH_SOURCES = Object.freeze([
   },
   {
     id: 'home-barista-community', author: 'home-barista.com forum thread',
-    canonicalUrl: 'https://www.home-barista.com', publication: 'Switch grind/steep thread',
+    canonicalUrl: 'https://www.home-barista.com', publication: 'Switch grind/steep thread (t85637)',
     evidenceType: 'community', evidenceTier: 'gut-check', status: 'community', brewer: 'Switch',
-    notes: 'Fine+short-steep vs coarser+long-steep debate; no verbatim "~90% of extraction in immersion" quote found anywhere — that framing is derived/interpolated synthesis, not a citation.',
+    notes: 'Fine+short-steep vs coarser+long-steep debate; no verbatim "~90% of extraction in immersion" quote found anywhere — that framing is derived/interpolated synthesis, not a citation. 2026-08-16 re-read (single-temp revision): dual-temp verdict in this thread is positive-but-qualified and bean-dependent; one contributor "doesn\'t love the minor fuss of the temp drop." No controlled A/B exists.',
+  },
+  {
+    id: 'hario-partners-manufacturer', author: 'Hario USA, with Partners Coffee',
+    canonicalUrl: 'https://hario-usa.com/blogs/brewing-demos-and-recipes/v60-switch-recipe-with-partners-coffee', publication: 'V60 Switch Recipe with Partners Coffee',
+    evidenceType: 'manufacturer', evidenceTier: 'manufacturer', status: 'original', brewer: 'Switch',
+    doseGrams: 16, ratio: 16, temperatureLightMediumC: 98, temperatureDarkC: 92,
+    valveOpenTimeSeconds: 90, structure: 'locked-bloom-then-open',
+    notes: 'Single, roast-banded temperature: 96-100C light/medium, 90.5-93C dark. Locked bloom 0:00-1:30, then open. 2026-08-16 addition (single-temp revision) — direct source for the revised light/dark temperature bands.',
+  },
+  {
+    id: 'quan-secondary', author: 'Brian Quan',
+    canonicalUrl: 'https://beanbook.app/recipes/196cd89b-1c9e-4dae-976b-3b5085dc5adb', publication: 'Brian Quan V60 Switch recipe',
+    evidenceType: 'adapted-secondary', evidenceTier: 'adapted-secondary-original-author', status: 'original-via-aggregator', brewer: 'Switch',
+    doseGrams: 15, ratio: 16, temperaturePhase1C: 94, structure: 'single-temp-steep-time-dial',
+    notes: '90-94C single temperature throughout. Explicitly frames steep time as the extraction dial (shorter = more acidity, longer = smoother/rounder), not temperature. 2026-08-16 addition (single-temp revision) — independent corroboration of the Chronicler sweet-version finding from a different author.',
   },
   {
     id: 'reddit-gut-check', author: 'r/pourover and related threads',

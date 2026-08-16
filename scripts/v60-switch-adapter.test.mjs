@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {
-  generateV60SwitchRecipe, generateV60SwitchFallback, validateV60SwitchCandidate,
+  generateV60SwitchRecipe, generateV60SwitchFallback, validateV60SwitchCandidate, modulateSwitchValveTiming,
 } from '../src/lib/v60SwitchAdapter.js';
+import { V60_SWITCH_ROAST_PRESETS } from '../src/data/v60SwitchConfiguration.js';
 import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
 import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
 
@@ -20,13 +21,17 @@ assert.notEqual(medium.ratio, dark.ratio);
 assert.notEqual(light.totalBrewTimeSeconds, medium.totalBrewTimeSeconds);
 assert.notEqual(medium.totalBrewTimeSeconds, dark.totalBrewTimeSeconds);
 
-// Temp split only where the preset dictates it; light has no drop.
-assert.equal(light.waterTemp2, null, 'light roast must not carry a temp drop');
-assert.equal(medium.waterTemp2.celsius, 70);
-assert.ok(dark.waterTemp2.celsius < dark.waterTemp.celsius);
-assert.ok(medium.reasonCodes.includes('SWITCH_TEMP_SPLIT_MEDIUM'));
-assert.ok(dark.reasonCodes.includes('SWITCH_TEMP_SPLIT_DARK'));
-assert.ok(light.reasonCodes.includes('SWITCH_LIGHT_NO_TEMP_DROP'));
+// Single kettle temperature only (Revision 2026-08-16) — no waterTemp2 field
+// on any roast preset, and each preset's single temp is distinct.
+assert.equal(light.waterTemp2, undefined, 'light roast must not carry a waterTemp2 field');
+assert.equal(medium.waterTemp2, undefined, 'medium roast must not carry a waterTemp2 field');
+assert.equal(dark.waterTemp2, undefined, 'dark roast must not carry a waterTemp2 field');
+assert.equal(light.waterTemp.celsius, 94);
+assert.equal(medium.waterTemp.celsius, 92);
+assert.equal(dark.waterTemp.celsius, 88);
+assert.ok(medium.reasonCodes.includes('SWITCH_SINGLE_TEMP_MEDIUM'));
+assert.ok(dark.reasonCodes.includes('SWITCH_SINGLE_TEMP_DARK'));
+assert.ok(light.reasonCodes.includes('SWITCH_SINGLE_TEMP_LIGHT'));
 assert.ok(light.reasonCodes.includes('SWITCH_HYBRID_DEFAULT'));
 
 // --- Anaerobic override: temp cap 88-91C, coarsens grind, reason code ---
@@ -67,6 +72,59 @@ assert.equal(validateV60SwitchCandidate(clampedBloom).valid, true);
 const noBloom = generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' });
 assert.ok(!noBloom.reasonCodes.includes('SWITCH_CLOSED_BLOOM_CAPPED'));
 assert.equal(noBloom.steps.length, 3, 'default template has 3 timed steps: percolation, close+steep, open+drain');
+
+// --- Bean-driven valve-timing modulation (Revision 2026-08-16) ------------
+// modulateSwitchValveTiming() directly: bounds respected, reason codes emitted.
+const mediumPreset = V60_SWITCH_ROAST_PRESETS.medium;
+
+const lowConfidence = modulateSwitchValveTiming(mediumPreset, { confidence: 'low' });
+assert.equal(lowConfidence.valveCloseTimeSeconds, mediumPreset.valveCloseTimeSeconds, 'low confidence must not modulate close time');
+assert.equal(lowConfidence.steepDurationSeconds, mediumPreset.steepDurationSeconds, 'low confidence must not modulate steep duration');
+assert.deepEqual(lowConfidence.reasonCodes, ['SWITCH_VALVE_TIMING_BASELINE_LOW_CONFIDENCE']);
+
+const noConfidence = modulateSwitchValveTiming(mediumPreset, {});
+assert.deepEqual(noConfidence.reasonCodes, ['SWITCH_VALVE_TIMING_BASELINE_LOW_CONFIDENCE'], 'missing confidence must default to the conservative baseline, not modulate');
+
+const clarityIntent = { confidence: 'high', cupDirection: { clarity: 'high', body: 'balanced', sweetness: 'high' } };
+const clarityMod = modulateSwitchValveTiming(mediumPreset, clarityIntent);
+assert.ok(clarityMod.valveCloseTimeSeconds > mediumPreset.valveCloseTimeSeconds, 'clarity-leaning bean must close the valve later');
+assert.ok(clarityMod.steepDurationSeconds < mediumPreset.steepDurationSeconds, 'clarity-leaning bean must steep for less time');
+assert.ok(clarityMod.reasonCodes.includes('SWITCH_LATE_CLOSE_CLARITY'));
+assert.ok(clarityMod.reasonCodes.includes('SWITCH_STEEP_SHORTENED_CLARITY'));
+assert.ok(clarityMod.valveCloseTimeSeconds - mediumPreset.valveCloseTimeSeconds <= 15, 'close-time delay must stay within the ~10-15s bound');
+assert.ok(mediumPreset.steepDurationSeconds - clarityMod.steepDurationSeconds <= 30, 'steep shortening must stay within the ~20-30s bound');
+
+const sweetnessIntent = { confidence: 'high', cupDirection: { clarity: 'balanced', body: 'supported', sweetness: 'high' }, finesRisk: 'high' };
+const sweetnessMod = modulateSwitchValveTiming(mediumPreset, sweetnessIntent);
+assert.ok(sweetnessMod.valveCloseTimeSeconds < mediumPreset.valveCloseTimeSeconds, 'body/sweetness-leaning bean must close the valve earlier');
+assert.ok(sweetnessMod.steepDurationSeconds > mediumPreset.steepDurationSeconds, 'high fines risk must extend the steep');
+assert.ok(sweetnessMod.reasonCodes.includes('SWITCH_EARLY_CLOSE_SWEETNESS'));
+assert.ok(sweetnessMod.reasonCodes.includes('SWITCH_STEEP_EXTENDED_BODY'));
+assert.ok(mediumPreset.valveCloseTimeSeconds - sweetnessMod.valveCloseTimeSeconds <= 15, 'earlier-close delta must stay within the ~10-15s bound');
+assert.ok(sweetnessMod.steepDurationSeconds - mediumPreset.steepDurationSeconds <= 30, 'steep extension must stay within the ~20-30s bound');
+
+// Sweetness-leaning without high fines risk: earlier close, no steep extension.
+const sweetnessNoRisk = modulateSwitchValveTiming(mediumPreset, { confidence: 'medium', cupDirection: { clarity: 'balanced', body: 'supported', sweetness: 'high' } });
+assert.ok(sweetnessNoRisk.reasonCodes.includes('SWITCH_EARLY_CLOSE_SWEETNESS'));
+assert.ok(!sweetnessNoRisk.reasonCodes.includes('SWITCH_STEEP_EXTENDED_BODY'), 'steep must not extend without high fines/solubility risk');
+assert.equal(sweetnessNoRisk.steepDurationSeconds, mediumPreset.steepDurationSeconds);
+
+// Neutral intent (neither leaning) -> baseline with an explicit neutral code.
+const neutralMod = modulateSwitchValveTiming(mediumPreset, { confidence: 'high', cupDirection: { clarity: 'balanced', body: 'balanced', sweetness: 'balanced' } });
+assert.equal(neutralMod.valveCloseTimeSeconds, mediumPreset.valveCloseTimeSeconds);
+assert.equal(neutralMod.steepDurationSeconds, mediumPreset.steepDurationSeconds);
+assert.deepEqual(neutralMod.reasonCodes, ['SWITCH_VALVE_TIMING_BASELINE_NEUTRAL_INTENT']);
+
+// End-to-end through the adapter: two beans, same roast, different intent ->
+// different valve schedules with reason codes on the generated recipe.
+const denseWashedBean = { id: 'dense-washed', process: 'washed', roastLevel: 'medium', sourceInsights: { brewGuidance: 'bright, clean, high clarity cup with crisp acidity' } };
+const softNaturalBean = { id: 'soft-natural', process: 'natural', roastLevel: 'medium', sourceInsights: { brewGuidance: 'juicy, syrupy body, low fines risk, very sweet, may stall the bed if pushed too fine' } };
+const denseWashedIntent = buildExtractionIntent(denseWashedBean);
+const softNaturalIntent = buildExtractionIntent(softNaturalBean);
+const denseWashedRecipe = generateV60SwitchRecipe(denseWashedIntent, { dose: 20, roast: 'medium' });
+const softNaturalRecipe = generateV60SwitchRecipe(softNaturalIntent, { dose: 20, roast: 'medium' });
+const findValveCloseAt = (recipe) => recipe.steps.find((s) => /close the valve/i.test(s.action)).timeSeconds;
+assert.notEqual(findValveCloseAt(denseWashedRecipe), findValveCloseAt(softNaturalRecipe), 'same-roast beans with different cup direction must produce different valve-close timestamps');
 
 // --- Dose bounds RangeError ----------------------------------------------
 assert.throws(() => generateV60SwitchRecipe({}, { dose: 14 }), RangeError);

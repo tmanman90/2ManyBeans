@@ -92,3 +92,63 @@ Applies on top of the roast preset, regardless of roast level, per R5:
 - Whether `temp_phase2` renders as a modal/timer instruction step or structured metadata is a UI decision deferred to U3 per the plan.
 - Zhang/Inaba competition recipe numbers are single-source (Hario booklet, no independent corroboration found) — usable as U5 shadow-comparison targets, not as adapter defaults.
 - honestcoffeeguide.com's Kasuya timestamps (close 1:30/open 2:20) remain an unresolved outlier vs. the 2-of-3-corroborated comoricoffee/gota.cafe timing (close 1:15/open 1:45) used above. If a future pass reaches Kasuya's own YouTube description text directly, re-verify against it.
+
+---
+
+## Revision 2026-08-16 — single-temperature mandate
+
+**Status of §§1-7 above: SUPERSEDED for the `temp_phase2` dimension only.** Sections 1, 2, 5, 6, and the structural template in §3 remain valid and are not re-litigated here. The roast preset table in §4 is superseded in full by the table below and is kept in place, unedited, for provenance — it is what the engine shipped as `v60-switch-engine-v1`/`v60-switch-rules-v1-phase1`. This revision documents `v60-switch-engine-v1`/`v60-switch-rules-v2-single-temp` (bump rationale: §"Engine/rules version bump" below).
+
+### Owner decision + rationale
+
+Owner review of the shipped dual-temp preset table found two problems that research alone could not have caught, because they are about *use*, not about *sourcing*:
+
+1. **The Kasuya-style 92°C → 70°C drop is unrealistic for a home brewer without a second kettle or an active-cooling method.** The shipped adapter's `prepSteps` already hedged this ("heat a second kettle, or let part of your first kettle cool") — that hedge is itself evidence the structure assumes equipment or a mid-brew wait most home setups don't have. A single kettle at a single set temperature is the actual home workflow.
+2. **Recipes felt identical across beans.** The dual-temp table's only per-bean lever was the roast-preset lookup (light/medium/dark) plus the anaerobic override — both roast/process classifications, not bean-specific evidence. A washed high-clarity Kenyan and a soft natural at the same roast level produced the same valve schedule. The engine has an extraction-intent layer (`src/lib/extractionIntent.js`) carrying per-bean signals — cup-direction (clarity/body/sweetness), solubility/fines risk, energy/temperature tendency, confidence — that the Switch adapter was not consuming at all for timing. Kalita and classic V60 both use this layer for real differentiation; the Switch adapter should too.
+
+Both problems point to the same fix, independently confirmed by new research (below): **the valve-close timestamp and steep duration are themselves the extraction dial, not the temperature drop.** Coffee Chronicler's own "sweet version" moves acidity/smoothness by moving the close time (0:45 → 0:25), not by adding a temperature phase. Brian Quan explicitly runs a single kettle temperature end to end and dials strength/acidity via steep length. This is the mainstream single-kettle Switch approach, not an outlier.
+
+### New sources (2026-08-16 verified web research pass)
+
+Added to `docs/data/v60-switch-source-registry.md` and `src/data/v60SwitchSourceRegistry.js` as first-class rows:
+
+- **`[hario-partners-manufacturer]`** — Hario USA official, with Partners Coffee (hario-usa.com/blogs/brewing-demos-and-recipes/v60-switch-recipe-with-partners-coffee). 16g:256g (1:16), locked bloom 0:00-1:30 → open. **Roast-banded single temperature**: 96-100°C light/medium, 90.5-93°C dark. Manufacturer tier — the strongest-provenance single-temp source in the registry, and the direct source for this revision's light/dark temperature bands.
+- **`[chronicler-primary]`** (existing row, new finding added) — coffeechronicler.com + timer.coffee. 92°C constant, 20g:300g (1:15), open 0:00 pour 150g → close 0:45 → pour remainder → open 2:00, total 2:45-3:15. **The "sweet version" closes at 0:25 instead of 0:45 specifically to reduce acidity** — this is the documented proof that valve-close timing is the acidity/smoothness lever that the temperature drop used to be assigned to. This single fact is the direct source for the bean-driven modulation design below.
+- **`[quan-secondary]`** — Brian Quan (beanbook.app/recipes/196cd89b-1c9e-4dae-976b-3b5085dc5adb), original author via an aggregator platform (evidence tier: secondary). 15g:240g (1:16), 94°C single temperature, 90-94°C band stated as the working range. Explicitly frames **steep time as the dial**: shorter steep = more acidity, longer steep = smoother/rounder. Independent corroboration of Chronicler's close-time-as-dial finding from a different author.
+- **`[kaldis-primary]`** (existing row, re-cited) — 13g:200g (1:15.4), closed 30-40s bloom → open. Re-cited here as additional single-temp-compatible structural evidence (Kaldi's was already single-temp per source — it never had a `temp_phase2`).
+- **`[home-barista-community]`** (existing row, new finding added) — home-barista.com Kasuya thread (t85637). The dual-temp verdict in that thread is **positive-but-qualified, bean-dependent**, and one poster explicitly notes they "don't love the minor fuss of the temp drop." No controlled A/B exists in the thread. This directly corroborates the owner's "unrealistic for home use" rationale from within the same community evidence this brief already leaned on for the closed-bloom guardrail.
+- **`[kasuya-super-hybrid-v2]`** (existing row, new finding added) — roastaroma.com. The Super Hybrid v2 uses a **coarser grind than the original God/Devil recipe**. This is the source for this revision's "+1 coarser than the old dual-temp preset" instruction on the medium preset below — precedent that simplifying/hardening the Switch recipe (in v2's case: adding the closed-bloom-first step; in this revision's case: dropping the temperature phase) pairs with a coarser grind, not a finer one.
+
+### Revised preset table (single temperature, `temp_phase2` removed)
+
+All times `mm:ss` from pour start. `grind_offset` is relative to the same classic-V60 micron baseline as before (R6, no new formula).
+
+| Parameter | Light | Medium | Dark |
+| --- | --- | --- | --- |
+| Ratio | 1:16.5 (unchanged) | 1:15 (unchanged) | 1:13.5 (unchanged) |
+| `temp` (single) | 94°C `[hario-partners-manufacturer 96-100 band, shaded to Hoffmann's 95 and conservative — derived]` | 92°C `[chronicler-primary]` — now an **exact** match, not a Kasuya/Chronicler blend, because there is no second temperature to average against | 88°C `[hario-partners-manufacturer dark floor 90.5, extrapolated down with a typical 2-5°C dark-roast offset — derived/interpolated]` |
+| `valve_close_time` | 0:45 (unchanged) `[chronicler-primary]` | 0:40 `[derived — 5s earlier than the old dual-temp preset's 1:00, shortening the pre-steep percolation slightly now that a single 92°C temperature runs the whole steep]` | 0:50 (unchanged) |
+| `steep_duration` (baseline, before per-bean modulation) | 75s (unchanged) | 70-80s baseline, engine default 75s (open ≈ 1:55, inside the owner-specified 1:50-2:00 window) | ~100s baseline (open ≈ 2:30) — **shorter than the old dual-temp preset's 110s**, because there is no cool second-phase temperature protecting the long steep from over-extraction; the astringency guardrail (below) does that job instead |
+| `grind_offset` | +0 (unchanged) | **+1 step coarser than the old dual-temp preset** (was ~1 step past the closed-time threshold; now 2 steps total) `[kasuya-super-hybrid-v2 coarser-grind precedent — derived]` | +1 to +2 steps (unchanged band, numeric value nudged up slightly within the same band to pair with the shorter, hotter, unprotected steep) |
+
+Per-bean valve-timing modulation (below) applies on top of this table; the numbers here are the deterministic baseline before any bean-driven adjustment.
+
+### Bean-driven modulation spec (differentiation fix)
+
+Implemented in `src/lib/v60SwitchAdapter.js` as a pure function over the existing `extractionIntent` output (`cupDirection.clarity/body/sweetness`, `solubilityRisk`, `finesRisk`, `energyTendency`, `confidence`) — no new evidence format, no new intent fields.
+
+- **Clarity-leaning / high-acidity-desired bean** (`cupDirection.clarity === 'high'`): steep is **shortened** (Quan's dial: shorter steep → more acidity/clarity), bounded −20 to −30s off the baseline steep, reason code `SWITCH_STEEP_SHORTENED_CLARITY`; valve close is **delayed** (more percolation before the immersion phase begins), bounded +10 to +15s, reason code `SWITCH_LATE_CLOSE_CLARITY`.
+- **Body/sweetness-leaning bean, or high fines/solubility risk** (`cupDirection.body === 'supported'` or `cupDirection.sweetness === 'high'` without high clarity, or `finesRisk`/`solubilityRisk === 'high'`): valve close is **earlier** (Chronicler's sweet-variant logic: 0:45 → 0:25), bounded −10 to −15s, reason code `SWITCH_EARLY_CLOSE_SWEETNESS`; when fines/solubility risk is specifically high, steep is also **extended** within the astringency guardrail, bounded +20 to +30s, reason code `SWITCH_STEEP_EXTENDED_BODY`.
+- **Low-confidence intent** (`confidence === 'low'`, i.e. no real source/stored/research guidance behind the bean): **no modulation** — baseline preset values only, reason code `SWITCH_VALVE_TIMING_BASELINE_LOW_CONFIDENCE` records that this was a deliberate conservative default, not a missed signal.
+- Modulations are additive on independent axes (close-time and steep-time), each clamped to its own bound before being applied, so a dense high-clarity washed bean and a soft high-sweetness natural at the *same roast preset* produce visibly different close/steep timestamps — this is the direct fix for "recipes feel identical across beans."
+
+### Astringency guardrail, adjusted for the single-temp world
+
+The old guardrail ("closed-valve dwell at ≥90°C should not exceed ~90-120s without a temperature drop") assumed a temperature drop was available as the release valve. With `temp_phase2` gone, the guardrail is restated directly in terms of the single temperature actually in effect:
+
+- **Closed-valve dwell at ≥92°C is capped at ~90-100s**, full stop — this now binds the medium preset (92°C) hard, including after modulation: `SWITCH_HOT_STEEP_CAPPED` fires if a clarity-leaning shortened steep were somehow combined with a body-leaning extension request (should not happen given the modulation rules are mutually exclusive per bean, but the guardrail is checked unconditionally, not trusted to the modulation logic).
+- **Longer steeps (up to the dark preset's ~100-130s modulated range) are only permitted at ≤90°C.** This is why the dark preset's temperature (88°C) sits below the threshold and the medium preset's (92°C) sits above it — the temperature band chosen per roast now directly gates how long that roast's steep is allowed to run, since there is no second cooler phase to fall back on mid-brew.
+
+### Engine/rules version bump
+
+`V60_SWITCH_ENGINE_VERSION` stays `'v60-switch-engine-v1'` (the template shape — percolate → close+steep → open+drain — is unchanged). `V60_SWITCH_RULES_VERSION` bumps from `'v60-switch-rules-v1-phase1'` to `'v60-switch-rules-v2-single-temp'` so every previously-cached dual-temp candidate (which carries a non-null `waterTemp2` and the old rules version) is invalidated and regenerated under the new rules on next read, per R8's "engine/rules versions are Switch-specific" invariant.
