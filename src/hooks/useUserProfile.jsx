@@ -10,6 +10,7 @@ const DEFAULT_PREFERENCES = {
   grinderCustomName: null,
   brewMethod: 'aiden',
   kalitaSize: '185',
+  v60Variant: 'classic',
   grindSizeDisplay: 'default',
   canisterCount: 3,
 };

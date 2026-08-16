@@ -39,13 +39,15 @@ export function buildTimingEvent(snapshot) {
   const targetMs = snapshot?.targetMs;
   const lineage = normalizeLineage(snapshot?.lineage);
   const kalitaSize = snapshot?.kalitaSize == null ? null : String(snapshot.kalitaSize);
+  const v60Variant = snapshot?.v60Variant == null ? null : String(snapshot.v60Variant);
   const configurationKey = stringOrNull(snapshot?.configurationKey);
 
   if (!sessionId || !beanId || !device || !mode || !COMPLETION_KINDS.has(completionKind)
     || !finitePositive(doseGrams) || !finiteNonNegative(actualElapsedMs)
     || !finitePositive(targetMs) || !lineage
     || (configurationKey && configurationKey.length > 120)
-    || (kalitaSize != null && !['155', '185'].includes(kalitaSize))) {
+    || (kalitaSize != null && !['155', '185'].includes(kalitaSize))
+    || (v60Variant != null && !['classic', 'switch'].includes(v60Variant))) {
     return null;
   }
 
@@ -55,6 +57,7 @@ export function buildTimingEvent(snapshot) {
     beanId,
     device,
     kalitaSize: device === 'kalita' ? kalitaSize : null,
+    v60Variant: device === 'v60' ? (v60Variant || 'classic') : null,
     mode,
     configurationKey,
     doseGrams,
@@ -96,6 +99,7 @@ export function timingContextFromRecipe({ beanId, recipe, mode = 'hot' } = {}) {
     beanId: stringOrNull(beanId),
     device: stringOrNull(recipe?.device) || 'v60',
     kalitaSize: recipe?.device === 'kalita' && recipe?.kalitaSize != null ? String(recipe.kalitaSize) : null,
+    v60Variant: recipe?.device === 'v60' ? (recipe?.variant === 'switch' ? 'switch' : 'classic') : null,
     mode: mode === 'iced' ? 'iced' : 'hot',
     configurationKey: stringOrNull(recipe?.configurationKey || recipe?.sourceLineage?.configurationKey),
     doseGrams: finitePositive(doseGrams) ? doseGrams : null,
@@ -117,6 +121,7 @@ function sameBaseConfiguration(event, context) {
   return event.beanId === context.beanId
     && event.device === context.device
     && event.kalitaSize === context.kalitaSize
+    && event.v60Variant === context.v60Variant
     && event.mode === context.mode
     && event.lineage.profile === context.lineage?.profile
     && event.lineage.engineVersion === context.lineage?.engineVersion

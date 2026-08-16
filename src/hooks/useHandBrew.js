@@ -17,14 +17,17 @@ import { KALITA_ICED_SOURCE_REGISTRY_VERSION } from '../data/kalitaIcedSourceReg
 import { generateKalitaIcedWithFallback } from '../lib/kalitaIcedGeneration';
 import { V60_ENGINE_VERSION, V60_RULES_VERSION, V60_CONFIGURATION_KEY, V60_PHASE_CONTRACT_VERSION, validateV60Candidate } from '../lib/v60Adapter';
 import { V60_ICED_ENGINE_VERSION, V60_ICED_RULES_VERSION, V60_ICED_CONFIGURATION_KEY, V60_ICED_PHASE_CONTRACT_VERSION, validateV60IcedCandidate } from '../lib/v60IcedAdapter';
+import { V60_SWITCH_ENGINE_VERSION, V60_SWITCH_RULES_VERSION, V60_SWITCH_PHASE_CONTRACT_VERSION, validateV60SwitchCandidate } from '../lib/v60SwitchAdapter';
+import { V60_SWITCH_CONFIGURATION_KEY } from '../data/v60SwitchConfiguration';
 import { V60_SOURCE_REGISTRY_VERSION } from '../data/v60SourceRegistry';
 import { V60_ICED_SOURCE_REGISTRY_VERSION } from '../data/v60IcedSourceRegistry';
-import { generateV60HotWithFallback, generateV60IcedWithFallback, v60DoseForRequest } from '../lib/v60Generation';
+import { V60_SWITCH_SOURCE_REGISTRY_VERSION } from '../data/v60SwitchSourceRegistry';
+import { generateV60HotWithFallback, generateV60IcedWithFallback, v60DoseForRequest, v60SwitchDoseForRequest } from '../lib/v60Generation';
 import { usePreferences } from './useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
 import { createKeyedLatestWriteQueue } from '../lib/latestWriteQueue';
-import { canUseCachedHotRecipe, kalitaDefaultDose, resolveIcedRetryConfiguration } from '../lib/handBrewCachePolicy';
+import { canUseCachedHotRecipe, kalitaDefaultDose, v60SwitchDefaultDose, resolveIcedRetryConfiguration } from '../lib/handBrewCachePolicy';
 
 export function useHandBrew(updateBean, saveHandBrewTiming) {
   const mountedRef = useRef(true);
@@ -91,13 +94,33 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
         && recipe.phaseContractVersion === KALITA_PHASE_CONTRACT_VERSION
         && validateKalitaCandidate(recipe).valid;
     }
-    return recipe.mode === 'hot'
-      && recipe.engineVersion === V60_ENGINE_VERSION
-      && recipe.rulesVersion === V60_RULES_VERSION
-      && recipe.configurationKey === V60_CONFIGURATION_KEY
-      && recipe.sourceRegistryVersion === V60_SOURCE_REGISTRY_VERSION
-      && recipe.phaseContractVersion === V60_PHASE_CONTRACT_VERSION
-      && validateV60Candidate(recipe).valid;
+    if (device === 'v60') {
+      // Legacy compatibility (R8/R9): a cached recipe without variant
+      // metadata (recipe.variant undefined) is classic. The configurationKey
+      // comparison is what actually enforces "never cross-serve" — the
+      // Switch key (v60:03:...:switch:hot) and classic key (v60:02:...)
+      // never match each other, so a variant flip always misses cache.
+      const requestedVariant = activePreferences?.v60Variant === 'switch' ? 'switch' : 'classic';
+      if (requestedVariant === 'switch') {
+        return recipe.mode === 'hot'
+          && (recipe.variant || 'classic') === 'switch'
+          && recipe.engineVersion === V60_SWITCH_ENGINE_VERSION
+          && recipe.rulesVersion === V60_SWITCH_RULES_VERSION
+          && recipe.configurationKey === V60_SWITCH_CONFIGURATION_KEY
+          && recipe.sourceRegistryVersion === V60_SWITCH_SOURCE_REGISTRY_VERSION
+          && recipe.phaseContractVersion === V60_SWITCH_PHASE_CONTRACT_VERSION
+          && validateV60SwitchCandidate(recipe).valid;
+      }
+      return recipe.mode === 'hot'
+        && (recipe.variant || 'classic') === 'classic'
+        && recipe.engineVersion === V60_ENGINE_VERSION
+        && recipe.rulesVersion === V60_RULES_VERSION
+        && recipe.configurationKey === V60_CONFIGURATION_KEY
+        && recipe.sourceRegistryVersion === V60_SOURCE_REGISTRY_VERSION
+        && recipe.phaseContractVersion === V60_PHASE_CONTRACT_VERSION
+        && validateV60Candidate(recipe).valid;
+    }
+    return false;
   };
 
   const icedCandidateMatchesConfiguration = (recipe, device, dose, bean, research, activePreferences = preferences) => {
@@ -148,16 +171,21 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     const activePreferences = {
       ...preferences,
       ...(generationOverrides.kalitaSize ? { kalitaSize: generationOverrides.kalitaSize } : {}),
+      ...(generationOverrides.v60Variant ? { v60Variant: generationOverrides.v60Variant } : {}),
     };
     const grinderKey = activePreferences?.grinder || 'fellow-ode-gen2';
+    const v60Variant = activePreferences?.v60Variant === 'switch' ? 'switch' : 'classic';
+    const isV60Switch = device === 'v60' && v60Variant === 'switch';
     // Kalita is now automatically bean-specific. The legacy GPT path remains
     // an invisible fallback if evidence normalization or candidate generation
     // fails; users do not need to choose between engines.
     const candidateMode = device === 'kalita' || device === 'v60' ? 'candidate' : 'legacy';
     const requestedDose = generationOverrides.doseOverride ?? Number(bean.userCoffeeGrams || bean.handBrewRecipes?.[device]?.userCoffeeGrams);
-    const defaultDose = device === 'kalita' ? kalitaDefaultDose(activePreferences?.kalitaSize || '185') : 15;
+    const defaultDose = device === 'kalita'
+      ? kalitaDefaultDose(activePreferences?.kalitaSize || '185')
+      : isV60Switch ? v60SwitchDefaultDose() : 15;
     const candidateDose = device === 'v60'
-      ? v60DoseForRequest(requestedDose, defaultDose)
+      ? (isV60Switch ? v60SwitchDoseForRequest(requestedDose, defaultDose) : v60DoseForRequest(requestedDose, defaultDose))
       : (Number.isFinite(requestedDose) && requestedDose > 0 ? requestedDose : defaultDose);
 
     // Check keyed cache first, fall back to legacy single-recipe field
@@ -337,7 +365,12 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       }
       if (device === 'v60' && !recipe) {
         const evidence = normalizeRecipeEvidence(bean, research);
-        const hotResult = generateV60HotWithFallback({ intent: sharedIntent, configuration: { dose: candidateDose, grinder: grinderKey }, evidence });
+        const hotResult = generateV60HotWithFallback({
+          intent: sharedIntent,
+          configuration: { dose: candidateDose, grinder: grinderKey, variant: v60Variant },
+          evidence,
+          variant: v60Variant,
+        });
         recipe = hotResult.recipe;
         if (!recipe) throw new Error(`V60 regeneration unavailable: ${hotResult.error?.message || 'deterministic candidate and fallback failed'}`);
       }
@@ -499,6 +532,28 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     );
   };
 
+  const handleV60VariantChange = async (variant) => {
+    const nextVariant = ['classic', 'switch'].includes(variant) ? variant : 'classic';
+    if (handBrewRecipe?.device !== 'v60' || !handBrewBean) return;
+
+    try {
+      await updatePreferences({ v60Variant: nextVariant });
+    } catch (err) {
+      console.warn('[handBrew] V60 variant preference failed:', err?.message || err);
+      setHandBrewError('Could not save the V60 variant. Try again.');
+      return;
+    }
+
+    setUserCoffeeGrams(undefined);
+    await handleBrewHandBrew(
+      handBrewBean,
+      handBrewResearch,
+      true,
+      'v60',
+      { v60Variant: nextVariant, doseOverride: nextVariant === 'switch' ? v60SwitchDefaultDose() : 15 },
+    );
+  };
+
   const closeHandBrewModal = () => {
     if (doseDebounceRef.current) {
       clearTimeout(doseDebounceRef.current);
@@ -576,6 +631,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     handBrewPhase, handBrewBean, handBrewResearch,
     handleBrewHandBrew, closeHandBrewModal,
     handleKalitaSizeChange,
+    handleV60VariantChange,
     handleKalitaIcedChillingMethodChange,
     attachHandBrewBeanId,
     userCoffeeGrams,

@@ -15,6 +15,7 @@ import { transformToFlashBrew } from '../lib/flashBrewTransform';
 import { isDeterministicV60Hot } from '../lib/v60Generation';
 import { isDeterministicKalitaHot } from '../lib/kalitaIcedAdapter';
 import { kalitaDoseBounds } from '../data/kalitaConfiguration';
+import { V60_SWITCH_DOSE_BOUNDS } from '../data/v60SwitchConfiguration';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 
@@ -129,6 +130,77 @@ const KalitaSizeSwitch = ({ value, onChange, disabled }) => {
               }}
             >
               {size}
+            </m.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const V60_VARIANT_LABELS = { classic: 'Classic', switch: 'Switch' };
+
+const V60VariantSwitch = ({ value, onChange, disabled }) => {
+  const selected = value === 'switch' ? 'switch' : 'classic';
+  return (
+    <div
+      role="group"
+      aria-label="V60 variant"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '10px 12px',
+        marginBottom: 14,
+        background: C.amberBg,
+        border: `1px solid ${C.accentLight}`,
+        borderRadius: radius.lg,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <SectionLabel style={{ color: C.accent }}>V60 variant</SectionLabel>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexShrink: 0,
+          padding: 3,
+          gap: 2,
+          background: C.card,
+          border: `1px solid ${C.borderLight}`,
+          borderRadius: radius.pill,
+          boxShadow: shadows.e1,
+        }}
+      >
+        {['classic', 'switch'].map((variant) => {
+          const active = selected === variant;
+          return (
+            <m.button
+              key={variant}
+              type="button"
+              onClick={() => onChange?.(variant)}
+              disabled={disabled || active}
+              whileTap={disabled || active ? undefined : { scale: 0.94 }}
+              transition={spring.snappy}
+              aria-pressed={active}
+              aria-label={`Use V60 ${V60_VARIANT_LABELS[variant]}`}
+              style={{
+                minWidth: 52,
+                minHeight: 44,
+                padding: '0 12px',
+                border: 'none',
+                borderRadius: radius.pill,
+                background: active ? C.accent : 'transparent',
+                color: active ? C.cream : C.textMuted,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: disabled || active ? 'default' : 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {V60_VARIANT_LABELS[variant]}
             </m.button>
           );
         })}
@@ -352,7 +424,7 @@ export const HandBrewModal = ({
   open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, onRetryIced, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
-  deviceKey, onKalitaSizeChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
+  deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -501,7 +573,11 @@ export const HandBrewModal = ({
         <m.div ref={modalContentRef} {...fadeUp}>
           {/* Recipe header */}
           <div style={{ marginBottom: 16 }}>
-            <SectionLabel style={{ marginBottom: 6 }}>{recipe.device === 'v60' ? 'V60 02 · Hot' : 'Hand brew recipe'}</SectionLabel>
+            <SectionLabel style={{ marginBottom: 6 }}>
+              {recipe.device === 'v60'
+                ? (recipe.variant === 'switch' ? 'V60 03 Switch · Hot' : 'V60 02 · Hot')
+                : 'Hand brew recipe'}
+            </SectionLabel>
             <div style={{
               fontFamily: fonts.heading,
               fontSize: 24,
@@ -526,6 +602,13 @@ export const HandBrewModal = ({
               disabled={loading}
             />
           )}
+          {recipe.device === 'v60' && (
+            <V60VariantSwitch
+              value={recipe.variant}
+              onChange={onV60VariantChange}
+              disabled={loading}
+            />
+          )}
 
           {/* Param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
@@ -536,6 +619,10 @@ export const HandBrewModal = ({
                 min: kalitaDoseBounds(displayRecipe.kalitaSize).minDose,
                 max: kalitaDoseBounds(displayRecipe.kalitaSize).maxDose,
               } : {})}
+              {...(device === 'v60' && recipe.variant === 'switch' ? {
+                min: V60_SWITCH_DOSE_BOUNDS.minDose,
+                max: V60_SWITCH_DOSE_BOUNDS.maxDose,
+              } : {})}
             />
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
@@ -545,6 +632,13 @@ export const HandBrewModal = ({
               Wave {recipe.kalitaSize || '185'} · {recipe.doseProfile || 'legacy profile'}
               {recipe.candidate ? ' · Bean-specific engine' : ''}
               {recipe.generationStatus === 'fallback' ? ' · GPT fallback' : ''}
+            </div>
+          )}
+          {recipe.device === 'v60' && recipe.variant === 'switch' && (
+            <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
+              Switch 03 · {recipe.doseProfile || recipe.roastPreset || 'hybrid'}
+              {recipe.candidate ? ' · Bean-specific engine' : ''}
+              {recipe.fallback ? ' · Conservative baseline' : ''}
             </div>
           )}
 
@@ -592,8 +686,11 @@ export const HandBrewModal = ({
             </div>
           )}
 
-          {/* Temperature */}
-          {recipe.waterTemp && (
+          {/* Temperature — Switch hybrid recipes may carry a second, cooler
+              temperature for the closed-valve pour (waterTemp2). Shown as a
+              "hot → cool" line in the same tile rather than a second card,
+              to keep the layout unchanged for every other device/recipe. */}
+          {displayRecipe.waterTemp && (
             <div style={{
               background: C.card,
               borderRadius: radius.lg,
@@ -607,9 +704,11 @@ export const HandBrewModal = ({
             }}>
               <Thermometer size={18} color={C.accent} />
               <div>
-                <SectionLabel>Water Temperature</SectionLabel>
+                <SectionLabel>{displayRecipe.waterTemp2 ? 'Water Temperature (percolation → immersion)' : 'Water Temperature'}</SectionLabel>
                 <div style={{ fontFamily: fonts.heading, fontSize: 16, fontWeight: 600, color: C.text, marginTop: 2 }}>
-                  {renderTemp(recipe.waterTemp)}
+                  {displayRecipe.waterTemp2
+                    ? `${renderTemp(displayRecipe.waterTemp)} → ${renderTemp(displayRecipe.waterTemp2)}`
+                    : renderTemp(displayRecipe.waterTemp)}
                 </div>
               </div>
             </div>
