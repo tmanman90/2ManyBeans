@@ -421,7 +421,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 );
 
 export const HandBrewModal = ({
-  open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, onRetryIced, loading, error, phase, onRetry, onRegenerate,
+  open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, icedUnsupported = false, onRetryIced, loading, error, phase, onRetry, onRegenerate,
   extraFooter, bean, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
@@ -463,6 +463,10 @@ export const HandBrewModal = ({
   const icedRecipe = useMemo(
     () => {
       if (!icedMode) return null;
+      // Defense in depth: iced Switch is out of scope. Even if icedMode were
+      // somehow entered stale (e.g. a variant flip mid-session), never
+      // render an iced recipe for a Switch hot request.
+      if (icedUnsupported) return null;
       if (icedRecipeProp?.candidate) return normalizeRecipePhases(icedRecipeProp);
       if (icedRecipeProp?.mode === 'iced' || icedRecipeProp?.isIced) return normalizeRecipePhases(icedRecipeProp);
       if (isDeterministicV60Hot(displayRecipe) || isDeterministicKalitaHot(displayRecipe)) return null;
@@ -812,8 +816,16 @@ export const HandBrewModal = ({
             </Btn>
           )}
 
-          {/* Iced entry point */}
-          {timerReady && (
+          {/* Iced entry point — hidden (not offered) for the Switch variant;
+              iced Switch is out of scope for this slice (plan Scope
+              Boundaries). A short note explains why instead of silently
+              omitting the option. */}
+          {timerReady && icedUnsupported && (
+            <div style={{ ...type.caption, color: C.textLight, textAlign: 'center', marginTop: 10 }}>
+              Iced isn't available yet for the Switch — switch to classic V60 for an iced recipe.
+            </div>
+          )}
+          {timerReady && !icedUnsupported && (
             <m.button
               onClick={handleEnterIced}
               whileTap={{ scale: 0.97 }}

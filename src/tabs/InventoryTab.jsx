@@ -516,6 +516,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         icedRecipe={handBrew.handBrewIcedRecipe}
         icedLoading={handBrew.handBrewIcedLoading}
         icedError={handBrew.handBrewIcedError}
+        icedUnsupported={handBrew.handBrewIcedUnsupported}
         onRetryIced={handBrew.onRetryIced}
         loading={handBrew.handBrewLoading}
         error={handBrew.handBrewError}

@@ -558,6 +558,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         icedRecipe={handBrew.handBrewIcedRecipe}
         icedLoading={handBrew.handBrewIcedLoading}
         icedError={handBrew.handBrewIcedError}
+        icedUnsupported={handBrew.handBrewIcedUnsupported}
         onRetryIced={handBrew.onRetryIced}
         loading={handBrew.handBrewLoading}
         error={handBrew.handBrewError}

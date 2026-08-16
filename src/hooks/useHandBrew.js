@@ -56,6 +56,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   const [handBrewIcedRecipe, setHandBrewIcedRecipe] = useState(null);
   const [handBrewIcedLoading, setHandBrewIcedLoading] = useState(false);
   const [handBrewIcedError, setHandBrewIcedError] = useState(null);
+  // Iced Switch is out of scope for this slice (plan Scope Boundaries). This
+  // flag is distinct from handBrewIcedError: it means "iced is not offered
+  // for the current hot variant," not "iced generation failed." Never set
+  // together with a populated handBrewIcedRecipe/handBrewIcedError.
+  const [handBrewIcedUnsupported, setHandBrewIcedUnsupported] = useState(false);
   const [handBrewLoading, setHandBrewLoading] = useState(false);
   const [handBrewError, setHandBrewError] = useState(null);
   const [handBrewBean, setHandBrewBean] = useState(null);
@@ -200,7 +205,12 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       ? cachedCandidate : null;
 
     const candidateIced = bean.handBrewIcedRecipes?.[device];
-    const candidateIcedValid = icedCandidateMatchesConfiguration(candidateIced, device, candidateDose, bean, requestResearch, activePreferences);
+    // Iced Switch is out of scope (plan Scope Boundaries): a Switch hot
+    // request never treats a cached iced entry as valid, regardless of its
+    // own shape, so it can never be silently served next to a Switch hot
+    // recipe.
+    const candidateIcedValid = !isV60Switch
+      && icedCandidateMatchesConfiguration(candidateIced, device, candidateDose, bean, requestResearch, activePreferences);
     const preservedChillingMethod = ['brew-over-ice', 'chill-after'].includes(generationOverrides.chillingMethod)
       ? generationOverrides.chillingMethod
       : ['brew-over-ice', 'chill-after'].includes(candidateIced?.chillingMethod)
@@ -227,8 +237,16 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
           repairHandBrewRecipe(hydrated, grinderKey, family, roastLevel, device);
         }
         setHandBrewRecipe(hydrated);
+        setHandBrewIcedUnsupported(isV60Switch);
         if (candidateIcedValid) {
           setHandBrewIcedRecipe(candidateIced);
+          setHandBrewIcedError(null);
+          setHandBrewIcedLoading(false);
+        } else if (isV60Switch) {
+          // Iced Switch is out of scope: never fall through to the classic
+          // V60 iced engine for a Switch hot request (would silently serve a
+          // classic-derived iced recipe next to a Switch hot recipe).
+          setHandBrewIcedRecipe(null);
           setHandBrewIcedError(null);
           setHandBrewIcedLoading(false);
         } else if (device === 'kalita' || device === 'v60') {
@@ -276,6 +294,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       setHandBrewIcedRecipe(bean.handBrewIcedRecipes?.[device] || null);
       setHandBrewIcedError(null);
       setHandBrewIcedLoading(false);
+      setHandBrewIcedUnsupported(false);
       setHandBrewError(null);
       setHandBrewModal(true);
       setHandBrewLoading(false);
@@ -300,6 +319,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     setHandBrewRecipe(null);
     setHandBrewIcedRecipe(null);
     setHandBrewIcedError(null);
+    setHandBrewIcedUnsupported(false);
     setHandBrewIcedLoading(device === 'v60' || device === 'kalita');
     setHandBrewLoading(true);
 
@@ -358,7 +378,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
         icedRecipe = icedResult.recipe;
         icedGenerationError = icedResult.recipe ? null : icedResult.error;
       }
-      if (device === 'v60' && candidateMode === 'candidate') {
+      // Iced Switch is out of scope (plan Scope Boundaries): a Switch hot
+      // request skips iced generation entirely rather than falling through
+      // to the classic V60 02 iced engine, which would silently pair a
+      // classic-derived iced recipe with a Switch hot recipe.
+      if (device === 'v60' && candidateMode === 'candidate' && !isV60Switch) {
         const icedResult = generateV60IcedWithFallback({ intent: sharedIntent, configuration: { dose: candidateDose, grinder: grinderKey } });
         icedRecipe = icedResult.recipe;
         icedGenerationError = icedResult.recipe ? null : icedResult.error;
@@ -399,6 +423,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       if (device === 'v60' || device === 'kalita') {
         setHandBrewIcedLoading(false);
         setHandBrewIcedError(icedGenerationError ? `Iced ${device === 'kalita' ? 'Kalita' : 'V60'} regeneration unavailable: ${icedGenerationError.message || icedGenerationError}` : null);
+        setHandBrewIcedUnsupported(isV60Switch);
       }
       if (icedRecipe) setHandBrewIcedRecipe({ ...icedRecipe, generatedAt: recipeData.generatedAt, sourceContextHash: recipeData.sourceContextHash, grinder: grinderKey });
       setHandBrewError(null);
@@ -429,6 +454,16 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     const retryConfig = resolveIcedRetryConfiguration({ recipe: handBrewRecipe, bean: handBrewBean, preferences });
     const { device, size, dose: candidateDose, grinder: grinderKey } = retryConfig;
     if (!['v60', 'kalita'].includes(device)) return;
+    // Iced Switch is out of scope (plan Scope Boundaries): a retry against a
+    // Switch hot recipe must never fall through to the classic V60 iced
+    // engine. `retryConfig.variant` is the informational field U3 threaded
+    // in for exactly this check.
+    if (device === 'v60' && retryConfig.variant === 'switch') {
+      setHandBrewIcedRecipe(null);
+      setHandBrewIcedError(null);
+      setHandBrewIcedUnsupported(true);
+      return;
+    }
     const rid = Symbol('handbrew-iced');
     activeRequestRef.current = rid;
     setHandBrewIcedLoading(true);
@@ -627,7 +662,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   }, [handBrewBean?.id, saveHandBrewTiming]);
 
   return {
-    handBrewModal, handBrewRecipe, handBrewIcedRecipe, handBrewIcedLoading, handBrewIcedError, handBrewLoading, handBrewError,
+    handBrewModal, handBrewRecipe, handBrewIcedRecipe, handBrewIcedLoading, handBrewIcedError, handBrewIcedUnsupported, handBrewLoading, handBrewError,
     handBrewPhase, handBrewBean, handBrewResearch,
     handleBrewHandBrew, closeHandBrewModal,
     handleKalitaSizeChange,
