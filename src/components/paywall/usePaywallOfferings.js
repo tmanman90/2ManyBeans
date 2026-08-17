@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getOfferings, isRevenueCatAvailable } from '../../lib/revenuecat';
+import { devOffering, devOfferingsEnabled } from '../../lib/devOfferings';
 
 function findPackage(offering, match) {
   if (!offering?.availablePackages) return null;
@@ -32,6 +33,23 @@ export function usePaywallOfferings({ open }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isDevMock, setIsDevMock] = useState(false);
+
+  // The dev app cannot load real products: its bundle id is
+  // com.talmeltzer.coffeehub.dev, while every StoreKit product lives under the
+  // production app record. Rather than leave the paywall permanently
+  // un-reviewable on the only device build we review on, fall back to a
+  // shape-compatible stand-in AFTER a real fetch has failed. Dev variant only,
+  // and the UI shows a DEV PRICES marker whenever it is in use.
+  function useDevFallback(reason) {
+    if (!devOfferingsEnabled()) return false;
+    console.warn(`[PaywallRoast] ${reason} — falling back to dev offerings stub. Purchases will NOT complete.`);
+    setOffering(devOffering());
+    setIsDevMock(true);
+    setError(null);
+    setLoading(false);
+    return true;
+  }
 
   // Fetch offerings on open (native only). `retryCount` is in the deps so
   // tapping the retry button re-runs the effect.
@@ -50,6 +68,7 @@ export function usePaywallOfferings({ open }) {
         if (!o) {
           // RC has no offerings at all (dashboard misconfig).
           console.error('[PaywallRoast] getOfferings returned null — RC dashboard has no offerings');
+          if (useDevFallback('getOfferings returned null')) return;
           setError('Subscription options not available yet. Please try again in a moment.');
           setLoading(false);
           return;
@@ -65,11 +84,13 @@ export function usePaywallOfferings({ open }) {
             serverDescription: o.serverDescription,
             rawPackagesLength: o.availablePackages?.length,
           });
+          if (useDevFallback('offering has zero packages')) return;
           setError('Subscription options not available yet. Please try again in a moment.');
           setLoading(false);
           return;
         }
         setOffering(o);
+        setIsDevMock(false);
         setLoading(false);
       })
       .catch((err) => {
@@ -78,10 +99,10 @@ export function usePaywallOfferings({ open }) {
           code: err?.code,
           underlying: err?.underlyingErrorMessage,
         });
-        if (!cancelled) {
-          setError('Could not load subscription options. Please try again.');
-          setLoading(false);
-        }
+        if (cancelled) return;
+        if (useDevFallback('getOfferings threw')) return;
+        setError('Could not load subscription options. Please try again.');
+        setLoading(false);
       });
     return () => { cancelled = true; };
   }, [open, retryCount]);
@@ -104,5 +125,6 @@ export function usePaywallOfferings({ open }) {
     error,
     retry,
     isWeb,
+    isDevMock,
   };
 }

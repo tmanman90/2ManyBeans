@@ -177,6 +177,9 @@ function parseCssRules(css) {
 
 const cssSource = sources.find((s) => s.isCss);
 const cssRules = cssSource ? parseCssRules(cssSource.code) : [];
+// ONLY the no-preference branch may hold opacity: 0. A reduce-branch fade was
+// tried and reverted: if its keyframe fails to run, the paywall is invisible
+// for exactly the users who opted into less motion. Keep this strict.
 const NO_PREFERENCE_RE = /prefers-reduced-motion:\s*no-preference/;
 
 // ---------------------------------------------------------------------------

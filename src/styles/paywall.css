@@ -149,8 +149,10 @@
    child <img>, never here.
    -------------------------------------------------------------------------- */
 .pw-hero-band {
-  height: 224px;
-  margin: 35px 0 0;
+  /* dvh-clamped so the third value row still fits above the CTA bar on
+     shorter screens; it was being pushed under the bar at a fixed 224px. */
+  height: clamp(140px, 23dvh, 224px);
+  margin: clamp(12px, 3dvh, 35px) 0 0;
   flex: none;
   overflow: hidden;
   background: var(--pw-hero-bg);
@@ -160,8 +162,8 @@
 
 .pw-hero-band img {
   display: block;
-  height: 224px;
-  width: 224px;
+  height: 100%;
+  width: auto;
   margin: 0 auto;
 }
 
@@ -172,8 +174,8 @@
 .pw-value-rows {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  margin: 57px auto 0;
+  gap: clamp(16px, 3dvh, 28px);
+  margin: clamp(20px, 5dvh, 57px) auto 0;
   width: max-content;
   max-width: calc(100% - 48px);
 }
@@ -590,30 +592,40 @@
    ========================================================================== */
 .pw-in { opacity: 1; }
 
+/* Reduced motion: content is simply visible, with NO animation of any kind.
+   A staggered crossfade was tried here and reverted deliberately. Any rule
+   that sets opacity: 0 and depends on a keyframe to bring it back is a
+   catastrophic failure mode if the keyframe does not run — an invisible
+   paywall. Nothing on this screen is communicated by arrival order alone, so
+   the information cost of dropping the stagger is zero and the downside risk
+   is total. Safety wins. */
+
 @media (prefers-reduced-motion: no-preference) {
-  /* Staggered entrance: headline 0ms -> hero 60 -> rows 120/180/240 -> CTA
-     last. Set the delay per element via --pw-d. Side-by-side peers (the two
-     plan cards) share ONE delay — never stagger them. */
+  /* Staggered entrance in reading order; --pw-d carries the per-element delay.
+     Side-by-side peers (the two plan cards) share ONE delay, never staggered.
+     Duration and travel are deliberately larger than the first pass: at 240ms
+     with a 0.95 scale and no translation the arrival was literally
+     imperceptible on device and read as "no animation at all". */
   .pw-in {
     opacity: 0;
-    animation: pwIn 240ms var(--pw-ease) both;
+    animation: pwIn 380ms var(--pw-ease) both;
     animation-delay: var(--pw-d, 0ms);
   }
   @keyframes pwIn {
-    from { opacity: 0; transform: scale(0.95); }
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
     to { opacity: 1; transform: none; }
   }
 
   /* Step push: incoming step only, forward from the right, back from the
      left. Never animate the outgoing step. */
-  .pw-step-fwd { animation: pwStepFwd 300ms var(--pw-ease) both; }
+  .pw-step-fwd { animation: pwStepFwd 340ms var(--pw-ease) both; }
   @keyframes pwStepFwd {
-    from { opacity: 0; transform: translate3d(24px, 0, 0); }
+    from { opacity: 0; transform: translate3d(40px, 0, 0); }
     to { opacity: 1; transform: none; }
   }
-  .pw-step-back { animation: pwStepBack 300ms var(--pw-ease) both; }
+  .pw-step-back { animation: pwStepBack 340ms var(--pw-ease) both; }
   @keyframes pwStepBack {
-    from { opacity: 0; transform: translate3d(-24px, 0, 0); }
+    from { opacity: 0; transform: translate3d(-40px, 0, 0); }
     to { opacity: 1; transform: none; }
   }
 
@@ -638,4 +650,24 @@
     from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
+}
+
+/* Dev-only marker. Rendered whenever the paywall is showing the dev offerings
+   stand-in (see src/lib/devOfferings.js) so stub prices can never be mistaken
+   for real App Store pricing. Cannot appear in a production build. */
+.pw-devbadge {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #E4A08D;
+  color: #241710;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
 }

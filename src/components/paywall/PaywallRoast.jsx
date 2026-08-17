@@ -35,7 +35,7 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
   const [cycle, setCycle] = useState('annual'); // 'annual' | 'monthly'
   const wasOpenRef = useRef(false);
 
-  const { packages, offering, loading, error, retry, isWeb } = usePaywallOfferings({ open });
+  const { packages, offering, loading, error, retry, isWeb, isDevMock } = usePaywallOfferings({ open });
   const {
     purchasing,
     error: purchaseError,
@@ -141,6 +141,9 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
       style={{ ...PW_CSS_VARS, position: 'fixed', inset: 0, zIndex: 2000 }}
     >
       <div className="pw-grain" />
+      {/* Stub prices are in use (dev app cannot reach StoreKit). Never renders
+          in production — devOfferingsEnabled() is compile-time gated. */}
+      {isDevMock ? <div className="pw-devbadge">Dev prices</div> : null}
       <PaywallToast message={toast} />
       <div className="pw-stage">
         {/*
