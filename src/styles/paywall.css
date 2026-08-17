@@ -16,7 +16,7 @@
 .pw-root {
   position: relative;
   height: 100%;
-  background: linear-gradient(180deg, var(--pw-s0) 0%, var(--pw-s1) 100%);
+  background: var(--pw-canvas);
   color: var(--pw-text);
   font-family: Nunito, system-ui, -apple-system, sans-serif;
   overscroll-behavior: contain;
@@ -149,6 +149,7 @@
    child <img>, never here.
    -------------------------------------------------------------------------- */
 .pw-hero-band {
+  position: relative;
   /* dvh-clamped so the third value row still fits above the CTA bar on
      shorter screens; it was being pushed under the bar at a fixed 224px. */
   height: clamp(140px, 23dvh, 224px);
@@ -156,16 +157,36 @@
   flex: none;
   overflow: hidden;
   background: var(--pw-hero-bg);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 72%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 72%, transparent 100%);
 }
 
+/* Feather the clip's left and right edges into the canvas. The band ground is
+   matched to the DECODED video background, but decode can shift a level or two
+   per device, and any mismatch shows as a rectangle. These are ordinary
+   overlay elements rather than a mask, because masks over a composited <video>
+   are dropped on real devices (lessons.md). Cheap insurance either way. */
+.pw-hero-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 56px;
+  pointer-events: none;
+}
+.pw-hero-edge-l { left: 0; background: linear-gradient(to right, var(--pw-canvas), rgba(31, 16, 9, 0)); }
+.pw-hero-edge-r { right: 0; background: linear-gradient(to left, var(--pw-canvas), rgba(31, 16, 9, 0)); }
+
+/* The hero is a looping <video>. Do NOT put a mask on this band or on the
+   media: lessons.md records that CSS masks over a composited <video> silently
+   vanish in real-device WKWebView, and neither the simulator nor desktop
+   WebKit reproduces the failure — it would ship as hard visible edges. The
+   dissolves are painted overlays instead, which cannot be dropped. */
+.pw-hero-band video,
 .pw-hero-band img {
   display: block;
   height: 100%;
   width: auto;
   margin: 0 auto;
 }
+
 
 /* --------------------------------------------------------------------------
    Value rows (step 1) — bare rows on the raw canvas. No card, no border,
@@ -225,7 +246,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(to top, var(--pw-s1) 60%, rgba(33, 19, 10, 0) 100%);
+  background: linear-gradient(to top, var(--pw-canvas) 60%, rgba(31, 16, 9, 0) 100%);
 }
 
 /* --------------------------------------------------------------------------
@@ -632,11 +653,9 @@
   /* Ambient: one slow float on the hero image ONLY (the mask stays on the
      unpositioned parent, see .pw-hero-band). Sparkles are baked into the
      art and stay static. */
-  .pw-hero-band img { animation: pwHeroFloat 4.2s ease-in-out infinite; }
-  @keyframes pwHeroFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
+  /* No CSS float on the hero any more: it is a real animated loop, and a bob
+     on top of it read as "just moving up and down". Motion comes from the
+     artwork itself. */
 
   .pw-cta.is-loading .pw-spinner { animation: pwSpin 800ms linear infinite; }
   @keyframes pwSpin { to { transform: rotate(360deg); } }

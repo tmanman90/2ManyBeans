@@ -46,6 +46,16 @@ function pkg(identifier, productId, price, priceString) {
   return {
     identifier,
     packageType: identifier,
+    // RevenueCat's purchasePackage() requires this key and throws
+    // "package argument did not have presentedOfferingContext" without it.
+    // Purchases still cannot complete on the dev app — the paywall
+    // short-circuits before calling the SDK — but the shape stays honest.
+    presentedOfferingContext: {
+      offeringIdentifier: 'dev_stub',
+      placementIdentifier: null,
+      targetingContext: null,
+    },
+    offeringIdentifier: 'dev_stub',
     product: {
       identifier: productId,
       price,

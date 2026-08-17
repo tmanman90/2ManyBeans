@@ -204,3 +204,10 @@ export const FREE_TIER_ROWS = [
 
 // Hero art — bundled on purpose (new path, assetUrl.js does not rewrite it).
 export const PAYWALL_HERO_SRC = '/images/paywall/hero-ruphus-flat.webp';
+
+// Animated hero: a 10s seamless loop (forward + reversed, so the loop point is
+// exact by construction rather than by hoping the generator returned to its
+// start pose). Poster is the video's own first frame, so the still and the
+// first painted video frame are pixel-identical and there is no flash on load.
+export const PAYWALL_HERO_LOOP = '/images/paywall/hero-ruphus-loop.mp4';
+export const PAYWALL_HERO_POSTER = '/images/paywall/hero-ruphus-loop-poster.webp';

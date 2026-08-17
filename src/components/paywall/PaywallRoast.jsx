@@ -33,6 +33,7 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
   // tier/cycle picks on unrelated re-renders (mirrors PaywallSheet.jsx:128).
   const [tier, setTier] = useState('pro'); // 'pro' | 'ultra'
   const [cycle, setCycle] = useState('annual'); // 'annual' | 'monthly'
+  const [devNotice, setDevNotice] = useState(null);
   const wasOpenRef = useRef(false);
 
   const { packages, offering, loading, error, retry, isWeb, isDevMock } = usePaywallOfferings({ open });
@@ -52,6 +53,7 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
       // feature (Aiden push, multi-brewer); Pro Annual otherwise.
       setTier(context?.promote === 'ultra' ? 'ultra' : 'pro');
       setCycle('annual');
+      setDevNotice(null);
       clearError();
     }
     // Also reset on the closing edge. Effects run after render, so resetting
@@ -87,7 +89,21 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
     if (nextTier !== tier || nextCycle !== cycle) haptic.selection();
     setTier(nextTier);
     setCycle(nextCycle);
+    setDevNotice(null);
     clearError();
+  }
+
+  // A purchase genuinely cannot complete while the dev offerings stand-in is
+  // in use: the dev app has no StoreKit products at all (its bundle id is not
+  // the one the products are registered under). Say that plainly instead of
+  // letting the RevenueCat SDK surface a raw internal error.
+  function handlePurchase(pkg) {
+    if (isDevMock) {
+      setDevNotice('Dev app cannot complete purchases. These are stub prices; the real flow needs a TestFlight build.');
+      return;
+    }
+    setDevNotice(null);
+    return purchase(pkg);
   }
 
   if (!open) return null;
@@ -102,8 +118,8 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
     cycle,
     onSelectSku: selectSku,
     purchasing,
-    purchaseError,
-    onPurchase: purchase,
+    purchaseError: purchaseError || devNotice,
+    onPurchase: handlePurchase,
     onRestore: restore,
     onClose,
   };

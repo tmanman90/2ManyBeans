@@ -35,8 +35,16 @@ export const PW = {
   goldLt: '#F7D274', // CTA gradient partner (horizontal, gold -> goldLt)
   ctaInk: '#241710', // text on gold
 
-  // Hero band ground — baked into hero-ruphus-flat.webp, must match exactly
-  heroBg: '#211008',
+  // Flat canvas, sampled from the encoded hero loop's own baked background.
+  // The paywall canvas, the hero band and the CTA scrim all share this one
+  // value, so the hero cannot read as a rectangle sitting on a different
+  // colour. It also replaces the old vertical gradient, which the design bank
+  // discourages anyway ("no atmospheric gradients").
+  // NB: sampled from the DECODED video, not from the source file. H.264
+  // yuv420p shifts the baked background by a level or two on decode, which is
+  // enough to show a faint rectangle around the hero on an OLED panel.
+  canvas: '#1F1009',
+  heroBg: '#1F1009',
 
   // Shared easing for every entrance and step push
   ease: 'cubic-bezier(0.22, 1, 0.36, 1)',
@@ -58,6 +66,7 @@ export const PW_CSS_VARS = {
   '--pw-gold': PW.gold,
   '--pw-gold-lt': PW.goldLt,
   '--pw-cta-ink': PW.ctaInk,
+  '--pw-canvas': PW.canvas,
   '--pw-hero-bg': PW.heroBg,
   '--pw-ease': PW.ease,
 };

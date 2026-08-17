@@ -11,7 +11,7 @@
 //   real free introductory offer exists (Apple 3.1.2).
 
 import { useEffect, useState } from 'react';
-import { PAYWALL_COPY, PAYWALL_HERO_SRC } from '../paywallCopy';
+import { PAYWALL_COPY, PAYWALL_HERO_LOOP, PAYWALL_HERO_POSTER } from '../paywallCopy';
 import { readWarmedTrial, trialFromOffering } from '../../../lib/trialOffer';
 import ValueRow from '../ValueRow';
 import PaywallCTABar from '../PaywallCTABar';
@@ -30,6 +30,12 @@ export default function StepValue({ trigger, offering, onContinue, onClose }) {
 
   const ctaLabel = trial ? `Start my ${trial.label}` : 'See my plans';
 
+  // Honour the OS setting: no decoder, no loop, just the still.
+  const reduceMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   return (
     <>
       <div className="pw-step-scroll">
@@ -44,8 +50,33 @@ export default function StepValue({ trigger, offering, onContinue, onClose }) {
           </h2>
         </div>
 
+        {/*
+          Hero. The band carries NO mask: lessons.md records that CSS masks on
+          a composited <video> silently vanish in device WKWebView, and neither
+          the simulator nor desktop WebKit reproduces it. The top and bottom
+          dissolves are unnecessary: the band ground and the canvas are the
+          same flat colour as the clip's own background, so there is no edge
+          to hide in the first place.
+          Under reduced motion we render the poster still rather than a paused
+          video, so no decoder is spun up at all.
+        */}
         <div className="pw-hero-band pw-in" style={{ '--pw-d': '60ms' }}>
-          <img src={PAYWALL_HERO_SRC} alt="Professor Ruphus with a gold coffee cup" />
+          {reduceMotion ? (
+            <img src={PAYWALL_HERO_POSTER} alt="Professor Ruphus with a gold coffee cup" />
+          ) : (
+            <video
+              src={PAYWALL_HERO_LOOP}
+              poster={PAYWALL_HERO_POSTER}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              aria-label="Professor Ruphus with a gold coffee cup"
+            />
+          )}
+          <span className="pw-hero-edge pw-hero-edge-l" aria-hidden="true" />
+          <span className="pw-hero-edge pw-hero-edge-r" aria-hidden="true" />
         </div>
 
         <div className="pw-value-rows">
