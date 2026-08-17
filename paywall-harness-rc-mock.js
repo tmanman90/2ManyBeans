@@ -6,6 +6,10 @@
 // Prices mirror docs/prds/subscription-paywall-prd.md. Trial length is driven by
 // the `?trial=` query param (e.g. ?trial=3day, ?trial=7day, ?trial=none) so we can
 // screenshot exactly what each App Store Connect intro-offer config would render.
+//
+// `?purchase=slow` holds purchasePackage() open indefinitely so
+// usePaywallPurchase's `purchasing` state (spinner + disabled CTA) is
+// screenshot-able — it resolves synchronously otherwise.
 
 const params = new URLSearchParams(window.location.search);
 const trial = params.get('trial') ?? '3day';
@@ -68,7 +72,10 @@ export const Purchases = {
     if (params.get('offerings') === 'null') return { current: null, all: {} };
     return { current: OFFERING, all: { default: OFFERING } };
   },
-  async purchasePackage() { return { customerInfo: { entitlements: { active: {} } } }; },
+  async purchasePackage() {
+    if (params.get('purchase') === 'slow') await new Promise((r) => setTimeout(r, 60000));
+    return { customerInfo: { entitlements: { active: {} } } };
+  },
   async restorePurchases() { return { customerInfo: { entitlements: { active: {} } } }; },
   async getCustomerInfo() { return { customerInfo: { entitlements: { active: {} } } }; },
 };

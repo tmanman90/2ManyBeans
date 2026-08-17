@@ -1018,7 +1018,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (isDemo) { onDemoAction?.(); return; }
 
     if (!hasPro) {
-      openPaywall({ feature: 'generic', promote: 'pro' });
+      openPaywall({ feature: 'chat', promote: 'pro' });
       return;
     }
 

@@ -123,7 +123,7 @@ export function useAidenBrew(updateBean) {
       // the paywall opens (and possibly persist a Pro-gated recipe to a
       // user who no longer has Pro).
       activeRequestRef.current = null;
-      openPaywall({ feature: 'generic', promote: 'pro' });
+      openPaywall({ feature: 'recipe', promote: 'pro' });
       return;
     }
 
