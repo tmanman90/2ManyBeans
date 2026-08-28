@@ -32,7 +32,9 @@ export function normalizeUsage(provider, usage) {
     ? [usage.cache_read_input_tokens, usage.cache_creation_input_tokens, usage.cache_creation?.ephemeral_5m_input_tokens, usage.cache_creation?.ephemeral_1h_input_tokens, usage.thinking_tokens, usage.output_tokens_details?.thinking_tokens]
     : provider === 'openai'
       ? [usage.input_tokens_details?.cached_tokens, usage.input_tokens_details?.cache_write_tokens, usage.input_token_details?.cached_tokens, usage.input_token_details?.cache_write_tokens, usage.prompt_tokens_details?.cached_tokens, usage.output_tokens_details?.reasoning_tokens, usage.completion_tokens_details?.reasoning_tokens, usage.reasoning_tokens]
-      : [];
+      : provider === 'gemini'
+        ? [usage.cachedContentTokenCount, usage.toolUsePromptTokenCount, usage.thoughtsTokenCount, usage.totalTokenCount]
+        : [];
   if (rawBuckets.some((value) => value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))) return null;
   let inputTokens; let outputTokens; let cacheReadTokens = 0; let cacheWriteTokens = 0; let cacheWrite5mTokens = 0; let cacheWrite1hTokens = 0; let reasoningTokens = 0; let thinkingTokens = 0;
   if (provider === 'anthropic') {
@@ -54,6 +56,8 @@ export function normalizeUsage(provider, usage) {
     const candidateOutput = finite(usage.candidatesTokenCount);
     const thoughtOutput = finite(usage.thoughtsTokenCount) ?? 0;
     outputTokens = candidateOutput == null ? null : candidateOutput + thoughtOutput;
+    reasoningTokens = thoughtOutput; thinkingTokens = thoughtOutput;
+    if (cacheReadTokens > inputTokens) return null;
     if (usage.totalTokenCount !== undefined) {
       const reportedTotal = finite(usage.totalTokenCount);
       if (reportedTotal == null || reportedTotal !== inputTokens + toolUseInput + outputTokens) return null;
