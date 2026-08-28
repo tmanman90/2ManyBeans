@@ -43,8 +43,10 @@ export function estimateSchedule({ arms = MODEL_ARMS, limits = DEFAULT_LIMITS, i
   assertExactArms(arms);
   const initialRuns = limits.cases * limits.repeats;
   const perArm = Object.fromEntries(arms.map((arm) => [arm.id, estimateTurnCost(arm, limits) * (initialRuns + canaryRuns) * (1 + limits.retries)]));
-  const lifecycle = Math.min(2, arms.length) * limits.finalistCases * limits.finalistRepeats * estimateTurnCost(arms[0], limits) * (1 + limits.retries);
-  const warm = includeWarmFinalists ? Math.min(2, arms.length) * limits.finalistCases * estimateTurnCost(arms[0], limits, { cacheRegime: 'warm' }) : 0;
+  const finalistTurn = Math.max(...arms.map((arm) => estimateTurnCost(arm, limits)));
+  const warmFinalistTurn = Math.max(...arms.map((arm) => estimateTurnCost(arm, limits, { cacheRegime: 'warm' })));
+  const lifecycle = Math.min(2, arms.length) * limits.finalistCases * limits.finalistRepeats * finalistTurn * (1 + limits.retries);
+  const warm = includeWarmFinalists ? Math.min(2, arms.length) * limits.finalistCases * warmFinalistTurn : 0;
   const total = Object.values(perArm).reduce((a, b) => a + b, 0) + lifecycle + warm;
   return { perArm, initialRunsPerArm: initialRuns, lifecycle, warm, total, cap: EVALUATION_CAP_USD, feasible: total <= EVALUATION_CAP_USD };
 }
