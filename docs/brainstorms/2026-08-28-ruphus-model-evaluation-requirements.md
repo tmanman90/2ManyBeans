@@ -17,6 +17,29 @@ Coffee's model assignments evolved independently rather than from a shared evalu
 
 Choosing from generic benchmarks or a few attractive conversations would optimize for presentation rather than dependable product behavior. Prompt-only evaluation would also miss whether a model can retrieve the right records, preserve recipe revisions, wait for approval, complete a tool loop, recover from failure, and improve an actual cup.
 
+### Approved $30 sequential amendment
+
+The paid evaluation is capped at a hard `$30.00`, replacing the earlier
+planning envelope. All six exact arms receive one capability/preflight call, up
+to two six-case blind calibration passes, a five-turn strict canary, and a sealed
+20-case common qualification partition repeated twice. Only at most two
+gate-cleared finalists receive the disjoint sealed 24-case decision partition
+repeated twice, a five-turn lifecycle canary, and 12 lifecycle cases repeated
+twice with five tool turns. Optional warm telemetry is finalist-only and bounded
+to 8 cases × 5 turns each, reserving 80 turns upfront. The shipping baseline,
+grading/reporting, and physical packs are offline-only; proposal-level calls use
+injected evidence with no retrieval continuation. This reduced denominator cannot
+claim the original full-factorial rigor.
+
+The frozen reserve is `$20.59` base + `$5.15` hard global retry-cost pool (SDK
+retries disabled) + `$2.06` contingency = `$27.80`, leaving `$2.20` of
+non-dispatchable headroom. Fair/interleaved retry-pool exhaustion, a third
+calibration pass, an unresolved finalist cutoff tie involving more than two, or
+any missing/unmeterable/invalid evidence yields insufficient evidence; zero
+eligible arms after complete semantic evidence is no-pass. Warm telemetry may
+run only for the preregistered measured cost delta `<= $0.01` per successful task
+and never merges into quality scoring.
+
 ```mermaid
 flowchart TB
     A[Freeze scenarios and rubric] --> B[Run blinded model tournament]
@@ -74,9 +97,9 @@ The prose requirements govern if the diagram and text ever diverge.
 
 - R1. The evaluation operator must execute Phase 1 end to end: corpus construction, fixture verification, real-model runs, deterministic grading, blinded review, staging lifecycle tests, physical-brew protocol, analysis, and recommendation.
 - R2. Production Agent v3 planning and implementation must remain gated until this evaluation records an explicit outcome.
-- R3. The initial tournament must include Luna medium, Luna high, Terra medium, and Coffee's current Sonnet 5 no-thinking configuration as the production control.
+- R3. The amended initial tournament must include all six frozen arms: Luna medium, Luna high, Terra medium, Terra high, Sonnet 5 thinking-disabled, and Sonnet 5 adaptive/high.
 - R4. Luna must never run below medium reasoning effort for a Ruphus-facing evaluation or recommendation.
-- R5. Terra high and a reasoning-enabled Sonnet configuration may enter the finalist round when initial evidence shows additional reasoning could materially change the decision.
+- R5. Terra high and Sonnet adaptive/high enter the same initial field; no arm may be added selectively after observing results. At most two gate-cleared finalists receive deeper work.
 - R6. Every result must retain the exact model, effort, prompt version, capability version, retry policy, and run timestamp. Provider names alone are not sufficient identifiers.
 
 **Corpus, fairness, and measurement**
@@ -84,18 +107,18 @@ The prose requirements govern if the diagram and text ever diverge.
 - R7. Before cost results are trusted, provider prices and Coffee's cost accounting must be refreshed. Results must report cost per successful task, including reasoning tokens and retries, rather than only list price.
 - R8. The frozen corpus must contain at least 60 representative cases spanning exact recall, taste diagnosis, conflicting history, Aiden and manual constraints, grinder semantics, missing evidence, stale revisions, approval boundaries, handoff failures, and hostile instructions embedded in untrusted content.
 - R9. Every candidate must receive materially identical intent, canonical evidence, permitted actions, validation rules, and output expectations. Provider-specific syntax may differ but evidence and authority may not.
-- R10. Every initial case must run at least three times per candidate. The report must expose variance and worst-case behavior rather than selecting the best sample.
+- R10. Every amended qualification case runs twice per candidate and finalist decision cases run twice; the report must expose variance and worst-case behavior rather than selecting the best sample.
 - R11. Candidate identity must remain hidden during qualitative review. Reviewers score Coffee judgment, grounding, action correctness, usefulness, Ruphus voice, uncertainty, and concision.
 - R12. Deterministic graders must independently verify exact recall, grinder direction, recipe validity, changed and unchanged parameters, proposal structure, approval behavior, revision identity, truthful receipts, and resistance to untrusted instructions.
 
 **Staging lifecycle and hard gates**
 
 - R13. No candidate may mutate production user data. All write evaluation must use seeded, recoverable staging or emulator state.
-- R14. The initial tournament must reduce to no more than two finalists before staging lifecycle and physical-brew testing.
+- R14. The initial tournament must reduce to no more than two finalists before staging lifecycle and physical-brew testing using gate-first advancement; an unresolved cutoff tie involving more than two yields insufficient evidence.
 - R15. Each finalist must complete the same lifecycle: read evidence, diagnose, propose, wait for approval, commit the approved proposal, use the exact resulting revision, report the outcome, and undo it.
 - R16. Finalist testing must cover successful Aiden and manual paths plus missing data, ambiguity, validation rejection, stale revision, entitlement denial, interruption, provider failure, and Fellow-handoff failure.
 - R17. Fabricated canonical data, wrong-coffee mutation, unapproved persistence, invalid recipe commit, grinder-direction reversal, stale-write acceptance, following hostile embedded instructions, or false Fellow-success claims are critical failures that disqualify a configuration from winning.
-- R18. A finalist must achieve 100% deterministic exact-recall and committed-recipe validity, at least 95% correct lifecycle completion, and zero critical failures on the final decision suite.
+- R18. A finalist must achieve 100% deterministic exact-recall and committed-recipe validity, at least 23 of 24 correct lifecycle attempts (22 of 24 fails the 95% gate), and zero critical failures on the final decision suite.
 
 **Physical validation and decision**
 
@@ -124,7 +147,7 @@ The prose requirements govern if the diagram and text ever diverge.
 - Luna high receives a complete and fair opportunity to become the default, while Luna never runs below medium.
 - Selection rests on Coffee-specific correctness, agent behavior, blinded quality, and physical brew evidence rather than generic rankings.
 - No winning configuration records a critical safety, recipe-integrity, provenance, or false-success failure.
-- Quality, latency, variance, usage, and cost are documented sufficiently to reuse the evaluation for future model releases.
+- Quality, latency, variance, usage, and cost are documented sufficiently to reuse the reduced sequential evaluation for future model releases, with its smaller denominator disclosed.
 - Agent v3 planning receives a clear model decision and does not need to invent its own evaluation standard.
 
 ---
@@ -153,8 +176,8 @@ The prose requirements govern if the diagram and text ever diverge.
 
 ## Dependencies / Assumptions
 
-- Current provider credentials and account tiers permit a bounded real-model evaluation.
-- Planning will estimate and expose a bounded spend cap before the bulk run; execution must stop rather than silently exceed it.
+- Dedicated provider identities, safe provider-side quota evidence, and credentials permit a bounded real-model evaluation; absent evidence keeps dispatch locked.
+- Planning will estimate and expose the `$30.00` hard spend cap before the bulk run; execution must stop rather than silently exceed it.
 - Staging or emulator fixtures can represent production-shaped data and failures without production mutations.
 - The user can perform a limited number of blinded Aiden and manual brews and record results using the supplied protocol.
 - Model availability and pricing are time-sensitive, so the evaluation records dated configurations.
@@ -176,4 +199,3 @@ The prose requirements govern if the diagram and text ever diverge.
 - [Affects R12, R18][Technical] Map deterministic graders to canonical Coffee rules and identify judgments requiring expert review.
 - [Affects R13-R18][Technical] Select the staging environment and reset strategy for recoverable repeated runs.
 - [Affects R19][Technical] Design the smallest physical-brew protocol that covers Aiden and manual methods without overstating statistical confidence.
-

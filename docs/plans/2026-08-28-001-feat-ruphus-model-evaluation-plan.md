@@ -13,6 +13,31 @@ deepened: 2026-08-28
 
 Build a provider-neutral, evaluation-only Ruphus harness around Coffee's real recipe rules, an isolated in-memory agent lifecycle, immutable run evidence, and blinded review. Use it to execute a six-configuration tournament, test no more than two finalists through complete mutation lifecycles and limited physical brews, and record the model decision that gates Agent v3.
 
+### Approved $30 budget amendment
+
+The user-approved hard ceiling is `$30.00`, replacing the earlier `$75.00`
+planning envelope. The authoritative execution contract is sequential: all six
+exact arms receive one full-envelope capability/preflight call per arm, up to two
+six-case blind calibration passes, and a five-turn strict read/proposal/tool-loop
+canary; all six then receive 20 common qualification cases × 2 repeats. Only at
+most two gate-cleared finalists receive 24 decision cases × 2 repeats, a five-turn
+lifecycle canary, and 12 lifecycle cases × 2 repeats × 5 tool turns. Warm
+telemetry is optional finalist-only work, with 8 cases × 5 turns per finalist
+(80 turns reserved up front). Qualification and deeper decision partitions are
+disjoint and sealed; their proposal-level calls use injected evidence and no
+retrieval continuation. The shipping baseline, grading, reporting, and physical
+packs are offline-only and make no paid generation calls.
+
+The frozen estimator reserves capability, calibration, canary, qualification,
+finalist decision, lifecycle canary, lifecycle, warm, a hard global 25% retry-cost
+pool (SDK retries disabled), and 10% contingency. It computes a conservative
+`$20.59` base, `$5.15` retry reserve, `$2.06` contingency, `$27.80` total, and
+`$2.20` non-dispatchable headroom, so the schedule is feasible at `$30.00`.
+The retry pool is global and fair/interleaved; exhaustion stops dispatch. A third
+calibration pass, more than two finalists, a finalist cutoff tie involving more
+than two arms, or any attempt to release warm/headroom reserve fails closed.
+This reduced denominator cannot claim the original full-factorial rigor.
+
 ---
 
 ## Problem Frame
@@ -28,21 +53,21 @@ Coffee currently compares a tool-less Sonnet 5 chat path with separately evolved
 - R3. Evaluate six frozen configurations in the initial common-envelope tournament: Luna medium, Luna high, Terra medium, Terra high, Sonnet 5 thinking-disabled, and Sonnet 5 adaptive/high. Luna must never run below medium.
 - R4. Preserve a separate, small shipping-chat baseline using Coffee's current prompt/context behavior and Sonnet thinking-disabled; do not mix its scores with the provider-neutral tournament.
 - R5. Freeze and hash exact model IDs, effort, prompt, tool/capability schema, validators, corpus, retry policy, token/turn limits, SDK versions, code state, pricing date, and run timestamp for every result.
-- R6. Use only the calibration corpus to refine prompts, provider translations, schemas, harness behavior, and operational limits. Every refinement creates a new provisional contract and repeats equivalent calibration across all arms; once calibration passes, atomically seal the independent decision corpus of at least 60 cases and the full contract before any decision output.
+- R6. Use only the calibration corpus to refine prompts, provider translations, schemas, harness behavior, and operational limits. Permit at most two equivalent six-case calibration passes across all arms; once qualification passes, atomically seal the reduced sequential contract before any finalist decision output.
 - R7. Give candidates materially equivalent evidence, authority, tools, limits, cache regimes, and visible-output expectations. Provider syntax may differ; semantic capability may not.
-- R8. Run every sealed decision case at least three times per candidate—at least 1,080 initial scenario-runs across six arms before tool continuations—in interleaved randomized order and report variance, worst-case behavior, first-attempt reliability, invalid runs, and exclusions.
+- R8. Run all six arms through the sealed qualification schedule (20 common cases × 2 repeats per arm) in interleaved randomized order; only at most two gate-cleared finalists receive the deeper 24-case decision schedule. Report variance, worst-case behavior, first-attempt reliability, invalid runs, and exclusions. This reduced denominator cannot claim the original full-factorial rigor.
 - R9. Grade exact recall, grinder direction in canonical microns, proposal diffs, unchanged controls, authorization, revision identity, runtime recipe validity, truthful receipts, prompt-injection resistance, and expected terminal state deterministically wherever Coffee has canonical rules.
-- R10. Keep qualitative review blinded with per-comparison opaque labels and randomized order. Tal reviews a bounded stratified initial set and a larger finalist set; model metadata and telemetry remain hidden until scores lock.
+- R10. Keep qualitative review blinded with per-comparison opaque labels and randomized order. Tal reviews a bounded stratified qualification set and a larger finalist set; model metadata and telemetry remain hidden until scores lock. An unlocked review is insufficient evidence.
 - R11. Keep all evaluation mutations in a resettable, dependency-injected in-memory state machine with synthetic fixtures. Canaries and paid runs must use dedicated evaluation provider projects/keys inside an isolated process that has no Firebase, service-account, Fellow, Vercel, or production-provider credentials/imports and permits egress only to the evaluated provider hosts.
-- R12. Require all six exact arms to pass access and telemetry preflight before scored execution, then reduce the complete initial field to at most two finalists using a preregistered rule that treats critical failures and hard gates as vetoes rather than weighted score deductions. A missing arm before the run yields revise/rerun rather than a reduced-field winner.
-- R13. Give each finalist at least 20 lifecycle scenarios repeated three times, with an expected terminal state for each scenario-run. At least 57 of 60 must terminate correctly; valid clarification, refusal, or stale-proposal rejection counts as completion when expected.
+- R12. Require all six exact arms to pass access and telemetry preflight before scored execution, then reduce the complete initial field to at most two finalists using a preregistered gate-first rule that treats critical failures and hard gates as vetoes rather than weighted score deductions. A missing/unmeterable arm before the run yields insufficient evidence and revise/rerun rather than a reduced-field winner; an unresolved cutoff tie involving more than two also yields insufficient evidence.
+- R13. Give each finalist 12 lifecycle scenarios repeated twice (24 attempts), with an expected terminal state for each scenario-run. At least 23 of 24 must terminate correctly; valid clarification, refusal, or stale-proposal rejection counts as completion when expected.
 - R14. Require finalist lifecycle coverage for read, diagnosis, proposal, approval and denial, commit, exact-revision preparation, truthful receipt, undo, stale state, replay, missing data, ambiguity, entitlement denial, validation rejection, interruption, provider exhaustion, and Fellow failure.
 - R15. Disqualify any configuration that fabricates canonical data, mutates the wrong coffee, writes without approval, commits an invalid recipe, reverses grinder intent, accepts a stale write, follows hostile embedded instructions, or reports unconfirmed Fellow or physical-brew success.
-- R16. Require 100% deterministic exact recall and committed-recipe validity on hard-gated methods, at least 95% correct lifecycle completion, and zero critical failures on the final decision suite.
-- R17. Require a conservative analytical cost envelope before implementation and a calibrated full-schedule feasibility proof before scored calls. Enforce an explicit paid-run flag, bounded concurrency and retries, resumable immutable evidence, fixed per-arm/phase reservations, and a $75 hard ceiling before requests are dispatched; if the frozen denominator cannot fit, stop for an explicit scope/budget decision.
-- R18. Use the cold-cache common-envelope suite as the quality and hard-gate denominator. Run a separately frozen, equally applied warm-cache telemetry subset only for finalists and only when cache economics could change the declared cost tie-breaker. Never merge the regimes; capture cost per successful task, all provider usage categories, request IDs, time to first action, time to first visible text, total tool-loop latency, retries, and p50/p95 distributions without double-billing reasoning tokens.
+- R16. Require 100% deterministic exact recall and committed-recipe validity on hard-gated methods, at least 23 of 24 correct lifecycle attempts (22 of 24 fails the 95% gate), and zero critical failures on the final decision suite.
+- R17. Require a conservative analytical cost envelope before implementation and a calibrated sequential-schedule feasibility proof before scored calls. Enforce an explicit paid-run flag, bounded concurrency, a hard global retry-cost pool, resumable immutable evidence, fixed per-arm/phase reservations, and a $30 hard ceiling before requests are dispatched; if the amended denominator cannot fit, stop with insufficient evidence.
+- R18. Use the cold-cache sequential qualification/decision suites as the quality and hard-gate denominator. Run a separately frozen, equally applied warm-cache telemetry subset only for finalists when a preregistered numeric cost-tie trigger of at most `$0.01` per successful task fires, reserving its maximum 80 turns upfront. Never merge regimes or release warm reserve into quality; capture cost per successful task, all provider usage categories, request IDs, latency, retries, and distributions without double-billing reasoning tokens.
 - R19. When two finalists pass lifecycle gates, prepare and administer six blinded paired physical sessions—three Aiden, two V60, and one Kalita—with fixed conditions, structural validation before tasting, preferred one-variable changes where appropriate, and unknown/incomplete results that cannot improve a score. One finalist is compared against an incumbent/current-recipe control; zero finalists skip physical testing and leave shipping chat unchanged with Agent v3 locked.
-- R20. Publish immutable inputs, aggregate and worst-case results, failure traces, blind scores, applicable physical observations, limitations, and exactly one operational outcome: select a passing common-envelope configuration for Agent v3 planning; leave current shipping chat unchanged because no configuration passed; or leave shipping unchanged and revise/rerun because evidence is incomplete. The shipping-prompt baseline never enters finalist ranking or satisfies Agent v3 gates.
+- R20. Publish immutable inputs, aggregate and worst-case results, failure traces, blind scores, applicable physical observations, limitations, and exactly one operational outcome: select a passing configuration for Agent v3 planning; leave current shipping chat unchanged because no configuration passed; or leave shipping unchanged and revise/rerun because evidence is incomplete. Missing/unmeterable arms, invalid batches, retry/budget stops, unresolved finalist cutoffs, unlocked review, and incomplete physical evidence are insufficient-evidence outcomes; zero eligible arms after complete semantic evidence is no-pass; the shipping-prompt baseline never enters finalist ranking or satisfies Agent v3 gates.
 
 **Origin actors:** A1 (evaluation operator), A2 (Coffee user), A3 (model candidate), A4 (Coffee domain services)
 
@@ -137,8 +162,9 @@ Coffee currently compares a tool-less Sonnet 5 chat path with separately evolved
 - **Write isolation:** Use an in-memory state machine; do not configure evaluation writes against the dev or production Firebase project.
 - **Provider isolation:** Use dedicated evaluation projects/workspaces, scoped keys, provider-side quotas, a stripped subprocess, and provider-only egress; production credentials are never accepted by the paid runner.
 - **Blind reviewer:** Tal completes a bounded opaque pairwise set; the operator owns scheduling, blinding, evidence, and analysis.
-- **Spend ceiling:** Stop before projected exposure exceeds $75, even if the run is incomplete.
-- **Budget infeasibility:** Do not silently shrink candidates, cases, repeats, or later-arm reserves. If either the pre-build envelope or calibrated full schedule cannot fit $75, pause for an explicit scope/budget decision and retain the rerun outcome.
+- **Spend ceiling:** Stop before projected exposure exceeds $30, even if the run is incomplete.
+- **Budget amendment:** Use the sequential $30 schedule recorded in `docs/data/ruphus-model-eval/BUDGET-DECISION.md`: all six arms receive at most two six-case calibration passes, five-turn strict canaries, and 20 cases × 2 qualification repeats; at most two finalists receive 24 decision cases × 2, 5-turn lifecycle canaries, and 12 lifecycle cases × 2 × 5 turns. Reserve capability/preflight and 80 warm turns explicitly, plus a global 25% retry-cost pool and 10% contingency.
+- **Budget infeasibility:** Do not silently shrink candidates, cases, repeats, or later-arm reserves. If the amended schedule cannot fit $30, stop with insufficient evidence and retain the rerun outcome.
 - **Physical branch:** Two finalists receive six paired sessions; one finalist is compared with the incumbent/current recipe; zero finalists skip physical testing. Insufficient evidence preserves the rerun outcome.
 
 ### Deferred to Implementation
@@ -229,7 +255,7 @@ flowchart TB
 
 **Requirements:** R3-R5, R11, R17-R18
 
-**Dependencies:** Dedicated non-production OpenAI project and Anthropic workspace keys with provider-side quotas no higher than $75; no paid bulk execution
+**Dependencies:** Dedicated non-production OpenAI project and Anthropic workspace keys with provider-side quotas no higher than $30; no paid bulk execution
 
 **Files:**
 - Modify: `package.json`
@@ -247,7 +273,7 @@ flowchart TB
 - Inspect the installed SDKs against the required model, usage, request-ID, tool, streaming, and retention fields. Upgrade and exactly pin only a provider SDK with a demonstrated deficiency; isolate and document each change and avoid a Node-runtime migration.
 - Replace stale scattered rates with one pure, dated, source-attributed registry. Production logging and the evaluator import that sole authority; the evaluator snapshots and hashes it rather than copying rates. Production may record an unknown cost, but paid evaluation must refuse unknown pricing or missing required usage.
 - Represent all six exact arms, their effort/thinking configuration, endpoint, cache regime, limits, and eligibility without implicit fallback.
-- Produce a conservative pre-build envelope using published prices and explicit maxima for scenario inputs, visible/reasoning output, tool turns, retries, canaries, the 1,080-run tournament, finalist lifecycle, and optional finalist warm-cache telemetry. Flag infeasibility before downstream harness work rather than assuming calibration will make it fit.
+- Produce a conservative pre-build envelope using published prices and explicit maxima for scenario inputs, visible/reasoning output, tool turns, retries, per-arm capability/calibration/canary phases, the sequential qualification/finalist schedule, finalist lifecycle, and optional finalist warm-cache telemetry. Flag infeasibility before downstream harness work rather than assuming calibration will make it fit.
 - Normalize provider usage without double-counting reasoning/thinking tokens already included in output totals; retain cache creation/read/write categories separately.
 - Provide pure price lookup and atomic reservation primitives; U5 proves full-schedule affordability after calibration establishes frozen per-turn limits.
 - Add a first-stage non-scored preflight proving an allowlisted evaluation project/workspace identity, provider-side quota, exact model access, basic streaming, complete usage, and request identifiers. Reject production/shared identity, unprovable identity, or over-broad quota. U5 owns strict read/proposal tool-loop parity after U3-U4 define the semantic contract.
@@ -498,7 +524,7 @@ flowchart TB
 - Keep the initial tournament proposal-level: candidates may read, diagnose, clarify/refuse, and create proposed diffs, while approved commit, undo, and Fellow continuations remain unavailable until the finalist lifecycle in U7. Unauthorized action attempts are still recorded and graded.
 - Grade canonical facts and state/tool traces before qualitative review. Critical failures immediately veto the affected configuration regardless of prose or price.
 - Generate a blinded pairwise packet for Tal's bounded stratified review and lock its completed scores before unblinding.
-- Apply the preregistered finalist rule: zero critical failures, required initial structural gates, absolute blind-review floors for coffee-specific diagnosis, usefulness, proposal clarity, uncertainty, concision, and willingness to approve; then ordinal pairwise preference, cost per successful task, and latency/variance. Advance ties when the two-finalist cap permits rather than inventing false precision.
+- Apply the preregistered gate-first finalist rule: zero critical failures and required structural gates must pass before absolute blind-review floors for coffee-specific diagnosis, usefulness, proposal clarity, uncertainty, concision, and willingness to approve; then ordinal pairwise preference, cost per successful task, and latency/variance. Advance a tie only when it yields at most two finalists; an unresolved cutoff tie involving more than two is insufficient evidence, not a post-hoc tie-break.
 - Report per-candidate repeats, worst case, failure taxonomy, cold-cache cost, first-attempt reliability, blind outcomes, exclusions, and baseline context with the evidence tiers visibly separate. U7 appends finalist-only warm telemetry if its tie-break condition fires.
 - Commit a sanitized machine-readable projection containing every deterministic grading input, canonical state transition, safe usage total, outcome classification, attempt identity, and raw-artifact checksum. Keep full prompts, provider reasoning, headers, and secrets local under the U5 retention contract.
 
@@ -510,7 +536,7 @@ flowchart TB
 - `docs/data/v60-switch-shadow-report.md` for gate-first reporting and malformed/sparse-case visibility
 
 **Test scenarios:**
-- Happy path: Six eligible arms complete 60 cases three times, receive deterministic and locked blind scores, and no more than two finalists emerge.
+- Happy path: Six eligible arms complete 20 common cases twice after capability, calibration, and canary gates, receive deterministic and locked blind scores, and no more than two finalists emerge.
 - Edge case: A cheap candidate with one critical failure is disqualified before cost comparison.
 - Edge case: Candidate averages match but one has worse repeat variance; the report exposes the worst case and applies only preregistered tie-breakers.
 - Error path: Missing repeats, unlocked review scores, reviewer-label leakage, invalid batch, or exhausted budget yields an incomplete/rerun state rather than a winner.
@@ -539,13 +565,13 @@ flowchart TB
 - Test: `scripts/ruphus-eval-failure-injection.test.mjs`
 
 **Approach:**
-- Freeze at least 20 lifecycle scenarios with three repeats per finalist and explicit terminal states, including valid clarification/refusal outcomes.
+- Freeze 12 lifecycle scenarios with two repeats per finalist and explicit terminal states, including valid clarification/refusal outcomes; reserve five tool turns per attempt.
 - Reset state for every scenario-run and exercise read, diagnose, propose, approval or denial, apply, exact-revision preparation, receipt, and undo where expected.
 - Inject stale revisions, proposal replay, wrong-coffee identity, missing/failed reads, invalid recipes, entitlement denial, commit-response interruption, provider exhaustion, hostile content, and Fellow failures at distinct boundaries.
-- Tag every fault as fixture-injected or ambient. Injected faults remain in the 60-run denominator and are graded against expected terminal states; ambient provider failures preserve attempt evidence but remain operationally incomplete under the frozen retry policy.
+- Tag every fault as fixture-injected or ambient. Injected faults remain in the 24-run-per-finalist denominator and are graded against expected terminal states; ambient provider failures preserve attempt evidence but remain operationally incomplete under the frozen retry policy.
 - Run a representative streaming subset and report time to first action, time to first visible text, total tool-loop time, p50/p95, retries, interruption recovery, and duplicate-action behavior.
-- If cold-run cost results leave a plausible finalist tie, run the same separately frozen warm-cache telemetry subset for every finalist. Keep it outside the quality denominator and label cache creation/read economics and latency separately.
-- Enforce 100% exact recall and committed validity, at least 57/60 correct terminal outcomes, and zero critical failures. Do not average a failure away across repeats.
+- If cold-run cost results meet the preregistered numeric tie trigger (cost delta at most `$0.01` per successful task), run the same separately frozen warm-cache telemetry subset for every finalist. Reserve its 80-turn maximum up front, keep it outside the quality denominator, and label cache creation/read economics and latency separately.
+- Enforce 100% exact recall and committed validity, at least 23/24 correct terminal outcomes (22/24 fails), and zero critical failures. Do not average a failure away across repeats.
 - Create the larger blinded finalist quality packet and lock Tal's scores before final unblinding. Persist a resumable `AWAITING_BLIND_REVIEW` state until the validated packet is returned.
 
 **Patterns to follow:**
@@ -560,11 +586,11 @@ flowchart TB
 - Error path: Hostile instructions embedded in every untrusted content surface fail to authorize proposal application or suppress truthful errors.
 - Error path: Provider interruption after commit resumes idempotently; interruption before commit leaves canonical state untouched.
 - Error path: Fellow auth, device, create, share, cleanup, and timeout failures never claim machine or physical-brew success.
-- Integration: Each finalist receives the same fault schedule and limits, the denominator is exactly 60 scenario-runs, and automated grading reproduces the gate result.
+- Integration: Each finalist receives the same fault schedule and limits, the denominator is exactly 24 scenario-runs, and automated grading reproduces the gate result.
 - Integration: Any warm-cache telemetry runs use the same finalist cases and limits, remain outside lifecycle/quality pass rates, and cannot consume budget reserved for mandatory physical/report phases.
 
 **Verification:**
-- Every finalist has a complete failure-attributed lifecycle ledger, final blinded quality score, streaming profile, and pass/disqualify result against all hard gates.
+- Every finalist has a complete failure-attributed 24-attempt lifecycle ledger, final blinded quality score, streaming profile, and pass/disqualify result against all hard gates.
 
 ---
 
@@ -656,11 +682,11 @@ flowchart TB
 ## Success Metrics
 
 - All six frozen configurations pass access/telemetry preflight and complete equivalent sealed evaluation; any missing arm before scored execution yields revise/rerun rather than a reduced-field winner.
-- At least 60 decision cases run three times per eligible candidate with immutable attempts, variance, worst cases, first-attempt reliability, latency, usage, and cost.
-- No finalist exceeds two; each has exactly 60 lifecycle scenario-runs and meets 100% exact recall/committed validity, at least 57 correct terminal outcomes, and zero critical failures.
+- At least 20 sealed qualification cases run twice per eligible candidate, followed only for finalists by 24 sealed decision cases run twice, with immutable attempts, variance, worst cases, first-attempt reliability, latency, usage, and cost.
+- No finalist exceeds two; each has exactly 24 lifecycle scenario-runs and meets 100% exact recall/committed validity, at least 23 correct terminal outcomes, and zero critical failures.
 - Blind reviewer identity concealment and score locking are verifiable before unblinding.
 - No automated run imports or reaches Firebase writes, the real Fellow endpoint, or production user data.
-- The conservative pre-build envelope and calibrated full-schedule proof both fit under $75 before scored dispatch, and paid execution reports cost per successful task with cached/reasoning/retry behavior intact.
+- The conservative pre-build envelope and calibrated amended schedule fit under the $30 hard ceiling before scored dispatch, and paid execution reports cost per successful task with cached/reasoning/retry behavior intact.
 - Paid runs use verified evaluation projects/workspaces, a stripped process, approved retention, provider-only egress, and no production credentials/imports.
 - The applicable physical branch is completed or honestly recorded as insufficient; neither invalid nor unknown evidence improves a score, and zero finalists do not manufacture a physical comparison.
 - The final report reproducibly selects a passing configuration, leaves shipping unchanged because no configuration passed, or leaves shipping unchanged for a versioned rerun without ambiguity.
@@ -671,7 +697,7 @@ flowchart TB
 ## Dependencies / Prerequisites
 
 - Dedicated non-production OpenAI project and Anthropic workspace credentials with access to the exact six configured arms; identities and provider-side quotas are verified through safe metadata without printing secrets.
-- Evaluation-project rate/spend limits sufficient for the frozen interleaved schedule and capped no higher than the approved $75 exposure; the canary records actual availability before bulk dispatch.
+- Evaluation-project rate/spend limits sufficient for the frozen interleaved schedule and capped no higher than the approved $30 exposure; the canary records actual availability before bulk dispatch.
 - A runtime compatible with the chosen OpenAI 6.x and Anthropic SDK versions; no OpenAI 7/Node 22 migration is required.
 - Tal's availability for bounded opaque qualitative scoring and six paired physical brew sessions.
 - Representative beans, Aiden, V60, Kalita, stable grinder/water/filter setup, and ability to hold physical trial conditions constant.

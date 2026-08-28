@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BudgetReservation, estimateSchedule, MODEL_ARMS, assertExactArms, LONG_CONTEXT_THRESHOLD, estimateTurnCost, validateLimits } from './ruphus-eval/models.mjs';
-test('conservative complete schedule explicitly accounts for tool loops and fails closed when over cap', () => {
+import { BudgetReservation, estimateSchedule, MODEL_ARMS, assertExactArms, LONG_CONTEXT_THRESHOLD, estimateTurnCost, validateLimits, DEFAULT_LIMITS, EVALUATION_CAP_USD } from './ruphus-eval/models.mjs';
+test('sequential six-arm qualification and finalist phases fit the amended cap', () => {
   const estimate = estimateSchedule();
-  assert.equal(estimate.initialModelTurnsPerArm, 910); // (60*3 + 2 canaries) * five turns
-  assert.ok(estimate.lifecycleTurns > 0 && estimate.warmCreationTurn > 0 && estimate.warmRead > 0);
-  assert.equal(estimate.feasible, false);
-  assert.ok(estimate.total > estimate.cap);
+  assert.equal(estimate.qualificationRunsPerArm, 40);
+  assert.equal(estimate.qualificationModelTurnsPerArm, 40); // 20 cases * 2 repeats * 1 turn
+  assert.ok(estimate.qualification > 0 && estimate.decision > 0 && estimate.lifecycle > 0 && estimate.warm > 0);
+  assert.equal(estimate.warmCalls, 80); // 2 finalists * 8 cases * 5 turns
+  assert.equal(estimate.cap, 30); assert.equal(estimate.cap, EVALUATION_CAP_USD);
+  assert.equal(estimate.feasible, true);
+  assert.ok(estimate.total > 27.79 && estimate.total < 27.81);
+  assert.ok(estimate.headroom > 2.19 && estimate.headroom < 2.21);
 });
 test('reservations reject duplicate and over-cap allocations', () => {
   const budget = new BudgetReservation(1); budget.reserve('a', 0.6);
@@ -23,7 +27,10 @@ test('long-context pricing is fail-closed until explicitly frozen', () => {
   assert.throws(() => assertExactArms([{ ...MODEL_ARMS[0], model: 'wrong-model' }, ...MODEL_ARMS.slice(1)]), /canonical model/);
 });
 test('schedule limits cannot be manipulated into free or negative work', () => {
-  for (const key of ['toolTurns', 'cases', 'repeats', 'finalistCases', 'finalistRepeats']) assert.throws(() => validateLimits({ ...estimateSchedule ? { inputTokens: 1, outputTokens: 1, toolTurns: 1, cases: 1, repeats: 1, finalistCases: 1, finalistRepeats: 1, retries: 0, canaryRuns: 0 } : {}, [key]: 0 }), /invalid/);
-  assert.throws(() => estimateSchedule({ limits: { inputTokens: 1, outputTokens: 1, toolTurns: 1, cases: 1, repeats: 1, finalistCases: 1, finalistRepeats: 1, retries: -1, canaryRuns: 0 } }), /invalid/);
-  assert.throws(() => estimateSchedule({ limits: { inputTokens: 1, outputTokens: -1, toolTurns: 1, cases: 1, repeats: 1, finalistCases: 1, finalistRepeats: 1, retries: 0, canaryRuns: 0 } }), /invalid/);
+  for (const key of ['qualificationCases', 'qualificationRepeats', 'qualificationToolTurns', 'decisionCases', 'decisionRepeats', 'decisionToolTurns', 'lifecycleCases', 'lifecycleRepeats', 'lifecycleToolTurns']) assert.throws(() => validateLimits({ ...DEFAULT_LIMITS, [key]: 0 }), /invalid/);
+  assert.throws(() => estimateSchedule({ limits: { retryReserveRate: -1 } }), /invalid/);
+  assert.throws(() => estimateSchedule({ limits: { outputTokens: -1 } }), /invalid/);
+  assert.throws(() => estimateSchedule({ limits: { calibrationPasses: 3 } }), /calibration/);
+  assert.throws(() => estimateSchedule({ limits: { warmTriggerCostDeltaUsd: 0 } }), /warm trigger/);
+  assert.throws(() => estimateSchedule({ limits: { finalistCount: 3 } }), /finalist/);
 });

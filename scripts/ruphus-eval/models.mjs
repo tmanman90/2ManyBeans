@@ -1,6 +1,8 @@
 import { getModelPrice, MODEL_PRICING, PRICING_REGISTRY_VERSION } from '../../api/_lib/modelPricing.js';
 
-export const EVALUATION_CAP_USD = 75;
+// Approved budget amendment: sequential qualification for all six arms, then
+// deeper decision/lifecycle work for at most two finalists.
+export const EVALUATION_CAP_USD = 30;
 export const LONG_CONTEXT_THRESHOLD = 272_000;
 export const CACHE_REGIMES = Object.freeze(['cold', 'warm']);
 export const MODEL_ARMS = Object.freeze([
@@ -40,14 +42,30 @@ export function validateSchedule(schedule, { allowWarm = false } = {}) {
 
 // Conservative planning maxima. Values are intentionally explicit and must be
 // frozen into the run manifest before any paid dispatch.
-export const DEFAULT_LIMITS = Object.freeze({ inputTokens: 5000, outputTokens: 1800, toolTurns: 5, retries: 1, canaryRuns: 2, cases: 60, repeats: 3, finalistCases: 20, finalistRepeats: 3 });
+export const DEFAULT_LIMITS = Object.freeze({
+  inputTokens: 5000, outputTokens: 1800,
+  capabilityTurns: 1, calibrationPasses: 2, calibrationCases: 6,
+  calibrationToolTurns: 1, toolCanaryTurns: 5,
+  qualificationCases: 20, qualificationRepeats: 2,
+  qualificationToolTurns: 1, finalistCount: 2,
+  decisionCases: 24, decisionRepeats: 2, decisionToolTurns: 1,
+  lifecycleCanaryTurns: 5,
+  lifecycleCases: 12, lifecycleRepeats: 2, lifecycleToolTurns: 5,
+  warmCases: 8, warmToolTurns: 5, contingencyRate: 0.10,
+  retryReserveRate: 0.25,
+  // Warm telemetry is only authorized for a preregistered numeric tie.
+  warmTriggerCostDeltaUsd: 0.01,
+});
 export function validateLimits(limits = DEFAULT_LIMITS) {
-  const positiveIntegers = ['toolTurns', 'cases', 'repeats', 'finalistCases', 'finalistRepeats'];
-  const nonNegativeIntegers = ['retries', 'canaryRuns'];
+  const positiveIntegers = ['capabilityTurns', 'calibrationPasses', 'calibrationCases', 'calibrationToolTurns', 'toolCanaryTurns', 'qualificationCases', 'qualificationRepeats', 'qualificationToolTurns', 'finalistCount', 'decisionCases', 'decisionRepeats', 'decisionToolTurns', 'lifecycleCanaryTurns', 'lifecycleCases', 'lifecycleRepeats', 'lifecycleToolTurns', 'warmCases', 'warmToolTurns'];
   const positiveFinite = ['inputTokens', 'outputTokens'];
   for (const key of positiveIntegers) if (!Number.isInteger(limits[key]) || limits[key] <= 0) throw new Error(`invalid positive limit ${key}`);
-  for (const key of nonNegativeIntegers) if (!Number.isInteger(limits[key]) || limits[key] < 0) throw new Error(`invalid nonnegative limit ${key}`);
   for (const key of positiveFinite) if (!Number.isFinite(limits[key]) || limits[key] <= 0) throw new Error(`invalid token ceiling ${key}`);
+  if (!Number.isFinite(limits.contingencyRate) || limits.contingencyRate < 0 || limits.contingencyRate > 1) throw new Error('invalid contingency rate');
+  if (!Number.isFinite(limits.retryReserveRate) || limits.retryReserveRate < 0 || limits.retryReserveRate > 1) throw new Error('invalid retry reserve rate');
+  if (!Number.isFinite(limits.warmTriggerCostDeltaUsd) || limits.warmTriggerCostDeltaUsd <= 0) throw new Error('invalid warm trigger');
+  if (limits.calibrationPasses > 2) throw new Error('calibration passes cannot exceed two');
+  if (limits.finalistCount > 2) throw new Error('finalist count cannot exceed two');
   return true;
 }
 export function estimateTurnCost(arm, limits = DEFAULT_LIMITS, { cacheRegime = 'cold' } = {}) {
@@ -58,26 +76,42 @@ export function estimateTurnCost(arm, limits = DEFAULT_LIMITS, { cacheRegime = '
   const cached = cacheRegime === 'warm' ? input * 0.25 : 0;
   return ((input - cached) * p.input + cached * (p.cacheRead ?? p.input) + limits.outputTokens * p.output) / 1_000_000;
 }
-export function estimateSchedule({ arms = MODEL_ARMS, limits = DEFAULT_LIMITS, includeWarmFinalists = true, canaryRuns = limits.canaryRuns } = {}) {
-  validateLimits({ ...limits, canaryRuns });
+export function estimateSchedule({ arms = MODEL_ARMS, limits = DEFAULT_LIMITS, includeWarmFinalists = true } = {}) {
+  limits = { ...DEFAULT_LIMITS, ...limits };
+  validateLimits(limits);
   assertExactArms(arms);
-  const initialRuns = limits.cases * limits.repeats;
-  const initialModelTurns = (initialRuns + canaryRuns) * limits.toolTurns;
-  const perArm = Object.fromEntries(arms.map((arm) => [arm.id, estimateTurnCost(arm, limits) * initialModelTurns * (1 + limits.retries)]));
+  const coldCosts = arms.map((arm) => estimateTurnCost(arm, limits));
+  const allArmColdTurnCost = coldCosts.reduce((sum, value) => sum + value, 0);
+  const capability = allArmColdTurnCost * limits.capabilityTurns;
+  const calibration = allArmColdTurnCost * limits.calibrationPasses * limits.calibrationCases * limits.calibrationToolTurns;
+  const toolCanary = allArmColdTurnCost * limits.toolCanaryTurns;
+  const qualificationRunsPerArm = limits.qualificationCases * limits.qualificationRepeats;
+  const qualificationModelTurns = qualificationRunsPerArm * limits.qualificationToolTurns;
+  const perArm = Object.fromEntries(arms.map((arm) => [arm.id, estimateTurnCost(arm, limits) * qualificationModelTurns]));
   const finalistTurn = Math.max(...arms.map((arm) => estimateTurnCost(arm, limits)));
   const warmFinalistTurn = Math.max(...arms.map((arm) => estimateTurnCost(arm, limits, { cacheRegime: 'warm' })));
-  const finalistCount = Math.min(2, arms.length);
-  const lifecycleTurns = finalistCount * limits.finalistCases * limits.finalistRepeats * limits.toolTurns;
-  const lifecycle = lifecycleTurns * finalistTurn * (1 + limits.retries);
-  const warmCalls = finalistCount * limits.finalistCases * limits.toolTurns;
+  const finalistCount = Math.min(limits.finalistCount, arms.length);
+  const decisionTurns = finalistCount * limits.decisionCases * limits.decisionRepeats * limits.decisionToolTurns;
+  const decision = decisionTurns * finalistTurn;
+  const lifecycleCanaryTurns = finalistCount * limits.lifecycleCanaryTurns;
+  const lifecycleCanary = lifecycleCanaryTurns * finalistTurn;
+  const lifecycleTurns = finalistCount * limits.lifecycleCases * limits.lifecycleRepeats * limits.lifecycleToolTurns;
+  const lifecycle = lifecycleTurns * finalistTurn;
   const warmCreationTurn = Math.max(...arms.map((arm) => {
     const p = getModelPrice(arm.model); return (limits.inputTokens * (p?.input || 0) + limits.outputTokens * (p?.output || 0) + limits.inputTokens * (p?.cacheWrite || 0)) / 1_000_000;
   }));
+  const warmCalls = finalistCount * limits.warmCases * limits.warmToolTurns;
   const warmRead = warmFinalistTurn * Math.max(0, warmCalls - finalistCount);
-  const warm = includeWarmFinalists ? (finalistCount * warmCreationTurn + warmRead) * (1 + limits.retries) : 0;
-  const initial = Object.values(perArm).reduce((a, b) => a + b, 0);
-  const total = initial + lifecycle + warm;
-  return { perArm, initial, initialRunsPerArm: initialRuns, initialModelTurnsPerArm: initialModelTurns, lifecycle, lifecycleTurns, warm, warmCreationTurn, warmRead, warmCalls, total, cap: EVALUATION_CAP_USD, feasible: total <= EVALUATION_CAP_USD };
+  const warm = includeWarmFinalists ? finalistCount * warmCreationTurn + warmRead : 0;
+  const qualification = Object.values(perArm).reduce((a, b) => a + b, 0);
+  const base = capability + calibration + toolCanary + qualification + decision + lifecycleCanary + lifecycle + warm;
+  const retryReserve = base * limits.retryReserveRate;
+  const contingency = base * limits.contingencyRate;
+  const subtotal = base;
+  const total = base + retryReserve + contingency;
+  return { perArm, capability, calibration, toolCanary, qualification, initial: qualification, qualificationRunsPerArm, qualificationModelTurnsPerArm: qualificationModelTurns,
+    decision, decisionTurns, lifecycleCanary, lifecycleCanaryTurns, lifecycle, lifecycleTurns, warm, warmCreationTurn, warmRead, warmCalls, subtotal, base, retryReserve, contingency,
+    total, cap: EVALUATION_CAP_USD, headroom: EVALUATION_CAP_USD - total, feasible: total <= EVALUATION_CAP_USD };
 }
 
 export class BudgetReservation {
