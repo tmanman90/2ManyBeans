@@ -26,7 +26,7 @@ export function normalizeUsage(provider, usage) {
     ? [usage.input_tokens, usage.output_tokens]
     : provider === 'openai'
       ? [has('input_tokens') ? usage.input_tokens : usage.prompt_tokens, has('output_tokens') ? usage.output_tokens : usage.completion_tokens]
-      : provider === 'gemini' ? [usage.promptTokenCount, usage.candidatesTokenCount] : [];
+    : provider === 'gemini' ? [usage.promptTokenCount, usage.candidatesTokenCount] : [];
   if (required.length !== 2 || required.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) return null;
   const rawBuckets = provider === 'anthropic'
     ? [usage.cache_read_input_tokens, usage.cache_creation_input_tokens, usage.cache_creation?.ephemeral_5m_input_tokens, usage.cache_creation?.ephemeral_1h_input_tokens, usage.thinking_tokens, usage.output_tokens_details?.thinking_tokens]
@@ -49,13 +49,22 @@ export function normalizeUsage(provider, usage) {
     cacheReadTokens = finite(usage.input_tokens_details?.cached_tokens ?? usage.input_token_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens) ?? 0;
     cacheWriteTokens = finite(usage.input_tokens_details?.cache_write_tokens ?? usage.input_token_details?.cache_write_tokens) ?? 0;
   } else if (provider === 'gemini') {
-    inputTokens = finite(usage.promptTokenCount); outputTokens = finite(usage.candidatesTokenCount); cacheReadTokens = finite(usage.cachedContentTokenCount) ?? 0;
+    inputTokens = finite(usage.promptTokenCount); cacheReadTokens = finite(usage.cachedContentTokenCount) ?? 0;
+    const toolUseInput = finite(usage.toolUsePromptTokenCount) ?? 0;
+    const candidateOutput = finite(usage.candidatesTokenCount);
+    const thoughtOutput = finite(usage.thoughtsTokenCount) ?? 0;
+    outputTokens = candidateOutput == null ? null : candidateOutput + thoughtOutput;
+    if (usage.totalTokenCount !== undefined) {
+      const reportedTotal = finite(usage.totalTokenCount);
+      if (reportedTotal == null || reportedTotal !== inputTokens + toolUseInput + outputTokens) return null;
+    }
+    inputTokens += toolUseInput;
   } else return null;
   const buckets = [cacheReadTokens, cacheWriteTokens, cacheWrite5mTokens, cacheWrite1hTokens, reasoningTokens, thinkingTokens];
   if (inputTokens == null || outputTokens == null || inputTokens < 0 || outputTokens < 0 || buckets.some((value) => !Number.isFinite(value) || value < 0)) return null;
   if (provider === 'openai' && cacheReadTokens + cacheWriteTokens > inputTokens) return null;
   return Object.freeze({ inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheWrite5mTokens, cacheWrite1hTokens, reasoningTokens, thinkingTokens,
-    inputIncludesCache: provider === 'openai', totalTokens: inputTokens + outputTokens });
+    inputIncludesCache: provider === 'openai' || provider === 'gemini', totalTokens: inputTokens + outputTokens });
 }
 export function calculateCost(model, tokens, registry = MODEL_PRICING) {
   const price = getModelPrice(model, registry);

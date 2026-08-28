@@ -27,6 +27,12 @@ test('known production model rates remain available', () => {
   assert.ok(calculateCost('gemini-2.5-flash', normalizeUsage('gemini', { promptTokenCount: 100, candidatesTokenCount: 10 })) > 0);
   assert.equal(calculateCost('gemini-2.5-flash-preview-05-20', normalizeUsage('gemini', { promptTokenCount: 100, candidatesTokenCount: 10 })), null);
 });
+test('Gemini UsageMetadata reconciles cache, tool, and thought buckets exactly', () => {
+  const usage = normalizeUsage('gemini', { promptTokenCount: 1000, cachedContentTokenCount: 200, toolUsePromptTokenCount: 100, candidatesTokenCount: 50, thoughtsTokenCount: 25, totalTokenCount: 1175 });
+  assert.equal(usage.inputTokens, 1100); assert.equal(usage.outputTokens, 75); assert.equal(usage.cacheReadTokens, 200);
+  assert.equal(calculateCost('gemini-2.5-flash', usage), 0.000464);
+  assert.equal(normalizeUsage('gemini', { promptTokenCount: 100, candidatesTokenCount: 10, totalTokenCount: 109 }), null);
+});
 test('GPT-5.4 long context applies official input/output multipliers', () => {
   const usage = normalizeUsage('openai', { input_tokens: LONG_CONTEXT_THRESHOLD + 1, output_tokens: 100 });
   assert.equal(calculateCost('gpt-5.4', usage), 1.362255);

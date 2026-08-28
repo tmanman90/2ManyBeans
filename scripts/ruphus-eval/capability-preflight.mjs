@@ -43,7 +43,7 @@ export async function runPreflight({ adapters = [], identity, expectedIdentity, 
     const probe = adapter?.probe ? await adapter.probe(arm) : {};
     const forbiddenIdentityKeys = ['armId', 'provider', 'model', 'effort', 'thinking', 'endpoint', 'cacheRegime', 'requestedModel', 'identity', 'expectedIdentity'];
     if (forbiddenIdentityKeys.some((key) => Object.prototype.hasOwnProperty.call(probe, key))) throw new Error(`preflight probe cannot override canonical ${forbiddenIdentityKeys.find((key) => Object.prototype.hasOwnProperty.call(probe, key))}`);
-    results.push({ ...probe, armId: arm.id, provider: arm.provider, model: arm.model, effort: arm.effort ?? null, thinking: arm.thinking ?? null, endpoint: arm.endpoint, cacheRegime: arm.cacheRegime });
+    results.push({ ...probe, id: arm.id, armId: arm.id, provider: arm.provider, model: arm.model, effort: arm.effort ?? null, thinking: arm.thinking ?? null, endpoint: arm.endpoint, cacheRegime: arm.cacheRegime });
   }
   assertExactArms(results);
   const checks = results.map((result) => ({ ...result, ...validatePreflight({ ...result, requestedModel: result.model, identity, expectedIdentity, env }) }));

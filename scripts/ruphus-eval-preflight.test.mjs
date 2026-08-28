@@ -23,3 +23,8 @@ test('probe cannot forge canonical arm attribution', async () => {
   const probe = { armId: 'terra-medium', model: 'gpt-5.6-terra', modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.openai.com', returnedModel: 'gpt-5.6-luna' };
   await assert.rejects(() => runPreflight({ identity: { ...actual, provider: 'openai' }, expectedIdentity: expected, env: {}, adapters: [{ provider: 'openai', probe: () => probe }, { provider: 'anthropic', probe: () => ({ ...probe, providerHost: 'https://api.anthropic.com', returnedModel: 'claude-sonnet-5', model: 'claude-sonnet-5' }) }] }), /override canonical/);
 });
+test('all six exact arms complete an attributable preflight', async () => {
+  const adapters = [{ provider: 'openai', probe: (arm) => ({ modelAccess: true, streaming: true, completeUsage: true, requestId: `r-${arm.id}`, providerHost: 'https://api.openai.com', returnedModel: arm.model }) }, { provider: 'anthropic', probe: (arm) => ({ modelAccess: true, streaming: true, completeUsage: true, requestId: `r-${arm.id}`, providerHost: 'https://api.anthropic.com', returnedModel: arm.model }) }];
+  const result = await runPreflight({ identity: { ...actual, provider: 'evaluation' }, expectedIdentity: expected, env: {}, adapters });
+  assert.equal(result.ok, true); assert.equal(result.checks.length, 6); assert.ok(result.checks.every((check) => check.ok && check.id === check.armId));
+});
