@@ -5,42 +5,10 @@
 import { withCorsAuthUltra, getDb } from './_lib/cors-auth.js';
 import { decrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { validateAidenProfile } from '../src/lib/aidenProfileValidation.js';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
 const RATE_LIMIT = { key: 'aidenPush', limit: 30, windowMs: 60 * 60 * 1000 };
-
-function validateProfile(profile) {
-  const errors = [];
-  const { ratio, bloomRatio, bloomDuration, bloomTemperature,
-    ssPulsesNumber, ssPulsesInterval, ssPulseTemperatures,
-    batchPulsesNumber, batchPulsesInterval, batchPulseTemperatures } = profile;
-
-  if (ratio < 14 || ratio > 20) errors.push(`ratio ${ratio} out of range 14-20`);
-  if (ratio % 0.5 !== 0) errors.push(`ratio ${ratio} must be in 0.5 steps`);
-
-  if (profile.bloomEnabled) {
-    if (bloomRatio < 1 || bloomRatio > 3) errors.push(`bloomRatio ${bloomRatio} out of range 1-3`);
-    if (bloomDuration < 1 || bloomDuration > 120) errors.push(`bloomDuration ${bloomDuration} out of range 1-120`);
-    if (bloomTemperature < 50 || bloomTemperature > 99) errors.push(`bloomTemperature ${bloomTemperature} out of range 50-99`);
-  }
-
-  const checkPulses = (label, enabled, num, interval, temps) => {
-    if (!enabled) return;
-    if (num < 1 || num > 10) errors.push(`${label} pulsesNumber ${num} out of range 1-10`);
-    if (interval < 5 || interval > 60) errors.push(`${label} pulsesInterval ${interval} out of range 5-60`);
-    if (temps.length !== num) errors.push(`${label} temps length ${temps.length} !== pulsesNumber ${num}`);
-    temps.forEach((t, i) => {
-      if (t < 50 || t > 99) errors.push(`${label} temp[${i}] ${t} out of range 50-99`);
-    });
-  };
-
-  checkPulses('ss', profile.ssPulsesEnabled, ssPulsesNumber, ssPulsesInterval, ssPulseTemperatures || []);
-  checkPulses('batch', profile.batchPulsesEnabled, batchPulsesNumber, batchPulsesInterval, batchPulseTemperatures || []);
-
-  if (profile.title && profile.title.length > 50) errors.push(`title too long (${profile.title.length} > 50)`);
-
-  return errors;
-}
 
 async function fellowFetch(path, options = {}) {
   const { timeout = 5000, ...fetchOpts } = options;
@@ -263,9 +231,9 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
 
   try {
     const profile = req.body;
-    const errors = validateProfile(profile);
-    if (errors.length > 0) {
-      return res.status(400).json({ error: `Invalid profile: ${errors.join('; ')}` });
+    const validation = validateAidenProfile(profile);
+    if (!validation.valid) {
+      return res.status(400).json({ error: `Invalid profile: ${validation.errors.join('; ')}` });
     }
 
     // Get credentials (per-user or relay)

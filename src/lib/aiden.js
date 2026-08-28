@@ -7,6 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { classifyFamilyFallback } from './beanFields';
 import { ODE_GEN2_STEPS, nearestOdeStep } from './brewMethods';
+import { assertValidAidenProfile } from './aidenProfileValidation';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -665,6 +666,7 @@ export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) 
   } = recipe;
 
   profile.title = bean ? buildAidenTitle(bean, isIced ? '(iced)' : '') : (recipe.title || '');
+  assertValidAidenProfile(profile);
 
   const result = await fetchWithRetry({
     url: `${API_BASE}/api/aiden`,
