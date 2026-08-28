@@ -7,7 +7,8 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { classifyFamilyFallback } from './beanFields';
 import { ODE_GEN2_STEPS, nearestOdeStep } from './brewMethods';
-import { assertValidAidenProfile } from './aidenProfileValidation';
+import { assertValidAidenProfile, buildAidenTitle, toAidenProfile } from './aidenProfileValidation';
+export { buildAidenTitle } from './aidenProfileValidation';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
 
@@ -620,52 +621,8 @@ export async function generateAidenRecipe(bean, research = null) {
   return repairRecipe(bean, parsed, research);
 }
 
-// Build the Fellow profile title from the current bean state.
-// Fellow caps profile titles at 50 chars (see api/aiden.js validateProfile).
-// Format: "#{jarSlot} {origin} {name} - {roaster}".
-// With label: "#{jarSlot} {label} {origin} {name} - {roaster}" (e.g. "#1 (iced) Elora").
-// If too long, truncate name first → drop roaster → drop origin.
-// Duplicate-title collisions are handled by api/aiden.js's cleanup-and-retry path.
-export function buildAidenTitle(bean, label = '') {
-  const MAX = 50;
-  const slot = bean?.jarSlot ? `#${bean.jarSlot} ` : '';
-  const prefix = label ? `${slot}${label} ` : slot;
-  const budget = MAX - prefix.length;
-
-  const name = (bean?.name || '').trim();
-  const origin = (bean?.origin || '').trim();
-  const roaster = (bean?.roaster || '').trim();
-
-  const originPart = origin ? origin + ' ' : '';
-  const roasterPart = roaster ? ' - ' + roaster : '';
-
-  const full = `${originPart}${name}${roasterPart}`.trim();
-  if (full.length <= budget) return `${prefix}${full}`;
-
-  const nameBudget = budget - originPart.length - roasterPart.length;
-  if (nameBudget > 0) {
-    return `${prefix}${originPart}${name.slice(0, nameBudget).trim()}${roasterPart}`.trim();
-  }
-
-  const nameBudgetNoRoaster = budget - originPart.length;
-  if (nameBudgetNoRoaster > 0) {
-    const n = name.length <= nameBudgetNoRoaster ? name : name.slice(0, nameBudgetNoRoaster).trim();
-    return `${prefix}${originPart}${n}`.trim();
-  }
-
-  return `${prefix}${name.slice(0, Math.max(0, budget)).trim()}`;
-}
-
 export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) {
-  // Strip fields not in Fellow schema
-  const {
-    grindRecommendation, generatedAt: _generatedAt, title: _staleTitle,
-    icedDose: _icedDose, brewWaterMl: _brewWaterMl, iceGrams: _iceGrams,
-    machineSuggestedDose: _machineSuggestedDose, isIced: _isIced,
-    ...profile
-  } = recipe;
-
-  profile.title = bean ? buildAidenTitle(bean, isIced ? '(iced)' : '') : (recipe.title || '');
+  const profile = toAidenProfile(recipe, bean, { isIced });
   assertValidAidenProfile(profile);
 
   const result = await fetchWithRetry({

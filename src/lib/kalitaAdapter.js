@@ -1,5 +1,5 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
-import { normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
+import { kalitaDoseBounds, normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
 export const KALITA_RULES_VERSION = 'kalita-rules-v3-phase1';
@@ -59,6 +59,11 @@ function techniqueInstructionFor(key) {
 
 export function validateKalitaCandidate(recipe) {
   const errors = [];
+  const size = String(recipe?.kalitaSize || '');
+  if (!recipe || recipe.device !== 'kalita' || recipe.mode !== 'hot' || recipe.isIced === true) errors.push('wrong-mode-or-device');
+  if (!['155', '185'].includes(size) || recipe?.configurationKey !== `kalita:${size}:wave-paper:hot`) errors.push('invalid-configuration');
+  const bounds = kalitaDoseBounds(size);
+  if (!Number.isFinite(recipe?.coffeeGrams) || recipe.coffeeGrams < bounds.minDose || recipe.coffeeGrams > bounds.maxDose) errors.push('invalid-dose');
   if (!Number.isFinite(recipe?.coffeeGrams) || !Number.isFinite(recipe?.waterGrams)) errors.push('non-finite-dose-or-water');
   if (!Number.isFinite(recipe?.waterTemp?.celsius) || recipe.waterTemp.celsius < 93 || recipe.waterTemp.celsius > 100) errors.push('invalid-temperature');
   if (!recipe?.grindSize?.setting || !Number.isFinite(recipe?.grindSize?.microns)) errors.push('invalid-grind');
@@ -70,6 +75,7 @@ export function validateKalitaCandidate(recipe) {
     lastTime = step.timeSeconds;
     lastWater = step.waterTotal;
   }
+  if (recipe?.steps?.length && recipe.steps.at(-1).waterTotal !== recipe.waterGrams) errors.push('final-water-mismatch');
   if (!Array.isArray(recipe?.steps) || !recipe.steps.length || !Number.isFinite(recipe.totalBrewTimeSeconds) || recipe.totalBrewTimeSeconds <= lastTime) errors.push('invalid-total-duration');
   return { valid: errors.length === 0, errors };
 }

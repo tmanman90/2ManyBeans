@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateAidenProfile, assertValidAidenProfile } from '../src/lib/aidenProfileValidation.js';
+import { validateAidenProfile, assertValidAidenProfile, toAidenProfile } from '../src/lib/aidenProfileValidation.js';
 
 const validProfile = {
   profileType: 0, title: 'Ethiopia test', ratio: 17, bloomEnabled: true,
@@ -43,4 +43,13 @@ test('disabled sections retain their existing optional-field behavior', () => {
   delete disabled.ssPulseTemperatures;
   delete disabled.batchPulseTemperatures;
   assert.equal(validateAidenProfile(disabled).valid, true);
+});
+
+test('canonical Fellow shape is required and null projection fails stably', () => {
+  const minimal = { ratio: 17, bloomEnabled: false, ssPulsesEnabled: false, batchPulsesEnabled: false };
+  assert.equal(validateAidenProfile(minimal).valid, false);
+  assert.equal(validateAidenProfile({ ...validProfile, bloomEnabled: 'false' }).valid, false);
+  assert.deepEqual(validateAidenProfile({}).valid, false);
+  assert.deepEqual(validateAidenProfile(null).valid, false);
+  assert.deepEqual(toAidenProfile(null), {});
 });

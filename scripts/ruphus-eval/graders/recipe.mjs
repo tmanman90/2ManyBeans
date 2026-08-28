@@ -1,4 +1,4 @@
-import { validateAidenProfile } from '../../../src/lib/aidenProfileValidation.js';
+import { validateAidenProfile, toAidenProfile } from '../../../src/lib/aidenProfileValidation.js';
 import { validateV60Candidate } from '../../../src/lib/v60Adapter.js';
 import { validateKalitaCandidate } from '../../../src/lib/kalitaAdapter.js';
 import { validateV60SwitchCandidate } from '../../../src/lib/v60SwitchAdapter.js';
@@ -38,21 +38,27 @@ export function validateRecipe(method, recipe) {
   if (recipe == null) return missingLayer();
   try {
     const result = validator(recipe);
-    return { present: true, valid: result.valid === true, errors: [...(result.errors || [])] };
+    return { present: true, parseable: typeof recipe === 'object' && !Array.isArray(recipe), valid: result.valid === true, errors: [...(result.errors || [])] };
   } catch (error) {
-    return { present: true, valid: false, errors: [`validator-threw:${error.message}`] };
+    return { present: true, parseable: false, valid: false, errors: [`validator-threw:${error.message}`] };
   }
 }
 
 /**
- * The adapter output itself is the canonical runtime/timer projection. Returning
- * it only after the production validator passes prevents the evaluator from
- * rebuilding a weaker parallel recipe representation.
+ * The production runtime/timer projection is the canonical downstream
+ * identity. Returning it only after the production validator passes prevents
+ * the evaluator from rebuilding a weaker parallel recipe representation.
  */
 export function projectCanonicalRuntime(method, recipe) {
   const validation = validateRecipe(method, recipe);
   if (!validation.valid) return { valid: false, errors: validation.errors, runtime: null };
-  if (method === 'aiden') return { valid: true, errors: [], runtime: recipe, timerReady: null, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  if (method === 'aiden') {
+    const runtime = toAidenProfile(recipe);
+    const runtimeValidation = validateRecipe(method, runtime);
+    return runtimeValidation.valid
+      ? { valid: true, errors: [], runtime, timerReady: null, projection: RECIPE_COVERAGE[method]?.runtime || null }
+      : { valid: false, errors: runtimeValidation.errors, runtime: null, timerReady: null, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  }
   const runtime = normalizeRecipePhases(recipe);
   const timerSteps = buildTimerSteps(recipe);
   if (!runtime?.timerReady || !timerSteps?.length) return { valid: false, errors: ['downstream-timer-not-ready'], runtime: null, timerReady: false, projection: RECIPE_COVERAGE[method]?.runtime || null };
@@ -60,10 +66,14 @@ export function projectCanonicalRuntime(method, recipe) {
 }
 
 function canonicalJson(value) {
-  try { return JSON.stringify(value); } catch { return null; }
+  try {
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+    if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+    return JSON.stringify(value);
+  } catch { return null; }
 }
 
-export function compareGrindMicrons({ before, after, direction }) {
+export function compareGrindMicrons({ before, after, direction } = {}) {
   const beforeMicrons = typeof before === 'number' ? before : before?.microns;
   const afterMicrons = typeof after === 'number' ? after : after?.microns;
   const valid = Number.isFinite(beforeMicrons) && Number.isFinite(afterMicrons);
@@ -82,12 +92,18 @@ export function gradeRecipeLayers({ method, raw, parsed, repaired, downstream = 
     downstream: validateRecipe(method, downstream),
   };
   const projection = projectCanonicalRuntime(method, downstream);
+  const repairedProjection = projectCanonicalRuntime(method, repaired);
   const repairApplied = repair?.applied ?? (canonicalJson(raw) !== canonicalJson(repaired));
   const coverage = RECIPE_COVERAGE[method] || { gate: 'advisory' };
-  const hardGate = coverage.gate === 'hard' && layers.postRepair.valid && layers.downstream.valid && projection.valid;
+  const downstreamMatchesRepair = repairedProjection.valid && projection.valid
+    && canonicalJson(repairedProjection.runtime) === canonicalJson(projection.runtime);
+  const grindResult = grind == null ? null : compareGrindMicrons(grind);
+  const grindPasses = grindResult == null || (grindResult.valid === true && grindResult.correct === true);
+  const hardGate = coverage.gate === 'hard' && layers.postRepair.valid && layers.parsed.present && layers.parsed.parseable !== false
+    && layers.downstream.valid && projection.valid && downstreamMatchesRepair && grindPasses;
   return {
     method, coverage: coverage.gate, layers, repairApplied, repair,
-    grind: grind || null, runtime: projection.runtime, timerReady: projection.timerReady ?? null,
+    grind: grindResult, runtime: projection.runtime, timerReady: projection.timerReady ?? null,
     hardGate, valid: hardGate,
   };
 }

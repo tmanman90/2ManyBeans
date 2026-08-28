@@ -29,6 +29,10 @@ function checkPulses(errors, label, enabled, count, interval, temperatures) {
 export function validateAidenProfile(profile) {
   const errors = [];
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return { valid: false, errors: ['profile must be an object'] };
+  if (profile.profileType !== 0) errors.push('profileType must be 0');
+  for (const key of ['bloomEnabled', 'ssPulsesEnabled', 'batchPulsesEnabled']) {
+    if (typeof profile[key] !== 'boolean') errors.push(`${key} must be boolean`);
+  }
 
   if (checkBoundedNumber(errors, 'ratio', profile.ratio, 14, 20) && profile.ratio % 0.5 !== 0) {
     errors.push(`ratio ${profile.ratio} must be in 0.5 steps`);
@@ -43,10 +47,45 @@ export function validateAidenProfile(profile) {
   checkPulses(errors, 'ss', profile.ssPulsesEnabled, profile.ssPulsesNumber, profile.ssPulsesInterval, profile.ssPulseTemperatures || []);
   checkPulses(errors, 'batch', profile.batchPulsesEnabled, profile.batchPulsesNumber, profile.batchPulsesInterval, profile.batchPulseTemperatures || []);
 
-  if (profile.title != null && (typeof profile.title !== 'string' || profile.title.length > 50)) {
-    errors.push('title must be a string of at most 50 characters');
-  }
+  if (typeof profile.title !== 'string' || profile.title.length === 0 || profile.title.length > 50) errors.push('title must be a non-empty string of at most 50 characters');
   return { valid: errors.length === 0, errors };
+}
+
+// Pure Fellow payload projection shared by the client and evaluator. This
+// denylist mirrors the former pushToAiden stripping contract: recipe-only
+// metadata must never be sent to Fellow or treated as its canonical payload.
+export function buildAidenTitle(bean, label = '') {
+  const max = 50;
+  const slot = bean?.jarSlot ? `#${bean.jarSlot} ` : '';
+  const prefix = label ? `${slot}${label} ` : slot;
+  const budget = max - prefix.length;
+  const name = (bean?.name || '').trim();
+  const origin = (bean?.origin || '').trim();
+  const roaster = (bean?.roaster || '').trim();
+  const originPart = origin ? `${origin} ` : '';
+  const roasterPart = roaster ? ` - ${roaster}` : '';
+  const full = `${originPart}${name}${roasterPart}`.trim();
+  if (full.length <= budget) return `${prefix}${full}`;
+  const nameBudget = budget - originPart.length - roasterPart.length;
+  if (nameBudget > 0) return `${prefix}${originPart}${name.slice(0, nameBudget).trim()}${roasterPart}`.trim();
+  const nameBudgetNoRoaster = budget - originPart.length;
+  if (nameBudgetNoRoaster > 0) {
+    const truncatedName = name.length <= nameBudgetNoRoaster ? name : name.slice(0, nameBudgetNoRoaster).trim();
+    return `${prefix}${originPart}${truncatedName}`.trim();
+  }
+  return `${prefix}${name.slice(0, Math.max(0, budget)).trim()}`;
+}
+
+export function toAidenProfile(recipe, bean = null, { isIced = false } = {}) {
+  if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return {};
+  const {
+    grindRecommendation, generatedAt: _generatedAt, title: _staleTitle,
+    icedDose: _icedDose, brewWaterMl: _brewWaterMl, iceGrams: _iceGrams,
+    machineSuggestedDose: _machineSuggestedDose, isIced: _isIced,
+    ...profile
+  } = recipe;
+  profile.title = bean ? buildAidenTitle(bean, isIced ? '(iced)' : '') : (recipe.title || '');
+  return profile;
 }
 
 export function assertValidAidenProfile(profile) {
