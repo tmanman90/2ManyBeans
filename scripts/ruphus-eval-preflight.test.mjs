@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { checkEvaluationIdentity, checkEnvironment, checkEgress, validatePreflight, runPreflight } from './ruphus-eval/capability-preflight.mjs';
-const expected = { projectId: 'eval-1', workspaceId: 'eval-a', credentialFingerprint: 'fp', quotaEvidenceId: 'quota-1', maxQuotaUsd: 75 };
-const actual = { ...expected, dedicated: true, quotaUsd: 75 };
+const expected = { projectId: 'eval-1', workspaceId: 'eval-a', credentialFingerprint: 'fp', quotaEvidenceId: 'quota-1', maxQuotaUsd: 30 };
+const actual = { ...expected, dedicated: true, quotaUsd: 30 };
 test('identity must be dedicated and capped', () => {
   assert.equal(checkEvaluationIdentity(actual, expected).ok, true);
   assert.equal(checkEvaluationIdentity({ ...actual, projectId: 'production' }, expected).ok, false);
-  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: 76 }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: 31 }, expected).ok, false);
   assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: Number.NaN }, expected).ok, false);
   assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: '75' }, expected).ok, false);
   assert.equal(checkEvaluationIdentity(actual).ok, false);
