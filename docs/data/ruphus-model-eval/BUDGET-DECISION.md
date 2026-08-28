@@ -3,8 +3,8 @@
 Status: paused pending dedicated provider identity/access evidence. U1 was
 accepted at implementation tip `04aeedf021d844bc9e8e2052f841b704758e7025`.
 The earlier `$75.00` checkpoint was recorded at `fdb87c4`; the amended budget
-implementation is in the later commit accompanying this document. No paid
-provider request has been made.
+implementation and this checkpoint are in `3f23de79016479784e700b50bcbeea2859330ea2`.
+No paid provider request has been made.
 
 ## Approved $30.00 sequential protocol
 
