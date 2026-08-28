@@ -93,17 +93,19 @@ export function gradeRecipeLayers({ method, raw, parsed, repaired, downstream = 
   };
   const projection = projectCanonicalRuntime(method, downstream);
   const repairedProjection = projectCanonicalRuntime(method, repaired);
-  const repairApplied = repair?.applied ?? (canonicalJson(raw) !== canonicalJson(repaired));
+  const repairApplied = canonicalJson(raw) !== canonicalJson(repaired);
+  const repairMetadataConsistent = repair == null || !Object.prototype.hasOwnProperty.call(repair, 'applied')
+    || (typeof repair.applied === 'boolean' && repair.applied === repairApplied);
   const coverage = RECIPE_COVERAGE[method] || { gate: 'advisory' };
   const downstreamMatchesRepair = repairedProjection.valid && projection.valid
     && canonicalJson(repairedProjection.runtime) === canonicalJson(projection.runtime);
   const grindResult = grind == null ? null : compareGrindMicrons(grind);
   const grindPasses = grindResult == null || (grindResult.valid === true && grindResult.correct === true);
-  const hardGate = coverage.gate === 'hard' && layers.postRepair.valid && layers.parsed.present && layers.parsed.parseable !== false
+  const hardGate = coverage.gate === 'hard' && layers.raw.present && layers.postRepair.valid && layers.parsed.present && layers.parsed.parseable !== false
     && layers.downstream.valid && projection.valid && downstreamMatchesRepair && grindPasses;
   return {
-    method, coverage: coverage.gate, layers, repairApplied, repair,
+    method, coverage: coverage.gate, layers, repairApplied, repairMetadataConsistent, repair,
     grind: grindResult, runtime: projection.runtime, timerReady: projection.timerReady ?? null,
-    hardGate, valid: hardGate,
+    hardGate: hardGate && repairMetadataConsistent, valid: hardGate && repairMetadataConsistent,
   };
 }

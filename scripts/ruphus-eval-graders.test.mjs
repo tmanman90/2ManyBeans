@@ -64,9 +64,19 @@ test('material repair remains visible while post-repair and downstream validity 
   assert.equal(result.layers.postRepair.valid, true);
   assert.equal(result.layers.downstream.valid, true);
   assert.equal(result.hardGate, true);
+  assert.equal(result.repairMetadataConsistent, true);
   assert.equal(gradeRecipeLayers({ method: 'aiden', raw: aiden, parsed: aiden, repaired: aiden }).hardGate, false);
   assert.equal(gradeRecipeLayers({ method: 'aiden', raw: aiden, parsed: null, repaired: aiden, downstream: aiden }).hardGate, false);
   assert.equal(gradeRecipeLayers({ method: 'aiden', raw: aiden, parsed: 'unparseable', repaired: aiden, downstream: aiden }).hardGate, false);
+  assert.equal(gradeRecipeLayers({ method: 'aiden', parsed: aiden, repaired: aiden, downstream: aiden }).hardGate, false);
+  const falseClaim = gradeRecipeLayers({ method: 'aiden', raw, parsed: raw, repaired: aiden, downstream: aiden, repair: { applied: false } });
+  assert.equal(falseClaim.repairApplied, true);
+  assert.equal(falseClaim.repairMetadataConsistent, false);
+  assert.equal(falseClaim.hardGate, false);
+  const trueClaimWithoutChange = gradeRecipeLayers({ method: 'aiden', raw: aiden, parsed: aiden, repaired: aiden, downstream: aiden, repair: { applied: true } });
+  assert.equal(trueClaimWithoutChange.repairApplied, false);
+  assert.equal(trueClaimWithoutChange.repairMetadataConsistent, false);
+  assert.equal(trueClaimWithoutChange.hardGate, false);
 
   const broken = { ...generateV60Recipe({}, { dose: 15 }), steps: [...generateV60Recipe({}, { dose: 15 }).steps].reverse() };
   const rejected = gradeRecipeLayers({ method: 'v60', raw: broken, parsed: broken, repaired: broken, downstream: broken });
