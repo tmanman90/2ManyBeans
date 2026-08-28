@@ -4,8 +4,8 @@ export const PRICING_REGISTRY_SOURCE = 'provider-pricing-pages-2026-08-28';
 export const MODEL_PRICING = Object.freeze({
   'gpt-5.6-luna': Object.freeze({ input: 0.20, output: 1.20, cacheRead: 0.02, cacheWrite: 0.25, source: 'https://developers.openai.com/api/docs/models/gpt-5.6-luna' }),
   'gpt-5.6-terra': Object.freeze({ input: 2, output: 12, cacheRead: 0.20, cacheWrite: 2.50, source: 'https://developers.openai.com/api/docs/models/gpt-5.6-terra' }),
-  'gpt-5.4': Object.freeze({ input: 2.50, output: 15, cacheRead: 0.25, cacheWrite: 0, source: 'https://developers.openai.com/api/docs/models' }),
-  'gpt-5.4-mini': Object.freeze({ input: 0.75, output: 4.50, cacheRead: 0.075, cacheWrite: 0, source: 'https://developers.openai.com/api/docs/models' }),
+  'gpt-5.4': Object.freeze({ input: 2.50, output: 15, cacheRead: 0.25, cacheWrite: 3.125, source: 'https://developers.openai.com/api/docs/models' }),
+  'gpt-5.4-mini': Object.freeze({ input: 0.75, output: 4.50, cacheRead: 0.075, cacheWrite: 0.9375, source: 'https://developers.openai.com/api/docs/models' }),
   'claude-sonnet-5': Object.freeze({ input: 2, output: 10, cacheRead: 0.20, cacheWrite: 2.50, cacheWrite1h: 4, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
   'claude-sonnet-4-6': Object.freeze({ input: 3, output: 15, cacheRead: 0.30, cacheWrite: 3.75, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
   'claude-haiku-4-5-20251001': Object.freeze({ input: 0.80, output: 4, cacheRead: 0.08, cacheWrite: 1, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
@@ -38,12 +38,13 @@ export function normalizeUsage(provider, usage) {
     const detail = usage.output_tokens_details || usage.completion_tokens_details || {};
     reasoningTokens = finite(detail.reasoning_tokens) ?? finite(usage.reasoning_tokens) ?? 0;
     cacheReadTokens = finite(usage.input_tokens_details?.cached_tokens ?? usage.input_token_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens) ?? 0;
+    cacheWriteTokens = finite(usage.input_tokens_details?.cache_write_tokens ?? usage.input_token_details?.cache_write_tokens) ?? 0;
   } else if (provider === 'gemini') {
     inputTokens = finite(usage.promptTokenCount); outputTokens = finite(usage.candidatesTokenCount); cacheReadTokens = finite(usage.cachedContentTokenCount) ?? 0;
   } else return null;
   const buckets = [cacheReadTokens, cacheWriteTokens, cacheWrite5mTokens, cacheWrite1hTokens, reasoningTokens, thinkingTokens];
   if (inputTokens == null || outputTokens == null || inputTokens < 0 || outputTokens < 0 || buckets.some((value) => !Number.isFinite(value) || value < 0)) return null;
-  if (provider === 'openai' && cacheReadTokens > inputTokens) return null;
+  if (provider === 'openai' && cacheReadTokens + cacheWriteTokens > inputTokens) return null;
   return Object.freeze({ inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheWrite5mTokens, cacheWrite1hTokens, reasoningTokens, thinkingTokens,
     inputIncludesCache: provider === 'openai', totalTokens: inputTokens + outputTokens });
 }
@@ -52,7 +53,8 @@ export function calculateCost(model, tokens, registry = MODEL_PRICING) {
   if (!price || !tokens || !Number.isFinite(tokens.inputTokens) || !Number.isFinite(tokens.outputTokens)) return null;
   // OpenAI input_tokens includes cached input, so replace that portion with
   // the discounted bucket. Anthropic reports cache buckets separately.
-  const uncachedInput = tokens.inputIncludesCache ? Math.max(0, tokens.inputTokens - (tokens.cacheReadTokens || 0)) : tokens.inputTokens;
+  const inclusiveCache = tokens.inputIncludesCache ? (tokens.cacheReadTokens || 0) + (tokens.cacheWriteTokens || 0) : 0;
+  const uncachedInput = tokens.inputIncludesCache ? Math.max(0, tokens.inputTokens - inclusiveCache) : tokens.inputTokens;
   const hasWriteBreakdown = (tokens.cacheWrite5mTokens || 0) + (tokens.cacheWrite1hTokens || 0) > 0;
   const fiveMinuteWrites = hasWriteBreakdown ? (tokens.cacheWrite5mTokens || 0) : (tokens.cacheWriteTokens || 0);
   const oneHourWrites = hasWriteBreakdown ? (tokens.cacheWrite1hTokens || 0) : 0;

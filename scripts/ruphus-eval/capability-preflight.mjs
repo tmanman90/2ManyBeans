@@ -16,7 +16,7 @@ export function checkEnvironment(env = process.env) {
   return { ok: forbidden.length === 0, forbidden };
 }
 export function checkEgress(url) {
-  try { const host = new URL(url).hostname; return { ok: ALLOWED_PROVIDER_HOSTS.has(host), host }; }
+  try { const parsed = new URL(url); const host = parsed.hostname; return { ok: parsed.protocol === 'https:' && ALLOWED_PROVIDER_HOSTS.has(host), host }; }
   catch { return { ok: false, host: null }; }
 }
 export function validatePreflight(result = {}) {

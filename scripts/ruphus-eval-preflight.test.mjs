@@ -7,7 +7,7 @@ test('identity must be dedicated and capped', () => {
   assert.equal(checkEvaluationIdentity({ projectId: 'eval-1', workspaceId: 'eval-a', quotaUsd: 76 }).ok, false);
 });
 test('forbidden credentials and non-provider egress are rejected', () => {
-  assert.equal(checkEnvironment({ FIREBASE_PROJECT_ID: 'x' }).ok, false); assert.equal(checkEgress('https://api.openai.com/v1').ok, true); assert.equal(checkEgress('https://example.com').ok, false);
+  assert.equal(checkEnvironment({ FIREBASE_PROJECT_ID: 'x' }).ok, false); assert.equal(checkEgress('https://api.openai.com/v1').ok, true); assert.equal(checkEgress('http://api.openai.com/v1').ok, false); assert.equal(checkEgress('https://example.com').ok, false);
 });
 test('preflight requires every telemetry capability', () => {
   assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.anthropic.com' }).ok, true);

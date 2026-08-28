@@ -17,6 +17,12 @@ export function getArm(id) { return MODEL_ARMS.find((arm) => arm.id === id) || n
 export function assertExactArms(arms = MODEL_ARMS) {
   const expected = new Set(MODEL_ARMS.map(({ id }) => id));
   if (arms.length !== expected.size || new Set(arms.map((arm) => arm.id)).size !== expected.size || arms.some((arm) => !expected.has(arm.id))) throw new Error('exact six-arm matrix requires every arm exactly once');
+  for (const canonical of MODEL_ARMS) {
+    const actual = arms.find((arm) => arm.id === canonical.id);
+    for (const field of ['provider', 'model', 'effort', 'thinking', 'endpoint', 'cacheRegime']) {
+      if ((actual?.[field] ?? null) !== (canonical[field] ?? null)) throw new Error(`arm ${canonical.id} does not match canonical ${field}`);
+    }
+  }
   if (arms.some((arm) => arm.provider === 'openai' && arm.model === 'gpt-5.6-luna' && arm.effort === 'low')) throw new Error('Luna cannot run below medium');
   return true;
 }
@@ -37,7 +43,7 @@ export function validateSchedule(schedule, { allowWarm = false } = {}) {
 export const DEFAULT_LIMITS = Object.freeze({ inputTokens: 5000, outputTokens: 1800, toolTurns: 5, retries: 1, canaryRuns: 2, cases: 60, repeats: 3, finalistCases: 20, finalistRepeats: 3 });
 export function estimateTurnCost(arm, limits = DEFAULT_LIMITS, { cacheRegime = 'cold' } = {}) {
   if (!Number.isFinite(limits.inputTokens) || limits.inputTokens > LONG_CONTEXT_THRESHOLD) throw new Error('long-context pricing is not frozen for this evaluator');
-  const p = getModelPrice(arm.model); if (!p) return null;
+  const p = getModelPrice(arm.model); if (!p) throw new Error(`unknown pricing for ${arm.model}`);
   const input = limits.inputTokens;
   const cached = cacheRegime === 'warm' ? input * 0.25 : 0;
   return ((input - cached) * p.input + cached * (p.cacheRead ?? p.input) + limits.outputTokens * p.output) / 1_000_000;

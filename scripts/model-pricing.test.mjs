@@ -15,6 +15,11 @@ test('OpenAI cached input is discounted, not charged twice', () => {
   const usage = normalizeUsage('openai', { input_tokens: 1000, output_tokens: 100, input_tokens_details: { cached_tokens: 400 } });
   assert.equal(calculateCost('gpt-5.6-terra', usage), 0.00248);
 });
+test('OpenAI cache writes are inclusive input and billed at 1.25x', () => {
+  const usage = normalizeUsage('openai', { input_tokens: 1000, output_tokens: 100, input_tokens_details: { cached_tokens: 200, cache_write_tokens: 300 } });
+  assert.equal(calculateCost('gpt-5.6-terra', usage), 0.00299);
+  assert.equal(normalizeUsage('openai', { input_tokens: 100, output_tokens: 1, input_tokens_details: { cached_tokens: 80, cache_write_tokens: 21 } }), null);
+});
 test('known production model rates remain available', () => {
   assert.equal(calculateCost('gpt-5.4', normalizeUsage('openai', { input_tokens: 100, output_tokens: 10 })), 0.0004);
   assert.equal(calculateCost('gpt-5.4-mini', normalizeUsage('openai', { input_tokens: 100, output_tokens: 10 })), 0.00012);

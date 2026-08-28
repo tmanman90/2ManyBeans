@@ -19,4 +19,6 @@ test('all exact arms are present and unique', () => {
 });
 test('long-context pricing is fail-closed until explicitly frozen', () => {
   assert.throws(() => estimateTurnCost(MODEL_ARMS[0], { inputTokens: LONG_CONTEXT_THRESHOLD + 1, outputTokens: 1 }), /long-context/);
+  assert.throws(() => estimateTurnCost({ ...MODEL_ARMS[0], model: 'unknown-model' }), /unknown pricing/);
+  assert.throws(() => assertExactArms([{ ...MODEL_ARMS[0], model: 'wrong-model' }, ...MODEL_ARMS.slice(1)]), /canonical model/);
 });
