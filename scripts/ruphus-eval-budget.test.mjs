@@ -11,6 +11,7 @@ test('sequential six-arm qualification and finalist phases fit the amended cap',
   assert.equal(estimate.feasible, true);
   assert.ok(estimate.total > 27.79 && estimate.total < 27.81);
   assert.ok(estimate.headroom > 2.19 && estimate.headroom < 2.21);
+  assert.throws(() => estimateSchedule({ includeWarmFinalists: false }), /unknown schedule option/);
 });
 test('reservations reject duplicate and over-cap allocations', () => {
   const budget = new BudgetReservation(1); budget.reserve('a', 0.6);

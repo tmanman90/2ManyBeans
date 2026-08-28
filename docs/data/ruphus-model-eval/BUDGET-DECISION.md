@@ -14,6 +14,10 @@ decision, lifecycle, and tool-loop testing. This is a reduced sequential
 denominator; it cannot claim the original 60-case × 3-repeat full-factorial
 rigor.
 
+After accepted calibration, the complete sequential contract is atomically
+sealed before any qualification output; qualification cannot tune its contract,
+thresholds, or schedule.
+
 The full frozen decision corpus may still contain at least 60 cases for coverage,
 but the amended paid schedule dispatches only the sealed 20-case common
 qualification partition and the sealed 24-case finalist decision partition.

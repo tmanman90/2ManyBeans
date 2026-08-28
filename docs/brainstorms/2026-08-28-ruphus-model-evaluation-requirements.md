@@ -31,6 +31,10 @@ grading/reporting, and physical packs are offline-only; proposal-level calls use
 injected evidence with no retrieval continuation. This reduced denominator cannot
 claim the original full-factorial rigor.
 
+The complete sequential contract is atomically sealed immediately after accepted
+calibration and before any qualification output; qualification cannot tune the
+contract, thresholds, or schedule.
+
 The frozen reserve is `$20.59` base + `$5.15` hard global retry-cost pool (SDK
 retries disabled) + `$2.06` contingency = `$27.80`, leaving `$2.20` of
 non-dispatchable headroom. Fair/interleaved retry-pool exhaustion, a third

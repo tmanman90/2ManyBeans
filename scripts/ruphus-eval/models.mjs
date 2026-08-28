@@ -78,7 +78,10 @@ export function estimateTurnCost(arm, limits = DEFAULT_LIMITS, { cacheRegime = '
   const cached = cacheRegime === 'warm' ? input * 0.25 : 0;
   return ((input - cached) * p.input + cached * (p.cacheRead ?? p.input) + limits.outputTokens * p.output) / 1_000_000;
 }
-export function estimateSchedule({ arms = MODEL_ARMS, limits = DEFAULT_LIMITS, includeWarmFinalists = true } = {}) {
+export function estimateSchedule(options = {}) {
+  const allowedOptions = new Set(['arms', 'limits']);
+  for (const key of Object.keys(options)) if (!allowedOptions.has(key)) throw new Error(`unknown schedule option ${key}`);
+  let { arms = MODEL_ARMS, limits = DEFAULT_LIMITS } = options;
   limits = { ...DEFAULT_LIMITS, ...limits };
   validateLimits(limits);
   assertExactArms(arms);
@@ -104,7 +107,9 @@ export function estimateSchedule({ arms = MODEL_ARMS, limits = DEFAULT_LIMITS, i
   }));
   const warmCalls = finalistCount * limits.warmCases * limits.warmToolTurns;
   const warmRead = warmFinalistTurn * Math.max(0, warmCalls - finalistCount);
-  const warm = includeWarmFinalists ? finalistCount * warmCreationTurn + warmRead : 0;
+  // The 80-turn warm maximum is reserved up front and cannot be released by an
+  // estimator option; the runner may only skip dispatch after reserving it.
+  const warm = finalistCount * warmCreationTurn + warmRead;
   const qualification = Object.values(perArm).reduce((a, b) => a + b, 0);
   const base = capability + calibration + toolCanary + qualification + decision + lifecycleCanary + lifecycle + warm;
   const retryReserve = base * limits.retryReserveRate;
