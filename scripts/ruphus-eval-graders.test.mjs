@@ -44,6 +44,7 @@ test('Aiden downstream projection preserves Fellow payload parity and strips rec
     ...aiden,
     grindRecommendation: { microns: 700 }, generatedAt: '2026-08-28T00:00:00Z',
     icedDose: 15, brewWaterMl: 240, iceGrams: 120, machineSuggestedDose: 15, isIced: true,
+    arbitraryModelField: 'must-not-reach-fellow',
   };
   const projection = projectCanonicalRuntime('aiden', enriched);
   assert.equal(projection.valid, true);
@@ -51,6 +52,7 @@ test('Aiden downstream projection preserves Fellow payload parity and strips rec
   for (const key of ['grindRecommendation', 'generatedAt', 'icedDose', 'brewWaterMl', 'iceGrams', 'machineSuggestedDose', 'isIced']) {
     assert.equal(key in projection.runtime, false, key);
   }
+  assert.equal('arbitraryModelField' in projection.runtime, false);
   assert.equal(projection.runtime.title, aiden.title);
 });
 
@@ -90,6 +92,12 @@ test('grind direction is graded through microns rather than display labels', () 
     method: 'aiden', raw: aiden, parsed: aiden, repaired: aiden, downstream: aiden,
     grind: { before: undefined, after: { microns: 650 }, direction: 'finer' },
   }).hardGate, false);
+  const correct = gradeRecipeLayers({
+    method: 'aiden', raw: aiden, parsed: aiden, repaired: aiden, downstream: aiden,
+    grind: { before: { microns: 650 }, after: { microns: 700 }, direction: 'coarser' },
+  });
+  assert.equal(correct.hardGate, true);
+  assert.deepEqual(correct.grind, { valid: true, correct: true, deltaMicrons: 50, errors: [] });
 });
 
 test('downstream identity is bound to the repaired candidate and method', () => {

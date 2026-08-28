@@ -4,6 +4,13 @@
 
 const finiteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
+const FELLOW_PROFILE_FIELDS = Object.freeze([
+  'profileType', 'title', 'ratio',
+  'bloomEnabled', 'bloomRatio', 'bloomDuration', 'bloomTemperature',
+  'ssPulsesEnabled', 'ssPulsesNumber', 'ssPulsesInterval', 'ssPulseTemperatures',
+  'batchPulsesEnabled', 'batchPulsesNumber', 'batchPulsesInterval', 'batchPulseTemperatures',
+]);
+
 function checkBoundedNumber(errors, name, value, min, max) {
   if (!finiteNumber(value)) {
     errors.push(`${name} must be a finite number`);
@@ -51,9 +58,9 @@ export function validateAidenProfile(profile) {
   return { valid: errors.length === 0, errors };
 }
 
-// Pure Fellow payload projection shared by the client and evaluator. This
-// denylist mirrors the former pushToAiden stripping contract: recipe-only
-// metadata must never be sent to Fellow or treated as its canonical payload.
+// Pure Fellow payload projection shared by the client and evaluator. Keep an
+// explicit allowlist so arbitrary recipe/model metadata can never reach Fellow
+// or be treated as its canonical payload.
 export function buildAidenTitle(bean, label = '') {
   const max = 50;
   const slot = bean?.jarSlot ? `#${bean.jarSlot} ` : '';
@@ -78,12 +85,9 @@ export function buildAidenTitle(bean, label = '') {
 
 export function toAidenProfile(recipe, bean = null, { isIced = false } = {}) {
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return {};
-  const {
-    grindRecommendation, generatedAt: _generatedAt, title: _staleTitle,
-    icedDose: _icedDose, brewWaterMl: _brewWaterMl, iceGrams: _iceGrams,
-    machineSuggestedDose: _machineSuggestedDose, isIced: _isIced,
-    ...profile
-  } = recipe;
+  const profile = Object.fromEntries(FELLOW_PROFILE_FIELDS
+    .filter((field) => Object.prototype.hasOwnProperty.call(recipe, field))
+    .map((field) => [field, recipe[field]]));
   profile.title = bean ? buildAidenTitle(bean, isIced ? '(iced)' : '') : (recipe.title || '');
   return profile;
 }
