@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruphus-eval/receipt.schema.json",
+  "type": "object",
+  "required": ["ok", "kind", "facts", "claims"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "kind": { "enum": ["invalid-recipe", "proposal-created", "approval-recorded", "proposal-denied", "coffee-commit-confirmed", "undo-committed", "coffee-side-preparation-confirmed", "coffee-side-preparation-failed"] },
+    "facts": { "type": "array", "items": { "type": "string" } },
+    "claims": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}
