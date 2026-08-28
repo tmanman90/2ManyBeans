@@ -28,6 +28,7 @@ test('long-context pricing is fail-closed until explicitly frozen', () => {
 });
 test('schedule limits cannot be manipulated into free or negative work', () => {
   for (const key of ['qualificationCases', 'qualificationRepeats', 'qualificationToolTurns', 'decisionCases', 'decisionRepeats', 'decisionToolTurns', 'lifecycleCases', 'lifecycleRepeats', 'lifecycleToolTurns']) assert.throws(() => validateLimits({ ...DEFAULT_LIMITS, [key]: 0 }), /invalid/);
+  for (const key of ['retries', 'canaryRuns', 'toolTurns', 'cases', 'repeats', 'finalistCases', 'finalistRepeats']) assert.throws(() => estimateSchedule({ limits: { [key]: 1 } }), /unknown schedule limit/);
   assert.throws(() => estimateSchedule({ limits: { retryReserveRate: -1 } }), /invalid/);
   assert.throws(() => estimateSchedule({ limits: { outputTokens: -1 } }), /invalid/);
   assert.throws(() => estimateSchedule({ limits: { calibrationPasses: 3 } }), /calibration/);

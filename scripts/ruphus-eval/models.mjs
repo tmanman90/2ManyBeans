@@ -59,6 +59,8 @@ export const DEFAULT_LIMITS = Object.freeze({
 export function validateLimits(limits = DEFAULT_LIMITS) {
   const positiveIntegers = ['capabilityTurns', 'calibrationPasses', 'calibrationCases', 'calibrationToolTurns', 'toolCanaryTurns', 'qualificationCases', 'qualificationRepeats', 'qualificationToolTurns', 'finalistCount', 'decisionCases', 'decisionRepeats', 'decisionToolTurns', 'lifecycleCanaryTurns', 'lifecycleCases', 'lifecycleRepeats', 'lifecycleToolTurns', 'warmCases', 'warmToolTurns'];
   const positiveFinite = ['inputTokens', 'outputTokens'];
+  const allowed = new Set([...positiveIntegers, ...positiveFinite, 'contingencyRate', 'retryReserveRate', 'warmTriggerCostDeltaUsd']);
+  for (const key of Object.keys(limits)) if (!allowed.has(key)) throw new Error(`unknown schedule limit ${key}`);
   for (const key of positiveIntegers) if (!Number.isInteger(limits[key]) || limits[key] <= 0) throw new Error(`invalid positive limit ${key}`);
   for (const key of positiveFinite) if (!Number.isFinite(limits[key]) || limits[key] <= 0) throw new Error(`invalid token ceiling ${key}`);
   if (!Number.isFinite(limits.contingencyRate) || limits.contingencyRate < 0 || limits.contingencyRate > 1) throw new Error('invalid contingency rate');
