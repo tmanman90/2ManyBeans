@@ -1,16 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { checkEvaluationIdentity, checkEnvironment, checkEgress, validatePreflight } from './ruphus-eval/capability-preflight.mjs';
+import { checkEvaluationIdentity, checkEnvironment, checkEgress, validatePreflight, runPreflight } from './ruphus-eval/capability-preflight.mjs';
+const expected = { projectId: 'eval-1', workspaceId: 'eval-a', credentialFingerprint: 'fp', quotaEvidenceId: 'quota-1', maxQuotaUsd: 75 };
+const actual = { ...expected, dedicated: true, quotaUsd: 75 };
 test('identity must be dedicated and capped', () => {
-  assert.equal(checkEvaluationIdentity({ projectId: 'eval-1', workspaceId: 'eval-a', dedicated: true, quotaUsd: 75 }).ok, true);
-  assert.equal(checkEvaluationIdentity({ projectId: 'production', workspaceId: 'eval-a', dedicated: true, quotaUsd: 75 }).ok, false);
-  assert.equal(checkEvaluationIdentity({ projectId: 'eval-1', workspaceId: 'eval-a', quotaUsd: 76 }).ok, false);
+  assert.equal(checkEvaluationIdentity(actual, expected).ok, true);
+  assert.equal(checkEvaluationIdentity({ ...actual, projectId: 'production' }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: 76 }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: Number.NaN }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: '75' }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity(actual).ok, false);
 });
 test('forbidden credentials and non-provider egress are rejected', () => {
   assert.equal(checkEnvironment({ FIREBASE_PROJECT_ID: 'x' }).ok, false); assert.equal(checkEgress('https://api.openai.com/v1').ok, true); assert.equal(checkEgress('http://api.openai.com/v1').ok, false); assert.equal(checkEgress('https://example.com').ok, false);
 });
 test('preflight requires every telemetry capability', () => {
-  assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.anthropic.com', requestedModel: 'claude-sonnet-5', returnedModel: 'claude-sonnet-5' }).ok, true);
-  assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r' }).ok, false);
-  assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.openai.com', requestedModel: 'gpt-5.6-luna', returnedModel: 'gpt-5.6-terra' }).ok, false);
+  assert.equal(validatePreflight({ identity: actual, expectedIdentity: expected, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.anthropic.com', requestedModel: 'claude-sonnet-5', returnedModel: 'claude-sonnet-5' }).ok, true);
+  assert.equal(validatePreflight({ identity: actual, expectedIdentity: expected, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r' }).ok, false);
+  assert.equal(validatePreflight({ identity: actual, expectedIdentity: expected, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.openai.com', requestedModel: 'gpt-5.6-luna', returnedModel: 'gpt-5.6-terra' }).ok, false);
+});
+test('probe cannot forge canonical arm attribution', async () => {
+  const probe = { armId: 'terra-medium', model: 'gpt-5.6-terra', modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.openai.com', returnedModel: 'gpt-5.6-luna' };
+  await assert.rejects(() => runPreflight({ identity: { ...actual, provider: 'openai' }, expectedIdentity: expected, env: {}, adapters: [{ provider: 'openai', probe: () => probe }, { provider: 'anthropic', probe: () => ({ ...probe, providerHost: 'https://api.anthropic.com', returnedModel: 'claude-sonnet-5', model: 'claude-sonnet-5' }) }] }), /override canonical/);
 });

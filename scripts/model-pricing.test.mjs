@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateCost, normalizeUsage, MODEL_PRICING } from '../api/_lib/modelPricing.js';
+import { calculateCost, normalizeUsage, MODEL_PRICING, LONG_CONTEXT_THRESHOLD } from '../api/_lib/modelPricing.js';
 test('normalizes provider usage and bills reasoning once', () => {
   const usage = normalizeUsage('openai', { input_tokens: 1_000, output_tokens: 500, output_tokens_details: { reasoning_tokens: 200 } });
   assert.equal(usage.totalTokens, 1500); assert.equal(usage.reasoningTokens, 200);
@@ -25,6 +25,11 @@ test('known production model rates remain available', () => {
   assert.equal(calculateCost('gpt-5.4-mini', normalizeUsage('openai', { input_tokens: 100, output_tokens: 10 })), 0.00012);
   assert.ok(calculateCost('claude-haiku-4-5-20251001', normalizeUsage('anthropic', { input_tokens: 100, output_tokens: 10 })) > 0);
   assert.ok(calculateCost('gemini-2.5-flash', normalizeUsage('gemini', { promptTokenCount: 100, candidatesTokenCount: 10 })) > 0);
+  assert.equal(calculateCost('gemini-2.5-flash-preview-05-20', normalizeUsage('gemini', { promptTokenCount: 100, candidatesTokenCount: 10 })), null);
+});
+test('GPT-5.4 long context applies official input/output multipliers', () => {
+  const usage = normalizeUsage('openai', { input_tokens: LONG_CONTEXT_THRESHOLD + 1, output_tokens: 100 });
+  assert.equal(calculateCost('gpt-5.4', usage), 1.362255);
 });
 test('invalid token buckets fail closed', () => {
   assert.equal(normalizeUsage('openai', { input_tokens: 100, output_tokens: 1, input_tokens_details: { cached_tokens: 101 } }), null);
@@ -32,6 +37,7 @@ test('invalid token buckets fail closed', () => {
   assert.equal(normalizeUsage('openai', { input_tokens: 1, output_tokens: 1, output_tokens_details: { reasoning_tokens: Number.NaN } }), null);
   assert.equal(normalizeUsage('openai', { input_tokens: null, output_tokens: null }), null);
   assert.equal(normalizeUsage('openai', { input_tokens: 1, output_tokens: 1, input_tokens_details: { cache_write_tokens: 'not-a-number' } }), null);
+  assert.equal(normalizeUsage('openai', { input_tokens: 1, output_tokens: 1, input_tokens_details: { cache_write_tokens: '3' } }), null);
 });
 test('Anthropic cache write TTL buckets retain their distinct rates', () => {
   const usage = normalizeUsage('anthropic', { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 20, cache_creation_input_tokens: 300, cache_creation: { ephemeral_5m_input_tokens: 200, ephemeral_1h_input_tokens: 100 }, output_tokens_details: { thinking_tokens: 7 } });

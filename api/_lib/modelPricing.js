@@ -1,17 +1,19 @@
 /** Single dated pricing authority shared by telemetry and evaluation. */
 export const PRICING_REGISTRY_VERSION = '2026-08-28.1';
 export const PRICING_REGISTRY_SOURCE = 'provider-pricing-pages-2026-08-28';
+export const LONG_CONTEXT_THRESHOLD = 272_000;
 export const MODEL_PRICING = Object.freeze({
   'gpt-5.6-luna': Object.freeze({ input: 0.20, output: 1.20, cacheRead: 0.02, cacheWrite: 0.25, source: 'https://developers.openai.com/api/docs/models/gpt-5.6-luna' }),
   'gpt-5.6-terra': Object.freeze({ input: 2, output: 12, cacheRead: 0.20, cacheWrite: 2.50, source: 'https://developers.openai.com/api/docs/models/gpt-5.6-terra' }),
-  'gpt-5.4': Object.freeze({ input: 2.50, output: 15, cacheRead: 0.25, cacheWrite: 3.125, source: 'https://developers.openai.com/api/docs/models' }),
+  'gpt-5.4': Object.freeze({ input: 2.50, output: 15, cacheRead: 0.25, cacheWrite: 3.125, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5, source: 'https://developers.openai.com/api/docs/models' }),
   'gpt-5.4-mini': Object.freeze({ input: 0.75, output: 4.50, cacheRead: 0.075, cacheWrite: 0.9375, source: 'https://developers.openai.com/api/docs/models' }),
   'claude-sonnet-5': Object.freeze({ input: 2, output: 10, cacheRead: 0.20, cacheWrite: 2.50, cacheWrite1h: 4, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
   'claude-sonnet-4-6': Object.freeze({ input: 3, output: 15, cacheRead: 0.30, cacheWrite: 3.75, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
-  'claude-haiku-4-5-20251001': Object.freeze({ input: 0.80, output: 4, cacheRead: 0.08, cacheWrite: 1, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
-  'gemini-2.5-flash': Object.freeze({ input: 0.15, output: 0.60, cacheRead: 0, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
-  'gemini-2.5-flash-preview-05-20': Object.freeze({ input: 0.15, output: 0.60, cacheRead: 0, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
-  'gemini-3.1-flash-image-preview': Object.freeze({ input: 0.15, output: 0.60, cacheRead: 0, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
+  'claude-haiku-4-5-20251001': Object.freeze({ input: 1, output: 5, cacheRead: 0.10, cacheWrite: 1.25, cacheWrite1h: 2, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
+  'gemini-2.5-flash': Object.freeze({ input: 0.30, output: 2.50, cacheRead: 0.03, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
+  'gemini-2.5-flash-preview-05-20': Object.freeze({ status: 'retired', unsupported: true, source: 'https://ai.google.dev/gemini-api/docs/deprecations' }),
+  'gemini-3.1-flash-image-preview': Object.freeze({ status: 'retired', unsupported: true, source: 'https://ai.google.dev/gemini-api/docs/deprecations' }),
+  'gemini-3.1-flash-image': Object.freeze({ status: 'current', unsupported: true, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
 });
 const finite = (value) => typeof value === 'number' && Number.isFinite(value) ? value : null;
 export function getModelPrice(model, registry = MODEL_PRICING) {
@@ -31,7 +33,7 @@ export function normalizeUsage(provider, usage) {
     : provider === 'openai'
       ? [usage.input_tokens_details?.cached_tokens, usage.input_tokens_details?.cache_write_tokens, usage.input_token_details?.cached_tokens, usage.input_token_details?.cache_write_tokens, usage.prompt_tokens_details?.cached_tokens, usage.output_tokens_details?.reasoning_tokens, usage.completion_tokens_details?.reasoning_tokens, usage.reasoning_tokens]
       : [];
-  if (rawBuckets.some((value) => value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0))) return null;
+  if (rawBuckets.some((value) => value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))) return null;
   let inputTokens; let outputTokens; let cacheReadTokens = 0; let cacheWriteTokens = 0; let cacheWrite5mTokens = 0; let cacheWrite1hTokens = 0; let reasoningTokens = 0; let thinkingTokens = 0;
   if (provider === 'anthropic') {
     inputTokens = finite(usage.input_tokens); outputTokens = finite(usage.output_tokens);
@@ -57,7 +59,7 @@ export function normalizeUsage(provider, usage) {
 }
 export function calculateCost(model, tokens, registry = MODEL_PRICING) {
   const price = getModelPrice(model, registry);
-  if (!price || !tokens || !Number.isFinite(tokens.inputTokens) || !Number.isFinite(tokens.outputTokens)) return null;
+  if (!price || price.unsupported || !tokens || !Number.isFinite(tokens.inputTokens) || !Number.isFinite(tokens.outputTokens)) return null;
   // OpenAI input_tokens includes cached input, so replace that portion with
   // the discounted bucket. Anthropic reports cache buckets separately.
   const inclusiveCache = tokens.inputIncludesCache ? (tokens.cacheReadTokens || 0) + (tokens.cacheWriteTokens || 0) : 0;
@@ -65,7 +67,10 @@ export function calculateCost(model, tokens, registry = MODEL_PRICING) {
   const hasWriteBreakdown = (tokens.cacheWrite5mTokens || 0) + (tokens.cacheWrite1hTokens || 0) > 0;
   const fiveMinuteWrites = hasWriteBreakdown ? (tokens.cacheWrite5mTokens || 0) : (tokens.cacheWriteTokens || 0);
   const oneHourWrites = hasWriteBreakdown ? (tokens.cacheWrite1hTokens || 0) : 0;
-  const value = (uncachedInput * price.input + tokens.cacheReadTokens * (price.cacheRead || 0) + tokens.outputTokens * price.output + fiveMinuteWrites * (price.cacheWrite || 0) + oneHourWrites * (price.cacheWrite1h || price.cacheWrite || 0)) / 1_000_000;
+  const longContext = tokens.inputTokens > LONG_CONTEXT_THRESHOLD;
+  const inputMultiplier = longContext ? (price.longContextInputMultiplier || 1) : 1;
+  const outputMultiplier = longContext ? (price.longContextOutputMultiplier || 1) : 1;
+  const value = (uncachedInput * price.input * inputMultiplier + tokens.cacheReadTokens * (price.cacheRead || 0) * inputMultiplier + fiveMinuteWrites * (price.cacheWrite || 0) * inputMultiplier + oneHourWrites * (price.cacheWrite1h || price.cacheWrite || 0) * inputMultiplier + tokens.outputTokens * price.output * outputMultiplier) / 1_000_000;
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 export function priceUsage({ model, provider, usage }, registry = MODEL_PRICING) {
