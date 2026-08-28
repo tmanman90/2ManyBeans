@@ -37,6 +37,13 @@ export function validatePreflight(result = {}) {
 export function assertPreflight(result) { const checked = validatePreflight(result); if (!checked.ok) throw new Error(`preflight failed: ${checked.errors.join('; ')}`); return checked; }
 export async function runPreflight({ adapters = [], identity, expectedIdentity, env = process.env } = {}) {
   assertExactArms(MODEL_ARMS);
+  // Identity, quota, and environment gates run before any adapter can issue a
+  // provider request. Invalid setup is a zero-call fail-closed result.
+  const identityCheck = checkEvaluationIdentity(identity, expectedIdentity);
+  const environmentCheck = checkEnvironment(env);
+  const setupErrors = [...identityCheck.errors];
+  if (!environmentCheck.ok) setupErrors.push(`forbidden environment variables: ${environmentCheck.forbidden.join(', ')}`);
+  if (setupErrors.length) return { ok: false, checks: [], errors: setupErrors, identity: identityCheck, environment: environmentCheck };
   const results = [];
   for (const arm of MODEL_ARMS) {
     const adapter = adapters.find((item) => item.provider === arm.provider);

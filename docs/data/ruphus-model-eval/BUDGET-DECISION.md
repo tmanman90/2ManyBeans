@@ -47,7 +47,9 @@ scores, releases its reserve, or changes a quality gate. SDK retries are disable
 the 25% retry reserve is one hard global cost pool, consumed fairly in the
 interleaved schedule. Exhaustion stops dispatch and yields insufficient evidence.
 At most two six-case calibration passes are permitted; a third pass fails closed.
-The 10% contingency and the `$2.20` headroom are non-dispatchable.
+The 10% contingency may absorb metered variance from already-authorized frozen
+calls, but cannot authorize extra calls, cases, or turns. The 10% contingency
+and the `$2.20` headroom are non-dispatchable for new work.
 
 The estimator uses frozen input/output ceilings of 5,000/1,800 tokens and the
 worst eligible arm for finalist phases. Current per-turn cold costs are derived

@@ -42,7 +42,9 @@ calibration pass, an unresolved finalist cutoff tie involving more than two, or
 any missing/unmeterable/invalid evidence yields insufficient evidence; zero
 eligible arms after complete semantic evidence is no-pass. Warm telemetry may
 run only for the preregistered measured cost delta `<= $0.01` per successful task
-and never merges into quality scoring.
+and never merges into quality scoring. Contingency may absorb metered variance
+from already-authorized frozen calls, but cannot authorize extra calls, cases, or
+turns; remaining headroom is never dispatchable.
 
 ```mermaid
 flowchart TB

@@ -28,3 +28,11 @@ test('all six exact arms complete an attributable preflight', async () => {
   const result = await runPreflight({ identity: { ...actual, provider: 'evaluation' }, expectedIdentity: expected, env: {}, adapters });
   assert.equal(result.ok, true); assert.equal(result.checks.length, 6); assert.ok(result.checks.every((check) => check.ok && check.id === check.armId));
 });
+test('invalid setup fails before invoking any provider probe', async () => {
+  let calls = 0;
+  const adapters = [{ provider: 'openai', probe: () => { calls += 1; throw new Error('probe must not run'); } }, { provider: 'anthropic', probe: () => { calls += 1; throw new Error('probe must not run'); } }];
+  const overCap = await runPreflight({ identity: { ...actual, quotaUsd: 31 }, expectedIdentity: expected, env: {}, adapters });
+  assert.equal(overCap.ok, false); assert.equal(calls, 0);
+  const forbiddenEnv = await runPreflight({ identity: actual, expectedIdentity: expected, env: { FIREBASE_PROJECT_ID: 'x' }, adapters });
+  assert.equal(forbiddenEnv.ok, false); assert.equal(calls, 0);
+});

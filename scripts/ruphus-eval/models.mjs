@@ -3,6 +3,9 @@ import { getModelPrice, MODEL_PRICING, PRICING_REGISTRY_VERSION } from '../../ap
 // Approved budget amendment: sequential qualification for all six arms, then
 // deeper decision/lifecycle work for at most two finalists.
 export const EVALUATION_CAP_USD = 30;
+// This is the exact frozen dispatch envelope. The remaining $2.20 of the
+// provider cap is non-dispatchable headroom and cannot be reserved for calls.
+export const APPROVED_DISPATCH_RESERVATION_USD = 27.798201000000006;
 export const LONG_CONTEXT_THRESHOLD = 272_000;
 export const CACHE_REGIMES = Object.freeze(['cold', 'warm']);
 export const MODEL_ARMS = Object.freeze([
@@ -79,10 +82,9 @@ export function estimateTurnCost(arm, limits = DEFAULT_LIMITS, { cacheRegime = '
   return ((input - cached) * p.input + cached * (p.cacheRead ?? p.input) + limits.outputTokens * p.output) / 1_000_000;
 }
 export function estimateSchedule(options = {}) {
-  const allowedOptions = new Set(['arms', 'limits']);
-  for (const key of Object.keys(options)) if (!allowedOptions.has(key)) throw new Error(`unknown schedule option ${key}`);
-  let { arms = MODEL_ARMS, limits = DEFAULT_LIMITS } = options;
-  limits = { ...DEFAULT_LIMITS, ...limits };
+  if (Object.keys(options).length) throw new Error('frozen schedule does not accept overrides');
+  const arms = MODEL_ARMS;
+  const limits = DEFAULT_LIMITS;
   validateLimits(limits);
   assertExactArms(arms);
   const coldCosts = arms.map((arm) => estimateTurnCost(arm, limits));
@@ -122,7 +124,7 @@ export function estimateSchedule(options = {}) {
 }
 
 export class BudgetReservation {
-  constructor(cap = EVALUATION_CAP_USD) { if (!Number.isFinite(cap) || !(cap > 0) || cap > EVALUATION_CAP_USD) throw new Error('budget cap must be finite, positive, and no higher than approved cap'); this.cap = cap; this.reserved = 0; this.reservations = new Map(); }
+  constructor(cap = APPROVED_DISPATCH_RESERVATION_USD) { if (!Number.isFinite(cap) || !(cap > 0) || cap > APPROVED_DISPATCH_RESERVATION_USD) throw new Error('budget cap must be finite, positive, and no higher than approved dispatch reservation'); this.cap = cap; this.reserved = 0; this.reservations = new Map(); }
   reserve(id, amount) {
     if (!id || !(amount > 0) || !Number.isFinite(amount)) throw new Error('invalid budget reservation');
     if (this.reservations.has(id)) throw new Error(`duplicate reservation ${id}`);
@@ -130,7 +132,6 @@ export class BudgetReservation {
     this.reservations.set(id, amount); this.reserved += amount;
     return Object.freeze({ id, amount, remaining: this.cap - this.reserved });
   }
-  release(id) { const amount = this.reservations.get(id) || 0; this.reservations.delete(id); this.reserved -= amount; return amount; }
   hasRoom(amount) { return Number.isFinite(amount) && amount >= 0 && this.reserved + amount <= this.cap + 1e-12; }
 }
 

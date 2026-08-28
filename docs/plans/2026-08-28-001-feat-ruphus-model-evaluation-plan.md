@@ -37,6 +37,10 @@ The retry pool is global and fair/interleaved; exhaustion stops dispatch. A thir
 calibration pass, more than two finalists, a finalist cutoff tie involving more
 than two arms, or any attempt to release warm/headroom reserve fails closed.
 This reduced denominator cannot claim the original full-factorial rigor.
+The estimator accepts no schedule overrides: the exact frozen protocol is the
+only dispatchable schedule. The 10% contingency can absorb metered variance from
+already-authorized calls, but cannot authorize additional calls, cases, or turns;
+the `$2.20` headroom is never dispatchable.
 
 ---
 
