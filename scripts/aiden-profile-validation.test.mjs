@@ -28,6 +28,15 @@ test('nonfinite and malformed Aiden values fail closed', () => {
   assert.throws(() => assertValidAidenProfile({ ...validProfile, bloomTemperature: Number.NaN }), /Invalid Aiden profile/);
 });
 
+test('legacy server coercion is characterized as intentional strict hardening', () => {
+  // The former inline server checks relied on JS comparisons and therefore
+  // accepted ratio:'17' and a truthy non-string title. Canonical profiles are
+  // unchanged, while these malformed wire values now fail before Fellow.
+  assert.equal(validateAidenProfile({ ...validProfile, ratio: '17' }).valid, false);
+  assert.equal(validateAidenProfile({ ...validProfile, title: { length: 1 } }).valid, false);
+  assert.equal(validateAidenProfile(validProfile).valid, true);
+});
+
 test('disabled sections retain their existing optional-field behavior', () => {
   const disabled = { ...validProfile, bloomEnabled: false, ssPulsesEnabled: false, batchPulsesEnabled: false };
   delete disabled.bloomTemperature;

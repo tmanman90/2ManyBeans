@@ -327,6 +327,7 @@ flowchart TB
 
 **Approach:**
 - Characterize existing Aiden server and client validation/repair behavior, then extract a browser-and-server-neutral pure validation boundary with no Firebase, DOM, Node-only, or evaluation imports and no change to accepted production profiles.
+- Preserve acceptance for canonical profiles. The characterization records that the former server comparisons accidentally accepted coercible malformed wire values (for example, a numeric-string ratio or non-string title); rejecting those values is intentional fail-closed hardening required by the malformed/non-finite fixture gates, not an unrecorded canonical-profile behavior change.
 - Import existing method validators directly into the grader; do not transcribe their constraints into evaluation-only rules.
 - Grade at raw, parsed, post-repair canonical, and downstream runtime/timer layers. A valid JSON object that later yields invalid or unusable steps fails.
 - Import or extract a browser/server-neutral canonical-recipe-to-runtime projection for each hard-gated method so production and evaluation exercise the same timer/preparation shape rather than an evaluator reconstruction.

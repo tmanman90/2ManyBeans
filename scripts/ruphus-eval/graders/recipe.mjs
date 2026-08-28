@@ -4,6 +4,7 @@ import { validateKalitaCandidate } from '../../../src/lib/kalitaAdapter.js';
 import { validateV60SwitchCandidate } from '../../../src/lib/v60SwitchAdapter.js';
 import { validateV60IcedCandidate } from '../../../src/lib/v60IcedAdapter.js';
 import { validateKalitaIcedCandidate } from '../../../src/lib/kalitaIcedAdapter.js';
+import { normalizeRecipePhases, buildTimerSteps } from '../../../src/lib/brewTimerSteps.js';
 
 const VALIDATORS = Object.freeze({
   aiden: validateAidenProfile,
@@ -51,7 +52,11 @@ export function validateRecipe(method, recipe) {
 export function projectCanonicalRuntime(method, recipe) {
   const validation = validateRecipe(method, recipe);
   if (!validation.valid) return { valid: false, errors: validation.errors, runtime: null };
-  return { valid: true, errors: [], runtime: recipe, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  if (method === 'aiden') return { valid: true, errors: [], runtime: recipe, timerReady: null, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  const runtime = normalizeRecipePhases(recipe);
+  const timerSteps = buildTimerSteps(recipe);
+  if (!runtime?.timerReady || !timerSteps?.length) return { valid: false, errors: ['downstream-timer-not-ready'], runtime: null, timerReady: false, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  return { valid: true, errors: [], runtime, timerSteps, timerReady: true, projection: RECIPE_COVERAGE[method]?.runtime || null };
 }
 
 function canonicalJson(value) {
@@ -82,7 +87,7 @@ export function gradeRecipeLayers({ method, raw, parsed, repaired, downstream = 
   const hardGate = coverage.gate === 'hard' && layers.postRepair.valid && layers.downstream.valid && projection.valid;
   return {
     method, coverage: coverage.gate, layers, repairApplied, repair,
-    grind: grind || null, runtime: projection.runtime,
+    grind: grind || null, runtime: projection.runtime, timerReady: projection.timerReady ?? null,
     hardGate, valid: hardGate,
   };
 }

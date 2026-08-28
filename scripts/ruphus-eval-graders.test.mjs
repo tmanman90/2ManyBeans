@@ -27,7 +27,13 @@ test('hard-gated grader delegates to canonical production validators', () => {
     assert.equal(validateRecipe(method, recipe).valid, true, method);
     const result = gradeRecipeLayers({ method, raw: recipe, parsed: recipe, repaired: recipe, downstream: recipe });
     assert.equal(result.hardGate, true, method);
-    assert.equal(projectCanonicalRuntime(method, recipe).runtime, recipe);
+    const projection = projectCanonicalRuntime(method, recipe);
+    if (method === 'aiden') assert.equal(projection.runtime, recipe);
+    if (method !== 'aiden') {
+      assert.equal(projection.timerReady, true, method);
+      assert.ok(projection.timerSteps.length > 0, method);
+      assert.deepEqual(projection.runtime.steps, recipe.steps, method);
+    }
   }
   assert.equal(RECIPE_COVERAGE.chemex.gate, 'advisory');
 });
@@ -46,6 +52,10 @@ test('material repair remains visible while post-repair and downstream validity 
   const rejected = gradeRecipeLayers({ method: 'v60', raw: broken, parsed: broken, repaired: broken, downstream: broken });
   assert.equal(rejected.hardGate, false);
   assert.ok(rejected.layers.downstream.errors.includes('invalid-timer-sequence'));
+  assert.equal(projectCanonicalRuntime('v60', broken).valid, false);
+  const shortGuide = { ...generateV60Recipe({}, { dose: 15 }), guideTargetSeconds: 1 };
+  assert.equal(validateRecipe('v60', shortGuide).valid, false);
+  assert.equal(projectCanonicalRuntime('v60', shortGuide).valid, false);
 });
 
 test('grind direction is graded through microns rather than display labels', () => {
