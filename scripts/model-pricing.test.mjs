@@ -30,6 +30,8 @@ test('invalid token buckets fail closed', () => {
   assert.equal(normalizeUsage('openai', { input_tokens: 100, output_tokens: 1, input_tokens_details: { cached_tokens: 101 } }), null);
   assert.equal(normalizeUsage('anthropic', { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: -1 }), null);
   assert.equal(normalizeUsage('openai', { input_tokens: 1, output_tokens: 1, output_tokens_details: { reasoning_tokens: Number.NaN } }), null);
+  assert.equal(normalizeUsage('openai', { input_tokens: null, output_tokens: null }), null);
+  assert.equal(normalizeUsage('openai', { input_tokens: 1, output_tokens: 1, input_tokens_details: { cache_write_tokens: 'not-a-number' } }), null);
 });
 test('Anthropic cache write TTL buckets retain their distinct rates', () => {
   const usage = normalizeUsage('anthropic', { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 20, cache_creation_input_tokens: 300, cache_creation: { ephemeral_5m_input_tokens: 200, ephemeral_1h_input_tokens: 100 }, output_tokens_details: { thinking_tokens: 7 } });

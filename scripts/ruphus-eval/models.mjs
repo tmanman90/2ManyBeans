@@ -10,7 +10,7 @@ export const MODEL_ARMS = Object.freeze([
   { id: 'terra-high', label: 'Terra high', provider: 'openai', model: 'gpt-5.6-terra', effort: 'high', endpoint: 'responses', cacheRegime: 'cold' },
   { id: 'sonnet-disabled', label: 'Sonnet 5 thinking-disabled', provider: 'anthropic', model: 'claude-sonnet-5', thinking: 'disabled', endpoint: 'messages', cacheRegime: 'cold' },
   { id: 'sonnet-adaptive-high', label: 'Sonnet 5 adaptive/high', provider: 'anthropic', model: 'claude-sonnet-5', thinking: 'adaptive', effort: 'high', endpoint: 'messages', cacheRegime: 'cold' },
-]);
+].map((arm) => Object.freeze(arm)));
 export const SHIPPING_BASELINE = Object.freeze({ id: 'shipping-sonnet-disabled', label: 'Shipping prompt baseline', provider: 'anthropic', model: 'claude-sonnet-5', thinking: 'disabled', endpoint: 'messages', cacheRegime: 'cold', rankingEligible: false });
 
 export function getArm(id) { return MODEL_ARMS.find((arm) => arm.id === id) || null; }
@@ -41,14 +41,25 @@ export function validateSchedule(schedule, { allowWarm = false } = {}) {
 // Conservative planning maxima. Values are intentionally explicit and must be
 // frozen into the run manifest before any paid dispatch.
 export const DEFAULT_LIMITS = Object.freeze({ inputTokens: 5000, outputTokens: 1800, toolTurns: 5, retries: 1, canaryRuns: 2, cases: 60, repeats: 3, finalistCases: 20, finalistRepeats: 3 });
+export function validateLimits(limits = DEFAULT_LIMITS) {
+  const positiveIntegers = ['toolTurns', 'cases', 'repeats', 'finalistCases', 'finalistRepeats'];
+  const nonNegativeIntegers = ['retries', 'canaryRuns'];
+  const positiveFinite = ['inputTokens', 'outputTokens'];
+  for (const key of positiveIntegers) if (!Number.isInteger(limits[key]) || limits[key] <= 0) throw new Error(`invalid positive limit ${key}`);
+  for (const key of nonNegativeIntegers) if (!Number.isInteger(limits[key]) || limits[key] < 0) throw new Error(`invalid nonnegative limit ${key}`);
+  for (const key of positiveFinite) if (!Number.isFinite(limits[key]) || limits[key] <= 0) throw new Error(`invalid token ceiling ${key}`);
+  return true;
+}
 export function estimateTurnCost(arm, limits = DEFAULT_LIMITS, { cacheRegime = 'cold' } = {}) {
   if (!Number.isFinite(limits.inputTokens) || limits.inputTokens > LONG_CONTEXT_THRESHOLD) throw new Error('long-context pricing is not frozen for this evaluator');
+  if (!Number.isFinite(limits.outputTokens) || limits.outputTokens <= 0) throw new Error('invalid token ceiling outputTokens');
   const p = getModelPrice(arm.model); if (!p) throw new Error(`unknown pricing for ${arm.model}`);
   const input = limits.inputTokens;
   const cached = cacheRegime === 'warm' ? input * 0.25 : 0;
   return ((input - cached) * p.input + cached * (p.cacheRead ?? p.input) + limits.outputTokens * p.output) / 1_000_000;
 }
 export function estimateSchedule({ arms = MODEL_ARMS, limits = DEFAULT_LIMITS, includeWarmFinalists = true, canaryRuns = limits.canaryRuns } = {}) {
+  validateLimits({ ...limits, canaryRuns });
   assertExactArms(arms);
   const initialRuns = limits.cases * limits.repeats;
   const initialModelTurns = (initialRuns + canaryRuns) * limits.toolTurns;

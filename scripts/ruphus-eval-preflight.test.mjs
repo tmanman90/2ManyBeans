@@ -10,7 +10,7 @@ test('forbidden credentials and non-provider egress are rejected', () => {
   assert.equal(checkEnvironment({ FIREBASE_PROJECT_ID: 'x' }).ok, false); assert.equal(checkEgress('https://api.openai.com/v1').ok, true); assert.equal(checkEgress('http://api.openai.com/v1').ok, false); assert.equal(checkEgress('https://example.com').ok, false);
 });
 test('preflight requires every telemetry capability', () => {
-  assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.anthropic.com' }).ok, true);
+  assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.anthropic.com', requestedModel: 'claude-sonnet-5', returnedModel: 'claude-sonnet-5' }).ok, true);
   assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r' }).ok, false);
   assert.equal(validatePreflight({ identity: { projectId: 'e', workspaceId: 'w', dedicated: true, quotaUsd: 75 }, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'r', providerHost: 'https://api.openai.com', requestedModel: 'gpt-5.6-luna', returnedModel: 'gpt-5.6-terra' }).ok, false);
 });

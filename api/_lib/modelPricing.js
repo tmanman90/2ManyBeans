@@ -13,16 +13,23 @@ export const MODEL_PRICING = Object.freeze({
   'gemini-2.5-flash-preview-05-20': Object.freeze({ input: 0.15, output: 0.60, cacheRead: 0, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
   'gemini-3.1-flash-image-preview': Object.freeze({ input: 0.15, output: 0.60, cacheRead: 0, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
 });
-const finite = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+const finite = (value) => typeof value === 'number' && Number.isFinite(value) ? value : null;
 export function getModelPrice(model, registry = MODEL_PRICING) {
   return registry?.[model] ? { ...registry[model], model, registryVersion: PRICING_REGISTRY_VERSION } : null;
 }
 export function normalizeUsage(provider, usage) {
   if (!usage || typeof usage !== 'object') return null;
+  const has = (key) => Object.prototype.hasOwnProperty.call(usage, key);
+  const required = provider === 'anthropic'
+    ? [usage.input_tokens, usage.output_tokens]
+    : provider === 'openai'
+      ? [has('input_tokens') ? usage.input_tokens : usage.prompt_tokens, has('output_tokens') ? usage.output_tokens : usage.completion_tokens]
+      : provider === 'gemini' ? [usage.promptTokenCount, usage.candidatesTokenCount] : [];
+  if (required.length !== 2 || required.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) return null;
   const rawBuckets = provider === 'anthropic'
     ? [usage.cache_read_input_tokens, usage.cache_creation_input_tokens, usage.cache_creation?.ephemeral_5m_input_tokens, usage.cache_creation?.ephemeral_1h_input_tokens, usage.thinking_tokens, usage.output_tokens_details?.thinking_tokens]
     : provider === 'openai'
-      ? [usage.input_tokens_details?.cached_tokens, usage.input_token_details?.cached_tokens, usage.prompt_tokens_details?.cached_tokens, usage.output_tokens_details?.reasoning_tokens, usage.completion_tokens_details?.reasoning_tokens, usage.reasoning_tokens]
+      ? [usage.input_tokens_details?.cached_tokens, usage.input_tokens_details?.cache_write_tokens, usage.input_token_details?.cached_tokens, usage.input_token_details?.cache_write_tokens, usage.prompt_tokens_details?.cached_tokens, usage.output_tokens_details?.reasoning_tokens, usage.completion_tokens_details?.reasoning_tokens, usage.reasoning_tokens]
       : [];
   if (rawBuckets.some((value) => value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0))) return null;
   let inputTokens; let outputTokens; let cacheReadTokens = 0; let cacheWriteTokens = 0; let cacheWrite5mTokens = 0; let cacheWrite1hTokens = 0; let reasoningTokens = 0; let thinkingTokens = 0;

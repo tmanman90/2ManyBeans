@@ -27,7 +27,7 @@ export function validatePreflight(result = {}) {
   if (!env.ok) errors.push(`forbidden environment variables: ${env.forbidden.join(', ')}`);
   if (!result.modelAccess || !result.streaming || !result.completeUsage || !result.requestId) errors.push('model access, streaming, complete usage, and request ID are all required');
   if (!result.providerHost || !checkEgress(result.providerHost).ok) errors.push('provider host attribution is required and must be allowlisted');
-  if (result.requestedModel && result.returnedModel !== result.requestedModel) errors.push('provider returned model does not equal requested exact model');
+  if (!result.requestedModel || !result.returnedModel || result.returnedModel !== result.requestedModel) errors.push('provider returned model does not equal requested exact model');
   return { ok: errors.length === 0, errors, identity, environment: env };
 }
 export function assertPreflight(result) { const checked = validatePreflight(result); if (!checked.ok) throw new Error(`preflight failed: ${checked.errors.join('; ')}`); return checked; }
