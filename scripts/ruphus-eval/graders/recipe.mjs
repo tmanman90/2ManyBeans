@@ -93,7 +93,7 @@ export function gradeRecipeLayers({ method, raw, parsed, repaired, downstream = 
   };
   const projection = projectCanonicalRuntime(method, downstream);
   const repairedProjection = projectCanonicalRuntime(method, repaired);
-  const repairApplied = canonicalJson(raw) !== canonicalJson(repaired);
+  const repairApplied = canonicalJson(parsed) !== canonicalJson(repaired);
   const repairMetadataConsistent = repair == null || !Object.prototype.hasOwnProperty.call(repair, 'applied')
     || (typeof repair.applied === 'boolean' && repair.applied === repairApplied);
   const coverage = RECIPE_COVERAGE[method] || { gate: 'advisory' };

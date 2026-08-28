@@ -77,6 +77,10 @@ test('material repair remains visible while post-repair and downstream validity 
   assert.equal(trueClaimWithoutChange.repairApplied, false);
   assert.equal(trueClaimWithoutChange.repairMetadataConsistent, false);
   assert.equal(trueClaimWithoutChange.hardGate, false);
+  const rawJson = gradeRecipeLayers({ method: 'aiden', raw: JSON.stringify(aiden), parsed: aiden, repaired: aiden, downstream: aiden, repair: { applied: false } });
+  assert.equal(rawJson.repairApplied, false);
+  assert.equal(rawJson.repairMetadataConsistent, true);
+  assert.equal(rawJson.hardGate, true);
 
   const broken = { ...generateV60Recipe({}, { dose: 15 }), steps: [...generateV60Recipe({}, { dose: 15 }).steps].reverse() };
   const rejected = gradeRecipeLayers({ method: 'v60', raw: broken, parsed: broken, repaired: broken, downstream: broken });
