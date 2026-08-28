@@ -1,8 +1,9 @@
 # Ruphus evaluation budget checkpoint
 
-Status: blocked pending an explicit budget/scope decision. U1 was accepted at
-`04aeedf021d844bc9e8e2052f841b704758e7025` (current branch tip at this
-checkpoint). No paid provider request has been made.
+Status: paused pending an explicit budget/scope decision. The accepted U1
+implementation tip is `04aeedf021d844bc9e8e2052f841b704758e7025`; this
+checkpoint was subsequently recorded in document commit `fdb87c4` and is not
+the U1 implementation tip. No paid provider request has been made.
 
 ## Reproduced envelope
 
@@ -25,13 +26,14 @@ Command:
 node -e "import('./scripts/ruphus-eval/models.mjs').then(({estimateSchedule}) => console.log(JSON.stringify(estimateSchedule(), null, 2)))"
 ```
 
-Reproduced result:
+Reproduced result (user-facing values rounded to cents; exact machine values
+are retained for auditability):
 
 ```text
-initial   $228.44640000000004
-lifecycle $37.92
-warm      $11.799
-total     $278.16540000000003
+initial   $228.45   (machine: 228.44640000000004)
+lifecycle $37.92    (machine: 37.92)
+warm      $11.80     (machine: 11.799)
+total     $278.17   (machine: 278.16540000000003)
 feasible  false
 ```
 
@@ -48,13 +50,13 @@ Pricing provenance is frozen in
 
 ## Decision required
 
-**Option A — raise the hard cap to $325.** Preserve the complete approved
-protocol and all six arms. This leaves `$46.83459999999997` of headroom over
-the reproduced conservative maximum. `$325` is a hard reservation ceiling,
+**Option A — raise the hard cap to $325.00.** Preserve the complete approved
+protocol and all six arms. This leaves `$46.83` of headroom over
+the reproduced conservative maximum. `$325.00` is a hard reservation ceiling,
 not an expected spend target; all U1 preflight, identity, retention, isolation,
 and per-phase reservation gates still apply.
 
-**Option B — retain the $75 cap.** Require a separately reviewed and approved
+**Option B — retain the $75.00 cap.** Require a separately reviewed and approved
 plan amendment defining a weaker or reduced protocol. No cases, repeats, arms,
 turns, retries, finalists, cache regime, or other denominator may be shrunk
 implicitly by the runner, and no paid call may occur until that amendment and
