@@ -26,6 +26,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { saveRuphusTasting } from '../lib/ruphusTasting';
 
 // ─────────────────────────────────────────────────────────────
 // List-mode helpers (added for redesign)
@@ -152,7 +153,14 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   // persist as-is without the background LLM score conversion that the manual/chat paths use.
   const saveWizardTasting = async (record) => {
     try {
-      await onAddTasting(record);
+      // Agent-started attempts use the server seam so recipe provenance and
+      // the attempt's immutable snapshot cannot be supplied by the client.
+      if (record?.attemptId) {
+        const { attemptId, ...sensory } = record;
+        await saveRuphusTasting({ attemptId, coffeeId: record.beanId, sensory });
+      } else {
+        await onAddTasting(record);
+      }
       setWizardDraft(null);
       setWizardOpen(false);
       setMode('list');

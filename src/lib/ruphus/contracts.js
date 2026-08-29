@@ -13,7 +13,8 @@ export const LIFECYCLE_TYPES = Object.freeze([
 
 export const ARTIFACT_TYPES = Object.freeze([
   'coffee_context', 'current_recipe', 'recipe_proposal', 'brew_comparison',
-  'brew_history_chart', 'data_gap',
+  'brew_history_chart', 'data_gap', 'action_receipt', 'fellow_handoff_result',
+  'undo_receipt', 'recipe_provenance',
 ]);
 
 export const SLOT_KEYS = Object.freeze([
@@ -168,7 +169,7 @@ export function validateCommandRequest(value) {
   const errors = [];
   if (!object(value)) return { valid: false, errors: ['command must be an object'] };
   if (!text(value.actionId, 180) || !text(value.mode, 80) || !text(value.coffeeId, 180)) errors.push('actionId, mode, and coffeeId are required');
-  if (value.mode && !['replace_active_recipe', 'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose', 'set_aiden_grind', 'undo_revision'].includes(value.mode)) errors.push('unsupported command mode');
+  if (value.mode && !['replace_active_recipe', 'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose', 'set_aiden_grind', 'set_aiden_link', 'undo_revision'].includes(value.mode)) errors.push('unsupported command mode');
   if (own(value, 'uid') || own(value, 'ownerId')) errors.push('owner identity is server-bound');
   return { valid: errors.length === 0, errors };
 }

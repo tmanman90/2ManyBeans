@@ -136,6 +136,14 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if false;
     }
+    match /users/{userId}/actions/{actionId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+    match /users/{userId}/receipts/{receiptId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
 
     // Redemption codes & ledger: Admin SDK only. Default-deny would already
     // cover these in rules_version 2, but declaring explicit blocks makes the

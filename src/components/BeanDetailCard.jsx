@@ -21,6 +21,7 @@ import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { tastingIcon, tastingIconImage } from '../lib/tastingIcons';
 import { useStrippedBag, bagPhotoFor } from '../lib/stripBg';
+import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
 
 // ---- card palette (its own collectible look) ----
 const RED = '#E0241C';
@@ -724,6 +725,9 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                   {/* Saved brew profile (archive only) — read-only recap of stored recipes */}
                   {showBrewProfile && (bean.aidenRecipe || bean.handBrewRecipe) && (
                     <Panel>
+                      {bean.activeRevisionIds && Object.keys(bean.activeRevisionIds).length > 0 && (
+                        <RecipeProvenanceStrip provenance={{ revisionId: Object.values(bean.activeRevisionIds)[0] }} />
+                      )}
                       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                         <Coffee size={26} color={INK} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />
                         <div style={{ borderLeft: `1px solid ${HAIR}`, paddingLeft: 14, flex: 1, minWidth: 0 }}>

@@ -8,6 +8,10 @@ export const ARTIFACT_REGISTRY = Object.freeze({
   recipe_proposal: Object.freeze({ type: 'recipe_proposal', label: 'Recipe proposal', actions: ['apply_proposal', 'brew_once', 'keep_current'], authority: 'coffee-proposal' }),
   brew_comparison: Object.freeze({ type: 'brew_comparison', label: 'Brew comparison', ...inert }),
   brew_history_chart: Object.freeze({ type: 'brew_history_chart', label: 'Brew history', ...inert }),
+  action_receipt: Object.freeze({ type: 'action_receipt', label: 'Coffee action receipt', ...inert }),
+  fellow_handoff_result: Object.freeze({ type: 'fellow_handoff_result', label: 'Fellow preparation', ...inert }),
+  undo_receipt: Object.freeze({ type: 'undo_receipt', label: 'Undo receipt', ...inert }),
+  recipe_provenance: Object.freeze({ type: 'recipe_provenance', label: 'Recipe provenance', ...inert }),
   data_gap: Object.freeze({ type: 'data_gap', label: 'More information needed', actions: ['choose'], authority: 'coffee-read-only' }),
 });
 

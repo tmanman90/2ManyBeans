@@ -30,8 +30,9 @@ import { ChatMessage } from '../components/chat/ChatMessage';
 import { StreamingBubble } from '../components/chat/StreamingBubble';
 import { recipeSummary } from '../components/chat/RecipeCard';
 import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatParse';
-import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { isRuphusAgentV3Enabled, isRuphusMutationEnabled } from '../lib/ruphus/featureFlags';
 import { streamAgentWithAuth } from '../lib/ruphus/streamAgent';
+import { useRuphusAction } from '../hooks/useRuphusAction';
 import { RuphusContextHeader } from '../components/chat/RuphusContextHeader';
 import { RuphusMessage } from '../components/chat/RuphusMessage';
 import { RuphusLifecycleCaption } from '../components/chat/RuphusLifecycleCaption';
@@ -401,6 +402,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   ]);
   const { hydratedMessages, hydratedContext, hydratedArtifacts, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
   const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
+  const mutationEnabled = isRuphusMutationEnabled({ uid, isDemo });
+  const { run: runRuphusAction } = useRuphusAction({ onReceipt: (result) => {
+    if (!result?.receipt) return;
+    const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
+    setAgentArtifacts((previous) => [...previous.filter((item) => item.id !== artifact.id), artifact]);
+  } });
   const [agentContext, setAgentContext] = useState(null);
   const [agentFrame, setAgentFrame] = useState(null);
   const [agentText, setAgentText] = useState('');
@@ -419,6 +426,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [showJumpLatest, setShowJumpLatest] = useState(false);
   const [savingRecipeKey, setSavingRecipeKey] = useState(null);
   const [toast, setToast] = useState(null);
+  const handleRuphusAction = useCallback(async (request) => {
+    if (!mutationEnabled) return null;
+    try { return await runRuphusAction(request); } catch (error) { setToast(error.message || 'Action unavailable'); return null; }
+  }, [mutationEnabled, runRuphusAction]);
   // Disable keyboard hook when tab is hidden to prevent double-counting
   // keyboard events and corrupting the shared tab bar hide counter.
   const keyboardHeight = useNativeKeyboard({ enabled: isActive });
@@ -1319,7 +1330,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (isIntroState && i === 0) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} />)}</div></RuphusMessage> : <ChatMessage
+                {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
@@ -1347,7 +1358,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           />
         )}
         {agentEnabled && loading && agentText && <RuphusMessage text={agentText} />}
-        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} />)}</div>}
+        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} />)}</div>}
       </div>
 
       {showJumpLatest && streamingSlot && (

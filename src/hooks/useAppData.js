@@ -10,6 +10,7 @@ import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
 import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
+import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate } from '../lib/recipeCommands';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -213,6 +214,15 @@ export const useAppData = (uid) => {
 
   const updateBean = useCallback(async (beanId, updates) => {
     if (!uid) return;
+    if (isProtectedRecipeUpdate(updates)) {
+      const bean = beansStateRef.current.find((item) => item.id === beanId);
+      if (!bean) throw new Error('This bean is no longer available.');
+      const command = commandForBeanUpdate(bean, updates);
+      if (!command.recipe && command.mode === 'replace_active_recipe') throw new Error('A complete recipe is required for this change.');
+      await executeRecipeCommand({ ...command, patch: (command.mode === 'replace_active_recipe' || command.mode === 'set_aiden_link') ? updates : undefined });
+      await refetch();
+      return;
+    }
     const beanRef = doc(db, 'users', uid, 'beans', beanId);
     await updateDoc(beanRef, {
       ...updates,
