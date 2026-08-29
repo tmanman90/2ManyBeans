@@ -153,8 +153,10 @@ export function validateColdSchedule(schedule, { requireAllArms = true, manifest
   if (contract.armCount !== null && (requireAllArms ? arms.size !== contract.armCount : arms.size > contract.armCount)) throw new Error('schedule must include all six exact arms');
   if (phase === 'finalist-decision' && (arms.size < 1 || arms.size > 2)) throw new Error('finalist schedule must contain at most two arms');
   const maxRepeat = Math.max(...schedule.map((entry) => entry.repeat));
+  if (phase !== 'calibration' && maxRepeat !== contract.repeats) throw new Error('non-calibration phase requires the frozen repeat count');
+  const repeatCount = phase === 'calibration' ? maxRepeat : contract.repeats;
   const expectedKeys = new Set();
-  for (let repeat = 1; repeat <= maxRepeat; repeat += 1) for (const caseId of contract.cases) for (const armId of arms) expectedKeys.add(`${armId}:${caseId}:${repeat}`);
+  for (let repeat = 1; repeat <= repeatCount; repeat += 1) for (const caseId of contract.cases) for (const armId of arms) expectedKeys.add(`${armId}:${caseId}:${repeat}`);
   if (schedule.length !== expectedKeys.size || [...expectedKeys].some((key) => !seen.has(key))) throw new Error('schedule must be a complete authorized phase denominator');
   return true;
 }

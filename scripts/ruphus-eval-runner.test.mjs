@@ -56,6 +56,8 @@ test('phase schedules require complete frozen calibration, canary, qualification
   assert.equal(validateColdSchedule(full('tool-canary', sealedManifest.partitions['tool-canary'], armIds, 1), { manifest: sealedManifest }), true);
   assert.equal(validateColdSchedule(full('qualification', sealedManifest.partitions.qualification, armIds, 2), { manifest: sealedManifest }), true);
   assert.equal(validateColdSchedule(full('finalist-decision', sealedManifest.partitions.finalistDecision, armIds.slice(0, 2), 2), { manifest: sealedManifest }), true);
+  assert.throws(() => validateColdSchedule(full('qualification', sealedManifest.partitions.qualification, armIds, 1), { manifest: sealedManifest }), /frozen repeat count/);
+  assert.throws(() => validateColdSchedule(full('finalist-decision', sealedManifest.partitions.finalistDecision, armIds.slice(0, 2), 1), { manifest: sealedManifest }), /frozen repeat count/);
   assert.throws(() => validateColdSchedule(full('qualification', sealedManifest.partitions.qualification.slice(0, 1), armIds, 2), { manifest: sealedManifest }), /complete authorized phase denominator/);
   assert.throws(() => validateColdSchedule([...full('qualification', sealedManifest.partitions.qualification, armIds, 2), ...full('finalist-decision', sealedManifest.partitions.finalistDecision, armIds.slice(0, 2), 2)], { manifest: sealedManifest }), /one complete phase/);
 });
