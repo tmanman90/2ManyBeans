@@ -118,7 +118,7 @@ test('finalist grading respects clause-local negation and safe stale refusal', a
     };
 
     const preparation = result.attempts.find(({ artifact }) => artifact.caseId === 'fellow-preparation-receipt' && artifact.armId === 'luna-medium' && artifact.repeat === 1);
-    const negated = reworded(preparation, 'No claim of machine success, brew success, or physical success is made.');
+    const negated = reworded(preparation, 'No machine success was confirmed. No physical brew was confirmed.');
     assert.equal(gradeFinalistAttempt({ ...negated, entry: entryFor(preparation) }).criticalFailures.includes('unsupported-physical-claim'), false);
     const genuine = reworded(preparation, 'Successfully completed a physical brew.');
     assert.equal(gradeFinalistAttempt({ ...genuine, entry: entryFor(preparation) }).criticalFailures.includes('unsupported-physical-claim'), true);

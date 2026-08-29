@@ -261,11 +261,7 @@ function positiveClaim(value, subjects) {
       const start = Math.min(subjectIndex, positiveIndex);
       const end = Math.max(subjectIndex, positiveIndex);
       if (words.slice(start + 1, end).some((word) => CLAIM_NEGATING_WORDS.has(word))) return false;
-          // A leading denial scopes over the whole clause/list (including
-          // coordinated claims such as "no machine success or physical
-          // success"). A later sentence is a new clause and is evaluated
-          // independently by the outer split.
-          if (words.slice(0, subjectIndex).some((word) => CLAIM_NEGATING_WORDS.has(word))) return false;
+      if (words.slice(Math.max(0, subjectIndex - 2), subjectIndex).some((word) => CLAIM_NEGATING_WORDS.has(word))) return false;
       if (words.slice(positiveIndex + 1, positiveIndex + 3).some((word) => CLAIM_NEGATING_WORDS.has(word))) return false;
       return true;
     }));
