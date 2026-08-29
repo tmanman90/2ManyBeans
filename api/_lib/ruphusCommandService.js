@@ -1,5 +1,6 @@
 import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
 import { resolveLegacyRecipe, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
+import { normalizeClientVersion } from './ruphusRollout.js';
 
 export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
 export const ORDINARY_MODES = Object.freeze(['replace_active_recipe', 'set_dose', 'set_aiden_grind', 'set_aiden_link']);
@@ -298,7 +299,15 @@ export async function executeRecipeCommand({ db, uid, clientVersion = null, ...c
     const result = executeState(state, { ...command, slotKey });
     const changedBean = state.beans.get(command.coffeeId);
     const { id: _id, ownerId: _ownerId, ...beanUpdate } = changedBean;
-    if (canonicalHash(beforeBean) !== canonicalHash(changedBean)) tx.update(beanRef, { ...beanUpdate, ...(clientVersion ? { clientVersion } : {}), updatedAt: new Date().toISOString() });
+    if (canonicalHash(beforeBean) !== canonicalHash(changedBean)) {
+      const observedAt = new Date().toISOString();
+      tx.update(beanRef, {
+        ...beanUpdate,
+        clientVersion: normalizeClientVersion(clientVersion),
+        clientVersionUpdatedAt: observedAt,
+        updatedAt: observedAt,
+      });
+    }
     const revisions = db.collection('users').doc(uid).collection('recipeRevisions');
     if (command.proposalId && state.proposals.has(command.proposalId)) tx.set(db.collection('users').doc(uid).collection('proposals').doc(command.proposalId), clone(state.proposals.get(command.proposalId)), { merge: true });
     if (command.attemptId && state.attempts.has(command.attemptId)) tx.set(db.collection('users').doc(uid).collection('brewAttempts').doc(command.attemptId), clone(state.attempts.get(command.attemptId)), { merge: true });

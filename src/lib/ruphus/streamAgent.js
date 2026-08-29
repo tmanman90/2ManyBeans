@@ -13,8 +13,8 @@ const TRANSITIONS = {
 function frameError(code, message) { return Object.assign(new Error(message), { code }); }
 
 export function resolveAgentStreamResult({ terminalType, usageSeen = true, transportError = null } = {}) {
-  if (terminalType === 'turn_completed' && (!usageSeen || transportError?.code === 'stream_incomplete')) return { ok: true, usageMissing: true };
-  if (terminalType === 'turn_completed') return { ok: true, usageMissing: false };
+  const missingUsageTransport = transportError == null || transportError.code === 'stream_incomplete';
+  if (terminalType === 'turn_completed' && missingUsageTransport) return { ok: true, usageMissing: !usageSeen || transportError?.code === 'stream_incomplete' };
   return { ok: false, error: transportError || frameError(terminalType || 'stream_incomplete', `The Agent turn ended with ${terminalType || 'an incomplete stream'}.`) };
 }
 
@@ -44,7 +44,7 @@ export function parseAgentFrames(text) { const frames = []; const parser = creat
 export async function streamAgentWithAuth({ url, body, onFrame, onError } = {}) {
   const parser = createAgentFrameParser({ onFrame });
   let result;
-  await streamWithAuth({ url, body, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: false, transportError: error }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame } : resolved; if (!result.ok) onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: true }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : resolved; } } });
+  await streamWithAuth({ url, body, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: false, transportError: error }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame } : resolved; if (!result.ok) onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: usage != null }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : resolved; } } });
   return result || { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') };
 }
 

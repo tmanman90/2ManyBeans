@@ -64,8 +64,15 @@ export function evaluateBeanCensus({ beans = [], minimumVersion, acceptedStraggl
   if (!observedUids.length) return { ready: false, reason: 'no_observed_beans', observedUids, stragglers: [] };
   const stragglers = [];
   for (const uid of observedUids) {
-    const versions = beans.filter((bean) => bean?.uid === uid).map((bean) => bean.clientVersion);
-    if (!versions.length || versions.some((version) => !parseClientVersion(version) || compareClientVersions(version, minimumVersion) < 0)) stragglers.push(uid);
+    const observations = beans.filter((bean) => bean?.uid === uid);
+    if (!observations.length || observations.some((bean) => {
+      const versionValid = parseClientVersion(bean.clientVersion) && compareClientVersions(bean.clientVersion, minimumVersion) >= 0;
+      const updatedAt = timestampMs(bean.updatedAt);
+      const clientVersionUpdatedAt = timestampMs(bean.clientVersionUpdatedAt);
+      const stampFresh = Number.isFinite(updatedAt) && Number.isFinite(clientVersionUpdatedAt)
+        && clientVersionUpdatedAt >= updatedAt;
+      return !versionValid || !stampFresh;
+    })) stragglers.push(uid);
   }
   return { ready: stragglers.every((uid) => accepted.has(uid)), reason: stragglers.length ? 'stragglers' : 'ready', observedUids, stragglers };
 }
@@ -84,7 +91,12 @@ export async function readRuphusBeanCensus({ db, minimumVersion, acceptedStraggl
   const snap = await db.collectionGroup('beans').where('updatedAt', '>=', new Date(cutoff)).get();
   const beans = snap.docs.map((doc) => {
     const segments = String(doc.ref?.path || '').split('/');
-    return { uid: segments[1], clientVersion: doc.data()?.clientVersion, updatedAt: doc.data()?.updatedAt };
+    return {
+      uid: segments[1],
+      clientVersion: doc.data()?.clientVersion,
+      clientVersionUpdatedAt: doc.data()?.clientVersionUpdatedAt,
+      updatedAt: doc.data()?.updatedAt,
+    };
   }).filter((bean) => timestampMs(bean.updatedAt) >= cutoff);
   return evaluateBeanCensus({ beans, minimumVersion, acceptedStragglers });
 }
@@ -114,7 +126,7 @@ export function normalizeTelemetryUsage(provider, model, usage) {
 
 export function aggregateProviderUsage(provider, usages = []) {
   const normalized = usages.map((usage) => normalizeUsage(provider, usage)).filter(Boolean);
-  if (!normalized.length) return null;
+  if (!usages.length || normalized.length !== usages.length) return null;
   const sum = (key) => normalized.reduce((total, value) => total + (Number(value[key]) || 0), 0);
   return {
     input_tokens: sum('inputTokens'),

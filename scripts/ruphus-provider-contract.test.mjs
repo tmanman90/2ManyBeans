@@ -9,7 +9,7 @@ test('OpenAI adapter is pinned, stateless, and provider-neutral', () => {
   assert.throws(() => buildOpenAIRequest({ instructions: '', input: [], tools: [], model: 'gpt-4o' }), /unsupported/);
 });
 test('provider output rejects malformed tool arguments and preserves attribution', () => {
-  assert.deepEqual(outputParts({ id: 'resp-1', model: RUPHUS_OPENAI_MODEL, output_text: 'hi', output: [] }), { text: 'hi', toolCalls: [], outputItems: [], requestId: 'resp-1', usage: null, model: RUPHUS_OPENAI_MODEL });
+  assert.deepEqual(outputParts({ id: 'resp-1', model: RUPHUS_OPENAI_MODEL, output_text: 'hi', output: [] }), { text: 'hi', toolCalls: [], outputItems: [], requestId: 'resp-1', usage: null, retryCount: 0, model: RUPHUS_OPENAI_MODEL });
   assert.throws(() => outputParts({ output: [{ type: 'function_call', name: 'read_coffee', arguments: '{' }] }), /malformed/);
 });
 

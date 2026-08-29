@@ -15,9 +15,16 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   const usageSamples = [];
   const providerRetrySamples = [];
   const rememberUsage = (value) => {
-    if (value?.usage) usageSamples.push(value.usage);
+    usageSamples.push(value?.usage ?? null);
     const retryCount = value?.retryCount ?? value?.retry_count;
     if (typeof retryCount === 'number' && Number.isFinite(retryCount) && retryCount >= 0) providerRetrySamples.push({ retryCount });
+  };
+  const accounting = () => {
+    const retryCount = aggregateProviderRetryCount(providerRetrySamples);
+    return {
+      usage: aggregateProviderUsage('openai', usageSamples),
+      ...(retryCount === undefined ? {} : { retryCount }),
+    };
   };
   let text = '';
   try {
@@ -45,11 +52,11 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     if (containsAuthorityClaim(text)) text = text.replace(/(?:receipt|action[_ -]?id|brew once|fellow|physical machine success)/gi, '');
     send('turn_completed', { text: text.trim() });
     const model = response?.model || null;
-    return { ok: true, turnId, text: text.trim(), toolCalls, toolNames, proposalIds, retryCount: aggregateProviderRetryCount(providerRetrySamples) ?? 0, requestId: response?.requestId || null, model, usage: aggregateProviderUsage('openai', usageSamples) || response?.usage || null };
+    return { ok: true, turnId, text: text.trim(), toolCalls, toolNames, proposalIds, requestId: response?.requestId || null, model, ...accounting() };
   } catch (error) {
     const code = error?.code === 'forbidden_tool' ? 'forbidden_tool' : 'turn_failed';
     send(code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code, message: error.message });
     const model = response?.model || null;
-    return { ok: false, turnId, code, text, toolCalls, toolNames, proposalIds, retryCount: aggregateProviderRetryCount(providerRetrySamples) ?? 0, model, usage: aggregateProviderUsage('openai', usageSamples) || response?.usage || null };
+    return { ok: false, turnId, code, text, toolCalls, toolNames, proposalIds, model, ...accounting() };
   }
 }

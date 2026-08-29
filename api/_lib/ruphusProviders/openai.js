@@ -13,7 +13,7 @@ function outputParts(response) {
       toolCalls.push({ callId: item.call_id, name: item.name, args });
     }
   }
-  return { text, toolCalls, outputItems: response?.output || [], requestId: response?.id || null, usage: response?.usage || null, model: response?.model || RUPHUS_OPENAI_MODEL };
+  return { text, toolCalls, outputItems: response?.output || [], requestId: response?.id || null, usage: response?.usage || null, retryCount: 0, model: response?.model || RUPHUS_OPENAI_MODEL };
 }
 
 export function buildOpenAIRequest({ instructions, input, tools, model = RUPHUS_OPENAI_MODEL, maxOutputTokens }) {
@@ -23,7 +23,10 @@ export function buildOpenAIRequest({ instructions, input, tools, model = RUPHUS_
 }
 
 export function createOpenAIProvider({ client, instructions = '', maxOutputTokens } = {}) {
-  const sdk = client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Retries must be visible to the orchestrator. The default adapter makes
+  // one provider request per turn; stream retry policy remains a separate
+  // client transport concern.
+  const sdk = client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
   const inputSequences = new Map();
   return Object.freeze({
     async runTurn({ turnId = 'default', context, userText, tools, previous, toolResult }) {

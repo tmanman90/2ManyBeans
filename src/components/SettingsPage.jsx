@@ -393,6 +393,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           atmosSlot: deleteField(),
           openDate: null,
           clientVersion: ruphusClientVersion(),
+          clientVersionUpdatedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       }
