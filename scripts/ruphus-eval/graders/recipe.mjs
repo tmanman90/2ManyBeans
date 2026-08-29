@@ -27,16 +27,14 @@ const RESERVED_AUTHORITY_FIELDS = new Set([
 ]);
 
 const MANUAL_GENERATORS = Object.freeze({
-  v60: () => [generateV60Recipe({}, { dose: 15 }), generateV60Recipe({}, { dose: 25 }), generateV60Fallback({ dose: 15 })],
-  kalita: () => [generateKalitaRecipe({}, { dose: 15, size: '155' }), generateKalitaRecipe({}, { dose: 20, size: '185' })],
-  'v60-switch': () => [generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' }), generateV60SwitchRecipe({}, { dose: 20, roast: 'light', closedBloomSeconds: 15 }), generateV60SwitchFallback({ dose: 20 })],
-  'v60-iced': () => [generateV60IcedRecipe({}, { dose: 15 }), generateV60IcedRecipe({}, { dose: 20 }), generateV60IcedFallback({ dose: 15 })],
-  'kalita-iced': () => [generateKalitaIcedRecipe({}, { dose: 15, size: '155' }), generateKalitaIcedRecipe({}, { dose: 20, size: '185' }), generateKalitaIcedFallback({ dose: 15, size: '155' })],
+  v60: () => [generateV60Recipe({}, { dose: 15 }), generateV60Recipe({}, { dose: 25 }), generateV60Recipe({}, { dose: 15, grinder: 'custom' }), generateV60Fallback({ dose: 15 })],
+  kalita: () => [generateKalitaRecipe({}, { dose: 15, size: '155' }), generateKalitaRecipe({}, { dose: 20, size: '185' }), generateKalitaRecipe({}, { dose: 15, size: '155', grinder: 'custom' })],
+  'v60-switch': () => [generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' }), generateV60SwitchRecipe({}, { dose: 20, roast: 'light', closedBloomSeconds: 15 }), generateV60SwitchRecipe({}, { dose: 20, grinder: 'custom' }), generateV60SwitchFallback({ dose: 20 })],
+  'v60-iced': () => [generateV60IcedRecipe({}, { dose: 15 }), generateV60IcedRecipe({}, { dose: 20 }), generateV60IcedRecipe({}, { dose: 15, grinder: 'custom' }), generateV60IcedFallback({ dose: 15 })],
+  'kalita-iced': () => [generateKalitaIcedRecipe({}, { dose: 15, size: '155' }), generateKalitaIcedRecipe({}, { dose: 15, size: '155', chillingMethod: 'brew-over-ice' }), generateKalitaIcedRecipe({}, { dose: 20, size: '185' }), generateKalitaIcedRecipe({}, { dose: 20, size: '185', chillingMethod: 'chill-after', grinder: 'custom' }), generateKalitaIcedFallback({ dose: 15, size: '155' })],
 });
 
-function primitiveShape(value) {
-  return { kind: 'primitive', types: new Set([value === null ? 'null' : typeof value]) };
-}
+function primitiveShape() { return { kind: 'primitive' }; }
 
 function shapeFor(value) {
   if (Array.isArray(value)) return { kind: 'array', item: value.length ? shapeFor(value[0]) : null };
@@ -45,7 +43,7 @@ function shapeFor(value) {
     for (const [key, child] of Object.entries(value)) fields.set(key, shapeFor(child));
     return { kind: 'object', fields };
   }
-  return primitiveShape(value);
+  return primitiveShape();
 }
 
 function mergeShapes(left, right) {
@@ -57,8 +55,8 @@ function mergeShapes(left, right) {
     return { kind: 'object', fields };
   }
   if (left.kind === 'array' && right.kind === 'array') return { kind: 'array', item: mergeShapes(left.item, right.item) };
-  if (left.kind === 'primitive' && right.kind === 'primitive') return { kind: 'primitive', types: new Set([...left.types, ...right.types]) };
-  return { kind: 'primitive', types: new Set(['undefined']) };
+  if (left.kind === 'primitive' && right.kind === 'primitive') return primitiveShape();
+  return primitiveShape();
 }
 
 const MANUAL_SHAPES = new Map();
@@ -85,9 +83,8 @@ function assertNoReservedAuthority(value, path = 'recipe', seen = new WeakSet())
 
 function projectByShape(value, shape, path = 'recipe') {
   if (!shape) throw new Error(`unknown production shape at ${path}`);
+  if (value === null) return null;
   if (shape.kind === 'primitive') {
-    const type = value === null ? 'null' : typeof value;
-    if (type === 'object' || !shape.types.has(type) && !shape.types.has('undefined')) throw new Error(`invalid production shape at ${path}`);
     return value;
   }
   if (shape.kind === 'array') {

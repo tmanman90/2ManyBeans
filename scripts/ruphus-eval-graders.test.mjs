@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60Recipe, generateV60Fallback } from '../src/lib/v60Adapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
-import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
-import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
-import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
+import { generateV60SwitchRecipe, generateV60SwitchFallback } from '../src/lib/v60SwitchAdapter.js';
+import { generateV60IcedRecipe, generateV60IcedFallback } from '../src/lib/v60IcedAdapter.js';
+import { generateKalitaIcedRecipe, generateKalitaIcedFallback } from '../src/lib/kalitaIcedAdapter.js';
 import { normalizeRecipePhases } from '../src/lib/brewTimerSteps.js';
 import { gradeRecipeLayers, validateRecipe, projectCanonicalRuntime, compareGrindMicrons, RECIPE_COVERAGE } from './ruphus-eval/graders/recipe.mjs';
 
@@ -66,6 +66,26 @@ test('manual runtime projections preserve the complete production-normalized sha
     ['kalita-iced', generateKalitaIcedRecipe({}, { dose: 20, size: '185' })],
   ];
   for (const [method, recipe] of recipes) {
+    const projection = projectCanonicalRuntime(method, recipe);
+    assert.equal(projection.valid, true, method);
+    assert.deepEqual(projection.runtime, normalizeRecipePhases(recipe), method);
+  }
+});
+
+test('manual projection sweep accepts production boundary variants without sampled-type rejection', () => {
+  const cases = [
+    ['v60', generateV60Recipe({}, { dose: 15, grinder: 'custom' })],
+    ['v60', generateV60Fallback({ dose: 15 })],
+    ['kalita', generateKalitaRecipe({}, { dose: 15, size: '155', grinder: 'custom' })],
+    ['v60-switch', generateV60SwitchRecipe({}, { dose: 20, roast: 'light', closedBloomSeconds: 15, grinder: 'custom' })],
+    ['v60-switch', generateV60SwitchFallback({ dose: 20 })],
+    ['v60-iced', generateV60IcedRecipe({}, { dose: 15, grinder: 'custom' })],
+    ['v60-iced', generateV60IcedFallback({ dose: 15 })],
+    ['kalita-iced', generateKalitaIcedRecipe({}, { dose: 15, size: '155', chillingMethod: 'brew-over-ice' })],
+    ['kalita-iced', generateKalitaIcedRecipe({}, { dose: 20, size: '185', chillingMethod: 'chill-after', grinder: 'custom' })],
+    ['kalita-iced', generateKalitaIcedFallback({ dose: 15, size: '155' })],
+  ];
+  for (const [method, recipe] of cases) {
     const projection = projectCanonicalRuntime(method, recipe);
     assert.equal(projection.valid, true, method);
     assert.deepEqual(projection.runtime, normalizeRecipePhases(recipe), method);
