@@ -11,11 +11,35 @@ function cleanString(value) {
 function clean(value) {
   if (typeof value === 'string') return cleanString(value);
   if (typeof value === 'number' || typeof value === 'boolean' || value == null) return value;
-  if (Array.isArray(value)) return value.map((item) => clean(item));
   if (typeof value !== 'object') return undefined;
-  return Object.fromEntries(Object.entries(value)
-    .filter(([key]) => !SECRET_KEYS.test(key) && !AUTHORITY_KEYS.test(key))
-    .map(([key, item]) => [cleanString(key), clean(item)]));
+
+  // Keep traversal iterative so hostile, circular evidence cannot consume the
+  // call stack. Repeated references are represented as inert text; evidence is
+  // explanatory context, never authority-bearing state.
+  const seen = new WeakSet();
+  const root = Array.isArray(value) ? [] : {};
+  seen.add(value);
+  const work = [{ source: value, target: root }];
+  while (work.length) {
+    const { source, target } = work.pop();
+    for (const [rawKey, item] of Object.entries(source)) {
+      if (!Array.isArray(source) && (SECRET_KEYS.test(rawKey) || AUTHORITY_KEYS.test(rawKey))) continue;
+      const key = Array.isArray(source) ? target.length : cleanString(rawKey);
+      if (item && typeof item === 'object') {
+        if (seen.has(item)) {
+          target[key] = '[Circular]';
+          continue;
+        }
+        seen.add(item);
+        target[key] = Array.isArray(item) ? [] : {};
+        work.push({ source: item, target: target[key] });
+      } else {
+        target[key] = typeof item === 'string' ? cleanString(item)
+          : (typeof item === 'number' || typeof item === 'boolean' || item == null ? item : undefined);
+      }
+    }
+  }
+  return root;
 }
 
 export function sanitizeEvidence(value, { maxBytes } = {}) {

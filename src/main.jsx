@@ -407,8 +407,15 @@ const Root = () => {
 const TestShareCardLazy = import.meta.env.DEV
   ? React.lazy(() => import('./pages/TestShareCard').then(m => ({ default: m.TestShareCard })))
   : null;
+const RuphusHarnessLazy = import.meta.env.DEV
+  ? React.lazy(() => import('./components/chat/RuphusBrowserHarness').then(m => ({ default: m.RuphusBrowserHarness })))
+  : null;
 
 const DevRouter = () => {
+  const search = new URLSearchParams(window.location.search);
+  if (search.has('ruphus-harness') && RuphusHarnessLazy) {
+    return <React.Suspense fallback={<div>Loading harness…</div>}><RuphusHarnessLazy legacy={search.has('legacy')} /></React.Suspense>;
+  }
   if (window.location.hash === '#/test-share-card' && TestShareCardLazy) {
     return (
       <React.Suspense fallback={<div style={{ color: '#fff', padding: 40 }}>Loading test page...</div>}>

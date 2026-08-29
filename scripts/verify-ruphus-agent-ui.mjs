@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+
+const baseUrl = process.env.RUPHUS_UI_BASE_URL || 'http://127.0.0.1:5173/';
+const browser = await chromium.launch({ headless: true });
+const errors = [];
+const requests = [];
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+page.on('pageerror', error => errors.push(error.message));
+page.on('request', request => { if (request.method() !== 'GET') requests.push(`${request.method()} ${request.url()}`); });
+
+await page.goto(`${baseUrl}?ruphus-harness=1`, { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-ruphus-harness="true"]');
+assert.match(await page.title(), /2manybeans|Coffee Hub|Vite/i);
+assert.match(await page.locator('body').innerText(), /Ruphus browser harness/);
+assert.equal(await page.locator('[data-ruphus-entry]').count(), 2);
+assert.equal(await page.locator('[data-agent-enabled="true"]').count(), 1);
+await page.locator('[data-ruphus-entry="bean-detail"]').click();
+assert.match(await page.locator('[data-ruphus-context-header]').innerText(), /House Blend/);
+await page.getByRole('button', { name: 'Bitter' }).click();
+assert.equal(await page.locator('[data-symptom-choice]').innerText(), 'Bitter');
+assert.equal(await page.locator('[data-command-write]').isDisabled(), true);
+await page.locator('[data-ruphus-stream]').click();
+await page.waitForSelector('[data-ruphus-lifecycle-caption]', { state: 'visible' });
+await page.waitForSelector('[data-ruphus-message="agent-v3"]', { state: 'visible' });
+await page.waitForSelector('[data-artifact="recipe_proposal"]', { state: 'visible' });
+await page.locator('[data-keyboard-input]').focus();
+assert.equal(await page.locator('[data-keyboard-visible="true"]').count(), 1);
+await page.screenshot({ path: '/tmp/ruphus-agent-v3-mobile.png', fullPage: false });
+
+const legacy = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await legacy.goto(`${baseUrl}?ruphus-harness=1&legacy=1`, { waitUntil: 'domcontentloaded' });
+await legacy.waitForSelector('[data-ruphus-harness="true"]');
+assert.equal(await legacy.locator('[data-agent-enabled="false"]').count(), 1);
+assert.equal(await legacy.locator('[data-legacy-route="true"]').count(), 1);
+await legacy.screenshot({ path: '/tmp/ruphus-agent-v3-legacy.png', fullPage: false });
+assert.deepEqual(requests, []);
+assert.deepEqual(errors, []);
+await browser.close();
+console.log('Ruphus rendered browser harness passed: 2 entries, pinned context, symptom choice, disabled command, Agent frames/artifact, legacy route, keyboard padding, no writes, mobile+desktop.');

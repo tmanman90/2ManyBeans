@@ -33,6 +33,7 @@ import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 import { useBeanDetail } from '../hooks/useBeanDetail';
+import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 
 // Secondary Liquid-Glass pill (iOS 26 material): bright rim + specular top sheen +
 // a floating drop shadow that lifts it off the card, with a faint semantic tint.
@@ -67,10 +68,11 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
   </m.button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
+  const agentV3Enabled = isRuphusAgentV3Enabled({ isDemo });
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
@@ -388,7 +390,13 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                       <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
-                      <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label="Learn" onClick={() => (isDemo ? onDemoAction : handleLearn)?.(bean)} />
+                      <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label={agentV3Enabled ? 'Ask Ruphus' : 'Learn'} onClick={() => {
+                        if (agentV3Enabled) {
+                          const method = preferences.brewMethod === 'aiden' ? 'aiden' : preferences.brewMethod === 'kalita' ? 'kalita' : 'v60';
+                          const mode = method === 'aiden' ? 'hot' : (bean.handBrewRecipe?.mode || 'hot');
+                          onOpenRuphus?.({ coffeeId: bean.id, coffeeName: bean.name, method, mode, slotKey: method === 'aiden' ? 'aiden' : `${method}_${mode}` }, 'What should I change for this coffee?');
+                        } else (isDemo ? onDemoAction : handleLearn)?.(bean);
+                      }} />
                       <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
                     </div>
                   </div>
@@ -650,7 +658,16 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           siblings={jarOrder}
           onNavigate={(b) => openDetail(b, null)}
           onClose={closeDetail}
-          onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
+          learnLabel={agentV3Enabled ? 'Ask Professor Ruphus' : 'Learn'}
+          onLearn={(b) => {
+            closeDetail();
+            if (agentV3Enabled) {
+              const method = preferences.brewMethod === 'aiden' ? 'aiden' : preferences.brewMethod === 'kalita' ? 'kalita' : 'v60';
+              const mode = method === 'aiden' ? 'hot' : (b.handBrewRecipe?.mode || 'hot');
+              const slotKey = method === 'aiden' ? 'aiden' : `${method}_${mode}`;
+              onOpenRuphus?.({ coffeeId: b.id, coffeeName: b.name, method, mode, slotKey }, 'What should I change for this coffee?');
+            } else (isDemo ? onDemoAction : handleLearn)?.(b);
+          }}
           onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}
           onFreeze={handleFreeze}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}

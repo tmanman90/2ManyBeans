@@ -33,10 +33,44 @@ const object = (value) => Boolean(value && typeof value === 'object' && !Array.i
 const text = (value, max = Infinity) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
 
 export function canonicalJson(value) {
-  if (value === undefined) return 'undefined';
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  // Iterative canonicalization keeps hostile deep/circular evidence from
+  // overflowing the JavaScript call stack while preserving the historical
+  // sorted-key representation used for recipe identities.
+  const output = [];
+  const active = new WeakSet();
+  const work = [{ kind: 'value', value }];
+  while (work.length) {
+    const item = work.pop();
+    if (item.kind === 'text') { output.push(item.text); continue; }
+    if (item.kind === 'leave') { active.delete(item.value); continue; }
+    const current = item.value;
+    if (current === undefined) { output.push('undefined'); continue; }
+    if (current === null || typeof current !== 'object') { output.push(JSON.stringify(current)); continue; }
+    if (active.has(current)) { output.push(JSON.stringify('[Circular]')); continue; }
+    active.add(current);
+    if (Array.isArray(current)) {
+      output.push('[');
+      work.push({ kind: 'leave', value: current });
+      work.push({ kind: 'text', text: ']' });
+      for (let index = current.length - 1; index >= 0; index -= 1) {
+        work.push({ kind: 'value', value: current[index] });
+        if (index > 0) work.push({ kind: 'text', text: ',' });
+      }
+      continue;
+    }
+    const keys = Object.keys(current).sort();
+    output.push('{');
+    work.push({ kind: 'leave', value: current });
+    work.push({ kind: 'text', text: '}' });
+    for (let index = keys.length - 1; index >= 0; index -= 1) {
+      const key = keys[index];
+      work.push({ kind: 'value', value: current[key] });
+      work.push({ kind: 'text', text: ':' });
+      work.push({ kind: 'text', text: JSON.stringify(key) });
+      if (index > 0) work.push({ kind: 'text', text: ',' });
+    }
+  }
+  return output.join('');
 }
 
 // A deterministic, browser-safe digest. It is an identity/checksum, not a

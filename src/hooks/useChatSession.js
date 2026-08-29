@@ -88,6 +88,7 @@ function createDefaultAdapter(uid) {
 
 export function useChatSession({ uid, isDemo, adapter } = {}) {
   const [hydratedMessages, setHydratedMessages] = useState([]);
+  const [hydratedContext, setHydratedContext] = useState(null);
   const [hydrationState, setHydrationState] = useState(isDemo || !uid ? 'idle' : 'loading');
   const adapterRef = useRef(null);
   const hydratedRef = useRef(false);
@@ -97,6 +98,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       adapterRef.current = null;
       hydratedRef.current = false;
       setHydratedMessages([]);
+      setHydratedContext(null);
       setHydrationState('idle');
       return undefined;
     }
@@ -104,7 +106,8 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     const storage = adapter || createDefaultAdapter(uid);
     adapterRef.current = storage;
     hydratedRef.current = false;
-    setHydratedMessages([]);
+      setHydratedMessages([]);
+      setHydratedContext(null);
     setHydrationState('loading');
     let cancelled = false;
     const timers = [];
@@ -112,6 +115,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     Promise.resolve(storage.loadLocal?.()).then(local => {
       if (cancelled || !local?.messages) return;
       setHydratedMessages(local.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(local).messages : inflateMessages(local.messages));
+      if (local.protocolVersion === AGENT_PROTOCOL_VERSION) setHydratedContext(local.contextRef || null);
       setHydrationState('local');
     }).catch(err => console.warn('[ChatSession] Local hydrate failed:', err));
 
@@ -120,6 +124,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
         if (cancelled) return;
         hydratedRef.current = true;
         setHydratedMessages(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(remote).messages : inflateMessages(remote?.messages || []));
+        setHydratedContext(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? remote.contextRef || null : null);
         setHydrationState('hydrated');
       }).catch(err => {
         if (cancelled) return;
@@ -166,5 +171,5 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       .catch(err => console.warn('[ChatSession] Local clear failed:', err));
   }, [isDemo, uid]);
 
-  return { hydratedMessages, hydrationState, persist, clear };
+  return { hydratedMessages, hydratedContext, hydrationState, persist, clear };
 }

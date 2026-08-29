@@ -30,6 +30,12 @@ import { ChatMessage } from '../components/chat/ChatMessage';
 import { StreamingBubble } from '../components/chat/StreamingBubble';
 import { recipeSummary } from '../components/chat/RecipeCard';
 import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatParse';
+import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { streamAgentWithAuth } from '../lib/ruphus/streamAgent';
+import { RuphusContextHeader } from '../components/chat/RuphusContextHeader';
+import { RuphusMessage } from '../components/chat/RuphusMessage';
+import { RuphusLifecycleCaption } from '../components/chat/RuphusLifecycleCaption';
+import { ArtifactRenderer } from '../components/chat/ArtifactRenderer';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
@@ -381,7 +387,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTiming, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTiming, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter, ruphusLaunch = null, onRuphusLaunchConsumed }) => {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
@@ -393,7 +399,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const apiMessages = useRef([
     { role: 'assistant', content: messages[0].content },
   ]);
-  const { hydratedMessages, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
+  const { hydratedMessages, hydratedContext, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
+  const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
+  const [agentContext, setAgentContext] = useState(null);
+  const [agentFrame, setAgentFrame] = useState(null);
+  const [agentText, setAgentText] = useState('');
+  const [agentArtifacts, setAgentArtifacts] = useState([]);
+  const agentTextRef = useRef('');
+  const agentArtifactsRef = useRef([]);
+  const agentContextRef = useRef(null);
   // Input state lives in the ChatInputBar child so keystrokes don't
   // re-render the parent's message list on every character.
   const [loading, setLoading] = useState(false);
@@ -427,6 +441,29 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   // revoking and pushing them here would pin huge base64 payloads for the
   // entire session, which is a real memory leak on native.
   const blobUrlsRef = useRef([]);
+
+  useEffect(() => {
+    if (!ruphusLaunch || !agentEnabled) return;
+    if (!hasPro) {
+      openPaywall({ feature: 'chat', promote: 'pro' });
+      onRuphusLaunchConsumed?.();
+      return;
+    }
+    setAgentContext(ruphusLaunch.contextRef);
+    agentContextRef.current = ruphusLaunch.contextRef;
+    onRuphusLaunchConsumed?.();
+    if (ruphusLaunch.starterIntent) sendTurn({ text: ruphusLaunch.starterIntent, agentContextOverride: ruphusLaunch.contextRef });
+  // Launch is an app-level handoff; consume it once even if the parent object
+  // is reconstructed while ChatTab is being revealed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruphusLaunch, agentEnabled]);
+
+  useEffect(() => {
+    if (agentEnabled && hydratedContext) {
+      setAgentContext(hydratedContext);
+      agentContextRef.current = hydratedContext;
+    }
+  }, [agentEnabled, hydratedContext]);
 
   // Revokes a URL if it's a blob: URL. No-op for data: URLs and anything else.
   const safeRevokeBlobUrl = (url) => {
@@ -732,7 +769,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     handleSend(hint);
   };
 
-  const sendTurn = async ({ text, turnPhotos = [], appendUser = true, apiMsgOverride = null, retryTurn = null } = {}) => {
+  const sendTurn = async ({ text, turnPhotos = [], appendUser = true, apiMsgOverride = null, retryTurn = null, agentContextOverride = null } = {}) => {
     if (sendingRef.current) return;
     sendingRef.current = true;
     stickRef.current = true;
@@ -794,6 +831,37 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       setThinkingCaptions(null);
       setStreamingSlot(null);
       sendingRef.current = false;
+    };
+
+    const sendAgentTurn = async () => {
+      const turnId = crypto.randomUUID();
+      const contextRef = agentContextOverride || agentContextRef.current || agentContext;
+      setAgentFrame({ type: 'context_loading', turnId });
+      setAgentText(''); agentTextRef.current = '';
+      setAgentArtifacts([]); agentArtifactsRef.current = [];
+      const onFrame = (frame) => {
+        setAgentFrame(frame);
+        if (frame.type === 'text_delta') {
+          agentTextRef.current += frame.text || '';
+          setAgentText(agentTextRef.current);
+        }
+        if (frame.type === 'artifact_ready' && frame.artifact) {
+          agentArtifactsRef.current = [...agentArtifactsRef.current.filter(item => item.id !== frame.artifact.id), frame.artifact];
+          setAgentArtifacts(agentArtifactsRef.current);
+        }
+      };
+      const result = await streamAgentWithAuth({
+        url: `${API_BASE}/api/ruphus-agent`,
+        body: { turnId, contextRef, userText: text },
+        onFrame,
+      });
+      if (!result.ok) throw result.error || new Error('Agent turn failed');
+      const assistant = newMessage({ role: 'assistant', content: agentTextRef.current || result.text || '', turnId, artifacts: agentArtifactsRef.current });
+      commitAssistantMessage(assistant);
+      persist(threadForPersistence([...messages, displayMsg, assistant]), {
+        protocolVersion: 1, contextRef, turns: [{ id: turnId, status: 'completed' }],
+      });
+      setAgentText(''); agentTextRef.current = ''; agentArtifactsRef.current = []; setAgentFrame(null);
     };
 
     await new Promise((resolve) => {
@@ -895,6 +963,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
               });
             });
           };
+
+          if (agentEnabled && agentContext) {
+            await sendAgentTurn();
+            complete();
+            return;
+          }
 
           let first = await runClaudePass();
           if (first.type === 'needsSearch' && first.query) {
@@ -1123,7 +1197,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const starterPrompts = getStarterPrompts(beans, isDemo);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div data-ruphus-agent-enabled={agentEnabled ? 'true' : 'false'} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
       {/* Masthead — calm editorial: Fraunces title + subtitle (no eyebrow, no gradient rule). */}
       <div data-masthead style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -1152,6 +1226,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         </div>
       </div>
 
+      {agentEnabled && <RuphusContextHeader context={agentContext} onClear={() => setAgentContext(null)} />}
+
       <div
         ref={scrollRef}
         onClick={() => { if (inputRef.current) inputRef.current.blur(); }}
@@ -1162,15 +1238,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         aria-live="polite"
         style={{
           overflowY: 'auto',
+          flex: '1 1 auto',
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
-          paddingBottom: keyboardHeight > 0 ? 80 : 140,
-          height: keyboardHeight > 0
-            ? `calc(100dvh - ${keyboardHeight + 200}px)`
-            : 'calc(100dvh - 340px)',
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 96 : 140,
         }}
       >
+        {agentEnabled && agentFrame && loading && <RuphusLifecycleCaption frame={agentFrame} />}
         {/* Intro / empty state — shown only when no user turns yet */}
         {isIntroState && (
           <m.div
@@ -1231,7 +1307,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (isIntroState && i === 0) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                <ChatMessage
+                {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
@@ -1244,7 +1320,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                       ? (handBrew.handBrewModal || handBrew.handBrewLoading)
                       : (aiden.aidenModal || aiden.aidenLoading),
                   }}
-                />
+                />}
               </m.div>
             );
           })}
@@ -1258,6 +1334,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             onFlush={handleStreamingFlush}
           />
         )}
+        {agentEnabled && loading && agentText && <RuphusMessage text={agentText} />}
+        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} />)}</div>}
       </div>
 
       {showJumpLatest && streamingSlot && (

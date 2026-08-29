@@ -38,7 +38,7 @@ export function parseAgentFrames(text) { const frames = []; const parser = creat
 export async function streamAgentWithAuth({ url, body, onFrame, onError } = {}) {
   const parser = createAgentFrameParser({ onFrame });
   let result;
-  await streamWithAuth({ url, body, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { result = { ok: false, error }; onError?.(error); }, onDone: () => { if (!result) result = parser.terminal ? { ok: true, turnId: parser.turnId, sawFrame: parser.sawFrame } : { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') }; } });
+  await streamWithAuth({ url, body, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { result = { ok: false, error }; onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) result = parser.terminal ? { ok: true, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') }; } });
   return result || { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') };
 }
 

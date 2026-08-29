@@ -321,7 +321,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, learnLabel = 'Learn', onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -759,7 +759,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                       beans have no "Return"), grid sized to the count so it stays even */}
                   {(() => {
                     const acts = [
-                      onLearn && { icon: <BookOpen size={16} />, label: 'Learn', onClick: () => onLearn(bean) },
+                      onLearn && { icon: <BookOpen size={16} />, label: learnLabel, onClick: () => onLearn(bean) },
                       onFreeze && { icon: <Snowflake size={16} />, label: bean.frozenAt ? 'Frozen' : 'Freeze', onClick: () => onFreeze(bean), active: !!bean.frozenAt },
                       onReturn && { icon: <Undo2 size={16} />, label: 'Return', onClick: () => onReturn(bean) },
                       onRestore && { icon: <RotateCcw size={16} />, label: 'Restore', onClick: () => { if (window.confirm('Move back to inventory?')) onRestore(bean); } },

@@ -62,6 +62,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // Mirrors pendingAddBeanMode: set here, consumed by TastingTab which
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
+  const [ruphusLaunch, setRuphusLaunch] = useState(null);
   // In-session tasting wizard draft. Kept above TastingTab so tab navigation
   // cannot discard an unfinished guided tasting; never persisted to Firebase.
   const [tastingWizardDraft, setTastingWizardDraft] = useState(null);
@@ -85,6 +86,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     if (!beanId) return;
     setPendingTastingBeanId(beanId);
     setTab('tasting');
+  };
+
+  // Single app-owned handoff for contextual Agent v3 entry points. Tabs never
+  // construct cross-tab navigation state themselves; they receive this bound
+  // context and one starter intent.
+  const openRuphus = (contextRef, starterIntent = '') => {
+    if (!contextRef?.coffeeId) return;
+    setRuphusLaunch({ contextRef, starterIntent });
+    setTab('chat');
   };
 
   const handleOpenBean = (preselectedBeanId, slot) => {
@@ -289,6 +299,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
             onboardingPalate={onboardingPalate}
             isDemo={isDemo}
             onDemoAction={onDemoAction}
+            onOpenRuphus={(contextRef, starterIntent) => openRuphus(contextRef, starterIntent)}
           />
         )}
         {tab === 'inventory' && (
@@ -327,6 +338,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               onWizardDraftChange={setTastingWizardDraft}
               pendingTastingBeanId={pendingTastingBeanId}
               onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
+              onOpenRuphus={openRuphus}
               onboardingPalate={onboardingPalate}
               isDemo={isDemo}
               onDemoAction={onDemoAction}
@@ -354,6 +366,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
                 onNavigateToTasting={() => setTab('tasting')}
                 isDemo={isDemo}
                 onDemoAction={onDemoAction}
+                ruphusLaunch={ruphusLaunch}
+                onRuphusLaunchConsumed={() => setRuphusLaunch(null)}
               />
             </Suspense>
           </div>

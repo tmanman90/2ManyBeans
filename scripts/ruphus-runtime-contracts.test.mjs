@@ -74,3 +74,11 @@ test('evidence sanitizer strips marker and authority-shaped claims and bounds by
   assert.equal(containsAuthorityClaim(result.value), false);
   assert.equal(sanitizeEvidence({ note: 'x'.repeat(1000) }, { maxBytes: 100 }).truncated, true);
 });
+
+test('evidence sanitizer handles circular and deeply nested dynamic input without recursion', () => {
+  const circular = { note: 'safe' }; circular.self = circular;
+  assert.doesNotThrow(() => sanitizeEvidence(circular, { maxBytes: 1000 }));
+  let deep = {}; let cursor = deep;
+  for (let index = 0; index < 10000; index += 1) { cursor.next = {}; cursor = cursor.next; }
+  assert.doesNotThrow(() => sanitizeEvidence(deep, { maxBytes: 100000 }));
+});

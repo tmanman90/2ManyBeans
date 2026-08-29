@@ -8,7 +8,7 @@
 // motion gated, iOS safe-area + keyboard aware.
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X, MessageCircle } from 'lucide-react';
 import { m } from 'framer-motion';
 import { C, fonts, type, radius, shadows, glass, motion as M } from '../../styles/theme';
 import { haptic } from '../../lib/haptics';
@@ -45,7 +45,7 @@ const BONE_REVEAL_ADVANCE_MS = 1100;
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge, onboardingPalate = null }) {
+export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge, onboardingPalate = null, onOpenRuphus }) {
   const [initialState] = useState(() => normalizeDraft(draft, bean?.id));
 
   const [phase, setPhase] = useState(initialState.phase); // intro | steps | reveal
@@ -238,7 +238,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
           <Stage key="reveal" reduce={reduce}>
             <RevealCard
               bean={bean} expected={expected} answers={answers} scores={scores} palate={palate}
-              reduce={reduce} setAnswers={setAnswers}
+              reduce={reduce} setAnswers={setAnswers} onOpenRuphus={onOpenRuphus}
             />
           </Stage>
         )}
@@ -437,7 +437,7 @@ function FreeText({ step, value, onChange }) {
 }
 
 // ---------------------------------------------------------------- reveal
-function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswers }) {
+function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswers, onOpenRuphus }) {
   const rows = [
     ['acidity', 'Acidity'], ['sweetness', 'Sweetness'], ['body', 'Body'],
   ];
@@ -497,6 +497,16 @@ function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswer
           </div>
         </div>
       </div>
+      {onOpenRuphus && <button
+        type="button"
+        data-ruphus-entry="tasting-wizard-reveal"
+        onClick={() => {
+          const method = bean?.aidenRecipe ? 'aiden' : String(bean?.handBrewRecipe?.method || '').toLowerCase().includes('kalita') ? 'kalita' : 'v60';
+          const mode = method === 'aiden' ? 'hot' : (bean?.handBrewRecipe?.mode || 'hot');
+          onOpenRuphus({ coffeeId: bean.id, coffeeName: bean.name, method, mode, slotKey: method === 'aiden' ? 'aiden' : `${method}_${mode}`, tastingId: null }, 'Help me understand this cup.');
+        }}
+        style={{ width: '100%', minHeight: 48, marginTop: 12, border: `1px solid ${C.border}`, borderRadius: radius.lg, background: C.cream, color: C.accent, fontFamily: fonts.body, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      ><MessageCircle size={17} aria-hidden="true" /> Ask Professor Ruphus about this cup</button>}
     </div>
   );
 }

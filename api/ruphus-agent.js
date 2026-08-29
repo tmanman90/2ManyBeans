@@ -9,7 +9,6 @@ import { persistProposal } from './_lib/ruphusRepository.js';
 import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
-export const agentV3Enabled = () => process.env.RUPHUS_AGENT_V3_ENABLED === 'true' && process.env.VERCEL_ENV !== 'production';
 export const allowedAgentUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_UIDS || '').split(',').map((uid) => uid.trim()).filter(Boolean));
 function writeFrame(res, frame) { res.write(`${JSON.stringify(frame)}\n`); }
 function firestoreReaders(db) {
@@ -22,16 +21,18 @@ function firestoreReaders(db) {
 }
 
 export default withCorsAuthPro(async (req, res, decodedToken) => {
-  if (!agentV3Enabled()) return res.status(404).json({ error: 'agent_v3_unavailable' });
   const uid = decodedToken?.uid; if (!allowedAgentUids().has(uid)) return res.status(404).json({ error: 'agent_v3_unavailable' });
   const { turnId, contextRef, userText = '' } = req.body || {};
   if (!uid || typeof turnId !== 'string' || !contextRef || typeof userText !== 'string') return res.status(400).json({ error: 'turnId, contextRef, and userText are required' });
   try {
-    const db = getDb(); const readers = firestoreReaders(db); const context = await buildRuphusContext({ uid, contextRef: { ...contextRef, sessionId: contextRef.sessionId || turnId }, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES) });
+    const db = getDb(); const readers = firestoreReaders(db); const context = await buildRuphusContext({ uid, contextRef: { ...contextRef, sessionId: contextRef.sessionId || turnId }, userText, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES) });
     const tools = createRuphusTools({ uid, context, readers, proposalStore: (input) => persistProposal({ db, ...input }) });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
     const turnResult = await runRuphusTurn({ turnId, context, userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => writeFrame(res, frame) });
     logApiUsage({ uid, provider: 'openai', model: turnResult.model || RUPHUS_OPENAI_MODEL, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', usage: turnResult.usage });
+    // streamWithAuth uses the shipped terminal usage envelope for retry and
+    // completion semantics; transport usage is not a lifecycle frame.
+    writeFrame(res, { type: 'usage', usage: turnResult.usage || null });
     res.end();
   } catch (error) {
     if (!res.headersSent) return res.status(error.code === 'not_found' ? 404 : 400).json({ error: error.code || 'agent_v3_failed', message: error.message });
