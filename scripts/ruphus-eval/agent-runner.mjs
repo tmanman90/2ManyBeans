@@ -229,7 +229,9 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
         const inputBytes = Buffer.byteLength(serializedInput);
         if (inputBytes > DEFAULT_LIMITS.inputTokens) throw Object.assign(new Error('provider input exceeds the frozen request maximum'), { code: 'INPUT_CEILING_EXCEEDED', classification: 'budget-stop' });
         await beforeRequest?.({ arm: resolvedArm, phase, attempt: attempts, isRetry: attempts > 1, estimatedCost: estimateTurnCost(resolvedArm, DEFAULT_LIMITS), inputBytes, maxOutputTokens });
+        const providerStartedAt = globalThis.performance?.now?.() ?? Date.now();
         result = await adapter.runTurn({ ...request, ...current, model: resolvedArm.model, effort: resolvedArm.effort, thinking: resolvedArm.thinking, maxOutputTokens });
+        result = { ...result, latencyMs: (globalThis.performance?.now?.() ?? Date.now()) - providerStartedAt };
         break;
       } catch (error) {
         const classification = classifyProviderError(error);
@@ -243,7 +245,7 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
     if (!costRecord) throw Object.assign(new Error('provider usage could not be metered'), { code: 'UNMETERABLE_USAGE', classification: 'provider-operational-failure' });
     const responsePayload = result.outputItems || result.content || { text: result.text || '' };
     const providerEvidence = { armId: resolvedArm.id, model: result.model, provider: result.provider, runId, attemptId, phase, providerRequestId: result.requestId, responseHash: hashValue(responsePayload) };
-    const record = immutableSnapshot({ attemptId, armId: resolvedArm.id, phase, retryAttempts: attempts, retryHistory, requestId: result.requestId, responseId: result.responseId || null, providerRequestId: result.requestId, model: result.model, provider: result.provider, responseHash: providerEvidence.responseHash, artifactChecksum: hashValue(providerEvidence), rawUsage: result.rawUsage, usage: result.usage, cost: costRecord.cost, outputItems: responsePayload, text: result.text || '', stopReason: result.stopReason || null });
+    const record = immutableSnapshot({ attemptId, armId: resolvedArm.id, phase, retryAttempts: attempts, retryHistory, requestId: result.requestId, responseId: result.responseId || null, providerRequestId: result.requestId, model: result.model, provider: result.provider, latencyMs: result.latencyMs, responseHash: providerEvidence.responseHash, artifactChecksum: hashValue(providerEvidence), rawUsage: result.rawUsage, usage: result.usage, cost: costRecord.cost, outputItems: responsePayload, text: result.text || '', stopReason: result.stopReason || null });
     telemetry.push(record); onTelemetry?.(record);
     last = result;
     const callsForTurn = Array.isArray(result.toolCalls) ? result.toolCalls : [];

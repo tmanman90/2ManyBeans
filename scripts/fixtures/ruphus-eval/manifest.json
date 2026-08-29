@@ -17,7 +17,7 @@
   "promptContract": {"mode": "provider-neutral", "groundTruth": "fixture-only", "qualificationContinuation": "none", "lifecycle": "U7"},
   "toolContract": {"approval": "out-of-band", "tasting": "out-of-band", "physicalClaims": "human-evidence-only", "providers": "none-in-U4"},
   "validatorRefs": ["src/lib/aidenProfileValidation.js", "src/lib/v60Adapter.js", "src/lib/kalitaAdapter.js", "src/lib/v60SwitchAdapter.js", "src/lib/v60IcedAdapter.js", "src/lib/kalitaIcedAdapter.js", "src/lib/brewTimerSteps.js", "src/lib/brewMethods.js", "src/data/v60SourceRegistry.js", "src/data/v60SwitchSourceRegistry.js", "src/data/v60IcedSourceRegistry.js", "src/data/kalitaConfiguration.js"],
-  "graderRefs": ["scripts/ruphus-eval/graders/recipe.mjs", "scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs", "scripts/ruphus-eval/diagnosis-contract.mjs", "scripts/ruphus-eval/report.mjs"],
+  "graderRefs": ["scripts/ruphus-eval/graders/recipe.mjs", "scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs", "scripts/ruphus-eval/diagnosis-contract.mjs", "scripts/ruphus-eval/report.mjs", "scripts/ruphus-eval/tournament.mjs"],
   "toolRefs": ["scripts/ruphus-eval/tools.mjs", "scripts/ruphus-eval/contracts.mjs", "scripts/ruphus-eval/staging-store.mjs", "scripts/ruphus-eval/cases.mjs", "scripts/ruphus-eval/recipe-fixtures.mjs", "scripts/ruphus-eval/provider-openai.mjs", "scripts/ruphus-eval/provider-anthropic.mjs", "scripts/ruphus-eval/agent-runner.mjs", "scripts/ruphus-eval/run.mjs", "scripts/fixtures/ruphus-eval/schemas/evidence.schema.json", "scripts/fixtures/ruphus-eval/schemas/proposal.schema.json", "scripts/fixtures/ruphus-eval/schemas/receipt.schema.json"],
   "rendererRefs": ["scripts/ruphus-eval/blinding.mjs", "scripts/ruphus-eval/blind.mjs", "scripts/ruphus-eval/product-baseline.mjs"],
   "modelRefs": ["scripts/ruphus-eval/models.mjs", "api/_lib/modelPricing.js"],
@@ -28,11 +28,11 @@
   "hashes": {
     "corpora": "0298380ca481904b43892520fd180a87fe5ba28c24fd0972f7ae86c22ccfaeef",
     "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
-    "tools": "c4b1858db81a20461fd0fc65bf1ee57185a47580daaebb48a4c21937e2ce0d8b",
+    "tools": "131e5436eef11dd54841fbb4d0a19a7997a61c114f1e5ef2ddcbeeaac9d10528",
     "modelRegistry": "d3b46daa7216e0c6b02a2f57f1750f3ae79f7a412572dbf2bb62b53bbf7b63d9",
     "validators": "f7a22c66828da27d4758d18fbe39b4517aacf8e3b82f54e26d980458f314c757",
-    "graders": "514145903756828a6405bdb947f03bbecd1e3cfeac4114beddb251d83eedc396",
-    "renderer": "931c7aaf4dc7d0ca7f5d34ad230a180e148bb30d7197d503eb021a0e8bc6442f",
+    "graders": "d67b8690d1c2139507f24d1f7fa02a68f871d4321f4d2a7525bc23630ed850c4",
+    "renderer": "f2bf34a35598b81f15e1509612ef7a64acda708002c33da3b9527044789ed504",
     "corpusManifest": "e9653c4ea7c507779a93001d9c174a33a5848fd4e627830abf24836745bef4c9",
     "rubric": "194d809ed4d880e20378b5caf1072a4d3478a8dc94b071341719ecbc059fe245",
     "blindReviewProtocol": "72b02563d9eea7c51054e5cc82aa546afdf651fdfb1201f7945773df198bc789",
@@ -41,6 +41,6 @@
     "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
     "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
     "schedule": "e1289e24eb55b607739e80b66a1ee8be2b3bb16e139b47201c4c0d35ef5e1c8c",
-    "evaluationHash": "9d333beff90fa0d8ad871a63805bc8c122e6a84e47d20f6ed9808c65de1aba79"
+    "evaluationHash": "e8a51f4089e40e2a29ec69630e339145276e4fb2ba736de817995c8f8f4f40e3"
   }
 }

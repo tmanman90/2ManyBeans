@@ -37,17 +37,18 @@ function usageFor(artifact, arm) {
   if (!Array.isArray(artifact.telemetry) || artifact.telemetry.length === 0) return { ok: false, reason: 'unmetered-artifact' };
   const turns = [];
   for (const turn of artifact.telemetry) {
-    if (!object(turn) || turn.provider !== arm.provider || turn.model !== arm.model || typeof turn.providerRequestId !== 'string' || !turn.providerRequestId || !object(turn.usage) || !finite(turn.usage.inputTokens) || !finite(turn.usage.outputTokens) || !finite(turn.cost) || turn.cost < 0 || !finite(turn.retryAttempts) || turn.retryAttempts < 1) return { ok: false, reason: 'unmetered-artifact' };
-    turns.push({ phase: turn.phase, providerRequestId: turn.providerRequestId, responseId: turn.responseId || null, usage: sanitizedValue(turn.usage), cost: turn.cost, retryAttempts: turn.retryAttempts, retryHistory: sanitizedValue(turn.retryHistory || []), responseHash: turn.responseHash, artifactChecksum: turn.artifactChecksum });
+    if (!object(turn) || turn.provider !== arm.provider || turn.model !== arm.model || typeof turn.providerRequestId !== 'string' || !turn.providerRequestId || !object(turn.usage) || !finite(turn.usage.inputTokens) || !finite(turn.usage.outputTokens) || !finite(turn.cost) || turn.cost < 0 || !finite(turn.retryAttempts) || turn.retryAttempts < 1 || !finite(turn.latencyMs) || turn.latencyMs < 0) return { ok: false, reason: 'unmetered-artifact' };
+    turns.push({ phase: turn.phase, providerRequestId: turn.providerRequestId, responseId: turn.responseId || null, usage: sanitizedValue(turn.usage), cost: turn.cost, retryAttempts: turn.retryAttempts, latencyMs: turn.latencyMs, retryHistory: sanitizedValue(turn.retryHistory || []), responseHash: turn.responseHash, artifactChecksum: turn.artifactChecksum });
   }
   return { ok: true, turns, totalCost: turns.reduce((sum, turn) => sum + turn.cost, 0), retryCount: turns.reduce((sum, turn) => sum + turn.retryAttempts - 1, 0) };
 }
 
-function expectedKeys(manifest) {
-  const cases = manifest?.partitions?.qualification;
-  const repeats = manifest?.schedule?.qualificationRepeats;
-  if (!Array.isArray(cases) || !Number.isInteger(repeats) || repeats < 1) return null;
-  return new Set(ARM_IDS.flatMap((armId) => cases.flatMap((caseId) => Array.from({ length: repeats }, (_, index) => `${armId}:${caseId}:${index + 1}`))));
+function expectedKeys(manifest, { phase = 'qualification', armIds = ARM_IDS } = {}) {
+  const partition = phase === 'finalist-decision' ? 'finalistDecision' : phase;
+  const cases = manifest?.partitions?.[partition];
+  const repeats = phase === 'calibration' ? 1 : phase === 'finalist-decision' ? manifest?.schedule?.finalistDecisionRepeats : manifest?.schedule?.qualificationRepeats;
+  if (!Array.isArray(cases) || !Number.isInteger(repeats) || repeats < 1 || !Array.isArray(armIds) || !armIds.length) return null;
+  return new Set(armIds.flatMap((armId) => cases.flatMap((caseId) => Array.from({ length: repeats }, (_, index) => `${armId}:${caseId}:${index + 1}`))));
 }
 
 function withScheduleIdentity(artifact, schedule = []) {
@@ -62,17 +63,19 @@ function actualFrom(artifact) {
   return artifact?.actual || artifact?.grading || artifact?.evidence || artifact?.response?.actual || null;
 }
 
-export function validateAttemptArtifact(artifact, { manifest = null, schedule = [] } = {}) {
+export function validateAttemptArtifact(artifact, { manifest = null, schedule = [], phase = 'qualification', armIds = ARM_IDS, allowRaw = false } = {}) {
   artifact = withScheduleIdentity(artifact, schedule);
   const failures = [];
   const checksum = verifyChecksum(artifact);
   if (!checksum.ok) failures.push(checksum.reason);
-  if (!object(artifact) || typeof artifact.attemptId !== 'string' || !artifact.attemptId || typeof artifact.runId !== 'string' || !artifact.runId || typeof artifact.evaluationHash !== 'string' || !artifact.evaluationHash || typeof artifact.armId !== 'string' || !getArm(artifact.armId) || typeof artifact.caseId !== 'string' || !artifact.caseId || !Number.isInteger(artifact.repeat) || artifact.repeat < 1 || artifact.phase !== 'qualification') failures.push('invalid-attempt-identity');
+  if (!object(artifact) || typeof artifact.attemptId !== 'string' || !artifact.attemptId || typeof artifact.runId !== 'string' || !artifact.runId || typeof artifact.evaluationHash !== 'string' || !artifact.evaluationHash || typeof artifact.armId !== 'string' || !getArm(artifact.armId) || !armIds.includes(artifact.armId) || typeof artifact.caseId !== 'string' || !artifact.caseId || !Number.isInteger(artifact.repeat) || artifact.repeat < 1 || artifact.phase !== phase) failures.push('invalid-attempt-identity');
   const manifestHash = manifest?.evaluationHash || manifest?.hashes?.evaluationHash;
   if (manifestHash && artifact.evaluationHash !== manifestHash) failures.push('evaluation-hash-mismatch');
+  if (!allowRaw && (!object(artifact) || typeof artifact.evidenceTier !== 'string' || !artifact.evidenceTier)) failures.push('evidence-tier-required');
+  if (artifact?.evidenceTier === 'real-provider' && (artifact.type !== 'u6-adjudication' || typeof artifact.rawArtifactChecksum !== 'string' || !artifact.rawArtifactChecksum)) failures.push('unbound-adjudication-evidence');
   const arm = getArm(artifact?.armId);
   if (arm && (artifact.model !== arm.model || artifact.provider !== arm.provider)) failures.push('arm-attribution-mismatch');
-  const expected = expectedKeys(manifest);
+  const expected = expectedKeys(manifest, { phase, armIds });
   if (expected && !expected.has(`${artifact.armId}:${artifact.caseId}:${artifact.repeat}`)) failures.push('attempt-outside-frozen-denominator');
   const usage = object(artifact) && getArm(artifact.armId) ? usageFor(artifact, getArm(artifact.armId)) : { ok: false, reason: 'unmetered-artifact' };
   if (!usage.ok) failures.push(usage.reason);
@@ -80,9 +83,9 @@ export function validateAttemptArtifact(artifact, { manifest = null, schedule = 
   return immutableSnapshot({ valid: failures.length === 0, failures: [...new Set(failures)], checksum: checksum.checksum || null, usage: usage.ok ? usage : null });
 }
 
-export function gradeAttempt(artifact, { cases = [], manifest = null, schedule = [] } = {}) {
+export function gradeAttempt(artifact, { cases = [], manifest = null, schedule = [], phase = 'qualification', armIds = ARM_IDS } = {}) {
   artifact = withScheduleIdentity(artifact, schedule);
-  const validation = validateAttemptArtifact(artifact, { manifest, schedule });
+  const validation = validateAttemptArtifact(artifact, { manifest, schedule, phase, armIds });
   const definition = cases.find((candidate) => candidate.id === artifact?.caseId);
   const actual = actualFrom(artifact);
   // Some adapters retain the canonical recall record under `record`, while
@@ -105,13 +108,13 @@ function blindMetrics({ packet, locked } = {}) {
       const bucket = byArm.get(armId) || { scores: [], wins: 0, losses: 0, unknown: false };
       bucket.scores.push(row.score);
       bucket.unknown ||= row.score.unknown === true || row.score.abstain === true;
-      const preference = row.score.preference;
+      const preference = row.preference;
       if (preference === side) bucket.wins += 1;
       else if (preference && preference !== 'tie' && preference !== side) bucket.losses += 1;
       byArm.set(armId, bucket);
     }
   }
-  return { status: 'locked', rows, byArm };
+  return { status: 'locked', rows, byArm, hasOrdinal: rows.every((row) => ['left', 'right', 'tie'].includes(row.preference)) };
 }
 
 function scoreSummary(bucket, minimumScore) {
@@ -124,45 +127,49 @@ function scoreSummary(bucket, minimumScore) {
   return { floor: dimensions.every((dimension) => means[dimension] >= minimumScore), average, wins: bucket.wins, losses: bucket.losses, variance };
 }
 
-function compareSummary(left, right) {
-  for (const field of ['wins', 'average']) if (left[field] !== right[field]) return right[field] - left[field];
-  // Lower variance is the preregistered repeat-quality tie-break.
-  if (left.variance !== right.variance) return left.variance - right.variance;
+function compareRank(left, right) {
+  for (const field of ['ordinalPreference', 'costPerSuccess', 'latencyMs', 'variance']) {
+    if (left[field] !== right[field]) return field === 'ordinalPreference' ? right[field] - left[field] : left[field] - right[field];
+  }
   return 0;
 }
 
 /** Build the deterministic U6 report. No report can rank a partial field. */
-export function buildTournamentReport({ artifacts = [], cases = [], manifest, schedule = [], blindPacket = null, blindLock = null, baseline = null } = {}) {
+export function buildTournamentReport({ artifacts = [], cases = [], manifest, schedule = [], blindPacket = null, blindLock = null, baseline = null, phase = 'qualification', armIds = ARM_IDS } = {}) {
   if (!manifest || manifest.status !== 'calibrated-sealed') return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'sealed-manifest-required', finalists: [], arms: [], artifacts: [] });
-  const expected = expectedKeys(manifest);
-  const graded = Array.isArray(artifacts) ? artifacts.map((artifact) => gradeAttempt(artifact, { cases, manifest, schedule })) : [];
+  const expected = expectedKeys(manifest, { phase, armIds });
+  const graded = Array.isArray(artifacts) ? artifacts.map((artifact) => gradeAttempt(artifact, { cases, manifest, schedule, phase, armIds })) : [];
   const seen = new Set(graded.map((item) => `${item.armId}:${item.caseId}:${item.repeat}`));
   const fieldComplete = expected && seen.size === expected.size && [...expected].every((key) => seen.has(key)) && graded.length === expected.size;
-  const grouped = new Map(ARM_IDS.map((id) => [id, []]));
+  const grouped = new Map(armIds.map((id) => [id, []]));
   graded.forEach((item) => grouped.get(item.armId)?.push(item));
-  const arms = ARM_IDS.map((armId) => {
+  const arms = armIds.map((armId) => {
     const rows = grouped.get(armId) || [];
     const criticalFailures = [...new Set(rows.flatMap((row) => row.grade.criticalFailures || row.validation.failures || []))];
     const totalCost = rows.every((row) => finite(row.cost)) ? rows.reduce((sum, row) => sum + row.cost, 0) : null;
-    const scores = rows.filter((row) => row.grade.valid).map((row) => row.grade.score);
+    const latencyMs = rows.every((row) => row.validation.usage?.turns?.every((turn) => finite(turn.latencyMs))) ? rows.reduce((sum, row) => sum + row.validation.usage.turns.reduce((turnSum, turn) => turnSum + turn.latencyMs, 0), 0) : null;
+    const firstAttemptReliability = rows.length ? rows.filter((row) => row.validation.usage?.retryCount === 0).length / rows.length : null;
+    const scores = rows.map((row) => row.grade.score ?? (row.grade.valid === true ? 1 : 0));
     const averageScore = scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
     const variance = scores.length ? scores.reduce((sum, score) => sum + ((score - averageScore) ** 2), 0) / scores.length : null;
     const tiers = [...new Set(rows.map((row) => row.evidenceTier))];
-    return { armId, attempts: rows.length, allHardGates: rows.length > 0 && rows.every((row) => row.eligible), criticalFailures, totalCost, averageScore, variance, evidenceTier: tiers.length === 1 ? tiers[0] : tiers.length ? 'mixed' : 'missing' };
+    return { armId, attempts: rows.length, allHardGates: rows.length > 0 && rows.every((row) => row.eligible), criticalFailures, totalCost, costPerSuccess: rows.length && rows.every((row) => row.eligible) ? totalCost / rows.length : null, latencyMs, firstAttemptReliability, worstCaseScore: scores.length ? Math.min(...scores) : null, averageScore, variance, evidenceTier: tiers.length === 1 ? tiers[0] : tiers.length ? 'mixed' : 'missing' };
   });
-  if (!fieldComplete) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'incomplete-or-invalid-six-arm-field', finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
+  if (!fieldComplete) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: `incomplete-or-invalid-${phase}-field`, finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
   if (graded.some((row) => row.validation.failures.length > 0)) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'invalid-or-unmetered-artifact', finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
-  if (arms.some((arm) => arm.criticalFailures.length || !arm.allHardGates || arm.totalCost == null)) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'no-pass', reason: 'critical-failure-or-hard-gate-veto', finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
+  const gateEligible = arms.filter((arm) => arm.criticalFailures.length === 0 && arm.allHardGates && arm.totalCost != null);
+  if (gateEligible.length === 0) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'no-pass', reason: 'zero-eligible-after-critical-or-hard-gate-veto', finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
   const blind = blindMetrics({ packet: blindPacket, locked: blindLock });
-  if (blind.status !== 'locked') return immutableSnapshot({ version: REPORT_VERSION, outcome: 'pending-blind-review', reason: 'blind-scores-not-locked', finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
+  if (blind.status !== 'locked' || !blind.hasOrdinal) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'pending-blind-review', reason: blind.status !== 'locked' ? 'blind-scores-not-locked' : 'ordinal-preference-not-locked', finalists: [], arms, graded, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
   const floor = manifest.absoluteUxFloor?.minimumScore;
   if (!finite(floor)) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'frozen-blind-floor-missing', finalists: [], arms, graded });
-  const ranked = arms.map((arm) => ({ ...arm, blind: scoreSummary(blind.byArm.get(arm.armId), floor) }));
-  const eligible = ranked.filter((arm) => arm.blind.floor);
+  const ranked = arms.map((arm) => ({ ...arm, eligible: gateEligible.some((candidate) => candidate.armId === arm.armId), blind: gateEligible.some((candidate) => candidate.armId === arm.armId) ? scoreSummary(blind.byArm.get(arm.armId), floor) : null }));
+  const eligible = ranked.filter((arm) => arm.eligible && arm.blind?.floor);
   if (!eligible.length) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'no-pass', reason: 'zero-eligible-after-blind-floor', finalists: [], arms: ranked, graded });
-  eligible.sort((left, right) => compareSummary(left.blind, right.blind) || ((left.totalCost / left.attempts) - (right.totalCost / right.attempts)) || ((left.armId > right.armId) - (left.armId < right.armId)));
-  if (eligible.length > 2 && compareSummary(eligible[1].blind, eligible[2].blind) === 0 && eligible[1].totalCost / eligible[1].attempts === eligible[2].totalCost / eligible[2].attempts) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'unresolved-finalist-cutoff-tie', finalists: [], arms: ranked, graded });
-  const finalists = eligible.slice(0, 2).map((arm) => arm.armId);
+  const rankedEligible = eligible.map((arm) => ({ ...arm, ordinalPreference: arm.blind.wins - arm.blind.losses })).sort(compareRank);
+  if (rankedEligible.some((arm) => !finite(arm.costPerSuccess) || !finite(arm.latencyMs) || !finite(arm.variance) || !finite(arm.ordinalPreference))) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'missing-frozen-ordering-evidence', finalists: [], arms: ranked, graded });
+  if (rankedEligible.length > 2 && compareRank(rankedEligible[1], rankedEligible[2]) === 0) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'unresolved-finalist-cutoff-tie', finalists: [], arms: ranked, graded });
+  const finalists = rankedEligible.slice(0, 2).map((arm) => arm.armId);
   return immutableSnapshot({ version: REPORT_VERSION, outcome: 'selected', reason: 'gate-first-selection', finalists, arms: ranked, graded, blind: { status: 'locked', rows: blind.rows }, baseline: baseline ? { ...baseline, rankingEligible: false } : null });
 }
 
@@ -202,3 +209,8 @@ export const rebuildReport = rebuildSanitizedProjection;
 export const sanitizeAttempts = rebuildSanitizedProjection;
 export const buildU6Report = buildTournamentReport;
 export const selectFinalists = buildTournamentReport;
+export function buildFinalistReport(options = {}) {
+  const finalists = options.armIds || options.finalists;
+  if (!Array.isArray(finalists) || finalists.length < 1 || finalists.length > 2) return immutableSnapshot({ version: REPORT_VERSION, outcome: 'insufficient-evidence', reason: 'finalist-count-invalid', finalists: [], arms: [], graded: [] });
+  return buildTournamentReport({ ...options, phase: 'finalist-decision', armIds: finalists });
+}

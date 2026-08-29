@@ -85,6 +85,8 @@ test('runner records attributed usage, retries only transient failures, and writ
     assert.equal(artifact.telemetry[0].requestId, 'provider-1');
     assert.equal(artifact.telemetry[0].retryHistory[0].status, 429);
     assert.equal(artifact.telemetry[0].providerRequestId, 'provider-1');
+    assert.equal(typeof artifact.telemetry[0].latencyMs, 'number');
+    assert.ok(artifact.telemetry[0].latencyMs >= 0);
     assert.equal(typeof artifact.telemetry[0].artifactChecksum, 'string');
     assert.equal(typeof artifact.attemptBinding, 'string');
     assert.equal((await store.read('attempt-1')).ok, true);
