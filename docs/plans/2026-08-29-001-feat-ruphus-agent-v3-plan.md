@@ -949,4 +949,3 @@ Passing M1 may authorize proposal dogfood only. Passing M2 may authorize mutatio
 - [OpenAI Responses API create reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create)
 - [Firebase transactions and batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions)
 - [Firebase guidance on insecure rules and server access](https://firebase.google.com/docs/firestore/security/insecure-rules)
-
