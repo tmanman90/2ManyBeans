@@ -17,14 +17,20 @@ test('brew_once handoff carries an owner-keyed attempt into the app and timer se
   assert.match(rotation, /openAidenAttempt\?\.\(bean, ruphusAttempt\)/);
   assert.match(rotation, /openHandAttempt\(bean, ruphusAttempt\)/);
   assert.match(timer, /sessionId: attemptId \|\|/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /if \(attemptId\) setTimerOpen\(true\)/);
   assert.match(timer, /attemptId/);
   assert.match(timer, /revisionId/);
   assert.match(timing, /attemptId,/);
   assert.match(timing, /revisionId,/);
   assert.match(outbox, /ruphus-attempt-outbox:\$\{uid\}/);
   assert.match(outbox, /ownerUid: uid/);
+  const action = await source('src/hooks/useRuphusAction.js');
+  assert.match(action, /ruphus-action-identity/);
+  assert.match(action, /localStorage\.getItem\(identityKey\)/);
+  assert.match(action, /ruphus-action-outbox:\$\{uid\}:\$\{artifact\.actionId\}/);
   assert.match(rotation, /consumedAttemptRef\.current === ruphusAttempt\.id/);
-  assert.match(app, /if \(attemptId\) clearRuphusAttempt\(\)/);
+  assert.doesNotMatch(app, /if \(attemptId\) clearRuphusAttempt\(\)/);
+  assert.match(await source('src/tabs/TastingTab.jsx'), /onRuphusAttemptCompleted\?\.\(\)/);
 });
 
 test('recipe command receipt exposes the canonical Fellow preparation action', async () => {
@@ -32,10 +38,12 @@ test('recipe command receipt exposes the canonical Fellow preparation action', a
     source('src/components/chat/artifacts/ActionReceiptCard.jsx'),
     source('api/_lib/ruphusCommandService.js'),
   ]);
-  assert.match(card, /prepare_attempt/);
-  assert.match(card, /artifact\.slotKey === 'aiden'/);
+  assert.doesNotMatch(card, /prepare_attempt/);
   assert.match(service, /mode === 'prepare_attempt'/);
   assert.match(service, /preparation: 'pending'/);
+  const aiden = await source('src/lib/aiden.js');
+  assert.match(aiden, /body: \{ attemptId \}/);
+  assert.match(aiden, /prepareAidenAttempt/);
 });
 
 test('M2 contextual recipe surfaces mount provenance and tasting detail entry', async () => {

@@ -178,7 +178,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     const record = { ...buildTastingFromAnswers(answers, bean?.id, todayISO()), ...(attemptId ? { attemptId } : {}) };
     haptic.success();
     onSave?.(record);
-  }, [answers, bean, onSave]);
+  }, [answers, bean, onSave, attemptId]);
 
   const requestClose = useCallback(() => {
     revealAdvancePending.current = false;

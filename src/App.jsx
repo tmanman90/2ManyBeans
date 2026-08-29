@@ -87,7 +87,6 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
 
   const handleStartTastingSession = (beanId, attemptId = null) => {
     if (!beanId) return;
-    if (attemptId) clearRuphusAttempt();
     setPendingTastingBeanId(beanId);
     setPendingTastingAttemptId(attemptId);
     setTab('tasting');
@@ -349,6 +348,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               pendingTastingBeanId={pendingTastingBeanId}
               pendingTastingAttemptId={pendingTastingAttemptId}
               onPendingTastingConsumed={() => { setPendingTastingBeanId(null); setPendingTastingAttemptId(null); }}
+              onRuphusAttemptCompleted={clearRuphusAttempt}
               onOpenRuphus={openRuphus}
               onboardingPalate={onboardingPalate}
               isDemo={isDemo}

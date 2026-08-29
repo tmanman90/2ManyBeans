@@ -37,3 +37,8 @@ test('mixed Edit Bean payload routes its protected generation field without swal
   assert.equal(command.mode, 'set_aiden_grind');
   assert.deepEqual(command.patch, { aidenGrind: { singleServe: 6, batch: 7 } });
 });
+
+test('generated Aiden payloads without device metadata still target the Aiden slot', () => {
+  const generatedAiden = { profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96] };
+  assert.equal(commandForBeanUpdate(bean, { aidenRecipe: generatedAiden }).slotKey, 'aiden');
+});

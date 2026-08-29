@@ -30,11 +30,11 @@ const stableProjectionHash = (recipe, slotKey) => {
   delete value.recipeHash;
   return canonicalHash(value);
 };
-const exactProjectionHash = (recipe, slotKey) => {
+const exactProjectionHash = (recipe, slotKey, siblingGrind = null) => {
   const value = clone(recipe || {});
   value.method = slotMethod(slotKey); value.device = slotMethod(slotKey); value.mode = slotMode(slotKey);
   delete value.recipeHash;
-  return canonicalHash(value);
+  return canonicalHash({ recipe: value, ...(slotKey === 'aiden' ? { aidenGrind: clone(siblingGrind) } : {}) });
 };
 const revisionFor = (state, bean, coffeeId, slotKey) => {
   const revisionId = bean.activeRevisionIds?.[slotKey];
@@ -43,14 +43,14 @@ const revisionFor = (state, bean, coffeeId, slotKey) => {
     const live = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
     if (!live.ok) fail('source_drift', 'The saved recipe is missing or ambiguous outside the command boundary; refresh before trying this action.');
     const strict = ['apply_proposal', 'brew_once', 'keep_current', 'undo_revision', 'promote_attempt'].includes(state.commandMode);
-    const liveHash = strict ? exactProjectionHash(live.recipe, slotKey) : stableProjectionHash(live.recipe, slotKey);
-    const currentHash = strict ? exactProjectionHash(current.snapshot, slotKey) : stableProjectionHash(current.snapshot, slotKey);
+    const liveHash = strict ? exactProjectionHash(live.recipe, slotKey, bean.aidenGrind) : stableProjectionHash(live.recipe, slotKey);
+    const currentHash = strict ? exactProjectionHash(current.snapshot, slotKey, current.aidenGrind) : stableProjectionHash(current.snapshot, slotKey);
     if (liveHash !== currentHash) fail('source_drift', 'The saved recipe changed outside the command boundary; refresh before trying this action.');
     return current;
   }
   const resolved = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
   if (!resolved.ok) fail(resolved.code, 'No valid recipe is available for this slot.');
-  const initial = { id: id('revision', `${coffeeId}-${slotKey}-initial`), ownerId: state.uid, coffeeId, slotKey, parentId: null, snapshot: clone(resolved.recipe), snapshotHash: canonicalHash(resolved.recipe), source: 'initial', status: 'active', createdAt: state.now() };
+  const initial = { id: id('revision', `${coffeeId}-${slotKey}-initial`), ownerId: state.uid, coffeeId, slotKey, parentId: null, snapshot: clone(resolved.recipe), snapshotHash: canonicalHash(resolved.recipe), ...(slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind || null) } : {}), source: 'initial', status: 'active', createdAt: state.now() };
   state.revisions.set(initial.id, initial);
   bean.activeRevisionIds = { ...(bean.activeRevisionIds || {}), [slotKey]: initial.id };
   state.beans.set(coffeeId, bean);
@@ -75,10 +75,24 @@ const applyBeanPatch = (target, patch = {}) => {
     });
   }
 };
-const assertRecipePatch = (patch) => {
+const assertRecipePatch = (patch, slotKey) => {
   if (!patch) return;
-  const allowed = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenUsedRelay', 'aidenIcedLink', 'aidenIcedUsedRelay', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
-  if (Object.keys(patch).some((key) => !allowed.has(key) && !key.startsWith('handBrewRecipes.') && !key.startsWith('handBrewIcedRecipes.') && !key.startsWith('handBrewRecipe.'))) fail('invalid_action', 'Only recipe projection fields may be updated by this command.');
+  const allowed = new Set(['aidenGrind', 'aidenLink', 'aidenUsedRelay', 'aidenIcedLink', 'aidenIcedUsedRelay']);
+  const method = slotMethod(slotKey); const iced = slotMode(slotKey) === 'iced';
+  const recipeRoot = `${iced ? 'handBrewIcedRecipes' : 'handBrewRecipes'}.${method}`;
+  for (const key of Object.keys(patch)) {
+    if (allowed.has(key) && (slotKey === 'aiden' || key !== 'aidenGrind')) continue;
+    if (slotKey === 'aiden' && key === 'aidenRecipe') continue;
+    if (key === recipeRoot || key.startsWith(`${recipeRoot}.`)) continue;
+    if (key === (iced ? 'handBrewIcedRecipes' : 'handBrewRecipes')) {
+      const value = patch[key];
+      if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every((entry) => entry === method)) continue;
+    }
+    if (key === 'handBrewRecipe' || key.startsWith('handBrewRecipe.')) {
+      if (slotKey !== 'aiden' && method === 'v60' && !iced) continue;
+    }
+    fail('invalid_action', 'Only the selected slot projection may be updated by this command.');
+  }
 };
 const receipt = ({ actionId, mode, status = 'succeeded', ...fields }) => ({ id: id('receipt', actionId), actionId, mode, status, ...fields, createdAt: new Date().toISOString() });
 
@@ -105,7 +119,7 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
     let result;
     if (mode === 'replace_active_recipe') {
       if (!command.recipe) fail('invalid_recipe', 'Recipe is required.');
-      assertRecipePatch(command.patch);
+      assertRecipePatch(command.patch, slotKey);
       const validation = validateExecutableRecipe(command.recipe, slotKey);
       if (!validation.valid) fail('invalid_recipe', validation.errors.join('; '), { errors: validation.errors });
       result = commitRevision(state, bean, current, command, command.recipe, 'replace');
@@ -116,7 +130,7 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
       state.beans.set(command.coffeeId, next);
       result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: current.id, status: 'succeeded' }), bean: next };
     } else if (mode === 'set_aiden_grind') {
-      assertRecipePatch(command.patch);
+      assertRecipePatch(command.patch, slotKey);
       const next = { ...bean, aidenGrind: clone(command.grind) };
       applyBeanPatch(next, command.patch);
       state.beans.set(command.coffeeId, next);
@@ -199,7 +213,7 @@ function createAttempt(state, command, revision, proposalId) {
 function commitRevision(state, bean, current, command, recipe, source, proposal = null, undoneRevisionId = null) {
   const validation = validateExecutableRecipe(recipe, command.slotKey);
   if (!validation.valid) fail('invalid_recipe', validation.errors.join('; '), { errors: validation.errors });
-  const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.id, snapshot: clone(recipe), snapshotHash: canonicalHash(recipe), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
+  const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.id, snapshot: clone(recipe), snapshotHash: canonicalHash(recipe), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(command.patch?.aidenGrind ?? bean.aidenGrind ?? null) } : {}), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
   state.revisions.set(revision.id, revision);
   const next = projection(bean, command.slotKey, recipe); next.activeRevisionIds[command.slotKey] = revision.id; state.beans.set(command.coffeeId, next);
   return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.id, proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' }) };
@@ -280,7 +294,7 @@ function executeOnState(state, command) {
   if (mode === 'replace_active_recipe') {
     const validation = validateExecutableRecipe(command.recipe, command.slotKey);
     if (!validation.valid) fail('invalid_recipe', validation.errors.join('; '), { errors: validation.errors });
-    assertRecipePatch(command.patch);
+    assertRecipePatch(command.patch, command.slotKey);
     result = commitRevision(state, bean, current, command, command.recipe, 'replace');
     if (command.patch) applyBeanPatch(state.beans.get(command.coffeeId), command.patch);
   } else if (mode === 'set_dose') {
@@ -288,7 +302,7 @@ function executeOnState(state, command) {
     const next = projection(bean, command.slotKey, { ...current.snapshot, userCoffeeGrams: command.dose }); state.beans.set(command.coffeeId, next);
     result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id }) };
   } else if (mode === 'set_aiden_grind') {
-    assertRecipePatch(command.patch);
+    assertRecipePatch(command.patch, command.slotKey);
     const next = { ...bean, aidenGrind: clone(command.grind) }; applyBeanPatch(next, command.patch); state.beans.set(command.coffeeId, next);
     result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id }) };
   } else if (mode === 'set_aiden_link') {

@@ -9,7 +9,7 @@
 // abandoned async chain from landing on a bean the user has since moved on from, and
 // prevents a stale push from persisting aidenLink on the wrong Firestore doc.
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { generateAidenRecipe, pushToAiden } from '../lib/aiden';
+import { generateAidenRecipe, pushToAiden, prepareAidenAttempt } from '../lib/aiden';
 import { researchBean } from '../lib/beanResearch';
 import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -45,6 +45,17 @@ export function useAidenBrew(updateBean) {
     setAidenError(null);
     setAidenPhase('push');
     setAidenModal(true);
+    prepareAidenAttempt(attempt.id)
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setAidenResult(result);
+        setAidenPhase(null);
+      })
+      .catch((error) => {
+        if (!mountedRef.current) return;
+        setAidenError(error.message || 'Could not prepare this profile in Fellow');
+        setAidenPhase(null);
+      });
   }, []);
 
   // Returns true if this async chain should still be applying state updates.

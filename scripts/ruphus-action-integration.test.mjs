@@ -91,6 +91,18 @@ test('A direct legacy projection drift fails closed before Apply can overwrite i
   assert.throws(() => store.execute({ actionId: 'drift-apply', mode: 'apply_proposal', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-drift' }), /outside the command boundary/);
 });
 
+test('a command cannot patch a sibling recipe projection or forge Aiden grind provenance', () => {
+  const { store, recipe } = setup();
+  store.execute({ actionId: 'patch-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe });
+  assert.throws(() => store.execute({ actionId: 'patch-cross-slot', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe, patch: { 'handBrewRecipes.kalita': recipe } }), /selected slot/i);
+  const aidenRecipe = { title: 'Aiden profile', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96], device: 'aiden', method: 'aiden' };
+  store.seedBean('aiden-drift', { id: 'aiden-drift', ownerId: 'user-1', aidenRecipe, aidenGrind: { singleServe: 5, batch: 7 } });
+  const aiden = store.getBean('aiden-drift');
+  store.execute({ actionId: 'aiden-base', mode: 'replace_active_recipe', coffeeId: 'aiden-drift', slotKey: 'aiden', recipe: aiden.aidenRecipe, patch: { aidenGrind: { singleServe: 5, batch: 7 } } });
+  const drifted = store.getBean('aiden-drift'); drifted.aidenGrind = { singleServe: 4, batch: 6 }; store.seedBean('aiden-drift', drifted);
+  assert.throws(() => store.execute({ actionId: 'aiden-drift-check', mode: 'apply_proposal', coffeeId: 'aiden-drift', slotKey: 'aiden', proposalId: 'missing' }), (error) => error.code === 'source_drift');
+});
+
 test('A tasted Brew-once attempt can be promoted only after provenance transition', () => {
   const { store, recipe } = setup();
   const current = store.execute({ actionId: 'promote-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;

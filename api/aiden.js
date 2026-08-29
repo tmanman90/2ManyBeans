@@ -5,7 +5,7 @@
 import { withCorsAuthUltra, getDb } from './_lib/cors-auth.js';
 import { decrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
-import { validateAidenProfile } from '../src/lib/aidenProfileValidation.js';
+import { validateAidenProfile, toAidenProfile } from '../src/lib/aidenProfileValidation.js';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
 const RATE_LIMIT = { key: 'aidenPush', limit: 30, windowMs: 60 * 60 * 1000 };
@@ -228,9 +228,30 @@ async function pushWithCredentials(profile, creds) {
 // integration feature that differentiates Ultra from Pro.
 export default withCorsAuthUltra(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
+  const body = req.body || {};
+  const attemptId = typeof body.attemptId === 'string' ? body.attemptId : null;
+  let attemptRef = null;
 
   try {
-    const profile = req.body;
+    let profile = body;
+    if (attemptId) {
+      if (Object.keys(body).some((key) => key !== 'attemptId')) return res.status(400).json({ error: 'attempt_id_only' });
+      const db = getDb();
+      attemptRef = db.collection('users').doc(uid).collection('brewAttempts').doc(attemptId);
+      const attemptSnap = await attemptRef.get();
+      const beanRef = db.collection('users').doc(uid).collection('beans').doc(attemptSnap.data()?.coffeeId || '__missing__');
+      const beanSnap = await beanRef.get();
+      if (!attemptSnap.exists || !beanSnap.exists) return res.status(404).json({ error: 'attempt_not_found' });
+      const attempt = { id: attemptSnap.id, ...attemptSnap.data() };
+      if (attempt.status === 'profile_prepared') return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, physicalBrewConfirmed: false });
+      if (!['created', 'preparing', 'uncertain'].includes(attempt.status)) return res.status(409).json({ error: 'invalid_attempt_state' });
+      profile = toAidenProfile(attempt.snapshot, { id: beanSnap.id, ...beanSnap.data() });
+      await db.runTransaction(async (tx) => {
+        const current = await tx.get(attemptRef);
+        if (!current.exists) throw Object.assign(new Error('Attempt is unavailable.'), { code: 'attempt_not_found' });
+        tx.update(attemptRef, { status: 'preparing', preparingAt: new Date().toISOString() });
+      });
+    }
     const validation = validateAidenProfile(profile);
     if (!validation.valid) {
       return res.status(400).json({ error: `Invalid profile: ${validation.errors.join('; ')}` });
@@ -241,6 +262,7 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
     try {
       creds = await getFellowCredentials(uid);
     } catch (credsErr) {
+      if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
       if (credsErr.status === 400) {
         return res.status(400).json({ error: credsErr.message });
       }
@@ -250,25 +272,28 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
     // Decryption failed: return error + try relay fallback ONLY for the
     // allowlisted relay uid. For everyone else, the relay would push to the
     // owner's personal Aiden -- refuse and surface a reconnect prompt.
-    if (creds.source === 'decrypt_failed') {
+      if (creds.source === 'decrypt_failed') {
       if (isRelayAllowed(uid)) {
         try {
           const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
           if (FELLOW_EMAIL && FELLOW_PASSWORD) {
             const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
             const result = await pushWithCredentials(profile, relayCreds);
+            if (attemptRef) await attemptRef.update({ status: 'profile_prepared', preparedAt: new Date().toISOString(), externalId: result.profileId || null, link: result.link || null });
             return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
           }
         } catch {
           // Relay also failed
         }
       }
+      if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
       return res.status(500).json({ error: 'Your Fellow credentials could not be read. Please reconnect in Settings.' });
     }
 
     // Try push with the resolved credentials
     try {
       const result = await pushWithCredentials(profile, creds);
+      if (attemptRef) await attemptRef.update({ status: 'profile_prepared', preparedAt: new Date().toISOString(), externalId: result.profileId || null, link: result.link || null });
       return res.status(200).json({ ...result, usedRelay: creds.source === 'relay' });
     } catch (pushErr) {
       // If user credentials failed with 401/403, try relay fallback -- again,
@@ -283,25 +308,32 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
             try {
               const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
               const result = await pushWithCredentials(profile, relayCreds);
+              if (attemptRef) await attemptRef.update({ status: 'profile_prepared', preparedAt: new Date().toISOString(), externalId: result.profileId || null, link: result.link || null });
               return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
             } catch (relayErr) {
               console.error('Relay fallback also failed:', relayErr.message);
             }
           }
         }
+        if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
         return res.status(401).json({ error: 'Your Fellow credentials are invalid. Please reconnect in Settings.' });
       }
 
       // Surface specific errors
       if (pushErr.status === 404) {
+        if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
         return res.status(404).json({ error: pushErr.message });
       }
       if (pushErr.status === 409) {
+        if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
         return res.status(409).json({ error: pushErr.message });
       }
       throw pushErr;
     }
   } catch (error) {
+    if (attemptRef) {
+      try { await attemptRef.update({ status: error?.name === 'AbortError' || error?.code === 'ETIMEDOUT' ? 'uncertain' : 'failed', updatedAt: new Date().toISOString() }); } catch { /* preserve original provider error */ }
+    }
     console.error('Fellow API error:', error.message);
     return res.status(502).json({ error: error.message || 'Failed to push profile to Fellow' });
   }

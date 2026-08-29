@@ -440,8 +440,9 @@ export const HandBrewModal = ({
     if (open) {
       setIcedMode(false);
       setTimerRecipeOverride(null);
+      if (attemptId) setTimerOpen(true);
     }
-  }, [open]);
+  }, [open, attemptId]);
 
   const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
     ? userCoffeeGrams

@@ -40,7 +40,7 @@ export function commandForBeanUpdate(bean, updates, { actionId = crypto.randomUU
   }
   const dottedRecipeEntry = Object.entries(updates || {}).find(([key, value]) => /^(handBrewRecipes|handBrewIcedRecipes)\.(v60|kalita)$/.test(key) && value && typeof value === 'object');
   const recipe = updates.aidenRecipe || updates.handBrewRecipe || updates.handBrewRecipes?.v60 || updates.handBrewRecipes?.kalita || updates.handBrewIcedRecipes?.v60 || updates.handBrewIcedRecipes?.kalita || dottedRecipeEntry?.[1];
-  const slotKey = dottedRecipeEntry?.[0].startsWith('handBrewIcedRecipes') ? `${dottedRecipeEntry[0].split('.')[1]}_iced` : recipe?.device === 'aiden' ? 'aiden' : recipe?.mode === 'iced' ? `${recipe.device || 'v60'}_iced` : `${recipe?.device || 'v60'}_hot`;
+  const slotKey = updates.aidenRecipe ? 'aiden' : dottedRecipeEntry?.[0].startsWith('handBrewIcedRecipes') ? `${dottedRecipeEntry[0].split('.')[1]}_iced` : recipe?.device === 'aiden' ? 'aiden' : recipe?.mode === 'iced' ? `${recipe.device || 'v60'}_iced` : `${recipe?.device || 'v60'}_hot`;
   return { actionId, mode: 'replace_active_recipe', coffeeId: bean.id, slotKey, recipe, patch: updates, expectedRevisionId: bean.activeRevisionIds?.[slotKey] || undefined };
 }
 

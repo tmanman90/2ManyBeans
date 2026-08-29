@@ -47,7 +47,7 @@ const formatDateRelative = (iso) => {
 };
 
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onRuphusAttemptCompleted, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -159,6 +159,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       if (record?.attemptId) {
         const { attemptId, ...sensory } = record;
         await saveRuphusTasting({ attemptId, coffeeId: record.beanId, sensory });
+        onRuphusAttemptCompleted?.();
       } else {
         await onAddTasting(record);
       }

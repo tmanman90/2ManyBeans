@@ -11,4 +11,3 @@ test('recipe command keeps ordinary auth access while applying per-mode entitlem
   assert.match(source, /mode === 'set_aiden_grind'.*'pro'/s);
   assert.doesNotMatch(source, /withCorsAuthPro/);
 });
-

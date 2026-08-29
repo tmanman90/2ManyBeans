@@ -7,7 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { classifyFamilyFallback } from './beanFields';
 import { ODE_GEN2_STEPS, nearestOdeStep } from './brewMethods';
-import { assertValidAidenProfile, buildAidenTitle, toAidenProfile } from './aidenProfileValidation';
+import { assertValidAidenProfile, toAidenProfile } from './aidenProfileValidation';
 export { buildAidenTitle } from './aidenProfileValidation';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
@@ -631,5 +631,11 @@ export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) 
     retries: 1,
     serviceName: 'Fellow',
   });
-  return { ...result, grindRecommendation };
+  return { ...result, grindRecommendation: recipe?.grindRecommendation || null };
+}
+
+export async function prepareAidenAttempt(attemptId) {
+  if (!attemptId) throw new Error('Aiden attempt ID is required.');
+  const result = await fetchWithRetry({ url: `${API_BASE}/api/aiden`, body: { attemptId }, retries: 2, serviceName: 'Fellow' });
+  return result;
 }
