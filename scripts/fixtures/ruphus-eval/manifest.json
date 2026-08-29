@@ -26,7 +26,7 @@
   "blindReviewProtocolRef": "docs/data/ruphus-model-eval/blinded-review-protocol.md",
   "physicalProtocolRef": "docs/data/ruphus-model-eval/physical-brew-protocol.md",
   "hashes": {
-    "corpora": "011b3d6024312e0bcef1cfcd1d7497983024441b80ebbab6ff94fabbed4b62bd",
+    "corpora": "afa7a7fd5e71f84486f5b46ec8becf7fa7e5b1032a543dc2c40b8f71ad8e3ceb",
     "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
     "tools": "a0e9a64dd8de13084facc588777abd27dff5d4530328c6bee4a9fb853a8f3136",
     "modelRegistry": "d3b46daa7216e0c6b02a2f57f1750f3ae79f7a412572dbf2bb62b53bbf7b63d9",
@@ -41,6 +41,6 @@
     "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
     "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
     "schedule": "05c3fc5019f50e8368780a3f2a31dd1f4ca8a24d07c7f89048c09611fcc936b2",
-    "evaluationHash": "2eb39e8660607bea80dbd9c4ee2c247c51be84146953a9a033b3e6e3a07958bc"
+    "evaluationHash": "faabb32ac98fe103d5b900ff2af160d5418b5c21ec9c63f345be5ee45fde5928"
   }
 }

@@ -159,6 +159,14 @@ test('U4 assertions fail closed on missing semantic evidence and forged identity
   assert.equal(gradeCase(failure, { terminal: failure.expected.terminal, fault: failure.expected.fault, mutation: false, claims: ['machine success confirmed'] }).hardGate, false);
 });
 
+test('U4 executable registries reject unknown or missing declarations', () => {
+  const source = decision.find((item) => item.id === 'dec-013');
+  assert.throws(() => runCase({ ...source, grader: { ...source.grader, assertions: ['unknown-assertion'] } }), /unknown assertion/);
+  assert.throws(() => runCase({ ...source, grader: { ...source.grader, assertions: [] } }), /unknown assertion/);
+  assert.throws(() => runCase({ ...source, grader: { ...source.grader, criticalFailures: ['unknown-failure'] } }), /unknown critical failure/);
+  assert.throws(() => runCase({ ...source, grader: { ...source.grader, criticalFailures: [] } }), /unknown critical failure/);
+});
+
 test('U4 diagnosis adjudication enforces one-variable extraction directions', () => {
   const diagnoses = decision.filter((item) => item.category === 'taste-diagnosis');
   assert.equal(diagnoses.length, 12);
