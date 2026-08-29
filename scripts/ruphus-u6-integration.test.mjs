@@ -52,7 +52,7 @@ test('recipe command receipt exposes the canonical Fellow preparation action', a
   assert.match(await source('src/hooks/useHandBrew.js'), /mode: 'timer_started'/);
   assert.match(service, /mode === 'timer_started'/);
   const aiden = await source('src/lib/aiden.js');
-  assert.match(aiden, /body: \{ attemptId, \...\(recovery \? \{ recovery \} : \{\}\) \}/);
+  assert.match(aiden, /body: \{ attemptId, \...\(recovery \? \{ recovery, actionId: `new_profile_\$\{attemptId\}` \} : \{\}\) \}/);
   assert.match(aiden, /prepareAidenAttempt/);
 });
 
@@ -65,6 +65,8 @@ test('M2 contextual recipe surfaces mount provenance and tasting detail entry', 
   ]);
   assert.match(hand, /RecipeProvenanceStrip/);
   assert.match(aiden, /RecipeProvenanceStrip/);
+  assert.match(hand, /recipeProvenance = null/);
+  assert.match(aiden, /recipeProvenance = null/);
   assert.match(detail, /Ask Ruphus/);
   assert.match(detail, /tastingEvidence/);
   assert.match(rotation, /onOpenRuphus=\{agentV3Enabled \? onOpenRuphus : undefined\}/);

@@ -573,6 +573,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         attemptId={aiden.attemptContext?.id || null}
         revisionId={aiden.attemptContext?.revisionId || null}
         provenanceSource={aiden.attemptContext?.source || null}
+        recipeProvenance={aiden.aidenBean?.recipeProvenance?.aiden || null}
         onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         onRetryAttempt={aiden.retryAttempt}
         onSendAsNewProfile={aiden.sendAsNewProfile}
@@ -600,6 +601,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         attemptId={handBrew.attemptContext?.id || null}
         revisionId={handBrew.attemptContext?.revisionId || null}
         provenanceSource={handBrew.attemptContext?.source || null}
+        recipeProvenance={handBrew.handBrewBean?.recipeProvenance?.[`${handBrew.handBrewRecipe?.device === 'kalita' ? 'kalita' : 'v60'}_${handBrew.handBrewRecipe?.mode === 'iced' ? 'iced' : 'hot'}`] || null}
         onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}

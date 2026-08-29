@@ -253,14 +253,17 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
   const body = req.body || {};
   const attemptId = typeof body.attemptId === 'string' ? body.attemptId : null;
   const recovery = body.recovery === 'new_profile' ? 'new_profile' : null;
+  const recoveryActionId = typeof body.actionId === 'string' ? body.actionId : null;
   let attemptRef = null;
   let attemptRecord = null;
   let attemptBean = null;
+  let recoveryReplay = false;
 
   try {
     let profile = body;
     if (attemptId) {
-      if (Object.keys(body).some((key) => key !== 'attemptId' && key !== 'recovery')) return res.status(400).json({ error: 'attempt_id_only' });
+      if (Object.keys(body).some((key) => key !== 'attemptId' && key !== 'recovery' && key !== 'actionId')) return res.status(400).json({ error: 'attempt_id_only' });
+      if (recovery && recoveryActionId !== `new_profile_${attemptId}`) return res.status(400).json({ error: 'recovery_action_invalid' });
       const db = getDb();
       attemptRef = db.collection('users').doc(uid).collection('brewAttempts').doc(attemptId);
       const attemptSnap = await attemptRef.get();
@@ -269,13 +272,14 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
       if (!attemptSnap.exists || !beanSnap.exists) return res.status(404).json({ error: 'attempt_not_found' });
       const attempt = { id: attemptSnap.id, ...attemptSnap.data() };
       attemptRecord = attempt;
-      if (attempt.status === 'profile_prepared' && !recovery) return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, physicalBrewConfirmed: false });
+      if (attempt.status === 'profile_prepared' && (!recovery || attempt.recoveryActionId === recoveryActionId)) return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, recovery: attempt.recovery || null, physicalBrewConfirmed: false });
       if (!['created', 'preparing', 'uncertain'].includes(attempt.status)) return res.status(409).json({ error: 'invalid_attempt_state' });
       attemptBean = { id: beanSnap.id, ...beanSnap.data() };
       // A new-profile recovery is explicit and user initiated. It gets a
       // distinct attempt-scoped title, while the durable attempt identity
       // remains the authority for reconciliation and tasting provenance.
-      profile = buildRuphusAttemptProfile(recovery ? { ...attempt, id: `${attempt.id}-new` } : attempt, attemptBean);
+      recoveryReplay = Boolean(recovery && attempt.recoveryTitle && attempt.recoveryActionId === recoveryActionId);
+      profile = buildRuphusAttemptProfile(recovery && !recoveryReplay ? { ...attempt, id: `${attempt.id}-new`, recoveryTitle: null } : attempt, attemptBean);
       await db.runTransaction(async (tx) => {
         const current = await tx.get(attemptRef);
         if (!current.exists) throw Object.assign(new Error('Attempt is unavailable.'), { code: 'attempt_not_found' });
@@ -305,14 +309,14 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
     // profile after a response-loss ambiguity.
     if (attemptRef && attemptRecord) {
       const prepared = await prepareRuphusAttempt({
-        attempt: { ...attemptRecord, id: recovery ? `${attemptRecord.id}-new` : attemptRecord.id, status: 'preparing' },
+        attempt: { ...attemptRecord, id: recovery && !recoveryReplay ? `${attemptRecord.id}-new` : attemptRecord.id, status: recoveryReplay ? 'uncertain' : 'preparing' },
         bean: attemptBean,
         adapter: {
           prepare: (canonicalProfile) => pushWithCredentials(canonicalProfile, creds, { allowDuplicateRecovery: recovery === 'new_profile' }),
           reconcile: ({ title }) => pushWithCredentials({ ...profile, title }, creds, { reconcileOnly: true }),
         },
       });
-      const attemptUpdate = { ...prepared.attempt, ...(recovery ? { recovery, recoveryTitle: profile.title } : {}) };
+      const attemptUpdate = { ...prepared.attempt, ...(recovery ? { recovery, recoveryActionId, recoveryTitle: profile.title } : {}) };
       await attemptRef.update(attemptUpdate).catch(() => {});
       if (prepared.error) {
         if (prepared.attempt.status === 'uncertain') return res.status(202).json({ attemptId, status: 'uncertain', physicalBrewConfirmed: false });

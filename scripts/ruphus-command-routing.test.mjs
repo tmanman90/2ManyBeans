@@ -17,7 +17,7 @@ test('every protected writer shape resolves to a canonical command mode', () => 
   assert.equal(commandForBeanUpdate(bean, { 'handBrewRecipe.userCoffeeGrams': 16, 'handBrewRecipes.v60.userCoffeeGrams': 16 }).mode, 'set_dose');
   assert.equal(commandForBeanUpdate(bean, { 'handBrewIcedRecipes.v60': iced }).slotKey, 'v60_iced');
   assert.equal(commandForBeanUpdate(bean, { handBrewRecipe: recipe, 'handBrewRecipes.v60': recipe }).mode, 'replace_active_recipe');
-  for (const key of ['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']) assert.ok(PROTECTED_KEYS.has(key));
+  for (const key of ['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']) assert.ok(PROTECTED_KEYS.has(key));
 });
 
 test('the app update seam intercepts protected fields before direct Firestore update', async () => {
@@ -26,6 +26,13 @@ test('the app update seam intercepts protected fields before direct Firestore up
   assert.match(source, /executeRecipeCommand\(/);
   assert.match(source, /await updateDoc\(beanRef/);
   assert.ok(source.indexOf('isProtectedRecipeUpdate(updates)') < source.indexOf('await updateDoc(beanRef'));
+});
+
+test('recipe provenance is a server-owned bean field in the compatible rules seam', async () => {
+  const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
+  assert.match(rules, /match \/users\/{userId}\/beans\/{beanId}/);
+  assert.match(rules, /!request\.resource\.data\.keys\(\)\.hasAny\(\['recipeProvenance'\]\)/);
+  assert.match(rules, /!request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasAny\(\['recipeProvenance'\]\)/);
 });
 
 test('mixed Edit Bean payload routes its protected generation field without swallowing ordinary fields', () => {

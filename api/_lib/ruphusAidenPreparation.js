@@ -4,6 +4,7 @@ export function buildRuphusAttemptProfile(attempt, bean) {
   const profile = toAidenProfile(attempt?.snapshot, bean);
   const suffix = ` · ${String(attempt?.id || '').slice(-16)}`;
   profile.title = `${buildAidenTitle(bean, '').slice(0, Math.max(1, 50 - suffix.length))}${suffix}`.slice(0, 50);
+  if (attempt?.recoveryTitle) profile.title = attempt.recoveryTitle;
   return profile;
 }
 

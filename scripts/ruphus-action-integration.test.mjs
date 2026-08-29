@@ -192,6 +192,28 @@ test('proposal bindings track dose and Aiden grind separately from recipe identi
   assert.doesNotThrow(() => grindStore.execute({ actionId: 'grind-new-apply', mode: 'apply_proposal', coffeeId: 'grind-bean', slotKey: 'aiden', proposalId: 'grind-new' }));
 });
 
+test('recipe provenance is slot-scoped and clears only the selected active revision', () => {
+  const store = createMemoryCommandStore({ uid: 'user-1' });
+  const v60 = generateV60Recipe({}, { dose: 15 });
+  const kalita = generateKalitaRecipe({}, { dose: 15 });
+  store.seedBean('multi-slot', { id: 'multi-slot', ownerId: 'user-1', handBrewRecipe: v60, handBrewRecipes: { v60, kalita } });
+  const v60Base = store.execute({ actionId: 'multi-v60-base', mode: 'replace_active_recipe', coffeeId: 'multi-slot', slotKey: 'v60_hot', recipe: v60 }).revision;
+  const kalitaBase = store.execute({ actionId: 'multi-kalita-base', mode: 'replace_active_recipe', coffeeId: 'multi-slot', slotKey: 'kalita_hot', recipe: kalita }).revision;
+  store.seedProposal({ id: 'multi-v60-proposal', ownerId: 'user-1', coffeeId: 'multi-slot', slotKey: 'v60_hot', sourceRevisionId: v60Base.id, sourceHash: v60Base.snapshotHash, after: { ...v60, waterTemp: { ...v60.waterTemp, celsius: 98 } }, status: 'proposed' });
+  store.execute({ actionId: 'multi-v60-apply', mode: 'apply_proposal', coffeeId: 'multi-slot', slotKey: 'v60_hot', proposalId: 'multi-v60-proposal' });
+  store.seedProposal({ id: 'multi-kalita-proposal', ownerId: 'user-1', coffeeId: 'multi-slot', slotKey: 'kalita_hot', sourceRevisionId: kalitaBase.id, sourceHash: kalitaBase.snapshotHash, after: { ...kalita, waterTemp: { ...kalita.waterTemp, celsius: 97 } }, status: 'proposed' });
+  const appliedKalita = store.execute({ actionId: 'multi-kalita-apply', mode: 'apply_proposal', coffeeId: 'multi-slot', slotKey: 'kalita_hot', proposalId: 'multi-kalita-proposal' });
+  let bean = store.getBean('multi-slot');
+  assert.equal(bean.recipeProvenance.v60_hot.slotKey, 'v60_hot');
+  assert.equal(bean.recipeProvenance.kalita_hot.slotKey, 'kalita_hot');
+  store.execute({ actionId: 'multi-v60-replace', mode: 'replace_active_recipe', coffeeId: 'multi-slot', slotKey: 'v60_hot', recipe: { ...v60, waterTemp: { ...v60.waterTemp, celsius: 99 } } });
+  bean = store.getBean('multi-slot');
+  assert.equal(bean.recipeProvenance.v60_hot, undefined);
+  assert.equal(bean.recipeProvenance.kalita_hot.slotKey, 'kalita_hot');
+  store.execute({ actionId: 'multi-kalita-undo', mode: 'undo_revision', coffeeId: 'multi-slot', slotKey: 'kalita_hot', expectedRevisionId: appliedKalita.revision.id });
+  assert.equal(store.getBean('multi-slot').recipeProvenance.kalita_hot, undefined);
+});
+
 test('A tasted Brew-once attempt can be promoted only after provenance transition', () => {
   const { store, recipe } = setup();
   const current = store.execute({ actionId: 'promote-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;

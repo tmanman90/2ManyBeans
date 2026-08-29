@@ -247,8 +247,10 @@ function commitRevision(state, bean, current, command, recipe, source, proposal 
   const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.id, snapshot: clone(recipe), snapshotHash: stableProjectionHash(recipe, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(command.patch?.aidenGrind ?? bean.aidenGrind ?? null) } : {}), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
   state.revisions.set(revision.id, revision);
   const next = projection(bean, command.slotKey, recipe); next.activeRevisionIds[command.slotKey] = revision.id;
-  if (source === 'apply' || source === 'promote') next.agentProvenance = { source, revisionId: revision.id, slotKey: command.slotKey };
-  if (source === 'undo') next.agentProvenance = null;
+  const recipeProvenance = { ...(next.recipeProvenance || {}) };
+  if (source === 'apply' || source === 'promote') recipeProvenance[command.slotKey] = { source, revisionId: revision.id, slotKey: command.slotKey };
+  if (source === 'replace' || source === 'undo') delete recipeProvenance[command.slotKey];
+  next.recipeProvenance = recipeProvenance;
   state.beans.set(command.coffeeId, next);
   return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.id, proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' }) };
 }

@@ -73,7 +73,11 @@ service cloud.firestore {
     // limit and catches accidental base64 image bloat early.
     match /users/{userId}/beans/{beanId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId
+      allow create: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['recipeProvenance'])
+        && request.resource.data.size() <= 100;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['recipeProvenance'])
         && request.resource.data.size() <= 100;  // max 100 top-level fields
       allow delete: if request.auth != null && request.auth.uid == userId;
     }

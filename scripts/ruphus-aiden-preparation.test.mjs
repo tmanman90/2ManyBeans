@@ -36,14 +36,26 @@ test('attempt preparation uses a unique Fellow-safe title and reconciliation bef
   assert.equal(created, false);
 });
 
+test('explicit new-profile recovery keeps its dispatched title across response loss', async () => {
+  const attempt = { id: 'attempt-recovery', status: 'uncertain', recoveryTitle: 'Kenya · attempt-recovery-new', snapshot };
+  const observedTitles = [];
+  const first = await prepareRuphusAttempt({ attempt, bean: { id: 'bean-1', name: 'Kenya' }, adapter: { reconcile: async ({ title }) => { observedTitles.push(title); return null; } } });
+  const second = await prepareRuphusAttempt({ attempt: { ...attempt, ...first.attempt }, bean: { id: 'bean-1', name: 'Kenya' }, adapter: { reconcile: async ({ title }) => { observedTitles.push(title); return { profileId: 'recovered', link: 'https://example.test/recovered' }; } } });
+  assert.deepEqual(observedTitles, ['Kenya · attempt-recovery-new', 'Kenya · attempt-recovery-new']);
+  assert.equal(second.attempt.status, 'profile_prepared');
+  assert.equal(second.attempt.externalId, 'recovered');
+});
+
 test('server Aiden boundary accepts an attempt ID rather than a client recipe', async () => {
   const source = await readFile(new URL('../api/aiden.js', import.meta.url), 'utf8');
   assert.match(source, /attemptId/);
-  assert.match(source, /Object\.keys\(body\)\.some\(\(key\) => key !== 'attemptId' && key !== 'recovery'\)/);
+  assert.match(source, /Object\.keys\(body\)\.some\(\(key\) => key !== 'attemptId' && key !== 'recovery' && key !== 'actionId'\)/);
   assert.match(source, /buildRuphusAttemptProfile\(/);
   assert.match(source, /prepareRuphusAttempt/);
   assert.match(source, /allowDuplicateRecovery: recovery === 'new_profile'/);
   assert.match(source, /recoveryTitle: profile\.title/);
+  assert.match(source, /recoveryActionId/);
+  assert.match(await readFile(new URL('../src/lib/aiden.js', import.meta.url), 'utf8'), /new_profile_\$\{attemptId\}/);
   assert.match(source, /reconcileOnly: true/);
   assert.match(source, /status: 'preparing'/);
   assert.match(source, /status: 'profile_prepared'/);

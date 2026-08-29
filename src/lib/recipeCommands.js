@@ -1,7 +1,7 @@
 import { getAuth } from 'firebase/auth';
 import { API_BASE } from './apiBase.js';
 
-const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
+const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
 
 export const isProtectedRecipeUpdate = (updates = {}) => Object.keys(updates).some((key) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.'));
 export const protectedRecipeUpdates = (updates = {}) => Object.fromEntries(

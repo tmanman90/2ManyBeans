@@ -372,7 +372,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null, provenanceSource = null, onOpenRuphus = null, onRetryAttempt = null, onSendAsNewProfile = null, onCompleteAttempt = null, onStartTasting = null }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onOpenRuphus = null, onRetryAttempt = null, onSendAsNewProfile = null, onCompleteAttempt = null, onStartTasting = null }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
@@ -474,7 +474,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           <BeanChip bean={bean} />
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
-          {attemptId && <RecipeProvenanceStrip provenance={{ revisionId, source: provenanceSource, slotKey: 'aiden' }} />}
+          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: 'aiden' } : recipeProvenance} />
           {attemptId && result?.status === 'uncertain' && onRetryAttempt && <Btn variant="ghost" onClick={onRetryAttempt} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Check Fellow again</Btn>}
           {attemptId && result?.status === 'uncertain' && onSendAsNewProfile && <Btn variant="ghost" onClick={onSendAsNewProfile} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Send as a new profile</Btn>}
           {attemptId && result?.status === 'profile_prepared' && onCompleteAttempt && <Btn variant="primary" onClick={handleAttemptComplete} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Start tasting</Btn>}

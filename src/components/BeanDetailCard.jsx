@@ -725,15 +725,13 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                   {/* Saved brew profile (archive only) — read-only recap of stored recipes */}
                   {showBrewProfile && (bean.aidenRecipe || bean.handBrewRecipe) && (
                     <Panel>
-                      {bean.agentProvenance && (
-                        <RecipeProvenanceStrip provenance={bean.agentProvenance} onUndo={onUndoRecipe ? () => onUndoRecipe(bean.agentProvenance) : undefined} />
-                      )}
                       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                         <Coffee size={26} color={INK} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />
                         <div style={{ borderLeft: `1px solid ${HAIR}`, paddingLeft: 14, flex: 1, minWidth: 0 }}>
                           <div style={{ ...lbl, fontSize: 11, color: INK, marginBottom: 8 }}>Brew Profile</div>
                           {bean.aidenRecipe && (
                             <div style={{ marginBottom: bean.handBrewRecipe ? 10 : 0 }}>
+                              <RecipeProvenanceStrip provenance={bean.recipeProvenance?.aiden} onUndo={onUndoRecipe ? () => onUndoRecipe(bean.recipeProvenance.aiden) : undefined} />
                               <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>Aiden Recipe</div>
                               <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
                                 {[bean.aidenRecipe.ratio && `Ratio ${bean.aidenRecipe.ratio}`, bean.aidenRecipe.bloomTime && `Bloom ${bean.aidenRecipe.bloomTime}`, bean.aidenRecipe.pulseCount && `${bean.aidenRecipe.pulseCount} pulses`, bean.aidenRecipe.grindRecommendation?.singleServe && `Grind ${bean.aidenRecipe.grindRecommendation.singleServe}`].filter(Boolean).join(' · ')}
@@ -742,6 +740,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                           )}
                           {bean.handBrewRecipe && (
                             <div>
+                              {(() => { const slotKey = `${bean.handBrewRecipe.device === 'kalita' ? 'kalita' : 'v60'}_${bean.handBrewRecipe.mode === 'iced' ? 'iced' : 'hot'}`; const provenance = bean.recipeProvenance?.[slotKey]; return <RecipeProvenanceStrip provenance={provenance} onUndo={onUndoRecipe ? () => onUndoRecipe(provenance) : undefined} />; })()}
                               <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>{bean.handBrewRecipe.title || 'Hand Brew'}</div>
                               <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
                                 {[bean.handBrewRecipe.method, bean.handBrewRecipe.coffeeGrams && bean.handBrewRecipe.waterGrams && `${bean.handBrewRecipe.coffeeGrams}g / ${bean.handBrewRecipe.waterGrams}g`, bean.handBrewRecipe.ratio, bean.handBrewRecipe.grindSize?.description && `Grind ${bean.handBrewRecipe.grindSize.description}`].filter(Boolean).join(' · ')}
