@@ -51,6 +51,7 @@ test('ordinary generation, dose, grind, and link modes never use the mutation ga
   assert.match(source, /requiredTierFor/);
   assert.match(source, /isMutationAllowed/);
   assert.match(source, /rawAccessUids: process\.env\.RUPHUS_AGENT_V3_UIDS/);
+  assert.match(source, /MUTATION_ROLLOUT_MODES\.has\(command\.mode\)/);
   assert.match(source, /approvalSource: MUTATION_MODES\.includes\(command\.mode\) \? 'native_card' : 'ordinary_app'/);
   assert.match(source, /const \{ clientVersion: _clientVersion, commandCapabilities: _commandCapabilities, \.\.\.serverCommand \} = command/);
   assert.match(source, /normalizeClientVersion\(command\.clientVersion\)/);
