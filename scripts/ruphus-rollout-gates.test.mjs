@@ -217,3 +217,19 @@ test('bean writers stamp strict client versions and telemetry TTL policy is sour
   assert.deepEqual(indexes.fieldOverrides, [{ collectionGroup: 'ruphusTelemetry', fieldPath: 'expiresAt', ttl: true, indexes: [] }]);
   assert.equal(appData.includes('ruphusCensus'), false);
 });
+
+test('native dev builds route only Ruphus authority calls to the preview backend', () => {
+  const apiBase = fs.readFileSync(new URL('../src/lib/apiBase.js', import.meta.url), 'utf8');
+  const chat = fs.readFileSync(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
+  const commands = fs.readFileSync(new URL('../src/lib/recipeCommands.js', import.meta.url), 'utf8');
+  const tasting = fs.readFileSync(new URL('../src/lib/ruphusTasting.js', import.meta.url), 'utf8');
+  const aiden = fs.readFileSync(new URL('../src/lib/aiden.js', import.meta.url), 'utf8');
+  assert.match(apiBase, /VITE_RUPHUS_API_BASE/);
+  assert.match(apiBase, /Capacitor\.isNativePlatform\(\) && isDevVariant/);
+  assert.match(apiBase, /\? configuredRuphusBase\s*:\s*API_BASE/);
+  assert.match(chat, /RUPHUS_API_BASE.*\/api\/ruphus-agent/s);
+  assert.match(commands, /RUPHUS_API_BASE.*\/api\/recipe-command/s);
+  assert.match(tasting, /RUPHUS_API_BASE.*\/api\/ruphus-tasting/s);
+  assert.match(aiden, /RUPHUS_API_BASE.*\/api\/aiden/s);
+  assert.match(chat, /API_BASE.*\/api\/claude-stream/s);
+});

@@ -9,7 +9,7 @@ import { haptic } from '../lib/haptics';
 import { buildChatContext, compressImage, prepareChatMessagesForClaude } from '../lib/claude';
 import { getOnboardingPalate, palateSummaryLine } from '../lib/palateProfile';
 import { searchWeb } from '../lib/gemini';
-import { API_BASE } from '../lib/apiBase';
+import { API_BASE, RUPHUS_API_BASE } from '../lib/apiBase';
 import { streamWithAuth, resolveTerminal, holdBackScan } from '../lib/streamChat';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
@@ -883,7 +883,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         }
       };
       const result = await streamAgentWithAuth({
-        url: `${API_BASE}/api/ruphus-agent`,
+        url: `${RUPHUS_API_BASE}/api/ruphus-agent`,
         body: { turnId, contextRef, userText: text, clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES },
         onFrame,
       });
