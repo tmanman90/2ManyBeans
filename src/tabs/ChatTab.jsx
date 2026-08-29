@@ -37,6 +37,8 @@ import { RuphusContextHeader } from '../components/chat/RuphusContextHeader';
 import { RuphusMessage } from '../components/chat/RuphusMessage';
 import { RuphusLifecycleCaption } from '../components/chat/RuphusLifecycleCaption';
 import { ArtifactRenderer } from '../components/chat/ArtifactRenderer';
+import { recoveryForAgentFrame } from '../lib/ruphus/recovery';
+import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from '../lib/ruphus/census';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
@@ -411,6 +413,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   } });
   const [agentContext, setAgentContext] = useState(null);
   const [agentFrame, setAgentFrame] = useState(null);
+  const [agentRecovery, setAgentRecovery] = useState(null);
+  const [legacyChatOverride, setLegacyChatOverride] = useState(false);
   const [agentText, setAgentText] = useState('');
   const [agentArtifacts, setAgentArtifacts] = useState([]);
   const agentTextRef = useRef('');
@@ -463,6 +467,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     }
     setAgentContext(ruphusLaunch.contextRef);
     agentContextRef.current = ruphusLaunch.contextRef;
+    setLegacyChatOverride(false);
+    setAgentRecovery(null);
     onRuphusLaunchConsumed?.();
     if (ruphusLaunch.starterIntent) sendTurn({ text: ruphusLaunch.starterIntent, agentContextOverride: ruphusLaunch.contextRef });
   // Launch is an app-level handoff; consume it once even if the parent object
@@ -859,11 +865,14 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const sendAgentTurn = async (contextOverride = null) => {
       const turnId = crypto.randomUUID();
       const contextRef = contextOverride || agentContextOverride || agentContextRef.current || agentContext;
+      setAgentRecovery(null);
       setAgentFrame({ type: 'context_loading', turnId });
       setAgentText(''); agentTextRef.current = '';
       setAgentArtifacts([]); agentArtifactsRef.current = [];
       const onFrame = (frame) => {
         setAgentFrame(frame);
+        const recovery = recoveryForAgentFrame(frame);
+        if (recovery) setAgentRecovery(recovery);
         if (frame.type === 'text_delta') {
           agentTextRef.current += frame.text || '';
           setAgentText(agentTextRef.current);
@@ -875,7 +884,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       };
       const result = await streamAgentWithAuth({
         url: `${API_BASE}/api/ruphus-agent`,
-        body: { turnId, contextRef, userText: text },
+        body: { turnId, contextRef, userText: text, clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES },
         onFrame,
       });
       if (!result.ok) throw result.error || new Error('Agent turn failed');
@@ -988,7 +997,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           };
 
           const turnContext = agentContextOverride || agentContextRef.current || agentContext;
-          if (agentEnabled && turnContext) {
+          if (agentEnabled && !legacyChatOverride && turnContext) {
             await sendAgentTurn(turnContext);
             complete();
             return;
@@ -1108,6 +1117,26 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     });
   };
 
+  const handleAgentRecovery = () => {
+    // The failed/interrupted provider turn is deliberately not retried here.
+    // The user explicitly chooses the established production chat and can
+    // submit the message again as a fresh legacy turn.
+    if (agentRecovery?.turnId) {
+      persist(threadForPersistence(messages), {
+        protocolVersion: 1,
+        contextRef: agentContext ? { ...agentContext, sessionId: agentRecovery.turnId } : undefined,
+        turns: [{ id: agentRecovery.turnId, status: 'recovered_to_legacy' }],
+      });
+    }
+    setLegacyChatOverride(true);
+    setAgentRecovery(null);
+    setAgentFrame(null);
+    setAgentText('');
+    agentTextRef.current = '';
+    setAgentArtifacts([]);
+    agentArtifactsRef.current = [];
+  };
+
   // Text comes from ChatInputBar (child owns the input state).
   const handleSend = async (text) => {
     if (sendingRef.current) return;
@@ -1144,6 +1173,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!window.confirm('Start a fresh conversation?')) return;
     clear();
     resetIntroThread();
+    setLegacyChatOverride(false);
+    setAgentRecovery(null);
     haptic.light();
   };
 
@@ -1271,6 +1302,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         }}
       >
         {agentEnabled && agentFrame && loading && <RuphusLifecycleCaption frame={agentFrame} />}
+        {agentEnabled && agentRecovery && !loading && (
+          <div role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', border: `1px solid ${C.hairline}`, borderRadius: radius.lg, background: C.cream }}>
+            <span style={{ ...typeScale.caption, color: C.textMuted }}>Professor Ruphus was {agentRecovery.reason}. Continue in standard chat?</span>
+            <Btn variant="small" onClick={handleAgentRecovery}>Continue in standard chat</Btn>
+          </div>
+        )}
         {/* Intro / empty state — shown only when no user turns yet */}
         {isIntroState && (
           <m.div

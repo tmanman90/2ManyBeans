@@ -1,5 +1,6 @@
 import { getAuth } from 'firebase/auth';
 import { API_BASE } from './apiBase.js';
+import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from './ruphus/census.js';
 
 const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
 
@@ -29,7 +30,7 @@ export async function executeRecipeCommand(command) {
   const response = await fetch(`${API_BASE}/api/recipe-command`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(command),
+    body: JSON.stringify({ ...command, clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES }),
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(result.message || result.error || 'Recipe command failed.'), { code: result.error || 'command_failed', details: result.details });

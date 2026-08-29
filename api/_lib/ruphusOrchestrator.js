@@ -9,6 +9,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   send('context_loading', { evidenceHash: context?.evidenceHash || null });
   let response;
   let toolCalls = 0;
+  const toolNames = [];
   let text = '';
   try {
     response = await provider.runTurn({ turnId, context, userText, tools: tools.definitions });
@@ -21,6 +22,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         toolCalls += 1;
         if (toolCalls > maxToolCalls || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
         send('tool_started', { name: request.name });
+        toolNames.push(request.name);
         const result = await tools.call(request.name, request.args || {});
         send('tool_result', { name: request.name, result });
         if (result?.artifact) send('artifact_ready', { artifact: result.artifact });
@@ -30,10 +32,10 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     }
     if (containsAuthorityClaim(text)) text = text.replace(/(?:receipt|action[_ -]?id|brew once|fellow|physical machine success)/gi, '');
     send('turn_completed', { text: text.trim() });
-    return { ok: true, turnId, text: text.trim(), toolCalls, requestId: response?.requestId || null, model: response?.model || null, usage: response?.usage || null };
+    return { ok: true, turnId, text: text.trim(), toolCalls, toolNames, retryCount: 0, requestId: response?.requestId || null, model: response?.model || null, usage: response?.usage || null };
   } catch (error) {
     const code = error?.code === 'forbidden_tool' ? 'forbidden_tool' : 'turn_failed';
     send(code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code, message: error.message });
-    return { ok: false, turnId, code, text, toolCalls };
+    return { ok: false, turnId, code, text, toolCalls, toolNames, retryCount: 0, model: response?.model || null, usage: response?.usage || null };
   }
 }

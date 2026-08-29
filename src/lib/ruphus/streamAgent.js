@@ -28,7 +28,7 @@ export function createAgentFrameParser({ onFrame } = {}) {
     accept(frame) { return accept(frame); },
     push(chunk) { pending += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk, { stream: true }); const lines = pending.split('\n'); pending = lines.pop() || ''; return lines.map(parseLine).filter(Boolean); },
     flush() { const tail = pending.trim(); pending = ''; return tail ? [parseLine(tail)] : []; },
-    get sawFrame() { return sawFrame; }, get terminal() { return TERMINAL.has(previous); }, get turnId() { return turnId; },
+    get sawFrame() { return sawFrame; }, get terminal() { return TERMINAL.has(previous); }, get terminalType() { return previous; }, get turnId() { return turnId; },
   };
 }
 
@@ -38,7 +38,7 @@ export function parseAgentFrames(text) { const frames = []; const parser = creat
 export async function streamAgentWithAuth({ url, body, onFrame, onError } = {}) {
   const parser = createAgentFrameParser({ onFrame });
   let result;
-  await streamWithAuth({ url, body, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { result = { ok: false, error }; onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) result = parser.terminal ? { ok: true, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') }; } });
+  await streamWithAuth({ url, body, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { result = { ok: false, error }; onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) result = parser.terminalType === 'turn_completed' ? { ok: true, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : { ok: false, error: frameError(parser.terminalType || 'stream_incomplete', `The Agent turn ended with ${parser.terminalType || 'an incomplete stream'}.`) }; } });
   return result || { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') };
 }
 
