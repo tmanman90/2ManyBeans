@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+import { commandForBeanUpdate, PROTECTED_KEYS } from '../src/lib/recipeCommands.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+
+const recipe = generateV60Recipe({}, { dose: 15 });
+const iced = generateV60IcedRecipe({}, { dose: 15 });
+const bean = { id: 'bean-1', handBrewRecipe: recipe, handBrewRecipes: { v60: recipe }, handBrewIcedRecipes: { v60: iced }, aidenRecipe: { method: 'aiden', device: 'aiden', mode: 'hot' }, activeRevisionIds: {} };
+
+test('every protected writer shape resolves to a canonical command mode', () => {
+  assert.equal(commandForBeanUpdate(bean, { aidenGrind: { singleServe: 5 } }).mode, 'set_aiden_grind');
+  assert.equal(commandForBeanUpdate(bean, { aidenLink: 'https://example.test', aidenUsedRelay: false }).mode, 'set_aiden_link');
+  assert.equal(commandForBeanUpdate(bean, { 'handBrewRecipe.userCoffeeGrams': 16, 'handBrewRecipes.v60.userCoffeeGrams': 16 }).mode, 'set_dose');
+  assert.equal(commandForBeanUpdate(bean, { 'handBrewIcedRecipes.v60': iced }).slotKey, 'v60_iced');
+  assert.equal(commandForBeanUpdate(bean, { handBrewRecipe: recipe, 'handBrewRecipes.v60': recipe }).mode, 'replace_active_recipe');
+  for (const key of ['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']) assert.ok(PROTECTED_KEYS.has(key));
+});
+
+test('the app update seam intercepts protected fields before direct Firestore update', async () => {
+  const source = await readFile(new URL('../src/hooks/useAppData.js', import.meta.url), 'utf8');
+  assert.match(source, /if \(isProtectedRecipeUpdate\(updates\)\)/);
+  assert.match(source, /executeRecipeCommand\(/);
+  assert.match(source, /await updateDoc\(beanRef/);
+  assert.ok(source.indexOf('isProtectedRecipeUpdate(updates)') < source.indexOf('await updateDoc(beanRef'));
+});

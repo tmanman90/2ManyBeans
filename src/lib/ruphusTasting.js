@@ -1,5 +1,5 @@
 import { getAuth } from 'firebase/auth';
-import { API_BASE } from './apiBase';
+import { API_BASE } from './apiBase.js';
 
 export async function saveRuphusTasting({ tastingId = crypto.randomUUID(), attemptId, coffeeId, sensory }) {
   const user = getAuth().currentUser;

@@ -20,9 +20,24 @@ const projection = (bean, slotKey, recipe) => {
   next.activeRevisionIds = { ...(next.activeRevisionIds || {}) };
   return next;
 };
+const stableProjectionHash = (recipe, slotKey) => {
+  const value = clone(recipe || {});
+  value.method = slotMethod(slotKey);
+  value.device = slotMethod(slotKey);
+  value.mode = slotMode(slotKey);
+  delete value.userCoffeeGrams;
+  delete value.aidenGrind;
+  delete value.recipeHash;
+  return canonicalHash(value);
+};
 const revisionFor = (state, bean, coffeeId, slotKey) => {
   const revisionId = bean.activeRevisionIds?.[slotKey];
-  if (revisionId && state.revisions.has(revisionId)) return state.revisions.get(revisionId);
+  if (revisionId && state.revisions.has(revisionId)) {
+    const current = state.revisions.get(revisionId);
+    const live = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
+    if (live.ok && stableProjectionHash(live.recipe, slotKey) !== stableProjectionHash(current.snapshot, slotKey)) fail('source_drift', 'The saved recipe changed outside the command boundary; refresh before trying this action.');
+    return current;
+  }
   const resolved = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
   if (!resolved.ok) fail(resolved.code, 'No valid recipe is available for this slot.');
   const initial = { id: id('revision', `${coffeeId}-${slotKey}-initial`), ownerId: state.uid, coffeeId, slotKey, parentId: null, snapshot: clone(resolved.recipe), snapshotHash: canonicalHash(resolved.recipe), source: 'initial', status: 'active', createdAt: state.now() };

@@ -1,5 +1,5 @@
 import { getAuth } from 'firebase/auth';
-import { API_BASE } from './apiBase';
+import { API_BASE } from './apiBase.js';
 
 const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenLinkRevisionId', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
 

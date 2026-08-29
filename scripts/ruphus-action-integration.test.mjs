@@ -69,6 +69,16 @@ test('Iced map writers resolve dotted legacy fields into the canonical slot proj
   assert.equal(result.bean['handBrewIcedRecipes.v60'], undefined);
 });
 
+test('A direct legacy projection drift fails closed before Apply can overwrite it', () => {
+  const { store, recipe } = setup();
+  const current = store.execute({ actionId: 'drift-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
+  store.seedProposal({ id: 'proposal-drift', ownerId: 'user-1', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: current.id, sourceHash: current.snapshotHash, after: { ...recipe, waterTemp: { ...recipe.waterTemp, celsius: 96 } }, status: 'proposed' });
+  const bean = store.getBean('bean-1');
+  bean.handBrewRecipes.v60 = { ...bean.handBrewRecipes.v60, waterTemp: { ...bean.handBrewRecipes.v60.waterTemp, celsius: 91 } };
+  store.seedBean('bean-1', bean);
+  assert.throws(() => store.execute({ actionId: 'drift-apply', mode: 'apply_proposal', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-drift' }), /outside the command boundary/);
+});
+
 test('A tasted Brew-once attempt can be promoted only after provenance transition', () => {
   const { store, recipe } = setup();
   const current = store.execute({ actionId: 'promote-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;

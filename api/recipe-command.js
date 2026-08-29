@@ -1,4 +1,4 @@
-import { withCorsAuthPro } from './_lib/cors-auth.js';
+import { withCorsAuth } from './_lib/cors-auth.js';
 import { executeRecipeCommand, MUTATION_MODES, ORDINARY_MODES } from './_lib/ruphusCommandService.js';
 import { getDb } from './_lib/cors-auth.js';
 import { validateCommandRequest } from '../src/lib/ruphus/contracts.js';
@@ -6,7 +6,7 @@ import { validateCommandRequest } from '../src/lib/ruphus/contracts.js';
 const allowedModes = new Set([...MUTATION_MODES, ...ORDINARY_MODES]);
 const mutationUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_MUTATION_UIDS || '').split(',').map((value) => value.trim()).filter(Boolean));
 
-export default withCorsAuthPro(async (req, res, decodedToken) => {
+export default withCorsAuth(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
   const command = req.body || {};
   const shape = validateCommandRequest(command);
