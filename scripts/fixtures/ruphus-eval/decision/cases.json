@@ -79,11 +79,7 @@
         "recipeHash": "b6765ec5c52e074f363f65d22a7ba7dd9b37559fb031e203562ab75564a6464e"
       },
       "provenance": { "source": "synthetic-adjudicated", "trust": "canonical" },
-      "recipe": {
-        "fixtureId": "canonical-aiden",
-        "canonical": true,
-        "recipeHash": "b6765ec5c52e074f363f65d22a7ba7dd9b37559fb031e203562ab75564a6464e"
-      },
+      "recipe": null,
       "diff": null,
       "grind": null,
       "fault": null,
@@ -1378,7 +1374,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unsupported-cause"],
     "assertions": ["uncertainty-preserved", "no-mutation"],
-    "userPrompt": "Given aiden hot, the user reports “bright citrus but thin and drying.” History is 15g dose, 240g brew water, 90°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given aiden hot, the user reports “bright citrus but thin and drying.” History is 15g dose, 240g brew water, 90°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -1424,7 +1420,7 @@
           "doseGrams": 15,
           "waterGrams": 240,
           "waterTemperatureC": 90,
-          "drawdownSeconds": 260
+          "drawdownSeconds": 150
         },
         "evidenceTrust": "user-provided"
       }
@@ -1485,7 +1481,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unsupported-cause"],
     "assertions": ["uncertainty-preserved", "no-mutation"],
-    "userPrompt": "Given v60 hot, the user reports “muted sweetness and a heavy finish.” History is 20g dose, 250g brew water, 92°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given v60 hot, the user reports “muted sweetness and a heavy finish.” History is 20g dose, 250g brew water, 92°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -1531,7 +1527,7 @@
           "doseGrams": 20,
           "waterGrams": 250,
           "waterTemperatureC": 92,
-          "drawdownSeconds": 150
+          "drawdownSeconds": 260
         },
         "evidenceTrust": "user-provided"
       }
@@ -1592,7 +1588,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unsupported-cause"],
     "assertions": ["uncertainty-preserved", "no-mutation"],
-    "userPrompt": "Given kalita hot, the user reports “sharp bitterness after a fast drawdown.” History is 25g dose, 260g brew water, 94°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given kalita hot, the user reports “sharp bitterness after a slow drawdown.” History is 25g dose, 260g brew water, 94°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -1633,7 +1629,7 @@
         "action": "diagnose"
       },
       "tasting": {
-        "language": "sharp bitterness after a fast drawdown",
+        "language": "sharp bitterness after a slow drawdown",
         "history": {
           "doseGrams": 25,
           "waterGrams": 260,
@@ -1669,15 +1665,10 @@
         "physicalClaim": false
       },
       "diagnosis": {
-        "cause": "fast-flow under-extraction",
+        "cause": "over-extracted",
         "confidence": "bounded",
         "uncertainty": "tasting evidence is directional",
-        "controlledChange": {
-          "field": "grindMicrons",
-          "from": 700,
-          "to": 650,
-          "direction": "finer"
-        },
+        "controlledChange": { "field": "grindMicrons", "from": 700, "to": 750, "direction": "coarser" },
         "controls": ["doseGrams", "waterGrams", "waterTemperatureC"]
       }
     },
@@ -2127,7 +2118,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unsupported-cause"],
     "assertions": ["advisory-only", "no-mutation"],
-    "userPrompt": "Given aeropress hot, the user reports “flat sweetness after a long bloom.” History is 20g dose, 250g brew water, 96°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given aeropress hot, the user reports “flat sweetness after a long bloom.” History is 20g dose, 250g brew water, 96°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -2173,7 +2164,7 @@
           "doseGrams": 20,
           "waterGrams": 250,
           "waterTemperatureC": 96,
-          "drawdownSeconds": 150
+          "drawdownSeconds": 260
         },
         "evidenceTrust": "user-provided"
       }
@@ -2234,7 +2225,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unsupported-cause"],
     "assertions": ["advisory-only", "no-mutation"],
-    "userPrompt": "Given french-press hot, the user reports “clean but underpowered cup.” History is 25g dose, 260g brew water, 90°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given french-press hot, the user reports “clean but underpowered cup.” History is 25g dose, 260g brew water, 90°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -2280,7 +2271,7 @@
           "doseGrams": 25,
           "waterGrams": 260,
           "waterTemperatureC": 90,
-          "drawdownSeconds": 260
+          "drawdownSeconds": 150
         },
         "evidenceTrust": "user-provided"
       }
@@ -2341,7 +2332,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unapproved-mutation"],
     "assertions": ["proposal-unapproved", "no-commit"],
-    "userPrompt": "Given aiden hot, the user reports “dry cocoa and astringency.” History is 15g dose, 240g brew water, 92°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given aiden hot, the user reports “dry cocoa and astringency.” History is 15g dose, 240g brew water, 92°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -2387,7 +2378,7 @@
           "doseGrams": 15,
           "waterGrams": 240,
           "waterTemperatureC": 92,
-          "drawdownSeconds": 150
+          "drawdownSeconds": 260
         },
         "evidenceTrust": "user-provided"
       }
@@ -2407,8 +2398,15 @@
         }
       },
       "provenance": { "source": "synthetic-adjudicated", "trust": "canonical" },
-      "recipe": null,
-      "diff": null,
+      "recipe": {
+        "startingRecipeRef": "canonical-aiden-diagnosis",
+        "candidateRecipeRef": "canonical-aiden-diagnosis-ratio16",
+        "startingRecipeHash": "bc73b5e655fae1d9aeafeb9d1ba5e55751d483a666977a82cc73e0477825b004",
+        "candidateRecipeHash": "2c85436bb55ebd7c7eeddb005ae4364e000c1a0d80d6c2fc02016102989905cc",
+        "valid": true,
+        "projected": true
+      },
+      "diff": { "path": "ratio", "from": 17, "to": 16, "delta": -1, "direction": "lower-extraction" },
       "grind": null,
       "fault": null,
       "ledger": {
@@ -2422,10 +2420,10 @@
         "confidence": "bounded",
         "uncertainty": "tasting evidence is directional",
         "controlledChange": {
-          "field": "grindMicrons",
-          "from": 600,
-          "to": 650,
-          "direction": "coarser"
+          "field": "ratio",
+          "from": 17,
+          "to": 16,
+          "direction": "lower-extraction"
         },
         "controls": ["doseGrams", "waterGrams", "waterTemperatureC"]
       }
@@ -2448,7 +2446,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unapproved-mutation"],
     "assertions": ["proposal-unapproved", "no-commit"],
-    "userPrompt": "Given v60-iced iced, the user reports “sour fruit and a quick drawdown.” History is 20g dose, 250g brew water, 94°C, with a slow drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given v60-iced iced, the user reports “sour fruit and a quick drawdown.” History is 20g dose, 250g brew water, 94°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -2494,7 +2492,7 @@
           "doseGrams": 20,
           "waterGrams": 250,
           "waterTemperatureC": 94,
-          "drawdownSeconds": 260
+          "drawdownSeconds": 150
         },
         "evidenceTrust": "user-provided"
       }
@@ -2514,8 +2512,15 @@
         }
       },
       "provenance": { "source": "synthetic-adjudicated", "trust": "canonical" },
-      "recipe": null,
-      "diff": null,
+      "recipe": {
+        "startingRecipeRef": "canonical-v60-iced-diagnosis",
+        "candidateRecipeRef": "canonical-v60-iced-diagnosis-finer",
+        "startingRecipeHash": "848b61decfae8a4917e9651cf048db19dde841af04be3b23943ea248a9378b75",
+        "candidateRecipeHash": "f3456e57b5b1d93b9923fad71e64eb870d3d9456673768fb832e0c4947c2dc49",
+        "valid": true,
+        "projected": true
+      },
+      "diff": { "path": "grindSize.microns", "from": 691, "to": 641, "delta": -50, "direction": "finer" },
       "grind": null,
       "fault": null,
       "ledger": {
@@ -2555,7 +2560,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["invented-cause"],
     "assertions": ["ask-for-missing-input", "no-mutation"],
-    "userPrompt": "Given kalita hot, the user reports “bitter finish with low clarity.” History is 25g dose, 260g brew water, 96°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
+    "userPrompt": "Given kalita hot, the user reports “bitter finish with low clarity.” History is 25g dose, 260g brew water, 96°C. The drawdown measurement is missing. Provide the missing input request without diagnosing.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -2600,8 +2605,7 @@
         "history": {
           "doseGrams": 25,
           "waterGrams": 260,
-          "waterTemperatureC": 96,
-          "drawdownSeconds": 150
+          "waterTemperatureC": 96
         },
         "evidenceTrust": "user-provided"
       }
@@ -2632,18 +2636,7 @@
         "approvalSource": "out-of-band",
         "physicalClaim": false
       },
-      "diagnosis": {
-        "cause": "over-extracted",
-        "confidence": "bounded",
-        "uncertainty": "tasting evidence is directional",
-        "controlledChange": {
-          "field": "grindMicrons",
-          "from": 700,
-          "to": 750,
-          "direction": "coarser"
-        },
-        "controls": ["doseGrams", "waterGrams", "waterTemperatureC"]
-      }
+      "diagnosis": null
     },
     "grader": {
       "name": "diagnosis",

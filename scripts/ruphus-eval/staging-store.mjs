@@ -45,25 +45,18 @@ function clone(value) { return value === undefined ? undefined : structuredClone
 function positiveInteger(value) { return Number.isInteger(value) && value >= 0; }
 
 export class StagingStore {
-  constructor({ clock = createFixedClock(), fellow = createRecordingFellow(), userId = 'user-eval-1', lifecycle = {} } = {}) {
+  constructor({ clock = createFixedClock(), fellow = createRecordingFellow(), userId = 'user-eval-1' } = {}) {
     if (!RECORDING_FELLOWS.has(fellow)) throw new LifecycleError('FORBIDDEN_EXTERNAL_ADAPTER', 'staging store requires the synthetic recording Fellow');
     this.clock = clock;
     this.fellow = fellow;
     this.defaultUserId = userId;
-    this.defaultLifecycle = Object.freeze({
-      terminal: lifecycle.terminal || 'complete',
-      valid: lifecycle.valid !== false,
-      recall: lifecycle.recall !== false,
-      criticalFailure: lifecycle.criticalFailure === true,
-    });
     this.resetCount = 0;
     this.reset();
     REGISTERED_STORES.add(this);
   }
 
-  reset({ userId = this.defaultUserId, coffeeId = 'coffee-eval-1', method = 'aiden', recipe = null, coffee = {}, entitlement = true, failures = {}, sessionId = null, lifecycle = this.defaultLifecycle } = {}) {
+  reset({ userId = this.defaultUserId, coffeeId = 'coffee-eval-1', method = 'aiden', recipe = null, coffee = {}, entitlement = true, failures = {}, sessionId = null } = {}) {
     if (typeof userId !== 'string' || !userId || typeof coffeeId !== 'string' || !coffeeId) throw new LifecycleError('INVALID_FIXTURE', 'user and coffee identities are required');
-    if (!lifecycle || typeof lifecycle !== 'object' || typeof lifecycle.terminal !== 'string' || !lifecycle.terminal || typeof lifecycle.valid !== 'boolean' || typeof lifecycle.recall !== 'boolean' || typeof lifecycle.criticalFailure !== 'boolean') throw new LifecycleError('INVALID_FIXTURE', 'lifecycle outcome is invalid');
     const initialRecipe = clone(recipe);
     const initialHash = hashValue(initialRecipe);
     this.resetCount += 1;
@@ -74,7 +67,7 @@ export class StagingStore {
       coffee: { ...clone(coffee), id: coffeeId, userId, name: coffee.name || 'Synthetic coffee' },
       method,
       entitlement: entitlement === true,
-      failures: clone(failures) || {}, lifecycle: immutableSnapshot(lifecycle),
+      failures: clone(failures) || {},
       revisions: [{ id: stableId('revision', { coffeeId, number: 0, initialHash }), recipeId: ids.recipeId, number: 0, parentRevisionId: null, recipe: initialRecipe, recipeHash: initialHash, operation: 'initial', createdAt: this.clock.now() }],
       proposals: new Map(), approvals: new Map(), idempotency: new Map(), brews: new Map(), tastings: new Map(), sessions: new Map(), ledger: [], sequence: 0,
     };
@@ -86,7 +79,7 @@ export class StagingStore {
     const s = this.state;
     return immutableSnapshot({
       identities: s.ids, user: s.user, coffee: s.coffee, method: s.method, entitlement: s.entitlement,
-      revisions: s.revisions, proposals: [...s.proposals.values()], approvals: [...s.approvals.values()], lifecycle: s.lifecycle,
+      revisions: s.revisions, proposals: [...s.proposals.values()], approvals: [...s.approvals.values()],
       brews: [...s.brews.values()], tastings: [...s.tastings.values()], sessions: [...s.sessions.values()], ledger: s.ledger,
     });
   }

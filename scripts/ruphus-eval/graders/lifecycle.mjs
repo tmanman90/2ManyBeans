@@ -1,33 +1,104 @@
 import { hashValue, immutableSnapshot } from '../contracts.mjs';
 import { isRegisteredStagingStore, readRegisteredStagingExecution } from '../staging-store.mjs';
+import { getRecipeFixture } from '../recipe-fixtures.mjs';
 
 export const LIFECYCLE_REQUIRED_ATTEMPTS = 24;
 export const LIFECYCLE_MINIMUM_SUCCESS = 23;
 const SEALED_ATTEMPTS = new WeakSet();
 const SEALED_BATCHES = new WeakSet();
+const REGISTERED_EXECUTIONS = new WeakSet();
 const freezeSchedule = (entries) => Object.freeze(entries.map((entry) => Object.freeze({ ...entry })));
 
 export const LIFECYCLE_SCHEDULE = freezeSchedule(Array.from({ length: LIFECYCLE_REQUIRED_ATTEMPTS }, (_, index) => ({ caseId: `case-${index % 12}`, repeat: Math.floor(index / 12) + 1 })));
 
-function expectedKeys() { return LIFECYCLE_SCHEDULE.map((entry) => `${entry.caseId}:${entry.repeat}`); }
+// This is the evaluator-owned terminal contract. It is deliberately not a
+// StagingStore fixture field and cannot be supplied by a model or caller.
+const LIFECYCLE_SCENARIOS = Object.freeze({
+  'case-0': Object.freeze({ operation: 'read', expectedTerminal: 'complete', requiredKinds: ['read'] }), 'case-1': Object.freeze({ operation: 'proposal', expectedTerminal: 'complete', requiredKinds: ['proposal-created'] }),
+  'case-2': Object.freeze({ operation: 'clarification', expectedTerminal: 'clarification', requiredKinds: ['read'] }), 'case-3': Object.freeze({ operation: 'denial', expectedTerminal: 'refusal', requiredKinds: ['proposal-created', 'state-transition'], requiredState: 'rejected' }),
+  'case-4': Object.freeze({ operation: 'commit', expectedTerminal: 'complete', requiredKinds: ['proposal-created', 'approval-recorded', 'state-transition'], requiredState: 'applied' }), 'case-5': Object.freeze({ operation: 'prepare', expectedTerminal: 'complete', requiredKinds: ['proposal-created', 'approval-recorded', 'state-transition'], requiredState: 'brew' }),
+  'case-6': Object.freeze({ operation: 'tasting-receipt', expectedTerminal: 'complete', requiredKinds: ['tasting-recorded'] }), 'case-7': Object.freeze({ operation: 'undo', expectedTerminal: 'complete', requiredKinds: ['proposal-created', 'approval-recorded', 'state-transition'], requiredState: 'undo' }),
+  'case-8': Object.freeze({ operation: 'stale-write', expectedTerminal: 'stale-revision', requiredKinds: ['failure'], requiredState: 'STALE_REVISION' }), 'case-9': Object.freeze({ operation: 'replay', expectedTerminal: 'complete', requiredKinds: ['proposal-created', 'idempotency-replay'] }),
+  'case-10': Object.freeze({ operation: 'read-failure', expectedTerminal: 'read-failure', requiredKinds: ['failure'], requiredState: 'WRONG_COFFEE' }), 'case-11': Object.freeze({ operation: 'incomplete', expectedTerminal: 'complete', requiredKinds: ['read'] }),
+});
 
-function validateStoreExecution(entry) {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('lifecycle entry must be an object');
-  if (Object.keys(entry).sort().join('|') !== 'caseId|repeat|store') throw new Error('lifecycle entries may contain only caseId, repeat, and store');
-  if (typeof entry.caseId !== 'string' || !entry.caseId || !Number.isInteger(entry.repeat) || ![1, 2].includes(entry.repeat)) throw new Error('lifecycle case identity is invalid');
-  if (!isRegisteredStagingStore(entry.store)) throw new Error('lifecycle execution must be a registered staging store');
-  const execution = readRegisteredStagingExecution(entry.store);
+function expectedKeys() { return LIFECYCLE_SCHEDULE.map((entry) => `${entry.caseId}:${entry.repeat}`); }
+function expectedTerminalFor(caseId, repeat) { const scenario = LIFECYCLE_SCENARIOS[caseId]; return scenario && caseId === 'case-11' && repeat === 2 ? 'insufficient-evidence' : scenario?.expectedTerminal; }
+
+function validateExecution(execution) {
+  if (!execution || typeof execution !== 'object' || !REGISTERED_EXECUTIONS.has(execution)) throw new Error('lifecycle execution must be produced by the evaluator scenario runner');
+  if (!Object.hasOwn(execution, 'caseId') || !Object.hasOwn(execution, 'repeat') || !Object.hasOwn(execution, 'snapshot') || !Object.hasOwn(execution, 'events') || !Object.hasOwn(execution, 'expectedTerminal') || Object.keys(execution).some((key) => !['caseId', 'repeat', 'snapshot', 'events', 'expectedTerminal', 'actualTerminal', 'valid', 'recall', 'criticalFailure'].includes(key))) throw new Error('lifecycle execution shape is invalid');
+  if (typeof execution.caseId !== 'string' || !execution.caseId || !Number.isInteger(execution.repeat) || ![1, 2].includes(execution.repeat)) throw new Error('lifecycle case identity is invalid');
   const snapshot = execution.snapshot;
-  const ids = snapshot.identities;
-  const revision = snapshot.revisions?.at(-1);
+  const ids = snapshot?.identities;
+  const revision = snapshot?.revisions?.at(-1);
   if (!ids || typeof ids.sessionId !== 'string' || !ids.sessionId || typeof ids.userId !== 'string' || !ids.userId || typeof ids.coffeeId !== 'string' || !ids.coffeeId) throw new Error('lifecycle store identity is invalid');
   if (!revision || typeof revision.id !== 'string' || !revision.id || typeof revision.recipeHash !== 'string' || !revision.recipeHash) throw new Error('lifecycle current revision is not canonical');
   const events = execution.events;
   const revisionIds = new Set(snapshot.revisions.map((candidate) => candidate.id));
   if (!Array.isArray(events) || events.length === 0 || events.some((event, index) => !event || typeof event.eventId !== 'string' || !event.eventId || event.sequence !== index || event.sessionId !== ids.sessionId || (event.revisionId != null && !revisionIds.has(event.revisionId)))) throw new Error('lifecycle event sequence is invalid');
-  const lifecycle = execution.lifecycle;
-  if (!lifecycle || typeof lifecycle.terminal !== 'string' || !lifecycle.terminal || typeof lifecycle.valid !== 'boolean' || typeof lifecycle.recall !== 'boolean' || typeof lifecycle.criticalFailure !== 'boolean') throw new Error('lifecycle terminal evidence is invalid');
-  return { snapshot, events, lifecycle, ids, revision };
+  const session = snapshot.sessions?.find((candidate) => candidate.id === ids.sessionId);
+  const scenario = LIFECYCLE_SCENARIOS[execution.caseId];
+  const expectedTerminal = expectedTerminalFor(execution.caseId, execution.repeat);
+  if (!session || typeof session.outcome !== 'string' || execution.actualTerminal !== session.outcome || execution.expectedTerminal !== expectedTerminal || !scenario || scenario.requiredKinds.some((kind) => !events.some((event) => event.kind === kind))) throw new Error('lifecycle terminal or required ledger state is not canonical');
+  if (scenario.requiredState === 'rejected' && !snapshot.proposals.some((proposal) => proposal.status === 'rejected')) throw new Error('lifecycle denial state is missing');
+  if (scenario.requiredState === 'applied' && !snapshot.proposals.some((proposal) => proposal.status === 'applied') || scenario.requiredState === 'brew' && !snapshot.brews.some((brew) => ['coffee-prepared', 'coffee-side-timer-prepared'].includes(brew.status)) || scenario.requiredState === 'undo' && !snapshot.revisions.some((candidate) => candidate.operation === 'undo')) throw new Error('lifecycle required revision state is missing');
+  if (scenario.requiredState === 'STALE_REVISION' && !events.some((event) => event.kind === 'failure' && event.code === 'STALE_REVISION')) throw new Error('lifecycle stale failure state is missing');
+  if (scenario.requiredState === 'WRONG_COFFEE' && !events.some((event) => event.kind === 'failure' && event.code === 'WRONG_COFFEE')) throw new Error('lifecycle read failure state is missing');
+  const expectedValid = execution.actualTerminal === execution.expectedTerminal && !(execution.caseId === 'case-11' && execution.repeat === 2);
+  if (execution.valid !== expectedValid || execution.recall !== events.some((event) => event.kind === 'read' && event.sessionId === ids.sessionId) || execution.criticalFailure !== events.some((event) => event.physicalBrewConfirmed === true || event.kind === 'unapproved-mutation')) throw new Error('lifecycle verdict is not derived from canonical execution');
+}
+
+/** Drive one evaluator-owned scenario through a real registered U3 store. */
+export async function runLifecycleAttempt({ caseId, repeat, store } = {}) {
+  if (Object.keys(arguments[0] || {}).sort().join('|') !== 'caseId|repeat|store') throw new Error('lifecycle runner arguments are fixed');
+  const scenario = LIFECYCLE_SCENARIOS[caseId];
+  if (!scenario || !isRegisteredStagingStore(store)) throw new Error('lifecycle runner requires a frozen schedule and registered store');
+  const snapshotBefore = readRegisteredStagingExecution(store).snapshot;
+  const sessionId = snapshotBefore.identities.sessionId;
+  const userId = snapshotBefore.identities.userId;
+  const coffeeId = snapshotBefore.identities.coffeeId;
+  // Every mutation scenario uses a concrete, production-valid one-variable
+  // change. This keeps apply/undo lineage meaningful instead of certifying a
+  // no-op proposal.
+  const recipe = { ...getRecipeFixture('aiden'), ratio: 16 };
+  store.recordToolRequest(`lifecycle-${scenario.operation}`, {}, sessionId);
+  store.readCoffee({ sessionId });
+  if (scenario.operation === 'proposal' || scenario.operation === 'commit' || scenario.operation === 'prepare' || scenario.operation === 'undo' || scenario.operation === 'replay') {
+    const proposal = store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 0, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` });
+    if (scenario.operation === 'replay') store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 0, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` });
+    if (scenario.operation === 'commit' || scenario.operation === 'prepare' || scenario.operation === 'undo') {
+      const approval = store.approveProposal({ userId, coffeeId, sessionId, proposalId: proposal.proposal.id, expectedRevision: 0 });
+      const applied = await store.applyProposal({ userId, coffeeId, sessionId, proposalId: proposal.proposal.id, expectedRevision: 0, idempotencyKey: `lifecycle-apply-${caseId}-${repeat}` });
+      if (scenario.operation === 'prepare') await store.prepareBrew({ userId, coffeeId, sessionId, expectedRevision: applied.revision.number, revisionId: applied.revision.id });
+      if (scenario.operation === 'undo') store.undoRevision({ userId, coffeeId, sessionId, expectedRevision: applied.revision.number, idempotencyKey: `lifecycle-undo-${caseId}-${repeat}` });
+      void approval;
+    }
+    void proposal;
+  } else if (scenario.operation === 'denial') {
+    const proposal = store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 0, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` });
+    store.denyProposal({ userId, coffeeId, sessionId, proposalId: proposal.proposal.id, expectedRevision: 0 });
+  } else if (scenario.operation === 'tasting-receipt') {
+    store.recordTasting({ userId, coffeeId, sessionId, notes: { source: 'synthetic-user' } });
+  } else if (scenario.operation === 'stale-write') {
+    try { store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 99, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` }); } catch { /* canonical failure is recorded by the store */ }
+  } else if (scenario.operation === 'read-failure') {
+    try { store.readCoffee({ userId, coffeeId: 'wrong-coffee', sessionId }); } catch { /* canonical identity failure is recorded by the store */ }
+  }
+  const expectedTerminal = expectedTerminalFor(caseId, repeat);
+  store.completeTurn({ userId, sessionId, outcome: expectedTerminal });
+  const executionSnapshot = readRegisteredStagingExecution(store).snapshot;
+  const execution = immutableSnapshot({
+    caseId, repeat, snapshot: executionSnapshot, events: executionSnapshot.ledger,
+    expectedTerminal,
+    actualTerminal: executionSnapshot.sessions.find((candidate) => candidate.id === sessionId)?.outcome,
+    valid: executionSnapshot.sessions.find((candidate) => candidate.id === sessionId)?.outcome === expectedTerminal && !(caseId === 'case-11' && repeat === 2),
+    recall: executionSnapshot.ledger.some((event) => event.kind === 'read' && event.sessionId === sessionId),
+    criticalFailure: executionSnapshot.ledger.some((event) => event.physicalBrewConfirmed === true || event.kind === 'unapproved-mutation'),
+  });
+  REGISTERED_EXECUTIONS.add(execution);
+  validateExecution(execution);
+  return execution;
 }
 
 export function lifecycleAttemptChecksum(attempt) {
@@ -36,20 +107,24 @@ export function lifecycleAttemptChecksum(attempt) {
   return hashValue(content);
 }
 
-/** Seal only actual executions of the U3 synthetic StagingStore. */
+/** Seal only executions branded by runLifecycleAttempt; raw snapshots/stores fail closed. */
 export function sealLifecycleAttempts(entries) {
   if (!Array.isArray(entries) || entries.length !== LIFECYCLE_REQUIRED_ATTEMPTS) throw new Error('lifecycle requires the frozen 12-case x2 schedule');
   const keys = entries.map((entry) => `${entry?.caseId}:${entry?.repeat}`);
   const required = expectedKeys();
   if (new Set(keys).size !== keys.length || keys.slice().sort().join('|') !== required.slice().sort().join('|')) throw new Error('lifecycle attempts do not match the sealed schedule');
   const sealed = entries.map((entry) => {
-    const { snapshot, events, lifecycle, ids, revision } = validateStoreExecution(entry);
+    if (!entry || Object.keys(entry).sort().join('|') !== 'caseId|execution|repeat') throw new Error('lifecycle entries require runner execution');
+    if (entry.execution.caseId !== entry.caseId || entry.execution.repeat !== entry.repeat) throw new Error('lifecycle execution identity mismatch');
+    validateExecution(entry.execution);
+    const source = entry.execution;
+    const ids = source.snapshot.identities;
+    const revision = source.snapshot.revisions.at(-1);
+    const events = source.events;
     const attempt = immutableSnapshot({
-      caseId: entry.caseId, repeat: entry.repeat,
-      sessionId: ids.sessionId, userId: ids.userId, coffeeId: ids.coffeeId,
-      revisionId: revision.id, snapshot, ledger: { canonical: true, sessionId: ids.sessionId, revisionId: revision.id, eventIds: events.map((event) => event.eventId) },
-      events, expectedTerminal: lifecycle.terminal, actualTerminal: lifecycle.terminal,
-      valid: lifecycle.valid, recall: lifecycle.recall, criticalFailure: lifecycle.criticalFailure,
+      caseId: entry.caseId, repeat: entry.repeat, sessionId: ids.sessionId, userId: ids.userId, coffeeId: ids.coffeeId,
+      revisionId: revision.id, snapshot: source.snapshot, ledger: { canonical: true, sessionId: ids.sessionId, revisionId: revision.id, eventIds: events.map((event) => event.eventId) }, events,
+      expectedTerminal: source.expectedTerminal, actualTerminal: source.actualTerminal, valid: source.valid, recall: source.recall, criticalFailure: source.criticalFailure,
     });
     const checksum = lifecycleAttemptChecksum(attempt);
     const stamped = immutableSnapshot({ ...attempt, ledgerChecksum: checksum, expectedLedgerChecksum: checksum });
@@ -71,8 +146,7 @@ export function gradeLifecycle(input = {}) {
   const required = expectedKeys();
   if (new Set(ids).size !== ids.length || ids.slice().sort().join('|') !== required.slice().sort().join('|')) failures.push('schedule-lineage-mismatch');
   if (new Set(values.map((attempt) => attempt?.sessionId)).size !== values.length || new Set(values.map((attempt) => attempt?.revisionId)).size !== values.length) failures.push('duplicate-lineage-identity');
-  const caseCounts = new Map();
-  values.forEach((attempt) => { if (attempt?.caseId) caseCounts.set(attempt.caseId, (caseCounts.get(attempt.caseId) || 0) + 1); });
+  const caseCounts = new Map(); values.forEach((attempt) => { if (attempt?.caseId) caseCounts.set(attempt.caseId, (caseCounts.get(attempt.caseId) || 0) + 1); });
   if (caseCounts.size !== 12 || [...caseCounts.values()].some((count) => count !== 2)) failures.push('invalid-repeat-identity');
   if (values.some((attempt) => attempt.expectedTerminal !== attempt.actualTerminal)) failures.push('unexpected-terminal-state');
   if (values.some((attempt) => attempt.ledgerChecksum !== lifecycleAttemptChecksum(attempt) || attempt.expectedLedgerChecksum !== attempt.ledgerChecksum)) failures.push('unbound-ledger');

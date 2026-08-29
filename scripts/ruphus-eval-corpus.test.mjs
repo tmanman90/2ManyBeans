@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { hashValue } from './ruphus-eval/contracts.mjs';
 import { ASSERTION_REGISTRY, CRITICAL_FAILURE_REGISTRY, casePayloadHash, caseSemanticFingerprint, gradeCase, resolveCaseFixture, runCase } from './ruphus-eval/cases.mjs';
 import { getRecipeFixture } from './ruphus-eval/recipe-fixtures.mjs';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+import { DIAGNOSIS_CONTRACT, diagnosisContractMatches } from './ruphus-eval/diagnosis-contract.mjs';
 
 const readJson = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const repoRoot = new URL('../', import.meta.url);
@@ -15,19 +17,28 @@ const requiredMethods = new Set(['aiden', 'v60', 'kalita', 'v60-switch', 'v60-ic
 const requiredFields = ['id', 'category', 'method', 'mode', 'action', 'evidenceCondition', 'expectedTerminal', 'groundTruth', 'criticalFailures', 'assertions'];
 const initialActions = new Set(['read', 'diagnose', 'propose', 'clarify', 'refuse', 'unauthorized']);
 const expectedPayloadFields = ['recipe', 'diff', 'grind', 'fault', 'ledger'];
+const aidenDiagnosisRecipe = Object.freeze({ profileType: 0, title: 'Aiden diagnosis fixture', ratio: 17, bloomEnabled: true, bloomRatio: 3, bloomDuration: 45, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 23, ssPulseTemperatures: [96, 95], batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: [96, 95] });
+function candidateRecipeFor(item) {
+  if (item.id === 'dec-022') return { ...aidenDiagnosisRecipe, ratio: 16 };
+  if (item.id === 'dec-023') { const recipe = generateV60IcedRecipe({}, { dose: 20 }); return { ...recipe, grindSize: { ...recipe.grindSize, microns: 641 } }; }
+  return getRecipeFixture(item.method);
+}
 const pendingProposal = (item) => ({
   proposalId: `${item.id}-proposal`, status: 'pending', method: item.method,
   expectedRevision: item.expected.identity.revisionId, diff: item.expected.diff,
-  candidateRecipeHash: hashValue(item.expected.recipe?.canonicalProjectionHash || item.expected.recipe || null),
+  candidateRecipe: candidateRecipeFor(item), candidateRecipeHash: hashValue(candidateRecipeFor(item)),
 });
 
 function positiveCaseActual(item) {
   const advisory = ['chemex', 'aeropress', 'french-press'].includes(item.method) || item.expected.terminal === 'advisory-only';
   const actual = { terminal: item.expected.terminal, mutation: false, commit: false, committed: false, approval: false, physicalClaim: false, advisory, hardGate: advisory ? false : undefined };
-  if (item.category === 'exact-recall') Object.assign(actual, { ...item.expected.record, identity: item.expected.identity, missing: item.expected.terminal === 'insufficient-evidence', unknown: item.expected.terminal === 'insufficient-evidence', selectionMade: false });
+  if (item.category === 'exact-recall') Object.assign(actual, { ...item.expected.record, identity: item.expected.identity, trust: 'canonical', untrustedTreatedAsCanonical: false, missing: item.expected.terminal === 'insufficient-evidence', unknown: item.expected.terminal === 'insufficient-evidence', selectionMade: false });
   if (item.category === 'taste-diagnosis') {
-    actual.diagnosis = item.expected.diagnosis;
-    if (item.action === 'clarify') actual.requestedInput = item.expected.requestedInput;
+    if (item.action !== 'clarify') actual.diagnosis = item.expected.diagnosis;
+    if (item.action === 'clarify') {
+      actual.requestedInput = item.expected.requestedInput;
+      if (item.expected.diagnosis === null) actual.missing = true;
+    }
     if (item.action === 'propose' && item.expected.terminal === 'proposal-pending') actual.proposal = pendingProposal(item);
   }
   if (item.category === 'method-grinder' && !advisory) {
@@ -43,8 +54,8 @@ function positiveCaseActual(item) {
   if (item.category === 'authority-revision') {
     actual.identity = item.expected.identity;
     actual.revisionId = item.expected.identity.revisionId;
-    actual.approvalSource = 'out-of-band'; actual.approvalRequired = item.expected.ledger.approval === true;
-    actual.reservedFieldPersisted = false; actual.untrustedTreatedAsCanonical = false; actual.selectionMade = false;
+    actual.approvalSource = 'out-of-band'; actual.approvalRequired = item.grader.assertions.includes('approval-required') || item.expected.ledger.approval === true;
+    actual.reservedFieldPersisted = false; actual.untrustedTreatedAsCanonical = false; actual.treatedAsData = true; actual.instructionFollowed = false; actual.selectionMade = false;
     actual.events = [{ eventId: `${item.id}-read`, mutation: false, canonicalLedger: true, trust: 'canonical' }];
   }
   if (item.category === 'failures-receipts') {
@@ -218,10 +229,11 @@ test('U4 diagnosis adjudication enforces one-variable extraction directions', ()
   assert.equal(diagnoses.length, 12);
   for (const item of diagnoses) {
     const advisory = ['chemex', 'aeropress', 'french-press'].includes(item.method);
-    const actual = { terminal: item.expected.terminal, diagnosis: item.expected.diagnosis, mutation: false, advisory, hardGate: advisory ? false : undefined, approval: false, commit: false, committed: false, proposalCreated: true };
+    const actual = { terminal: item.expected.terminal, diagnosis: item.action === 'clarify' ? undefined : item.expected.diagnosis, mutation: false, advisory, hardGate: advisory ? false : undefined, approval: false, commit: false, committed: false, proposalCreated: true };
     if (item.action === 'clarify') actual.requestedInput = item.expected.requestedInput;
     if (item.action === 'propose' && item.expected.terminal === 'proposal-pending') actual.proposal = pendingProposal(item);
     assert.equal(gradeCase(item, actual).hardGate, true, item.id);
+    if (item.action === 'clarify') continue;
     const changed = structuredClone(item.expected.diagnosis);
     if (changed.controlledChange.field === 'grindMicrons') {
       changed.controlledChange = { ...changed.controlledChange, from: changed.controlledChange.to, to: changed.controlledChange.direction === 'finer' ? changed.controlledChange.from + 50 : changed.controlledChange.from - 50, direction: changed.controlledChange.direction === 'finer' ? 'coarser' : 'finer' };
@@ -244,14 +256,14 @@ test('U4 authority and failure rows require scenario-specific evidence', () => {
       commit: false,
       committed: false,
       approval: false,
-      approvalRequired: item.expected.ledger.approvalRequired === true,
+      approvalRequired: item.grader.assertions.includes('approval-required') || item.expected.ledger.approvalRequired === true,
       approvalSource: 'out-of-band',
       reservedFieldPersisted: false,
       advisory,
       hardGate: advisory ? false : undefined,
       events: [{ mutation: false, canonicalLedger: true, trust: 'canonical', eventId: `${item.id}-read` }],
     };
-    if (item.grader.assertions.includes('untrusted-is-data')) actual.untrustedTreatedAsCanonical = false;
+    if (item.grader.assertions.includes('untrusted-is-data')) { actual.untrustedTreatedAsCanonical = false; actual.treatedAsData = true; actual.instructionFollowed = false; }
     if (item.grader.assertions.includes('no-selection')) actual.selectionMade = false;
     if (item.action === 'propose' && item.expected.terminal === 'proposal-pending') actual.proposal = pendingProposal(item);
     assert.equal(gradeCase(item, actual).hardGate, true, item.id);
@@ -316,7 +328,7 @@ test('every declared assertion and critical failure has executable positive and 
     'exact-revision': (a) => ({ ...a, revisionId: 'forged' }), 'identity-bound': (a) => ({ ...a, identity: { forged: true } }), 'coffee-id-check': (a) => ({ ...a, identity: { ...a.identity, coffeeId: 'forged' } }),
     'user-id-check': (a) => ({ ...a, identity: { ...a.identity, userId: 'forged' } }), 'revision-check': (a) => ({ ...a, identity: { ...a.identity, revisionId: 'forged' } }),
     'approval-out-of-band': (a) => ({ ...a, approvalSource: 'model', approval: true }), 'approval-required': (a) => ({ ...a, approval: true, approvalRequired: false }),
-    'untrusted-is-data': (a) => ({ ...a, untrustedTreatedAsCanonical: true }), 'reserved-field-rejected': (a) => ({ ...a, reservedFieldPersisted: true }),
+    'untrusted-is-data': (a) => ({ ...a, treatedAsData: false }), 'reserved-field-rejected': (a) => ({ ...a, reservedFieldPersisted: true }),
     'micron-comparison': (a) => ({ ...a, grind: { ...a.grind, correct: false } }), 'micron-delta': (a) => ({ ...a, grind: { ...a.grind, deltaMicrons: 0 } }),
     'sequence-ascending': (a) => ({ ...a, sequenceAscending: false }), 'iced-validator': (a) => ({ ...a, recipe: null }), 'switch-validator': (a) => ({ ...a, recipe: null }),
     'device-bound': (a) => ({ ...a, deviceBound: false }), 'mass-reconciles': (a) => ({ ...a, massReconciles: false }),
@@ -328,7 +340,12 @@ test('every declared assertion and critical failure has executable positive and 
       assert.ok(item, `${category}:${name}:declared case`);
       const context = { caseDefinition: item, actual: positiveCaseActual(item) };
       assert.equal(registry[name](context), true, `${category}:${name}:positive`);
-      if (assertionDegrade[name]) assert.equal(registry[name]({ ...context, actual: assertionDegrade[name](context.actual) }), false, `${category}:${name}:targeted`);
+      if (assertionDegrade[name]) {
+        const degraded = assertionDegrade[name](context.actual);
+        assert.equal(registry[name]({ ...context, actual: degraded }), false, `${category}:${name}:targeted`);
+        const isolated = { ...item, grader: { ...item.grader, assertions: [name] } };
+        assert.equal(gradeCase(isolated, degraded).hardGate, false, `${category}:${name}:gradeCase-deletion/null`);
+      }
     }
   }
   for (const [category, registry] of Object.entries(CRITICAL_FAILURE_REGISTRY)) {
@@ -338,5 +355,16 @@ test('every declared assertion and critical failure has executable positive and 
       assert.ok(item, `${category}:${name}:declared case`);
       assert.equal(typeof registry[name]({ caseDefinition: item, actual: positiveCaseActual(item) }), 'boolean', `${category}:${name}:executable`);
     }
+  }
+});
+
+test('diagnosis observations and expected controls match the independent contract', () => {
+  for (const item of decision.filter((candidate) => candidate.category === 'taste-diagnosis')) {
+    assert.ok(DIAGNOSIS_CONTRACT[item.id]);
+    assert.equal(diagnosisContractMatches(item), true, item.id);
+    const expected = DIAGNOSIS_CONTRACT[item.id];
+    if (item.action === 'clarify') continue;
+    assert.equal(item.expected.diagnosis.cause, expected.cause, item.id);
+    assert.equal(item.expected.diagnosis.controlledChange.direction, expected.direction, item.id);
   }
 });

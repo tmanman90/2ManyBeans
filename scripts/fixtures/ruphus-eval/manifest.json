@@ -17,7 +17,7 @@
   "promptContract": {"mode": "provider-neutral", "groundTruth": "fixture-only", "qualificationContinuation": "none", "lifecycle": "U7"},
   "toolContract": {"approval": "out-of-band", "tasting": "out-of-band", "physicalClaims": "human-evidence-only", "providers": "none-in-U4"},
   "validatorRefs": ["src/lib/aidenProfileValidation.js", "src/lib/v60Adapter.js", "src/lib/kalitaAdapter.js", "src/lib/v60SwitchAdapter.js", "src/lib/v60IcedAdapter.js", "src/lib/kalitaIcedAdapter.js", "src/lib/brewTimerSteps.js", "src/lib/brewMethods.js", "src/data/v60SourceRegistry.js", "src/data/v60SwitchSourceRegistry.js", "src/data/v60IcedSourceRegistry.js", "src/data/kalitaConfiguration.js"],
-  "graderRefs": ["scripts/ruphus-eval/graders/recipe.mjs", "scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs"],
+  "graderRefs": ["scripts/ruphus-eval/graders/recipe.mjs", "scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs", "scripts/ruphus-eval/diagnosis-contract.mjs"],
   "toolRefs": ["scripts/ruphus-eval/tools.mjs", "scripts/ruphus-eval/contracts.mjs", "scripts/ruphus-eval/staging-store.mjs", "scripts/ruphus-eval/cases.mjs", "scripts/ruphus-eval/recipe-fixtures.mjs", "scripts/fixtures/ruphus-eval/schemas/evidence.schema.json", "scripts/fixtures/ruphus-eval/schemas/proposal.schema.json", "scripts/fixtures/ruphus-eval/schemas/receipt.schema.json"],
   "rendererRefs": ["scripts/ruphus-eval/blinding.mjs"],
   "modelRefs": ["scripts/ruphus-eval/models.mjs", "api/_lib/modelPricing.js"],
@@ -26,12 +26,12 @@
   "blindReviewProtocolRef": "docs/data/ruphus-model-eval/blinded-review-protocol.md",
   "physicalProtocolRef": "docs/data/ruphus-model-eval/physical-brew-protocol.md",
   "hashes": {
-    "corpora": "f84d49648e3678c687cef715108939a8ff93a376cd13006f17215c3e4fb0f42c",
+    "corpora": "15f6ad60a6da17fad9d7034cf97ccb98d4140a714c5e0cbd511bb92b20170c58",
     "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
-    "tools": "e6e9935104875149ff9390b28c42b3b997d5972773f6460d18572c13125780b4",
+    "tools": "c196207f881b8029a33867d94e49504f5f8bd7f808434ad9496321795a5d22d1",
     "modelRegistry": "d3b46daa7216e0c6b02a2f57f1750f3ae79f7a412572dbf2bb62b53bbf7b63d9",
     "validators": "f7a22c66828da27d4758d18fbe39b4517aacf8e3b82f54e26d980458f314c757",
-    "graders": "87f18ce12bde6a88872475a2f1792baf4f0a458db621fc7d28e03d4be4c53e63",
+    "graders": "d32bf92382975ec0fcc396d8401cb3632309da7d0d83454b6eddbb88bd479fe7",
     "renderer": "c7290da65e42afbf4a812546a7fe71c037dc2f661b25242666834875ef8dc84a",
     "corpusManifest": "e9653c4ea7c507779a93001d9c174a33a5848fd4e627830abf24836745bef4c9",
     "rubric": "194d809ed4d880e20378b5caf1072a4d3478a8dc94b071341719ecbc059fe245",
@@ -41,6 +41,6 @@
     "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
     "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
     "schedule": "05c3fc5019f50e8368780a3f2a31dd1f4ca8a24d07c7f89048c09611fcc936b2",
-    "evaluationHash": "cb25a7ee350b291cad53afaa4717b6bf54e57564b184e44bbb36ccdac6a0a0a1"
+    "evaluationHash": "b284fcaa8679969ba48ee4e1713f26b3afe1691ae81eff98bdb7365fe67af89f"
   }
 }

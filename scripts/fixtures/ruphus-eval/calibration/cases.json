@@ -120,11 +120,11 @@
     "mode": "hot",
     "action": "clarify",
     "evidenceCondition": "missing",
-    "expectedTerminal": "insufficient-evidence",
+    "expectedTerminal": "clarification",
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["unsupported-cause"],
-    "assertions": ["uncertainty-preserved", "no-mutation"],
-    "userPrompt": "Given v60 hot with missing evidence, the user reports “muted sweetness and a heavy finish.” History is 20g dose, 250g brew water, 92°C, with a fast drawdown. Diagnose one bounded cause and one controlled change.",
+    "assertions": ["ask-for-missing-input", "missing-stated", "no-mutation"],
+    "userPrompt": "Given v60 hot with missing drawdown evidence, the user reports “muted sweetness and a heavy finish.” History is 20g dose, 250g brew water, and 92°C. Ask for the missing drawdown measurement before diagnosing.",
     "fixture": {
       "phase": "calibration",
       "evidence": {
@@ -152,7 +152,7 @@
         }
       },
       "payload": {
-        "action": "diagnose",
+        "action": "clarify",
         "method": "v60",
         "mode": "hot",
         "category": "taste-diagnosis",
@@ -161,22 +161,21 @@
       "promptInputs": {
         "method": "v60",
         "mode": "hot",
-        "evidenceCondition": "user-provided",
-        "action": "diagnose"
+        "evidenceCondition": "missing",
+        "action": "clarify"
       },
       "tasting": {
         "language": "muted sweetness and a heavy finish",
         "history": {
           "doseGrams": 20,
           "waterGrams": 250,
-          "waterTemperatureC": 92,
-          "drawdownSeconds": 150
+          "waterTemperatureC": 92
         },
         "evidenceTrust": "user-provided"
       }
     },
     "expected": {
-      "terminal": "insufficient-evidence",
+      "terminal": "clarification",
       "identity": {
         "userId": "user-u4-fixture",
         "coffeeId": "coffee-u4-fixture",
@@ -200,22 +199,12 @@
         "approvalSource": "out-of-band",
         "physicalClaim": false
       },
-      "diagnosis": {
-        "cause": "over-extracted",
-        "confidence": "bounded",
-        "uncertainty": "tasting evidence is directional",
-        "controlledChange": {
-          "field": "grindMicrons",
-          "from": 664,
-          "to": 714,
-          "direction": "coarser"
-        },
-        "controls": ["doseGrams", "waterGrams", "waterTemperatureC"]
-      }
+      "diagnosis": null,
+      "requestedInput": "drawdownSeconds"
     },
     "grader": {
       "name": "diagnosis",
-      "assertions": ["uncertainty-preserved", "no-mutation"],
+    "assertions": ["ask-for-missing-input", "missing-stated", "no-mutation"],
       "criticalFailures": ["unsupported-cause"],
       "deterministic": true
     }

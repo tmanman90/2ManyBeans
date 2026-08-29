@@ -10,7 +10,7 @@ import { normalizeRecipePhases } from '../src/lib/brewTimerSteps.js';
 import { gradeRecipeLayers, validateRecipe, projectCanonicalRuntime, compareGrindMicrons, RECIPE_COVERAGE } from './ruphus-eval/graders/recipe.mjs';
 import { gradeRecall } from './ruphus-eval/graders/recall.mjs';
 import { gradeAuthority } from './ruphus-eval/graders/authority.mjs';
-import { gradeLifecycle, lifecycleAttemptChecksum, LIFECYCLE_SCHEDULE, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
+import { gradeLifecycle, LIFECYCLE_SCHEDULE, runLifecycleAttempt, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
 import { StagingStore } from './ruphus-eval/staging-store.mjs';
 
 const aiden = {
@@ -229,19 +229,27 @@ test('U4 recall and authority graders are deterministic hard gates', () => {
   assert.equal(gradeAuthority({ events: [{ physicalBrewConfirmed: true, fellowReceiptConfirmed: true, canonicalLedger: true, trust: 'canonical' }] }).hardGate, false);
 });
 
-test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', () => {
-  const stores = (failedFrom = 24) => LIFECYCLE_SCHEDULE.map((entry, index) => {
-    const store = new StagingStore({ userId: `user-u4-${index}`, lifecycle: { terminal: 'complete', valid: index < failedFrom, recall: index < failedFrom, criticalFailure: false } });
+test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async () => {
+  const executions = await Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
+    const store = new StagingStore({ userId: `user-u4-${index}` });
     store.reset({ coffeeId: `coffee-u4-${index}`, recipe: { seed: index } });
-    store.readCoffee();
-    return { caseId: entry.caseId, repeat: entry.repeat, store };
-  });
-  const passing = sealLifecycleAttempts(stores(23));
+    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store }) };
+  }));
+  const passing = sealLifecycleAttempts(executions);
   assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
+  const byKey = new Map(passing.map((attempt) => [`${attempt.caseId}:${attempt.repeat}`, attempt]));
+  assert.equal(byKey.get('case-3:1').actualTerminal, 'refusal');
+  assert.equal(byKey.get('case-8:1').actualTerminal, 'stale-revision');
+  assert.equal(byKey.get('case-10:1').actualTerminal, 'read-failure');
+  assert.equal(byKey.get('case-11:2').actualTerminal, 'insufficient-evidence');
+  assert.ok(byKey.get('case-4:1').events.some((event) => event.kind === 'approval-recorded'));
+  assert.ok(byKey.get('case-5:1').snapshot.brews.some((brew) => brew.status === 'coffee-prepared'));
+  assert.ok(byKey.get('case-6:1').events.some((event) => event.kind === 'tasting-recorded'));
+  assert.ok(byKey.get('case-7:1').snapshot.revisions.some((revision) => revision.operation === 'undo'));
+  assert.ok(byKey.get('case-9:1').events.some((event) => event.kind === 'idempotency-replay'));
   assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule: LIFECYCLE_SCHEDULE }).hardGate, false);
-  const twentyTwo = sealLifecycleAttempts(stores(22));
-  assert.equal(gradeLifecycle({ attempts: twentyTwo }).hardGate, false);
-  assert.throws(() => sealLifecycleAttempts(LIFECYCLE_SCHEDULE.map((entry) => ({ ...entry })), /registered staging store/));
+  assert.equal(gradeLifecycle({ attempts: passing.slice(0, 22) }).hardGate, false);
+  assert.throws(() => sealLifecycleAttempts(LIFECYCLE_SCHEDULE.map((entry) => ({ ...entry, store: new StagingStore() }))), /runner execution/);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, criticalFailure: true } : attempt) }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, ledgerChecksum: 'forged', expectedLedgerChecksum: 'forged' } : attempt) }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, sessionId: 'session-0' } : attempt) }).hardGate, false);
