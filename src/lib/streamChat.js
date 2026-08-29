@@ -157,7 +157,7 @@ function getStreamingFetch() {
   return webFetch || fetch;
 }
 
-export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxRetries = 2 }) {
+export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFrame, maxRetries = 2 }) {
   const token = await getAuthToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -220,6 +220,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
           } catch {
             throw makeError('malformed_stream', 'The AI stream returned malformed data.');
           }
+          onFrame?.(frame);
 
           if (frame.type === 'delta') {
             onDelta?.(frame.text || '');
@@ -241,6 +242,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
         } catch {
           throw makeError('malformed_stream', 'The AI stream returned malformed data.');
         }
+        onFrame?.(frame);
         if (frame.type === 'usage') {
           sawUsage = true;
           onDone?.({ usage: frame.usage, stopReason: frame.stop_reason });

@@ -5,9 +5,11 @@ import { cacheRead, cacheWrite, chatKey } from '../lib/offlineCache';
 import { resolveTerminal } from '../lib/streamChat';
 import { parseBeanScan, parseRecipeCard } from '../lib/chatParse';
 import { recipeSummary } from '../components/chat/RecipeCard';
+import { normalizeAgentSession, inflateAgentSession } from '../lib/ruphus/session.js';
 
 const MAX_MESSAGES = 50;
 const MAX_TEXT = 2000;
+const AGENT_PROTOCOL_VERSION = 1;
 
 const textValue = (value) => String(value || '').trim();
 
@@ -32,6 +34,8 @@ function normalizeMessages(messages) {
       role: message.role,
       text: persistedText(message),
       createdAt: Number(message.createdAt) || Date.now(),
+      ...(message.turnId ? { turnId: textValue(message.turnId).slice(0, 180) } : {}),
+      ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}),
     }))
     .filter(message => message.text)
     .slice(-MAX_MESSAGES);
@@ -46,9 +50,13 @@ function inflateMessages(messages) {
       role: message.role,
       content: textValue(message.text).slice(0, MAX_TEXT),
       createdAt: Number(message.createdAt) || Date.now(),
+      ...(message.turnId ? { turnId: textValue(message.turnId).slice(0, 180) } : {}),
+      ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}),
     }))
     .slice(-MAX_MESSAGES);
 }
+
+export { normalizeAgentSession, inflateAgentSession };
 
 function createDefaultAdapter(uid) {
   const ref = doc(db, 'users', uid, 'chatSessions', 'active');
@@ -103,7 +111,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
 
     Promise.resolve(storage.loadLocal?.()).then(local => {
       if (cancelled || !local?.messages) return;
-      setHydratedMessages(inflateMessages(local.messages));
+      setHydratedMessages(local.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(local).messages : inflateMessages(local.messages));
       setHydrationState('local');
     }).catch(err => console.warn('[ChatSession] Local hydrate failed:', err));
 
@@ -111,7 +119,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       Promise.resolve(storage.loadRemote?.()).then(remote => {
         if (cancelled) return;
         hydratedRef.current = true;
-        setHydratedMessages(inflateMessages(remote?.messages || []));
+        setHydratedMessages(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(remote).messages : inflateMessages(remote?.messages || []));
         setHydrationState('hydrated');
       }).catch(err => {
         if (cancelled) return;
@@ -132,12 +140,14 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     };
   }, [adapter, isDemo, uid]);
 
-  const persist = useCallback((messages) => {
+  const persist = useCallback((messages, metadata = {}) => {
     if (isDemo || !uid || !adapterRef.current) return;
-    const session = {
+    const session = metadata.protocolVersion === AGENT_PROTOCOL_VERSION
+      ? normalizeAgentSession({ ...metadata, messages })
+      : {
       messages: normalizeMessages(messages),
       updatedAt: Date.now(),
-    };
+      };
     Promise.resolve(adapterRef.current.saveLocal?.(session))
       .catch(err => console.warn('[ChatSession] Local persist failed:', err));
     if (!hydratedRef.current) return;

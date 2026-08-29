@@ -1,0 +1,2 @@
+const CAPTIONS = { context_loading: 'Reading your recipe…', read_tastings: 'Checking your last cups…', read_attempts: 'Looking at how it brewed…', propose_recipe_change: 'Working out one change…' };
+export function RuphusLifecycleCaption({ frame }) { const key = frame?.name || frame?.tool || frame?.type; return <div role="status" data-ruphus-lifecycle-caption="true">{CAPTIONS[key] || 'Professor Ruphus is thinking…'}</div>; }

@@ -1,0 +1,38 @@
+import OpenAI from 'openai';
+
+export const RUPHUS_OPENAI_MODEL = 'gpt-5.6-luna';
+export const RUPHUS_REASONING_EFFORT = 'medium';
+
+function outputParts(response) {
+  const text = typeof response?.output_text === 'string' ? response.output_text : '';
+  const toolCalls = [];
+  for (const item of response?.output || []) {
+    if (item.type === 'function_call') {
+      let args = {};
+      try { args = JSON.parse(item.arguments || '{}'); } catch { throw Object.assign(new Error('provider returned malformed tool arguments'), { code: 'provider_schema' }); }
+      toolCalls.push({ callId: item.call_id, name: item.name, args });
+    }
+  }
+  return { text, toolCalls, outputItems: response?.output || [], requestId: response?.id || null, usage: response?.usage || null, model: response?.model || RUPHUS_OPENAI_MODEL };
+}
+
+export function buildOpenAIRequest({ instructions, input, tools, model = RUPHUS_OPENAI_MODEL, maxOutputTokens }) {
+  if (model !== RUPHUS_OPENAI_MODEL) throw Object.assign(new Error('unsupported Ruphus model'), { code: 'provider_model' });
+  if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1) throw Object.assign(new Error('provider output cap must be configured'), { code: 'provider_config' });
+  return { model, instructions, input, tools, store: false, reasoning: { effort: RUPHUS_REASONING_EFFORT }, max_output_tokens: maxOutputTokens };
+}
+
+export function createOpenAIProvider({ client, instructions = '', maxOutputTokens } = {}) {
+  const sdk = client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return Object.freeze({
+    async runTurn({ context, userText, tools, previous, toolResult }) {
+      const input = previous && toolResult
+        ? [...(previous.outputItems || []), ...(toolResult.results || [toolResult]).map((item) => ({ type: 'function_call_output', call_id: item.callId || item.name, output: JSON.stringify(item.result) }))]
+        : [{ role: 'user', content: `${userText}\n\nCanonical context:\n${JSON.stringify(context)}` }];
+      const response = await sdk.responses.create(buildOpenAIRequest({ instructions, input, tools, maxOutputTokens }));
+      return outputParts(response);
+    },
+  });
+}
+
+export { outputParts };
