@@ -3,8 +3,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { buildOpenAIRequest, buildAnthropicRequest, buildFinalistRequest, buildFinalistSchedule, FINALIST_TOOL_SCHEMAS, runFinalistBatch, gradeFinalistAttempt } from './ruphus-eval/finalist.mjs';
+import { buildOpenAIRequest, buildAnthropicRequest, buildFinalistRequest, buildFinalistSchedule, FINALIST_TOOL_SCHEMAS, createFinalistTools, runFinalistBatch, gradeFinalistAttempt } from './ruphus-eval/finalist.mjs';
 import { ImmutableArtifactStore } from './ruphus-eval/agent-runner.mjs';
+import { createRecordingFellow, StagingStore } from './ruphus-eval/staging-store.mjs';
 
 const evaluationHash = 'finalist-offline-evaluation-hash';
 
@@ -23,6 +24,26 @@ test('finalist contract has exactly six workflows, two repeats, and no approval 
   const proposal = FINALIST_TOOL_SCHEMAS.find((tool) => tool.name === 'proposeRecipe');
   assert.deepEqual(proposal.parameters.required, ['path', 'from', 'to']);
   assert.equal(proposal.parameters.additionalProperties, false);
+  const prepared = { method: 'aiden', currentRevision: { id: 'revision-1', number: 1, recipeHash: 'hash-1' }, recipe: { ratio: 16 }, requestedRevision: { expectedRevision: 0, number: 0 } };
+  for (const scenario of ['recipe-proposal', 'approval-bound-apply', 'undo-stale-revision', 'fellow-preparation-receipt']) {
+    const request = buildFinalistRequest({ scenarioId: scenario, preparedEvidence: prepared });
+    const names = request.tools.map((tool) => tool.name);
+    assert.equal(names.includes('readRecipe'), false, `${scenario} should use prepared revision evidence`);
+    assert.deepEqual(JSON.parse(request.input[1].content).evidence, prepared);
+  }
+});
+
+test('out-of-band approval is returned as trusted minimal confirmation without an approval tool', async () => {
+  const fellow = createRecordingFellow();
+  const store = new StagingStore({ fellow, userId: 'finalist-approval' });
+  store.reset({ userId: 'finalist-approval', coffeeId: 'coffee-approval', method: 'aiden', recipe: { profileType: 0, title: 'Approval fixture', ratio: 17, bloomEnabled: true, bloomRatio: 3, bloomDuration: 45, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 23, ssPulseTemperatures: [96, 95], batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: [96, 95] } });
+  const tools = createFinalistTools({ store, scenarioId: 'approval-bound-apply', evaluatorApprove: true });
+  const result = await tools.call('proposeRecipe', { path: 'ratio', from: 17, to: 16 });
+  assert.equal(result.data.proposal.status, 'pending');
+  assert.equal(result.data.approval.status, 'approved');
+  assert.equal(result.data.approval.proposalId, result.data.proposal.id);
+  assert.equal(result.data.approval.expectedRevision, 0);
+  assert.equal(store.snapshot().approvals.length, 1);
 });
 
 test('finalist tool schemas translate identically at OpenAI and Anthropic boundaries', () => {
@@ -53,6 +74,8 @@ test('offline finalist batch uses fresh U3 stores and records all six state tran
     const byScenario = new Map(result.attempts.map(({ artifact, sidecar }) => [`${artifact.armId}:${artifact.caseId}:${artifact.repeat}`, { artifact, sidecar }]));
     for (const armId of ['luna-medium', 'terra-medium']) {
       assert.equal(byScenario.get(`${armId}:read-stats:1`).sidecar.snapshot.revisions.at(-1).number, 0);
+      assert.equal(byScenario.get(`${armId}:read-stats:1`).sidecar.snapshot.sessions.length, 1);
+      assert.equal(byScenario.get(`${armId}:read-stats:1`).sidecar.snapshot.sessions[0].outcome, 'complete');
       assert.equal(byScenario.get(`${armId}:tasting-diagnosis:1`).sidecar.snapshot.revisions.at(-1).number, 0);
       const proposal = byScenario.get(`${armId}:recipe-proposal:1`).sidecar;
       assert.equal(proposal.snapshot.revisions.at(-1).number, 0);
@@ -64,6 +87,7 @@ test('offline finalist batch uses fresh U3 stores and records all six state tran
       assert.equal(applied.snapshot.approvals.length, 1);
       const stale = byScenario.get(`${armId}:undo-stale-revision:1`).sidecar;
       assert.equal(stale.snapshot.revisions.at(-1).number, 1);
+      assert.equal(stale.snapshot.sessions[0].outcome, 'stale-revision');
       assert.ok(stale.ledger.some((event) => event.kind === 'tool-failure' && event.code === 'STALE_REVISION'));
       const prepared = byScenario.get(`${armId}:fellow-preparation-receipt:1`);
       assert.equal(prepared.sidecar.snapshot.revisions.at(-1).number, 1);

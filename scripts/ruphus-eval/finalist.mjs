@@ -36,18 +36,17 @@ export const FINALIST_TOOL_SCHEMAS = Object.freeze([
   Object.freeze({ type: 'function', name: 'applyProposal', description: 'Apply an already approved proposal revision.', strict: true, parameters: requiredObject({ proposalId: { type: 'string' }, expectedRevision: { type: 'integer' } }) }),
   Object.freeze({ type: 'function', name: 'prepareBrew', description: 'Prepare the exact confirmed revision.', strict: true, parameters: requiredObject({ revisionId: { type: 'string' }, expectedRevision: { type: 'integer' } }) }),
   Object.freeze({ type: 'function', name: 'undoRevision', description: 'Undo the current applied revision when the revision is current.', strict: true, parameters: requiredObject({ expectedRevision: { type: 'integer' }, idempotencyKey: { type: 'string' } }) }),
-  Object.freeze({ type: 'function', name: 'completeTurn', description: 'Finish the current Coffee turn.', strict: true, parameters: requiredObject({ outcome: { type: 'string', enum: ['complete', 'clarification', 'refusal', 'stale-revision'] } }) }),
   SUBMIT_RESULT_TOOL,
 ]);
 const TOOL_NAMES = new Set(FINALIST_TOOL_SCHEMAS.map((tool) => tool.name));
 const TOOL_BY_NAME = new Map(FINALIST_TOOL_SCHEMAS.map((tool) => [tool.name, tool]));
 const WORKFLOW_TOOL_NAMES = Object.freeze({
-  'read-stats': Object.freeze(['readCoffee', 'readRecipe', 'readTastings', 'completeTurn', 'submit_result']),
-  'tasting-diagnosis': Object.freeze(['readRecipe', 'readTastings', 'compareGrind', 'completeTurn', 'submit_result']),
-  'recipe-proposal': Object.freeze(['readRecipe', 'proposeRecipe', 'completeTurn', 'submit_result']),
-  'approval-bound-apply': Object.freeze(['readRecipe', 'proposeRecipe', 'applyProposal', 'completeTurn', 'submit_result']),
-  'undo-stale-revision': Object.freeze(['readRecipe', 'undoRevision', 'completeTurn', 'submit_result']),
-  'fellow-preparation-receipt': Object.freeze(['readRecipe', 'prepareBrew', 'completeTurn', 'submit_result']),
+  'read-stats': Object.freeze(['readCoffee', 'readRecipe', 'readTastings', 'submit_result']),
+  'tasting-diagnosis': Object.freeze(['readRecipe', 'readTastings', 'compareGrind', 'submit_result']),
+  'recipe-proposal': Object.freeze(['proposeRecipe', 'submit_result']),
+  'approval-bound-apply': Object.freeze(['proposeRecipe', 'applyProposal', 'submit_result']),
+  'undo-stale-revision': Object.freeze(['undoRevision', 'submit_result']),
+  'fellow-preparation-receipt': Object.freeze(['prepareBrew', 'submit_result']),
 });
 
 export const FINALIST_WORKFLOWS = FINALIST_SCENARIOS;
@@ -65,11 +64,12 @@ export function buildFinalistSchedule({ runId, evaluationHash = null, armIds = F
   }))));
 }
 
-export function buildFinalistRequest({ scenarioId } = {}) {
+export function buildFinalistRequest({ scenarioId, preparedEvidence = null } = {}) {
   const scenario = scenarioFor(scenarioId);
+  const evidence = preparedEvidence || { method: 'aiden', recipe: AIDEN };
   const request = {
-    instructions: 'You are a Coffee assistant. Use the available Coffee tools when needed, then call submit_result exactly once. Report semantic user-facing guidance only; approval, mutation, machine, Fellow, receipt, and physical claims are evaluator-controlled.',
-    input: [{ role: 'user', content: scenario.prompt }, { role: 'user', content: JSON.stringify({ evidence: { method: 'aiden', recipe: AIDEN } }) }],
+    instructions: 'You are a Coffee assistant. Use the available Coffee tools when needed, then call submit_result exactly once. The evaluator closes the turn after accepted submit_result; do not invent approval, mutation, machine, Fellow, receipt, or physical claims.',
+    input: [{ role: 'user', content: scenario.prompt }, { role: 'user', content: JSON.stringify({ evidence }) }],
     tools: WORKFLOW_TOOL_NAMES[scenarioId].map((name) => TOOL_BY_NAME.get(name)),
     maxOutputTokens: 900,
   };
@@ -91,11 +91,47 @@ function createStore({ runId, armId, scenarioId, repeat, failures = {}, initialA
   return { store, fellow, applied };
 }
 
+function preparedEvidence(store, scenarioId) {
+  const snapshot = store.snapshot();
+  const revision = snapshot.revisions.at(-1);
+  const evidence = {
+    method: snapshot.method,
+    currentRevision: { id: revision.id, number: revision.number, recipeHash: revision.recipeHash },
+    recipe: revision.recipe,
+  };
+  if (scenarioId === 'undo-stale-revision') evidence.requestedRevision = { expectedRevision: 0, number: 0 };
+  return immutableSnapshot(evidence);
+}
+
+function requestEvidence(options = {}) {
+  const messages = Array.isArray(options.input) ? options.input : [];
+  for (const message of messages) {
+    if (typeof message?.content !== 'string') continue;
+    try {
+      const parsed = JSON.parse(message.content);
+      if (parsed && parsed.evidence) return parsed.evidence;
+    } catch { /* user content is not required to be parseable by the offline driver */ }
+  }
+  return null;
+}
+
+function toolOutput(options = {}, name) {
+  const outputs = Array.isArray(options.input) ? options.input : [];
+  for (const output of outputs) {
+    if (output?.type !== 'function_call_output' || typeof output.output !== 'string') continue;
+    try {
+      const parsed = JSON.parse(output.output);
+      if (name == null || parsed?.data?.proposal || parsed?.data?.approval) return parsed;
+    } catch { /* malformed tool output is handled by the real attempt loop */ }
+  }
+  return null;
+}
+
 function typedToolFailure(error) {
   return immutableSnapshot({ ok: false, error: { code: typeof error?.code === 'string' ? error.code : 'TOOL_FAILURE' }, evidence: { source: 'tool-result', trust: 'synthetic', failure: true } });
 }
 
-function compactToolResult(name, result, scenarioId = null) {
+function compactToolResult(name, result, scenarioId = null, approval = null) {
   if (!result || typeof result !== 'object') return immutableSnapshot({ ok: false, error: { code: 'INVALID_TOOL_RESULT' } });
   if (result.ok === false) return immutableSnapshot({ ok: false, error: result.error || { code: 'TOOL_FAILURE' } });
   if (name === 'readCoffee') return immutableSnapshot({ ok: true, data: { coffee: result.data?.coffee, revision: { ...result.data?.revision, recipe: undefined }, userId: result.data?.userId } });
@@ -105,7 +141,7 @@ function compactToolResult(name, result, scenarioId = null) {
   }
   if (name === 'readTastings') return immutableSnapshot({ ok: true, data: { tastings: result.data?.tastings || [] } });
   if (name === 'compareGrind') return immutableSnapshot({ ok: result.ok === true, data: result.data });
-  if (name === 'proposeRecipe') return immutableSnapshot({ ok: true, data: { proposal: result.proposal && { id: result.proposal.id, method: result.proposal.method, expectedRevision: result.proposal.expectedRevision, status: result.proposal.status, recipeHash: result.proposal.recipeHash }, validation: result.validation } });
+  if (name === 'proposeRecipe') return immutableSnapshot({ ok: true, data: { proposal: result.proposal && { id: result.proposal.id, method: result.proposal.method, expectedRevision: result.proposal.expectedRevision, status: result.proposal.status, recipeHash: result.proposal.recipeHash }, approval: approval && { id: approval.approval?.id, proposalId: approval.approval?.proposalId, expectedRevision: approval.approval?.expectedRevision, status: 'approved' }, validation: result.validation } });
   if (name === 'applyProposal' || name === 'undoRevision') return immutableSnapshot({ ok: true, data: { revision: result.revision && { id: result.revision.id, number: result.revision.number, recipeHash: result.revision.recipeHash }, receipt: result.receipt } });
   if (name === 'prepareBrew') return immutableSnapshot({ ok: result.ok === true, data: { brew: result.brew && { id: result.brew.id, revisionId: result.brew.revisionId, status: result.brew.status }, receipt: result.receipt } });
   if (name === 'completeTurn') return immutableSnapshot({ ok: true, data: result.data });
@@ -125,7 +161,12 @@ export function createFinalistTools({ store, scenarioId, evaluatorApprove = fals
     async call(name, args = {}) {
       if (!TOOL_NAMES.has(name) || name === 'submit_result' || !allowed.has(name)) throw Object.assign(new Error('tool is unavailable in finalist workflow'), { code: 'TOOL_UNAVAILABLE' });
       if (name !== 'proposeRecipe') {
-        try { return compactToolResult(name, await base.call(name, args), scenarioId); } catch (error) { return typedToolFailure(error); }
+        try {
+          const toolArgs = name === 'applyProposal'
+            ? { ...args, idempotencyKey: stableId('finalist-apply', { sessionId: current().identities.sessionId, proposalId: args.proposalId, expectedRevision: args.expectedRevision }) }
+            : args;
+          return compactToolResult(name, await base.call(name, toolArgs), scenarioId);
+        } catch (error) { return typedToolFailure(error); }
       }
       if (!args || typeof args.path !== 'string' || !Object.hasOwn(args, 'from') || !Object.hasOwn(args, 'to')) return typedToolFailure(Object.assign(new Error('semantic recipe patch is invalid'), { code: 'INVALID_TOOL_INPUT' }));
       const snapshot = current();
@@ -134,8 +175,9 @@ export function createFinalistTools({ store, scenarioId, evaluatorApprove = fals
       recipe.ratio = args.to;
       try {
         const result = await base.call('proposeRecipe', { method: 'aiden', expectedRevision: snapshot.revisions.at(-1).number, recipe, idempotencyKey: stableId('finalist-proposal', { scenarioId, sessionId: snapshot.identities.sessionId, path: args.path, from: args.from, to: args.to }) });
-        if (evaluatorApprove && result.ok === true) store.approveProposal({ proposalId: result.proposal.id, expectedRevision: result.proposal.expectedRevision });
-        return compactToolResult(name, result, scenarioId);
+        let approval = null;
+        if (evaluatorApprove && result.ok === true) approval = store.approveProposal({ proposalId: result.proposal.id, expectedRevision: result.proposal.expectedRevision });
+        return compactToolResult(name, result, scenarioId, approval);
       } catch (error) { return typedToolFailure(error); }
     },
   });
@@ -149,16 +191,13 @@ function makeProviderResult(arm, attemptId, index, toolCalls = [], text = '') {
 }
 
 /** Deterministic offline candidate adapter for focused harness proofs. */
-export function createOfflineFinalistAdapter({ armId, attemptId, scenarioId, store } = {}) {
+export function createOfflineFinalistAdapter({ armId, attemptId, scenarioId } = {}) {
   const arm = getArm(armId); scenarioFor(scenarioId);
-  if (!arm || typeof attemptId !== 'string' || !attemptId || !store) throw new Error('offline finalist adapter identity is required');
+  if (!arm || typeof attemptId !== 'string' || !attemptId) throw new Error('offline finalist adapter identity is required');
   let turn = 0;
-  let proposalId = null;
   return Object.freeze({
-    async runTurn() {
+    async runTurn(options = {}) {
       turn += 1;
-      const current = store.snapshot();
-      const revision = current.revisions.at(-1);
       if (turn === 1) {
         const tools = {
           'read-stats': [{ name: 'readCoffee', args: {} }, { name: 'readRecipe', args: {} }, { name: 'readTastings', args: {} }],
@@ -166,15 +205,14 @@ export function createOfflineFinalistAdapter({ armId, attemptId, scenarioId, sto
           'recipe-proposal': [{ name: 'proposeRecipe', args: { path: 'ratio', from: 17, to: 16 } }],
           'approval-bound-apply': [{ name: 'proposeRecipe', args: { path: 'ratio', from: 17, to: 16 } }],
           'undo-stale-revision': [{ name: 'undoRevision', args: { expectedRevision: 0, idempotencyKey: stableId('finalist-undo', { attemptId }) } }],
-          'fellow-preparation-receipt': [{ name: 'prepareBrew', args: { revisionId: revision.id, expectedRevision: revision.number } }],
+          'fellow-preparation-receipt': [{ name: 'prepareBrew', args: { revisionId: requestEvidence(options)?.currentRevision?.id, expectedRevision: requestEvidence(options)?.currentRevision?.number } }],
         };
         return makeProviderResult(arm, attemptId, turn, tools[scenarioId]);
       }
       if (scenarioId === 'approval-bound-apply' && turn === 2) {
-        proposalId = current.proposals.find((proposal) => proposal.status === 'applied' || proposal.status === 'pending')?.id || proposalId;
+        const proposalId = toolOutput(options)?.data?.proposal?.id;
         return makeProviderResult(arm, attemptId, turn, proposalId ? [
-          { name: 'applyProposal', args: { proposalId, expectedRevision: 0, idempotencyKey: stableId('finalist-apply', { attemptId }) } },
-          { name: 'completeTurn', args: { outcome: 'complete' } },
+          { name: 'applyProposal', args: { proposalId, expectedRevision: toolOutput(options)?.data?.proposal?.expectedRevision ?? 0 } },
           { name: 'submit_result', args: { reply: 'The requested recipe guidance is ready.', action: 'propose', diagnosis: null, patch: { path: 'ratio', from: 17, to: 16 } } },
         ] : []);
       }
@@ -184,14 +222,17 @@ export function createOfflineFinalistAdapter({ armId, attemptId, scenarioId, sto
         diagnosis: scenarioId === 'tasting-diagnosis' ? { cause: 'Under-extraction is consistent with the tasting evidence.', confidence: 'moderate', uncertainty: 'The adjustment should be checked against a repeat brew.' } : null,
         patch: ['recipe-proposal', 'approval-bound-apply', 'tasting-diagnosis'].includes(scenarioId) ? { path: scenarioId === 'tasting-diagnosis' ? 'grindSize.microns' : 'ratio', from: scenarioId === 'tasting-diagnosis' ? 700 : 17, to: scenarioId === 'tasting-diagnosis' ? 650 : 16 } : null,
       };
-      const outcome = scenarioId === 'undo-stale-revision' ? 'stale-revision' : 'complete';
-      return makeProviderResult(arm, attemptId, turn, [{ name: 'completeTurn', args: { outcome } }, { name: 'submit_result', args: submitted }]);
+      return makeProviderResult(arm, attemptId, turn, [{ name: 'submit_result', args: submitted }]);
     },
   });
 }
 
 function prepareScenario(scenarioId, options) {
   return createStore({ ...options, scenarioId, initialApplied: ['undo-stale-revision', 'fellow-preparation-receipt'].includes(scenarioId) });
+}
+
+function scenarioOutcome(scenarioId) {
+  return scenarioId === 'undo-stale-revision' ? 'stale-revision' : 'complete';
 }
 
 function safeFailureCode(error) {
@@ -230,10 +271,10 @@ export async function runFinalistAttempt({ entry, adapter = null, artifactStore,
   if (!arm || entry.phase !== 'finalist' || entry.repeat !== 1 && entry.repeat !== 2) throw new Error('finalist attempt identity is invalid');
   const { store, fellow } = prepareScenario(entry.scenario, { runId: entry.runId, armId: entry.armId, repeat: entry.repeat, failures });
   const tools = createFinalistTools({ store, scenarioId: entry.scenario, evaluatorApprove: entry.scenario === 'approval-bound-apply' });
-  const candidateAdapter = adapter || createOfflineFinalistAdapter({ armId: entry.armId, attemptId: entry.attemptId, scenarioId: entry.scenario, store });
   let submitted = null;
-  const request = buildFinalistRequest({ scenarioId: entry.scenario });
-  const artifact = await runAgentAttempt({ adapter: candidateAdapter, arm, request, tools, attemptId: entry.attemptId, runId: entry.runId, evaluationHash, phase: 'finalist', caseId: entry.scenario, repeat: entry.repeat, maxTurns: 5, maxPhases: 2, artifactStore, retry: { maxAttempts: 1 }, onSubmitResult: (value) => { submitted = validateSubmitResult(value); } });
+  const request = buildFinalistRequest({ scenarioId: entry.scenario, preparedEvidence: preparedEvidence(store, entry.scenario) });
+  const candidateAdapter = adapter || createOfflineFinalistAdapter({ armId: entry.armId, attemptId: entry.attemptId, scenarioId: entry.scenario });
+  const artifact = await runAgentAttempt({ adapter: candidateAdapter, arm, request, tools, attemptId: entry.attemptId, runId: entry.runId, evaluationHash, phase: 'finalist', caseId: entry.scenario, repeat: entry.repeat, maxTurns: 5, maxPhases: 2, artifactStore, retry: { maxAttempts: 1 }, onSubmitResult: (value) => { submitted = validateSubmitResult(value); store.completeTurn({ outcome: scenarioOutcome(entry.scenario) }); } });
   if (!submitted) throw new Error('finalist candidate did not submit semantic result');
   const persisted = await artifactStore.read(entry.attemptId);
   if (!persisted.ok) throw new Error('finalist artifact was not persisted');
