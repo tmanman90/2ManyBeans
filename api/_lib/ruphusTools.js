@@ -66,13 +66,13 @@ export function createRuphusTools({ uid, context, readers: _readers = {}, propos
     }
     if (name === 'read_recipe') {
       requireCoffee(args, context);
-      if (!context.recipe || typeof context.recipe !== 'object') return { ok: false, code: 'data_gap', artifact: makeArtifact('data_gap', { id: `recipe-gap-${context.context.coffeeId}`, title: 'No executable recipe found', options: [{ id: 'choose-method', label: 'Choose a brew method' }] }) };
+      if (!context.recipe || typeof context.recipe !== 'object' || context.recipe.code) return { ok: false, code: 'data_gap', artifact: makeArtifact('data_gap', { id: `recipe-gap-${context.context.coffeeId}`, title: 'No executable recipe found', options: [{ id: 'choose-method', label: 'Choose a brew method' }] }) };
       return { ok: true, data: clone(context.recipe), artifact: makeArtifact('current_recipe', { id: `current-recipe-${context.context.coffeeId}`, recipe: clone(recipeValue(context.recipe)) }) };
     }
     if (name === 'read_tastings') { requireCoffee(args, context); return { ok: true, data: clone(context.tastings) }; }
     if (name === 'read_attempts') { requireCoffee(args, context); return { ok: true, data: clone(context.attempts) }; }
     requireCoffee(args, context);
-    if (!context.recipe || typeof context.recipe !== 'object') return { ok: false, code: 'data_gap', artifact: makeArtifact('data_gap', { id: `recipe-gap-${context.context.coffeeId}`, title: 'No executable recipe found', options: [{ id: 'choose-method', label: 'Choose a brew method' }] }) };
+    if (!context.recipe || typeof context.recipe !== 'object' || context.recipe.code) return { ok: false, code: 'data_gap', artifact: makeArtifact('data_gap', { id: `recipe-gap-${context.context.coffeeId}`, title: 'No executable recipe found', options: [{ id: 'choose-method', label: 'Choose a brew method' }] }) };
     if (!args.afterRecipe || typeof args.afterRecipe !== 'object' || Array.isArray(args.afterRecipe)) return { ok: false, code: 'invalid_proposal', message: 'A complete candidate recipe is required.' };
     const beforeRecipe = recipeValue(context.recipe);
     const afterRecipe = recipeValue(args.afterRecipe);

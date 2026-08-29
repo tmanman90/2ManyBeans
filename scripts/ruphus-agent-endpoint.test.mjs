@@ -49,6 +49,8 @@ test('read tools expose native context, recipe, and gap artifacts', async () => 
   const gapTools = createRuphusTools({ uid: 'user-1', context: { ...current, recipe: null } });
   assert.equal((await gapTools.call('read_recipe', { coffeeId: 'bean-1' })).artifact.type, 'data_gap');
   assert.equal((await gapTools.call('propose_recipe_change', { coffeeId: 'bean-1', afterRecipe: current.recipe })).artifact.type, 'data_gap');
+  const ambiguousTools = createRuphusTools({ uid: 'user-1', context: { ...current, recipe: { code: 'legacy_recipe_ambiguous' } } });
+  assert.equal((await ambiguousTools.call('read_recipe', { coffeeId: 'bean-1' })).artifact.type, 'data_gap');
 });
 
 test('proposal schema keeps heterogeneous controls strict while allowing absent method fields', () => {
