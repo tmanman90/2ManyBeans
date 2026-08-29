@@ -32,3 +32,7 @@ android/
 !public/images/**/*.png
 !assets/*.png
 demo-recordings/
+
+# U5 raw provider artifacts remain outside the committed evaluation evidence.
+scripts/ruphus-eval/runs/raw/
+docs/data/ruphus-model-eval/runs/raw/
