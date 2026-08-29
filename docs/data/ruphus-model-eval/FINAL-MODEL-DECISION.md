@@ -14,8 +14,9 @@ and its checksum-bound derivation are
 - Current manifest evaluation hash: `a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398`.
 - Calibration evaluation hashes: `e5acab4da495a04e5444d0c07829eec769b9704f47b739c7439a36bdd4c2c221` and `a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398`.
 - Sorted identity-bound checksum-set hash for all 72 immutable artifacts: `d2a5e18378a8bc7e996ace8f6ebe566faa20b7a24af736aa269c41bc5114aca7`.
-- Metered spend: `$0.37` (`0.37037899999999985` machine value); retries: `$0.00` and 0 retry attempts.
+- Artifact-metered calibration spend: `$0.37` (`0.37037899999999985` machine value); retries: `$0.00` and 0 retry attempts. Capability probes are not persisted in attempt artifacts, so exact all-provider billed spend is not derivable from this ledger.
 - Frozen dispatch reservation: `$27.80` (`27.798201000000006` machine value) within the `$30.00` provider cap; the remaining `$2.20` headroom is non-dispatchable.
+- The conservative bound remains below the cap: `$0.75` (`0.746939` machine value) = `$0.37` artifact-metered calibration plus three visible live capability-set reserves at `$0.13` each (`0.12552` machine value). This is an upper bound, not a claim of exact probe billing.
 
 Each pass completed 36 calls: six calibration cases per arm for each of the
 six arms. Per-arm counts are 6/6 completed and 0/6 accepted under the final

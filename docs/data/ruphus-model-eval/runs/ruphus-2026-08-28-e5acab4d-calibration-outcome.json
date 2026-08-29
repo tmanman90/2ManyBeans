@@ -21,54 +21,52 @@
       "attemptCount": 36,
       "completedCount": 36,
       "perArm": {
-        "luna-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "luna-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "terra-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "terra-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "sonnet-disabled": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "sonnet-adaptive-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 }
+        "luna-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 5, "candidate-response-envelope-is-invalid": 1 } },
+        "luna-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 5, "candidate-response-envelope-is-invalid": 1 } },
+        "terra-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 5, "candidate-response-envelope-is-invalid": 1 } },
+        "terra-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 5, "candidate-response-envelope-is-invalid": 1 } },
+        "sonnet-disabled": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 4, "candidate-response-envelope-is-invalid": 2 } },
+        "sonnet-adaptive-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 3, "candidate-response-envelope-is-invalid": 3 } }
       },
-      "transportEnvelopeParsedBeforeFinalSchema": { "openai": 20, "anthropic": 0 },
       "acceptedByFinalContract": 0,
-      "meteredSpendUsd": 0.12298800000000001,
+      "artifactMeteredCalibrationSpendUsd": 0.12298800000000001,
       "retryCount": 0,
       "checksumSetHash": "47b0b82ada1a321bc3e2c04ae5be78d1c83bb251c35c7dac66770ef4f36da000",
-      "failureClasses": [
-        "candidate-evidence-field-actual.approval-is-required",
-        "candidate-response-envelope-is-invalid",
-        "candidate-response-must-be-strict-JSON",
-        "candidate-response-must-contain-one-complete-JSON-fence"
-      ]
+      "failureClassCounts": {
+        "candidate-evidence-field-actual.approval-is-required": 27,
+        "candidate-response-envelope-is-invalid": 9
+      },
+      "historicalTransportParsing": { "openai": { "parsed": 20, "attempted": 24 }, "anthropic": { "parsed": 0, "attempted": 12 } }
     },
     {
       "evaluationHash": "a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398",
       "attemptCount": 36,
       "completedCount": 36,
       "perArm": {
-        "luna-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "luna-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "terra-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "terra-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "sonnet-disabled": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
-        "sonnet-adaptive-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 }
+        "luna-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 3, "candidate-response-envelope-is-invalid": 2, "candidate-response-must-be-strict-JSON": 1 } },
+        "luna-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 3, "candidate-response-envelope-is-invalid": 2, "candidate-response-must-be-strict-JSON": 1 } },
+        "terra-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 1, "candidate-response-envelope-is-invalid": 3, "candidate-response-must-be-strict-JSON": 2 } },
+        "terra-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 3, "candidate-response-envelope-is-invalid": 2, "candidate-response-must-be-strict-JSON": 1 } },
+        "sonnet-disabled": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 2, "candidate-response-envelope-is-invalid": 2, "candidate-response-must-be-strict-JSON": 1, "candidate-response-must-contain-one-complete-JSON-fence": 1 } },
+        "sonnet-adaptive-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0, "failureClassCounts": { "candidate-evidence-field-actual.approval-is-required": 3, "candidate-response-envelope-is-invalid": 2, "candidate-response-must-be-strict-JSON": 1 } }
       },
       "acceptedByFinalContract": 0,
-      "meteredSpendUsd": 0.247391,
+      "artifactMeteredCalibrationSpendUsd": 0.247391,
       "retryCount": 0,
       "checksumSetHash": "b35098a40ac92319a8d15296477c6f90767640554da6f7a033534205d5d3d1db",
-      "failureClasses": [
-        "candidate-evidence-field-actual.approval-is-required",
-        "candidate-response-envelope-is-invalid",
-        "candidate-response-must-be-strict-JSON",
-        "candidate-response-must-contain-one-complete-JSON-fence"
-      ]
+      "failureClassCounts": {
+        "candidate-evidence-field-actual.approval-is-required": 15,
+        "candidate-response-envelope-is-invalid": 13,
+        "candidate-response-must-be-strict-JSON": 7,
+        "candidate-response-must-contain-one-complete-JSON-fence": 1
+      }
     }
   ],
   "combined": {
     "attemptCount": 72,
     "completedCount": 72,
     "acceptedByFinalContract": 0,
-    "meteredSpendUsd": 0.37037899999999985,
+    "artifactMeteredCalibrationSpendUsd": 0.37037899999999985,
     "retryCount": 0,
     "sortedChecksumSetHash": "d2a5e18378a8bc7e996ace8f6ebe566faa20b7a24af736aa269c41bc5114aca7"
   },
@@ -76,7 +74,10 @@
     "providerCapUsd": 30,
     "approvedDispatchReservationUsd": 27.798201000000006,
     "headroomUsd": 2.201798999999994,
-    "remainingReservationAfterCalibrationUsd": 27.427822000000006
+    "capabilityProbeWorstCaseReservePerSetUsd": 0.12552,
+    "capabilityProbeSetsUpperBound": 3,
+    "conservativeProviderSpendUpperBoundUsd": 0.746939,
+    "conservativeBoundFormula": "0.370379 artifact-metered calibration + 3 x 0.12552 capability reserve"
   },
   "terminal": {
     "classification": "insufficient-evidence",
