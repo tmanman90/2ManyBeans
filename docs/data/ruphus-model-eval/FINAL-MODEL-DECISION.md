@@ -1,68 +1,83 @@
-# Ruphus model evaluation: final decision
+# Ruphus model evaluation: terminal decision
 
-Status: insufficient evidence — calibration incomplete.
+Status: `insufficient-evidence`.
 
-The two authorized calibration passes for run `ruphus-2026-08-28-e5acab4d`
-completed 72/72 attributed calls across all six exact arms. The final frozen
-response contract accepted 0/36 responses in each pass, so calibration did not
-establish evidence that can enter qualification. The redacted machine record
-and its checksum-bound derivation are
-[ruphus-2026-08-28-e5acab4d-calibration-outcome.json](runs/ruphus-2026-08-28-e5acab4d-calibration-outcome.json).
+The completed six-arm screen and replacement finalist run do not satisfy the
+pre-registered finalist gate. No model is selected, the shipping chat remains
+unchanged, and Agent v3 remains locked.
 
 ## Bound evidence
 
-- Current manifest evaluation hash: `a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398`.
-- Calibration evaluation hashes: `e5acab4da495a04e5444d0c07829eec769b9704f47b739c7439a36bdd4c2c221` and `a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398`.
-- Sorted identity-bound checksum-set hash for all 72 immutable artifacts: `d2a5e18378a8bc7e996ace8f6ebe566faa20b7a24af736aa269c41bc5114aca7`.
-- Artifact-metered calibration spend: `$0.37` (`0.37037899999999985` machine value); retries: `$0.00` and 0 retry attempts. Capability probes are not persisted in attempt artifacts, so exact all-provider billed spend is not derivable from this ledger.
-- Frozen dispatch reservation: `$27.80` (`27.798201000000006` machine value) within the `$30.00` provider cap; the remaining `$2.20` headroom is non-dispatchable.
-- The conservative bound remains below the cap: `$0.75` (`0.746939` machine value) = `$0.37` artifact-metered calibration plus three visible live capability-set reserves at `$0.13` each (`0.12552` machine value). This is an upper bound, not a claim of exact probe billing.
+- Six-arm screen: 60/60 complete; eligible arms were `luna-medium` and
+  `terra-medium`; evidence hash
+  `1258027e127e7bb29c4f1ecbcd314a2e08f980ee185e8f1d04923056816f8a93`;
+  artifact-metered spend `$0.24` (`0.24293` machine value); zero retries.
+- The locked blind screen preference was Luna medium over Terra medium. Score
+  lock hash: `c352f3deb9123ad440962607afb51bf0ead06b58d85f179ab45514a139605dd1`.
+  Screen decision hash:
+  `caf59d1c5d7216f9b5964fc3583f6dca5bc56bc02553e4ed840c716197e8ac7e`.
+- Replacement finalist run:
+  `ruphus-finalist-replacement-1787998472445`, evaluation hash
+  `a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398`,
+  24/24 attempts; regrade evidence hash
+  `724abc2fc65810a98ee54c8d2a3a0edf69e486d035f086cb511e7f914113af93`;
+  artifact-metered spend `$0.05` (`0.049846999999999995` machine value); zero
+  retries.
+- The detailed regrade is retained outside the repository at
+  `/Users/talmeltzer/Library/Application Support/RuphusEval/ruphus-finalist-replacement-1787998472445-2adA5v/finalist-regrade-4f33712.json`.
+  It is named as a source only; no raw provider content is copied here.
 
-Each pass completed 36 calls: six calibration cases per arm for each of the
-six arms. Per-arm counts are 6/6 completed and 0/6 accepted under the final
-contract in both passes. The first pass had 20/24 OpenAI transport envelopes
-parse before the final schema correction and 0/12 Anthropic envelopes; the
-second pass had 0/36 final-contract acceptances. These counts are metadata
-only; no provider response body, reasoning, header, or credential is included
-in the committed record.
+## Finalist gate
 
-## Terminal decision
+The frozen rule requires at least one valid attempt in each of the six
+workflows for each finalist. Both arms covered read, tasting diagnosis,
+pending recipe proposal, stale-revision refusal, and Coffee-side/fake-Fellow
+preparation. Neither arm covered approval-bound apply: each had 0/2 valid
+attempts, so neither satisfies the gate.
 
-Incomplete calibration evidence means the result is `insufficient-evidence`:
+| arm | valid | invalid | approval-bound apply | other critical evidence |
+| --- | ---: | ---: | ---: | --- |
+| Luna medium | 10/12 | 2 | 0/2 | no unsupported physical claim |
+| Terra medium | 9/12 | 3 | 0/2 | Fellow preparation 1/2; one positive physical claim |
 
-- leave the current shipping chat unchanged;
-- select no model;
-- keep Agent v3 locked;
-- revise and rerun the calibration contract before any scored phase.
+Luna finalist spend was `$0.01` (`0.0052569999999999995`) with aggregate
+latency `39.44s` (`39444.22525100001ms`). Terra finalist spend was `$0.04`
+(`0.04459`) with aggregate latency `37.70s` (`37696.17762500001ms`). These are
+artifact-metered values, not an invoice total.
 
-No qualification, tool-canary, blind review, finalist decision, lifecycle,
-warm, or physical-brew evidence exists: those phases were never dispatched.
-There is therefore no finalist cutoff or human score lock to interpret.
+## Terminal result
 
-A third calibration pass is forbidden by R6 and the frozen manifest’s maximum
-of two complete passes. This is not permission to shrink the denominator or
-reinterpret failed calibration as qualification evidence.
+The machine-readable redacted decision is
+[`ruphus-final-model-decision.json`](runs/ruphus-final-model-decision.json).
+Its terminal classification is `insufficient-evidence`: no production model
+switch, no production Agent v3 unlock, and no change to the shipping chat.
+The missing approval-bound apply evidence is not repaired by counting a
+proposal or a stale-revision refusal as a commit.
 
-## Reproducibility and evidence levels
+The prior calibration-only terminal report remains historical evidence at
+[`ruphus-2026-08-28-e5acab4d-calibration-outcome.json`](runs/ruphus-2026-08-28-e5acab4d-calibration-outcome.json).
+It is superseded as the current report by this screen-plus-finalist result.
 
-Run the focused proof with:
+## Practical development recommendation
 
-```sh
-node scripts/ruphus-eval-calibration-outcome.test.mjs
-```
+This is separate from terminal selection and does not approve production
+mutation: `luna-medium` is the preferred development candidate because it won
+the locked blind quality preference, had 10 versus Terra's 9 valid attempts,
+and was approximately 8.48x cheaper in finalist artifact-metered spend.
+Before any production model selection, make approval-to-commit deterministic
+and app-owned (or an explicit new-turn state), then run only a bounded apply
+confirmation under a separately approved evaluation contract.
 
-When the owner-only immutable artifact directory is available, the second
-test verifies every JSON checksum, run/evaluation/arm/case/repeat identity,
-per-pass and per-arm denominator, metered cost, and the identity-bound
-checksum-set hash. Without that directory, the first test still verifies the
-committed redacted terminal contract; raw provider content is intentionally
-not copied into the repository.
+## Spend and evidence limits
 
-The calibration tier is real-provider metadata plus metered immutable artifact
-checksums. Qualification/finalist evidence, blind-human evidence, and physical
-evidence are all absent. The separate shipping product baseline is not part of
-this evaluation and made no paid call.
+Known artifact-metered spend across historical calibration (`0.37037899999999985`),
+replacement smoke (`0.016222`), composite screen (`0.24293`), invalid first
+finalist (`0.057152`), and replacement finalist
+(`0.049846999999999995`) is `$0.74`
+(`0.7365299999999998` machine value). Capability probes and unmetered failures
+are not exactly billable from artifacts, so this is not an exact provider
+invoice total. The previously proven conservative bound remained below the
+`$30.00` hard cap; no further calls are authorized by this terminal result.
 
-The exact frozen budget and phase contract remain in
-[BUDGET-DECISION.md](BUDGET-DECISION.md), and the current schedule/hash
-inputs remain in [manifest.json](../../../scripts/fixtures/ruphus-eval/manifest.json).
+No Firebase, production, real Fellow, deployment, or model-switch writes were
+made.
