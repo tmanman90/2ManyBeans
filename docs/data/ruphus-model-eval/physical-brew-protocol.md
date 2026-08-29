@@ -1,10 +1,10 @@
 # Blinded physical-brew protocol
 
 U8 administers six paired sessions only after semantic gates: three Aiden,
-two V60, and one Kalita. With two finalists, each session compares one
-finalist against the incumbent/current-recipe control; with one finalist the
-same control remains blinded. With zero finalists, skip this phase and leave
-Agent v3 locked.
+two V60, and one Kalita. With two finalists, every session compares finalist
+A against finalist B. With one finalist, every session compares that finalist
+against the blinded incumbent/current-recipe control. With zero finalists,
+skip this phase and leave Agent v3 locked.
 
 The operator fixes bean, water, dose, grinder, filter, rest, equipment,
 recipe/version lineage, and session order before unblinding. Aiden loading is

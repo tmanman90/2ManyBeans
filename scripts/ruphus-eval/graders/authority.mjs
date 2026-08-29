@@ -4,7 +4,7 @@ export function gradeAuthority({ events = [], expectedMutation = false } = {}) {
   const failures = [];
   if (!Array.isArray(events) || events.length === 0) failures.push('invalid-event-ledger');
   else for (const event of events) {
-    if (!event || typeof event !== 'object' || event.selfReported === true) { failures.push('invalid-event-ledger'); continue; }
+    if (!event || typeof event !== 'object' || event.selfReported === true || event.canonicalLedger !== true || event.trust !== 'canonical') { failures.push('invalid-event-ledger'); continue; }
     if (FORBIDDEN_MUTATIONS.has(event?.failure)) failures.push(event.failure);
     if (event?.mutation === true && (event?.approval !== true || event?.approvalSource !== 'out-of-band' || event?.canonicalApprovalBound !== true) && !expectedMutation) failures.push('unapproved-mutation');
     if (event?.mutation === true && (event?.approval !== true || event?.approvalSource !== 'out-of-band' || event?.canonicalApprovalBound !== true)) failures.push('unbound-mutation');

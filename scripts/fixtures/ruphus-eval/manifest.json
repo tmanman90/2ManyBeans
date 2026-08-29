@@ -18,7 +18,7 @@
   "toolContract": {"approval": "out-of-band", "tasting": "out-of-band", "physicalClaims": "human-evidence-only", "providers": "none-in-U4"},
   "validatorRefs": ["src/lib/aidenProfileValidation.js", "src/lib/v60Adapter.js", "src/lib/kalitaAdapter.js", "src/lib/v60SwitchAdapter.js", "src/lib/v60IcedAdapter.js", "src/lib/kalitaIcedAdapter.js", "src/lib/brewTimerSteps.js", "src/lib/brewMethods.js", "src/data/v60SourceRegistry.js", "src/data/v60SwitchSourceRegistry.js", "src/data/v60IcedSourceRegistry.js", "src/data/kalitaConfiguration.js"],
   "graderRefs": ["scripts/ruphus-eval/graders/recipe.mjs", "scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs"],
-  "toolRefs": ["scripts/ruphus-eval/tools.mjs", "scripts/ruphus-eval/contracts.mjs", "scripts/ruphus-eval/staging-store.mjs", "scripts/ruphus-eval/cases.mjs", "scripts/fixtures/ruphus-eval/schemas/evidence.schema.json", "scripts/fixtures/ruphus-eval/schemas/proposal.schema.json", "scripts/fixtures/ruphus-eval/schemas/receipt.schema.json"],
+  "toolRefs": ["scripts/ruphus-eval/tools.mjs", "scripts/ruphus-eval/contracts.mjs", "scripts/ruphus-eval/staging-store.mjs", "scripts/ruphus-eval/cases.mjs", "scripts/ruphus-eval/recipe-fixtures.mjs", "scripts/fixtures/ruphus-eval/schemas/evidence.schema.json", "scripts/fixtures/ruphus-eval/schemas/proposal.schema.json", "scripts/fixtures/ruphus-eval/schemas/receipt.schema.json"],
   "rendererRefs": ["scripts/ruphus-eval/blinding.mjs"],
   "modelRefs": ["scripts/ruphus-eval/models.mjs", "api/_lib/modelPricing.js"],
   "corpusManifestRef": "docs/data/ruphus-model-eval/corpus-manifest.md",
@@ -26,21 +26,21 @@
   "blindReviewProtocolRef": "docs/data/ruphus-model-eval/blinded-review-protocol.md",
   "physicalProtocolRef": "docs/data/ruphus-model-eval/physical-brew-protocol.md",
   "hashes": {
-    "corpora": "03ee276e893d7faca2ba03f62c11176744ec6eaa78879669c834fcf91dfb9396",
+    "corpora": "563c68e2586e714cce9d7860ddad5eccdad0a76339275fbd429e1f85a41ddb41",
     "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
-    "tools": "5d05d8dd10cbf281f7a1934293809377de62133b3ed1936dbaabf687a3fbcef6",
+    "tools": "b22970c6536da3da1cc860c9bd8c7ef0ec10e887d945050aa0ec5f97692ff89a",
     "modelRegistry": "d3b46daa7216e0c6b02a2f57f1750f3ae79f7a412572dbf2bb62b53bbf7b63d9",
     "validators": "f7a22c66828da27d4758d18fbe39b4517aacf8e3b82f54e26d980458f314c757",
-    "graders": "8abaaeba48813eec71edd9e9c8af95ac1bf153791dfbe509f5f1372461daa1b8",
-    "renderer": "110e3f01504646a675602217730032d502a41afa21999eb76a7e48686a7d9736",
+    "graders": "6ebf6b60612ec180bde68f4053d0a01d273b7493408d70956543334b73ff41be",
+    "renderer": "d4330a3e9f3d940ad8a726605d8cb403d81938deca1ac4b96cc0637e5db7d398",
     "corpusManifest": "e9653c4ea7c507779a93001d9c174a33a5848fd4e627830abf24836745bef4c9",
     "rubric": "194d809ed4d880e20378b5caf1072a4d3478a8dc94b071341719ecbc059fe245",
     "blindReviewProtocol": "72b02563d9eea7c51054e5cc82aa546afdf651fdfb1201f7945773df198bc789",
-    "physicalProtocol": "7c384d749d296366d3ce6c5da85144d140c4bc6a0688916f74b6246c2af0d8e2",
+    "physicalProtocol": "38fc1cb0bde3a87bbc75132150fe4376060dae1222545c52e88bc8cdb7bed188",
     "partitions": "53ea441a14f563ee6cd230a6ae4b66c9f6dc044ecc315209e03d4726dad6bcbc",
     "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
     "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
     "schedule": "05c3fc5019f50e8368780a3f2a31dd1f4ca8a24d07c7f89048c09611fcc936b2",
-    "evaluationHash": "c97095b3aa0d49a75cc3ef9898f8eb549f5c4f35d1a2c90782ad208af7bb242d"
+    "evaluationHash": "f1b5fc59b7ce38cef6f5ce9d20581ef846c76f321e21ea7da5531d76011e4c1a"
   }
 }

@@ -1,19 +1,31 @@
+import { hashValue } from '../contracts.mjs';
+
 export const LIFECYCLE_REQUIRED_ATTEMPTS = 24;
 export const LIFECYCLE_MINIMUM_SUCCESS = 23;
 
-export function gradeLifecycle({ attempts, requiredAttempts = LIFECYCLE_REQUIRED_ATTEMPTS } = {}) {
+export function lifecycleAttemptChecksum(attempt) {
+  if (!attempt || typeof attempt !== 'object') return null;
+  const { ledgerChecksum, expectedLedgerChecksum, ...content } = attempt;
+  return hashValue(content);
+}
+
+export function gradeLifecycle({ attempts, expectedSchedule, requiredAttempts = LIFECYCLE_REQUIRED_ATTEMPTS } = {}) {
   const failures = [];
   if (requiredAttempts !== LIFECYCLE_REQUIRED_ATTEMPTS) failures.push('invalid-lifecycle-contract');
+  if (!Object.isFrozen(expectedSchedule) || !Array.isArray(expectedSchedule) || expectedSchedule.length !== LIFECYCLE_REQUIRED_ATTEMPTS) failures.push('missing-frozen-schedule');
   if (!Array.isArray(attempts) || attempts.length !== requiredAttempts) failures.push('incomplete-lifecycle');
   const values = Array.isArray(attempts) ? attempts : [];
   const expectedIds = values.map((attempt) => `${attempt?.caseId}:${attempt?.repeat}`);
   if (values.some((attempt) => !attempt || typeof attempt !== 'object' || typeof attempt.caseId !== 'string' || !attempt.caseId || !Number.isInteger(attempt.repeat) || ![1, 2].includes(attempt.repeat) || typeof attempt.sessionId !== 'string' || !attempt.sessionId || typeof attempt.revisionId !== 'string' || !attempt.revisionId || typeof attempt.ledgerChecksum !== 'string' || !attempt.ledgerChecksum)) failures.push('invalid-attempt-identity');
   if (new Set(expectedIds).size !== expectedIds.length) failures.push('duplicate-attempt-identity');
+  const expectedKeys = Array.isArray(expectedSchedule) ? expectedSchedule.map((entry) => `${entry?.caseId}:${entry?.repeat}`) : [];
+  if (new Set(expectedKeys).size !== expectedKeys.length || expectedKeys.some((key) => !expectedIds.includes(key)) || expectedIds.some((key) => !expectedKeys.includes(key))) failures.push('schedule-lineage-mismatch');
+  if (new Set(values.map((attempt) => attempt?.sessionId)).size !== values.length || new Set(values.map((attempt) => attempt?.revisionId)).size !== values.length) failures.push('duplicate-lineage-identity');
   const caseCounts = new Map();
   values.forEach((attempt) => { if (attempt?.caseId) caseCounts.set(attempt.caseId, (caseCounts.get(attempt.caseId) || 0) + 1); });
   if (caseCounts.size !== 12 || [...caseCounts.values()].some((count) => count !== 2)) failures.push('invalid-repeat-identity');
   if (values.some((attempt) => typeof attempt?.expectedTerminal !== 'string' || typeof attempt?.actualTerminal !== 'string' || attempt.expectedTerminal !== attempt.actualTerminal)) failures.push('unexpected-terminal-state');
-  if (values.some((attempt) => attempt?.ledgerBound !== true || typeof attempt?.ledgerChecksum !== 'string' || !attempt.ledgerChecksum || attempt.ledgerChecksum !== attempt.expectedLedgerChecksum)) failures.push('unbound-ledger');
+  if (values.some((attempt) => attempt?.ledgerBound !== true || typeof attempt?.ledgerChecksum !== 'string' || !attempt.ledgerChecksum || attempt.ledgerChecksum !== attempt.expectedLedgerChecksum || attempt.ledgerChecksum !== lifecycleAttemptChecksum(attempt))) failures.push('unbound-ledger');
   const successes = values.filter((attempt) => attempt?.valid === true && attempt?.recall === true && attempt?.criticalFailure !== true).length;
   if (successes < Math.max(LIFECYCLE_MINIMUM_SUCCESS, requiredAttempts - 1)) failures.push('lifecycle-reliability-floor');
   if (values.some((attempt) => attempt?.criticalFailure === true)) failures.push('critical-failure');

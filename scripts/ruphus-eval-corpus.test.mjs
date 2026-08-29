@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { hashValue } from './ruphus-eval/contracts.mjs';
-import { casePayloadHash, gradeCase, runCase } from './ruphus-eval/cases.mjs';
+import { casePayloadHash, caseSemanticFingerprint, gradeCase, resolveCaseFixture, runCase } from './ruphus-eval/cases.mjs';
+import { getRecipeFixture } from './ruphus-eval/recipe-fixtures.mjs';
 
 const readJson = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const repoRoot = new URL('../', import.meta.url);
@@ -50,6 +51,16 @@ test('U4 corpus is unique, balanced, synthetic, and fully adjudicated', () => {
     assert.equal(typeof item.grader.name, 'string');
     assert.doesNotThrow(() => runCase(item));
     assert.match(casePayloadHash(item), /^[a-f0-9]{64}$/);
+    assert.match(item.userPrompt, new RegExp(item.method.replace('-', '[ -]')));
+    if (item.category === 'exact-recall') assert.ok(item.fixture.record.recipeHash && item.fixture.record.recipeHash !== item.fixture.record.revisionId);
+    if (item.category === 'taste-diagnosis') assert.ok(item.fixture.tasting?.language && item.fixture.tasting?.history?.doseGrams);
+    if (item.category === 'method-grinder') {
+      assert.ok(item.fixture.recipeInputRef && item.fixture.candidateRecipeRef && item.fixture.grindObservation?.beforeMicrons);
+      assert.doesNotThrow(() => resolveCaseFixture(item));
+      assert.ok(item.expected.diff?.path && item.expected.grind?.deltaMicrons);
+    }
+    if (item.category === 'authority-revision') assert.ok(item.fixture.trace?.some((event) => event.trust === 'canonical') && item.fixture.approvalBinding?.source === 'out-of-band');
+    if (item.category === 'failures-receipts') assert.equal(item.fixture.injectedBoundary?.initialOnly, true);
     assert.equal(item.groundTruth.mutation === true, item.expectedTerminal === 'resume-idempotent');
     assert.doesNotMatch(JSON.stringify(item), /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i, `${item.id}:PII`);
     assert.doesNotMatch(JSON.stringify(item), /202[0-9]-[0-9]{2}-[0-9]{2}T/, `${item.id}:mutable timestamp`);
@@ -59,11 +70,16 @@ test('U4 corpus is unique, balanced, synthetic, and fully adjudicated', () => {
   assertPartition('qualification', manifest.partitions.qualification);
   assertPartition('finalistDecision', manifest.partitions.finalistDecision);
   assert.equal(new Set([...manifest.partitions.qualification, ...manifest.partitions.finalistDecision]).size, 44);
+  const paidCases = [...manifest.partitions.qualification, ...manifest.partitions.finalistDecision].map((id) => decision.find((item) => item.id === id));
+  assert.ok(paidCases.every((item) => !['resume-idempotent', 'partial-preparation', 'preparation-failed'].includes(item.expectedTerminal)));
+  assert.ok(paidCases.every((item) => item.action !== 'apply' && item.action !== 'undo'));
   assert.ok(calibration.every((item) => item.fixture.phase === 'calibration'));
   assert.ok(decision.every((item) => item.fixture.phase === 'decision'));
   assert.equal(new Set(calibration.map(casePayloadHash)).size, calibration.length);
   assert.equal(new Set(decision.map(casePayloadHash)).size, decision.length);
   assert.equal(new Set(calibration.map(casePayloadHash).filter((hash) => decision.map(casePayloadHash).includes(hash))).size, 0);
+  const decisionSemantic = new Set(decision.map(caseSemanticFingerprint));
+  assert.equal(calibration.map(caseSemanticFingerprint).filter((hash) => decisionSemantic.has(hash)).length, 0, 'calibration workload must be semantically disjoint');
 });
 
 test('U4 manifest freezes the amended schedule and gate-first outcomes', () => {
@@ -113,11 +129,14 @@ test('U4 cases execute through deterministic category graders', () => {
   const recipeCase = decision.find((item) => item.category === 'method-grinder');
   const authorityCase = decision.find((item) => item.category === 'authority-revision');
   const failureCase = decision.find((item) => item.category === 'failures-receipts');
-  assert.equal(gradeCase(recallCase, { ...recallCase.expected.identity, recipeHash: recallCase.expected.identity.revisionId, provenance: recallCase.expected.provenance, terminal: recallCase.expected.terminal }).hardGate, true);
-  assert.equal(gradeCase(recallCase, { ...recallCase.expected.identity, recipeHash: 'wrong', provenance: recallCase.expected.provenance, terminal: recallCase.expected.terminal }).hardGate, false);
-  assert.equal(gradeCase(diagnosisCase, { terminal: diagnosisCase.expected.terminal, action: diagnosisCase.action, mutation: false }).hardGate, true);
-  assert.equal(gradeCase(recipeCase, { terminal: recipeCase.expected.terminal, mutation: false, recipe: { valid: true, method: recipeCase.method }, grind: { valid: true } }).hardGate, true);
-  assert.equal(gradeCase(authorityCase, { terminal: authorityCase.expected.terminal, events: [{ mutation: false }] }).hardGate, true);
-  assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, mutation: false, failureAttributed: true }).hardGate, true);
-  assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, mutation: false, failureAttributed: false }).hardGate, false);
+  assert.equal(gradeCase(recallCase, { ...recallCase.expected.record, terminal: recallCase.expected.terminal }).hardGate, true);
+  assert.equal(gradeCase(recallCase, { ...recallCase.expected.record, recipeHash: 'wrong', terminal: recallCase.expected.terminal }).hardGate, false);
+  assert.equal(gradeCase(diagnosisCase, { terminal: diagnosisCase.expected.terminal, diagnosis: diagnosisCase.expected.diagnosis, mutation: false }).hardGate, true);
+  assert.equal(gradeCase(diagnosisCase, { terminal: diagnosisCase.expected.terminal, diagnosis: { ...diagnosisCase.expected.diagnosis, cause: 'invented-cause' }, mutation: false }).hardGate, false);
+  assert.equal(gradeCase(recipeCase, { terminal: recipeCase.expected.terminal, mutation: false, recipe: getRecipeFixture(recipeCase.method), grind: recipeCase.expected.grind }).hardGate, true);
+  assert.equal(gradeCase(recipeCase, { terminal: recipeCase.expected.terminal, mutation: false, recipe: { ...getRecipeFixture(recipeCase.method), method: 'forged' }, grind: recipeCase.expected.grind }).hardGate, false);
+  assert.equal(gradeCase(authorityCase, { terminal: authorityCase.expected.terminal, events: [{ mutation: false, canonicalLedger: true, trust: 'canonical' }] }).hardGate, true);
+  assert.equal(gradeCase(authorityCase, { terminal: authorityCase.expected.terminal, events: [{ mutation: false }] }).hardGate, false);
+  assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, fault: failureCase.expected.fault, mutation: false }).hardGate, true);
+  assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, fault: { ...failureCase.expected.fault, errorCode: 'FORGED' }, mutation: false }).hardGate, false);
 });
