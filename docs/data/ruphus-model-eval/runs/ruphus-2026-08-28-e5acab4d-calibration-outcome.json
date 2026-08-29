@@ -1,0 +1,105 @@
+{
+  "kind": "ruphus-calibration-outcome",
+  "version": 1,
+  "runId": "ruphus-2026-08-28-e5acab4d",
+  "manifestEvaluationHash": "a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398",
+  "evaluationHashes": [
+    "e5acab4da495a04e5444d0c07829eec769b9704f47b739c7439a36bdd4c2c221",
+    "a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398"
+  ],
+  "arms": [
+    "luna-medium",
+    "luna-high",
+    "terra-medium",
+    "terra-high",
+    "sonnet-disabled",
+    "sonnet-adaptive-high"
+  ],
+  "passes": [
+    {
+      "evaluationHash": "e5acab4da495a04e5444d0c07829eec769b9704f47b739c7439a36bdd4c2c221",
+      "attemptCount": 36,
+      "completedCount": 36,
+      "perArm": {
+        "luna-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "luna-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "terra-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "terra-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "sonnet-disabled": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "sonnet-adaptive-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 }
+      },
+      "transportEnvelopeParsedBeforeFinalSchema": { "openai": 20, "anthropic": 0 },
+      "acceptedByFinalContract": 0,
+      "meteredSpendUsd": 0.12298800000000001,
+      "retryCount": 0,
+      "checksumSetHash": "47b0b82ada1a321bc3e2c04ae5be78d1c83bb251c35c7dac66770ef4f36da000",
+      "failureClasses": [
+        "candidate-evidence-field-actual.approval-is-required",
+        "candidate-response-envelope-is-invalid",
+        "candidate-response-must-be-strict-JSON",
+        "candidate-response-must-contain-one-complete-JSON-fence"
+      ]
+    },
+    {
+      "evaluationHash": "a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398",
+      "attemptCount": 36,
+      "completedCount": 36,
+      "perArm": {
+        "luna-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "luna-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "terra-medium": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "terra-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "sonnet-disabled": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 },
+        "sonnet-adaptive-high": { "attemptCount": 6, "completedCount": 6, "acceptedByFinalContract": 0 }
+      },
+      "acceptedByFinalContract": 0,
+      "meteredSpendUsd": 0.247391,
+      "retryCount": 0,
+      "checksumSetHash": "b35098a40ac92319a8d15296477c6f90767640554da6f7a033534205d5d3d1db",
+      "failureClasses": [
+        "candidate-evidence-field-actual.approval-is-required",
+        "candidate-response-envelope-is-invalid",
+        "candidate-response-must-be-strict-JSON",
+        "candidate-response-must-contain-one-complete-JSON-fence"
+      ]
+    }
+  ],
+  "combined": {
+    "attemptCount": 72,
+    "completedCount": 72,
+    "acceptedByFinalContract": 0,
+    "meteredSpendUsd": 0.37037899999999985,
+    "retryCount": 0,
+    "sortedChecksumSetHash": "d2a5e18378a8bc7e996ace8f6ebe566faa20b7a24af736aa269c41bc5114aca7"
+  },
+  "budget": {
+    "providerCapUsd": 30,
+    "approvedDispatchReservationUsd": 27.798201000000006,
+    "headroomUsd": 2.201798999999994,
+    "remainingReservationAfterCalibrationUsd": 27.427822000000006
+  },
+  "terminal": {
+    "classification": "insufficient-evidence",
+    "reason": "incomplete-calibration-evidence",
+    "shippingChat": "unchanged",
+    "modelSelected": false,
+    "agentV3": "locked",
+    "reviseRerunRequired": true,
+    "qualificationDispatched": false,
+    "finalistDecisionDispatched": false,
+    "physicalEvidence": false,
+    "thirdCalibrationPass": "forbidden-by-R6-and-frozen-manifest"
+  },
+  "evidence": {
+    "calibration": "real-provider-metadata-and-metered-artifact-checksums",
+    "qualification": "none",
+    "finalistDecision": "none",
+    "blindHuman": "none",
+    "physical": "none"
+  },
+  "redaction": {
+    "rawProviderContentCommitted": false,
+    "providerReasoningCommitted": false,
+    "headersOrSecretsCommitted": false
+  }
+}
