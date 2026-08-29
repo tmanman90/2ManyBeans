@@ -230,10 +230,49 @@ test('U4 recall and authority graders are deterministic hard gates', () => {
 });
 
 test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async () => {
+  const candidateDriver = () => {
+    let proposalId = null;
+    return async ({ phase, scenario, tools, limits, store }) => {
+      assert.equal(store, undefined);
+      assert.deepEqual(limits, { maxToolCalls: 8, maxContinuationPhases: 2 });
+      const call = (name, args = {}) => tools.call(name, args);
+      if (phase === 'candidate') {
+        if (scenario.operation === 'read' || scenario.operation === 'clarification' || scenario.operation === 'incomplete') await call('readCoffee');
+        if (scenario.operation === 'read' || scenario.operation === 'incomplete') await call('completeTurn', { outcome: scenario.expectedTerminal });
+        if (scenario.operation === 'clarification') await call('completeTurn', { outcome: 'clarification' });
+        if (['proposal', 'commit', 'prepare', 'undo', 'denial', 'replay'].includes(scenario.operation)) {
+          await call('readCoffee');
+          const result = await call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: scenario.candidateRecipe, idempotencyKey: `driver-${scenario.operation}` });
+          proposalId = result.proposal.id;
+          if (scenario.operation === 'replay') await call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: scenario.candidateRecipe, idempotencyKey: `driver-${scenario.operation}` });
+          if (scenario.operation === 'proposal' || scenario.operation === 'replay') await call('completeTurn', { outcome: 'complete' });
+        }
+        if (scenario.operation === 'tasting-receipt') { await call('readCoffee'); await call('completeTurn', { outcome: 'complete' }); }
+        if (scenario.operation === 'stale-write') {
+          await call('readCoffee');
+          try { await call('proposeRecipe', { expectedRevision: 99, method: 'aiden', recipe: scenario.candidateRecipe, idempotencyKey: 'driver-stale' }); } catch { /* expected */ }
+          await call('completeTurn', { outcome: 'stale-revision' });
+        }
+        if (scenario.operation === 'read-failure') {
+          await call('readCoffee');
+          try { await call('readCoffee', { coffeeId: 'wrong-coffee' }); } catch { /* expected */ }
+          await call('completeTurn', { outcome: 'read-failure' });
+        }
+      } else if (phase === 'after-denial') {
+        await call('completeTurn', { outcome: 'refusal' });
+      } else if (phase === 'after-approval') {
+        const applied = await call('applyProposal', { proposalId, expectedRevision: 0, idempotencyKey: `driver-apply-${scenario.operation}` });
+        if (scenario.operation === 'prepare') await call('prepareBrew', { expectedRevision: applied.revision.number, revisionId: applied.revision.id });
+        if (scenario.operation === 'undo') await call('undoRevision', { expectedRevision: applied.revision.number, idempotencyKey: 'driver-undo' });
+        await call('completeTurn', { outcome: 'complete' });
+      }
+      return { response: { phase }, trace: [{ operation: scenario.operation, phase }] };
+    };
+  };
   const executions = await Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
     const store = new StagingStore({ userId: `user-u4-${index}` });
     store.reset({ coffeeId: `coffee-u4-${index}`, recipe: { seed: index } });
-    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store }) };
+    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(), candidateIdentity: { armId: `arm-${index % 6}`, runId: 'u4-run', attemptId: `attempt-${index}` } }) };
   }));
   const passing = sealLifecycleAttempts(executions);
   assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
@@ -247,6 +286,10 @@ test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async 
   assert.ok(byKey.get('case-6:1').events.some((event) => event.kind === 'tasting-recorded'));
   assert.ok(byKey.get('case-7:1').snapshot.revisions.some((revision) => revision.operation === 'undo'));
   assert.ok(byKey.get('case-9:1').events.some((event) => event.kind === 'idempotency-replay'));
+  const noOpStore = new StagingStore({ userId: 'u4-no-op' });
+  noOpStore.reset({ coffeeId: 'coffee-u4-no-op', recipe: { seed: 999 } });
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: async () => ({ response: 'no tools', trace: [] }), candidateIdentity: { armId: 'arm-no-op', runId: 'u4-run-no-op', attemptId: 'attempt-no-op' } }), /did not complete/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateIdentity: { armId: 'arm-missing', runId: 'u4-run-missing', attemptId: 'attempt-missing' } }), /arguments are fixed/);
   assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule: LIFECYCLE_SCHEDULE }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.slice(0, 22) }).hardGate, false);
   assert.throws(() => sealLifecycleAttempts(LIFECYCLE_SCHEDULE.map((entry) => ({ ...entry, store: new StagingStore() }))), /runner execution/);

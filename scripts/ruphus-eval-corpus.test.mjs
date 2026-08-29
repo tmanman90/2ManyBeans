@@ -19,9 +19,15 @@ const initialActions = new Set(['read', 'diagnose', 'propose', 'clarify', 'refus
 const expectedPayloadFields = ['recipe', 'diff', 'grind', 'fault', 'ledger'];
 const aidenDiagnosisRecipe = Object.freeze({ profileType: 0, title: 'Aiden diagnosis fixture', ratio: 17, bloomEnabled: true, bloomRatio: 3, bloomDuration: 45, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 23, ssPulseTemperatures: [96, 95], batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: [96, 95] });
 function candidateRecipeFor(item) {
-  if (item.id === 'dec-022') return { ...aidenDiagnosisRecipe, ratio: 16 };
-  if (item.id === 'dec-023') { const recipe = generateV60IcedRecipe({}, { dose: 20 }); return { ...recipe, grindSize: { ...recipe.grindSize, microns: 641 } }; }
-  return getRecipeFixture(item.method);
+  const starting = item.id === 'dec-022' ? aidenDiagnosisRecipe : item.id === 'dec-023' ? generateV60IcedRecipe({}, { dose: 20 }) : getRecipeFixture(item.method);
+  const candidate = structuredClone(starting);
+  const path = item.expected.diff?.path;
+  if (!path) return candidate;
+  const keys = path.split('.');
+  let target = candidate;
+  for (const key of keys.slice(0, -1)) target = target[key];
+  target[keys.at(-1)] = item.expected.diff.to;
+  return candidate;
 }
 const pendingProposal = (item) => ({
   proposalId: `${item.id}-proposal`, status: 'pending', method: item.method,
@@ -109,16 +115,19 @@ test('U4 corpus is unique, balanced, synthetic, and fully adjudicated', () => {
     assert.doesNotThrow(() => runCase(item));
     assert.match(casePayloadHash(item), /^[a-f0-9]{64}$/);
     assert.match(item.userPrompt, new RegExp(item.method.replace('-', '[ -]')));
-    if (item.category === 'exact-recall') assert.ok(item.fixture.record.recipeHash && item.fixture.record.recipeHash !== item.fixture.record.revisionId);
+    if (item.category === 'exact-recall') {
+      if (item.expected.record) assert.ok(item.fixture.record?.recipeHash && item.fixture.record.recipeHash !== item.fixture.record.revisionId);
+      else assert.equal(item.fixture.record, null, `${item.id}: missing evidence must not carry a record`);
+    }
     if (item.category === 'taste-diagnosis') assert.ok(item.fixture.tasting?.language && item.fixture.tasting?.history?.doseGrams);
     if (item.category === 'method-grinder') {
       if (item.expectedTerminal === 'advisory-only') {
         assert.equal(item.fixture.recipeInputRef, null, `${item.id}: advisory method must not enter canonical recipe validation`);
       } else {
-        assert.ok(item.fixture.recipeInputRef && item.fixture.candidateRecipeRef && item.fixture.grindObservation?.beforeMicrons);
+        assert.ok(item.fixture.recipeInputRef && item.fixture.candidateRecipeRef && (item.fixture.grindObservation?.beforeMicrons || item.fixture.controlledChange?.path));
       }
       assert.doesNotThrow(() => resolveCaseFixture(item));
-      assert.ok(item.expected.diff?.path && item.expected.grind?.deltaMicrons);
+      assert.ok(item.expected.diff?.path && (item.expected.grind?.deltaMicrons || item.expected.diff.path === 'ratio'));
     }
     if (item.category === 'authority-revision') assert.ok(item.fixture.trace?.some((event) => event.trust === 'canonical') && item.fixture.approvalBinding?.source === 'out-of-band');
     if (item.category === 'failures-receipts') assert.equal(item.fixture.injectedBoundary?.initialOnly, true);
@@ -367,4 +376,15 @@ test('diagnosis observations and expected controls match the independent contrac
     assert.equal(item.expected.diagnosis.cause, expected.cause, item.id);
     assert.equal(item.expected.diagnosis.controlledChange.direction, expected.direction, item.id);
   }
+});
+
+test('calibration cross-field contract is coherent and semantically disjoint', () => {
+  for (const item of calibration) {
+    assert.equal(item.fixture.evidence.condition, item.evidenceCondition, item.id);
+    assert.equal(item.fixture.promptInputs.evidenceCondition, item.evidenceCondition, item.id);
+    assert.equal(item.fixture.promptInputs.action, item.action, item.id);
+    assert.equal(item.fixture.payload.action, item.action, item.id);
+    if (item.evidenceCondition === 'missing') assert.ok(['clarification', 'insufficient-evidence'].includes(item.expectedTerminal), item.id);
+  }
+  assert.equal(new Set(calibration.map(caseSemanticFingerprint)).size, calibration.length);
 });

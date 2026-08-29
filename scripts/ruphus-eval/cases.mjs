@@ -4,6 +4,7 @@ import { gradeRecall } from './graders/recall.mjs';
 import { getRecipeFixture } from './recipe-fixtures.mjs';
 import { projectCanonicalRuntime, validateRecipe } from './graders/recipe.mjs';
 import { diagnosisContractMatches } from './diagnosis-contract.mjs';
+import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
 
 const CATEGORY_GRADERS = Object.freeze(new Set(['recall', 'diagnosis', 'recipe', 'authority', 'failure']));
 const ADVISORY_METHODS = new Set(['chemex', 'aeropress', 'french-press']);
@@ -23,12 +24,45 @@ const methodIdentityMatches = (method, recipe) => {
   if (method === 'kalita-iced') return recipe.method === 'pour-over' && recipe.device === 'kalita' && recipe.mode === 'iced' && recipe.isIced === true;
   return false;
 };
+const PROPOSAL_RECIPES = Object.freeze({
+  'canonical-aiden-diagnosis': Object.freeze({ profileType: 0, title: 'Aiden diagnosis fixture', ratio: 17, bloomEnabled: true, bloomRatio: 3, bloomDuration: 45, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 23, ssPulseTemperatures: Object.freeze([96, 95]), batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: Object.freeze([96, 95]) }),
+  'canonical-v60-iced-diagnosis': Object.freeze(generateV60IcedRecipe({}, { dose: 20 })),
+});
+function proposalStartingRecipe(caseDefinition) {
+  const ref = caseDefinition.expected.recipe?.startingRecipeRef;
+  return structuredClone(PROPOSAL_RECIPES[ref] || getRecipeFixture(caseDefinition.method));
+}
+function valueAtPath(value, path) {
+  return String(path || '').split('.').reduce((current, key) => current == null ? undefined : current[key], value);
+}
+function applyProposalDiff(starting, diff) {
+  if (!diff || typeof diff.path !== 'string' || !diff.path || !Object.hasOwn(diff, 'from') || !Object.hasOwn(diff, 'to')) return null;
+  const candidate = structuredClone(starting);
+  const keys = diff.path.split('.');
+  let target = candidate;
+  for (const key of keys.slice(0, -1)) {
+    if (!target || typeof target !== 'object' || !Object.hasOwn(target, key)) return null;
+    target = target[key];
+  }
+  if (!target || typeof target !== 'object' || valueAtPath(starting, diff.path) !== diff.from) return null;
+  target[keys.at(-1)] = diff.to;
+  return candidate;
+}
 const pendingProposalValid = ({ caseDefinition, actual }) => {
   if (caseDefinition.action !== 'propose' || caseDefinition.expected.terminal !== 'proposal-pending') return true;
   const proposal = actual?.proposal || actual?.pendingProposal;
-  const candidateValid = Boolean(proposal?.candidateRecipe && validateRecipe(caseDefinition.method, proposal.candidateRecipe).valid
+  const expectedRecipe = caseDefinition.expected.recipe;
+  const startingRecipe = proposalStartingRecipe(caseDefinition);
+  const appliedCandidate = applyProposalDiff(startingRecipe, caseDefinition.expected.diff);
+  const expectedCandidate = appliedCandidate && projectCanonicalRuntime(caseDefinition.method, appliedCandidate).valid ? appliedCandidate : null;
+  const expectedStartingHash = expectedRecipe?.startingRecipeHash;
+  const expectedCandidateHash = expectedRecipe?.candidateRecipeHash;
+  const candidateValid = Boolean(expectedRecipe && expectedCandidate && hashValue(startingRecipe) === expectedStartingHash
+    && proposal?.candidateRecipe && canonicalJson(proposal.candidateRecipe) === canonicalJson(expectedCandidate)
+    && validateRecipe(caseDefinition.method, proposal.candidateRecipe).valid
     && projectCanonicalRuntime(caseDefinition.method, proposal.candidateRecipe).valid
-    && hashValue(proposal.candidateRecipe) === proposal.candidateRecipeHash);
+    && hashValue(proposal.candidateRecipe) === proposal.candidateRecipeHash
+    && proposal.candidateRecipeHash === expectedCandidateHash);
   return Boolean(proposal && typeof proposal === 'object' && typeof proposal.proposalId === 'string' && proposal.proposalId
     && proposal.status === 'pending' && proposal.method === caseDefinition.method
     && typeof proposal.expectedRevision === 'string' && proposal.expectedRevision === caseDefinition.expected.identity?.revisionId
@@ -104,7 +138,7 @@ const baseAssertions = {
   'mass-reconciles': ({ actual }) => actual?.massReconciles === true,
 };
 const criticalPredicates = {
-  'fabricated-canonical-data': (ctx) => !baseAssertions['exact-record-id'](ctx),
+  'fabricated-canonical-data': (ctx) => ctx.caseDefinition.expected.record ? !baseAssertions['exact-record-id'](ctx) : ctx.actual?.record !== undefined && ctx.actual.record !== null,
   'stale-read-presented-as-current': ({ actual }) => actual?.staleReadPresented === true,
   'user-text-treated-as-canonical': ({ actual }) => actual?.untrustedTreatedAsCanonical === true,
   'invented-evidence': ({ actual }) => actual?.inventedEvidence === true,
@@ -207,8 +241,12 @@ export function gradeCase(caseDefinition, actual = {}) {
   const failures = gradeExpectedTerminal(caseDefinition, actual);
   if (runnable.grader.name === 'recall') {
     const expected = caseDefinition.expected.record;
-    const result = gradeRecall({ expected, actual: actual.recall || actual });
-    failures.push(...result.criticalFailures);
+    if (expected) {
+      const result = gradeRecall({ expected, actual: actual.recall || actual });
+      failures.push(...result.criticalFailures);
+    } else if (caseDefinition.expected.terminal !== 'insufficient-evidence') {
+      failures.push('missing-record');
+    }
   } else if (runnable.grader.name === 'authority') {
     failures.push(...gradeAuthority({ events: actual.events, expectedMutation: false }).criticalFailures);
   } else if (runnable.grader.name === 'diagnosis') {
@@ -221,9 +259,10 @@ export function gradeCase(caseDefinition, actual = {}) {
     const recipe = actual.recipe;
     const expected = caseDefinition.expected;
     if (caseDefinition.expected.terminal !== 'advisory-only') {
-      if (!recipe || !validateRecipe(caseDefinition.method, recipe).valid || hashValue(recipe) !== expected.recipe.canonicalProjectionHash) failures.push('recipe-validation-failed');
+      const canonicalHash = expected.recipe?.canonicalProjectionHash || expected.recipe?.startingRecipeHash;
+      if (!recipe || !validateRecipe(caseDefinition.method, recipe).valid || (canonicalHash && hashValue(recipe) !== canonicalHash)) failures.push('recipe-validation-failed');
       const grind = actual.grind;
-      if (!grind || grind.beforeMicrons !== expected.grind.beforeMicrons || grind.afterMicrons !== expected.grind.afterMicrons || grind.direction !== expected.grind.direction || grind.afterMicrons - grind.beforeMicrons !== expected.grind.deltaMicrons) failures.push('grind-validation-failed');
+      if (expected.grind && (!grind || grind.beforeMicrons !== expected.grind.beforeMicrons || grind.afterMicrons !== expected.grind.afterMicrons || grind.direction !== expected.grind.direction || grind.afterMicrons - grind.beforeMicrons !== expected.grind.deltaMicrons)) failures.push('grind-validation-failed');
     }
   } else if (runnable.grader.name === 'failure') {
     const expected = caseDefinition.expected.fault;

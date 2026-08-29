@@ -21,7 +21,7 @@ function coffeeEvidence(result) {
   };
 }
 
-const COMPLETION_OUTCOMES = new Set(['complete', 'clarification', 'refusal', 'insufficient-evidence', 'error']);
+const COMPLETION_OUTCOMES = new Set(['complete', 'clarification', 'refusal', 'insufficient-evidence', 'stale-revision', 'read-failure', 'error']);
 
 /** Provider-neutral model tools. Approval is intentionally out of band. */
 export function createEvaluationTools(store) {

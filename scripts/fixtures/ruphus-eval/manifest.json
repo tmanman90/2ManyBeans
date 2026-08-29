@@ -26,12 +26,12 @@
   "blindReviewProtocolRef": "docs/data/ruphus-model-eval/blinded-review-protocol.md",
   "physicalProtocolRef": "docs/data/ruphus-model-eval/physical-brew-protocol.md",
   "hashes": {
-    "corpora": "15f6ad60a6da17fad9d7034cf97ccb98d4140a714c5e0cbd511bb92b20170c58",
+    "corpora": "0298380ca481904b43892520fd180a87fe5ba28c24fd0972f7ae86c22ccfaeef",
     "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
-    "tools": "c196207f881b8029a33867d94e49504f5f8bd7f808434ad9496321795a5d22d1",
+    "tools": "663329c1818b11e4f3cdb15cb3ff422971b6070fd1e078b30eaa1623aa607ddf",
     "modelRegistry": "d3b46daa7216e0c6b02a2f57f1750f3ae79f7a412572dbf2bb62b53bbf7b63d9",
     "validators": "f7a22c66828da27d4758d18fbe39b4517aacf8e3b82f54e26d980458f314c757",
-    "graders": "d32bf92382975ec0fcc396d8401cb3632309da7d0d83454b6eddbb88bd479fe7",
+    "graders": "e7345696810455e50f41fd187f993e2b098d252305ac6b89e2ab7a00eeb27bed",
     "renderer": "c7290da65e42afbf4a812546a7fe71c037dc2f661b25242666834875ef8dc84a",
     "corpusManifest": "e9653c4ea7c507779a93001d9c174a33a5848fd4e627830abf24836745bef4c9",
     "rubric": "194d809ed4d880e20378b5caf1072a4d3478a8dc94b071341719ecbc059fe245",
@@ -41,6 +41,6 @@
     "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
     "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
     "schedule": "05c3fc5019f50e8368780a3f2a31dd1f4ca8a24d07c7f89048c09611fcc936b2",
-    "evaluationHash": "b284fcaa8679969ba48ee4e1713f26b3afe1691ae81eff98bdb7365fe67af89f"
+    "evaluationHash": "4d265041670b54805dfe9615e3619f6fdfbc8898e7f6e78c97acd8fc7cba4bf8"
   }
 }

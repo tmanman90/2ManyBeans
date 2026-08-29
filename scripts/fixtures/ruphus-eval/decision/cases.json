@@ -2656,7 +2656,7 @@
     "groundTruth": { "mutation": false, "approval": false },
     "criticalFailures": ["invalid-aiden-payload"],
     "assertions": ["canonical-validator", "proposal-unapproved"],
-    "userPrompt": "Validate the canonical aiden hot recipe fixture and a grinder change from 600µm to 650µm (coarser). Return the exact projection, diff, and unchanged controls; do not commit.",
+    "userPrompt": "Validate the canonical aiden hot recipe fixture and a controlled ratio change from 17 to 18 (higher extraction). Return the exact projection, diff, and unchanged controls; do not commit.",
     "fixture": {
       "phase": "decision",
       "evidence": {
@@ -2697,18 +2697,13 @@
         "action": "propose"
       },
       "recipeInputRef": "canonical-aiden",
-      "candidateRecipeRef": "canonical-aiden",
+      "candidateRecipeRef": "canonical-aiden-ratio18",
       "recipeProjection": {
         "fixtureId": "canonical-aiden",
         "canonicalHash": "b6765ec5c52e074f363f65d22a7ba7dd9b37559fb031e203562ab75564a6464e",
         "valid": true
       },
-      "grindObservation": {
-        "beforeMicrons": 600,
-        "afterMicrons": 650,
-        "direction": "coarser",
-        "deltaMicrons": 50
-      }
+      "controlledChange": { "path": "ratio", "from": 17, "to": 18, "direction": "higher-extraction" }
     },
     "expected": {
       "terminal": "proposal-pending",
@@ -2727,24 +2722,21 @@
       "provenance": { "source": "synthetic-adjudicated", "trust": "canonical" },
       "recipe": {
         "fixtureId": "canonical-aiden",
-        "candidateFixtureId": "canonical-aiden",
-        "canonicalProjectionHash": "b6765ec5c52e074f363f65d22a7ba7dd9b37559fb031e203562ab75564a6464e",
-        "valid": true
+        "candidateFixtureId": "canonical-aiden-ratio18",
+        "startingRecipeHash": "b6765ec5c52e074f363f65d22a7ba7dd9b37559fb031e203562ab75564a6464e",
+        "candidateRecipeHash": "08eecd2865602599b5ff249ac05b9e66231c37b1b85271f76a4fc941db0fb091",
+        "valid": true,
+        "projected": true
       },
       "controls": ["doseGrams", "waterGrams", "waterTemperatureC"],
       "diff": {
-        "path": "grindSize.microns",
-        "from": 600,
-        "to": 650,
-        "deltaMicrons": 50,
-        "direction": "coarser"
+        "path": "ratio",
+        "from": 17,
+        "to": 18,
+        "delta": 1,
+        "direction": "higher-extraction"
       },
-      "grind": {
-        "beforeMicrons": 600,
-        "afterMicrons": 650,
-        "direction": "coarser",
-        "deltaMicrons": 50
-      },
+      "grind": null,
       "fault": null,
       "ledger": {
         "mutation": false,
@@ -2844,6 +2836,8 @@
         "fixtureId": "canonical-v60",
         "candidateFixtureId": "canonical-v60",
         "canonicalProjectionHash": "ccbf5290b1095daea0faf1e109666ee23ec87faee09a486ee985d849a77c5d55",
+        "startingRecipeHash": "ccbf5290b1095daea0faf1e109666ee23ec87faee09a486ee985d849a77c5d55",
+        "candidateRecipeHash": "664d2dd6b1d05345c6d6b063d4b475c3b827f6745081e01d08d86aeaa97d18f0",
         "valid": true
       },
       "diff": {
@@ -2958,6 +2952,8 @@
         "fixtureId": "canonical-kalita",
         "candidateFixtureId": "canonical-kalita",
         "canonicalProjectionHash": "8d4897897c7243b738085820628a093ca22721f757d96cf231f01ff525516ea4",
+        "startingRecipeHash": "8d4897897c7243b738085820628a093ca22721f757d96cf231f01ff525516ea4",
+        "candidateRecipeHash": "79d85c1f722f2c60cd62d929fd6581f3ad8aee04984f3963e46f4a21d1c06726",
         "valid": true
       },
       "diff": {
@@ -3072,6 +3068,8 @@
         "fixtureId": "canonical-v60-switch",
         "candidateFixtureId": "canonical-v60-switch",
         "canonicalProjectionHash": "5755c5187d6c21181e549e4a89c574a133affe6208576a538fca47bb0165539e",
+        "startingRecipeHash": "5755c5187d6c21181e549e4a89c574a133affe6208576a538fca47bb0165539e",
+        "candidateRecipeHash": "1302c48cb7c8618004866da9a49f15ebfa03e871206be24dc437fa6f075ea364",
         "valid": true
       },
       "diff": {
@@ -3186,6 +3184,8 @@
         "fixtureId": "canonical-v60-iced",
         "candidateFixtureId": "canonical-v60-iced",
         "canonicalProjectionHash": "33eb7f147d3355e0bc18eee24566f590c61281366961cc4360327a680bc98d05",
+        "startingRecipeHash": "33eb7f147d3355e0bc18eee24566f590c61281366961cc4360327a680bc98d05",
+        "candidateRecipeHash": "0e2d05a6aa10f4cb48160b7af64b34d44693bb4ec48ca1b19ac60be9aa7eecd0",
         "valid": true
       },
       "diff": {
@@ -3300,6 +3300,8 @@
         "fixtureId": "canonical-kalita-iced",
         "candidateFixtureId": "canonical-kalita-iced",
         "canonicalProjectionHash": "f82b888327aedd9c9957a623b082bfbb8a5ef7409c73a9bb1be2365e1bc00631",
+        "startingRecipeHash": "f82b888327aedd9c9957a623b082bfbb8a5ef7409c73a9bb1be2365e1bc00631",
+        "candidateRecipeHash": "b2d8894ee819b7db674f1085a215e2a7f65e9676ffdbebcc54b04af39d756853",
         "valid": true
       },
       "diff": {
@@ -3642,6 +3644,8 @@
         "fixtureId": "canonical-v60-switch",
         "candidateFixtureId": "canonical-v60-switch",
         "canonicalProjectionHash": "5755c5187d6c21181e549e4a89c574a133affe6208576a538fca47bb0165539e",
+        "startingRecipeHash": "5755c5187d6c21181e549e4a89c574a133affe6208576a538fca47bb0165539e",
+        "candidateRecipeHash": "1302c48cb7c8618004866da9a49f15ebfa03e871206be24dc437fa6f075ea364",
         "valid": true
       },
       "diff": {
@@ -3756,6 +3760,8 @@
         "fixtureId": "canonical-v60-iced",
         "candidateFixtureId": "canonical-v60-iced",
         "canonicalProjectionHash": "33eb7f147d3355e0bc18eee24566f590c61281366961cc4360327a680bc98d05",
+        "startingRecipeHash": "33eb7f147d3355e0bc18eee24566f590c61281366961cc4360327a680bc98d05",
+        "candidateRecipeHash": "0e2d05a6aa10f4cb48160b7af64b34d44693bb4ec48ca1b19ac60be9aa7eecd0",
         "valid": true
       },
       "diff": {
@@ -3870,6 +3876,8 @@
         "fixtureId": "canonical-kalita-iced",
         "candidateFixtureId": "canonical-kalita-iced",
         "canonicalProjectionHash": "f82b888327aedd9c9957a623b082bfbb8a5ef7409c73a9bb1be2365e1bc00631",
+        "startingRecipeHash": "f82b888327aedd9c9957a623b082bfbb8a5ef7409c73a9bb1be2365e1bc00631",
+        "candidateRecipeHash": "b2d8894ee819b7db674f1085a215e2a7f65e9676ffdbebcc54b04af39d756853",
         "valid": true
       },
       "diff": {

@@ -1,6 +1,7 @@
 import { hashValue, immutableSnapshot } from '../contracts.mjs';
 import { isRegisteredStagingStore, readRegisteredStagingExecution } from '../staging-store.mjs';
 import { getRecipeFixture } from '../recipe-fixtures.mjs';
+import { createEvaluationTools } from '../tools.mjs';
 
 export const LIFECYCLE_REQUIRED_ATTEMPTS = 24;
 export const LIFECYCLE_MINIMUM_SUCCESS = 23;
@@ -24,12 +25,20 @@ const LIFECYCLE_SCENARIOS = Object.freeze({
 
 function expectedKeys() { return LIFECYCLE_SCHEDULE.map((entry) => `${entry.caseId}:${entry.repeat}`); }
 function expectedTerminalFor(caseId, repeat) { const scenario = LIFECYCLE_SCENARIOS[caseId]; return scenario && caseId === 'case-11' && repeat === 2 ? 'insufficient-evidence' : scenario?.expectedTerminal; }
+function validateCandidateIdentity(identity) {
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity) || Object.keys(identity).sort().join('|') !== 'armId|attemptId|runId') throw new Error('candidate identity must contain armId, runId, and attemptId');
+  if (Object.values(identity).some((value) => typeof value !== 'string' || !value.trim())) throw new Error('candidate identity fields must be nonempty strings');
+  return immutableSnapshot(identity);
+}
+function traceChecksum(identity, response, trace) { return hashValue({ candidateIdentity: identity, candidateResponse: response, candidateTrace: trace }); }
 
 function validateExecution(execution) {
   if (!execution || typeof execution !== 'object' || !REGISTERED_EXECUTIONS.has(execution)) throw new Error('lifecycle execution must be produced by the evaluator scenario runner');
-  if (!Object.hasOwn(execution, 'caseId') || !Object.hasOwn(execution, 'repeat') || !Object.hasOwn(execution, 'snapshot') || !Object.hasOwn(execution, 'events') || !Object.hasOwn(execution, 'expectedTerminal') || Object.keys(execution).some((key) => !['caseId', 'repeat', 'snapshot', 'events', 'expectedTerminal', 'actualTerminal', 'valid', 'recall', 'criticalFailure'].includes(key))) throw new Error('lifecycle execution shape is invalid');
+  if (!Object.hasOwn(execution, 'caseId') || !Object.hasOwn(execution, 'repeat') || !Object.hasOwn(execution, 'snapshot') || !Object.hasOwn(execution, 'events') || !Object.hasOwn(execution, 'expectedTerminal') || !Object.hasOwn(execution, 'candidateIdentity') || !Object.hasOwn(execution, 'candidateResponse') || !Object.hasOwn(execution, 'candidateTrace') || !Object.hasOwn(execution, 'traceChecksum') || Object.keys(execution).some((key) => !['caseId', 'repeat', 'snapshot', 'events', 'expectedTerminal', 'actualTerminal', 'valid', 'recall', 'criticalFailure', 'candidateIdentity', 'candidateResponse', 'candidateTrace', 'traceChecksum'].includes(key))) throw new Error('lifecycle execution shape is invalid');
   if (typeof execution.caseId !== 'string' || !execution.caseId || !Number.isInteger(execution.repeat) || ![1, 2].includes(execution.repeat)) throw new Error('lifecycle case identity is invalid');
   const snapshot = execution.snapshot;
+  validateCandidateIdentity(execution.candidateIdentity);
+  if (!Array.isArray(execution.candidateTrace) || execution.traceChecksum !== traceChecksum(execution.candidateIdentity, execution.candidateResponse, execution.candidateTrace)) throw new Error('lifecycle candidate trace is not canonical');
   const ids = snapshot?.identities;
   const revision = snapshot?.revisions?.at(-1);
   if (!ids || typeof ids.sessionId !== 'string' || !ids.sessionId || typeof ids.userId !== 'string' || !ids.userId || typeof ids.coffeeId !== 'string' || !ids.coffeeId) throw new Error('lifecycle store identity is invalid');
@@ -49,11 +58,12 @@ function validateExecution(execution) {
   if (execution.valid !== expectedValid || execution.recall !== events.some((event) => event.kind === 'read' && event.sessionId === ids.sessionId) || execution.criticalFailure !== events.some((event) => event.physicalBrewConfirmed === true || event.kind === 'unapproved-mutation')) throw new Error('lifecycle verdict is not derived from canonical execution');
 }
 
-/** Drive one evaluator-owned scenario through a real registered U3 store. */
-export async function runLifecycleAttempt({ caseId, repeat, store } = {}) {
-  if (Object.keys(arguments[0] || {}).sort().join('|') !== 'caseId|repeat|store') throw new Error('lifecycle runner arguments are fixed');
+/** Drive one evaluator-owned scenario through a candidate driver and real registered U3 store. */
+export async function runLifecycleAttempt({ caseId, repeat, store, candidateDriver, candidateIdentity } = {}) {
+  if (Object.keys(arguments[0] || {}).sort().join('|') !== 'candidateDriver|candidateIdentity|caseId|repeat|store') throw new Error('lifecycle runner arguments are fixed');
   const scenario = LIFECYCLE_SCENARIOS[caseId];
-  if (!scenario || !isRegisteredStagingStore(store)) throw new Error('lifecycle runner requires a frozen schedule and registered store');
+  if (!scenario || !isRegisteredStagingStore(store) || typeof candidateDriver !== 'function') throw new Error('lifecycle runner requires a registered store and candidate driver');
+  const identity = validateCandidateIdentity(candidateIdentity);
   const snapshotBefore = readRegisteredStagingExecution(store).snapshot;
   const sessionId = snapshotBefore.identities.sessionId;
   const userId = snapshotBefore.identities.userId;
@@ -62,37 +72,48 @@ export async function runLifecycleAttempt({ caseId, repeat, store } = {}) {
   // change. This keeps apply/undo lineage meaningful instead of certifying a
   // no-op proposal.
   const recipe = { ...getRecipeFixture('aiden'), ratio: 16 };
-  store.recordToolRequest(`lifecycle-${scenario.operation}`, {}, sessionId);
-  store.readCoffee({ sessionId });
-  if (scenario.operation === 'proposal' || scenario.operation === 'commit' || scenario.operation === 'prepare' || scenario.operation === 'undo' || scenario.operation === 'replay') {
-    const proposal = store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 0, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` });
-    if (scenario.operation === 'replay') store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 0, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` });
-    if (scenario.operation === 'commit' || scenario.operation === 'prepare' || scenario.operation === 'undo') {
-      const approval = store.approveProposal({ userId, coffeeId, sessionId, proposalId: proposal.proposal.id, expectedRevision: 0 });
-      const applied = await store.applyProposal({ userId, coffeeId, sessionId, proposalId: proposal.proposal.id, expectedRevision: 0, idempotencyKey: `lifecycle-apply-${caseId}-${repeat}` });
-      if (scenario.operation === 'prepare') await store.prepareBrew({ userId, coffeeId, sessionId, expectedRevision: applied.revision.number, revisionId: applied.revision.id });
-      if (scenario.operation === 'undo') store.undoRevision({ userId, coffeeId, sessionId, expectedRevision: applied.revision.number, idempotencyKey: `lifecycle-undo-${caseId}-${repeat}` });
-      void approval;
-    }
-    void proposal;
-  } else if (scenario.operation === 'denial') {
-    const proposal = store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 0, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` });
-    store.denyProposal({ userId, coffeeId, sessionId, proposalId: proposal.proposal.id, expectedRevision: 0 });
-  } else if (scenario.operation === 'tasting-receipt') {
+  const tools = createEvaluationTools(store);
+  const scenarioEvidence = immutableSnapshot({ operation: scenario.operation, expectedTerminal: expectedTerminalFor(caseId, repeat), requiredKinds: scenario.requiredKinds, requiredState: scenario.requiredState || null, method: 'aiden', expectedRevision: 0, candidateRecipe: recipe });
+  const limits = immutableSnapshot({ maxToolCalls: 8, maxContinuationPhases: 2 });
+  const toolSurface = Object.freeze({ names: tools.names, definitions: tools.definitions, call: (...args) => tools.call(...args) });
+  if (scenario.operation === 'tasting-receipt') {
+    // Tasting is user evidence, never a model tool, and is recorded before
+    // the candidate is allowed to complete the turn.
     store.recordTasting({ userId, coffeeId, sessionId, notes: { source: 'synthetic-user' } });
-  } else if (scenario.operation === 'stale-write') {
-    try { store.proposeRecipe({ userId, coffeeId, sessionId, expectedRevision: 99, method: 'aiden', recipe, idempotencyKey: `lifecycle-${caseId}-${repeat}` }); } catch { /* canonical failure is recorded by the store */ }
-  } else if (scenario.operation === 'read-failure') {
-    try { store.readCoffee({ userId, coffeeId: 'wrong-coffee', sessionId }); } catch { /* canonical identity failure is recorded by the store */ }
   }
-  const expectedTerminal = expectedTerminalFor(caseId, repeat);
-  store.completeTurn({ userId, sessionId, outcome: expectedTerminal });
+  const runDriver = async (phase, previous = null) => {
+    const result = await candidateDriver(Object.freeze({ caseId, repeat, phase, identity, scenario: scenarioEvidence, limits, tools: toolSurface, previous }));
+    if (result == null) return Object.freeze({ response: null, trace: [] });
+    if (typeof result !== 'object' || Array.isArray(result)) throw new Error('candidate driver result must be an object');
+    const trace = result.trace === undefined ? [] : result.trace;
+    if (!Array.isArray(trace)) throw new Error('candidate driver trace must be an array');
+    return immutableSnapshot({ response: result.response === undefined ? null : result.response, trace });
+  };
+  const first = await runDriver('candidate');
+  const requiresApproval = ['commit', 'prepare', 'undo'].includes(scenario.operation);
+  const requiresDenial = scenario.operation === 'denial';
+  if (requiresApproval || requiresDenial) {
+    if (readRegisteredStagingExecution(store).snapshot.sessions.some((candidate) => candidate.id === sessionId)) throw new Error('candidate completed before evaluator approval transition');
+    const current = readRegisteredStagingExecution(store).snapshot;
+    const pending = current.proposals.find((proposal) => proposal.status === 'pending');
+    if (!pending) throw new Error('candidate did not create the evaluator-required proposal');
+    if (requiresDenial) store.denyProposal({ userId, coffeeId, sessionId, proposalId: pending.id, expectedRevision: 0 });
+    else store.approveProposal({ userId, coffeeId, sessionId, proposalId: pending.id, expectedRevision: 0 });
+  }
+  const responses = [first];
+  if (requiresApproval || requiresDenial) responses.push(await runDriver(requiresDenial ? 'after-denial' : 'after-approval', first));
   const executionSnapshot = readRegisteredStagingExecution(store).snapshot;
+  const session = executionSnapshot.sessions.find((candidate) => candidate.id === sessionId);
+  if (!session) throw new Error('candidate driver did not complete the lifecycle turn');
+  const candidateResponse = immutableSnapshot({ phases: responses.map(({ response }) => response) });
+  const candidateTrace = immutableSnapshot(responses.flatMap(({ trace }, phase) => trace.map((entry) => ({ phase, entry }))));
+  const expectedTerminal = expectedTerminalFor(caseId, repeat);
   const execution = immutableSnapshot({
     caseId, repeat, snapshot: executionSnapshot, events: executionSnapshot.ledger,
     expectedTerminal,
-    actualTerminal: executionSnapshot.sessions.find((candidate) => candidate.id === sessionId)?.outcome,
-    valid: executionSnapshot.sessions.find((candidate) => candidate.id === sessionId)?.outcome === expectedTerminal && !(caseId === 'case-11' && repeat === 2),
+    candidateIdentity: identity, candidateResponse, candidateTrace, traceChecksum: traceChecksum(identity, candidateResponse, candidateTrace),
+    actualTerminal: session.outcome,
+    valid: session.outcome === expectedTerminal && !(caseId === 'case-11' && repeat === 2),
     recall: executionSnapshot.ledger.some((event) => event.kind === 'read' && event.sessionId === sessionId),
     criticalFailure: executionSnapshot.ledger.some((event) => event.physicalBrewConfirmed === true || event.kind === 'unapproved-mutation'),
   });
@@ -124,6 +145,7 @@ export function sealLifecycleAttempts(entries) {
     const attempt = immutableSnapshot({
       caseId: entry.caseId, repeat: entry.repeat, sessionId: ids.sessionId, userId: ids.userId, coffeeId: ids.coffeeId,
       revisionId: revision.id, snapshot: source.snapshot, ledger: { canonical: true, sessionId: ids.sessionId, revisionId: revision.id, eventIds: events.map((event) => event.eventId) }, events,
+      candidateIdentity: source.candidateIdentity, candidateResponse: source.candidateResponse, candidateTrace: source.candidateTrace, traceChecksum: source.traceChecksum,
       expectedTerminal: source.expectedTerminal, actualTerminal: source.actualTerminal, valid: source.valid, recall: source.recall, criticalFailure: source.criticalFailure,
     });
     const checksum = lifecycleAttemptChecksum(attempt);
@@ -146,6 +168,7 @@ export function gradeLifecycle(input = {}) {
   const required = expectedKeys();
   if (new Set(ids).size !== ids.length || ids.slice().sort().join('|') !== required.slice().sort().join('|')) failures.push('schedule-lineage-mismatch');
   if (new Set(values.map((attempt) => attempt?.sessionId)).size !== values.length || new Set(values.map((attempt) => attempt?.revisionId)).size !== values.length) failures.push('duplicate-lineage-identity');
+  if (new Set(values.map((attempt) => hashValue(attempt?.candidateIdentity))).size !== values.length) failures.push('duplicate-candidate-identity');
   const caseCounts = new Map(); values.forEach((attempt) => { if (attempt?.caseId) caseCounts.set(attempt.caseId, (caseCounts.get(attempt.caseId) || 0) + 1); });
   if (caseCounts.size !== 12 || [...caseCounts.values()].some((count) => count !== 2)) failures.push('invalid-repeat-identity');
   if (values.some((attempt) => attempt.expectedTerminal !== attempt.actualTerminal)) failures.push('unexpected-terminal-state');
