@@ -684,7 +684,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           siblings={jarOrder}
           onNavigate={(b) => openDetail(b, null)}
           onClose={closeDetail}
-          learnLabel={agentV3Enabled ? 'Ask Professor Ruphus' : 'Learn'}
+          learnLabel={agentV3Enabled ? 'Ask Ruphus' : 'Learn'}
           onLearn={(b) => {
             closeDetail();
             if (agentV3Enabled) {
