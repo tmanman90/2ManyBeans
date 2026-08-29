@@ -3,14 +3,14 @@ import test from 'node:test';
 import { checkEvaluationIdentity, checkEnvironment, checkEgress, validatePreflight, runPreflight } from './ruphus-eval/capability-preflight.mjs';
 import { createOpenAIAdapter } from './ruphus-eval/provider-openai.mjs';
 import { createAnthropicAdapter } from './ruphus-eval/provider-anthropic.mjs';
-const expected = { projectId: 'eval-1', workspaceId: 'eval-a', credentialFingerprint: 'fp', quotaEvidenceId: 'quota-1', maxQuotaUsd: 30 };
-const actual = { ...expected, dedicated: true, quotaUsd: 30 };
-test('identity must be dedicated and capped', () => {
+const expected = { credentialFingerprint: 'fp', authorizationLabel: 'tal-approved-coffee-evaluation' };
+const actual = { ...expected, userAuthorized: true };
+test('identity requires explicit authorization and immutable credential evidence', () => {
   assert.equal(checkEvaluationIdentity(actual, expected).ok, true);
   assert.equal(checkEvaluationIdentity({ ...actual, projectId: 'production' }, expected).ok, false);
-  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: 31 }, expected).ok, false);
-  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: Number.NaN }, expected).ok, false);
-  assert.equal(checkEvaluationIdentity({ ...actual, quotaUsd: '75' }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, userAuthorized: false }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, credentialFingerprint: '' }, expected).ok, false);
+  assert.equal(checkEvaluationIdentity({ ...actual, authorizationLabel: 'other' }, expected).ok, false);
   assert.equal(checkEvaluationIdentity(actual).ok, false);
 });
 test('forbidden credentials and non-provider egress are rejected', () => {
@@ -33,8 +33,8 @@ test('all six exact arms complete an attributable preflight', async () => {
 test('invalid setup fails before invoking any provider probe', async () => {
   let calls = 0;
   const adapters = [{ provider: 'openai', probe: () => { calls += 1; throw new Error('probe must not run'); } }, { provider: 'anthropic', probe: () => { calls += 1; throw new Error('probe must not run'); } }];
-  const overCap = await runPreflight({ identity: { ...actual, quotaUsd: 31 }, expectedIdentity: expected, env: {}, adapters });
-  assert.equal(overCap.ok, false); assert.equal(calls, 0);
+  const unauthorized = await runPreflight({ identity: { ...actual, userAuthorized: false }, expectedIdentity: expected, env: {}, adapters });
+  assert.equal(unauthorized.ok, false); assert.equal(calls, 0);
   const forbiddenEnv = await runPreflight({ identity: actual, expectedIdentity: expected, env: { FIREBASE_PROJECT_ID: 'x' }, adapters });
   assert.equal(forbiddenEnv.ok, false); assert.equal(calls, 0);
 });

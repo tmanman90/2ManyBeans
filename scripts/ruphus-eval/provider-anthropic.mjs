@@ -13,15 +13,16 @@ function assertTools(tools = []) {
   if (tools.some((tool) => { const schema = tool.input_schema || tool.parameters || tool.inputSchema; return schema && (schema.type !== 'object' || !exactObject(schema.properties) || schema.additionalProperties !== false); })) throw new Error('Anthropic evaluation tools require strict object schemas');
 }
 
-export function buildAnthropicRequest({ model, system, messages = [], tools = [], maxOutputTokens = 1800, thinking = 'disabled', effort, signal } = {}) {
+export function buildAnthropicRequest({ model, system, instructions, messages = [], input = null, tools = [], maxOutputTokens = 1800, thinking = 'disabled', effort, signal } = {}) {
   if (typeof model !== 'string' || !model.trim()) throw new Error('Anthropic model is required');
-  if (!Array.isArray(messages)) throw new Error('Anthropic messages must be an array');
+  const providerMessages = messages.length > 0 ? messages : input == null ? [] : Array.isArray(input) ? input : [input];
+  if (!Array.isArray(providerMessages)) throw new Error('Anthropic messages must be an array');
   if (typeof maxOutputTokens !== 'number' || !Number.isFinite(maxOutputTokens) || maxOutputTokens <= 0) throw new Error('Anthropic output ceiling must be positive');
   assertTools(tools);
   const request = {
     model,
     max_tokens: maxOutputTokens,
-    messages: messages.map((message) => immutableSnapshot(message)),
+    messages: providerMessages.map((message) => immutableSnapshot(message)),
     tools: tools.map((tool) => immutableSnapshot({
       name: tool.name,
       description: tool.description || '',
@@ -30,7 +31,7 @@ export function buildAnthropicRequest({ model, system, messages = [], tools = []
     })),
     stream: true,
   };
-  if (system != null) request.system = system;
+  if (system != null || instructions != null) request.system = system ?? instructions;
   if (thinking !== 'disabled') {
     request.thinking = { type: thinking === 'adaptive' ? 'adaptive' : 'enabled' };
     if (effort != null) request.output_config = { effort };

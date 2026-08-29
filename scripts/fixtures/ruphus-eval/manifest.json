@@ -18,7 +18,7 @@
   "toolContract": {"approval": "out-of-band", "tasting": "out-of-band", "physicalClaims": "human-evidence-only", "providers": "none-in-U4"},
   "validatorRefs": ["src/lib/aidenProfileValidation.js", "src/lib/v60Adapter.js", "src/lib/kalitaAdapter.js", "src/lib/v60SwitchAdapter.js", "src/lib/v60IcedAdapter.js", "src/lib/kalitaIcedAdapter.js", "src/lib/brewTimerSteps.js", "src/lib/brewMethods.js", "src/data/v60SourceRegistry.js", "src/data/v60SwitchSourceRegistry.js", "src/data/v60IcedSourceRegistry.js", "src/data/kalitaConfiguration.js"],
   "graderRefs": ["scripts/ruphus-eval/graders/recipe.mjs", "scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs", "scripts/ruphus-eval/diagnosis-contract.mjs", "scripts/ruphus-eval/report.mjs", "scripts/ruphus-eval/tournament.mjs"],
-  "toolRefs": ["scripts/ruphus-eval/tools.mjs", "scripts/ruphus-eval/contracts.mjs", "scripts/ruphus-eval/staging-store.mjs", "scripts/ruphus-eval/cases.mjs", "scripts/ruphus-eval/recipe-fixtures.mjs", "scripts/ruphus-eval/provider-openai.mjs", "scripts/ruphus-eval/provider-anthropic.mjs", "scripts/ruphus-eval/agent-runner.mjs", "scripts/ruphus-eval/run.mjs", "scripts/fixtures/ruphus-eval/schemas/evidence.schema.json", "scripts/fixtures/ruphus-eval/schemas/proposal.schema.json", "scripts/fixtures/ruphus-eval/schemas/receipt.schema.json"],
+  "toolRefs": ["scripts/ruphus-eval/tools.mjs", "scripts/ruphus-eval/contracts.mjs", "scripts/ruphus-eval/staging-store.mjs", "scripts/ruphus-eval/cases.mjs", "scripts/ruphus-eval/recipe-fixtures.mjs", "scripts/ruphus-eval/provider-openai.mjs", "scripts/ruphus-eval/provider-anthropic.mjs", "scripts/ruphus-eval/agent-runner.mjs", "scripts/ruphus-eval/run.mjs", "scripts/ruphus-eval/capability-preflight.mjs", "scripts/fixtures/ruphus-eval/schemas/evidence.schema.json", "scripts/fixtures/ruphus-eval/schemas/proposal.schema.json", "scripts/fixtures/ruphus-eval/schemas/receipt.schema.json"],
   "rendererRefs": ["scripts/ruphus-eval/blinding.mjs", "scripts/ruphus-eval/blind.mjs", "scripts/ruphus-eval/product-baseline.mjs"],
   "modelRefs": ["scripts/ruphus-eval/models.mjs", "api/_lib/modelPricing.js"],
   "corpusManifestRef": "docs/data/ruphus-model-eval/corpus-manifest.md",
@@ -28,7 +28,7 @@
   "hashes": {
     "corpora": "0298380ca481904b43892520fd180a87fe5ba28c24fd0972f7ae86c22ccfaeef",
     "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
-    "tools": "65358038602febf48953a49c6c1884baa933e5e386a87859d1b6ff8d97bc07ad",
+    "tools": "52d75a845e9f47887699c716c18b5ad922fd976c43ed00f034f017f81a9986e7",
     "modelRegistry": "d3b46daa7216e0c6b02a2f57f1750f3ae79f7a412572dbf2bb62b53bbf7b63d9",
     "validators": "f7a22c66828da27d4758d18fbe39b4517aacf8e3b82f54e26d980458f314c757",
     "graders": "a6640599d8d3172de32fe0ae651091d13b6b5966ccf91d20659bdc353abd495c",
@@ -41,6 +41,6 @@
     "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
     "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
     "schedule": "e1289e24eb55b607739e80b66a1ee8be2b3bb16e139b47201c4c0d35ef5e1c8c",
-    "evaluationHash": "057e19fab9537637ca8c966dd8febd535fb7c3221beebefc965405c948ab138e"
+    "evaluationHash": "e5acab4da495a04e5444d0c07829eec769b9704f47b739c7439a36bdd4c2c221"
   }
 }

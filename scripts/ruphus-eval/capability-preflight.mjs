@@ -5,14 +5,13 @@ const FORBIDDEN_ENV = /(^|_)(FIREBASE|GOOGLE_APPLICATION|FELLOW|AIDEN|VERCEL|SUP
 
 export function checkEvaluationIdentity(identity = {}, expectedIdentity = null) {
   const errors = [];
-  const requiredEvidence = ['projectId', 'workspaceId', 'credentialFingerprint', 'quotaEvidenceId', 'maxQuotaUsd'];
-  if (!expectedIdentity || requiredEvidence.some((key) => expectedIdentity[key] == null)) errors.push('frozen expected evaluation identity and provider evidence are required');
-  if (expectedIdentity && (typeof expectedIdentity.maxQuotaUsd !== 'number' || !Number.isFinite(expectedIdentity.maxQuotaUsd) || expectedIdentity.maxQuotaUsd <= 0 || expectedIdentity.maxQuotaUsd > EVALUATION_CAP_USD)) errors.push('expected identity quota cap must be finite, positive, and no higher than approved cap');
-  if (!identity.projectId || !identity.workspaceId || identity.dedicated !== true || !identity.credentialFingerprint || !identity.quotaEvidenceId) errors.push('dedicated evaluation project/workspace attestation and evidence are required');
+  const requiredEvidence = ['credentialFingerprint', 'authorizationLabel'];
+  if (!expectedIdentity || requiredEvidence.some((key) => typeof expectedIdentity[key] !== 'string' || !expectedIdentity[key])) errors.push('frozen expected credential fingerprint and authorization label are required');
+  if (identity.userAuthorized !== true) errors.push('explicit user authorization is required');
+  if (typeof identity.credentialFingerprint !== 'string' || !identity.credentialFingerprint) errors.push('credential fingerprint is required');
+  if (typeof identity.authorizationLabel !== 'string' || !identity.authorizationLabel) errors.push('authorization label is required');
   if (expectedIdentity) for (const key of requiredEvidence) if (identity[key] !== expectedIdentity[key]) errors.push(`actual evaluation identity does not match expected ${key}`);
   if (identity.projectId === 'production' || identity.workspaceId === 'production' || identity.shared === true) errors.push('production/shared provider identity is forbidden');
-  if (typeof identity.quotaUsd !== 'number' || !Number.isFinite(identity.quotaUsd) || identity.quotaUsd > EVALUATION_CAP_USD || (expectedIdentity && identity.quotaUsd > expectedIdentity.maxQuotaUsd)) errors.push('provider-side quota must be attributable and no higher than approved cap');
-  if (typeof identity.quotaUsd === 'number' && identity.quotaUsd <= 0) errors.push('provider-side quota must be positive');
   return { ok: errors.length === 0, errors };
 }
 export function checkEnvironment(env = process.env) {

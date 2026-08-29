@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createOpenAIAdapter, buildOpenAIRequest, normalizeOpenAIResponse } from './ruphus-eval/provider-openai.mjs';
 import { createAnthropicAdapter, buildAnthropicRequest } from './ruphus-eval/provider-anthropic.mjs';
 import { MODEL_ARMS } from './ruphus-eval/models.mjs';
+import { createEvaluationRequest } from './ruphus-eval/tournament.mjs';
 
 const usage = { input_tokens: 100, output_tokens: 20, input_tokens_details: { cached_tokens: 10, cache_write_tokens: 5 } };
 
@@ -72,6 +73,15 @@ test('Anthropic Messages adapter preserves thinking/tool blocks and usage', asyn
 test('Anthropic request rejects non-function tool types', () => {
   assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', tools: [{ type: 'computer' }] }), /custom function/);
   assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', tools: [{ name: 'readCoffee', strict: false }] }), /must be strict/);
+});
+
+test('provider-neutral scored requests preserve instructions and evidence across adapters', () => {
+  const common = createEvaluationRequest({ caseDefinition: { id: 'dec-parity', userPrompt: 'Diagnose this coffee result.', fixture: { method: 'v60', evidence: 'thin and sour' } } });
+  const openai = buildOpenAIRequest({ model: MODEL_ARMS[0].model, instructions: common.instructions, input: common.input, maxOutputTokens: common.maxOutputTokens });
+  const anthropic = buildAnthropicRequest({ model: MODEL_ARMS[4].model, instructions: common.instructions, input: common.input, maxOutputTokens: common.maxOutputTokens });
+  assert.equal(openai.instructions, anthropic.system);
+  assert.deepEqual(openai.input, anthropic.messages);
+  assert.deepEqual(openai.input, common.input);
 });
 
 test('probe uses the provider minimum and never substitutes a response id for request id', async () => {

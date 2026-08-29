@@ -182,7 +182,7 @@ export function validateRunnerGates({ preflight, env = process.env, endpoint, en
   const errors = [...checked.errors];
   if (!environment.ok) errors.push(`forbidden environment variables: ${environment.forbidden.join(', ')}`);
   if (!egress.ok) errors.push('provider-only HTTPS egress is required');
-  if (!retention || retention.openaiStore !== false || retention.anthropicZdrVerified !== true) errors.push('verified non-persistent provider retention is required');
+  if (!retention || retention.openaiStore !== false || retention.anthropicStandardRetentionAcknowledged !== true) errors.push('OpenAI non-persistence and standard Anthropic retention acknowledgement are required');
   const provisionalPhase = phase === 'calibration' || phase === 'tool-canary';
   const manifestHash = manifest?.evaluationHash || manifest?.hashes?.evaluationHash;
   if (!manifest || (!provisionalPhase && manifest.status !== 'calibrated-sealed') || (provisionalPhase && !['calibrated-sealed', 'provisional-before-calibration'].includes(manifest.status)) || typeof manifestHash !== 'string' || !manifestHash) errors.push(provisionalPhase ? 'accepted provisional calibration manifest is required before quality dispatch' : 'accepted calibration must seal the final manifest before dispatch');
@@ -202,7 +202,7 @@ function nextInput(provider, previous, toolResults) {
   return { messages: [...previous.messages, { role: 'assistant', content: previous.assistantContent }, { role: 'user', content: toolResults.map((toolResult) => ({ type: 'tool_result', tool_use_id: toolResult.callId, content: JSON.stringify(toolResult.result) })) }] };
 }
 
-export async function runAgentAttempt({ adapter, arm, request = {}, tools = null, attemptId, runId = null, evaluationHash = null, maxTurns = MAX_TOOL_TURNS, maxPhases = MAX_PROVIDER_PHASES, artifactStore = null, retry = { maxAttempts: 1 }, onTelemetry = null, beforeRequest = null } = {}) {
+export async function runAgentAttempt({ adapter, arm, request = {}, tools = null, attemptId, runId = null, evaluationHash = null, phase: attemptPhase = null, caseId = null, repeat = null, maxTurns = MAX_TOOL_TURNS, maxPhases = MAX_PROVIDER_PHASES, artifactStore = null, retry = { maxAttempts: 1 }, onTelemetry = null, beforeRequest = null } = {}) {
   if (!adapter || typeof adapter.runTurn !== 'function') throw new Error('provider adapter is required');
   const resolvedArm = typeof arm === 'string' ? getArm(arm) : getArm(arm?.id);
   if (!resolvedArm) throw new Error('exact canonical model arm is required');
@@ -266,7 +266,7 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
     current = nextInput(resolvedArm.provider, { outputItems: result.outputItems || [], messages: current.messages, assistantContent: result.content || result.outputItems || [] }, toolResults);
   }
   if (!last) throw Object.assign(new Error('provider produced no response'), { classification: 'provider-operational-failure' });
-  const artifact = immutableSnapshot({ attemptId, runId, evaluationHash, armId: resolvedArm.id, model: resolvedArm.model, provider: resolvedArm.provider, telemetry, attemptBinding: hashValue({ runId, evaluationHash, armId: resolvedArm.id, attemptId, providerRequestIds: telemetry.map((turn) => turn.providerRequestId), phases: telemetry.map((turn) => turn.phase) }), response: { requestId: last.requestId, responseId: last.responseId || null, text: last.text || '', stopReason: last.stopReason || null } });
+  const artifact = immutableSnapshot({ attemptId, runId, evaluationHash, armId: resolvedArm.id, model: resolvedArm.model, provider: resolvedArm.provider, phase: attemptPhase, caseId, repeat, telemetry, attemptBinding: hashValue({ runId, evaluationHash, armId: resolvedArm.id, attemptId, phase: attemptPhase, caseId, repeat, providerRequestIds: telemetry.map((turn) => turn.providerRequestId), phases: telemetry.map((turn) => turn.phase) }), response: { requestId: last.requestId, responseId: last.responseId || null, text: last.text || '', stopReason: last.stopReason || null } });
   if (artifactStore) await artifactStore.write(attemptId, artifact);
   return artifact;
 }
@@ -305,7 +305,10 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
       const baseEnvelope = reservationUsd / (1 + DEFAULT_LIMITS.retryReserveRate + DEFAULT_LIMITS.contingencyRate);
       const retryPool = baseEnvelope * DEFAULT_LIMITS.retryReserveRate;
       try {
-        const priorArtifacts = await artifactStore.list({ runId, evaluationHash });
+        // Calibration seals a new manifest hash, but remains the same
+        // authorized run. Count every immutable artifact for this run so a
+        // later phase cannot receive a fresh budget envelope.
+        const priorArtifacts = await artifactStore.list({ runId });
         spend = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + turn.cost, 0), 0);
         retrySpend = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + Math.max(0, turn.retryAttempts - 1) * turn.cost, 0), 0);
         baseReserved = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + estimateTurnCost(getArm(artifact.armId), DEFAULT_LIMITS), 0), 0);
@@ -325,7 +328,7 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
           const adapter = adapters[arm.provider];
           let artifact;
           try {
-            artifact = await runAgentAttempt({ adapter, arm, attemptId, runId, evaluationHash, request: requestFor?.(entry) || entry.request || {}, tools: toolsFor?.(entry) || null, maxTurns: phase.toolTurns, maxPhases: phase.providerTurns, artifactStore, retry, beforeRequest: ({ isRetry, estimatedCost }) => {
+            artifact = await runAgentAttempt({ adapter, arm, attemptId, runId, evaluationHash, phase: entry.phase, caseId: entry.caseId, repeat: entry.repeat, request: requestFor?.(entry) || entry.request || {}, tools: toolsFor?.(entry) || null, maxTurns: phase.toolTurns, maxPhases: phase.providerTurns, artifactStore, retry, beforeRequest: ({ isRetry, estimatedCost }) => {
               if (spend + estimatedCost > reservationUsd + 1e-12) throw Object.assign(new Error('metered spend plus next request would exceed the approved envelope'), { code: 'BUDGET_PRE_DISPATCH' });
               if (isRetry) {
                 if (retryReserved + estimatedCost > retryPool + 1e-12 || retrySpend + estimatedCost > retryPool + 1e-12) throw Object.assign(new Error('retry reservation would exceed the frozen global retry pool'), { code: 'BUDGET_PRE_DISPATCH' });
@@ -337,7 +340,7 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
               if (baseReserved + retryReserved > reservationUsd + 1e-12) throw Object.assign(new Error('dispatch reservation would exceed the approved envelope'), { code: 'BUDGET_PRE_DISPATCH' });
             } });
           } catch (error) {
-            const failure = immutableSnapshot({ attemptId, runId, evaluationHash, armId: arm.id, model: arm.model, provider: arm.provider, status: 'failed', classification: error.classification || classifyProviderError(error), error: { code: typeof error.code === 'string' ? error.code : 'RUN_ATTEMPT_FAILED', status: Number.isInteger(error.status) ? error.status : null }, telemetry: error.telemetry || [] });
+            const failure = immutableSnapshot({ attemptId, runId, evaluationHash, armId: arm.id, model: arm.model, provider: arm.provider, phase: entry.phase, caseId: entry.caseId, repeat: entry.repeat, status: 'failed', classification: error.classification || classifyProviderError(error), error: { code: typeof error.code === 'string' ? error.code : 'RUN_ATTEMPT_FAILED', status: Number.isInteger(error.status) ? error.status : null }, telemetry: error.telemetry || [] });
             if (artifactStore) await artifactStore.write(attemptId, failure).catch(() => {});
             return immutableSnapshot({ ok: false, classification: failure.classification, dispatched: true, errors: [failure.error.code], artifacts: [...artifacts, failure], spend, retrySpend });
           }
