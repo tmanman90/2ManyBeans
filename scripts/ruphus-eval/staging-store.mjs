@@ -2,6 +2,7 @@ import { projectCanonicalRuntime, validateRecipe } from './graders/recipe.mjs';
 import {
   LifecycleError, createFixedClock,
   evidenceEnvelope, hashValue, identitySet, immutableSnapshot, stableId,
+  validateProposalContract, validateReceiptContract,
 } from './contracts.mjs';
 
 export class FellowFailure extends Error {
@@ -125,6 +126,23 @@ export class StagingStore {
     this.state.idempotency.set(key, { fingerprint, result });
   }
 
+  _assertProposal(proposal) {
+    const validation = validateProposalContract(proposal);
+    if (!validation.valid) this._error('INVALID_PROPOSAL_CONTRACT', 'proposal does not satisfy the immutable contract', { errors: validation.errors });
+    return proposal;
+  }
+
+  _assertReceipt(receipt) {
+    const validation = validateReceiptContract(receipt);
+    if (!validation.valid) this._error('INVALID_RECEIPT_CONTRACT', 'receipt does not satisfy the immutable contract', { errors: validation.errors });
+    return immutableSnapshot(receipt);
+  }
+
+  _storeProposal(proposal) {
+    this._assertProposal(proposal);
+    this.state.proposals.set(proposal.id, proposal);
+  }
+
   _coffee(coffeeId) {
     if (typeof coffeeId !== 'string' || coffeeId !== this.state.coffee.id) this._error('WRONG_COFFEE', 'coffee identity does not match the session', { coffeeId });
   }
@@ -185,7 +203,7 @@ export class StagingStore {
     const proposalValidation = projection.valid ? validation : { valid: false, errors: [...validation.errors, ...projection.errors] };
     this._record('validation', { operation: 'propose', method, valid: proposalValidation.valid, errors: proposalValidation.errors });
     if (!proposalValidation.valid) {
-      const rejected = immutableSnapshot({ ok: false, proposal: null, validation: proposalValidation, receipt: { ok: false, kind: 'invalid-recipe', facts: proposalValidation.errors, claims: ['no mutation'] } });
+      const rejected = immutableSnapshot({ ok: false, proposal: null, validation: proposalValidation, receipt: this._assertReceipt({ ok: false, kind: 'invalid-recipe', facts: proposalValidation.errors, claims: ['no mutation'] }) });
       this._cacheResult(key, requestFingerprint, rejected);
       this._record('receipt', { operation: 'propose', receipt: rejected.receipt });
       return rejected;
@@ -195,8 +213,8 @@ export class StagingStore {
       userId, coffeeId, method, expectedRevision, expectedRevisionId: current.id,
       recipe: clone(canonicalRecipe), recipeHash: hashValue(canonicalRecipe), status: 'pending', createdAt: this.clock.now(),
     });
-    this.state.proposals.set(proposal.id, proposal);
-    const result = immutableSnapshot({ ok: true, proposal, validation: proposalValidation, receipt: { ok: true, kind: 'proposal-created', facts: [`proposal ${proposal.id} created`], claims: ['proposal only; no mutation'] } });
+    this._storeProposal(proposal);
+    const result = immutableSnapshot({ ok: true, proposal, validation: proposalValidation, receipt: this._assertReceipt({ ok: true, kind: 'proposal-created', facts: [`proposal ${proposal.id} created`], claims: ['proposal only; no mutation'] }) });
     this._cacheResult(key, requestFingerprint, result);
     this._record('proposal-created', { proposalId: proposal.id, userId, coffeeId, expectedRevision });
     this._record('receipt', { operation: 'propose', proposalId: proposal.id, receipt: result.receipt });
@@ -218,7 +236,7 @@ export class StagingStore {
     if (proposal.expectedRevisionId !== this._currentRevision().id) this._error('STALE_REVISION', 'proposal expected revision is stale');
     if (proposal.status !== 'pending') this._error('PROPOSAL_NOT_PENDING', 'proposal is no longer pending approval');
     const approval = immutableSnapshot({ id: stableId('approval', { userId, coffeeId, proposalId, proposalHash: proposal.recipeHash, expectedRevision }), userId, coffeeId, proposalId, proposalHash: proposal.recipeHash, expectedRevision, used: false, createdAt: this.clock.now() });
-    const result = immutableSnapshot({ ok: true, approval, receipt: { ok: true, kind: 'approval-recorded', facts: [`approval ${approval.id} bound to proposal ${proposal.id}`], claims: ['out-of-band approval; not a model tool'] } });
+    const result = immutableSnapshot({ ok: true, approval, receipt: this._assertReceipt({ ok: true, kind: 'approval-recorded', facts: [`approval ${approval.id} bound to proposal ${proposal.id}`], claims: ['out-of-band approval; not a model tool'] }) });
     this.state.approvals.set(approval.id, { ...approval, result });
     this._record('approval-recorded', { approvalId: approval.id, proposalId, userId, coffeeId, expectedRevision });
     this._record('receipt', { operation: 'approve', approvalId: approval.id, receipt: result.receipt });
@@ -233,8 +251,8 @@ export class StagingStore {
     if (proposal.expectedRevision !== expectedRevision || proposal.expectedRevisionId !== this._currentRevision().id) this._error('STALE_REVISION', 'proposal expected revision is stale');
     if (proposal.status === 'rejected') return clone(proposal.denialResult);
     if (proposal.status !== 'pending') this._error('PROPOSAL_NOT_PENDING', 'applied proposal cannot be denied');
-    const result = immutableSnapshot({ ok: true, proposalId, receipt: { ok: true, kind: 'proposal-denied', facts: [`proposal ${proposalId} denied`, `reason=${reason}`], claims: ['no Coffee mutation'] } });
-    this.state.proposals.set(proposalId, { ...proposal, status: 'rejected', denialResult: result });
+    const result = immutableSnapshot({ ok: true, proposalId, receipt: this._assertReceipt({ ok: true, kind: 'proposal-denied', facts: [`proposal ${proposalId} denied`, `reason=${reason}`], claims: ['no Coffee mutation'] }) });
+    this._storeProposal({ ...proposal, status: 'rejected', denialResult: result });
     this._record('state-transition', { operation: 'deny-proposal', proposalId, reason });
     this._record('receipt', { operation: 'deny-proposal', proposalId, receipt: result.receipt });
     return clone(result);
@@ -258,9 +276,9 @@ export class StagingStore {
     if (!validation.valid) this._error('INVALID_RECIPE', 'proposal recipe is invalid at commit', { errors: validation.errors });
     const revision = immutableSnapshot({ id: stableId('revision', { coffeeId, number: current.number + 1, parent: current.id, recipeHash: proposal.recipeHash }), recipeId: stableId('recipe', { coffeeId, recipeHash: proposal.recipeHash }), number: current.number + 1, parentRevisionId: current.id, recipe: clone(proposal.recipe), recipeHash: proposal.recipeHash, operation: 'apply-proposal', proposalId, createdAt: this.clock.now() });
     this.state.revisions.push(revision);
-    this.state.proposals.set(proposalId, { ...proposal, status: 'applied', appliedRevisionId: revision.id });
+    this._storeProposal({ ...proposal, status: 'applied', appliedRevisionId: revision.id });
     this.state.approvals.set(approvalRecord.id, { ...approvalRecord, used: true });
-    const result = immutableSnapshot({ ok: true, revision, receipt: { ok: true, kind: 'coffee-commit-confirmed', facts: [`coffee ${coffeeId} committed revision ${revision.number}`, `revisionId=${revision.id}`], claims: ['Coffee state committed', 'physical brew not confirmed'] } });
+    const result = immutableSnapshot({ ok: true, revision, receipt: this._assertReceipt({ ok: true, kind: 'coffee-commit-confirmed', facts: [`coffee ${coffeeId} committed revision ${revision.number}`, `revisionId=${revision.id}`], claims: ['Coffee state committed', 'physical brew not confirmed'] }) });
     this._cacheResult(key, requestFingerprint, result);
     this._record('state-transition', { operation: 'apply', proposalId, revisionId: revision.id, revision: revision.number });
     this._record('receipt', { operation: 'apply', proposalId, revisionId: revision.id, receipt: result.receipt });
@@ -286,7 +304,7 @@ export class StagingStore {
     if (!previous) this._error('REVISION_NOT_FOUND', 'undo parent revision is missing');
     const revision = immutableSnapshot({ id: stableId('revision', { coffeeId, number: current.number + 1, parent: current.id, recipeHash: previous.recipeHash, operation: 'undo' }), recipeId: previous.recipeId, number: current.number + 1, parentRevisionId: current.id, recipe: clone(previous.recipe), recipeHash: previous.recipeHash, operation: 'undo', undoneRevisionId: current.id, createdAt: this.clock.now() });
     this.state.revisions.push(revision);
-    const result = immutableSnapshot({ ok: true, revision, receipt: { ok: true, kind: 'undo-committed', facts: [`undo created revision ${revision.number} from ${current.number}`], claims: ['Coffee state committed', 'physical brew not confirmed'] } });
+    const result = immutableSnapshot({ ok: true, revision, receipt: this._assertReceipt({ ok: true, kind: 'undo-committed', facts: [`undo created revision ${revision.number} from ${current.number}`], claims: ['Coffee state committed', 'physical brew not confirmed'] }) });
     this._cacheResult(key, requestFingerprint, result);
     this._record('state-transition', { operation: 'undo', revisionId: revision.id, undoneRevisionId: current.id });
     this._record('receipt', { operation: 'undo', revisionId: revision.id, receipt: result.receipt });
@@ -313,7 +331,7 @@ export class StagingStore {
       if (this.state.method !== 'aiden') {
         const brew = immutableSnapshot({ id: brewId, coffeeId, revisionId: revision.id, status: 'coffee-side-timer-prepared', createdAt: this.clock.now() });
         this.state.brews.set(brewId, brew);
-        const result = immutableSnapshot({ ok: true, brew, receipt: { ok: true, kind: 'coffee-side-preparation-confirmed', facts: [`revision ${revision.number} prepared in Coffee-side timer`], claims: ['Coffee-side timer preparation confirmed', 'Fellow not called', 'physical brew not confirmed'] } });
+        const result = immutableSnapshot({ ok: true, brew, receipt: this._assertReceipt({ ok: true, kind: 'coffee-side-preparation-confirmed', facts: [`revision ${revision.number} prepared in Coffee-side timer`], claims: ['Coffee-side timer preparation confirmed', 'Fellow not called', 'physical brew not confirmed'] }) });
         this._record('state-transition', { operation: 'prepare-brew', brewId, revisionId: revision.id, status: 'coffee-side-timer-prepared' });
         this._record('receipt', { operation: 'prepare-brew', brewId, receipt: result.receipt });
         return result;
@@ -328,7 +346,7 @@ export class StagingStore {
       const cleanup = await this.fellow.cleanupProfile(profileId);
       const brew = immutableSnapshot({ id: brewId, coffeeId, revisionId: revision.id, status: 'coffee-prepared', shareId: shared.shareId, cleanup, createdAt: this.clock.now() });
       this.state.brews.set(brewId, brew);
-      const result = immutableSnapshot({ ok: true, brew, receipt: { ok: true, kind: 'coffee-side-preparation-confirmed', facts: [`revision ${revision.number} prepared in Coffee-side fake`, `shareId=${shared.shareId}`], claims: ['Coffee-side preparation confirmed', 'machine receipt not confirmed', 'physical brew not confirmed'] } });
+      const result = immutableSnapshot({ ok: true, brew, receipt: this._assertReceipt({ ok: true, kind: 'coffee-side-preparation-confirmed', facts: [`revision ${revision.number} prepared in Coffee-side fake`, `shareId=${shared.shareId}`], claims: ['Coffee-side preparation confirmed', 'machine receipt not confirmed', 'physical brew not confirmed'] }) });
       this._record('state-transition', { operation: 'prepare-brew', brewId, revisionId: revision.id, status: 'coffee-prepared' });
       this._record('receipt', { operation: 'prepare-brew', brewId, receipt: result.receipt });
       return result;
@@ -336,7 +354,7 @@ export class StagingStore {
       this._record('failure', { operation: 'prepare-brew', brewId, revisionId: revision.id, boundary: error.boundary || null, code: error.code || 'FELLOW_FAILURE' });
       const shareFact = shared ? `share ${shared.shareId} confirmed before failure` : null;
       const facts = [`Fellow fake failed at ${error.boundary || 'unknown boundary'}`, shareFact].filter(Boolean);
-      const result = immutableSnapshot({ ok: false, brew: null, error: { code: error.code || 'FELLOW_FAILURE', boundary: error.boundary || null }, receipt: { ok: false, kind: 'coffee-side-preparation-failed', facts, claims: [shared ? 'Coffee-side share confirmed' : 'Coffee-side share not confirmed', 'machine receipt not confirmed', 'physical brew not confirmed'] } });
+      const result = immutableSnapshot({ ok: false, brew: null, error: { code: error.code || 'FELLOW_FAILURE', boundary: error.boundary || null }, receipt: this._assertReceipt({ ok: false, kind: 'coffee-side-preparation-failed', facts, claims: [shared ? 'Coffee-side share confirmed' : 'Coffee-side share not confirmed', 'machine receipt not confirmed', 'physical brew not confirmed'] }) });
       this.state.brews.set(brewId, immutableSnapshot({ id: brewId, coffeeId, revisionId: revision.id, status: 'failed', shareId: shared?.shareId || null, profileId, failureBoundary: error.boundary || null, createdAt: this.clock.now() }));
       this._record('receipt', { operation: 'prepare-brew', brewId, receipt: result.receipt });
       return result;
@@ -358,6 +376,7 @@ export class StagingStore {
   completeTurn({ userId = this.state.user.id, sessionId = this.state.ids.sessionId, outcome = 'complete', receipt = null } = {}) {
     this._auth(userId);
     if (typeof sessionId !== 'string' || !sessionId || sessionId !== this.state.ids.sessionId) this._error('INVALID_SESSION', 'session identity is not the current attempt');
+    if (receipt != null) this._assertReceipt(receipt);
     const existing = this.state.sessions.get(sessionId);
     if (existing) return clone(existing);
     const session = immutableSnapshot({ id: sessionId, userId, outcome, receipt: clone(receipt), completedAt: this.clock.now() });

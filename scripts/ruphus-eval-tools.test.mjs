@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { createFixedClock, evidenceEnvelope, validateEvidenceContract, validateProposalContract, validateReceiptContract } from './ruphus-eval/contracts.mjs';
+import { createFixedClock, evidenceEnvelope, evidenceToolContent, validateEvidenceContract, validateProposalContract, validateReceiptContract } from './ruphus-eval/contracts.mjs';
 import { StagingStore } from './ruphus-eval/staging-store.mjs';
 import { createEvaluationTools, createForbiddenAdapter, listModelToolNames } from './ruphus-eval/tools.mjs';
 
@@ -52,11 +52,15 @@ test('reads return typed immutable evidence and proposals do not mutate state', 
   assert.equal(Object.isFrozen(deepEvidence.data.nested), true);
   assert.throws(() => { deepEvidence.data.nested.hostile = false; }, TypeError);
   assert.throws(() => evidenceEnvelope({ source: 'tool-result', trust: 'synthetic', recordId: { kind: 'fixture', id: 'fixture-1', extra: true }, data: {} }), /immutable record identity/);
+  assert.throws(() => evidenceToolContent({ type: 'evidence', version: 'ruphus-u3-v1', source: 'tool-result', trust: 'synthetic', recordId: { kind: 'fixture', id: 'fixture-1', extra: true }, data: {} }), /extra/);
   const proposal = await tools.call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: aiden, idempotencyKey: 'tool-proposal' });
   assert.equal(proposal.ok, true);
   assert.equal(JSON.parse(proposal.evidence.content).trust, 'untrusted');
   assert.equal(validateProposalContract(proposal.proposal).valid, true);
   assert.equal(validateProposalContract({ ...proposal.proposal, unexpected: true }).valid, false);
+  assert.equal(validateProposalContract({ ...proposal.proposal, appliedRevisionId: 42 }).valid, false);
+  assert.equal(validateProposalContract({ ...proposal.proposal, status: 'applied' }).valid, false);
+  assert.equal(validateProposalContract({ ...proposal.proposal, status: 'rejected', denialResult: null }).valid, false);
   assert.equal(validateReceiptContract(proposal.receipt).valid, true);
   assert.equal(validateReceiptContract({ ...proposal.receipt, claims: ['ok', 1] }).valid, false);
   assert.equal(store.snapshot().revisions.length, 1);

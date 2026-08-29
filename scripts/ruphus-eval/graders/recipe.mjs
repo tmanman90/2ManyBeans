@@ -4,6 +4,11 @@ import { validateKalitaCandidate } from '../../../src/lib/kalitaAdapter.js';
 import { validateV60SwitchCandidate } from '../../../src/lib/v60SwitchAdapter.js';
 import { validateV60IcedCandidate } from '../../../src/lib/v60IcedAdapter.js';
 import { validateKalitaIcedCandidate } from '../../../src/lib/kalitaIcedAdapter.js';
+import { generateV60Recipe, generateV60Fallback } from '../../../src/lib/v60Adapter.js';
+import { generateKalitaRecipe } from '../../../src/lib/kalitaAdapter.js';
+import { generateV60SwitchRecipe, generateV60SwitchFallback } from '../../../src/lib/v60SwitchAdapter.js';
+import { generateV60IcedRecipe, generateV60IcedFallback } from '../../../src/lib/v60IcedAdapter.js';
+import { generateKalitaIcedRecipe, generateKalitaIcedFallback } from '../../../src/lib/kalitaIcedAdapter.js';
 import { normalizeRecipePhases, buildTimerSteps } from '../../../src/lib/brewTimerSteps.js';
 
 const VALIDATORS = Object.freeze({
@@ -15,15 +20,88 @@ const VALIDATORS = Object.freeze({
   'kalita-iced': validateKalitaIcedCandidate,
 });
 
-const MANUAL_RUNTIME_FIELDS = Object.freeze([
-  'method', 'device', 'mode', 'isIced', 'v60Size', 'kalitaSize', 'configurationKey', 'doseProfile',
-  'engineVersion', 'rulesVersion', 'sourceRegistryVersion', 'sourceLineage', 'candidate', 'fallback', 'generationStatus',
-  'doseTimingPolicy', 'coffeeGrams', 'waterGrams', 'ratio', 'waterTemp', 'grindSize', 'technique', 'techniqueLabel',
-  'techniqueInstruction', 'drawdownTarget', 'prepSteps', 'steps', 'postBrewSteps', 'phaseContractVersion',
-  'phaseContractStatus', 'totalBrewTime', 'totalBrewTimeSeconds', 'guideTargetSeconds', 'guideRangeSeconds', 'timerReady',
-  'timingProfile', 'reasonCodes', 'reasoning', 'tips', 'title', 'confidence', 'evidenceHash',
+const RESERVED_AUTHORITY_FIELDS = new Set([
+  'receipt', 'claims', 'fellowreceipt', 'physicalbrewconfirmed', 'machinereceived', 'machinereceipt',
+  'physicalsuccess', 'physicalbrewsuccess', 'brewconfirmed', 'fellowsuccess', 'approval', 'approvalgranted',
+  'approved', 'commitreceipt', 'providerreceipt', 'shareconfirmed',
 ]);
-const RESERVED_CLAIM_FIELDS = Object.freeze(['physicalBrewConfirmed', 'fellowReceipt', 'receipt', 'claims']);
+
+const MANUAL_GENERATORS = Object.freeze({
+  v60: () => [generateV60Recipe({}, { dose: 15 }), generateV60Recipe({}, { dose: 25 }), generateV60Fallback({ dose: 15 })],
+  kalita: () => [generateKalitaRecipe({}, { dose: 15, size: '155' }), generateKalitaRecipe({}, { dose: 20, size: '185' })],
+  'v60-switch': () => [generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' }), generateV60SwitchRecipe({}, { dose: 20, roast: 'light', closedBloomSeconds: 15 }), generateV60SwitchFallback({ dose: 20 })],
+  'v60-iced': () => [generateV60IcedRecipe({}, { dose: 15 }), generateV60IcedRecipe({}, { dose: 20 }), generateV60IcedFallback({ dose: 15 })],
+  'kalita-iced': () => [generateKalitaIcedRecipe({}, { dose: 15, size: '155' }), generateKalitaIcedRecipe({}, { dose: 20, size: '185' }), generateKalitaIcedFallback({ dose: 15, size: '155' })],
+});
+
+function primitiveShape(value) {
+  return { kind: 'primitive', types: new Set([value === null ? 'null' : typeof value]) };
+}
+
+function shapeFor(value) {
+  if (Array.isArray(value)) return { kind: 'array', item: value.length ? shapeFor(value[0]) : null };
+  if (value && typeof value === 'object') {
+    const fields = new Map();
+    for (const [key, child] of Object.entries(value)) fields.set(key, shapeFor(child));
+    return { kind: 'object', fields };
+  }
+  return primitiveShape(value);
+}
+
+function mergeShapes(left, right) {
+  if (!left) return right;
+  if (!right) return left;
+  if (left.kind === 'object' && right.kind === 'object') {
+    const fields = new Map(left.fields);
+    for (const [key, child] of right.fields) fields.set(key, mergeShapes(fields.get(key), child));
+    return { kind: 'object', fields };
+  }
+  if (left.kind === 'array' && right.kind === 'array') return { kind: 'array', item: mergeShapes(left.item, right.item) };
+  if (left.kind === 'primitive' && right.kind === 'primitive') return { kind: 'primitive', types: new Set([...left.types, ...right.types]) };
+  return { kind: 'primitive', types: new Set(['undefined']) };
+}
+
+const MANUAL_SHAPES = new Map();
+function manualShape(method) {
+  if (MANUAL_SHAPES.has(method)) return MANUAL_SHAPES.get(method);
+  const generator = MANUAL_GENERATORS[method];
+  if (!generator) return null;
+  let shape = null;
+  for (const variant of generator()) shape = mergeShapes(shape, shapeFor(normalizeRecipePhases(variant)));
+  MANUAL_SHAPES.set(method, shape);
+  return shape;
+}
+
+function assertNoReservedAuthority(value, path = 'recipe', seen = new WeakSet()) {
+  if (!value || typeof value !== 'object') return;
+  if (seen.has(value)) throw new Error(`cyclic recipe at ${path}`);
+  seen.add(value);
+  for (const [key, child] of Object.entries(value)) {
+    if (RESERVED_AUTHORITY_FIELDS.has(key.toLowerCase())) throw new Error(`reserved-authority:${path}.${key}`);
+    assertNoReservedAuthority(child, `${path}.${key}`, seen);
+  }
+  seen.delete(value);
+}
+
+function projectByShape(value, shape, path = 'recipe') {
+  if (!shape) throw new Error(`unknown production shape at ${path}`);
+  if (shape.kind === 'primitive') {
+    const type = value === null ? 'null' : typeof value;
+    if (type === 'object' || !shape.types.has(type) && !shape.types.has('undefined')) throw new Error(`invalid production shape at ${path}`);
+    return value;
+  }
+  if (shape.kind === 'array') {
+    if (!Array.isArray(value) || (value.length > 0 && !shape.item)) throw new Error(`invalid production array at ${path}`);
+    return value.map((item, index) => projectByShape(item, shape.item, `${path}[${index}]`));
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`invalid production object at ${path}`);
+  const projected = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (!shape.fields.has(key)) continue;
+    projected[key] = projectByShape(child, shape.fields.get(key), `${path}.${key}`);
+  }
+  return projected;
+}
 
 // Hard-gated methods use the same production validators as the runtime. Legacy
 // methods without canonical validators remain advisory-only and cannot satisfy
@@ -42,15 +120,15 @@ export const RECIPE_COVERAGE = Object.freeze({
 
 function missingLayer() { return { present: false, valid: false, errors: ['missing-layer'] }; }
 
-function projectManualRuntime(recipe) {
-  const forbidden = RESERVED_CLAIM_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(recipe, field));
-  if (forbidden.length) return { valid: false, errors: forbidden.map((field) => `reserved-claim:${field}`), runtime: null };
-  const normalized = normalizeRecipePhases(recipe);
-  if (!normalized) return { valid: false, errors: ['downstream-timer-not-ready'], runtime: null };
-  const runtime = Object.fromEntries(MANUAL_RUNTIME_FIELDS
-    .filter((field) => Object.prototype.hasOwnProperty.call(normalized, field))
-    .map((field) => [field, normalized[field]]));
-  return { valid: true, errors: [], runtime };
+function projectManualRuntime(method, recipe) {
+  try {
+    assertNoReservedAuthority(recipe);
+    const normalized = normalizeRecipePhases(recipe);
+    if (!normalized) return { valid: false, errors: ['downstream-timer-not-ready'], runtime: null };
+    return { valid: true, errors: [], runtime: projectByShape(normalized, manualShape(method)) };
+  } catch (error) {
+    return { valid: false, errors: [error.message], runtime: null };
+  }
 }
 
 export function validateRecipe(method, recipe) {
@@ -71,6 +149,11 @@ export function validateRecipe(method, recipe) {
  * the evaluator from rebuilding a weaker parallel recipe representation.
  */
 export function projectCanonicalRuntime(method, recipe) {
+  try {
+    assertNoReservedAuthority(recipe);
+  } catch (error) {
+    return { valid: false, errors: [error.message], runtime: null, timerReady: false, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  }
   const validation = validateRecipe(method, recipe);
   if (!validation.valid) return { valid: false, errors: validation.errors, runtime: null };
   if (method === 'aiden') {
@@ -82,7 +165,7 @@ export function projectCanonicalRuntime(method, recipe) {
   }
   const runtime = normalizeRecipePhases(recipe);
   const timerSteps = buildTimerSteps(recipe);
-  const manualProjection = projectManualRuntime(recipe);
+  const manualProjection = projectManualRuntime(method, recipe);
   if (!manualProjection.valid || !runtime?.timerReady || !timerSteps?.length) return { valid: false, errors: manualProjection.errors.length ? manualProjection.errors : ['downstream-timer-not-ready'], runtime: null, timerReady: false, projection: RECIPE_COVERAGE[method]?.runtime || null };
   return { valid: true, errors: [], runtime: manualProjection.runtime, timerSteps, timerReady: true, projection: RECIPE_COVERAGE[method]?.runtime || null };
 }

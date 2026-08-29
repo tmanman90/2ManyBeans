@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createFixedClock, LifecycleError } from './ruphus-eval/contracts.mjs';
+import { createFixedClock, LifecycleError, validateProposalContract, validateReceiptContract } from './ruphus-eval/contracts.mjs';
 import { createRecordingFellow, StagingStore } from './ruphus-eval/staging-store.mjs';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
@@ -56,10 +56,12 @@ test('happy lifecycle is approval-bound, exact-revision, truthful, and undo is a
   assert.equal(read.revision.number, 0);
   const proposalResult = store.proposeRecipe({ expectedRevision: 0, method: 'aiden', recipe: changed, idempotencyKey: 'proposal-1' });
   assert.equal(proposalResult.ok, true);
+  assert.equal(validateProposalContract(proposalResult.proposal).valid, true);
   const approval = store.approveProposal({ proposalId: proposalResult.proposal.id, expectedRevision: 0 });
   assert.equal(approval.ok, true);
   const applied = store.applyProposal({ proposalId: proposalResult.proposal.id, expectedRevision: 0, idempotencyKey: 'apply-1' });
   assert.equal(applied.revision.number, 1);
+  assert.equal(validateReceiptContract(applied.receipt).valid, true);
   assert.notEqual(applied.revision.recipeHash, read.revision.recipeHash);
   assert.equal(applied.revision.recipe.ratio, 16.5);
   assert.equal(applied.receipt.claims.includes('physical brew not confirmed'), true);
@@ -71,6 +73,7 @@ test('happy lifecycle is approval-bound, exact-revision, truthful, and undo is a
   const tasting = store.recordTasting({ revisionId: applied.revision.id, notes: { acidity: 4 } });
   assert.equal(tasting.coffeeId, 'coffee-1');
   const undone = store.undoRevision({ expectedRevision: 1, idempotencyKey: 'undo-1' });
+  assert.equal(validateReceiptContract(undone.receipt).valid, true);
   assert.equal(undone.revision.number, 2);
   assert.equal(undone.revision.operation, 'undo');
   assert.equal(undone.revision.parentRevisionId, applied.revision.id);
@@ -85,6 +88,8 @@ test('happy lifecycle is approval-bound, exact-revision, truthful, and undo is a
   assert.ok(ledgerKinds.includes('state-transition'));
   assert.ok(ledgerKinds.includes('receipt'));
   assert.ok(ledgerKinds.includes('turn-completed'));
+  const invalidReceiptStore = setup().store;
+  assert.throws(() => invalidReceiptStore.completeTurn({ outcome: 'error', receipt: { ok: true, kind: 'coffee-commit-confirmed', facts: [], claims: [], unexpected: true } }), (error) => error.code === 'INVALID_RECEIPT_CONTRACT');
 });
 
 test('advice-only, clarification, invalid recipe, and hostile evidence cannot mutate state or mint approval', () => {
@@ -210,6 +215,7 @@ test('manual proposals use the canonical timer projection and never persist host
     assert.equal(proposal.ok, false);
     const cleanProposal = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, arbitraryModelField: 'drop-me' }, idempotencyKey: `${suffix}-clean` });
     assert.equal(cleanProposal.ok, true);
+    assert.equal(validateProposalContract(cleanProposal.proposal).valid, true);
     assert.equal(cleanProposal.proposal.recipe.arbitraryModelField, undefined);
     store.approveProposal({ proposalId: cleanProposal.proposal.id, expectedRevision: 0 });
     const applied = store.applyProposal({ proposalId: cleanProposal.proposal.id, expectedRevision: 0, idempotencyKey: `${suffix}-apply` });

@@ -62,15 +62,20 @@ export function evidenceEnvelope({ source, trust, recordId, data }) {
     || Object.keys(recordId).some((key) => !['kind', 'id'].includes(key))) {
     throw new LifecycleError('INVALID_EVIDENCE', 'evidence requires an immutable record identity');
   }
-  return Object.freeze({
+  const envelope = Object.freeze({
     type: 'evidence', version: U3_CONTRACT_VERSION, source, trust,
     recordId: immutableSnapshot({ kind: recordId.kind, id: recordId.id }),
     data: immutableSnapshot(data),
   });
+  const validation = validateEvidenceContract(envelope);
+  if (!validation.valid) throw new LifecycleError('INVALID_EVIDENCE', validation.errors.join(', '));
+  return envelope;
 }
 
 export function evidenceToolContent(evidence) {
   if (!evidence || evidence.type !== 'evidence') throw new LifecycleError('INVALID_EVIDENCE', 'tool content requires an evidence envelope');
+  const validation = validateEvidenceContract(evidence);
+  if (!validation.valid) throw new LifecycleError('INVALID_EVIDENCE', validation.errors.join(', '));
   return Object.freeze({ role: 'tool', content: JSON.stringify(evidence) });
 }
 
@@ -100,6 +105,11 @@ export function validateProposalContract(value) {
   if (!Number.isInteger(value.expectedRevision) || value.expectedRevision < 0 || !Number.isInteger(value.createdAt) || value.createdAt < 0) errors.push('invalid proposal numbers');
   if (!value.recipe || typeof value.recipe !== 'object' || Array.isArray(value.recipe)) errors.push('invalid recipe');
   if (!['pending', 'applied', 'rejected'].includes(value.status)) errors.push('invalid status');
+  if (Object.prototype.hasOwnProperty.call(value, 'appliedRevisionId') && (typeof value.appliedRevisionId !== 'string' || !value.appliedRevisionId)) errors.push('invalid appliedRevisionId');
+  if (Object.prototype.hasOwnProperty.call(value, 'denialResult') && (!value.denialResult || typeof value.denialResult !== 'object' || Array.isArray(value.denialResult))) errors.push('invalid denialResult');
+  if (value.status === 'pending' && (Object.prototype.hasOwnProperty.call(value, 'appliedRevisionId') || Object.prototype.hasOwnProperty.call(value, 'denialResult'))) errors.push('pending proposal has terminal fields');
+  if (value.status === 'applied' && (typeof value.appliedRevisionId !== 'string' || !value.appliedRevisionId || Object.prototype.hasOwnProperty.call(value, 'denialResult'))) errors.push('applied proposal terminal fields are invalid');
+  if (value.status === 'rejected' && (typeof value.denialResult !== 'object' || !value.denialResult || Object.prototype.hasOwnProperty.call(value, 'appliedRevisionId'))) errors.push('rejected proposal terminal fields are invalid');
   return contractResult(errors);
 }
 
