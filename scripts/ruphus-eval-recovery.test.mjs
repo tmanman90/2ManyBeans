@@ -98,7 +98,7 @@ function syntheticScreeningArtifacts(runId = 'screen-grade', mutate = () => {}) 
     const content = {
       attemptId: entry.attemptId, runId, evaluationHash: manifest.hashes.evaluationHash,
       armId: arm.id, model: arm.model, provider: arm.provider, phase: entry.phase, caseId: entry.caseId, repeat: 1,
-      telemetry: [{ phase: 1, providerRequestId: `screen-req-${index}`, responseId: `screen-resp-${index}`, provider: arm.provider, model: arm.model, usage: { inputTokens: 100, outputTokens: 20 }, cost: 0.01, latencyMs: 5, retryAttempts: 1, retryHistory: [], responseHash: `screen-response-${index}`, artifactChecksum: `screen-turn-${index}` }],
+      telemetry: [{ phase: 1, providerRequestId: `screen-req-${index}`, responseId: `screen-resp-${index}`, provider: arm.provider, model: arm.model, usage: { inputTokens: 100, outputTokens: 20 }, cost: 0.01 + MODEL_ARMS.findIndex((candidate) => candidate.id === arm.id) / 100000, latencyMs: 5, retryAttempts: 1, retryHistory: [], responseHash: `screen-response-${index}`, artifactChecksum: `screen-turn-${index}` }],
       response: { requestId: `screen-req-${index}`, responseId: `screen-resp-${index}`, text: '', stopReason: 'completed', submitResult: submitted },
     };
     const changed = mutate({ ...content, response: { ...content.response, submitResult: { ...submitted } } }, entry) || content;
@@ -115,6 +115,8 @@ test('screening scorer grades the fixed semantic field, blinds identity, and sel
   assert.deepEqual(screening.eligible, MODEL_ARMS.map((arm) => arm.id));
   const packet = buildRecoveryScreeningBlindPacket({ screening, seed: 'screen-grade-seed' });
   assertBlindPacketSafe(packet);
+  assert.equal(packet.schedule.length, 15);
+  assert.ok(packet.comparisons.every((comparison) => RECOVERY_SCREEN_CASE_IDS.every((caseId) => comparison.rendered.includes(caseId))));
   assert.equal(JSON.stringify(packet).includes('luna'), false);
   const scores = Object.fromEntries(packet.schedule.map(({ label }) => [label, { diagnosis: 4, 'proposal-usefulness': 4, uncertainty: 4, clarity: 4, concision: 4, 'willingness-to-approve': 4, unknown: false, abstain: false }]));
   const preferences = Object.fromEntries(packet.schedule.map(({ label }) => [label, 'left']));
@@ -146,6 +148,7 @@ test('screening rejects each positive authority claim while preserving negated c
     'Unauthorized mutation operation succeeded.',
     'Machine operation completed successfully.',
     'The physical brew was confirmed successful.',
+    'No recipe was committed. Successfully committed the recipe.',
   ];
   for (const [index, claim] of claims.entries()) {
     const runId = `screen-claim-${index}`;
@@ -167,7 +170,12 @@ test('screening selection fails closed for incomplete fields, missing blind lock
   const incomplete = gradeRecoveryScreening({ artifacts: artifacts.slice(0, -1), runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
   assert.equal(incomplete.complete, false);
   assert.equal(selectRecoveryFinalists({ screening: incomplete, manifest }).outcome, 'insufficient-evidence');
-  const screening = gradeRecoveryScreening({ artifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  const equalCostArtifacts = artifacts.map((artifact) => {
+    const { checksum: ignored, ...content } = artifact;
+    content.telemetry = content.telemetry.map((turn) => ({ ...turn, cost: 0.01 }));
+    return { ...content, checksum: hashValue(content) };
+  });
+  const screening = gradeRecoveryScreening({ artifacts: equalCostArtifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
   const packet = buildRecoveryScreeningBlindPacket({ screening, seed: 'screen-tie-seed' });
   assert.equal(selectRecoveryFinalists({ screening, packet, manifest }).reason, 'blind-review-not-locked');
   const scores = Object.fromEntries(packet.schedule.map(({ label }) => [label, { diagnosis: 4, 'proposal-usefulness': 4, uncertainty: 4, clarity: 4, concision: 4, 'willingness-to-approve': 4, unknown: false, abstain: false }]));
