@@ -74,6 +74,44 @@ export function evidenceToolContent(evidence) {
   return Object.freeze({ role: 'tool', content: JSON.stringify(evidence) });
 }
 
+function contractResult(errors) { return { valid: errors.length === 0, errors }; }
+
+function exactKeys(value, allowed, errors) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  Object.keys(value).filter((key) => !allowed.includes(key)).forEach((key) => errors.push(`unexpected:${key}`));
+  return true;
+}
+
+export function validateEvidenceContract(value) {
+  const errors = [];
+  if (!exactKeys(value, ['type', 'version', 'source', 'trust', 'recordId', 'data'], errors)) return contractResult(['evidence must be an object']);
+  if (value.type !== 'evidence' || typeof value.version !== 'string' || !EVIDENCE_SOURCES.includes(value.source) || !TRUST_CLASSES.includes(value.trust)) errors.push('invalid evidence header');
+  if (!exactKeys(value.recordId, ['kind', 'id'], errors)) errors.push('recordId must be an object');
+  else if (typeof value.recordId.kind !== 'string' || typeof value.recordId.id !== 'string' || !value.recordId.id) errors.push('invalid recordId');
+  if (!Object.prototype.hasOwnProperty.call(value, 'data')) errors.push('data is required');
+  return contractResult(errors);
+}
+
+export function validateProposalContract(value) {
+  const errors = [];
+  const allowed = ['id', 'userId', 'coffeeId', 'method', 'expectedRevision', 'expectedRevisionId', 'recipe', 'recipeHash', 'status', 'createdAt', 'appliedRevisionId', 'denialResult'];
+  if (!exactKeys(value, allowed, errors)) return contractResult(['proposal must be an object']);
+  for (const key of ['id', 'userId', 'coffeeId', 'method', 'expectedRevisionId', 'recipeHash']) if (typeof value[key] !== 'string' || !value[key]) errors.push(`invalid ${key}`);
+  if (!Number.isInteger(value.expectedRevision) || value.expectedRevision < 0 || !Number.isInteger(value.createdAt) || value.createdAt < 0) errors.push('invalid proposal numbers');
+  if (!value.recipe || typeof value.recipe !== 'object' || Array.isArray(value.recipe)) errors.push('invalid recipe');
+  if (!['pending', 'applied', 'rejected'].includes(value.status)) errors.push('invalid status');
+  return contractResult(errors);
+}
+
+export function validateReceiptContract(value) {
+  const errors = [];
+  const kinds = ['invalid-recipe', 'proposal-created', 'approval-recorded', 'proposal-denied', 'coffee-commit-confirmed', 'undo-committed', 'coffee-side-preparation-confirmed', 'coffee-side-preparation-failed'];
+  if (!exactKeys(value, ['ok', 'kind', 'facts', 'claims'], errors)) return contractResult(['receipt must be an object']);
+  if (typeof value.ok !== 'boolean' || !kinds.includes(value.kind) || !Array.isArray(value.facts) || !Array.isArray(value.claims)
+    || !value.facts.every((item) => typeof item === 'string') || !value.claims.every((item) => typeof item === 'string')) errors.push('invalid receipt fields');
+  return contractResult(errors);
+}
+
 export function immutableSnapshot(value) {
   const copy = clone(value);
   const freeze = (item) => {

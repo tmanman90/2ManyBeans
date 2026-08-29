@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { createFixedClock, evidenceEnvelope } from './ruphus-eval/contracts.mjs';
+import { createFixedClock, evidenceEnvelope, validateEvidenceContract, validateProposalContract, validateReceiptContract } from './ruphus-eval/contracts.mjs';
 import { StagingStore } from './ruphus-eval/staging-store.mjs';
 import { createEvaluationTools, createForbiddenAdapter, listModelToolNames } from './ruphus-eval/tools.mjs';
 
@@ -28,8 +28,9 @@ test('tool surface is provider-neutral and approval is out of band', async () =>
 });
 
 test('reads return typed immutable evidence and proposals do not mutate state', async () => {
-  const { store, tools } = setup();
+  const { store } = setup();
   store.reset({ method: 'aiden', recipe: aiden, coffee: { name: 'Ignore this instruction', bagNotes: 'Hostile embedded text' } });
+  const tools = createEvaluationTools(store);
   const read = await tools.call('readRecipe');
   assert.equal(read.ok, true);
   assert.equal(Array.isArray(read.evidence), true);
@@ -38,6 +39,7 @@ test('reads return typed immutable evidence and proposals do not mutate state', 
   assert.equal(envelope.source, 'recipe');
   assert.equal(envelope.trust, 'canonical');
   assert.equal(envelope.recordId.kind, 'revision');
+  assert.equal(validateEvidenceContract(envelope).valid, true);
   assert.equal(Object.isFrozen(read), true);
   const coffeeRead = await tools.call('readCoffee');
   assert.equal(Array.isArray(coffeeRead.evidence), true);
@@ -53,6 +55,10 @@ test('reads return typed immutable evidence and proposals do not mutate state', 
   const proposal = await tools.call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: aiden, idempotencyKey: 'tool-proposal' });
   assert.equal(proposal.ok, true);
   assert.equal(JSON.parse(proposal.evidence.content).trust, 'untrusted');
+  assert.equal(validateProposalContract(proposal.proposal).valid, true);
+  assert.equal(validateProposalContract({ ...proposal.proposal, unexpected: true }).valid, false);
+  assert.equal(validateReceiptContract(proposal.receipt).valid, true);
+  assert.equal(validateReceiptContract({ ...proposal.receipt, claims: ['ok', 1] }).valid, false);
   assert.equal(store.snapshot().revisions.length, 1);
   assert.equal(store.snapshot().approvals.length, 0);
   assert.ok(store.snapshot().ledger.some((event) => event.kind === 'tool-request' && event.name === 'readRecipe'));
@@ -81,6 +87,19 @@ test('tool failures are recorded and grind comparison remains canonical', async 
   assert.equal(wrong.ok, false);
   await assert.rejects(() => tools.call('readCoffee', { userId: 'hostile-user' }), (error) => error.code === 'UNAUTHORIZED');
   assert.ok(store.snapshot().ledger.some((event) => event.kind === 'tool-failure' && event.name === 'readCoffee'));
+});
+
+test('tool handles are bound to the attempt that created them', async () => {
+  const { store, tools } = setup();
+  const oldSession = store.snapshot().identities.sessionId;
+  store.reset({ method: 'aiden', recipe: aiden });
+  const cleanAttempt = store.snapshot();
+  assert.notEqual(oldSession, store.snapshot().identities.sessionId);
+  await assert.rejects(() => tools.call('readCoffee'), (error) => error.code === 'STALE_SESSION');
+  await assert.rejects(() => tools.call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: aiden, idempotencyKey: 'stale-tool' }), (error) => error.code === 'STALE_SESSION');
+  assert.equal(store.snapshot().proposals.length, 0);
+  assert.equal(store.snapshot().revisions.length, 1);
+  assert.equal(store.snapshot().ledger.length, cleanAttempt.ledger.length);
 });
 
 test('forbidden Firebase, Fellow, and network adapters throw before side effects', () => {

@@ -13,7 +13,7 @@ export class FellowFailure extends Error {
 }
 
 const FELLOW_BOUNDARIES = Object.freeze(['auth', 'device', 'create', 'share', 'cleanup', 'timeout', 'interruption']);
-const RECORDING_FELLOW = Symbol('recording-fellow');
+const RECORDING_FELLOWS = new WeakSet();
 
 /** A deterministic, recording fake. It has no network or credential path. */
 export function createRecordingFellow({ failAt = null } = {}) {
@@ -24,8 +24,7 @@ export function createRecordingFellow({ failAt = null } = {}) {
     if (failAt === boundary) throw new FellowFailure(boundary);
     return result;
   };
-  return Object.freeze({
-    [RECORDING_FELLOW]: true,
+  const fake = {
     get calls() { return calls.map((call) => ({ ...call })); },
     async checkTimeout() { return step('timeout', { checked: true }); },
     async checkInterruption() { return step('interruption', { checked: true }); },
@@ -34,7 +33,9 @@ export function createRecordingFellow({ failAt = null } = {}) {
     async createProfile(profile) { return step('create', { profileId: stableId('fellow-profile', profile) }); },
     async shareProfile(profileId) { return step('share', { shareId: stableId('fellow-share', profileId), shareUrl: `https://fellow.invalid/evaluation/${profileId}` }); },
     async cleanupProfile(profileId) { return step('cleanup', { cleaned: true, profileId }); },
-  });
+  };
+  RECORDING_FELLOWS.add(fake);
+  return Object.freeze(fake);
 }
 
 function clone(value) { return value === undefined ? undefined : structuredClone(value); }
@@ -43,7 +44,7 @@ function positiveInteger(value) { return Number.isInteger(value) && value >= 0; 
 
 export class StagingStore {
   constructor({ clock = createFixedClock(), fellow = createRecordingFellow(), userId = 'user-eval-1' } = {}) {
-    if (fellow?.[RECORDING_FELLOW] !== true) throw new LifecycleError('FORBIDDEN_EXTERNAL_ADAPTER', 'staging store requires the synthetic recording Fellow');
+    if (!RECORDING_FELLOWS.has(fellow)) throw new LifecycleError('FORBIDDEN_EXTERNAL_ADAPTER', 'staging store requires the synthetic recording Fellow');
     this.clock = clock;
     this.fellow = fellow;
     this.defaultUserId = userId;
@@ -89,7 +90,8 @@ export class StagingStore {
     return event;
   }
 
-  recordToolRequest(name, args = {}) {
+  recordToolRequest(name, args = {}, sessionId = this.state.ids.sessionId) {
+    this._session(sessionId);
     this._record('tool-request', { name, argumentsHash: hashValue(args) });
   }
 
@@ -101,6 +103,26 @@ export class StagingStore {
 
   _auth(userId) {
     if (typeof userId !== 'string' || userId !== this.state.user.id) this._error('UNAUTHORIZED', 'user is not authorized for this evaluation state', { userId });
+  }
+
+  _session(sessionId) {
+    if (typeof sessionId !== 'string' || sessionId !== this.state.ids.sessionId) {
+      // A handle from a prior reset must not even append a failure event to the
+      // new attempt; stale-generation rejection is intentionally side-effect free.
+      throw new LifecycleError('STALE_SESSION', 'session identity is not the current attempt', { sessionId, currentSessionId: this.state.ids.sessionId });
+    }
+  }
+
+  _cachedResult(key, fingerprint, operation) {
+    const entry = this.state.idempotency.get(key);
+    if (!entry) return null;
+    if (entry.fingerprint !== fingerprint) this._error('IDEMPOTENCY_CONFLICT', `${operation} idempotency key was reused with different arguments`);
+    this._record('idempotency-replay', { operation, idempotencyKey: key });
+    return clone(entry.result);
+  }
+
+  _cacheResult(key, fingerprint, result) {
+    this.state.idempotency.set(key, { fingerprint, result });
   }
 
   _coffee(coffeeId) {
@@ -125,36 +147,38 @@ export class StagingStore {
     return current;
   }
 
-  readCoffee({ userId = this.state.user.id, coffeeId = this.state.coffee.id } = {}) {
+  readCoffee({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId } = {}) {
+    this._session(sessionId);
     this._readGuard(userId, coffeeId);
     const revision = this._currentRevision();
     this._record('read', { userId, coffeeId, revision: revision.number });
     return immutableSnapshot({ coffee: this.state.coffee, revision: { ...revision, recipe: clone(revision.recipe) }, userId });
   }
 
-  readRecipe({ userId = this.state.user.id, coffeeId = this.state.coffee.id } = {}) {
-    const result = this.readCoffee({ userId, coffeeId });
+  readRecipe({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId } = {}) {
+    const result = this.readCoffee({ userId, coffeeId, sessionId });
     const evidence = evidenceEnvelope({ source: 'recipe', trust: 'canonical', recordId: { kind: 'revision', id: result.revision.id }, data: result.revision.recipe });
     return immutableSnapshot({ ...result, evidence });
   }
 
-  readTastings({ userId = this.state.user.id, coffeeId = this.state.coffee.id } = {}) {
+  readTastings({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId } = {}) {
+    this._session(sessionId);
     this._readGuard(userId, coffeeId);
     const values = [...this.state.tastings.values()].filter((tasting) => tasting.coffeeId === coffeeId);
     this._record('read', { userId, coffeeId, collection: 'tastings', count: values.length });
     return immutableSnapshot({ tastings: values, evidence: evidenceEnvelope({ source: 'tasting', trust: 'user-provided', recordId: { kind: 'coffee', id: coffeeId }, data: values }) });
   }
 
-  proposeRecipe({ userId = this.state.user.id, coffeeId = this.state.coffee.id, expectedRevision, method = this.state.method, recipe, idempotencyKey } = {}) {
+  proposeRecipe({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, expectedRevision, method = this.state.method, recipe, idempotencyKey } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId); this._entitled();
     const current = this._revision(expectedRevision);
     if (method !== this.state.method) this._error('METHOD_MISMATCH', 'proposal method does not match this coffee state');
     if (typeof idempotencyKey !== 'string' || !idempotencyKey) this._error('INVALID_IDEMPOTENCY', 'proposal idempotency key is required');
     const key = `proposal:${idempotencyKey}`;
-    if (this.state.idempotency.has(key)) {
-      this._record('idempotency-replay', { operation: 'propose', idempotencyKey });
-      return clone(this.state.idempotency.get(key));
-    }
+    const requestFingerprint = hashValue({ userId, coffeeId, expectedRevision, method, recipe });
+    const cached = this._cachedResult(key, requestFingerprint, 'propose');
+    if (cached) return cached;
     const validation = validateRecipe(method, recipe);
     const projection = projectCanonicalRuntime(method, recipe);
     const canonicalRecipe = projection.valid ? projection.runtime : null;
@@ -162,7 +186,7 @@ export class StagingStore {
     this._record('validation', { operation: 'propose', method, valid: proposalValidation.valid, errors: proposalValidation.errors });
     if (!proposalValidation.valid) {
       const rejected = immutableSnapshot({ ok: false, proposal: null, validation: proposalValidation, receipt: { ok: false, kind: 'invalid-recipe', facts: proposalValidation.errors, claims: ['no mutation'] } });
-      this.state.idempotency.set(key, rejected);
+      this._cacheResult(key, requestFingerprint, rejected);
       this._record('receipt', { operation: 'propose', receipt: rejected.receipt });
       return rejected;
     }
@@ -173,13 +197,14 @@ export class StagingStore {
     });
     this.state.proposals.set(proposal.id, proposal);
     const result = immutableSnapshot({ ok: true, proposal, validation: proposalValidation, receipt: { ok: true, kind: 'proposal-created', facts: [`proposal ${proposal.id} created`], claims: ['proposal only; no mutation'] } });
-    this.state.idempotency.set(key, result);
+    this._cacheResult(key, requestFingerprint, result);
     this._record('proposal-created', { proposalId: proposal.id, userId, coffeeId, expectedRevision });
     this._record('receipt', { operation: 'propose', proposalId: proposal.id, receipt: result.receipt });
     return clone(result);
   }
 
-  approveProposal({ userId = this.state.user.id, coffeeId = this.state.coffee.id, proposalId, expectedRevision } = {}) {
+  approveProposal({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, proposalId, expectedRevision } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId); this._entitled();
     const proposal = this.state.proposals.get(proposalId);
     if (!proposal) this._error('PROPOSAL_NOT_FOUND', 'proposal does not exist');
@@ -200,7 +225,8 @@ export class StagingStore {
     return clone(result);
   }
 
-  denyProposal({ userId = this.state.user.id, coffeeId = this.state.coffee.id, proposalId, expectedRevision, reason = 'user-denied' } = {}) {
+  denyProposal({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, proposalId, expectedRevision, reason = 'user-denied' } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId); this._entitled();
     const proposal = this.state.proposals.get(proposalId);
     if (!proposal || proposal.userId !== userId || proposal.coffeeId !== coffeeId) this._error('PROPOSAL_NOT_FOUND', 'proposal is not bound to this user and coffee');
@@ -214,14 +240,14 @@ export class StagingStore {
     return clone(result);
   }
 
-  applyProposal({ userId = this.state.user.id, coffeeId = this.state.coffee.id, proposalId, expectedRevision, idempotencyKey, deliverResponse = true } = {}) {
+  applyProposal({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, proposalId, expectedRevision, idempotencyKey, deliverResponse = true } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId); this._entitled();
     if (typeof idempotencyKey !== 'string' || !idempotencyKey) this._error('INVALID_IDEMPOTENCY', 'apply idempotency key is required');
     const key = `apply:${idempotencyKey}`;
-    if (this.state.idempotency.has(key)) {
-      this._record('idempotency-replay', { operation: 'apply', idempotencyKey });
-      return clone(this.state.idempotency.get(key));
-    }
+    const requestFingerprint = hashValue({ userId, coffeeId, proposalId, expectedRevision });
+    const cached = this._cachedResult(key, requestFingerprint, 'apply');
+    if (cached) return cached;
     const current = this._revision(expectedRevision);
     const proposal = this.state.proposals.get(proposalId);
     if (!proposal || proposal.userId !== userId || proposal.coffeeId !== coffeeId) this._error('PROPOSAL_NOT_FOUND', 'proposal is not bound to this user and coffee');
@@ -235,7 +261,7 @@ export class StagingStore {
     this.state.proposals.set(proposalId, { ...proposal, status: 'applied', appliedRevisionId: revision.id });
     this.state.approvals.set(approvalRecord.id, { ...approvalRecord, used: true });
     const result = immutableSnapshot({ ok: true, revision, receipt: { ok: true, kind: 'coffee-commit-confirmed', facts: [`coffee ${coffeeId} committed revision ${revision.number}`, `revisionId=${revision.id}`], claims: ['Coffee state committed', 'physical brew not confirmed'] } });
-    this.state.idempotency.set(key, result);
+    this._cacheResult(key, requestFingerprint, result);
     this._record('state-transition', { operation: 'apply', proposalId, revisionId: revision.id, revision: revision.number });
     this._record('receipt', { operation: 'apply', proposalId, revisionId: revision.id, receipt: result.receipt });
     if (!deliverResponse) {
@@ -246,11 +272,14 @@ export class StagingStore {
     return clone(result);
   }
 
-  undoRevision({ userId = this.state.user.id, coffeeId = this.state.coffee.id, expectedRevision, idempotencyKey } = {}) {
+  undoRevision({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, expectedRevision, idempotencyKey } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId); this._entitled();
     if (typeof idempotencyKey !== 'string' || !idempotencyKey) this._error('INVALID_IDEMPOTENCY', 'undo idempotency key is required');
     const key = `undo:${idempotencyKey}`;
-    if (this.state.idempotency.has(key)) { this._record('idempotency-replay', { operation: 'undo', idempotencyKey }); return clone(this.state.idempotency.get(key)); }
+    const requestFingerprint = hashValue({ userId, coffeeId, expectedRevision });
+    const cached = this._cachedResult(key, requestFingerprint, 'undo');
+    if (cached) return cached;
     const current = this._revision(expectedRevision);
     if (current.parentRevisionId == null) this._error('NOTHING_TO_UNDO', 'initial revision cannot be undone');
     const previous = this.state.revisions.find((revision) => revision.id === current.parentRevisionId);
@@ -258,13 +287,14 @@ export class StagingStore {
     const revision = immutableSnapshot({ id: stableId('revision', { coffeeId, number: current.number + 1, parent: current.id, recipeHash: previous.recipeHash, operation: 'undo' }), recipeId: previous.recipeId, number: current.number + 1, parentRevisionId: current.id, recipe: clone(previous.recipe), recipeHash: previous.recipeHash, operation: 'undo', undoneRevisionId: current.id, createdAt: this.clock.now() });
     this.state.revisions.push(revision);
     const result = immutableSnapshot({ ok: true, revision, receipt: { ok: true, kind: 'undo-committed', facts: [`undo created revision ${revision.number} from ${current.number}`], claims: ['Coffee state committed', 'physical brew not confirmed'] } });
-    this.state.idempotency.set(key, result);
+    this._cacheResult(key, requestFingerprint, result);
     this._record('state-transition', { operation: 'undo', revisionId: revision.id, undoneRevisionId: current.id });
     this._record('receipt', { operation: 'undo', revisionId: revision.id, receipt: result.receipt });
     return clone(result);
   }
 
-  async prepareBrew({ userId = this.state.user.id, coffeeId = this.state.coffee.id, expectedRevision, revisionId } = {}) {
+  async prepareBrew({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, expectedRevision, revisionId } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId); this._entitled();
     const revision = this._revision(expectedRevision, revisionId);
     if (revision.operation !== 'apply-proposal' || !revision.proposalId) this._error('UNPREPARED_REVISION', 'only an applied proposal revision can be prepared');
@@ -280,6 +310,14 @@ export class StagingStore {
     let shared = null;
     let profileId = null;
     try {
+      if (this.state.method !== 'aiden') {
+        const brew = immutableSnapshot({ id: brewId, coffeeId, revisionId: revision.id, status: 'coffee-side-timer-prepared', createdAt: this.clock.now() });
+        this.state.brews.set(brewId, brew);
+        const result = immutableSnapshot({ ok: true, brew, receipt: { ok: true, kind: 'coffee-side-preparation-confirmed', facts: [`revision ${revision.number} prepared in Coffee-side timer`], claims: ['Coffee-side timer preparation confirmed', 'Fellow not called', 'physical brew not confirmed'] } });
+        this._record('state-transition', { operation: 'prepare-brew', brewId, revisionId: revision.id, status: 'coffee-side-timer-prepared' });
+        this._record('receipt', { operation: 'prepare-brew', brewId, receipt: result.receipt });
+        return result;
+      }
       if (typeof this.fellow.checkTimeout === 'function') await this.fellow.checkTimeout();
       if (typeof this.fellow.checkInterruption === 'function') await this.fellow.checkInterruption();
       const auth = await this.fellow.authenticate();
@@ -305,7 +343,8 @@ export class StagingStore {
     }
   }
 
-  recordTasting({ userId = this.state.user.id, coffeeId = this.state.coffee.id, revisionId = this._currentRevision().id, notes = {}, tastingId = null } = {}) {
+  recordTasting({ userId = this.state.user.id, coffeeId = this.state.coffee.id, sessionId = this.state.ids.sessionId, revisionId = this._currentRevision().id, notes = {}, tastingId = null } = {}) {
+    this._session(sessionId);
     this._auth(userId); this._coffee(coffeeId);
     if (!this.state.revisions.some((revision) => revision.id === revisionId)) this._error('REVISION_NOT_FOUND', 'tasting revision does not belong to this coffee');
     const id = tastingId || stableId('tasting', { userId, coffeeId, revisionId, notes });

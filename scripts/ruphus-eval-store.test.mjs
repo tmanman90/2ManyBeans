@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createFixedClock, LifecycleError } from './ruphus-eval/contracts.mjs';
 import { createRecordingFellow, StagingStore } from './ruphus-eval/staging-store.mjs';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 
 const aiden = {
   profileType: 0, title: 'Synthetic Aiden', ratio: 17,
@@ -130,6 +132,20 @@ test('commit response loss resumes idempotently without a second revision', () =
   assert.equal(store.snapshot().revisions.length, 2);
 });
 
+test('idempotency keys are bound to canonical request fingerprints', () => {
+  const { store } = setup();
+  const first = store.proposeRecipe({ expectedRevision: 0, recipe: aiden, idempotencyKey: 'same-proposal' });
+  assert.deepEqual(store.proposeRecipe({ expectedRevision: 0, recipe: aiden, idempotencyKey: 'same-proposal' }), first);
+  assert.throws(() => store.proposeRecipe({ expectedRevision: 0, recipe: { ...aiden, ratio: 16.5 }, idempotencyKey: 'same-proposal' }), (error) => error.code === 'IDEMPOTENCY_CONFLICT');
+  store.approveProposal({ proposalId: first.proposal.id, expectedRevision: 0 });
+  const applied = store.applyProposal({ proposalId: first.proposal.id, expectedRevision: 0, idempotencyKey: 'same-apply' });
+  assert.deepEqual(store.applyProposal({ proposalId: first.proposal.id, expectedRevision: 0, idempotencyKey: 'same-apply' }), applied);
+  assert.throws(() => store.applyProposal({ proposalId: first.proposal.id, expectedRevision: 1, idempotencyKey: 'same-apply' }), (error) => error.code === 'IDEMPOTENCY_CONFLICT');
+  const undone = store.undoRevision({ expectedRevision: 1, idempotencyKey: 'same-undo' });
+  assert.deepEqual(store.undoRevision({ expectedRevision: 1, idempotencyKey: 'same-undo' }), undone);
+  assert.throws(() => store.undoRevision({ expectedRevision: 2, idempotencyKey: 'same-undo' }), (error) => error.code === 'IDEMPOTENCY_CONFLICT');
+});
+
 test('read failure and entitlement denial never write proposals', () => {
   const failedRead = setup({ failures: { read: true } }).store;
   assert.throws(() => failedRead.readCoffee(), (error) => error.code === 'READ_FAILED');
@@ -183,6 +199,25 @@ test('initial, stale, and undo revisions cannot be reported as applied brew prep
   const undone = store.undoRevision({ expectedRevision: 1, idempotencyKey: 'exact-undo' });
   await assert.rejects(() => store.prepareBrew({ expectedRevision: 2, revisionId: undone.revision.id }), (error) => error.code === 'UNPREPARED_REVISION');
   assert.equal(applied.revision.operation, 'apply-proposal');
+});
+
+test('manual proposals use the canonical timer projection and never persist hostile claims or call Fellow', async () => {
+  for (const [method, recipe, suffix] of [['v60', generateV60Recipe({}, { dose: 15 }), 'v60'], ['kalita', generateKalitaRecipe({}, { dose: 20 }), 'kalita']]) {
+    const fellow = createRecordingFellow();
+    const store = new StagingStore({ clock: createFixedClock(), fellow });
+    store.reset({ method, recipe });
+    const proposal = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, arbitraryModelField: 'drop-me', physicalBrewConfirmed: true }, idempotencyKey: `${suffix}-safe` });
+    assert.equal(proposal.ok, false);
+    const cleanProposal = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, arbitraryModelField: 'drop-me' }, idempotencyKey: `${suffix}-clean` });
+    assert.equal(cleanProposal.ok, true);
+    assert.equal(cleanProposal.proposal.recipe.arbitraryModelField, undefined);
+    store.approveProposal({ proposalId: cleanProposal.proposal.id, expectedRevision: 0 });
+    const applied = store.applyProposal({ proposalId: cleanProposal.proposal.id, expectedRevision: 0, idempotencyKey: `${suffix}-apply` });
+    const prepared = await store.prepareBrew({ expectedRevision: 1, revisionId: applied.revision.id });
+    assert.equal(prepared.ok, true);
+    assert.equal(prepared.receipt.claims.includes('Fellow not called'), true);
+    assert.equal(fellow.calls.length, 0);
+  }
 });
 
 test('invalid identity and clock inputs fail closed', () => {

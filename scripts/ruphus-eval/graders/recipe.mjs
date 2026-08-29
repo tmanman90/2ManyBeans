@@ -15,6 +15,16 @@ const VALIDATORS = Object.freeze({
   'kalita-iced': validateKalitaIcedCandidate,
 });
 
+const MANUAL_RUNTIME_FIELDS = Object.freeze([
+  'method', 'device', 'mode', 'isIced', 'v60Size', 'kalitaSize', 'configurationKey', 'doseProfile',
+  'engineVersion', 'rulesVersion', 'sourceRegistryVersion', 'sourceLineage', 'candidate', 'fallback', 'generationStatus',
+  'doseTimingPolicy', 'coffeeGrams', 'waterGrams', 'ratio', 'waterTemp', 'grindSize', 'technique', 'techniqueLabel',
+  'techniqueInstruction', 'drawdownTarget', 'prepSteps', 'steps', 'postBrewSteps', 'phaseContractVersion',
+  'phaseContractStatus', 'totalBrewTime', 'totalBrewTimeSeconds', 'guideTargetSeconds', 'guideRangeSeconds', 'timerReady',
+  'timingProfile', 'reasonCodes', 'reasoning', 'tips', 'title', 'confidence', 'evidenceHash',
+]);
+const RESERVED_CLAIM_FIELDS = Object.freeze(['physicalBrewConfirmed', 'fellowReceipt', 'receipt', 'claims']);
+
 // Hard-gated methods use the same production validators as the runtime. Legacy
 // methods without canonical validators remain advisory-only and cannot satisfy
 // committed-validity gates.
@@ -31,6 +41,17 @@ export const RECIPE_COVERAGE = Object.freeze({
 });
 
 function missingLayer() { return { present: false, valid: false, errors: ['missing-layer'] }; }
+
+function projectManualRuntime(recipe) {
+  const forbidden = RESERVED_CLAIM_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(recipe, field));
+  if (forbidden.length) return { valid: false, errors: forbidden.map((field) => `reserved-claim:${field}`), runtime: null };
+  const normalized = normalizeRecipePhases(recipe);
+  if (!normalized) return { valid: false, errors: ['downstream-timer-not-ready'], runtime: null };
+  const runtime = Object.fromEntries(MANUAL_RUNTIME_FIELDS
+    .filter((field) => Object.prototype.hasOwnProperty.call(normalized, field))
+    .map((field) => [field, normalized[field]]));
+  return { valid: true, errors: [], runtime };
+}
 
 export function validateRecipe(method, recipe) {
   const validator = VALIDATORS[method];
@@ -61,8 +82,9 @@ export function projectCanonicalRuntime(method, recipe) {
   }
   const runtime = normalizeRecipePhases(recipe);
   const timerSteps = buildTimerSteps(recipe);
-  if (!runtime?.timerReady || !timerSteps?.length) return { valid: false, errors: ['downstream-timer-not-ready'], runtime: null, timerReady: false, projection: RECIPE_COVERAGE[method]?.runtime || null };
-  return { valid: true, errors: [], runtime, timerSteps, timerReady: true, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  const manualProjection = projectManualRuntime(recipe);
+  if (!manualProjection.valid || !runtime?.timerReady || !timerSteps?.length) return { valid: false, errors: manualProjection.errors.length ? manualProjection.errors : ['downstream-timer-not-ready'], runtime: null, timerReady: false, projection: RECIPE_COVERAGE[method]?.runtime || null };
+  return { valid: true, errors: [], runtime: manualProjection.runtime, timerSteps, timerReady: true, projection: RECIPE_COVERAGE[method]?.runtime || null };
 }
 
 function canonicalJson(value) {

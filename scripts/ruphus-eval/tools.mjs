@@ -26,9 +26,11 @@ const COMPLETION_OUTCOMES = new Set(['complete', 'clarification', 'refusal', 'in
 /** Provider-neutral model tools. Approval is intentionally out of band. */
 export function createEvaluationTools(store) {
   if (!store || typeof store.recordToolRequest !== 'function') throw new LifecycleError('INVALID_TOOL_STORE', 'tools require a staging store');
+  const boundSessionId = store.snapshot().identities.sessionId;
+  const bound = (args = {}) => ({ ...args, sessionId: boundSessionId });
   const handlers = {
     readCoffee: async (args = {}) => {
-      const result = store.readCoffee(args);
+      const result = store.readCoffee(bound(args));
       const coffee = coffeeEvidence(result);
       return {
         ok: true,
@@ -37,12 +39,12 @@ export function createEvaluationTools(store) {
       };
     },
     readRecipe: async (args = {}) => {
-      const result = store.readRecipe(args);
+      const result = store.readRecipe(bound(args));
       const coffee = coffeeEvidence(result);
       return { ok: true, data: coffee.safeData, evidence: [...coffee.evidence, evidenceToolContent(result.evidence)] };
     },
     readTastings: async (args = {}) => {
-      const result = store.readTastings(args);
+      const result = store.readTastings(bound(args));
       const safeTastings = result.tastings.map(({ id, userId, coffeeId, revisionId, createdAt }) => ({ id, userId, coffeeId, revisionId, createdAt }));
       return { ok: true, data: { tastings: safeTastings }, evidence: evidenceToolContent(result.evidence) };
     },
@@ -51,24 +53,24 @@ export function createEvaluationTools(store) {
       return { ok: comparison.valid && comparison.correct, data: comparison, evidence: resultEvidence('tool-result', 'synthetic', { kind: 'grind-comparison', id: stableId('grind', args) }, comparison) };
     },
     proposeRecipe: async (args = {}) => {
-      const result = store.proposeRecipe(args);
+      const result = store.proposeRecipe(bound(args));
       return { ...result, evidence: resultEvidence('recipe', 'untrusted', { kind: 'proposal', id: result.proposal?.id || stableId('invalid-proposal', args) }, result.proposal || result.validation) };
     },
     applyProposal: async ({ userId, coffeeId, proposalId, expectedRevision, idempotencyKey } = {}) => {
-      const result = store.applyProposal({ userId, coffeeId, proposalId, expectedRevision, idempotencyKey });
+      const result = store.applyProposal(bound({ userId, coffeeId, proposalId, expectedRevision, idempotencyKey }));
       return { ...result, evidence: resultEvidence('tool-result', 'synthetic', { kind: 'revision', id: result.revision.id }, result.receipt) };
     },
     prepareBrew: async (args = {}) => {
-      const result = await store.prepareBrew(args);
+      const result = await store.prepareBrew(bound(args));
       return { ...result, evidence: resultEvidence('tool-result', 'synthetic', { kind: 'brew', id: result.brew?.id || stableId('failed-brew', args) }, result.receipt) };
     },
     undoRevision: async ({ userId, coffeeId, expectedRevision, idempotencyKey } = {}) => {
-      const result = store.undoRevision({ userId, coffeeId, expectedRevision, idempotencyKey });
+      const result = store.undoRevision(bound({ userId, coffeeId, expectedRevision, idempotencyKey }));
       return { ...result, evidence: resultEvidence('tool-result', 'synthetic', { kind: 'revision', id: result.revision.id }, result.receipt) };
     },
     completeTurn: async ({ userId, sessionId, outcome } = {}) => {
       if (!COMPLETION_OUTCOMES.has(outcome)) throw new LifecycleError('INVALID_OUTCOME', 'model completion outcome is not allowed');
-      const session = store.completeTurn({ userId, sessionId, outcome, receipt: null });
+      const session = store.completeTurn({ userId, sessionId: boundSessionId, outcome, receipt: null });
       return { ok: true, data: session, evidence: resultEvidence('tool-result', 'synthetic', { kind: 'session', id: session.id }, session) };
     },
   };
@@ -78,7 +80,7 @@ export function createEvaluationTools(store) {
     names: TOOL_NAMES,
     async call(name, args = {}) {
       if (!Object.prototype.hasOwnProperty.call(handlers, name)) throw new LifecycleError('TOOL_UNAVAILABLE', `model tool is unavailable: ${name}`);
-      store.recordToolRequest(name, args);
+      store.recordToolRequest(name, args, boundSessionId);
       try {
         const result = await handlers[name](args);
         return immutableSnapshot(result);
