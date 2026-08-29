@@ -3,19 +3,19 @@ import { hashValue, immutableSnapshot } from './contracts.mjs';
 import { buildFinalistReport, buildTournamentReport, validateAttemptArtifact } from './report.mjs';
 
 const ENVELOPE_KEYS = Object.freeze(['actual', 'reply']);
-const FORBIDDEN_AUTHORITY_KEYS = /^(?:receipt|claims?|fellow(?:receipt|success)?|physical(?:brew(?:confirmed|success)?|success|claim|receipt)?|machine(?:received|receipt|success)?|approval(?:granted|receipt|minted)?|commit(?:ted|receipt|success)?|share(?:confirmed|receipt)?|provider(?:receipt|success)?)$/i;
 const MAX_REPLY_BYTES = DEFAULT_LIMITS.outputTokens * 4;
 
 function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 
-function rejectAuthority(value, path = 'actual', seen = new WeakSet()) {
+// Candidate authority-shaped fields are inert evidence for deterministic
+// graders. They must remain available so forged claims can be vetoed; only
+// cyclic structures are rejected at this parser boundary.
+function assertAcyclic(value, path = 'actual', seen = new WeakSet()) {
   if (!value || typeof value !== 'object') return;
   if (seen.has(value)) throw new Error(`candidate response is cyclic at ${path}`);
   seen.add(value);
   for (const [key, child] of Object.entries(value)) {
-    const normalized = key.replace(/[\s_-]/g, '');
-    if (FORBIDDEN_AUTHORITY_KEYS.test(normalized)) throw new Error(`candidate response contains authority field ${path}.${key}`);
-    rejectAuthority(child, `${path}.${key}`, seen);
+    assertAcyclic(child, `${path}.${key}`, seen);
   }
   seen.delete(value);
 }
@@ -45,7 +45,7 @@ export function parseCandidateResponse(raw) {
     try { value = JSON.parse(raw); } catch { throw new Error('candidate response must be strict JSON'); }
   }
   if (!object(value) || Object.keys(value).sort().join('|') !== ENVELOPE_KEYS.slice().sort().join('|') || typeof value.reply !== 'string' || !value.reply.trim() || !object(value.actual) || Buffer.byteLength(value.reply, 'utf8') > MAX_REPLY_BYTES) throw new Error('candidate response envelope is invalid');
-  rejectAuthority(value.actual);
+  assertAcyclic(value.actual);
   return immutableSnapshot({ reply: value.reply, actual: value.actual });
 }
 

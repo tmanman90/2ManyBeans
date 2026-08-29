@@ -149,7 +149,14 @@ test('provider-neutral response bridge binds strict parsed evidence to the raw c
   const request = createEvaluationRequest({ caseDefinition: cases[0], phase: 'qualification' });
   assert.equal(request.responseFormat.additionalProperties, false);
   assert.throws(() => parseCandidateResponse(JSON.stringify({ reply: 'ok', actual: {}, extra: true })), /envelope/);
-  assert.throws(() => parseCandidateResponse(JSON.stringify({ reply: 'ok', actual: { physicalBrewConfirmed: true } })), /authority field/);
+  for (const actual of [{ approval: false, commit: false, committed: false, mutation: false }, { physicalClaim: false }, { claims: [], receiptFacts: ['share confirmed'] }]) {
+    assert.deepEqual(parseCandidateResponse(JSON.stringify({ reply: 'ok', actual })).actual, actual);
+  }
+  const forged = parseCandidateResponse(JSON.stringify({ reply: 'ok', actual: { record: { recordId: 'forged' }, claims: ['Successfully committed the recipe'], physicalClaim: true } }));
+  const forgedArtifact = deriveAdjudicationArtifact({ rawArtifact: rawArtifact('luna-medium', 1), caseDefinition: cases[0], response: forged });
+  const forgedGrade = gradeAttempt(forgedArtifact, { cases, manifest });
+  assert.equal(forgedGrade.eligible, false);
+  assert.equal(forgedGrade.criticalFailure, true);
   const raw = rawArtifact('luna-medium', 1);
   const derived = deriveAdjudicationArtifact({ rawArtifact: raw, caseDefinition: cases[0], response: JSON.stringify({ reply: 'recorded', actual: raw.actual }) });
   assert.equal(derived.type, 'u6-adjudication');
