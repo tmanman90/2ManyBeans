@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,7 +12,9 @@ const expectedIdentity = { projectId: 'eval-1', workspaceId: 'eval-a', credentia
 const identity = { ...expectedIdentity, dedicated: true, quotaUsd: 30 };
 const preflight = { identity, expectedIdentity, env: {}, modelAccess: true, streaming: true, completeUsage: true, requestId: 'preflight-1', providerHost: 'https://api.openai.com', requestedModel: 'gpt-5.6-luna', returnedModel: 'gpt-5.6-luna' };
 const retention = { openaiStore: false, anthropicZdrVerified: true };
-const sealedManifest = sealCalibrationManifest({ manifest: { manifestVersion: 'u5-test' }, calibrationArtifacts: [{ caseId: 'cal-001', score: 1 }], sealedAt: '2026-08-28T00:00:00.000Z' });
+const sourceManifest = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/manifest.json', import.meta.url), 'utf8'));
+const sealedManifest = sealCalibrationManifest({ manifest: sourceManifest, calibrationArtifacts: [{ caseId: 'cal-001', score: 1 }], sealedAt: '2026-08-28T00:00:00.000Z' });
+const qualificationSchedule = () => sealedManifest.partitions.qualification.flatMap((caseId) => [1, 2].flatMap((repeat) => MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId, repeat, cacheRegime: 'cold' }))));
 
 test('provider and semantic failure classes keep transport retries separate', () => {
   assert.equal(classifyProviderError({ status: 429 }), 'transient-provider');
@@ -37,13 +40,36 @@ test('runner gates fail closed without dispatch when identity, retention, or pai
 });
 
 test('cold schedule requires every exact arm and rejects warm or duplicate identities', () => {
-  const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
-  assert.equal(validateColdSchedule(schedule), true);
-  assert.throws(() => validateColdSchedule(schedule.slice(0, 5)), /six exact arms/);
-  assert.throws(() => validateColdSchedule(schedule.map(({ phase, ...entry }) => entry)), /authorized phase/);
-  assert.throws(() => validateColdSchedule(schedule.map((entry, index) => index === 0 ? { ...entry, cacheRegime: 'warm' } : entry)), /cold-cache/);
-  assert.throws(() => validateColdSchedule([...schedule, schedule[0]]), /duplicate/);
-  assert.throws(() => validateColdSchedule(schedule, { manifest: { partitions: { qualification: ['dec-002'], finalistDecision: [] } } }), /not authorized/);
+  const schedule = qualificationSchedule();
+  assert.equal(validateColdSchedule(schedule, { manifest: sealedManifest }), true);
+  assert.throws(() => validateColdSchedule(schedule.slice(0, 5), { manifest: sealedManifest }), /six exact arms|complete authorized phase denominator/);
+  assert.throws(() => validateColdSchedule(schedule.map(({ phase, ...entry }) => entry), { manifest: sealedManifest }), /phase is not authorized/);
+  assert.throws(() => validateColdSchedule(schedule.map((entry, index) => index === 0 ? { ...entry, cacheRegime: 'warm' } : entry), { manifest: sealedManifest }), /cold-cache/);
+  assert.throws(() => validateColdSchedule([...schedule, schedule[0]], { manifest: sealedManifest }), /duplicate/);
+  assert.throws(() => validateColdSchedule(schedule, { manifest: { ...sealedManifest, partitions: { ...sealedManifest.partitions, qualification: ['dec-002'] } } }), /authorized phase/);
+});
+
+test('phase schedules require complete frozen calibration, canary, qualification, and finalist denominators', () => {
+  const full = (phase, cases, arms, repeats) => cases.flatMap((caseId) => Array.from({ length: repeats }, (_, index) => arms.map((armId) => ({ armId, phase, caseId, repeat: index + 1, cacheRegime: 'cold' }))).flat());
+  const armIds = MODEL_ARMS.map((arm) => arm.id);
+  assert.equal(validateColdSchedule(full('calibration', sealedManifest.partitions.calibration, armIds, 2), { manifest: sealedManifest }), true);
+  assert.equal(validateColdSchedule(full('tool-canary', sealedManifest.partitions['tool-canary'], armIds, 1), { manifest: sealedManifest }), true);
+  assert.equal(validateColdSchedule(full('qualification', sealedManifest.partitions.qualification, armIds, 2), { manifest: sealedManifest }), true);
+  assert.equal(validateColdSchedule(full('finalist-decision', sealedManifest.partitions.finalistDecision, armIds.slice(0, 2), 2), { manifest: sealedManifest }), true);
+  assert.throws(() => validateColdSchedule(full('qualification', sealedManifest.partitions.qualification.slice(0, 1), armIds, 2), { manifest: sealedManifest }), /complete authorized phase denominator/);
+  assert.throws(() => validateColdSchedule([...full('qualification', sealedManifest.partitions.qualification, armIds, 2), ...full('finalist-decision', sealedManifest.partitions.finalistDecision, armIds.slice(0, 2), 2)], { manifest: sealedManifest }), /one complete phase/);
+});
+
+test('provisional calibration phase dispatches one bounded turn per exact arm/case', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u5-calibration-'));
+  try {
+    const schedule = sealedManifest.partitions.calibration.flatMap((caseId) => MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'calibration', caseId, repeat: 1, cacheRegime: 'cold' })));
+    const runTurn = async ({ model }) => ({ provider: model.startsWith('claude-') ? 'anthropic' : 'openai', model, requestId: `cal-${model}`, outputItems: [], content: [], text: 'calibrated', toolCalls: [], stopReason: 'completed', rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } });
+    const runner = createAgentRunner({ adapters: { openai: { runTurn }, anthropic: { runTurn } }, artifactStore: new ImmutableArtifactStore({ directory }), runId: 'calibration-run', evaluationHash: sourceManifest.hashes.evaluationHash, manifest: sourceManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
+    const result = await runner.runSchedule({ schedule });
+    assert.equal(result.ok, true);
+    assert.equal(result.artifacts.length, 36);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test('runner records attributed usage, retries only transient failures, and writes no-overwrite checksummed artifacts', async () => {
@@ -100,14 +126,14 @@ test('resumable schedule skips only checksum-valid attempts under one lease', as
       anthropic: { runTurn: async ({ model }) => { calls += 1; return { provider: 'anthropic', model, requestId: `schedule-${calls}`, content: [], text: 'done', toolCalls: [], stopReason: 'end_turn', rawUsage: { input_tokens: 10, output_tokens: 5 }, usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: false } }; } },
     };
     const runner = createAgentRunner({ adapters, artifactStore: new ImmutableArtifactStore({ directory }), runId: 'schedule-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
-    const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
+    const schedule = qualificationSchedule();
     const first = await runner.runSchedule({ schedule });
     assert.equal(first.ok, true);
-    assert.equal(first.artifacts.length, 6);
-    assert.equal(calls, 6);
+    assert.equal(first.artifacts.length, 240);
+    assert.equal(calls, 240);
     const resumed = await runner.runSchedule({ schedule });
     assert.equal(resumed.ok, true);
-    assert.equal(calls, 6);
+    assert.equal(calls, 240);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -126,7 +152,7 @@ test('concurrent schedules cannot acquire a second lease for the same run', asyn
   const artifactStore = new ImmutableArtifactStore({ directory });
   const runner = createAgentRunner({ adapters, artifactStore, runId: 'lease-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
   const competingRunner = createAgentRunner({ adapters, artifactStore, runId: 'lease-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
-  const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
+  const schedule = qualificationSchedule();
   const first = runner.runSchedule({ schedule, retry: { maxAttempts: 1 } });
   while (!release) await new Promise((resolve) => setTimeout(resolve, 1));
   await assert.rejects(() => competingRunner.runSchedule({ schedule }), /lease is already held/);
@@ -148,7 +174,7 @@ test('paid runner requires a real artifact store and cumulative reservation befo
     let calls = 0;
     const adapters = { openai: { runTurn: async ({ model }) => { calls += 1; return { provider: 'openai', model, requestId: 'must-not-dispatch', outputItems: [], text: 'done', toolCalls: [], rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } }; } }, anthropic: { runTurn: async () => { calls += 1; throw new Error('must not dispatch'); } } };
     const runner = createAgentRunner({ adapters, artifactStore, runId, evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
-    const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
+  const schedule = qualificationSchedule();
     const single = await runner.runAttempt({ arm: 'luna-medium', attemptId: 'single-paid' });
     assert.equal(single.dispatched, false);
     await assert.rejects(() => runner.runAttempt({ arm: 'luna-medium', attemptId: 'over-limit', maxTurns: 6 }), /frozen five-turn/);
@@ -161,6 +187,37 @@ test('paid runner requires a real artifact store and cumulative reservation befo
     assert.equal(resumed.classification, 'budget-stop');
     assert.equal(calls, 3);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('tool canary permits five sequential provider continuations and rejects a sixth', async () => {
+  const canarySchedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'tool-canary', caseId: 'canary-001', repeat: 1, cacheRegime: 'cold' }));
+  const makeAdapter = ({ endless = false } = {}) => {
+    const counts = new Map();
+    const runTurn = async ({ model, effort, thinking }) => {
+      const key = `${model}:${effort || thinking || 'disabled'}`;
+      const turn = (counts.get(key) || 0) + 1; counts.set(key, turn);
+      const tool = endless || turn < 5;
+      return { provider: model.startsWith('claude-') ? 'anthropic' : 'openai', model, requestId: `canary-${key}-${turn}`, outputItems: tool ? [{ type: 'function_call', call_id: `call-${key}-${turn}`, name: 'readCoffee', arguments: '{}' }] : [], content: [], text: '', toolCalls: tool ? [{ callId: `call-${key}-${turn}`, name: 'readCoffee', args: {} }] : [], stopReason: tool ? 'tool_calls' : 'completed', rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: !model.startsWith('claude-') } };
+    };
+    return { adapters: { openai: { runTurn }, anthropic: { runTurn } }, counts };
+  };
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u5-canary-'));
+  try {
+    const good = makeAdapter();
+    const runner = createAgentRunner({ adapters: good.adapters, artifactStore: new ImmutableArtifactStore({ directory }), runId: 'canary-good', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
+    const result = await runner.runSchedule({ schedule: canarySchedule, toolsFor: () => ({ call: async () => ({ ok: true }) }) });
+    assert.equal(result.ok, true);
+    assert.deepEqual([...good.counts.values()], [5, 5, 5, 5, 5, 5]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+  const secondDirectory = await mkdtemp(join(tmpdir(), 'ruphus-u5-canary-limit-'));
+  try {
+    const endless = makeAdapter({ endless: true });
+    const runner = createAgentRunner({ adapters: endless.adapters, artifactStore: new ImmutableArtifactStore({ directory: secondDirectory }), runId: 'canary-limit', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
+    const result = await runner.runSchedule({ schedule: canarySchedule, toolsFor: () => ({ call: async () => ({ ok: true }) }) });
+    assert.equal(result.ok, false);
+    assert.equal(result.classification, 'semantic-candidate-failure');
+    assert.deepEqual([...endless.counts.values()], [5]);
+  } finally { await rm(secondDirectory, { recursive: true, force: true }); }
 });
 
 test('top-level runner fails closed before schedule or provider dispatch without identity evidence', async () => {
@@ -179,8 +236,8 @@ test('top-level dispatch requires sealed calibration and every arm preflight bef
     { provider: 'openai', probe: (arm) => ({ modelAccess: true, streaming: true, completeUsage: true, requestId: `pre-${arm.id}`, providerHost: 'https://api.openai.com', returnedModel: arm.model }), runTurn: async ({ model }) => ({ provider: 'openai', model, requestId: `mock-${++calls}`, outputItems: [], text: 'ok', toolCalls: [], rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } }) },
     { provider: 'anthropic', probe: (arm) => ({ modelAccess: true, streaming: true, completeUsage: true, requestId: `pre-${arm.id}`, providerHost: 'https://api.anthropic.com', returnedModel: arm.model }), runTurn: async ({ model }) => ({ provider: 'anthropic', model, requestId: `mock-${++calls}`, content: [], text: 'ok', toolCalls: [], rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: false } }) },
   ];
-  const outcome = await runEvaluation({ adapters, identity, expectedIdentity, env: {}, retention, endpoints: ['https://api.openai.com', 'https://api.anthropic.com'], paidRun: true, manifest: sealedManifest, runId: 'top-level-run', evaluationHash: sealedManifest.evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }), schedule: MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' })), dispatch: true });
+  const outcome = await runEvaluation({ adapters, identity, expectedIdentity, env: {}, retention, endpoints: ['https://api.openai.com', 'https://api.anthropic.com'], paidRun: true, manifest: sealedManifest, runId: 'top-level-run', evaluationHash: sealedManifest.evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }), schedule: qualificationSchedule(), dispatch: true });
   assert.equal(outcome.ok, true);
-  assert.equal(calls, 6);
+  assert.equal(calls, 240);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

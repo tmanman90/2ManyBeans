@@ -133,26 +133,43 @@ export class ImmutableArtifactStore {
 
 export function validateColdSchedule(schedule, { requireAllArms = true, manifest = null } = {}) {
   if (!Array.isArray(schedule) || schedule.length === 0) throw new Error('evaluation schedule is required');
+  if (!isObject(manifest) || !isObject(manifest.schedule) || !isObject(manifest.partitions)) throw new Error('sealed phase schedule contract is required');
+  if (!['calibrated-sealed', 'provisional-before-calibration'].includes(manifest.status) || typeof (manifest.evaluationHash || manifest.hashes?.evaluationHash) !== 'string' || !(manifest.evaluationHash || manifest.hashes?.evaluationHash)) throw new Error('sealed or provisional calibration manifest is required for paid phase dispatch');
+  const phases = new Set(schedule.map((entry) => entry?.phase));
+  if (phases.size !== 1) throw new Error('schedule must contain one complete phase');
+  const phase = schedule[0]?.phase;
+  const contract = phaseContract(manifest, phase);
+  if (!contract || !Array.isArray(contract.cases) || !Number.isInteger(contract.repeats) || !Number.isInteger(contract.providerTurns) || !Number.isInteger(contract.toolTurns)) throw new Error('phase is not authorized for U5 dispatch');
   const seen = new Set();
   for (const entry of schedule) {
     if (!isObject(entry) || typeof entry.armId !== 'string' || !getArm(entry.armId)) throw new Error('schedule contains an unknown exact arm');
-    if (!['qualification', 'finalist-decision'].includes(entry.phase) || typeof entry.caseId !== 'string' || !entry.caseId || !Number.isInteger(entry.repeat) || entry.repeat < 1 || entry.repeat > 2) throw new Error('schedule entry requires an authorized phase, case, and repeat');
-    if (manifest?.partitions) {
-      const authorized = manifest.partitions[entry.phase === 'qualification' ? 'qualification' : 'finalistDecision'];
-      if (!Array.isArray(authorized) || !authorized.includes(entry.caseId)) throw new Error('schedule case is not authorized by the sealed manifest');
-    }
+    if (typeof entry.caseId !== 'string' || !entry.caseId || !Number.isInteger(entry.repeat) || entry.repeat < 1 || entry.repeat > contract.repeats || !contract.cases.includes(entry.caseId)) throw new Error('schedule entry requires an authorized phase, case, and repeat');
     if ((entry.cacheRegime || getArm(entry.armId).cacheRegime) !== 'cold') throw new Error('U5 quality schedule must be cold-cache');
     const key = `${entry.armId}:${entry.caseId}:${entry.repeat}`;
     if (seen.has(key)) throw new Error('schedule contains duplicate attempt identity');
     seen.add(key);
   }
   const arms = new Set(schedule.map((entry) => entry.armId));
-  if (requireAllArms && schedule.some((entry) => entry.phase === 'qualification') && arms.size !== MODEL_ARMS.length) throw new Error('schedule must include all six exact arms');
-  if (schedule.every((entry) => entry.phase === 'finalist-decision') && (arms.size < 1 || arms.size > 2)) throw new Error('finalist schedule must contain at most two arms');
+  if (contract.armCount !== null && (requireAllArms ? arms.size !== contract.armCount : arms.size > contract.armCount)) throw new Error('schedule must include all six exact arms');
+  if (phase === 'finalist-decision' && (arms.size < 1 || arms.size > 2)) throw new Error('finalist schedule must contain at most two arms');
+  const maxRepeat = Math.max(...schedule.map((entry) => entry.repeat));
+  const expectedKeys = new Set();
+  for (let repeat = 1; repeat <= maxRepeat; repeat += 1) for (const caseId of contract.cases) for (const armId of arms) expectedKeys.add(`${armId}:${caseId}:${repeat}`);
+  if (schedule.length !== expectedKeys.size || [...expectedKeys].some((key) => !seen.has(key))) throw new Error('schedule must be a complete authorized phase denominator');
   return true;
 }
 
-export function validateRunnerGates({ preflight, env = process.env, endpoint, endpoints = null, retention, paidRun = false, manifest = null, evaluationHash = null, artifactStore = null } = {}) {
+function phaseContract(manifest, phase) {
+  const contracts = {
+    calibration: { cases: manifest?.partitions?.calibration, repeats: manifest?.schedule?.calibrationPassesMaximum, armCount: MODEL_ARMS.length, providerTurns: manifest?.schedule?.calibrationProviderTurns, toolTurns: manifest?.schedule?.calibrationToolTurns },
+    'tool-canary': { cases: manifest?.partitions?.['tool-canary'], repeats: 1, armCount: MODEL_ARMS.length, providerTurns: manifest?.schedule?.toolCanaryProviderTurns, toolTurns: manifest?.schedule?.toolCanaryToolTurns },
+    qualification: { cases: manifest?.partitions?.qualification, repeats: manifest?.schedule?.qualificationRepeats, armCount: MODEL_ARMS.length, providerTurns: manifest?.schedule?.qualificationProviderTurns, toolTurns: manifest?.schedule?.qualificationToolTurns },
+    'finalist-decision': { cases: manifest?.partitions?.finalistDecision, repeats: manifest?.schedule?.finalistDecisionRepeats, armCount: null, providerTurns: manifest?.schedule?.finalistDecisionProviderTurns, toolTurns: manifest?.schedule?.finalistDecisionToolTurns },
+  };
+  return contracts[phase] || null;
+}
+
+export function validateRunnerGates({ preflight, env = process.env, endpoint, endpoints = null, retention, paidRun = false, manifest = null, evaluationHash = null, artifactStore = null, phase = null } = {}) {
   const checked = Array.isArray(preflight?.checks)
     ? { ...preflight, errors: preflight.ok === true && preflight.checks.every((check) => check.ok === true) ? [] : ['all six exact provider preflight checks must pass'] }
     : validatePreflight(preflight || {});
@@ -164,8 +181,10 @@ export function validateRunnerGates({ preflight, env = process.env, endpoint, en
   if (!environment.ok) errors.push(`forbidden environment variables: ${environment.forbidden.join(', ')}`);
   if (!egress.ok) errors.push('provider-only HTTPS egress is required');
   if (!retention || retention.openaiStore !== false || retention.anthropicZdrVerified !== true) errors.push('verified non-persistent provider retention is required');
-  if (!manifest || manifest.status !== 'calibrated-sealed' || typeof manifest.evaluationHash !== 'string' || !manifest.evaluationHash) errors.push('accepted calibration must seal the final manifest before dispatch');
-  if (evaluationHash != null && (!manifest || evaluationHash !== manifest.evaluationHash)) errors.push('runner evaluation hash must match the sealed manifest');
+  const provisionalPhase = phase === 'calibration' || phase === 'tool-canary';
+  const manifestHash = manifest?.evaluationHash || manifest?.hashes?.evaluationHash;
+  if (!manifest || (!provisionalPhase && manifest.status !== 'calibrated-sealed') || (provisionalPhase && !['calibrated-sealed', 'provisional-before-calibration'].includes(manifest.status)) || typeof manifestHash !== 'string' || !manifestHash) errors.push(provisionalPhase ? 'accepted provisional calibration manifest is required before quality dispatch' : 'accepted calibration must seal the final manifest before dispatch');
+  if (evaluationHash != null && (!manifest || evaluationHash !== manifestHash)) errors.push('runner evaluation hash must match the sealed manifest');
   if (paidRun === true && !(artifactStore instanceof ImmutableArtifactStore)) errors.push('paid dispatch requires a real immutable artifact store');
   if (paidRun !== true) errors.push('explicit paid-run flag is required');
   return { ok: errors.length === 0, errors, preflight: checked, environment, egress };
@@ -268,11 +287,11 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
         return immutableSnapshot({ ok: true, dispatched: true, artifact: await runAgentAttempt({ ...options, arm, adapter, runId, evaluationHash, artifactStore }) });
       } finally { await lease.release(); }
     },
-    async runSchedule({ schedule, toolsFor = null, requestFor = null, maxTurns = 5, maxPhases = 2, retry = { maxAttempts: 1 } } = {}) {
-      const gate = validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash, artifactStore });
+    async runSchedule({ schedule, toolsFor = null, requestFor = null, retry = { maxAttempts: 1 } } = {}) {
+      const gate = validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash, artifactStore, phase: schedule?.[0]?.phase });
       if (!gate.ok) return immutableSnapshot({ ok: false, classification: 'insufficient-evidence', dispatched: false, errors: gate.errors, artifacts: [] });
       validateColdSchedule(schedule, { manifest });
-      if (maxTurns !== MAX_TOOL_TURNS || maxPhases !== MAX_PROVIDER_PHASES) throw new Error('runner must use the frozen five-turn, two-phase limits');
+      const phase = phaseContract(manifest, schedule[0].phase);
       await lease.acquire();
       const artifacts = [];
       let spend = 0;
@@ -302,7 +321,7 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
           const adapter = adapters[arm.provider];
           let artifact;
           try {
-            artifact = await runAgentAttempt({ adapter, arm, attemptId, runId, evaluationHash, request: requestFor?.(entry) || entry.request || {}, tools: toolsFor?.(entry) || null, maxTurns, maxPhases, artifactStore, retry, beforeRequest: ({ isRetry, estimatedCost }) => {
+            artifact = await runAgentAttempt({ adapter, arm, attemptId, runId, evaluationHash, request: requestFor?.(entry) || entry.request || {}, tools: toolsFor?.(entry) || null, maxTurns: phase.toolTurns, maxPhases: phase.providerTurns, artifactStore, retry, beforeRequest: ({ isRetry, estimatedCost }) => {
               if (spend + estimatedCost > reservationUsd + 1e-12) throw Object.assign(new Error('metered spend plus next request would exceed the approved envelope'), { code: 'BUDGET_PRE_DISPATCH' });
               if (isRetry) {
                 if (retryReserved + estimatedCost > retryPool + 1e-12 || retrySpend + estimatedCost > retryPool + 1e-12) throw Object.assign(new Error('retry reservation would exceed the frozen global retry pool'), { code: 'BUDGET_PRE_DISPATCH' });
