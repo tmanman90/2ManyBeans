@@ -59,7 +59,7 @@ test('Anthropic Messages adapter preserves thinking/tool blocks and usage', asyn
   assert.deepEqual(calls[0].thinking, { type: 'adaptive' });
   assert.deepEqual(calls[0].output_config, { effort: 'high' });
   assert.equal(calls[0].effort, undefined);
-  assert.equal(calls[0].tools[0].strict, true);
+  assert.equal(calls[0].tools[0].strict, undefined);
   assert.equal(result.requestId, 'sdk-anthropic-1');
   assert.equal(result.responseId, 'msg-1');
   assert.equal(result.toolCalls[0].callId, 'tool-1');

@@ -14,10 +14,16 @@ export const SUBMIT_RESULT_TOOL = Object.freeze({
     properties: Object.freeze({
       reply: Object.freeze({ type: 'string' }),
       action: Object.freeze({ type: 'string', enum: Object.freeze(['read', 'diagnose', 'propose', 'clarify', 'refuse', 'insufficient-evidence']) }),
-      diagnosis: Object.freeze({ type: 'object', additionalProperties: false, properties: Object.freeze({ cause: { type: 'string' }, confidence: { type: 'string' }, uncertainty: { type: 'string' } }) }),
-      patch: Object.freeze({ type: 'object', additionalProperties: false, properties: Object.freeze({ path: { type: 'string' }, from: {}, to: {} }), required: Object.freeze(['path', 'from', 'to']) }),
+      diagnosis: Object.freeze({ anyOf: Object.freeze([
+        Object.freeze({ type: 'object', additionalProperties: false, properties: Object.freeze({ cause: { type: 'string' }, confidence: { type: 'string' }, uncertainty: { type: 'string' } }), required: Object.freeze(['cause', 'confidence', 'uncertainty']) }),
+        Object.freeze({ type: 'null' }),
+      ]) }),
+      patch: Object.freeze({ anyOf: Object.freeze([
+        Object.freeze({ type: 'object', additionalProperties: false, properties: Object.freeze({ path: { type: 'string' }, from: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] }, to: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] } }), required: Object.freeze(['path', 'from', 'to']) }),
+        Object.freeze({ type: 'null' }),
+      ]) }),
     }),
-    required: Object.freeze(['reply', 'action']),
+    required: Object.freeze(['reply', 'action', 'diagnosis', 'patch']),
   }),
 });
 const RECOVERY_MODEL_TOOL_NAMES = Object.freeze(['readCoffee', 'readRecipe', 'readTastings', 'compareGrind', 'proposeRecipe', 'applyProposal', 'prepareBrew', 'undoRevision']);
@@ -30,9 +36,10 @@ const CASE_ACTIONS = new Set(['read', 'diagnose', 'propose', 'clarify', 'refuse'
 function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 
 export function validateSubmitResult(value) {
-  if (!object(value) || Object.keys(value).some((key) => !['reply', 'action', 'diagnosis', 'patch'].includes(key)) || typeof value.reply !== 'string' || !value.reply.trim() || !CASE_ACTIONS.has(value.action)) throw new Error('semantic submit_result envelope is invalid');
-  if (value.diagnosis !== undefined && (!object(value.diagnosis) || Object.keys(value.diagnosis).some((key) => !['cause', 'confidence', 'uncertainty'].includes(key)) || Object.keys(value.diagnosis).some((key) => typeof value.diagnosis[key] !== 'string'))) throw new Error('semantic diagnosis is invalid');
-  if (value.patch !== undefined && (!object(value.patch) || Object.keys(value.patch).some((key) => !['path', 'from', 'to'].includes(key)) || typeof value.patch.path !== 'string' || !value.patch.path.trim() || !Object.hasOwn(value.patch, 'from') || !Object.hasOwn(value.patch, 'to'))) throw new Error('semantic patch is invalid');
+  if (!object(value) || Object.keys(value).some((key) => !['reply', 'action', 'diagnosis', 'patch'].includes(key)) || !Object.hasOwn(value, 'diagnosis') || !Object.hasOwn(value, 'patch') || typeof value.reply !== 'string' || !value.reply.trim() || !CASE_ACTIONS.has(value.action)) throw new Error('semantic submit_result envelope is invalid');
+  if (value.diagnosis !== undefined && value.diagnosis !== null && (!object(value.diagnosis) || Object.keys(value.diagnosis).some((key) => !['cause', 'confidence', 'uncertainty'].includes(key)) || ['cause', 'confidence', 'uncertainty'].some((key) => typeof value.diagnosis[key] !== 'string' || !value.diagnosis[key].trim()))) throw new Error('semantic diagnosis is invalid');
+  const scalar = (candidate) => candidate === null || typeof candidate === 'string' || typeof candidate === 'boolean' || (typeof candidate === 'number' && Number.isFinite(candidate));
+  if (value.patch !== undefined && value.patch !== null && (!object(value.patch) || Object.keys(value.patch).some((key) => !['path', 'from', 'to'].includes(key)) || typeof value.patch.path !== 'string' || !value.patch.path.trim() || !Object.hasOwn(value.patch, 'from') || !Object.hasOwn(value.patch, 'to') || !scalar(value.patch.from) || !scalar(value.patch.to))) throw new Error('semantic patch is invalid');
   return immutableSnapshot(value);
 }
 
@@ -97,7 +104,9 @@ export async function runRecoveryPhase({ adapters = {}, preflight, env = {}, end
         artifacts.push(artifact);
         actualSpend += artifact.telemetry.reduce((sum, turn) => sum + turn.cost, 0);
       } catch (error) {
-        failures.push({ attemptId, armId: arm.id, model: arm.model, provider: arm.provider, classification: error.classification || 'insufficient-evidence', code: error.code || 'RECOVERY_ATTEMPT_FAILED' });
+        const failure = immutableSnapshot({ attemptId, runId, evaluationHash, armId: arm.id, model: arm.model, provider: arm.provider, phase: entry.phase, caseId: entry.caseId, repeat: entry.repeat, status: 'failed', classification: error.classification || 'insufficient-evidence', error: { code: typeof error.code === 'string' ? error.code : 'RECOVERY_ATTEMPT_FAILED', status: Number.isInteger(error.status) ? error.status : null } });
+        const storedFailure = await artifactStore.write(attemptId, failure).catch(() => null);
+        failures.push({ attemptId, armId: arm.id, model: arm.model, provider: arm.provider, classification: failure.classification, code: failure.error.code, artifactChecksum: storedFailure?.checksum || null });
       }
     }
     return immutableSnapshot({ ok: failures.length === 0, classification: failures.length === 0 ? 'completed' : 'insufficient-evidence', dispatched: true, errors: failures.map((failure) => failure.code), failures, artifacts, spend: actualSpend, attemptCount: artifacts.length, evidenceHash: hashValue(artifacts.map((artifact) => artifact.checksum || artifact.attemptBinding)) });

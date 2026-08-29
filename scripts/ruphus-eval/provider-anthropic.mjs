@@ -27,7 +27,6 @@ export function buildAnthropicRequest({ model, system, instructions, messages = 
       name: tool.name,
       description: tool.description || '',
       input_schema: tool.input_schema || tool.parameters || tool.inputSchema || { type: 'object', properties: {}, additionalProperties: false },
-      strict: tool.strict !== false,
     })),
     stream: true,
   };

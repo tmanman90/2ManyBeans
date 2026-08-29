@@ -17,16 +17,21 @@ const expectedIdentity = { credentialFingerprint: identity.credentialFingerprint
 const retention = { openaiStore: false, anthropicStandardRetentionAcknowledged: true };
 
 test('submit_result uses one strict provider-neutral logical schema and native forcing', () => {
-  assert.deepEqual(SUBMIT_RESULT_TOOL.parameters.required, ['reply', 'action']);
-  assert.deepEqual(SUBMIT_RESULT_TOOL.parameters.properties.patch.required, ['path', 'from', 'to']);
+  assert.deepEqual(SUBMIT_RESULT_TOOL.parameters.required, ['reply', 'action', 'diagnosis', 'patch']);
+  assert.deepEqual(SUBMIT_RESULT_TOOL.parameters.properties.patch.anyOf[0].required, ['path', 'from', 'to']);
+  assert.deepEqual(SUBMIT_RESULT_TOOL.parameters.properties.diagnosis.anyOf[0].required, ['cause', 'confidence', 'uncertainty']);
   const common = { model: 'gpt-5.6-luna', instructions: 'semantic', input: [{ role: 'user', content: 'coffee' }], tools: [SUBMIT_RESULT_TOOL], toolChoice: { name: 'submit_result' }, maxOutputTokens: 900 };
   const openai = buildOpenAIRequest(common);
   const anthropic = buildAnthropicRequest({ ...common, messages: common.input });
   assert.deepEqual(openai.tool_choice, { type: 'function', name: 'submit_result' });
   assert.deepEqual(anthropic.tool_choice, { type: 'tool', name: 'submit_result' });
+  assert.deepEqual(openai.tools[0].parameters.required, ['reply', 'action', 'diagnosis', 'patch']);
   assert.deepEqual(openai.tools[0].parameters, anthropic.tools[0].input_schema);
-  assert.deepEqual(validateSubmitResult({ reply: 'Use a finer grind.', action: 'propose', patch: { path: 'grindSize', from: 700, to: 750 } }).patch, { path: 'grindSize', from: 700, to: 750 });
-  assert.throws(() => validateSubmitResult({ reply: 'ok', action: 'propose', approval: true }), /invalid/);
+  assert.deepEqual(validateSubmitResult({ reply: 'Use a finer grind.', action: 'propose', diagnosis: null, patch: { path: 'grindSize', from: 700, to: 750 } }).patch, { path: 'grindSize', from: 700, to: 750 });
+  assert.throws(() => validateSubmitResult({ reply: 'ok', action: 'propose', diagnosis: null, patch: null, approval: true }), /invalid/);
+  assert.throws(() => validateSubmitResult({ reply: 'ok', action: 'propose', diagnosis: { cause: 'under-extraction' }, patch: null }), /diagnosis/);
+  assert.throws(() => validateSubmitResult({ reply: 'ok', action: 'propose', diagnosis: null, patch: { path: 'grindSize', from: 700 } }), /patch/);
+  assert.throws(() => validateSubmitResult({ reply: 'ok', action: 'propose', diagnosis: null, patch: { path: 'grindSize', from: {}, to: 750 } }), /patch/);
 });
 
 test('recovery smoke dispatches one identical semantic request per exact arm and stores attributed evidence', async () => {
@@ -35,7 +40,8 @@ test('recovery smoke dispatches one identical semantic request per exact arm and
     const calls = [];
     const runTurn = async ({ model, provider, tools, toolChoice, input }) => {
       calls.push({ model, provider, tools, toolChoice, input });
-      return { provider: provider || (model.startsWith('claude') ? 'anthropic' : 'openai'), model, requestId: `recovery-${calls.length}`, responseId: `response-${calls.length}`, outputItems: [{ type: 'function_call', call_id: `call-${calls.length}`, name: 'submit_result', arguments: JSON.stringify({ reply: 'Coffee answer', action: 'read' }) }], toolCalls: [{ name: 'submit_result', callId: `call-${calls.length}`, args: { reply: 'Coffee answer', action: 'read' } }], text: '', stopReason: 'completed', rawUsage: { input_tokens: 100, output_tokens: 20 }, usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } };
+      const submitted = { reply: 'Coffee answer', action: 'read', diagnosis: null, patch: null };
+      return { provider: provider || (model.startsWith('claude') ? 'anthropic' : 'openai'), model, requestId: `recovery-${calls.length}`, responseId: `response-${calls.length}`, outputItems: [{ type: 'function_call', call_id: `call-${calls.length}`, name: 'submit_result', arguments: JSON.stringify(submitted) }], toolCalls: [{ name: 'submit_result', callId: `call-${calls.length}`, args: submitted }], text: '', stopReason: 'completed', rawUsage: { input_tokens: 100, output_tokens: 20 }, usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } };
     };
     const adapters = { openai: { runTurn }, anthropic: { runTurn } };
     const schedule = buildRecoverySchedule({ runId: 'recovery-smoke', phase: 'smoke', caseIds: ['dec-001'] });
@@ -45,6 +51,20 @@ test('recovery smoke dispatches one identical semantic request per exact arm and
     assert.equal(calls.length, MODEL_ARMS.length);
     assert.ok(calls.every((call) => call.tools.length === 1 && call.tools[0].name === 'submit_result' && call.toolChoice.name === 'submit_result'));
     assert.ok(result.artifacts.every((artifact) => artifact.response.submitResult.action === 'read' && artifact.telemetry.length === 1));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('failed provider attempts leave only safe, checksummed audit metadata', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-recovery-failure-'));
+  try {
+    const schedule = buildRecoverySchedule({ runId: 'recovery-failure', phase: 'smoke', caseIds: ['dec-001'] });
+    const result = await runRecoveryPhase({ adapters: { openai: { runTurn: async () => { throw Object.assign(new Error('provider rejected tool schema'), { code: 'invalid_function_parameters', status: 400 }); } }, anthropic: { runTurn: async () => { throw Object.assign(new Error('provider rejected tool schema'), { code: 'invalid_function_parameters', status: 400 }); } } }, preflight, env: {}, retention, endpoint: 'https://api.openai.com', endpoints: ['https://api.openai.com', 'https://api.anthropic.com'], paidRun: true, manifest, runId: 'recovery-failure', evaluationHash: manifest.hashes.evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }), schedule });
+    assert.equal(result.ok, false);
+    assert.equal(result.failures.length, 6);
+    assert.ok(result.failures.every((failure) => typeof failure.artifactChecksum === 'string' && failure.artifactChecksum.length === 64));
+    const stored = await new ImmutableArtifactStore({ directory }).read(schedule[0].attemptId);
+    assert.equal(stored.ok, true);
+    assert.deepEqual(Object.keys(stored.artifact).sort(), ['armId', 'attemptId', 'caseId', 'checksum', 'classification', 'error', 'evaluationHash', 'model', 'phase', 'provider', 'repeat', 'runId', 'status'].sort());
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
