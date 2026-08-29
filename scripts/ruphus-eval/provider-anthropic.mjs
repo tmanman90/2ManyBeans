@@ -105,7 +105,9 @@ export function normalizeAnthropicResponse(state, requestedModel) {
   return immutableSnapshot({
     provider: ANTHROPIC_PROVIDER,
     model: state?.model || requestedModel || null,
-    requestId: state?.requestId || state?.responseId || null,
+    // Keep the SDK request id separate from the message/response id. A
+    // missing request id is unmeterable preflight evidence.
+    requestId: state?.requestId || null,
     responseId: state?.responseId || null,
     content,
     text: state?.text || content.filter((block) => block?.type === 'text').map((block) => block.text || '').join(''),
@@ -118,6 +120,25 @@ export function normalizeAnthropicResponse(state, requestedModel) {
   });
 }
 
+async function probeAnthropic({ client, arm } = {}) {
+  if (!arm || arm.provider !== ANTHROPIC_PROVIDER || typeof arm.model !== 'string' || !arm.model) throw new Error('Anthropic probe requires a canonical Anthropic arm');
+  try {
+    const result = await runAnthropicTurn({
+      client, model: arm.model, thinking: arm.thinking || 'disabled', effort: arm.effort,
+      system: 'Return a minimal probe acknowledgement.',
+      messages: [{ role: 'user', content: 'probe' }], maxOutputTokens: 1, tools: [],
+    });
+    const completeUsage = Boolean(result.rawUsage && result.usage && Number.isFinite(result.usage.inputTokens) && Number.isFinite(result.usage.outputTokens));
+    return immutableSnapshot({
+      returnedModel: result.model, providerHost: ANTHROPIC_ENDPOINT,
+      modelAccess: result.model === arm.model, streaming: result.streaming === true,
+      completeUsage, requestId: typeof result.requestId === 'string' && result.requestId ? result.requestId : null,
+    });
+  } catch (error) {
+    return immutableSnapshot({ returnedModel: null, providerHost: ANTHROPIC_ENDPOINT, modelAccess: false, streaming: false, completeUsage: false, requestId: null, errorCode: typeof error?.code === 'string' ? error.code : 'PROBE_FAILED' });
+  }
+}
+
 export async function runAnthropicTurn({ client, ...options } = {}) {
   if (!client?.messages || typeof client.messages.create !== 'function') throw new Error('Anthropic Messages client is required');
   const request = buildAnthropicRequest(options);
@@ -128,7 +149,7 @@ export async function runAnthropicTurn({ client, ...options } = {}) {
 }
 
 export function createAnthropicAdapter({ client } = {}) {
-  return Object.freeze({ provider: ANTHROPIC_PROVIDER, endpoint: ANTHROPIC_ENDPOINT, runTurn: (options) => runAnthropicTurn({ client, ...options }) });
+  return Object.freeze({ provider: ANTHROPIC_PROVIDER, endpoint: ANTHROPIC_ENDPOINT, runTurn: (options) => runAnthropicTurn({ client, ...options }), probe: (arm) => probeAnthropic({ client, arm }) });
 }
 
 export const createAnthropicProvider = createAnthropicAdapter;

@@ -100,7 +100,10 @@ export function normalizeOpenAIResponse(state, requestedModel) {
   return immutableSnapshot({
     provider: OPENAI_PROVIDER,
     model: state?.model || requestedModel || null,
-    requestId: state?.requestId || state?.responseId || null,
+    // A response id identifies the response, not the billable provider
+    // request. Keep the two fields distinct and fail closed when the SDK did
+    // not expose its request id.
+    requestId: state?.requestId || null,
     responseId: state?.responseId || null,
     outputItems,
     text: state?.text || '',
@@ -113,6 +116,25 @@ export function normalizeOpenAIResponse(state, requestedModel) {
   });
 }
 
+async function probeOpenAI({ client, arm } = {}) {
+  if (!arm || arm.provider !== OPENAI_PROVIDER || typeof arm.model !== 'string' || !arm.model) throw new Error('OpenAI probe requires a canonical OpenAI arm');
+  try {
+    const result = await runOpenAITurn({
+      client, model: arm.model, effort: arm.effort,
+      instructions: 'Return a minimal probe acknowledgement.',
+      input: [{ role: 'user', content: 'probe' }], maxOutputTokens: 1, tools: [],
+    });
+    const completeUsage = Boolean(result.rawUsage && result.usage && Number.isFinite(result.usage.inputTokens) && Number.isFinite(result.usage.outputTokens));
+    return immutableSnapshot({
+      returnedModel: result.model, providerHost: OPENAI_ENDPOINT,
+      modelAccess: result.model === arm.model, streaming: result.streaming === true,
+      completeUsage, requestId: typeof result.requestId === 'string' && result.requestId ? result.requestId : null,
+    });
+  } catch (error) {
+    return immutableSnapshot({ returnedModel: null, providerHost: OPENAI_ENDPOINT, modelAccess: false, streaming: false, completeUsage: false, requestId: null, errorCode: typeof error?.code === 'string' ? error.code : 'PROBE_FAILED' });
+  }
+}
+
 export async function runOpenAITurn({ client, ...options } = {}) {
   if (!client?.responses || typeof client.responses.create !== 'function') throw new Error('OpenAI Responses client is required');
   const request = buildOpenAIRequest(options);
@@ -123,7 +145,7 @@ export async function runOpenAITurn({ client, ...options } = {}) {
 }
 
 export function createOpenAIAdapter({ client } = {}) {
-  return Object.freeze({ provider: OPENAI_PROVIDER, endpoint: OPENAI_ENDPOINT, runTurn: (options) => runOpenAITurn({ client, ...options }) });
+  return Object.freeze({ provider: OPENAI_PROVIDER, endpoint: OPENAI_ENDPOINT, runTurn: (options) => runOpenAITurn({ client, ...options }), probe: (arm) => probeOpenAI({ client, arm }) });
 }
 
 export const createOpenAIProvider = createOpenAIAdapter;
