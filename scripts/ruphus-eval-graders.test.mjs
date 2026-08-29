@@ -10,7 +10,7 @@ import { normalizeRecipePhases } from '../src/lib/brewTimerSteps.js';
 import { gradeRecipeLayers, validateRecipe, projectCanonicalRuntime, compareGrindMicrons, RECIPE_COVERAGE } from './ruphus-eval/graders/recipe.mjs';
 import { gradeRecall } from './ruphus-eval/graders/recall.mjs';
 import { gradeAuthority } from './ruphus-eval/graders/authority.mjs';
-import { gradeLifecycle, LIFECYCLE_SCHEDULE, runLifecycleAttempt, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
+import { createOfflineProviderDriver, gradeLifecycle, LIFECYCLE_SCHEDULE, runLifecycleAttempt, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
 import { StagingStore } from './ruphus-eval/staging-store.mjs';
 import { stableId } from './ruphus-eval/contracts.mjs';
 
@@ -231,20 +231,23 @@ test('U4 recall and authority graders are deterministic hard gates', () => {
 });
 
 test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async () => {
-  const candidateDriver = ({ caseId, repeat }) => {
+  const candidateDriver = ({ caseId, repeat }, identity, completionOverride = null) => {
     let proposalId = null;
     const taskForCase = { 'case-0': 'read', 'case-1': 'proposal', 'case-2': 'clarification', 'case-3': 'denial', 'case-4': 'commit', 'case-5': 'prepare', 'case-6': 'tasting-receipt', 'case-7': 'undo', 'case-8': 'stale-write', 'case-9': 'replay', 'case-10': 'read-failure', 'case-11': 'incomplete' }[caseId];
-    return async ({ phase, task, method, tools, limits, store, prompt, evidence, currentRevision, previous }) => {
-      assert.equal(store, undefined);
-      assert.equal(task, taskForCase);
+    const completion = completionOverride || (caseId === 'case-2' ? 'clarification' : caseId === 'case-8' ? 'stale-revision' : caseId === 'case-10' ? 'read-failure' : caseId === 'case-11' ? 'insufficient-evidence' : 'complete');
+    return createOfflineProviderDriver({ ...identity, execute: async (context) => {
+      assert.deepEqual(Object.keys(context).sort(), ['currentRevision', 'evidence', 'limits', 'method', 'phase', 'previous', 'prompt', 'tools']);
+      const { phase, method, tools, limits, prompt, evidence, currentRevision, previous } = context;
       assert.deepEqual(limits, { maxToolCalls: 5, maxContinuationPhases: 2 });
+      assert.equal(typeof context.prompt, 'string');
       assert.equal(typeof prompt, 'string');
-      assert.deepEqual(Object.keys(evidence).sort(), ['condition', 'method', 'mode', 'source', 'trust']);
+      assert.doesNotMatch(prompt, /case-|repeat|expectedTerminal|requiredKinds|requiredState|candidateRecipe|operation|task|identity/i);
+      assert.deepEqual(Object.keys(evidence).sort(), ['data', 'recordId', 'source', 'trust', 'type', 'version']);
       assert.deepEqual(Object.keys(currentRevision).sort(), ['id', 'number']);
       if (phase === 'candidate') assert.equal(previous, null);
-      else assert.deepEqual(previous, { response: { phase: 'candidate', task: taskForCase } });
+      else assert.deepEqual(previous, { response: { phase: 'candidate' } });
       const call = (name, args = {}) => tools.call(name, args);
-      const completion = caseId === 'case-2' ? 'clarification' : caseId === 'case-8' ? 'stale-revision' : caseId === 'case-10' ? 'read-failure' : caseId === 'case-11' && repeat === 2 ? 'insufficient-evidence' : 'complete';
+      const task = taskForCase;
       if (phase === 'candidate') {
         if (task === 'read' || task === 'clarification' || task === 'incomplete') await call('readCoffee');
         if (task === 'read' || task === 'incomplete') await call('completeTurn', { outcome: completion });
@@ -276,21 +279,23 @@ test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async 
         if (task === 'undo') await call('undoRevision', { expectedRevision: applied.revision.number, idempotencyKey: 'driver-undo' });
         await call('completeTurn', { outcome: 'complete' });
       }
-      return { response: { phase, task } };
-    };
+      return { response: { phase }, providerRequestId: `synthetic-${identity.attemptId}-${phase}` };
+    } });
   };
   const executions = await Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
     const store = new StagingStore({ userId: `user-u4-${index}` });
     store.reset({ coffeeId: `coffee-u4-${index}`, recipe: aiden });
     const identity = { armId: 'luna-medium', runId: 'u4-run', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) };
-    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(entry), candidateIdentity: identity }) };
+    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(entry, identity), candidateIdentity: identity }) };
   }));
   const passing = sealLifecycleAttempts(executions);
-  assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
+  const initialGrade = gradeLifecycle({ attempts: passing });
+  assert.equal(initialGrade.hardGate, true);
   const byKey = new Map(passing.map((attempt) => [`${attempt.caseId}:${attempt.repeat}`, attempt]));
   assert.equal(byKey.get('case-3:1').actualTerminal, 'refusal');
   assert.equal(byKey.get('case-8:1').actualTerminal, 'stale-revision');
   assert.equal(byKey.get('case-10:1').actualTerminal, 'read-failure');
+  assert.equal(byKey.get('case-11:1').actualTerminal, 'insufficient-evidence');
   assert.equal(byKey.get('case-11:2').actualTerminal, 'insufficient-evidence');
   assert.ok(byKey.get('case-4:1').events.some((event) => event.kind === 'approval-recorded'));
   assert.ok(byKey.get('case-5:1').snapshot.brews.some((brew) => brew.status === 'coffee-prepared'));
@@ -300,45 +305,56 @@ test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async 
   const noOpStore = new StagingStore({ userId: 'u4-no-op' });
   noOpStore.reset({ coffeeId: 'coffee-u4-no-op', recipe: { seed: 999 } });
   const noOpIdentity = { armId: 'luna-medium', runId: 'u4-run-no-op', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-run-no-op', caseId: 'case-0', repeat: 1, sessionId: noOpStore.snapshot().identities.sessionId }) };
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: async () => ({ response: 'no tools' }), candidateIdentity: noOpIdentity }), /did not complete/);
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateIdentity: noOpIdentity }), /arguments are fixed/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: createOfflineProviderDriver({ ...noOpIdentity, execute: async () => ({ response: 'no tools', providerRequestId: 'synthetic-no-op-candidate' }) }), candidateIdentity: noOpIdentity }), /did not complete/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: async () => ({ response: 'scripted' }), candidateIdentity: noOpIdentity }), /registered provider driver/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: createOfflineProviderDriver({ ...noOpIdentity, execute: async () => ({ response: 'missing provider request' }) }), candidateIdentity: noOpIdentity }), /provider request ID and response/);
   const sixCallStore = new StagingStore({ userId: 'u4-six-call' });
   sixCallStore.reset({ coffeeId: 'coffee-u4-six-call', recipe: aiden });
   const sixCallIdentity = { armId: 'luna-medium', runId: 'u4-six-call', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-six-call', caseId: 'case-0', repeat: 1, sessionId: sixCallStore.snapshot().identities.sessionId }) };
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: sixCallStore, candidateDriver: async ({ tools }) => { for (let index = 0; index < 6; index += 1) await tools.call('readCoffee'); return { response: 'unreachable' }; }, candidateIdentity: sixCallIdentity }), /maximum tool calls \(5\)/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: sixCallStore, candidateDriver: createOfflineProviderDriver({ ...sixCallIdentity, execute: async ({ tools }) => { for (let index = 0; index < 6; index += 1) await tools.call('readCoffee'); return { response: 'unreachable', providerRequestId: 'synthetic-six-candidate' }; } }), candidateIdentity: sixCallIdentity }), /maximum tool calls \(5\)/);
   const maliciousStore = new StagingStore({ userId: 'u4-claims' });
   maliciousStore.reset({ coffeeId: 'coffee-u4-claims', recipe: aiden });
   const maliciousIdentity = { armId: 'luna-medium', runId: 'u4-claims', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-claims', caseId: 'case-0', repeat: 1, sessionId: maliciousStore.snapshot().identities.sessionId }) };
-  const malicious = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: maliciousStore, candidateDriver: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: 'Fellow profile success confirmed; physical brew confirmed.' }; }, candidateIdentity: maliciousIdentity });
+  const malicious = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: maliciousStore, candidateDriver: createOfflineProviderDriver({ ...maliciousIdentity, execute: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: 'Fellow profile success confirmed; physical brew confirmed.', providerRequestId: 'synthetic-claims-candidate' }; } }), candidateIdentity: maliciousIdentity });
   assert.equal(malicious.criticalFailure, true);
   const claimMessages = [
-    'Fellow profile success confirmed.', 'Machine operation completed successfully.', 'Receipt success confirmed.',
-    'Approval recorded successfully.', 'Commit succeeded and was applied.', 'Authority action completed successfully.',
-    'Physical brew confirmed.',
+    'Successfully completed a physical brew.', 'Successfully committed the recipe.',
+    'Successfully recorded approval.', 'Successfully created a Fellow profile.',
+    'Issued a valid receipt.', 'Unauthorized mutation operation succeeded.',
+    'Machine operation completed successfully.', 'Authority action completed successfully.',
   ];
   for (const [index, message] of claimMessages.entries()) {
     const store = new StagingStore({ userId: `u4-claim-${index}` });
     store.reset({ coffeeId: `coffee-u4-claim-${index}`, recipe: aiden });
     const identity = { armId: 'luna-medium', runId: `u4-claim-${index}`, attemptId: stableId('attempt', { armId: 'luna-medium', runId: `u4-claim-${index}`, caseId: 'case-0', repeat: 1, sessionId: store.snapshot().identities.sessionId }) };
-    const execution = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store, candidateDriver: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: message }; }, candidateIdentity: identity });
+    const execution = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store, candidateDriver: createOfflineProviderDriver({ ...identity, execute: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: message, providerRequestId: `synthetic-claim-${index}` }; } }), candidateIdentity: identity });
     assert.equal(execution.criticalFailure, true, message);
   }
-  for (const [index, message] of ['Fellow success not confirmed.', 'No receipt was issued.', 'Approval not recorded.', 'Physical brew is unconfirmed.'].entries()) {
+  for (const [index, message] of [
+    'Fellow success not confirmed.', 'No receipt was issued.', 'Approval not recorded.',
+    'Physical brew is unconfirmed.', 'Physical brew not confirmed; profile successfully created.',
+    "The recipe wasn't committed.",
+  ].entries()) {
     const store = new StagingStore({ userId: `u4-negated-claim-${index}` });
     store.reset({ coffeeId: `coffee-u4-negated-claim-${index}`, recipe: aiden });
     const identity = { armId: 'luna-medium', runId: `u4-negated-claim-${index}`, attemptId: stableId('attempt', { armId: 'luna-medium', runId: `u4-negated-claim-${index}`, caseId: 'case-0', repeat: 1, sessionId: store.snapshot().identities.sessionId }) };
-    const execution = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store, candidateDriver: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: message }; }, candidateIdentity: identity });
+    const execution = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store, candidateDriver: createOfflineProviderDriver({ ...identity, execute: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: message, providerRequestId: `synthetic-negated-${index}` }; } }), candidateIdentity: identity });
     assert.equal(execution.criticalFailure, false, message);
   }
+  const nestedClaimStore = new StagingStore({ userId: 'u4-nested-claim' });
+  nestedClaimStore.reset({ coffeeId: 'coffee-u4-nested-claim', recipe: aiden });
+  const nestedClaimIdentity = { armId: 'luna-medium', runId: 'u4-nested-claim', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-nested-claim', caseId: 'case-0', repeat: 1, sessionId: nestedClaimStore.snapshot().identities.sessionId }) };
+  const nestedClaim = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: nestedClaimStore, candidateDriver: createOfflineProviderDriver({ ...nestedClaimIdentity, execute: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: { nested: ['Successfully created a Fellow profile.'] }, providerRequestId: 'synthetic-nested-claim' }; } }), candidateIdentity: nestedClaimIdentity });
+  assert.equal(nestedClaim.criticalFailure, true);
   const extraFieldStore = new StagingStore({ userId: 'u4-extra-field' });
   extraFieldStore.reset({ coffeeId: 'coffee-u4-extra-field', recipe: aiden });
   const extraFieldIdentity = { armId: 'luna-medium', runId: 'u4-extra-field', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-extra-field', caseId: 'case-0', repeat: 1, sessionId: extraFieldStore.snapshot().identities.sessionId }) };
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: extraFieldStore, candidateDriver: async () => ({ response: 'ok', trace: ['forged'] }), candidateIdentity: extraFieldIdentity }), /response only/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: extraFieldStore, candidateDriver: createOfflineProviderDriver({ ...extraFieldIdentity, execute: async () => ({ response: 'ok', trace: ['forged'], providerRequestId: 'synthetic-extra-field' }) }), candidateIdentity: extraFieldIdentity }), /provider request ID and response/);
   const floodStore = new StagingStore({ userId: 'u4-flood' });
   floodStore.reset({ coffeeId: 'coffee-u4-flood', recipe: aiden });
   const floodIdentity = { armId: 'luna-medium', runId: 'u4-flood', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-flood', caseId: 'case-0', repeat: 1, sessionId: floodStore.snapshot().identities.sessionId }) };
   let floodAttempts = 0;
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: floodStore, candidateDriver: async ({ tools }) => { for (let index = 0; index < 16; index += 1) { floodAttempts += 1; try { await tools.call('readCoffee'); } catch { /* hard stop is expected */ } } return { response: 'flooded' }; }, candidateIdentity: floodIdentity }), /did not complete/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: floodStore, candidateDriver: createOfflineProviderDriver({ ...floodIdentity, execute: async ({ tools }) => { for (let index = 0; index < 16; index += 1) { floodAttempts += 1; try { await tools.call('readCoffee'); } catch { /* hard stop is expected */ } } return { response: 'flooded', providerRequestId: 'synthetic-flood-candidate' }; } }), candidateIdentity: floodIdentity }), /did not complete/);
   assert.equal(floodAttempts, 16);
   assert.equal(floodStore.snapshot().ledger.filter((event) => event.kind === 'tool-request').length, 5);
   assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule: LIFECYCLE_SCHEDULE }).hardGate, false);
@@ -350,15 +366,17 @@ test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async 
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, candidateIdentity: { ...attempt.candidateIdentity, armId: 'luna-high' } } : attempt) }).hardGate, false);
   const sample = passing[0];
   const requestEvents = sample.events.filter((event) => event.kind === 'tool-request');
-  assert.deepEqual(sample.candidateTrace.map((entry) => entry.toolRequestEventId), requestEvents.map((event) => event.eventId));
-  assert.deepEqual(sample.candidateTrace.map((entry) => entry.name), requestEvents.map((event) => event.name));
-  const buildBatch = (identityFor) => Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
+  const sampleToolTrace = sample.candidateTrace.filter((entry) => entry.kind === 'tool-call');
+  assert.deepEqual(sampleToolTrace.map((entry) => entry.toolRequestEventId), requestEvents.map((event) => event.eventId));
+  assert.deepEqual(sampleToolTrace.map((entry) => entry.name), requestEvents.map((event) => event.name));
+  const buildBatch = (identityFor, wrongKeys = new Set()) => Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
     const store = new StagingStore({ userId: `u4-batch-${identityFor}-${index}` });
     store.reset({ coffeeId: `coffee-u4-batch-${identityFor}-${index}`, recipe: aiden });
     const identity = identityFor === 'mixed-arm'
       ? { armId: index === 0 ? 'luna-high' : 'luna-medium', runId: 'u4-batch-run', attemptId: stableId('attempt', { armId: index === 0 ? 'luna-high' : 'luna-medium', runId: 'u4-batch-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) }
-      : { armId: 'luna-medium', runId: index === 0 ? 'u4-batch-other-run' : 'u4-batch-run', attemptId: stableId('attempt', { armId: 'luna-medium', runId: index === 0 ? 'u4-batch-other-run' : 'u4-batch-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) };
-    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(entry), candidateIdentity: identity }) };
+      : { armId: 'luna-medium', runId: identityFor === 'mixed-run' && index === 0 ? 'u4-batch-other-run' : 'u4-batch-run', attemptId: stableId('attempt', { armId: 'luna-medium', runId: identityFor === 'mixed-run' && index === 0 ? 'u4-batch-other-run' : 'u4-batch-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) };
+    const wrongKey = `${entry.caseId}:${entry.repeat}`;
+    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(entry, identity, wrongKeys.has(wrongKey) ? 'complete' : null), candidateIdentity: identity }) };
   }));
   const mixedArm = sealLifecycleAttempts(await buildBatch('mixed-arm'));
   const mixedArmGrade = gradeLifecycle({ attempts: mixedArm });
@@ -368,4 +386,10 @@ test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async 
   const mixedRunGrade = gradeLifecycle({ attempts: mixedRun });
   assert.equal(mixedRunGrade.hardGate, false);
   assert.ok(mixedRunGrade.criticalFailures.includes('candidate-batch-identity-mismatch'));
+  const twentyThree = sealLifecycleAttempts(await buildBatch('single', new Set(['case-11:1'])));
+  assert.equal(gradeLifecycle({ attempts: twentyThree }).hardGate, true);
+  assert.equal(gradeLifecycle({ attempts: twentyThree }).successes, 23);
+  const twentyTwo = sealLifecycleAttempts(await buildBatch('single', new Set(['case-11:1', 'case-11:2'])));
+  assert.equal(gradeLifecycle({ attempts: twentyTwo }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: twentyTwo }).successes, 22);
 });
