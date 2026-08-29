@@ -58,10 +58,10 @@ function scenarioFor(id) {
   return scenario;
 }
 
-export function buildFinalistSchedule({ runId, armIds = FINALIST_ARM_IDS } = {}) {
+export function buildFinalistSchedule({ runId, evaluationHash = null, armIds = FINALIST_ARM_IDS } = {}) {
   if (typeof runId !== 'string' || !runId || !Array.isArray(armIds) || armIds.length !== 2 || new Set(armIds).size !== 2 || armIds.some((id) => !getArm(id))) throw new Error('finalist schedule requires exactly two canonical arms');
   return armIds.flatMap((armId) => FINALIST_SCENARIOS.flatMap((scenario) => [1, 2].map((repeat) => Object.freeze({
-    attemptId: stableId('finalist-attempt', { runId, armId, scenario: scenario.id, repeat }), runId, armId, scenario: scenario.id, repeat, phase: 'finalist', cacheRegime: 'cold',
+    attemptId: stableId('finalist-attempt', { runId, armId, scenario: scenario.id, repeat }), runId, ...(typeof evaluationHash === 'string' && evaluationHash ? { evaluationHash } : {}), armId, scenario: scenario.id, repeat, phase: 'finalist', cacheRegime: 'cold',
   }))));
 }
 
@@ -194,6 +194,35 @@ function prepareScenario(scenarioId, options) {
   return createStore({ ...options, scenarioId, initialApplied: ['undo-stale-revision', 'fellow-preparation-receipt'].includes(scenarioId) });
 }
 
+function safeFailureCode(error) {
+  return typeof error?.code === 'string' && /^[A-Z0-9_.-]{1,64}$/.test(error.code) ? error.code : 'FINALIST_ATTEMPT_FAILED';
+}
+
+function safeFailureClassification(error) {
+  const allowed = new Set(['transient-provider', 'semantic-candidate-failure', 'provider-operational-failure', 'budget-stop', 'insufficient-evidence']);
+  return allowed.has(error?.classification) ? error.classification : 'provider-operational-failure';
+}
+
+async function persistFinalistFailure({ entry, artifactStore, evaluationHash, error }) {
+  const arm = getArm(entry.armId);
+  const code = safeFailureCode(error);
+  const classification = safeFailureClassification(error);
+  const identity = { runId: entry.runId, evaluationHash, armId: arm.id, attemptId: entry.attemptId, phase: entry.phase, caseId: entry.scenario, repeat: entry.repeat };
+  const telemetry = Array.isArray(error?.telemetry) ? error.telemetry.map((turn) => ({
+    provider: turn.provider, model: turn.model, requestId: turn.requestId, providerRequestId: turn.providerRequestId,
+    responseId: turn.responseId || null, latencyMs: turn.latencyMs, retryAttempts: turn.retryAttempts,
+    retryHistory: turn.retryHistory, rawUsage: turn.rawUsage, usage: turn.usage, cost: turn.cost, responseHash: turn.responseHash,
+  })) : [];
+  const artifact = await artifactStore.write(entry.attemptId, {
+    ...identity, model: arm.model, provider: arm.provider, status: 'failed', classification,
+    error: { code, status: Number.isInteger(error?.status) ? error.status : null },
+    telemetry, response: null, attemptBinding: hashValue({ ...identity, providerRequestIds: telemetry.map((turn) => turn.providerRequestId || turn.requestId).filter(Boolean) }),
+  });
+  const sidecar = immutableSnapshot({ type: 'finalist-state-sidecar', version: 1, ...identity, model: arm.model, provider: arm.provider, status: 'failed', artifactChecksum: artifact.checksum, error: { code, status: Number.isInteger(error?.status) ? error.status : null }, fellowCalls: [], ledger: [], snapshot: null });
+  await artifactStore.write(`${entry.attemptId}.state`, sidecar);
+  return { artifact, sidecar, fellowCalls: [] };
+}
+
 /** Execute one finalist workflow through the real U5 attempt loop and U3 tools. */
 export async function runFinalistAttempt({ entry, adapter = null, artifactStore, evaluationHash, sidecarStore = artifactStore, failures = {} } = {}) {
   if (!entry || !artifactStore || !(artifactStore instanceof ImmutableArtifactStore) || typeof evaluationHash !== 'string' || !evaluationHash) throw new Error('finalist attempt requires immutable artifacts and evaluation identity');
@@ -216,9 +245,16 @@ export async function runFinalistAttempt({ entry, adapter = null, artifactStore,
 }
 
 export async function runFinalistBatch({ runId, evaluationHash, artifactStore, armIds = FINALIST_ARM_IDS, adapterFor = null, failuresFor = null } = {}) {
-  const schedule = buildFinalistSchedule({ runId, armIds });
+  if (!(artifactStore instanceof ImmutableArtifactStore)) throw new Error('finalist batch requires an immutable artifact store');
+  const schedule = buildFinalistSchedule({ runId, evaluationHash, armIds });
   const attempts = [];
-  for (const entry of schedule) attempts.push(await runFinalistAttempt({ entry, evaluationHash, artifactStore, adapter: adapterFor?.(entry) || null, failures: failuresFor?.(entry) || {} }));
+  for (const entry of schedule) {
+    try {
+      attempts.push(await runFinalistAttempt({ entry, evaluationHash, artifactStore, adapter: adapterFor?.(entry) || null, failures: failuresFor?.(entry) || {} }));
+    } catch (error) {
+      attempts.push(await persistFinalistFailure({ entry, artifactStore, evaluationHash, error }));
+    }
+  }
   const summaries = attempts.map(({ artifact, sidecar }, index) => {
     const entry = schedule[index];
     const grade = gradeFinalistAttempt({ artifact, sidecar, entry });
@@ -226,7 +262,7 @@ export async function runFinalistBatch({ runId, evaluationHash, artifactStore, a
       attemptId: entry.attemptId, armId: entry.armId, scenario: entry.scenario, repeat: entry.repeat,
       valid: grade.valid, criticalFailures: grade.criticalFailures,
       toolNames: sidecar.ledger.filter((event) => event.kind === 'tool-request').map((event) => event.name),
-      revisionNumber: sidecar.snapshot.revisions.at(-1)?.number ?? null,
+      revisionNumber: sidecar.snapshot?.revisions?.at(-1)?.number ?? null,
       cost: artifact.telemetry.reduce((sum, turn) => sum + turn.cost, 0),
       latencyMs: artifact.telemetry.reduce((sum, turn) => sum + turn.latencyMs, 0),
       retries: artifact.telemetry.reduce((sum, turn) => sum + Math.max(0, turn.retryAttempts - 1), 0),
@@ -238,9 +274,19 @@ export async function runFinalistBatch({ runId, evaluationHash, artifactStore, a
 export function gradeFinalistAttempt({ artifact, sidecar, entry } = {}) {
   const failures = [];
   if (!artifact || !sidecar || !entry) return { valid: false, criticalFailures: ['missing-finalist-evidence'] };
+  const arm = getArm(entry.armId);
   const { checksum, ...content } = artifact;
   if (checksum !== hashValue(content)) failures.push('corrupt-artifact');
-  if (sidecar.artifactChecksum !== checksum || sidecar.attemptId !== entry.attemptId || sidecar.runId !== entry.runId || sidecar.armId !== entry.armId || sidecar.scenario !== entry.scenario || sidecar.repeat !== entry.repeat) failures.push('state-artifact-binding-mismatch');
+  if (!arm || artifact.attemptId !== entry.attemptId || artifact.runId !== entry.runId || (typeof entry.evaluationHash === 'string' && artifact.evaluationHash !== entry.evaluationHash) || artifact.armId !== arm.id || artifact.model !== arm.model || artifact.provider !== arm.provider || artifact.phase !== 'finalist' || artifact.caseId !== entry.scenario || artifact.repeat !== entry.repeat) failures.push('artifact-attribution-mismatch');
+  if (sidecar.artifactChecksum !== checksum || sidecar.attemptId !== entry.attemptId || sidecar.runId !== entry.runId || (typeof entry.evaluationHash === 'string' && sidecar.evaluationHash !== entry.evaluationHash) || sidecar.armId !== entry.armId || sidecar.model !== arm?.model || sidecar.provider !== arm?.provider || sidecar.scenario !== entry.scenario || sidecar.repeat !== entry.repeat) failures.push('state-artifact-binding-mismatch');
+  if (artifact.status === 'failed') {
+    if (!artifact.error || typeof artifact.error.code !== 'string' || !artifact.classification || !Array.isArray(artifact.telemetry) || artifact.telemetry.some((turn) => turn.provider !== arm?.provider || turn.model !== arm?.model || typeof turn.requestId !== 'string' || !turn.requestId)) failures.push('invalid-failure-attribution');
+    failures.push('attempt-failed');
+    return { valid: false, criticalFailures: failures };
+  }
+  if (!Array.isArray(artifact.telemetry) || artifact.telemetry.length === 0 || !artifact.response || typeof artifact.response.requestId !== 'string' || !artifact.response.requestId) failures.push('missing-provider-request-attribution');
+  if (Array.isArray(artifact.telemetry) && artifact.telemetry.some((turn) => turn.provider !== arm?.provider || turn.model !== arm?.model || typeof turn.requestId !== 'string' || !turn.requestId)) failures.push('telemetry-attribution-mismatch');
+  if (artifact.telemetry?.length && artifact.response?.requestId !== artifact.telemetry.at(-1).requestId) failures.push('response-request-attribution-mismatch');
   if (!sidecar.snapshot?.sessions?.some((session) => session.id === sidecar.sessionId)) failures.push('missing-session-state');
   if (!Array.isArray(sidecar.ledger) || sidecar.ledger.length === 0) failures.push('missing-ledger');
   const revision = sidecar.snapshot?.revisions?.at(-1);

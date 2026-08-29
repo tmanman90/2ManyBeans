@@ -87,5 +87,39 @@ test('finalist grading fails closed on sidecar or artifact mismatch', async () =
     const entry = result.schedule[0];
     assert.equal(gradeFinalistAttempt({ artifact: result.attempts[0].artifact, sidecar: { ...result.attempts[0].sidecar, artifactChecksum: 'forged' }, entry }).valid, false);
     assert.equal(gradeFinalistAttempt({ artifact: { ...result.attempts[0].artifact, checksum: 'forged' }, sidecar: result.attempts[0].sidecar, entry }).valid, false);
+    for (const field of ['runId', 'armId', 'model', 'provider', 'caseId', 'repeat']) {
+      const forged = { ...result.attempts[0].artifact, [field]: field === 'repeat' ? 2 : `forged-${field}` };
+      assert.equal(gradeFinalistAttempt({ artifact: forged, sidecar: result.attempts[0].sidecar, entry }).valid, false, `forged ${field} must fail attribution`);
+    }
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('one finalist provider failure is preserved safely while the fixed 24-attempt denominator continues', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-finalist-failure-'));
+  try {
+    const store = new ImmutableArtifactStore({ directory });
+    const runId = 'finalist-failure';
+    const firstAttemptId = buildFinalistSchedule({ runId, evaluationHash })[0].attemptId;
+    const result = await runFinalistBatch({
+      runId,
+      evaluationHash,
+      artifactStore: store,
+      adapterFor: (entry) => entry.attemptId === firstAttemptId ? { runTurn: async () => { throw Object.assign(new Error('synthetic provider failure'), { code: 'SYNTHETIC_PROVIDER_FAILURE' }); } } : null,
+    });
+    assert.equal(result.attemptCount, 24);
+    assert.equal(result.attempts.length, 24);
+    assert.equal(result.attempts[0].artifact.status, 'failed');
+    assert.equal(result.attempts[0].artifact.runId, runId);
+    assert.equal(result.attempts[0].artifact.armId, 'luna-medium');
+    assert.equal(result.attempts[0].artifact.model, 'gpt-5.6-luna');
+    assert.equal(result.attempts[0].artifact.provider, 'openai');
+    assert.equal(result.attempts[0].artifact.caseId, 'read-stats');
+    assert.equal(result.attempts[0].artifact.repeat, 1);
+    assert.equal(result.attempts[0].artifact.requestId, undefined);
+    assert.ok(result.attempts.slice(1).every(({ artifact }) => artifact.status === undefined));
+    const failureGrade = gradeFinalistAttempt({ artifact: result.attempts[0].artifact, sidecar: result.attempts[0].sidecar, entry: result.schedule[0] });
+    assert.equal(failureGrade.valid, false);
+    assert.ok(failureGrade.criticalFailures.includes('attempt-failed'));
+    assert.ok(result.summaries[0].criticalFailures.includes('attempt-failed'));
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
