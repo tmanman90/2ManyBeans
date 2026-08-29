@@ -20,8 +20,14 @@ export function createBlindSchedule({ caseIds = [], seed = 'ruphus-u4-seed' } = 
   }));
 }
 
-const LEAK_PATTERN = /\b(?:luna|terra|sonnet|gpt(?:-[0-9.]+)?|claude|anthropic|openai|gemini|google|provider|telemetry|request[ _-]?id|model(?:[ _-]?id)?|candidate-[ab]|arm[ _-]?id)\b/i;
-const URL_PATTERN = /\b(?:[a-z][a-z0-9+.-]*):(?:\/\/|[^\s])/i;
+const LEAK_PATTERN = /\b(?:luna|terra|sonnet|gpt(?:-[0-9.]+)?|claude|anthropic|openai|gemini|google|provider|telemetry|request[\s_-]*id|model(?:[\s_-]*id)?|candidate[\s_-]*[ab]|arm[\s_-]*id)\b/i;
+const URL_PATTERN = /(?:\b[a-z][a-z0-9+.-]*:(?:\/\/|[^\s])|\/\/[^\s]+|(?:^|[\s(])(?:\.\.\/|\.\/|\/)[^\s)]+|\[[^\]]+\]\([^\)]+\)|<\s*(?:[a-z][a-z0-9+.-]*:|\/\/|\.\.\/|\.\/|\/)[^>]*>)/i;
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const nested of Object.values(value)) deepFreeze(nested);
+  return Object.freeze(value);
+}
 
 export function renderBlindText({ label, leftText = '', rightText = '' } = {}) {
   const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll(/https?:\/\/\S+/gi, '[link omitted]');
@@ -43,7 +49,7 @@ export function lockBlindScores({ schedule, scores, scheduleHash = hashValue(sch
     if (DIMENSIONS.some((dimension) => !Number.isInteger(value[dimension]) || value[dimension] < 1 || value[dimension] > 5)) throw new Error('blind scores must include six 1 through 5 dimensions');
     if (typeof value.unknown !== 'boolean' || typeof value.abstain !== 'boolean') throw new Error('blind scores must record unknown and abstain flags');
   }
-  return Object.freeze({ type: 'blind-score-lock', version: 1, scheduleHash, candidateMapHash: candidateMapHash(schedule), dimensions: Object.freeze([...DIMENSIONS]), labels: Object.freeze([...labels]), scores: Object.freeze(structuredClone(scores)) });
+  return Object.freeze({ type: 'blind-score-lock', version: 1, scheduleHash, candidateMapHash: candidateMapHash(schedule), dimensions: Object.freeze([...DIMENSIONS]), labels: Object.freeze([...labels]), scores: deepFreeze(structuredClone(scores)) });
 }
 
 export function unblindScores({ locked, schedule } = {}) {

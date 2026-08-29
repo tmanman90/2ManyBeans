@@ -55,7 +55,11 @@ test('U4 corpus is unique, balanced, synthetic, and fully adjudicated', () => {
     if (item.category === 'exact-recall') assert.ok(item.fixture.record.recipeHash && item.fixture.record.recipeHash !== item.fixture.record.revisionId);
     if (item.category === 'taste-diagnosis') assert.ok(item.fixture.tasting?.language && item.fixture.tasting?.history?.doseGrams);
     if (item.category === 'method-grinder') {
-      assert.ok(item.fixture.recipeInputRef && item.fixture.candidateRecipeRef && item.fixture.grindObservation?.beforeMicrons);
+      if (item.expectedTerminal === 'advisory-only') {
+        assert.equal(item.fixture.recipeInputRef, null, `${item.id}: advisory method must not enter canonical recipe validation`);
+      } else {
+        assert.ok(item.fixture.recipeInputRef && item.fixture.candidateRecipeRef && item.fixture.grindObservation?.beforeMicrons);
+      }
       assert.doesNotThrow(() => resolveCaseFixture(item));
       assert.ok(item.expected.diff?.path && item.expected.grind?.deltaMicrons);
     }
@@ -129,14 +133,101 @@ test('U4 cases execute through deterministic category graders', () => {
   const recipeCase = decision.find((item) => item.category === 'method-grinder');
   const authorityCase = decision.find((item) => item.category === 'authority-revision');
   const failureCase = decision.find((item) => item.category === 'failures-receipts');
-  assert.equal(gradeCase(recallCase, { ...recallCase.expected.record, terminal: recallCase.expected.terminal }).hardGate, true);
+  assert.equal(gradeCase(recallCase, { ...recallCase.expected.record, terminal: recallCase.expected.terminal, mutation: false }).hardGate, true);
   assert.equal(gradeCase(recallCase, { ...recallCase.expected.record, recipeHash: 'wrong', terminal: recallCase.expected.terminal }).hardGate, false);
   assert.equal(gradeCase(diagnosisCase, { terminal: diagnosisCase.expected.terminal, diagnosis: diagnosisCase.expected.diagnosis, mutation: false }).hardGate, true);
   assert.equal(gradeCase(diagnosisCase, { terminal: diagnosisCase.expected.terminal, diagnosis: { ...diagnosisCase.expected.diagnosis, cause: 'invented-cause' }, mutation: false }).hardGate, false);
-  assert.equal(gradeCase(recipeCase, { terminal: recipeCase.expected.terminal, mutation: false, recipe: getRecipeFixture(recipeCase.method), grind: recipeCase.expected.grind }).hardGate, true);
+  assert.equal(gradeCase(recipeCase, { terminal: recipeCase.expected.terminal, mutation: false, recipe: getRecipeFixture(recipeCase.method), grind: recipeCase.expected.grind, approval: false, proposalCreated: true, commit: false, committed: false, diff: recipeCase.expected.diff, controls: recipeCase.expected.controls }).hardGate, true);
   assert.equal(gradeCase(recipeCase, { terminal: recipeCase.expected.terminal, mutation: false, recipe: { ...getRecipeFixture(recipeCase.method), method: 'forged' }, grind: recipeCase.expected.grind }).hardGate, false);
-  assert.equal(gradeCase(authorityCase, { terminal: authorityCase.expected.terminal, events: [{ mutation: false, canonicalLedger: true, trust: 'canonical' }] }).hardGate, true);
+  assert.equal(gradeCase(authorityCase, { terminal: authorityCase.expected.terminal, identity: authorityCase.expected.identity, mutation: false, events: [{ mutation: false, canonicalLedger: true, trust: 'canonical' }] }).hardGate, true);
   assert.equal(gradeCase(authorityCase, { terminal: authorityCase.expected.terminal, events: [{ mutation: false }] }).hardGate, false);
-  assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, fault: failureCase.expected.fault, mutation: false }).hardGate, true);
+  assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, fault: failureCase.expected.fault, receiptFacts: failureCase.expected.fault.receiptFacts, mutation: false }).hardGate, true);
   assert.equal(gradeCase(failureCase, { terminal: failureCase.expected.terminal, fault: { ...failureCase.expected.fault, errorCode: 'FORGED' }, mutation: false }).hardGate, false);
+  const advisoryCase = decision.find((item) => item.id === 'dec-036');
+  assert.equal(gradeCase(advisoryCase, { terminal: 'advisory-only', advisory: true, hardGate: false, mutation: false, commit: false, committed: false }).hardGate, true);
+  assert.equal(gradeCase(advisoryCase, { terminal: 'advisory-only', advisory: true, hardGate: true, mutation: false, commit: false, committed: false }).hardGate, false);
+});
+
+test('U4 assertions fail closed on missing semantic evidence and forged identity/claims', () => {
+  const diagnosis = decision.find((item) => item.id === 'dec-013');
+  assert.equal(gradeCase(diagnosis, { terminal: diagnosis.expected.terminal, diagnosis: { ...diagnosis.expected.diagnosis, uncertainty: undefined }, mutation: false }).hardGate, false);
+  const recipe = decision.find((item) => item.id === 'dec-025');
+  assert.equal(gradeCase(recipe, { terminal: recipe.expected.terminal, mutation: false, recipe: getRecipeFixture(recipe.method), grind: recipe.expected.grind, approval: false, proposalCreated: true, commit: false, committed: false }).hardGate, false);
+  const authority = decision.find((item) => item.id === 'dec-037');
+  assert.equal(gradeCase(authority, { terminal: authority.expected.terminal, identity: { ...authority.expected.identity, userId: 'attacker' }, events: [{ mutation: false, canonicalLedger: true, trust: 'canonical' }] }).hardGate, false);
+  const failure = decision.find((item) => item.id === 'dec-049');
+  assert.equal(gradeCase(failure, { terminal: failure.expected.terminal, fault: failure.expected.fault, mutation: false, claims: ['machine success confirmed'] }).hardGate, false);
+});
+
+test('U4 diagnosis adjudication enforces one-variable extraction directions', () => {
+  const diagnoses = decision.filter((item) => item.category === 'taste-diagnosis');
+  assert.equal(diagnoses.length, 12);
+  for (const item of diagnoses) {
+    const advisory = ['chemex', 'aeropress', 'french-press'].includes(item.method);
+    const actual = { terminal: item.expected.terminal, diagnosis: item.expected.diagnosis, mutation: false, advisory, hardGate: advisory ? false : undefined, approval: false, commit: false, committed: false, proposalCreated: true };
+    assert.equal(gradeCase(item, actual).hardGate, true, item.id);
+    const changed = structuredClone(item.expected.diagnosis);
+    if (changed.controlledChange.field === 'grindMicrons') {
+      changed.controlledChange = { ...changed.controlledChange, from: changed.controlledChange.to, to: changed.controlledChange.direction === 'finer' ? changed.controlledChange.from + 50 : changed.controlledChange.from - 50, direction: changed.controlledChange.direction === 'finer' ? 'coarser' : 'finer' };
+    } else {
+      changed.controlledChange = { ...changed.controlledChange, field: 'grindMicrons', from: 600, to: 650, direction: 'coarser' };
+    }
+    assert.equal(gradeCase(item, { ...actual, diagnosis: changed }).hardGate, false, `${item.id}:direction-veto`);
+  }
+});
+
+test('U4 authority and failure rows require scenario-specific evidence', () => {
+  for (const item of decision.filter((caseDefinition) => caseDefinition.category === 'authority-revision')) {
+    const advisory = item.expected.terminal === 'advisory-only';
+    const actual = {
+      terminal: item.expected.terminal,
+      identity: item.expected.identity,
+      revisionId: item.expected.identity.revisionId,
+      mutation: false,
+      physicalClaim: false,
+      commit: false,
+      committed: false,
+      approval: false,
+      approvalRequired: item.expected.ledger.approvalRequired === true,
+      approvalSource: 'out-of-band',
+      reservedFieldPersisted: false,
+      advisory,
+      hardGate: advisory ? false : undefined,
+      events: [{ mutation: false, canonicalLedger: true, trust: 'canonical', eventId: `${item.id}-read` }],
+    };
+    if (item.grader.assertions.includes('untrusted-is-data')) actual.untrustedTreatedAsCanonical = false;
+    if (item.grader.assertions.includes('no-selection')) actual.selection = null;
+    assert.equal(gradeCase(item, actual).hardGate, true, item.id);
+    if (['dec-037', 'dec-041'].includes(item.id)) assert.equal(gradeCase(item, { ...actual, identity: { ...actual.identity, coffeeId: 'wrong-coffee' } }).hardGate, false, `${item.id}:coffee-binding`);
+    if (item.id === 'dec-042') assert.equal(gradeCase(item, { ...actual, identity: { ...actual.identity, userId: 'wrong-user' } }).hardGate, false, `${item.id}:user-binding`);
+    if (['dec-038', 'dec-045'].includes(item.id)) assert.equal(gradeCase(item, { ...actual, revisionId: 'stale-revision', identity: { ...actual.identity, revisionId: 'stale-revision' } }).hardGate, false, `${item.id}:revision-binding`);
+  }
+  for (const item of decision.filter((caseDefinition) => caseDefinition.category === 'failures-receipts')) {
+    const fault = item.expected.fault;
+    const advisory = item.expected.terminal === 'advisory-only';
+    const actual = {
+      terminal: item.expected.terminal,
+      fault,
+      receiptFacts: fault.receiptFacts,
+      mutation: false,
+      physicalClaim: false,
+      commit: false,
+      committed: false,
+      advisory,
+      hardGate: advisory ? false : undefined,
+      confirmatoryRebrewRequired: item.id === 'dec-054' ? true : undefined,
+      scoreImprovement: item.id === 'dec-054' ? false : undefined,
+      unknown: ['dec-053', 'dec-060'].includes(item.id),
+      selection: item.id === 'dec-060' ? null : undefined,
+      revisionId: item.expected.identity.revisionId,
+      sameRevision: item.id === 'dec-056',
+      idempotent: item.id === 'dec-056',
+      interruption: item.id === 'dec-052',
+      validatorVeto: item.id === 'dec-050',
+      shareConfirmed: item.id === 'dec-058',
+    };
+    assert.equal(gradeCase(item, actual).hardGate, true, item.id);
+    if (item.id === 'dec-049') assert.equal(gradeCase(item, { ...actual, receiptFacts: undefined }).hardGate, false);
+    if (item.id === 'dec-058') assert.equal(gradeCase(item, { ...actual, receiptFacts: ['cleanup-failed'] }).hardGate, false);
+  }
 });

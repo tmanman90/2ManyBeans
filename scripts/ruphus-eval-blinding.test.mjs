@@ -25,6 +25,9 @@ test('offline blind renderer escapes active content and omits links', () => {
   assert.throws(() => renderBlindText({ label: 'pair-0123456789ab', leftText: 'javascript:alert(1)', rightText: 'y' }), /identity/);
   assert.throws(() => renderBlindText({ label: 'pair-0123456789ab', leftText: 'data:text/html,x', rightText: 'y' }), /identity/);
   assert.throws(() => renderBlindText({ label: 'pair-0123456789ab', leftText: 'https://bad.invalid', rightText: 'y' }), /identity/);
+  for (const leaked of ['Candidate A', 'candidate_a', 'candidate-b', '[source](/docs/a)', '<https://bad.invalid>', '//bad.invalid/a', './relative/path']) {
+    assert.throws(() => renderBlindText({ label: 'pair-0123456789ab', leftText: leaked, rightText: 'y' }), /identity/);
+  }
 });
 
 test('blind scores lock before unblinding and preserve opaque labels', () => {
@@ -33,6 +36,8 @@ test('blind scores lock before unblinding and preserve opaque labels', () => {
   const scores = Object.fromEntries(schedule.map(({ label }, index) => [label, Object.fromEntries([...dimensions.map((dimension) => [dimension, index + 4]), ['unknown', false], ['abstain', false]])]));
   const locked = lockBlindScores({ schedule, scores });
   assert.equal(locked.type, 'blind-score-lock');
+  assert.equal(Object.isFrozen(locked.scores[schedule[0].label]), true);
+  assert.equal(Object.isFrozen(locked.scores[schedule[0].label]), true);
   assert.deepEqual(unblindScores({ locked, schedule }).map(({ score }) => score.diagnosis).sort(), [4, 5]);
   assert.throws(() => lockBlindScores({ schedule, scores: { [schedule[0].label]: 4 } }), /cover/);
   const missingFlags = structuredClone(scores);

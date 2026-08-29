@@ -10,7 +10,7 @@ import { normalizeRecipePhases } from '../src/lib/brewTimerSteps.js';
 import { gradeRecipeLayers, validateRecipe, projectCanonicalRuntime, compareGrindMicrons, RECIPE_COVERAGE } from './ruphus-eval/graders/recipe.mjs';
 import { gradeRecall } from './ruphus-eval/graders/recall.mjs';
 import { gradeAuthority } from './ruphus-eval/graders/authority.mjs';
-import { gradeLifecycle, lifecycleAttemptChecksum } from './ruphus-eval/graders/lifecycle.mjs';
+import { gradeLifecycle, lifecycleAttemptChecksum, LIFECYCLE_SCHEDULE, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
 
 const aiden = {
   profileType: 0, title: 'Aiden test',
@@ -229,13 +229,14 @@ test('U4 recall and authority graders are deterministic hard gates', () => {
 });
 
 test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', () => {
-  const expectedSchedule = Object.freeze(Array.from({ length: 24 }, (_, index) => ({ caseId: `case-${index % 12}`, repeat: Math.floor(index / 12) + 1 })));
-  const passing = Array.from({ length: 24 }, (_, index) => ({ caseId: `case-${index % 12}`, repeat: Math.floor(index / 12) + 1, sessionId: `session-${index}`, revisionId: `revision-${index}`, ledgerBound: true, expectedTerminal: 'complete', actualTerminal: 'complete', valid: index !== 23, recall: index !== 23, criticalFailure: false })).map((attempt) => ({ ...attempt, ledgerChecksum: lifecycleAttemptChecksum(attempt), expectedLedgerChecksum: lifecycleAttemptChecksum(attempt) }));
-  assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule }).hardGate, true);
-  const twentyTwo = passing.map((attempt, index) => index >= 22 ? { ...attempt, valid: false, recall: false } : attempt);
-  assert.equal(gradeLifecycle({ attempts: twentyTwo, expectedSchedule }).hardGate, false);
-  assert.equal(gradeLifecycle({ attempts: passing.slice(0, 23), expectedSchedule }).criticalFailures.includes('incomplete-lifecycle'), true);
-  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, criticalFailure: true } : attempt), expectedSchedule }).hardGate, false);
-  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, ledgerChecksum: 'forged', expectedLedgerChecksum: 'forged' } : attempt), expectedSchedule }).hardGate, false);
-  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, sessionId: 'session-0' } : attempt), expectedSchedule }).hardGate, false);
+  const raw = LIFECYCLE_SCHEDULE.map((entry, index) => ({ ...entry, userId: 'user-u4', coffeeId: 'coffee-u4', sessionId: `session-${index}`, revisionId: `revision-${index}`, snapshot: { userId: 'user-u4', coffeeId: 'coffee-u4', revisionId: `revision-${index}`, recipeHash: `recipe-${index}` }, ledger: { canonical: true, sessionId: `session-${index}`, revisionId: `revision-${index}`, eventIds: [`event-${index}`] }, events: [{ id: `event-${index}`, sequence: 0, sessionId: `session-${index}`, revisionId: `revision-${index}` }], expectedTerminal: 'complete', actualTerminal: 'complete', valid: index !== 23, recall: index !== 23, criticalFailure: false }));
+  const passing = sealLifecycleAttempts(raw);
+  assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
+  assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule: LIFECYCLE_SCHEDULE }).hardGate, false);
+  const twentyTwo = sealLifecycleAttempts(raw.map((attempt, index) => index >= 22 ? { ...attempt, valid: false, recall: false } : attempt));
+  assert.equal(gradeLifecycle({ attempts: twentyTwo }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: raw }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, criticalFailure: true } : attempt) }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, ledgerChecksum: 'forged', expectedLedgerChecksum: 'forged' } : attempt) }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, sessionId: 'session-0' } : attempt) }).hardGate, false);
 });
