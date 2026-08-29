@@ -8,6 +8,8 @@ import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
 
 const CATEGORY_GRADERS = Object.freeze(new Set(['recall', 'diagnosis', 'recipe', 'authority', 'failure']));
 const ADVISORY_METHODS = new Set(['chemex', 'aeropress', 'french-press']);
+const CANONICAL_RECIPE_METHODS = new Set(['aiden', 'v60', 'kalita', 'v60-switch', 'v60-iced', 'kalita-iced']);
+const RECIPE_EVIDENCE_ASSERTIONS = new Set(['canonical-validator', 'proposal-unapproved', 'micron-comparison', 'micron-delta', 'iced-validator', 'switch-validator', 'device-bound', 'mass-reconciles']);
 const allFalse = (actual, keys) => keys.some((key) => actual?.[key] === false) && !keys.some((key) => actual?.[key] === true);
 const identityMatches = (expected, actual) => canonicalJson(expected?.identity) === canonicalJson(actual?.identity);
 const expectedFault = (ctx) => ctx.caseDefinition.expected.fault;
@@ -213,16 +215,37 @@ export function runCase(caseDefinition) {
   return Object.freeze({ caseId: caseDefinition.id, prompt: caseDefinition.userPrompt, fixture: caseDefinition.fixture, expected: caseDefinition.expected, grader: caseDefinition.grader });
 }
 
-export function resolveCaseFixture(caseDefinition) {
+export function resolveCaseFixture(caseDefinition, { forModel = false } = {}) {
   const runnable = runCase(caseDefinition);
   const resolved = structuredClone(runnable.fixture);
-  if (caseDefinition.expected.recipe?.fixtureId) {
+  const needsCanonicalRecipe = caseDefinition.action === 'propose'
+    || caseDefinition.grader.assertions.some((assertion) => RECIPE_EVIDENCE_ASSERTIONS.has(assertion));
+  if (caseDefinition.expected.recipe?.fixtureId && needsCanonicalRecipe && CANONICAL_RECIPE_METHODS.has(caseDefinition.method)) {
     resolved.recipeInput = getRecipeFixture(caseDefinition.method);
     resolved.candidateRecipe = getRecipeFixture(caseDefinition.method);
     const validation = validateRecipe(caseDefinition.method, resolved.recipeInput);
     if (!validation.valid) throw new Error(`invalid canonical fixture for ${caseDefinition.method}`);
   }
+  // Diagnosis proposal fixtures use a frozen named starting recipe rather
+  // than a fixtureId. Expose that same complete canonical recipe to the model
+  // so applying the declared one-variable diff remains hash-reproducible.
+  if (caseDefinition.action === 'propose' && caseDefinition.expected.recipe && !resolved.recipeInput && CANONICAL_RECIPE_METHODS.has(caseDefinition.method)) {
+    resolved.recipeInput = proposalStartingRecipe(caseDefinition);
+  }
   if (caseDefinition.category === 'exact-recall') resolved.record = structuredClone(caseDefinition.expected.record);
+  // The canonical recipe and record are frozen evidence, but fixture-side
+  // validation metadata contains answer-key hashes. Keep that metadata for
+  // offline grading while removing it from the model-facing evidence.
+  if (forModel && resolved.recipeInput && typeof resolved.recipeInput === 'object') {
+    // Preserve the full production canonical recipe. Its annotations are part
+    // of the frozen hash contract and cannot be reconstructed by a model.
+    delete resolved.candidateRecipe;
+    delete resolved.candidateRecipeRef;
+    delete resolved.recipeInputRef;
+    // Projection metadata carries answer-key hashes and is redundant with the
+    // complete recipeInput; omit it from model-facing evidence.
+    delete resolved.recipeProjection;
+  }
   return resolved;
 }
 

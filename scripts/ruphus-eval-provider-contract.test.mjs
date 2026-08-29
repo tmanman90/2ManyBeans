@@ -76,12 +76,18 @@ test('Anthropic request rejects non-function tool types', () => {
 });
 
 test('provider-neutral scored requests preserve instructions and evidence across adapters', () => {
-  const common = createEvaluationRequest({ caseDefinition: { id: 'dec-parity', userPrompt: 'Diagnose this coffee result.', fixture: { method: 'v60', evidence: 'thin and sour' } } });
+  const common = createEvaluationRequest({ caseDefinition: { id: 'dec-parity', userPrompt: 'Diagnose this coffee result.', fixture: { phase: 'decision', evidence: { method: 'v60', condition: 'canonical' } }, expected: { terminal: 'read-only', provenance: {}, ledger: { mutation: false } }, grader: { name: 'recall', deterministic: true, assertions: ['no-mutation'], criticalFailures: ['fabricated-canonical-data'] } } });
   const openai = buildOpenAIRequest({ model: MODEL_ARMS[0].model, instructions: common.instructions, input: common.input, maxOutputTokens: common.maxOutputTokens });
   const anthropic = buildAnthropicRequest({ model: MODEL_ARMS[4].model, instructions: common.instructions, input: common.input, maxOutputTokens: common.maxOutputTokens });
   assert.equal(openai.instructions, anthropic.system);
   assert.deepEqual(openai.input, anthropic.messages);
   assert.deepEqual(openai.input, common.input);
+  const transmitted = JSON.parse(openai.input[1].content);
+  assert.ok(transmitted.evidenceContract.r.includes('terminal'));
+  assert.equal(Object.hasOwn(transmitted, 'expected'), false);
+  assert.equal(Object.hasOwn(transmitted.evidenceContract, 'expected'), false);
+  assert.deepEqual(JSON.parse(anthropic.messages[1].content).evidenceContract, transmitted.evidenceContract);
+  assert.deepEqual(transmitted.evidenceContract, common.evidenceContractWire);
 });
 
 test('probe uses the provider minimum and never substitutes a response id for request id', async () => {

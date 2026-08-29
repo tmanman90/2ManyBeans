@@ -44,7 +44,14 @@ export async function runFrozenEvaluation({
   const scheduleFor = (phase, armIds) => schedules?.[phase] || phaseSchedule(manifest, phase, armIds);
   const execute = async (phase, phaseManifest, phaseHash, schedule) => {
     const runner = createAgentRunner({ adapters: adapterMap, preflight: checkedPreflight, env, retention, endpoint, endpoints, paidRun, manifest: phaseManifest, runId, evaluationHash: phaseHash, artifactStore });
-    return runner.runSchedule({ schedule, toolsFor, requestFor, retry });
+    const requests = new Map();
+    const requestForPhase = (entry) => {
+      const request = requestFor?.(entry) || entry.request || {};
+      requests.set(`${entry.armId}:${entry.caseId}:${entry.repeat}`, request);
+      return request;
+    };
+    const result = await runner.runSchedule({ schedule, toolsFor, requestFor: requestForPhase, retry });
+    return { ...result, requests };
   };
   const calibrationSchedule = scheduleFor('calibration');
   const calibration = await execute('calibration', manifest, evaluationHash || manifest.evaluationHash || manifest.hashes?.evaluationHash, calibrationSchedule);
@@ -52,7 +59,7 @@ export async function runFrozenEvaluation({
   let calibrationAccepted = true;
   try {
     if (calibration.artifacts.length !== calibrationSchedule.length) calibrationAccepted = false;
-    for (const artifact of calibration.artifacts) parseCandidateResponse(artifact.response?.text);
+    for (const artifact of calibration.artifacts) parseCandidateResponse(artifact.response?.text, { evidenceContract: calibration.requests?.get(`${artifact.armId}:${artifact.caseId}:${artifact.repeat}`)?.evidenceContract || null });
     if (calibrationAcceptance && calibrationAcceptance({ artifacts: calibration.artifacts, schedule: calibrationSchedule }) !== true) calibrationAccepted = false;
   } catch { calibrationAccepted = false; }
   if (!calibrationAccepted) return { ok: false, classification: 'insufficient-evidence', stage: 'calibration-acceptance', dispatched: true, errors: ['calibration response contract was not accepted; decision phases remain sealed'], calibration, preflight: checkedPreflight };

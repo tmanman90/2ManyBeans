@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createAgentRunner, ImmutableArtifactStore, classifyProviderError, validateColdSchedule, validateRunnerGates, validateEvaluationEnvironment, runAgentAttempt, sealCalibrationManifest } from './ruphus-eval/agent-runner.mjs';
 import { runEvaluation, runFrozenEvaluation } from './ruphus-eval/run.mjs';
+import { createEvaluationRequest } from './ruphus-eval/tournament.mjs';
 import { APPROVED_DISPATCH_RESERVATION_USD, MODEL_ARMS } from './ruphus-eval/models.mjs';
 
 const expectedIdentity = { credentialFingerprint: 'fp', authorizationLabel: 'tal-approved-coffee-evaluation' };
@@ -286,5 +287,21 @@ test('frozen coordinator executes phases in order and stops at finalist blind re
     assert.equal(outcome.finalist.artifacts.length, 4);
     assert.equal(outcome.qualification.artifacts.every((artifact) => artifact.caseId === 'dec-001' && artifact.repeat >= 1), true);
     assert.equal(outcome.blindReview.status, 'pending');
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('frozen coordinator seals calibration only after the requested evidence contract passes', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-frozen-calibration-contract-'));
+  try {
+    const manifest = { ...sourceManifest, partitions: { calibration: ['cal-001'], 'tool-canary': ['canary-001'], qualification: ['dec-001'], finalistDecision: ['dec-002'] }, schedule: { ...sourceManifest.schedule, calibrationCasesPerArm: 1, qualificationCasesPerArm: 1, finalistDecisionCases: 1 } };
+    const request = createEvaluationRequest({ caseDefinition: { id: 'cal-001', userPrompt: 'Read this calibration record.', fixture: { phase: 'calibration', evidence: { condition: 'missing' } }, expected: { terminal: 'read-only', provenance: {}, ledger: { mutation: false } }, grader: { name: 'recall', deterministic: true, assertions: ['no-mutation'], criticalFailures: ['fabricated-canonical-data'] } } });
+    let calls = 0;
+    const runTurn = async ({ model }) => ({ provider: model.startsWith('claude-') ? 'anthropic' : 'openai', model, requestId: `request-${++calls}`, outputItems: [], content: [], text: JSON.stringify({ reply: 'missing actual evidence', actual: {} }), toolCalls: [], stopReason: 'completed', rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } });
+    const adapters = [{ provider: 'openai', probe: async (arm) => ({ returnedModel: arm.model, providerHost: 'https://api.openai.com', modelAccess: true, streaming: true, completeUsage: true, requestId: `probe-${arm.id}` }), runTurn }, { provider: 'anthropic', probe: async (arm) => ({ returnedModel: arm.model, providerHost: 'https://api.anthropic.com', modelAccess: true, streaming: true, completeUsage: true, requestId: `probe-${arm.id}` }), runTurn }];
+    const outcome = await runFrozenEvaluation({ adapters, identity, expectedIdentity, env: {}, retention, endpoints: ['https://api.openai.com', 'https://api.anthropic.com'], paidRun: true, manifest, runId: 'frozen-contract-fail', evaluationHash: sourceManifest.hashes.evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }), sealedAt: '2026-08-28T00:00:00.000Z', requestFor: () => request });
+    assert.equal(outcome.ok, false);
+    assert.equal(outcome.stage, 'calibration-acceptance');
+    assert.equal(outcome.calibration.artifacts.length, 6);
+    assert.equal(outcome.canary, undefined);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

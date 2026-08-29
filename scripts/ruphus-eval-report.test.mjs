@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { hashValue } from './ruphus-eval/contracts.mjs';
-import { MODEL_ARMS } from './ruphus-eval/models.mjs';
+import { DEFAULT_LIMITS, MODEL_ARMS } from './ruphus-eval/models.mjs';
 import { createBlindPacket, createBlindKeyArtifact, resumeBlindPacket, lockTournamentScores, unblindTournamentScores, assertBlindPacketSafe } from './ruphus-eval/blind.mjs';
 import { buildFinalistReport, buildTournamentReport, gradeAttempt, rebuildSanitizedProjection, sanitizeAttemptArtifact } from './ruphus-eval/report.mjs';
 import { assertProductBaselineSeparate, createProductBaseline } from './ruphus-eval/product-baseline.mjs';
 import { createEvaluationRequest, deriveAdjudicationArtifact, parseCandidateResponse, runU6Tournament } from './ruphus-eval/tournament.mjs';
+import { resolveCaseFixture } from './ruphus-eval/cases.mjs';
 
 const manifest = Object.freeze({
   status: 'calibrated-sealed', evaluationHash: 'sealed-u6-fixture',
@@ -20,7 +22,7 @@ function rawArtifact(armId, repeat, overrides = {}) {
     attemptId: `attempt-${armId}-${repeat}`, runId: 'run-u6', evaluationHash: manifest.evaluationHash,
     armId, model: arm.model, provider: arm.provider, phase: 'qualification', caseId: 'case-1', repeat,
     telemetry: [{ phase: 1, providerRequestId: `req-${armId}-${repeat}`, responseId: `resp-${armId}-${repeat}`, provider: arm.provider, model: arm.model, usage: { inputTokens: 10, outputTokens: 5 }, cost: 0.01 + MODEL_ARMS.findIndex((candidate) => candidate.id === armId) / 1000, latencyMs: 1 + MODEL_ARMS.findIndex((candidate) => candidate.id === armId), retryAttempts: 1, retryHistory: [], responseHash: 'response-hash', artifactChecksum: 'turn-hash' }],
-    evidenceTier: 'synthetic/mock', actual: { terminal: 'read-only', record: { recordId: 'record-1', method: 'v60', mode: 'hot', recipeHash: 'recipe-1', provenance: { source: 'coffee' } }, ...overrides },
+    evidenceTier: 'synthetic/mock', actual: { terminal: 'read-only', mutation: false, approval: false, commit: false, committed: false, physicalClaim: false, record: { recordId: 'record-1', method: 'v60', mode: 'hot', recipeHash: 'recipe-1', provenance: { source: 'coffee' } }, ...overrides },
   };
   return { ...artifact, checksum: hashValue(artifact) };
 }
@@ -152,7 +154,7 @@ test('provider-neutral response bridge binds strict parsed evidence to the raw c
   for (const actual of [{ approval: false, commit: false, committed: false, mutation: false }, { physicalClaim: false }, { claims: [], receiptFacts: ['share confirmed'] }]) {
     assert.deepEqual(parseCandidateResponse(JSON.stringify({ reply: 'ok', actual })).actual, actual);
   }
-  const forged = parseCandidateResponse(JSON.stringify({ reply: 'ok', actual: { record: { recordId: 'forged' }, claims: ['Successfully committed the recipe'], physicalClaim: true } }));
+  const forged = parseCandidateResponse(JSON.stringify({ reply: 'ok', actual: { terminal: 'read-only', mutation: false, approval: false, commit: false, committed: false, physicalClaim: true, record: { recordId: 'forged' }, claims: ['Successfully committed the recipe'] } }));
   const forgedArtifact = deriveAdjudicationArtifact({ rawArtifact: rawArtifact('luna-medium', 1), caseDefinition: cases[0], response: forged });
   const forgedGrade = gradeAttempt(forgedArtifact, { cases, manifest });
   assert.equal(forgedGrade.eligible, false);
@@ -168,6 +170,66 @@ test('provider-neutral response bridge binds strict parsed evidence to the raw c
   delete unbound.evidenceTier;
   const { checksum: ignoredUnbound, ...unboundContent } = unbound;
   assert.equal(gradeAttempt({ ...unboundContent, checksum: hashValue(unboundContent) }, { cases, manifest }).eligible, false);
+});
+
+test('model requests resolve canonical recipe evidence without exposing answer keys', () => {
+  const calibration = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/calibration/cases.json', import.meta.url), 'utf8'));
+  const recipeCase = calibration.find((item) => item.id === 'cal-003');
+  const request = createEvaluationRequest({ caseDefinition: recipeCase, phase: 'qualification' });
+  const payload = JSON.parse(request.input[1].content);
+  assert.equal(payload.evidence.recipeInput.method, 'pour-over');
+  assert.equal(payload.evidence.recipeInput.device, 'kalita');
+  assert.equal(payload.evidence.recipeProjection, undefined);
+  assert.equal(Object.hasOwn(payload, 'expected'), false);
+  assert.equal(Object.hasOwn(request.evidenceContract, 'expected'), false);
+  assert.ok(request.evidenceContract.required.includes('recipe'));
+  assert.ok(request.evidenceContract.required.includes('proposal'));
+  assert.deepEqual(JSON.parse(request.input[1].content).evidenceContract, request.evidenceContractWire);
+});
+
+test('model-facing full recipe evidence preserves every frozen proposal candidate hash', () => {
+  const calibration = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/calibration/cases.json', import.meta.url), 'utf8'));
+  const decision = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/decision/cases.json', import.meta.url), 'utf8'));
+  const casesWithRecipeProposal = [...calibration, ...decision].filter((item) => item.expected?.recipe?.candidateRecipeHash && item.expected?.diff?.path);
+  assert.ok(casesWithRecipeProposal.length > 0);
+  for (const caseDefinition of casesWithRecipeProposal) {
+    const request = createEvaluationRequest({ caseDefinition, phase: 'qualification' });
+    const modelRecipe = JSON.parse(request.input[1].content).evidence.recipeInput;
+    const completeRecipe = resolveCaseFixture(caseDefinition, { forModel: true }).recipeInput;
+    assert.ok(modelRecipe && typeof modelRecipe === 'object', `${caseDefinition.id} must expose its complete recipe input`);
+    // JSON transport cannot represent an enumerable undefined value; compare
+    // the wire form to that canonical JSON representation, then hash the
+    // complete frozen object used by the grader.
+    assert.deepEqual(modelRecipe, JSON.parse(JSON.stringify(completeRecipe)), `${caseDefinition.id} must not strip canonical recipe fields`);
+    const candidate = structuredClone(completeRecipe);
+    const path = caseDefinition.expected.diff.path.split('.');
+    let target = candidate;
+    for (const key of path.slice(0, -1)) target = target[key];
+    assert.deepEqual(path.reduce((value, key) => value?.[key], modelRecipe), caseDefinition.expected.diff.from, `${caseDefinition.id} frozen diff must apply to model recipe`);
+    target[path.at(-1)] = caseDefinition.expected.diff.to;
+    assert.equal(hashValue(candidate), caseDefinition.expected.recipe.candidateRecipeHash, `${caseDefinition.id} model recipe must reproduce candidate hash`);
+  }
+});
+
+test('all frozen calibration and decision requests fit the runner input ceiling', () => {
+  const calibration = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/calibration/cases.json', import.meta.url), 'utf8'));
+  const decision = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/decision/cases.json', import.meta.url), 'utf8'));
+  const requests = [...calibration, ...decision].map((caseDefinition) => createEvaluationRequest({ caseDefinition, phase: 'qualification' }));
+  const sizes = requests.map((request) => Buffer.byteLength(JSON.stringify({ instructions: request.instructions, input: request.input, tools: [], previousOutputItems: [], messages: [] })));
+  assert.equal(requests.length, 66);
+  assert.ok(sizes.every((size) => size <= DEFAULT_LIMITS.inputTokens), `request exceeds ${DEFAULT_LIMITS.inputTokens} byte ceiling: ${Math.max(...sizes)}`);
+});
+
+test('candidate parser accepts one optional JSON fence and enforces the category evidence contract', () => {
+  const request = createEvaluationRequest({ caseDefinition: cases[0], phase: 'qualification' });
+  const actual = { terminal: 'read-only', mutation: false, approval: false, commit: false, committed: false, physicalClaim: false, record: {} };
+  const response = { reply: 'ok', actual };
+  const fenced = `\`\`\`json\n${JSON.stringify(response)}\n\`\`\``;
+  assert.deepEqual(parseCandidateResponse(fenced, { evidenceContract: request.evidenceContract }).actual, actual);
+  assert.throws(() => parseCandidateResponse(`${fenced} trailing`), /one complete JSON fence/);
+  assert.throws(() => parseCandidateResponse(`${fenced}\n${fenced}`), /one complete JSON fence/);
+  assert.throws(() => parseCandidateResponse('```json\n{"reply":"ok","actual":{}}\n```', { evidenceContract: request.evidenceContract }), /evidence field actual\.(approval|commit|committed|mutation|physicalClaim|record|terminal)/);
+  assert.throws(() => parseCandidateResponse('```json\n{"reply":"ok","actual":{}}\n'), /one complete JSON fence/);
 });
 
 test('finalist phase requires its exact partition and the staged path cannot skip it', () => {
