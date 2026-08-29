@@ -30,7 +30,9 @@ test('M1 contextual starter routes with its explicit context before React state 
   const chat = read('src/tabs/ChatTab.jsx');
   assert.match(chat, /sendAgentTurn\(turnContext\)/);
   assert.match(chat, /const turnContext = agentContextOverride \|\| agentContextRef\.current \|\| agentContext/);
-  assert.match(chat, /if \(agentEnabled && turnContext\)/);
+  assert.match(chat, /if \(agentEnabled && !legacyChatOverride && turnContext\)/);
+  assert.match(chat, /agentContextOverride: ruphusLaunch\.contextRef/);
+  assert.match(chat, /setLegacyChatOverride\(true\)/);
 });
 test('M1 tasting reveal carries bounded unsaved cup evidence into the immutable context', () => {
   const wizard = read('src/components/tasting/TastingWizard.jsx');
