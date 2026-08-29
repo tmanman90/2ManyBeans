@@ -2608,6 +2608,7 @@
     },
     "expected": {
       "terminal": "clarification",
+      "requestedInput": "drawdownSeconds",
       "identity": {
         "userId": "user-u4-fixture",
         "coffeeId": "coffee-u4-fixture",

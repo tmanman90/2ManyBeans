@@ -1,4 +1,5 @@
-import { hashValue } from '../contracts.mjs';
+import { hashValue, immutableSnapshot } from '../contracts.mjs';
+import { isRegisteredStagingStore, readRegisteredStagingExecution } from '../staging-store.mjs';
 
 export const LIFECYCLE_REQUIRED_ATTEMPTS = 24;
 export const LIFECYCLE_MINIMUM_SUCCESS = 23;
@@ -8,15 +9,25 @@ const freezeSchedule = (entries) => Object.freeze(entries.map((entry) => Object.
 
 export const LIFECYCLE_SCHEDULE = freezeSchedule(Array.from({ length: LIFECYCLE_REQUIRED_ATTEMPTS }, (_, index) => ({ caseId: `case-${index % 12}`, repeat: Math.floor(index / 12) + 1 })));
 
-function validateRawAttempt(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('lifecycle attempt must be an object');
-  if (typeof raw.caseId !== 'string' || !raw.caseId || !Number.isInteger(raw.repeat) || ![1, 2].includes(raw.repeat)) throw new Error('lifecycle case identity is invalid');
-  if (typeof raw.sessionId !== 'string' || !raw.sessionId || typeof raw.revisionId !== 'string' || !raw.revisionId) throw new Error('lifecycle session/revision identity is required');
-  if (typeof raw.userId !== 'string' || !raw.userId || typeof raw.coffeeId !== 'string' || !raw.coffeeId) throw new Error('lifecycle user/coffee identity is required');
-  if (!raw.snapshot || typeof raw.snapshot !== 'object' || raw.snapshot.userId !== raw.userId || raw.snapshot.coffeeId !== raw.coffeeId || raw.snapshot.revisionId !== raw.revisionId || typeof raw.snapshot.recipeHash !== 'string' || !raw.snapshot.recipeHash) throw new Error('lifecycle snapshot identity is not canonical');
-  if (!raw.ledger || typeof raw.ledger !== 'object' || raw.ledger.canonical !== true || raw.ledger.sessionId !== raw.sessionId || raw.ledger.revisionId !== raw.revisionId || !Array.isArray(raw.ledger.eventIds) || raw.ledger.eventIds.length === 0) throw new Error('lifecycle ledger is not canonical');
-  if (!Array.isArray(raw.events) || raw.events.length !== raw.ledger.eventIds.length || raw.events.some((event, index) => !event || typeof event !== 'object' || typeof event.id !== 'string' || event.id !== raw.ledger.eventIds[index] || event.sequence !== index || event.sessionId !== raw.sessionId || event.revisionId !== raw.revisionId)) throw new Error('lifecycle event sequence is invalid');
-  if (typeof raw.expectedTerminal !== 'string' || typeof raw.actualTerminal !== 'string' || raw.expectedTerminal !== raw.actualTerminal) throw new Error('lifecycle terminal state is invalid');
+function expectedKeys() { return LIFECYCLE_SCHEDULE.map((entry) => `${entry.caseId}:${entry.repeat}`); }
+
+function validateStoreExecution(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('lifecycle entry must be an object');
+  if (Object.keys(entry).sort().join('|') !== 'caseId|repeat|store') throw new Error('lifecycle entries may contain only caseId, repeat, and store');
+  if (typeof entry.caseId !== 'string' || !entry.caseId || !Number.isInteger(entry.repeat) || ![1, 2].includes(entry.repeat)) throw new Error('lifecycle case identity is invalid');
+  if (!isRegisteredStagingStore(entry.store)) throw new Error('lifecycle execution must be a registered staging store');
+  const execution = readRegisteredStagingExecution(entry.store);
+  const snapshot = execution.snapshot;
+  const ids = snapshot.identities;
+  const revision = snapshot.revisions?.at(-1);
+  if (!ids || typeof ids.sessionId !== 'string' || !ids.sessionId || typeof ids.userId !== 'string' || !ids.userId || typeof ids.coffeeId !== 'string' || !ids.coffeeId) throw new Error('lifecycle store identity is invalid');
+  if (!revision || typeof revision.id !== 'string' || !revision.id || typeof revision.recipeHash !== 'string' || !revision.recipeHash) throw new Error('lifecycle current revision is not canonical');
+  const events = execution.events;
+  const revisionIds = new Set(snapshot.revisions.map((candidate) => candidate.id));
+  if (!Array.isArray(events) || events.length === 0 || events.some((event, index) => !event || typeof event.eventId !== 'string' || !event.eventId || event.sequence !== index || event.sessionId !== ids.sessionId || (event.revisionId != null && !revisionIds.has(event.revisionId)))) throw new Error('lifecycle event sequence is invalid');
+  const lifecycle = execution.lifecycle;
+  if (!lifecycle || typeof lifecycle.terminal !== 'string' || !lifecycle.terminal || typeof lifecycle.valid !== 'boolean' || typeof lifecycle.recall !== 'boolean' || typeof lifecycle.criticalFailure !== 'boolean') throw new Error('lifecycle terminal evidence is invalid');
+  return { snapshot, events, lifecycle, ids, revision };
 }
 
 export function lifecycleAttemptChecksum(attempt) {
@@ -25,20 +36,25 @@ export function lifecycleAttemptChecksum(attempt) {
   return hashValue(content);
 }
 
-export function sealLifecycleAttempts(rawAttempts) {
-  if (!Array.isArray(rawAttempts) || rawAttempts.length !== LIFECYCLE_REQUIRED_ATTEMPTS) throw new Error('lifecycle requires the frozen 12-case x2 schedule');
-  const keys = rawAttempts.map((attempt) => `${attempt?.caseId}:${attempt?.repeat}`);
-  const expectedKeys = LIFECYCLE_SCHEDULE.map((entry) => `${entry.caseId}:${entry.repeat}`);
-  if (new Set(keys).size !== keys.length || keys.slice().sort().join('|') !== expectedKeys.slice().sort().join('|')) throw new Error('lifecycle attempts do not match the sealed schedule');
-  const sealed = rawAttempts.map((raw) => {
-    validateRawAttempt(raw);
-    const copy = structuredClone(raw);
-    delete copy.ledgerChecksum;
-    delete copy.expectedLedgerChecksum;
-    const checksum = lifecycleAttemptChecksum(copy);
-    const attempt = Object.freeze({ ...copy, ledgerChecksum: checksum, expectedLedgerChecksum: checksum });
-    SEALED_ATTEMPTS.add(attempt);
-    return attempt;
+/** Seal only actual executions of the U3 synthetic StagingStore. */
+export function sealLifecycleAttempts(entries) {
+  if (!Array.isArray(entries) || entries.length !== LIFECYCLE_REQUIRED_ATTEMPTS) throw new Error('lifecycle requires the frozen 12-case x2 schedule');
+  const keys = entries.map((entry) => `${entry?.caseId}:${entry?.repeat}`);
+  const required = expectedKeys();
+  if (new Set(keys).size !== keys.length || keys.slice().sort().join('|') !== required.slice().sort().join('|')) throw new Error('lifecycle attempts do not match the sealed schedule');
+  const sealed = entries.map((entry) => {
+    const { snapshot, events, lifecycle, ids, revision } = validateStoreExecution(entry);
+    const attempt = immutableSnapshot({
+      caseId: entry.caseId, repeat: entry.repeat,
+      sessionId: ids.sessionId, userId: ids.userId, coffeeId: ids.coffeeId,
+      revisionId: revision.id, snapshot, ledger: { canonical: true, sessionId: ids.sessionId, revisionId: revision.id, eventIds: events.map((event) => event.eventId) },
+      events, expectedTerminal: lifecycle.terminal, actualTerminal: lifecycle.terminal,
+      valid: lifecycle.valid, recall: lifecycle.recall, criticalFailure: lifecycle.criticalFailure,
+    });
+    const checksum = lifecycleAttemptChecksum(attempt);
+    const stamped = immutableSnapshot({ ...attempt, ledgerChecksum: checksum, expectedLedgerChecksum: checksum });
+    SEALED_ATTEMPTS.add(stamped);
+    return stamped;
   });
   const batch = Object.freeze(sealed);
   SEALED_BATCHES.add(batch);
@@ -51,9 +67,9 @@ export function gradeLifecycle(input = {}) {
   const attempts = input?.attempts;
   if (!SEALED_BATCHES.has(attempts) || !Array.isArray(attempts) || attempts.length !== LIFECYCLE_REQUIRED_ATTEMPTS || attempts.some((attempt) => !SEALED_ATTEMPTS.has(attempt))) failures.push('unsealed-lifecycle-artifact');
   const values = Array.isArray(attempts) ? attempts : [];
-  const expectedIds = values.map((attempt) => `${attempt?.caseId}:${attempt?.repeat}`);
-  const expectedKeys = LIFECYCLE_SCHEDULE.map((entry) => `${entry.caseId}:${entry.repeat}`);
-  if (new Set(expectedIds).size !== expectedIds.length || expectedIds.slice().sort().join('|') !== expectedKeys.slice().sort().join('|')) failures.push('schedule-lineage-mismatch');
+  const ids = values.map((attempt) => `${attempt?.caseId}:${attempt?.repeat}`);
+  const required = expectedKeys();
+  if (new Set(ids).size !== ids.length || ids.slice().sort().join('|') !== required.slice().sort().join('|')) failures.push('schedule-lineage-mismatch');
   if (new Set(values.map((attempt) => attempt?.sessionId)).size !== values.length || new Set(values.map((attempt) => attempt?.revisionId)).size !== values.length) failures.push('duplicate-lineage-identity');
   const caseCounts = new Map();
   values.forEach((attempt) => { if (attempt?.caseId) caseCounts.set(attempt.caseId, (caseCounts.get(attempt.caseId) || 0) + 1); });

@@ -11,6 +11,7 @@ import { gradeRecipeLayers, validateRecipe, projectCanonicalRuntime, compareGrin
 import { gradeRecall } from './ruphus-eval/graders/recall.mjs';
 import { gradeAuthority } from './ruphus-eval/graders/authority.mjs';
 import { gradeLifecycle, lifecycleAttemptChecksum, LIFECYCLE_SCHEDULE, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
+import { StagingStore } from './ruphus-eval/staging-store.mjs';
 
 const aiden = {
   profileType: 0, title: 'Aiden test',
@@ -229,13 +230,18 @@ test('U4 recall and authority graders are deterministic hard gates', () => {
 });
 
 test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', () => {
-  const raw = LIFECYCLE_SCHEDULE.map((entry, index) => ({ ...entry, userId: 'user-u4', coffeeId: 'coffee-u4', sessionId: `session-${index}`, revisionId: `revision-${index}`, snapshot: { userId: 'user-u4', coffeeId: 'coffee-u4', revisionId: `revision-${index}`, recipeHash: `recipe-${index}` }, ledger: { canonical: true, sessionId: `session-${index}`, revisionId: `revision-${index}`, eventIds: [`event-${index}`] }, events: [{ id: `event-${index}`, sequence: 0, sessionId: `session-${index}`, revisionId: `revision-${index}` }], expectedTerminal: 'complete', actualTerminal: 'complete', valid: index !== 23, recall: index !== 23, criticalFailure: false }));
-  const passing = sealLifecycleAttempts(raw);
+  const stores = (failedFrom = 24) => LIFECYCLE_SCHEDULE.map((entry, index) => {
+    const store = new StagingStore({ userId: `user-u4-${index}`, lifecycle: { terminal: 'complete', valid: index < failedFrom, recall: index < failedFrom, criticalFailure: false } });
+    store.reset({ coffeeId: `coffee-u4-${index}`, recipe: { seed: index } });
+    store.readCoffee();
+    return { caseId: entry.caseId, repeat: entry.repeat, store };
+  });
+  const passing = sealLifecycleAttempts(stores(23));
   assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
   assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule: LIFECYCLE_SCHEDULE }).hardGate, false);
-  const twentyTwo = sealLifecycleAttempts(raw.map((attempt, index) => index >= 22 ? { ...attempt, valid: false, recall: false } : attempt));
+  const twentyTwo = sealLifecycleAttempts(stores(22));
   assert.equal(gradeLifecycle({ attempts: twentyTwo }).hardGate, false);
-  assert.equal(gradeLifecycle({ attempts: raw }).hardGate, false);
+  assert.throws(() => sealLifecycleAttempts(LIFECYCLE_SCHEDULE.map((entry) => ({ ...entry })), /registered staging store/));
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, criticalFailure: true } : attempt) }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, ledgerChecksum: 'forged', expectedLedgerChecksum: 'forged' } : attempt) }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, sessionId: 'session-0' } : attempt) }).hardGate, false);
