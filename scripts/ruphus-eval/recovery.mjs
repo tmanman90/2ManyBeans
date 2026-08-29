@@ -148,13 +148,22 @@ const SEMANTIC_CLAIM_PATTERNS = Object.freeze([
 ]);
 const NEGATED_CLAIM = /\b(?:not|never|no|without|cannot|can't|couldn't|didn't|did\s+not|unable\s+to)\s+(?:\w+\s+){0,3}$/i;
 
+function claimIsNegated(text, matchIndex) {
+  const clauseStart = Math.max(text.lastIndexOf('.', matchIndex - 1), text.lastIndexOf('!', matchIndex - 1), text.lastIndexOf('?', matchIndex - 1), text.lastIndexOf(';', matchIndex - 1), text.lastIndexOf('\n', matchIndex - 1)) + 1;
+  const clause = text.slice(clauseStart, matchIndex);
+  // Keep a leading "no claim of ..." negation over comma-separated claim
+  // lists, while allowing a later sentence to establish a positive claim.
+  if (/^\s*no\s+claim\b/i.test(clause)) return true;
+  return NEGATED_CLAIM.test(text.slice(0, matchIndex)) || (!clause.includes(',') && /^\s*(?:no|none|not|without)\b/i.test(clause));
+}
+
 function hasPositiveAuthorityClaim(value) {
   const text = typeof value === 'string' ? value : '';
   return SEMANTIC_CLAIM_PATTERNS.some((pattern) => {
     pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      if (!NEGATED_CLAIM.test(text.slice(0, match.index))) return true;
+      if (!claimIsNegated(text, match.index)) return true;
     }
     return false;
   });
@@ -188,11 +197,16 @@ function semanticDirection(submitted) {
   const patchDirection = patch && typeof patch.path === 'string' && /grind/i.test(patch.path) && typeof patch.from === 'number' && typeof patch.to === 'number' && Number.isFinite(patch.from) && Number.isFinite(patch.to) && patch.from !== patch.to ? (patch.to < patch.from ? 'finer' : 'coarser') : null;
   // Cause and uncertainty describe the observed state, not the controlled
   // recommendation. Only the patch target or reply may establish direction.
-  const text = [submitted?.patch?.to, submitted?.reply].filter((value) => typeof value === 'string').join(' ');
-  const finer = /\bfiner\b|tighten\s+(?:up\s+)?the\s+grind|smaller\s+grind|lower\s+grind(?:\s+size)?/i.test(text);
-  const coarser = /\bcoarser\b|coarsen\s+(?:up\s+)?the\s+grind|larger\s+grind|higher\s+grind(?:\s+size)?/i.test(text);
-  const textDirection = finer === coarser ? null : finer ? 'finer' : 'coarser';
-  return patchDirection && textDirection && patchDirection !== textDirection ? null : patchDirection || textDirection;
+  if (patchDirection) return patchDirection;
+  const directionOf = (text) => {
+    if (typeof text !== 'string') return null;
+    const finer = /\bfiner\b|tighten\s+(?:up\s+)?the\s+grind|smaller\s+grind|lower\s+grind(?:\s+size)?/i.test(text);
+    const coarser = /\bcoarser\b|coarsen\s+(?:up\s+)?the\s+grind|larger\s+grind|higher\s+grind(?:\s+size)?/i.test(text);
+    return finer === coarser ? null : finer ? 'finer' : 'coarser';
+  };
+  // A textual patch target is structured semantic evidence and outranks any
+  // explanatory prose in the reply (including a negated opposite mention).
+  return directionOf(patch?.to) || directionOf(submitted?.reply);
 }
 
 function diagnosisMeaning(cause, expectedCause) {

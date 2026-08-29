@@ -203,6 +203,18 @@ test('diagnosis grading accepts frozen cause and direction paraphrases without r
   assert.ok(row.criticalFailures.includes('diagnosis-direction-mismatch'));
 });
 
+test('structured patch direction outranks explanatory prose and compound no-claim lists stay negated', () => {
+  const structured = syntheticScreeningArtifacts('screen-structured-direction', (content, entry) => entry.caseId === 'dec-013'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'Coarser is not indicated here; finer is appropriate.', patch: { path: 'grindMicrons', from: 600, to: 'one-step-finer' } } } } : content);
+  const accepted = gradeRecoveryScreening({ artifacts: structured, runId: 'screen-structured-direction', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(accepted.arms.every((arm) => arm.valid), true);
+
+  const truthfulClaims = syntheticScreeningArtifacts('screen-compound-negation', (content, entry) => entry.caseId === 'dec-049'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'No claim of machine success, brew success, or physical success is made in this response.' } } } : content);
+  const claimsScreening = gradeRecoveryScreening({ artifacts: truthfulClaims, runId: 'screen-compound-negation', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(claimsScreening.arms.every((arm) => arm.valid), true);
+});
+
 test('screening rejects each positive authority claim while preserving negated claims', () => {
   const claims = [
     'Successfully committed the recipe.',
