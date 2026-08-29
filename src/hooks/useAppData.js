@@ -10,7 +10,8 @@ import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
 import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
-import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate, protectedRecipeUpdates } from '../lib/recipeCommands';
+import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate, protectedRecipeUpdates, splitProtectedRecipeUpdates } from '../lib/recipeCommands';
+import { canonicalHash } from '../lib/ruphus/contracts';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -218,9 +219,11 @@ export const useAppData = (uid) => {
       const bean = beansStateRef.current.find((item) => item.id === beanId);
       if (!bean) throw new Error('This bean is no longer available.');
       const protectedUpdates = protectedRecipeUpdates(updates);
-      const command = commandForBeanUpdate(bean, protectedUpdates);
-      if (!command.recipe && command.mode === 'replace_active_recipe') throw new Error('A complete recipe is required for this change.');
-      await executeRecipeCommand({ ...command, patch: (command.mode === 'replace_active_recipe' || command.mode === 'set_aiden_link' || command.mode === 'set_aiden_grind') ? protectedUpdates : undefined });
+      for (const [index, updateGroup] of splitProtectedRecipeUpdates(protectedUpdates).entries()) {
+        const command = commandForBeanUpdate(bean, updateGroup, { actionId: `${beanId}:${canonicalHash(updateGroup)}:${index}` });
+        if (!command.recipe && command.mode === 'replace_active_recipe') throw new Error('A complete recipe is required for this change.');
+        await executeRecipeCommand({ ...command, patch: (command.mode === 'replace_active_recipe' || command.mode === 'set_aiden_link' || command.mode === 'set_aiden_grind') ? updateGroup : undefined });
+      }
       const ordinaryUpdates = Object.fromEntries(Object.entries(updates).filter(([key]) => !Object.hasOwn(protectedUpdates, key)));
       if (Object.keys(ordinaryUpdates).length) {
         await updateDoc(doc(db, 'users', uid, 'beans', beanId), { ...ordinaryUpdates, updatedAt: serverTimestamp() });

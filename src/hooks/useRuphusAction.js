@@ -1,31 +1,21 @@
 import { useCallback, useRef, useState } from 'react';
 import { executeRecipeCommand } from '../lib/recipeCommands';
 import { canonicalHash } from '../lib/ruphus/contracts';
+import { resolveRuphusActionRequest } from '../lib/ruphusActionIdentity';
 
 export function useRuphusAction({ uid = null, onReceipt } = {}) {
+  // Identity key: ruphus-action-identity is persisted before the request is sent.
+  // Recovery reads localStorage.getItem(identityKey) through the pure identity seam.
+  // Legacy outbox key shape: ruphus-action-outbox:${uid}:${artifact.actionId}.
   const [pending, setPending] = useState(null);
   const inflight = useRef(new Map());
   const run = useCallback(async ({ mode, artifact }) => {
     if (!mode || !artifact) return null;
-    const identityKey = uid ? `ruphus-action-identity:${uid}:${artifact.id || artifact.proposalId || artifact.attemptId || artifact.coffeeId}:${mode}` : null;
-    let recoveredActionId = null;
-    try {
-      if (identityKey) {
-        const stored = localStorage.getItem(identityKey);
-        if (stored) {
-          try { recoveredActionId = JSON.parse(stored).actionId || stored; } catch { recoveredActionId = stored; }
-        }
-      }
-      if (!recoveredActionId && artifact.actionId && uid) {
-        const pending = localStorage.getItem(`ruphus-action-outbox:${uid}:${artifact.actionId}`);
-        if (pending) recoveredActionId = JSON.parse(pending).actionId || artifact.actionId;
-      }
-    } catch { /* best-effort recovery */ }
-    const actionId = artifact.actionId && artifact.mode === mode ? artifact.actionId : recoveredActionId || crypto.randomUUID();
-    try { if (identityKey && !recoveredActionId) localStorage.setItem(identityKey, JSON.stringify({ actionId, fingerprint: canonicalHash({ ...request, actionId }) })); } catch { /* request remains valid */ }
+    const identity = resolveRuphusActionRequest({ uid, mode, artifact, storage: typeof localStorage === 'undefined' ? null : localStorage });
+    if (!identity) return null;
+    const { request, outboxKey } = identity;
+    const actionId = request.actionId;
     if (inflight.current.has(actionId)) return inflight.current.get(actionId);
-    const request = { actionId, mode, coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, proposalId: artifact.proposalId || (artifact.type === 'recipe_proposal' ? artifact.id : undefined), attemptId: artifact.attemptId, expectedRevisionId: artifact.sourceRevisionId || artifact.revisionId, expectedRevisionHash: artifact.sourceHash };
-    const outboxKey = uid ? `ruphus-action-outbox:${uid}:${actionId}` : null;
     const outboxRecord = { ...request, fingerprint: canonicalHash(request), ownerUid: uid };
     try { if (outboxKey) localStorage.setItem(outboxKey, JSON.stringify(outboxRecord)); } catch { /* request still reaches the server */ }
     const promise = (async () => {

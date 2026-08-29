@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { commandForBeanUpdate, PROTECTED_KEYS } from '../src/lib/recipeCommands.js';
+import { commandForBeanUpdate, PROTECTED_KEYS, splitProtectedRecipeUpdates } from '../src/lib/recipeCommands.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 
@@ -41,4 +41,12 @@ test('mixed Edit Bean payload routes its protected generation field without swal
 test('generated Aiden payloads without device metadata still target the Aiden slot', () => {
   const generatedAiden = { profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96] };
   assert.equal(commandForBeanUpdate(bean, { aidenRecipe: generatedAiden }).slotKey, 'aiden');
+});
+
+test('mixed hot and iced editor payloads split into ordered selected-slot commands', () => {
+  const groups = splitProtectedRecipeUpdates({ 'handBrewRecipes.v60': recipe, 'handBrewIcedRecipes.v60': iced });
+  assert.equal(groups.length, 2);
+  assert.equal(commandForBeanUpdate(bean, groups[0]).slotKey, 'v60_hot');
+  assert.equal(commandForBeanUpdate(bean, groups[1]).slotKey, 'v60_iced');
+  assert.notDeepEqual(groups[0], groups[1]);
 });

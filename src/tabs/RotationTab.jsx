@@ -566,6 +566,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onRetryIcedPush={aiden.onRetryIcedPush}
         attemptId={aiden.attemptContext?.id || null}
         revisionId={aiden.attemptContext?.revisionId || null}
+        onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
       />
       <HandBrewModal
         open={handBrew.handBrewModal}
@@ -587,6 +588,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         bean={handBrew.handBrewBean}
         attemptId={handBrew.attemptContext?.id || null}
         revisionId={handBrew.attemptContext?.revisionId || null}
+        onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
         onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}

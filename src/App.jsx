@@ -65,10 +65,19 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
   const [pendingTastingAttemptId, setPendingTastingAttemptId] = useState(null);
   const [ruphusLaunch, setRuphusLaunch] = useState(null);
-  const { attempt: ruphusAttempt, put: putRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
+  const { attempt: ruphusAttemptRecord, put: putRuphusAttempt, update: updateRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
+  const ruphusAttempt = ruphusAttemptRecord?.stage === 'tasting' ? null : ruphusAttemptRecord;
   // In-session tasting wizard draft. Kept above TastingTab so tab navigation
   // cannot discard an unfinished guided tasting; never persisted to Firebase.
-  const [tastingWizardDraft, setTastingWizardDraft] = useState(null);
+  const [tastingWizardDraft, setTastingWizardDraft] = useState(() => ruphusAttemptRecord?.stage === 'tasting' ? ruphusAttemptRecord.draft || null : null);
+  useEffect(() => {
+    if (ruphusAttemptRecord?.stage === 'tasting' && ruphusAttemptRecord.attemptId) {
+      setPendingTastingBeanId(ruphusAttemptRecord.coffeeId);
+      setPendingTastingAttemptId(ruphusAttemptRecord.attemptId);
+      if (ruphusAttemptRecord.draft) setTastingWizardDraft(ruphusAttemptRecord.draft);
+      setTab('tasting');
+    }
+  }, [ruphusAttemptRecord?.stage, ruphusAttemptRecord?.attemptId, ruphusAttemptRecord?.coffeeId, ruphusAttemptRecord?.draft]);
   const [tourActive, setTourActive] = useState(() => {
     if (new URLSearchParams(window.location.search).has('tour')) return true;
     return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
@@ -89,6 +98,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     if (!beanId) return;
     setPendingTastingBeanId(beanId);
     setPendingTastingAttemptId(attemptId);
+    if (attemptId && ruphusAttemptRecord?.id === attemptId) updateRuphusAttempt({ stage: 'tasting', attemptId, coffeeId: beanId });
     setTab('tasting');
   };
 
@@ -344,7 +354,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               onDeleteTasting={deleteTasting}
               updateBean={updateBean}
               wizardDraft={tastingWizardDraft}
-              onWizardDraftChange={setTastingWizardDraft}
+              onWizardDraftChange={(draft) => { setTastingWizardDraft(draft); if (ruphusAttemptRecord?.stage === 'tasting') updateRuphusAttempt({ draft }); }}
               pendingTastingBeanId={pendingTastingBeanId}
               pendingTastingAttemptId={pendingTastingAttemptId}
               onPendingTastingConsumed={() => { setPendingTastingBeanId(null); setPendingTastingAttemptId(null); }}

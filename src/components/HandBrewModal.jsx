@@ -423,7 +423,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 
 export const HandBrewModal = ({
   open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, icedUnsupported = false, onRetryIced, loading, error, phase, onRetry, onRegenerate,
-  extraFooter, bean, attemptId = null, revisionId = null, onStartTasting,
+  extraFooter, bean, attemptId = null, revisionId = null, onStartTasting, onOpenRuphus = null,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
 }) => {
@@ -601,6 +601,7 @@ export const HandBrewModal = ({
             )}
           </div>
           {attemptId && <RecipeProvenanceStrip provenance={{ revisionId }} />}
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeId: bean?.id, coffeeName: bean?.name, method: device === 'kalita' ? 'kalita' : 'v60', mode: 'hot', slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot`, revisionId }, 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           {recipe.device === 'kalita' && (
             <KalitaSizeSwitch

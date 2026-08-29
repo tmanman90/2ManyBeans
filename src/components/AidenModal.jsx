@@ -372,7 +372,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null, onOpenRuphus = null }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
@@ -471,6 +471,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
           {attemptId && <RecipeProvenanceStrip provenance={{ revisionId }} />}
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeId: bean?.id, coffeeName: bean?.name, method: 'aiden', mode: 'hot', slotKey: 'aiden', revisionId }, 'How should I improve this Aiden recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           <DialCard recipe={recipe} />
 

@@ -636,6 +636,9 @@ export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) 
 
 export async function prepareAidenAttempt(attemptId) {
   if (!attemptId) throw new Error('Aiden attempt ID is required.');
-  const result = await fetchWithRetry({ url: `${API_BASE}/api/aiden`, body: { attemptId }, retries: 2, serviceName: 'Fellow' });
+  // The server owns retry/reconciliation for attempt preparation. Retrying
+  // this request client-side could duplicate a provider create after response
+  // loss; relaunching the same attempt is the recovery action.
+  const result = await fetchWithRetry({ url: `${API_BASE}/api/aiden`, body: { attemptId }, retries: 0, serviceName: 'Fellow' });
   return result;
 }

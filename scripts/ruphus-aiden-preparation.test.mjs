@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { prepareRuphusAttempt, reconcileRuphusAttempt } from '../api/_lib/ruphusAidenPreparation.js';
+import { buildRuphusAttemptProfile, prepareRuphusAttempt, reconcileRuphusAttempt } from '../api/_lib/ruphusAidenPreparation.js';
 
 const snapshot = { profileType: 0, title: 'ignored', ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96], modelMetadata: 'must not reach Fellow' };
 
@@ -10,7 +10,7 @@ test('Aiden preparation projects only the attempt snapshot and records prepared 
   const result = await prepareRuphusAttempt({ attempt: { id: 'attempt-1', status: 'preparing', snapshot }, bean: { id: 'bean-1', name: 'Kenya' }, adapter: async (profile) => { received = profile; return { profileId: 'fellow-1', link: 'https://example.test' }; }, now: '2026-08-29T12:00:00.000Z' });
   assert.equal(result.attempt.status, 'profile_prepared');
   assert.equal(result.attempt.externalId, 'fellow-1');
-  assert.equal(received.title, 'Kenya');
+  assert.match(received.title, /^Kenya · /);
   assert.equal(received.modelMetadata, undefined);
 });
 
@@ -25,11 +25,25 @@ test('uncertain Aiden preparation reconciles an existing external profile withou
   assert.equal(result.attempt.externalId, 'fellow-3');
 });
 
+test('attempt preparation uses a unique Fellow-safe title and reconciliation before create', async () => {
+  const attempt = { id: 'attempt-relaunch-123456789', status: 'uncertain', snapshot };
+  const profile = buildRuphusAttemptProfile(attempt, { id: 'bean-1', name: 'Kenya' });
+  assert.ok(profile.title.length <= 50);
+  let created = false;
+  const result = await prepareRuphusAttempt({ attempt, bean: { id: 'bean-1', name: 'Kenya' }, adapter: { reconcile: async ({ title }) => ({ profileId: 'observed', title }) , prepare: async () => { created = true; } } });
+  assert.equal(result.attempt.status, 'profile_prepared');
+  assert.equal(result.attempt.externalId, 'observed');
+  assert.equal(created, false);
+});
+
 test('server Aiden boundary accepts an attempt ID rather than a client recipe', async () => {
   const source = await readFile(new URL('../api/aiden.js', import.meta.url), 'utf8');
   assert.match(source, /attemptId/);
   assert.match(source, /Object\.keys\(body\)\.some\(\(key\) => key !== 'attemptId'\)/);
-  assert.match(source, /toAidenProfile\(attempt\.snapshot/);
+  assert.match(source, /buildRuphusAttemptProfile\(attempt/);
+  assert.match(source, /prepareRuphusAttempt/);
+  assert.match(source, /allowDuplicateRecovery: false/);
+  assert.match(source, /reconcileOnly: true/);
   assert.match(source, /status: 'preparing'/);
   assert.match(source, /status: 'profile_prepared'/);
 });

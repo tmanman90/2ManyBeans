@@ -13,14 +13,23 @@ export function useRuphusAttemptOutbox(uid) {
   }, [uid]);
   const put = useCallback((value) => {
     if (!uid || !value?.id || !value?.coffeeId || !value?.snapshot) return;
-    const next = { ...value, ownerUid: uid };
+    const next = { ...value, ownerUid: uid, stage: value.stage || 'brew' };
     try { localStorage.setItem(keyFor(uid), JSON.stringify(next)); } catch { /* local recovery is best-effort */ }
     setAttempt(next);
+  }, [uid]);
+  const update = useCallback((changes = {}) => {
+    if (!uid) return;
+    setAttempt(current => {
+      if (!current) return current;
+      const next = { ...current, ...changes, ownerUid: uid };
+      try { localStorage.setItem(keyFor(uid), JSON.stringify(next)); } catch { /* best effort */ }
+      return next;
+    });
   }, [uid]);
   const clear = useCallback(() => {
     const key = keyFor(uid);
     try { if (key) localStorage.removeItem(key); } catch { /* best-effort */ }
     setAttempt(null);
   }, [uid]);
-  return { attempt, put, clear };
+  return { attempt, put, update, clear };
 }

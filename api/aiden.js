@@ -5,7 +5,8 @@
 import { withCorsAuthUltra, getDb } from './_lib/cors-auth.js';
 import { decrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
-import { validateAidenProfile, toAidenProfile } from '../src/lib/aidenProfileValidation.js';
+import { validateAidenProfile } from '../src/lib/aidenProfileValidation.js';
+import { buildRuphusAttemptProfile, prepareRuphusAttempt } from './_lib/ruphusAidenPreparation.js';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
 const RATE_LIMIT = { key: 'aidenPush', limit: 30, windowMs: 60 * 60 * 1000 };
@@ -124,7 +125,7 @@ async function clearTokenCache(secretsRef) {
   }
 }
 
-async function pushWithCredentials(profile, creds) {
+async function pushWithCredentials(profile, creds, { allowDuplicateRecovery = true, reconcileOnly = false } = {}) {
   let token = null;
   let deviceId = creds.cachedDeviceId || null;
 
@@ -162,6 +163,13 @@ async function pushWithCredentials(profile, creds) {
   // Cache token + device for next time (non-blocking)
   cacheTokenAndDevice(creds.secretsRef, token, deviceId);
 
+  if (reconcileOnly) {
+    const existing = await fellowFetch(`/devices/${deviceId}/profiles`, { headers: authHeaders });
+    const profiles = existing.profiles || existing;
+    const match = Array.isArray(profiles) && profiles.find((candidate) => candidate.title === profile.title || candidate.name === profile.title);
+    return match ? { profileId: match.id || match.profileId, title: profile.title, link: match.link || match.url || null } : null;
+  }
+
   // Create temp profile on device (auto-delete duplicate if leftover from previous push)
   let created;
   try {
@@ -171,7 +179,13 @@ async function pushWithCredentials(profile, creds) {
       body: JSON.stringify(profile),
     });
   } catch (createErr) {
-    if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists')) {
+    if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists') && !allowDuplicateRecovery) {
+      const existing = await fellowFetch(`/devices/${deviceId}/profiles`, { headers: authHeaders });
+      const profiles = existing.profiles || existing;
+      const match = Array.isArray(profiles) && profiles.find((candidate) => candidate.title === profile.title || candidate.name === profile.title);
+      if (match) return { profileId: match.id || match.profileId, title: profile.title, link: match.link || match.url || null, reconciled: true };
+      throw Object.assign(new Error('Aiden profile creation is uncertain; no matching profile was observed.'), { code: 'timeout', status: 202 });
+    } else if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists')) {
       // Stale profile from a previous push that failed to clean up -- delete it and retry
       console.warn('Duplicate profile detected, cleaning up and retrying...');
       try {
@@ -201,10 +215,18 @@ async function pushWithCredentials(profile, creds) {
   const profileId = created.id || created.profileId;
 
   // Share profile -> get brew.link
-  const shared = await fellowFetch(`/devices/${deviceId}/profiles/${profileId}/share`, {
-    method: 'POST',
-    headers: authHeaders,
-  });
+  let shared;
+  try {
+    shared = await fellowFetch(`/devices/${deviceId}/profiles/${profileId}/share`, {
+      method: 'POST',
+      headers: authHeaders,
+    });
+  } catch (shareError) {
+    // Preserve the observed provider identity so an uncertain retry can
+    // reconcile this exact profile instead of creating another one.
+    shareError.externalId = profileId;
+    throw shareError;
+  }
   const link = shared.link || shared.url || shared.shareUrl;
 
   // Delete the temp profile -- keep device clean
@@ -231,6 +253,8 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
   const body = req.body || {};
   const attemptId = typeof body.attemptId === 'string' ? body.attemptId : null;
   let attemptRef = null;
+  let attemptRecord = null;
+  let attemptBean = null;
 
   try {
     let profile = body;
@@ -243,13 +267,15 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
       const beanSnap = await beanRef.get();
       if (!attemptSnap.exists || !beanSnap.exists) return res.status(404).json({ error: 'attempt_not_found' });
       const attempt = { id: attemptSnap.id, ...attemptSnap.data() };
+      attemptRecord = attempt;
       if (attempt.status === 'profile_prepared') return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, physicalBrewConfirmed: false });
       if (!['created', 'preparing', 'uncertain'].includes(attempt.status)) return res.status(409).json({ error: 'invalid_attempt_state' });
-      profile = toAidenProfile(attempt.snapshot, { id: beanSnap.id, ...beanSnap.data() });
+      attemptBean = { id: beanSnap.id, ...beanSnap.data() };
+      profile = buildRuphusAttemptProfile(attempt, attemptBean);
       await db.runTransaction(async (tx) => {
         const current = await tx.get(attemptRef);
         if (!current.exists) throw Object.assign(new Error('Attempt is unavailable.'), { code: 'attempt_not_found' });
-        tx.update(attemptRef, { status: 'preparing', preparingAt: new Date().toISOString() });
+        if (attempt.status !== 'uncertain') tx.update(attemptRef, { status: 'preparing', preparingAt: new Date().toISOString() });
       });
     }
     const validation = validateAidenProfile(profile);
@@ -267,6 +293,27 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
         return res.status(400).json({ error: credsErr.message });
       }
       throw credsErr;
+    }
+
+    // Attempt preparation is the durable, attempt-ID-only boundary. It
+    // reloads the canonical snapshot and reconciles uncertain creates by the
+    // unique title; it never trusts a client recipe or auto-recreates a
+    // profile after a response-loss ambiguity.
+    if (attemptRef && attemptRecord) {
+      const prepared = await prepareRuphusAttempt({
+        attempt: { ...attemptRecord, status: attemptRecord.status === 'created' ? 'preparing' : attemptRecord.status },
+        bean: attemptBean,
+        adapter: {
+          prepare: (canonicalProfile) => pushWithCredentials(canonicalProfile, creds, { allowDuplicateRecovery: false }),
+          reconcile: ({ title }) => pushWithCredentials({ ...profile, title }, creds, { reconcileOnly: true }),
+        },
+      });
+      await attemptRef.update(prepared.attempt).catch(() => {});
+      if (prepared.error) {
+        if (prepared.attempt.status === 'uncertain') return res.status(202).json({ attemptId, status: 'uncertain', physicalBrewConfirmed: false });
+        return res.status(502).json({ error: prepared.error.message || 'Could not prepare Aiden attempt.' });
+      }
+      return res.status(200).json({ ...prepared.external, attemptId, status: 'profile_prepared', physicalBrewConfirmed: false });
     }
 
     // Decryption failed: return error + try relay fallback ONLY for the

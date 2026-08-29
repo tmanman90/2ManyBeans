@@ -24,6 +24,8 @@ test('brew_once handoff carries an owner-keyed attempt into the app and timer se
   assert.match(timing, /revisionId,/);
   assert.match(outbox, /ruphus-attempt-outbox:\$\{uid\}/);
   assert.match(outbox, /ownerUid: uid/);
+  assert.match(outbox, /stage: value\.stage \|\| 'brew'/);
+  assert.match(outbox, /const update = useCallback/);
   const action = await source('src/hooks/useRuphusAction.js');
   assert.match(action, /ruphus-action-identity/);
   assert.match(action, /localStorage\.getItem\(identityKey\)/);
@@ -31,6 +33,8 @@ test('brew_once handoff carries an owner-keyed attempt into the app and timer se
   assert.match(rotation, /consumedAttemptRef\.current === ruphusAttempt\.id/);
   assert.doesNotMatch(app, /if \(attemptId\) clearRuphusAttempt\(\)/);
   assert.match(await source('src/tabs/TastingTab.jsx'), /onRuphusAttemptCompleted\?\.\(\)/);
+  assert.match(app, /stage === 'tasting'/);
+  assert.match(app, /updateRuphusAttempt\(\{ draft \}\)/);
 });
 
 test('recipe command receipt exposes the canonical Fellow preparation action', async () => {
@@ -41,6 +45,8 @@ test('recipe command receipt exposes the canonical Fellow preparation action', a
   assert.doesNotMatch(card, /prepare_attempt/);
   assert.match(service, /mode === 'prepare_attempt'/);
   assert.match(service, /preparation: 'pending'/);
+  assert.match(card, /Start brew/);
+  assert.match(card, /Prepare in Fellow/);
   const aiden = await source('src/lib/aiden.js');
   assert.match(aiden, /body: \{ attemptId \}/);
   assert.match(aiden, /prepareAidenAttempt/);

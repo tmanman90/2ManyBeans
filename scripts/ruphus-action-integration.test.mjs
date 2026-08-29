@@ -4,6 +4,7 @@ import { createMemoryCommandStore } from '../api/_lib/ruphusCommandService.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { applyRuphusTastingState } from '../api/ruphus-tasting.js';
+import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 
 function setup() {
   const store = createMemoryCommandStore({ uid: 'user-1' });
@@ -21,6 +22,9 @@ test('Apply creates one active revision and idempotent replay does not duplicate
   assert.equal(result.revision.id, replay.revision.id);
   assert.equal(store.snapshot().revisions.filter((item) => item.source === 'apply').length, 1);
   assert.equal(store.snapshot().receipts.filter((item) => item.actionId === 'apply-1').length, 1);
+  assert.equal(result.receipt.executionAvailable, true);
+  const started = store.execute({ actionId: 'apply-start-1', mode: 'start_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', expectedRevisionId: result.revision.id });
+  assert.equal(started.attempt.revisionId, result.revision.id);
   assert.throws(() => store.execute({ actionId: 'apply-1', mode: 'apply_proposal', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-1', expectedRevisionId: 'different' }), /idempotency/i);
 });
 
@@ -42,7 +46,19 @@ test('brew attempt completion is an idempotent server transition before tasting'
   const replay = store.execute({ actionId: 'complete-attempt', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
   assert.equal(completed.attempt.status, 'completed');
   assert.equal(replay.attempt.status, 'completed');
-  assert.equal(completed.receipt.physicalBrewConfirmed, true);
+  assert.equal(completed.receipt.physicalBrewConfirmed, false);
+  assert.equal(completed.receipt.timerCompleted, true);
+});
+
+test('action identity survives storage-backed relaunch before a response arrives', () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value) };
+  const artifact = { id: 'proposal-relaunch', coffeeId: 'bean-1', slotKey: 'v60_hot', type: 'recipe_proposal' };
+  const first = resolveRuphusActionRequest({ uid: 'user-1', mode: 'apply_proposal', artifact, storage, idFactory: () => 'stable-action' });
+  const relaunched = resolveRuphusActionRequest({ uid: 'user-1', mode: 'apply_proposal', artifact, storage, idFactory: () => 'different-action' });
+  assert.equal(first.request.actionId, 'stable-action');
+  assert.equal(relaunched.request.actionId, 'stable-action');
+  assert.equal(relaunched.request.actionId, first.request.actionId);
 });
 
 test('Undo rejects stale revision and restores only the targeted slot', () => {

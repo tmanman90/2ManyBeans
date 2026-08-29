@@ -1,12 +1,26 @@
 import { getAuth } from 'firebase/auth';
 import { API_BASE } from './apiBase.js';
 
-const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenLinkRevisionId', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
+const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
 
 export const isProtectedRecipeUpdate = (updates = {}) => Object.keys(updates).some((key) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.'));
 export const protectedRecipeUpdates = (updates = {}) => Object.fromEntries(
   Object.entries(updates).filter(([key]) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.'))
 );
+
+// A single editor save can contain hot and iced projections. Each protected
+// slot is its own command so a selected-slot patch can never cross-contaminate.
+export function splitProtectedRecipeUpdates(updates = {}) {
+  const groups = new Map();
+  for (const [key, value] of Object.entries(protectedRecipeUpdates(updates))) {
+    let group = 'aiden';
+    if (key.startsWith('handBrewIcedRecipes.') || key === 'handBrewIcedRecipes') group = 'iced';
+    else if (key.startsWith('handBrewRecipes.') || key === 'handBrewRecipes' || key.startsWith('handBrewRecipe.') || key === 'handBrewRecipe') group = 'hot';
+    if (!groups.has(group)) groups.set(group, {});
+    groups.get(group)[key] = value;
+  }
+  return [...groups.values()];
+}
 
 export async function executeRecipeCommand(command) {
   const user = getAuth().currentUser;
