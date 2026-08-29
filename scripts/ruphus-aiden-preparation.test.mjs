@@ -39,11 +39,13 @@ test('attempt preparation uses a unique Fellow-safe title and reconciliation bef
 test('server Aiden boundary accepts an attempt ID rather than a client recipe', async () => {
   const source = await readFile(new URL('../api/aiden.js', import.meta.url), 'utf8');
   assert.match(source, /attemptId/);
-  assert.match(source, /Object\.keys\(body\)\.some\(\(key\) => key !== 'attemptId'\)/);
-  assert.match(source, /buildRuphusAttemptProfile\(attempt/);
+  assert.match(source, /Object\.keys\(body\)\.some\(\(key\) => key !== 'attemptId' && key !== 'recovery'\)/);
+  assert.match(source, /buildRuphusAttemptProfile\(/);
   assert.match(source, /prepareRuphusAttempt/);
-  assert.match(source, /allowDuplicateRecovery: false/);
+  assert.match(source, /allowDuplicateRecovery: recovery === 'new_profile'/);
+  assert.match(source, /recoveryTitle: profile\.title/);
   assert.match(source, /reconcileOnly: true/);
   assert.match(source, /status: 'preparing'/);
   assert.match(source, /status: 'profile_prepared'/);
+  assert.match(source, /recovery === 'new_profile'/);
 });

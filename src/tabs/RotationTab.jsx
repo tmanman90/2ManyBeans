@@ -34,6 +34,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 import { useBeanDetail } from '../hooks/useBeanDetail';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { executeRecipeCommand } from '../lib/recipeCommands';
 
 // Secondary Liquid-Glass pill (iOS 26 material): bright rim + specular top sheen +
 // a floating drop shadow that lifts it off the card, with a faint semantic tint.
@@ -102,6 +103,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [newBeanEntry, setNewBeanEntry] = useState(null);
   const [activeJar, setActiveJar] = useState(0);
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
+  const undoRuphusRecipe = useCallback(async (provenance) => {
+    if (!detailBean?.id || !provenance?.revisionId || !provenance?.slotKey) return;
+    await executeRecipeCommand({ actionId: `undo_${provenance.revisionId}`, mode: 'undo_revision', coffeeId: detailBean.id, slotKey: provenance.slotKey, expectedRevisionId: provenance.revisionId });
+    closeDetail();
+  }, [detailBean, closeDetail]);
   const [editBean, setEditBean] = useState(null);
   const shelfRef = useRef(null);
   const cardRefs = useRef([]);
@@ -566,7 +572,12 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onRetryIcedPush={aiden.onRetryIcedPush}
         attemptId={aiden.attemptContext?.id || null}
         revisionId={aiden.attemptContext?.revisionId || null}
+        provenanceSource={aiden.attemptContext?.source || null}
         onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
+        onRetryAttempt={aiden.retryAttempt}
+        onSendAsNewProfile={aiden.sendAsNewProfile}
+        onCompleteAttempt={aiden.completeAttempt}
+        onStartTasting={onStartTastingSession}
       />
       <HandBrewModal
         open={handBrew.handBrewModal}
@@ -588,6 +599,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         bean={handBrew.handBrewBean}
         attemptId={handBrew.attemptContext?.id || null}
         revisionId={handBrew.attemptContext?.revisionId || null}
+        provenanceSource={handBrew.attemptContext?.source || null}
         onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
@@ -684,6 +696,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           onFreeze={handleFreeze}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
           onOpenTasting={(t) => setDetailTasting(t)}
+          onUndoRecipe={undoRuphusRecipe}
         />
       )}
       {detailTasting && (

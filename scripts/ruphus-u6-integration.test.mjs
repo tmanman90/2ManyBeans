@@ -47,8 +47,12 @@ test('recipe command receipt exposes the canonical Fellow preparation action', a
   assert.match(service, /preparation: 'pending'/);
   assert.match(card, /Start brew/);
   assert.match(card, /Prepare in Fellow/);
+  assert.match(await source('src/components/RecipeProvenanceStrip.jsx'), /\['apply', 'promote'\]/);
+  assert.match(await source('src/components/BeanDetailCard.jsx'), /onUndoRecipe/);
+  assert.match(await source('src/hooks/useHandBrew.js'), /mode: 'timer_started'/);
+  assert.match(service, /mode === 'timer_started'/);
   const aiden = await source('src/lib/aiden.js');
-  assert.match(aiden, /body: \{ attemptId \}/);
+  assert.match(aiden, /body: \{ attemptId, \...\(recovery \? \{ recovery \} : \{\}\) \}/);
   assert.match(aiden, /prepareAidenAttempt/);
 });
 

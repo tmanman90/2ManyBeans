@@ -8,15 +8,29 @@ export const OPEN_PROPOSAL_RETENTION = 8;
 const nowIso = () => new Date().toISOString();
 const id = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 const canonicalCandidate = (recipe, slotKey) => ({ ...clone(recipe), method: slotKey === 'aiden' ? 'aiden' : slotKey.startsWith('kalita') ? 'kalita' : 'v60', device: slotKey === 'aiden' ? 'aiden' : slotKey.startsWith('kalita') ? 'kalita' : 'v60', mode: slotKey.endsWith('iced') ? 'iced' : 'hot' });
+const recipeIdentityHash = (recipe, slotKey = null) => {
+  const identity = clone(recipe || {});
+  if (slotKey) {
+    const method = slotKey === 'aiden' ? 'aiden' : slotKey.startsWith('kalita') ? 'kalita' : 'v60';
+    identity.method = method;
+    identity.device = method;
+    identity.mode = slotKey.endsWith('iced') ? 'iced' : 'hot';
+  }
+  delete identity.userCoffeeGrams;
+  delete identity.aidenGrind;
+  delete identity.recipeHash;
+  return canonicalHash(identity);
+};
 
 function assertOwner(uid) {
   if (typeof uid !== 'string' || !uid.trim()) throw Object.assign(new Error('owner is required'), { code: 'owner_required' });
 }
 
-function buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after, sourceRevisionId = null, sourceRevisionHash, createdAt }) {
+function buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after, sourceRevisionId = null, sourceRevisionHash, sourceDose = null, sourceAidenGrind = null, createdAt }) {
   const proposal = {
     id: proposalId, ownerId: uid, coffeeId, slotKey, sessionId,
-    sourceRevisionId, sourceHash: sourceRevisionHash || canonicalHash(before),
+    sourceRevisionId, sourceHash: sourceRevisionHash || recipeIdentityHash(before, slotKey),
+    ...(slotKey === 'aiden' ? { sourceAidenGrind: clone(sourceAidenGrind) } : { sourceDose }),
     before: clone(before), after: clone(after), recipeHash: canonicalHash(after),
     status: 'proposed', createdAt,
   };
@@ -48,11 +62,11 @@ export function createMemoryRuphusRepository({ clock = () => Date.now() } = {}) 
       if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
       const before = resolved.recipe;
       const activeRevisionId = bean.activeRevisionIds?.[slotKey] || null;
-      const sourceHash = activeRevisionId ? canonicalHash(before) : before.recipeHash || canonicalHash(before);
+      const sourceHash = recipeIdentityHash(before, slotKey);
       const createdAt = new Date(clock()).toISOString();
       if (!activeRevisionId) {
         const baseId = id('revision');
-        revisions.set(key(uid, baseId), { id: baseId, ownerId: uid, coffeeId, slotKey, snapshot: clone(before), snapshotHash: canonicalHash(before), status: 'active', createdAt, parentId: null });
+        revisions.set(key(uid, baseId), { id: baseId, ownerId: uid, coffeeId, slotKey, snapshot: clone(before), snapshotHash: recipeIdentityHash(before, slotKey), status: 'active', createdAt, parentId: null });
         bean.activeRevisionIds = { ...(bean.activeRevisionIds || {}), [slotKey]: baseId };
         beans.set(key(uid, coffeeId), bean);
       }
@@ -61,7 +75,7 @@ export function createMemoryRuphusRepository({ clock = () => Date.now() } = {}) 
         existing.supersededAt = createdAt;
         proposals.set(key(uid, existing.id), existing);
       }
-      const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: bean.activeRevisionIds?.[slotKey] || null, sourceRevisionHash: sourceHash, createdAt });
+      const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: bean.activeRevisionIds?.[slotKey] || null, sourceRevisionHash: sourceHash, sourceDose: before.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt });
       proposals.set(key(uid, proposalId), proposal);
       const open = this.listProposals(uid, { sessionId }).filter((p) => p.status === 'proposed').sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
       while (open.length > OPEN_PROPOSAL_RETENTION) {
@@ -100,11 +114,11 @@ export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, a
     const [pairSnap, sessionSnap] = await Promise.all([tx.get(pairQuery), tx.get(sessionQuery)]);
     if (!activeRevisionId) {
       activeRevisionId = id('revision');
-      tx.set(revisions.doc(activeRevisionId), { id: activeRevisionId, ownerId: uid, coffeeId, slotKey, snapshot: clone(resolved.recipe), snapshotHash: canonicalHash(resolved.recipe), status: 'active', parentId: null, createdAt });
+      tx.set(revisions.doc(activeRevisionId), { id: activeRevisionId, ownerId: uid, coffeeId, slotKey, snapshot: clone(resolved.recipe), snapshotHash: recipeIdentityHash(resolved.recipe, slotKey), ...(slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind ?? null) } : {}), status: 'active', parentId: null, createdAt });
       tx.update(beanRef, { activeRevisionIds: { ...(bean.activeRevisionIds || {}), [slotKey]: activeRevisionId } });
     }
     pairSnap.docs.forEach((doc) => tx.update(doc.ref, { status: 'superseded', supersededAt: createdAt }));
-    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before: resolved.recipe, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: canonicalHash(resolved.recipe), createdAt });
+    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before: resolved.recipe, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: recipeIdentityHash(resolved.recipe, slotKey), sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt });
     tx.create(proposalRef, proposal);
     const open = [...sessionSnap.docs.filter((doc) => !pairSnap.docs.some((pair) => pair.id === doc.id)), { id: proposalId, data: () => proposal }].sort((a, b) => String(a.data().createdAt).localeCompare(String(b.data().createdAt)));
     while (open.length > OPEN_PROPOSAL_RETENTION) { const oldest = open.shift(); if (oldest.id !== proposalId) tx.update(oldest.ref, { status: 'archived', archivedAt: createdAt }); }

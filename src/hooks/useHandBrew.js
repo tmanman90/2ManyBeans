@@ -22,6 +22,7 @@ import { V60_SWITCH_CONFIGURATION_KEY } from '../data/v60SwitchConfiguration';
 import { V60_SOURCE_REGISTRY_VERSION } from '../data/v60SourceRegistry';
 import { V60_ICED_SOURCE_REGISTRY_VERSION } from '../data/v60IcedSourceRegistry';
 import { V60_SWITCH_SOURCE_REGISTRY_VERSION } from '../data/v60SwitchSourceRegistry';
+import { executeRecipeCommand } from '../lib/recipeCommands';
 import { generateV60HotWithFallback, generateV60IcedWithFallback, v60DoseForRequest, v60SwitchDoseForRequest } from '../lib/v60Generation';
 import { usePreferences } from './useUserProfile';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -79,11 +80,14 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     if (!bean?.id || !attempt?.snapshot) return;
     setHandBrewBean(bean);
     setHandBrewRecipe(attempt.snapshot);
-    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null });
+    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null, source: attempt.revisionSource || null });
     setHandBrewIcedRecipe(null);
     setHandBrewError(null);
     setHandBrewPhase('recipe');
     setHandBrewModal(true);
+    executeRecipeCommand({ actionId: `timer_started_${attempt.id}`, mode: 'timer_started', coffeeId: bean.id, slotKey: attempt.slotKey || 'v60_hot', attemptId: attempt.id, expectedRevisionId: attempt.revisionId || undefined }).catch((error) => {
+      if (mountedRef.current) setHandBrewError(`Could not start this brew timer: ${error.message || 'try again.'}`);
+    });
   }, []);
 
   const queueLatestRecipeWrite = (beanId, payload) => {

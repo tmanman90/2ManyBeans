@@ -372,7 +372,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null, onOpenRuphus = null }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null, provenanceSource = null, onOpenRuphus = null, onRetryAttempt = null, onSendAsNewProfile = null, onCompleteAttempt = null, onStartTasting = null }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
@@ -403,6 +403,10 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
   const handleBackToHot = () => {
     setIcedMode(false);
     modalContentRef.current?.closest('[role="dialog"]')?.scrollTo?.({ top: 0 });
+  };
+  const handleAttemptComplete = async () => {
+    const completed = await onCompleteAttempt?.();
+    if (completed) onStartTasting?.(bean?.id, attemptId);
   };
 
   const handleRegenerate = () => {
@@ -470,7 +474,10 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           <BeanChip bean={bean} />
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
-          {attemptId && <RecipeProvenanceStrip provenance={{ revisionId }} />}
+          {attemptId && <RecipeProvenanceStrip provenance={{ revisionId, source: provenanceSource, slotKey: 'aiden' }} />}
+          {attemptId && result?.status === 'uncertain' && onRetryAttempt && <Btn variant="ghost" onClick={onRetryAttempt} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Check Fellow again</Btn>}
+          {attemptId && result?.status === 'uncertain' && onSendAsNewProfile && <Btn variant="ghost" onClick={onSendAsNewProfile} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Send as a new profile</Btn>}
+          {attemptId && result?.status === 'profile_prepared' && onCompleteAttempt && <Btn variant="primary" onClick={handleAttemptComplete} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Start tasting</Btn>}
           {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeId: bean?.id, coffeeName: bean?.name, method: 'aiden', mode: 'hot', slotKey: 'aiden', revisionId }, 'How should I improve this Aiden recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           <DialCard recipe={recipe} />

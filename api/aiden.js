@@ -252,6 +252,7 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
   const body = req.body || {};
   const attemptId = typeof body.attemptId === 'string' ? body.attemptId : null;
+  const recovery = body.recovery === 'new_profile' ? 'new_profile' : null;
   let attemptRef = null;
   let attemptRecord = null;
   let attemptBean = null;
@@ -259,7 +260,7 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
   try {
     let profile = body;
     if (attemptId) {
-      if (Object.keys(body).some((key) => key !== 'attemptId')) return res.status(400).json({ error: 'attempt_id_only' });
+      if (Object.keys(body).some((key) => key !== 'attemptId' && key !== 'recovery')) return res.status(400).json({ error: 'attempt_id_only' });
       const db = getDb();
       attemptRef = db.collection('users').doc(uid).collection('brewAttempts').doc(attemptId);
       const attemptSnap = await attemptRef.get();
@@ -268,10 +269,13 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
       if (!attemptSnap.exists || !beanSnap.exists) return res.status(404).json({ error: 'attempt_not_found' });
       const attempt = { id: attemptSnap.id, ...attemptSnap.data() };
       attemptRecord = attempt;
-      if (attempt.status === 'profile_prepared') return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, physicalBrewConfirmed: false });
+      if (attempt.status === 'profile_prepared' && !recovery) return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, physicalBrewConfirmed: false });
       if (!['created', 'preparing', 'uncertain'].includes(attempt.status)) return res.status(409).json({ error: 'invalid_attempt_state' });
       attemptBean = { id: beanSnap.id, ...beanSnap.data() };
-      profile = buildRuphusAttemptProfile(attempt, attemptBean);
+      // A new-profile recovery is explicit and user initiated. It gets a
+      // distinct attempt-scoped title, while the durable attempt identity
+      // remains the authority for reconciliation and tasting provenance.
+      profile = buildRuphusAttemptProfile(recovery ? { ...attempt, id: `${attempt.id}-new` } : attempt, attemptBean);
       await db.runTransaction(async (tx) => {
         const current = await tx.get(attemptRef);
         if (!current.exists) throw Object.assign(new Error('Attempt is unavailable.'), { code: 'attempt_not_found' });
@@ -301,19 +305,20 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
     // profile after a response-loss ambiguity.
     if (attemptRef && attemptRecord) {
       const prepared = await prepareRuphusAttempt({
-        attempt: { ...attemptRecord, status: attemptRecord.status === 'created' ? 'preparing' : attemptRecord.status },
+        attempt: { ...attemptRecord, id: recovery ? `${attemptRecord.id}-new` : attemptRecord.id, status: 'preparing' },
         bean: attemptBean,
         adapter: {
-          prepare: (canonicalProfile) => pushWithCredentials(canonicalProfile, creds, { allowDuplicateRecovery: false }),
+          prepare: (canonicalProfile) => pushWithCredentials(canonicalProfile, creds, { allowDuplicateRecovery: recovery === 'new_profile' }),
           reconcile: ({ title }) => pushWithCredentials({ ...profile, title }, creds, { reconcileOnly: true }),
         },
       });
-      await attemptRef.update(prepared.attempt).catch(() => {});
+      const attemptUpdate = { ...prepared.attempt, ...(recovery ? { recovery, recoveryTitle: profile.title } : {}) };
+      await attemptRef.update(attemptUpdate).catch(() => {});
       if (prepared.error) {
         if (prepared.attempt.status === 'uncertain') return res.status(202).json({ attemptId, status: 'uncertain', physicalBrewConfirmed: false });
         return res.status(502).json({ error: prepared.error.message || 'Could not prepare Aiden attempt.' });
       }
-      return res.status(200).json({ ...prepared.external, attemptId, status: 'profile_prepared', physicalBrewConfirmed: false });
+      return res.status(200).json({ ...prepared.external, attemptId, status: 'profile_prepared', recovery, physicalBrewConfirmed: false });
     }
 
     // Decryption failed: return error + try relay fallback ONLY for the

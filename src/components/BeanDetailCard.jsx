@@ -322,7 +322,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, learnLabel = 'Learn', onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, learnLabel = 'Learn', onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null, onUndoRecipe = null }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -725,8 +725,8 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                   {/* Saved brew profile (archive only) — read-only recap of stored recipes */}
                   {showBrewProfile && (bean.aidenRecipe || bean.handBrewRecipe) && (
                     <Panel>
-                      {bean.activeRevisionIds && Object.keys(bean.activeRevisionIds).length > 0 && (
-                        <RecipeProvenanceStrip provenance={{ revisionId: Object.values(bean.activeRevisionIds)[0] }} />
+                      {bean.agentProvenance && (
+                        <RecipeProvenanceStrip provenance={bean.agentProvenance} onUndo={onUndoRecipe ? () => onUndoRecipe(bean.agentProvenance) : undefined} />
                       )}
                       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                         <Coffee size={26} color={INK} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />

@@ -14,6 +14,7 @@ import { researchBean } from '../lib/beanResearch';
 import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
+import { executeRecipeCommand } from '../lib/recipeCommands';
 
 export function useAidenBrew(updateBean) {
   const mountedRef = useRef(true);
@@ -40,7 +41,7 @@ export function useAidenBrew(updateBean) {
     if (!bean?.id || !attempt?.snapshot) return;
     setAidenBean(bean);
     setAidenRecipe(attempt.snapshot);
-    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null });
+    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null, source: attempt.revisionSource || null });
     setAidenResult(null);
     setAidenError(null);
     setAidenPhase('push');
@@ -57,6 +58,25 @@ export function useAidenBrew(updateBean) {
         setAidenPhase(null);
       });
   }, []);
+
+  const retryAttempt = useCallback(async () => {
+    if (!attemptContext?.id) return null;
+    const result = await prepareAidenAttempt(attemptContext.id);
+    if (mountedRef.current) { setAidenResult(result); setAidenError(null); }
+    return result;
+  }, [attemptContext]);
+
+  const sendAsNewProfile = useCallback(async () => {
+    if (!attemptContext?.id) return null;
+    const result = await prepareAidenAttempt(attemptContext.id, { recovery: 'new_profile' });
+    if (mountedRef.current) { setAidenResult(result); setAidenError(null); }
+    return result;
+  }, [attemptContext]);
+
+  const completeAttempt = useCallback(async () => {
+    if (!attemptContext?.id || !aidenBean?.id) return null;
+    return executeRecipeCommand({ actionId: `complete_${attemptContext.id}`, mode: 'complete_attempt', coffeeId: aidenBean.id, slotKey: 'aiden', attemptId: attemptContext.id, expectedRevisionId: attemptContext.revisionId || undefined });
+  }, [attemptContext, aidenBean]);
 
   // Returns true if this async chain should still be applying state updates.
   const isActive = (requestId) => mountedRef.current && activeRequestRef.current === requestId;
@@ -241,7 +261,7 @@ export function useAidenBrew(updateBean) {
     aidenModal, aidenRecipe, aidenResult, aidenLoading, aidenError,
     aidenPhase, aidenBean, aidenResearch, attemptContext,
     icedResult, icedLoading, icedError,
-    handleBrewWithAiden, closeAidenModal, openAttempt,
+    handleBrewWithAiden, closeAidenModal, openAttempt, retryAttempt, sendAsNewProfile, completeAttempt,
     onRetry: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined,
     onRetryPush: aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined,
     onRegenerate: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch, true) : undefined,

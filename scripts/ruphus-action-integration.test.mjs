@@ -3,8 +3,10 @@ import test from 'node:test';
 import { createMemoryCommandStore } from '../api/_lib/ruphusCommandService.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { applyRuphusTastingState } from '../api/ruphus-tasting.js';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
+import { createMemoryRuphusRepository } from '../api/_lib/ruphusRepository.js';
 
 function setup() {
   const store = createMemoryCommandStore({ uid: 'user-1' });
@@ -42,12 +44,39 @@ test('brew attempt completion is an idempotent server transition before tasting'
   const current = store.execute({ actionId: 'complete-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
   store.seedProposal({ id: 'proposal-complete', ownerId: 'user-1', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: current.id, sourceHash: current.snapshotHash, after: recipe, status: 'proposed' });
   const brewed = store.execute({ actionId: 'complete-brew', mode: 'brew_once', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-complete' });
+  const timerStarted = store.execute({ actionId: 'timer-started', mode: 'timer_started', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
+  assert.equal(timerStarted.attempt.status, 'timer_started');
   const completed = store.execute({ actionId: 'complete-attempt', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
   const replay = store.execute({ actionId: 'complete-attempt', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
   assert.equal(completed.attempt.status, 'completed');
   assert.equal(replay.attempt.status, 'completed');
   assert.equal(completed.receipt.physicalBrewConfirmed, false);
   assert.equal(completed.receipt.timerCompleted, true);
+});
+
+test('attempt lifecycle requires timer start for manual brews and profile preparation for Aiden', () => {
+  const { store, recipe } = setup();
+  const current = store.execute({ actionId: 'lifecycle-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
+  const started = store.execute({ actionId: 'lifecycle-start', mode: 'start_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', expectedRevisionId: current.id });
+  assert.throws(() => store.execute({ actionId: 'lifecycle-skip', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: started.attempt.id }), /timer must be started/i);
+  const aidenRecipe = { title: 'Aiden', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96], device: 'aiden', method: 'aiden' };
+  store.seedBean('lifecycle-aiden', { id: 'lifecycle-aiden', ownerId: 'user-1', aidenRecipe });
+  const aidenStart = store.execute({ actionId: 'lifecycle-aiden-start', mode: 'start_attempt', coffeeId: 'lifecycle-aiden', slotKey: 'aiden' });
+  assert.throws(() => store.execute({ actionId: 'lifecycle-aiden-skip', mode: 'complete_attempt', coffeeId: 'lifecycle-aiden', slotKey: 'aiden', attemptId: aidenStart.attempt.id }), /profile-prepared/i);
+  store.seedAttempt({ ...aidenStart.attempt, status: 'profile_prepared' });
+  assert.equal(store.execute({ actionId: 'lifecycle-aiden-complete', mode: 'complete_attempt', coffeeId: 'lifecycle-aiden', slotKey: 'aiden', attemptId: aidenStart.attempt.id }).attempt.status, 'completed');
+});
+
+test('promotion rejects a live dose change against the attempt-time binding', () => {
+  const { store, recipe } = setup();
+  const current = store.execute({ actionId: 'attempt-binding-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
+  const started = store.execute({ actionId: 'attempt-binding-start', mode: 'start_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', expectedRevisionId: current.id });
+  store.seedAttempt({ ...started.attempt, status: 'tasted' });
+  const bean = store.getBean('bean-1');
+  bean.handBrewRecipes.v60 = { ...bean.handBrewRecipes.v60, userCoffeeGrams: 18 };
+  bean.handBrewRecipe = bean.handBrewRecipes.v60;
+  store.seedBean('bean-1', bean);
+  assert.throws(() => store.execute({ actionId: 'attempt-binding-promote', mode: 'promote_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: started.attempt.id }), /dose changed/i);
 });
 
 test('action identity survives storage-backed relaunch before a response arrives', () => {
@@ -116,7 +145,51 @@ test('a command cannot patch a sibling recipe projection or forge Aiden grind pr
   const aiden = store.getBean('aiden-drift');
   store.execute({ actionId: 'aiden-base', mode: 'replace_active_recipe', coffeeId: 'aiden-drift', slotKey: 'aiden', recipe: aiden.aidenRecipe, patch: { aidenGrind: { singleServe: 5, batch: 7 } } });
   const drifted = store.getBean('aiden-drift'); drifted.aidenGrind = { singleServe: 4, batch: 6 }; store.seedBean('aiden-drift', drifted);
-  assert.throws(() => store.execute({ actionId: 'aiden-drift-check', mode: 'apply_proposal', coffeeId: 'aiden-drift', slotKey: 'aiden', proposalId: 'missing' }), (error) => error.code === 'source_drift');
+  assert.throws(() => store.execute({ actionId: 'aiden-drift-check', mode: 'apply_proposal', coffeeId: 'aiden-drift', slotKey: 'aiden', proposalId: 'missing' }), (error) => error.code === 'not_found');
+});
+
+test('new Aiden and Kalita projections accept complete generated recipes and reject mismatched flat mirrors', () => {
+  const store = createMemoryCommandStore({ uid: 'user-1' });
+  const aiden = { title: 'Kenya', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96] };
+  store.seedBean('new-aiden', { id: 'new-aiden', ownerId: 'user-1' });
+  const aidenResult = store.execute({ actionId: 'new-aiden-replace', mode: 'replace_active_recipe', coffeeId: 'new-aiden', slotKey: 'aiden', recipe: aiden, patch: { aidenRecipe: aiden } });
+  assert.equal(aidenResult.bean.aidenRecipe.title, 'Kenya');
+  const kalita = generateKalitaRecipe({}, { dose: 15 });
+  store.seedBean('new-kalita', { id: 'new-kalita', ownerId: 'user-1' });
+  const kalitaResult = store.execute({ actionId: 'new-kalita-replace', mode: 'replace_active_recipe', coffeeId: 'new-kalita', slotKey: 'kalita_hot', recipe: kalita, patch: { handBrewRecipe: kalita, 'handBrewRecipes.kalita': kalita } });
+  assert.equal(kalitaResult.bean.handBrewRecipes.kalita.mode, 'hot');
+  assert.throws(() => store.execute({ actionId: 'bad-flat-mirror', mode: 'replace_active_recipe', coffeeId: 'new-kalita', slotKey: 'kalita_hot', recipe: kalita, patch: { handBrewRecipe: { ...kalita, device: 'v60' } } }), /selected slot/i);
+});
+
+test('proposal bindings track dose and Aiden grind separately from recipe identity', () => {
+  const repository = createMemoryRuphusRepository();
+  const base = generateV60Recipe({}, { dose: 15 });
+  repository.seedBean('user-1', { id: 'dose-bean', handBrewRecipes: { v60: base } });
+  const first = repository.createProposal({ uid: 'user-1', coffeeId: 'dose-bean', slotKey: 'v60_hot', sessionId: 'session-1', after: { ...base, ratio: 17 }, proposalId: 'dose-old' });
+  const changed = { ...base, userCoffeeGrams: 18 };
+  repository.seedBean('user-1', { id: 'dose-bean', handBrewRecipes: { v60: changed }, activeRevisionIds: { v60_hot: first.sourceRevisionId } });
+  const second = repository.createProposal({ uid: 'user-1', coffeeId: 'dose-bean', slotKey: 'v60_hot', sessionId: 'session-2', after: { ...changed, ratio: 17 }, proposalId: 'dose-new' });
+  assert.equal(second.sourceDose, 18);
+  const store = createMemoryCommandStore({ uid: 'user-1' });
+  store.seedBean('dose-bean', { id: 'dose-bean', ownerId: 'user-1', handBrewRecipes: { v60: changed } });
+  const current = store.execute({ actionId: 'dose-base', mode: 'replace_active_recipe', coffeeId: 'dose-bean', slotKey: 'v60_hot', recipe: changed }).revision;
+  store.seedProposal({ ...first, sourceRevisionId: current.id, sourceHash: current.snapshotHash, status: 'proposed' });
+  store.seedProposal({ ...second, sourceRevisionId: current.id, sourceHash: current.snapshotHash, status: 'proposed' });
+  assert.throws(() => store.execute({ actionId: 'dose-old-apply', mode: 'apply_proposal', coffeeId: 'dose-bean', slotKey: 'v60_hot', proposalId: 'dose-old' }), /dose changed/i);
+  assert.doesNotThrow(() => store.execute({ actionId: 'dose-new-apply', mode: 'apply_proposal', coffeeId: 'dose-bean', slotKey: 'v60_hot', proposalId: 'dose-new' }));
+  const aidenBase = { title: 'Aiden', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 96, ssPulsesEnabled: true, ssPulsesNumber: 1, ssPulsesInterval: 20, ssPulseTemperatures: [96], batchPulsesEnabled: true, batchPulsesNumber: 1, batchPulsesInterval: 30, batchPulseTemperatures: [96], device: 'aiden', method: 'aiden' };
+  const aidenRepo = createMemoryRuphusRepository();
+  aidenRepo.seedBean('user-1', { id: 'grind-bean', aidenRecipe: aidenBase, aidenGrind: { singleServe: 5, batch: 7 } });
+  const grindOld = aidenRepo.createProposal({ uid: 'user-1', coffeeId: 'grind-bean', slotKey: 'aiden', sessionId: 'grind-1', after: { ...aidenBase, ratio: 17 }, proposalId: 'grind-old' });
+  aidenRepo.seedBean('user-1', { id: 'grind-bean', aidenRecipe: aidenBase, aidenGrind: { singleServe: 6, batch: 8 }, activeRevisionIds: { aiden: grindOld.sourceRevisionId } });
+  const grindNew = aidenRepo.createProposal({ uid: 'user-1', coffeeId: 'grind-bean', slotKey: 'aiden', sessionId: 'grind-2', after: { ...aidenBase, ratio: 17 }, proposalId: 'grind-new' });
+  const grindStore = createMemoryCommandStore({ uid: 'user-1' });
+  grindStore.seedBean('grind-bean', { id: 'grind-bean', ownerId: 'user-1', aidenRecipe: aidenBase, aidenGrind: { singleServe: 6, batch: 8 } });
+  const grindCurrent = grindStore.execute({ actionId: 'grind-base', mode: 'replace_active_recipe', coffeeId: 'grind-bean', slotKey: 'aiden', recipe: aidenBase, patch: { aidenGrind: { singleServe: 6, batch: 8 } } }).revision;
+  grindStore.seedProposal({ ...grindOld, sourceRevisionId: grindCurrent.id, sourceHash: grindCurrent.snapshotHash, status: 'proposed' });
+  grindStore.seedProposal({ ...grindNew, sourceRevisionId: grindCurrent.id, sourceHash: grindCurrent.snapshotHash, status: 'proposed' });
+  assert.throws(() => grindStore.execute({ actionId: 'grind-old-apply', mode: 'apply_proposal', coffeeId: 'grind-bean', slotKey: 'aiden', proposalId: 'grind-old' }), /grind changed/i);
+  assert.doesNotThrow(() => grindStore.execute({ actionId: 'grind-new-apply', mode: 'apply_proposal', coffeeId: 'grind-bean', slotKey: 'aiden', proposalId: 'grind-new' }));
 });
 
 test('A tasted Brew-once attempt can be promoted only after provenance transition', () => {

@@ -169,7 +169,7 @@ export function validateCommandRequest(value) {
   const errors = [];
   if (!object(value)) return { valid: false, errors: ['command must be an object'] };
   if (!text(value.actionId, 180) || !text(value.mode, 80) || !text(value.coffeeId, 180)) errors.push('actionId, mode, and coffeeId are required');
-  if (value.mode && !['replace_active_recipe', 'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose', 'set_aiden_grind', 'set_aiden_link', 'undo_revision'].includes(value.mode)) errors.push('unsupported command mode');
+  if (value.mode && !['replace_active_recipe', 'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose', 'set_aiden_grind', 'set_aiden_link', 'undo_revision'].includes(value.mode)) errors.push('unsupported command mode');
   if (own(value, 'uid') || own(value, 'ownerId')) errors.push('owner identity is server-bound');
   return { valid: errors.length === 0, errors };
 }

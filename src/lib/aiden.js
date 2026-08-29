@@ -7,7 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { classifyFamilyFallback } from './beanFields';
 import { ODE_GEN2_STEPS, nearestOdeStep } from './brewMethods';
-import { assertValidAidenProfile, toAidenProfile } from './aidenProfileValidation';
+import { assertValidAidenProfile, buildAidenTitle, toAidenProfile } from './aidenProfileValidation';
 export { buildAidenTitle } from './aidenProfileValidation';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
@@ -537,9 +537,9 @@ function repairRecipe(bean, recipe, research) {
   enforceDeterministicGrind(repaired, bean, research);
   enforceClarityRules(repaired, bean);
 
-  // Title is stamped at push time from the current bean (see buildAidenTitle),
-  // so a cached recipe always reflects the bean's current jar slot.
-  delete repaired.title;
+  // Keep a complete validated profile in the persisted recipe. The server
+  // stamps the attempt title again with its stable attempt suffix.
+  repaired.title = buildAidenTitle(bean, '');
 
   // Log changed fields for debugging
   const changes = {};
@@ -634,11 +634,11 @@ export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) 
   return { ...result, grindRecommendation: recipe?.grindRecommendation || null };
 }
 
-export async function prepareAidenAttempt(attemptId) {
+export async function prepareAidenAttempt(attemptId, { recovery = null } = {}) {
   if (!attemptId) throw new Error('Aiden attempt ID is required.');
   // The server owns retry/reconciliation for attempt preparation. Retrying
   // this request client-side could duplicate a provider create after response
   // loss; relaunching the same attempt is the recovery action.
-  const result = await fetchWithRetry({ url: `${API_BASE}/api/aiden`, body: { attemptId }, retries: 0, serviceName: 'Fellow' });
+  const result = await fetchWithRetry({ url: `${API_BASE}/api/aiden`, body: { attemptId, ...(recovery ? { recovery } : {}) }, retries: 0, serviceName: 'Fellow' });
   return result;
 }
