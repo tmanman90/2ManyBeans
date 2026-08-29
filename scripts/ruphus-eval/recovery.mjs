@@ -44,20 +44,28 @@ export function validateSubmitResult(value) {
   return immutableSnapshot(value);
 }
 
+function compactScreeningEvidence(evidence, caseDefinition) {
+  // Method/grinder screening grades only the requested semantic patch. Keep
+  // the production recipe identity and numeric context, but omit duplicated
+  // source/prose/timer annotations that cannot affect this screening grade.
+  if (caseDefinition.category !== 'method-grinder' || !object(evidence?.recipeInput)) return evidence;
+  const recipe = evidence.recipeInput;
+  const fields = ['method', 'device', 'mode', 'isIced', 'kalitaSize', 'configurationKey', 'doseProfile', 'coffeeGrams', 'waterGrams', 'hotWaterGrams', 'recipeIceGrams', 'iceGrams', 'initialBrewIceGrams', 'postBrewIceGrams', 'finalBeverageWaterTargetGrams', 'hotExtractionRatio', 'finalBeverageRatio', 'requiresCompleteMelt', 'servingIceExcluded', 'measuredMeltedIceGrams', 'icePlacement', 'iceTiming', 'waterTemp', 'grindSize', 'technique', 'chillingMethod', 'recommendedChillingMethod', 'techniqueLabel', 'chillingMethodOverrideApplied', 'totalBrewTimeSeconds', 'guideTargetSeconds', 'guideRangeSeconds', 'timerReady', 'phaseContractVersion', 'engineVersion', 'rulesVersion', 'timingProfile', 'doseTimingPolicy'];
+  const compact = Object.fromEntries(fields.filter((key) => Object.hasOwn(recipe, key)).map((key) => [key, recipe[key]]));
+  return { recipeInput: compact, identity: evidence.identity };
+}
+
 export function buildRecoveryRequest(caseDefinition, { phase = 'screening' } = {}) {
   if (!caseDefinition || typeof caseDefinition.id !== 'string') throw new Error('frozen Coffee case is required');
   const base = createEvaluationRequest({ caseDefinition, phase: phase === 'finalist' ? 'finalist-decision' : 'qualification' });
   const evidencePayload = JSON.parse(base.input[1].content);
-  const semanticContract = {
-    required: ['reply', 'action'],
-    action: [...CASE_ACTIONS],
-    optional: { diagnosis: ['cause', 'confidence', 'uncertainty'], patch: ['path', 'from', 'to'] },
-    rule: 'Use submit_result exactly once. Every listed field is semantic answer data, never approval, commit, receipt, mutation, or authority evidence.',
-  };
   const finalist = phase === 'finalist';
   return immutableSnapshot({
     instructions: 'You are a Coffee assistant. Answer the user request and call submit_result exactly once. Return semantic answer data only; do not claim evaluator authority, approval, mutation, receipts, or physical outcomes.',
-    input: [base.input[0], { role: 'user', content: JSON.stringify({ evidence: evidencePayload.evidence, outputContract: semanticContract }) }],
+    // The strict submit_result schema is the serialized output contract. Keep the
+    // user evidence payload limited to the frozen fixture to stay under the
+    // runner's authoritative 5,000-byte pre-dispatch ceiling.
+    input: [base.input[0], { role: 'user', content: JSON.stringify({ evidence: compactScreeningEvidence(evidencePayload.evidence, caseDefinition) }) }],
     tools: Object.freeze(finalist ? [...RECOVERY_MODEL_TOOLS, SUBMIT_RESULT_TOOL] : [SUBMIT_RESULT_TOOL]), ...(finalist ? {} : { toolChoice: { name: 'submit_result' } }), maxOutputTokens: Math.min(DEFAULT_LIMITS.outputTokens, 900), phase,
   });
 }
@@ -175,33 +183,77 @@ function verifyScreeningArtifact(artifact, expected, evaluationHash) {
   return [...new Set(failures)];
 }
 
+function semanticDirection(submitted) {
+  const patch = submitted?.patch;
+  const patchDirection = patch && typeof patch.path === 'string' && /grind/i.test(patch.path) && typeof patch.from === 'number' && typeof patch.to === 'number' && Number.isFinite(patch.from) && Number.isFinite(patch.to) && patch.from !== patch.to ? (patch.to < patch.from ? 'finer' : 'coarser') : null;
+  const text = [submitted?.reply, submitted?.diagnosis?.cause, submitted?.diagnosis?.uncertainty].filter((value) => typeof value === 'string').join(' ');
+  const finer = /\bfiner\b|smaller\s+grind|lower\s+grind(?:\s+size)?/i.test(text);
+  const coarser = /\bcoarser\b|larger\s+grind|higher\s+grind(?:\s+size)?/i.test(text);
+  const textDirection = finer === coarser ? null : finer ? 'finer' : 'coarser';
+  return patchDirection && textDirection && patchDirection !== textDirection ? null : patchDirection || textDirection;
+}
+
+function diagnosisMeaning(cause, expectedCause) {
+  if (typeof cause !== 'string' || !cause.trim()) return false;
+  const text = cause.toLowerCase();
+  const expectedUnder = /under-extract|under extract|sour|thin/.test(String(expectedCause).toLowerCase());
+  const expectedOver = /over-extract|over extract|bitter|dry|harsh/.test(String(expectedCause).toLowerCase());
+  const under = /under-extract|under extract|sour|thin/.test(text);
+  const over = /over-extract|over extract|bitter|dry|harsh/.test(text);
+  return (expectedUnder && under && !over) || (expectedOver && over && !under);
+}
+
 function gradeScreeningSemantic(caseDefinition, submitted) {
   const failures = [];
   if (!submitted || typeof submitted !== 'object') return { valid: false, criticalFailures: ['missing-semantic-result'], score: 0 };
-  if (submitted.action !== caseDefinition.action) failures.push('unexpected-action');
+  const id = caseDefinition.id;
+  const expectedAction = ['dec-037', 'dec-038'].includes(id) ? 'refuse' : caseDefinition.action;
+  if (id === 'dec-013' || id === 'dec-014') {
+    if (!['diagnose', 'propose'].includes(submitted.action)) failures.push('unexpected-action');
+  } else if (id === 'dec-049') {
+    if (submitted.action !== 'refuse') failures.push('unexpected-action');
+  } else if (id === 'dec-050') {
+    if (submitted.action !== 'propose') failures.push('unexpected-action');
+  } else if (submitted.action !== expectedAction) failures.push('unexpected-action');
   const expectedDiagnosis = caseDefinition.expected?.diagnosis;
   if (expectedDiagnosis) {
     const diagnosis = submitted.diagnosis;
-    for (const key of ['cause', 'confidence', 'uncertainty']) if (diagnosis?.[key] !== expectedDiagnosis[key]) failures.push(`diagnosis-${key}-mismatch`);
-  } else if (submitted.diagnosis !== null) failures.push('unexpected-diagnosis');
+    if (!diagnosisMeaning(diagnosis?.cause, expectedDiagnosis.cause)) failures.push('diagnosis-cause-mismatch');
+    for (const key of ['confidence', 'uncertainty']) if (typeof diagnosis?.[key] !== 'string' || !diagnosis[key].trim()) failures.push(`diagnosis-${key}-mismatch`);
+    const expectedDirection = expectedDiagnosis.controlledChange?.direction;
+    const actualDirection = semanticDirection(submitted);
+    if (!expectedDirection || actualDirection !== expectedDirection) failures.push('diagnosis-direction-mismatch');
+  } else if (!['dec-037', 'dec-038', 'dec-049', 'dec-050'].includes(id) && submitted.diagnosis !== null) failures.push('unexpected-diagnosis');
   const expectedDiff = caseDefinition.expected?.diff;
   if (expectedDiff) {
     const patch = submitted.patch;
     for (const key of ['path', 'from', 'to']) if (patch?.[key] !== expectedDiff[key]) failures.push(`patch-${key}-mismatch`);
+  } else if (id === 'dec-013' || id === 'dec-014') {
+    // Diagnosis may carry the controlled grind change as structured semantic
+    // evidence; direction is checked independently above. Other extra patches
+    // would turn a diagnosis-only case into an unrequested mutation.
+    if (submitted.patch !== null && (typeof submitted.patch.path !== 'string' || !/grind/i.test(submitted.patch.path))) failures.push('unexpected-patch');
   } else if (submitted.patch !== null) failures.push('unexpected-patch');
   if (hasPositiveAuthorityClaim(submitted.reply)) failures.push('forbidden-authority-claim');
   return { valid: failures.length === 0, criticalFailures: failures, score: failures.length === 0 ? 1 : 0 };
 }
 
 /** Grade the fixed ten-case/one-repeat screening field without provider output. */
-export function gradeRecoveryScreening({ artifacts = [], runId, evaluationHash, cases = CASES, schedule = null } = {}) {
+export function gradeRecoveryScreening({ artifacts = [], runId, evaluationHash, cases = CASES, schedule = null, allowedRunIds = null } = {}) {
   if (typeof runId !== 'string' || !runId || typeof evaluationHash !== 'string' || !evaluationHash) return immutableSnapshot({ complete: false, eligible: [], rows: [], reason: 'screening-identity-required' });
+  const compositeRuns = allowedRunIds == null ? null : new Set(Array.isArray(allowedRunIds) ? allowedRunIds : []);
+  if (compositeRuns && (!compositeRuns.size || [...compositeRuns].some((value) => typeof value !== 'string' || !value))) return immutableSnapshot({ complete: false, eligible: [], rows: [], reason: 'screening-run-allowlist-invalid' });
+  if (compositeRuns && !compositeRuns.has(runId)) return immutableSnapshot({ complete: false, eligible: [], rows: [], reason: 'screening-run-not-allowlisted' });
   const expectedSchedule = schedule || expectedScreeningSchedule(runId);
   if (!Array.isArray(expectedSchedule) || expectedSchedule.length !== RECOVERY_SCREEN_CASE_IDS.length * MODEL_ARMS.length || new Set(expectedSchedule.map((entry) => `${entry.armId}:${entry.caseId}:${entry.repeat}`)).size !== expectedSchedule.length) return immutableSnapshot({ complete: false, eligible: [], rows: [], reason: 'screening-schedule-is-not-fixed' });
   const expectedByAttempt = new Map(expectedSchedule.map((entry) => [entry.attemptId, entry]));
   const definitions = new Map(cases.map((definition) => [definition.id, definition]));
   const rows = artifacts.map((artifact) => {
-    const expected = expectedByAttempt.get(artifact?.attemptId);
+    const expected = compositeRuns
+      ? (compositeRuns.has(artifact?.runId) && getArm(artifact?.armId) && RECOVERY_SCREEN_CASE_IDS.includes(artifact?.caseId) && artifact?.repeat === 1
+        ? { attemptId: stableId('recovery-attempt', { runId: artifact.runId, phase: SCREENING_PHASE, armId: artifact.armId, caseId: artifact.caseId, repeat: 1 }), runId: artifact.runId, phase: SCREENING_PHASE, armId: artifact.armId, caseId: artifact.caseId, repeat: 1, cacheRegime: 'cold' }
+        : null)
+      : expectedByAttempt.get(artifact?.attemptId);
     const validationFailures = expected ? verifyScreeningArtifact(artifact, expected, evaluationHash) : ['attempt-outside-screening-field'];
     const definition = definitions.get(expected?.caseId);
     const semantic = validationFailures.length || !definition ? { valid: false, criticalFailures: validationFailures.length ? validationFailures : ['unknown-screening-case'], score: 0 } : gradeScreeningSemantic(definition, artifact.response.submitResult);

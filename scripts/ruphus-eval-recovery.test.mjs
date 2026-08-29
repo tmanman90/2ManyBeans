@@ -82,6 +82,19 @@ test('recovery schedules have the authorized screening and finalist denominators
   assert.equal(Math.round(RECOVERY_LIMIT_CHECK()), 29);
 });
 
+test('fixed screening requests fit the runner and provider serialized input ceiling', () => {
+  for (const caseId of RECOVERY_SCREEN_CASE_IDS) {
+    const definition = decisionCaseById.get(caseId);
+    const request = buildRecoveryRequest(definition);
+    const commonBytes = Buffer.byteLength(JSON.stringify({ instructions: request.instructions, system: request.system, tools: request.tools, input: request.input, previousOutputItems: [], messages: request.messages || [] }));
+    const openaiBytes = Buffer.byteLength(JSON.stringify(buildOpenAIRequest({ ...request, model: MODEL_ARMS[0].model })));
+    const anthropicBytes = Buffer.byteLength(JSON.stringify(buildAnthropicRequest({ ...request, model: MODEL_ARMS[0].model, system: request.instructions, messages: request.input })));
+    assert.ok(commonBytes <= 5000, `${caseId} common request is ${commonBytes} bytes`);
+    assert.ok(openaiBytes <= 5000, `${caseId} OpenAI request is ${openaiBytes} bytes`);
+    assert.ok(anthropicBytes <= 5000, `${caseId} Anthropic request is ${anthropicBytes} bytes`);
+  }
+});
+
 function RECOVERY_LIMIT_CHECK() { return 30 - 0.746939; }
 
 function syntheticScreeningArtifacts(runId = 'screen-grade', mutate = () => {}) {
@@ -90,8 +103,8 @@ function syntheticScreeningArtifacts(runId = 'screen-grade', mutate = () => {}) 
     const arm = MODEL_ARMS.find((candidate) => candidate.id === entry.armId);
     const definition = decisionCaseById.get(entry.caseId);
     const submitted = {
-      reply: 'Careful coffee guidance.',
-      action: definition.action,
+      reply: definition.expected.diagnosis ? `Careful coffee guidance; make the grind ${definition.expected.diagnosis.controlledChange.direction}.` : 'Careful coffee guidance.',
+      action: ['dec-037', 'dec-038'].includes(entry.caseId) ? 'refuse' : definition.action,
       diagnosis: definition.expected.diagnosis ? { cause: definition.expected.diagnosis.cause, confidence: definition.expected.diagnosis.confidence, uncertainty: definition.expected.diagnosis.uncertainty } : null,
       patch: definition.expected.diff ? { path: definition.expected.diff.path, from: definition.expected.diff.from, to: definition.expected.diff.to } : null,
     };
@@ -126,6 +139,19 @@ test('screening scorer grades the fixed semantic field, blinds identity, and sel
   assert.ok(selected.finalists.length >= 1 && selected.finalists.length <= 2);
 });
 
+test('screening can compose two checksum-valid runs without rebinding artifacts', () => {
+  const firstRun = syntheticScreeningArtifacts('screen-composite-a').filter((artifact) => !['dec-029', 'dec-030'].includes(artifact.caseId));
+  const secondRun = syntheticScreeningArtifacts('screen-composite-b').filter((artifact) => ['dec-029', 'dec-030'].includes(artifact.caseId));
+  const screening = gradeRecoveryScreening({ artifacts: [...firstRun, ...secondRun], runId: 'screen-composite-a', allowedRunIds: ['screen-composite-a', 'screen-composite-b'], evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(screening.complete, true);
+  assert.deepEqual(screening.eligible, MODEL_ARMS.map((arm) => arm.id));
+  const mutated = secondRun.map((artifact) => ({ ...artifact, runId: 'screen-forged' }));
+  const rejected = gradeRecoveryScreening({ artifacts: [...firstRun, ...mutated], runId: 'screen-composite-a', allowedRunIds: ['screen-composite-a', 'screen-composite-b'], evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(rejected.complete, true);
+  assert.deepEqual(rejected.eligible, []);
+  assert.ok(rejected.rows.some((row) => row.validationFailures.includes('attempt-outside-screening-field')));
+});
+
 test('screening hard gates exclude a forged authority claim and identity leakage cannot enter blind text', () => {
   const runId = 'screen-hard-gates';
   const forged = syntheticScreeningArtifacts(runId, (content, entry) => entry.armId === 'luna-medium' && entry.caseId === 'dec-001'
@@ -137,6 +163,23 @@ test('screening hard gates exclude a forged authority claim and identity leakage
     ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'Luna gives careful guidance.' } } } : content);
   const leakScreening = gradeRecoveryScreening({ artifacts: leaked, runId: 'screen-leak', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
   assert.throws(() => buildRecoveryScreeningBlindPacket({ screening: leakScreening }), /identity metadata/);
+});
+
+test('diagnosis grading accepts a controlled grind patch and rejects its opposite direction', () => {
+  const positive = syntheticScreeningArtifacts('screen-diagnosis-patch', (content, entry) => {
+    if (entry.caseId !== 'dec-013') return content;
+    return { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'The tasting is directional.', patch: { path: 'grindMicrons', from: 600, to: 550 } } } };
+  });
+  const accepted = gradeRecoveryScreening({ artifacts: positive, runId: 'screen-diagnosis-patch', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(accepted.arms.every((arm) => arm.valid), true);
+  const opposite = syntheticScreeningArtifacts('screen-diagnosis-opposite', (content, entry) => {
+    if (entry.caseId !== 'dec-013') return content;
+    return { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'The tasting is directional; make the grind coarser.' } } };
+  });
+  const rejected = gradeRecoveryScreening({ artifacts: opposite, runId: 'screen-diagnosis-opposite', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  const row = rejected.arms.find((arm) => arm.armId === 'luna-medium').rows.find((candidate) => candidate.caseId === 'dec-013');
+  assert.equal(row.valid, false);
+  assert.ok(row.criticalFailures.includes('diagnosis-direction-mismatch'));
 });
 
 test('screening rejects each positive authority claim while preserving negated claims', () => {
