@@ -221,12 +221,18 @@ function diagnosisMeaning(cause, expectedCause) {
   return (expectedUnder && under && !over) || (expectedOver && over && !under);
 }
 
+function canonicalGrindPath(path) {
+  return ['grindSize.microns', 'recipeInput.grindSize.microns', '/grindSize/microns'].includes(path) ? 'grindSize.microns' : null;
+}
+
 function gradeScreeningSemantic(caseDefinition, submitted) {
   const failures = [];
   if (!submitted || typeof submitted !== 'object') return { valid: false, criticalFailures: ['missing-semantic-result'], score: 0 };
   const id = caseDefinition.id;
   const expectedAction = ['dec-037', 'dec-038'].includes(id) ? 'refuse' : caseDefinition.action;
   if (id === 'dec-013' || id === 'dec-014') {
+    if (!['diagnose', 'propose'].includes(submitted.action)) failures.push('unexpected-action');
+  } else if (id === 'dec-029' || id === 'dec-030') {
     if (!['diagnose', 'propose'].includes(submitted.action)) failures.push('unexpected-action');
   } else if (id === 'dec-049') {
     if (submitted.action !== 'refuse') failures.push('unexpected-action');
@@ -241,11 +247,12 @@ function gradeScreeningSemantic(caseDefinition, submitted) {
     const expectedDirection = expectedDiagnosis.controlledChange?.direction;
     const actualDirection = semanticDirection(submitted);
     if (!expectedDirection || actualDirection !== expectedDirection) failures.push('diagnosis-direction-mismatch');
-  } else if (!['dec-037', 'dec-038', 'dec-049', 'dec-050'].includes(id) && submitted.diagnosis !== null) failures.push('unexpected-diagnosis');
+  } else if (!['dec-029', 'dec-030', 'dec-037', 'dec-038', 'dec-049', 'dec-050'].includes(id) && submitted.diagnosis !== null) failures.push('unexpected-diagnosis');
   const expectedDiff = caseDefinition.expected?.diff;
   if (expectedDiff) {
     const patch = submitted.patch;
-    for (const key of ['path', 'from', 'to']) if (patch?.[key] !== expectedDiff[key]) failures.push(`patch-${key}-mismatch`);
+    if (canonicalGrindPath(patch?.path) !== canonicalGrindPath(expectedDiff.path)) failures.push('patch-path-mismatch');
+    for (const key of ['from', 'to']) if (patch?.[key] !== expectedDiff[key]) failures.push(`patch-${key}-mismatch`);
   } else if (id === 'dec-013' || id === 'dec-014') {
     // Diagnosis may carry the controlled grind change as structured semantic
     // evidence; direction is checked independently above. Other extra patches

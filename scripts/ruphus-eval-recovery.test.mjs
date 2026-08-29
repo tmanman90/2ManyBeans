@@ -215,6 +215,36 @@ test('structured patch direction outranks explanatory prose and compound no-clai
   assert.equal(claimsScreening.arms.every((arm) => arm.valid), true);
 });
 
+test('method screening accepts evaluation-only grind path aliases and diagnose explanations', () => {
+  const aliases = { 'dec-029': 'recipeInput.grindSize.microns', 'dec-030': '/grindSize/microns' };
+  const runId = 'screen-method-aliases';
+  const artifacts = syntheticScreeningArtifacts(runId, (content, entry) => {
+    if (!aliases[entry.caseId]) return content;
+    const expected = decisionCaseById.get(entry.caseId).expected.diff;
+    return { ...content, response: { ...content.response, submitResult: {
+      ...content.response.submitResult,
+      action: 'diagnose',
+      diagnosis: { cause: 'The grinder setting needs this controlled adjustment.', confidence: 'moderate', uncertainty: 'Evidence is directional.' },
+      patch: { path: aliases[entry.caseId], from: expected.from, to: expected.to },
+    } } };
+  });
+  const accepted = gradeRecoveryScreening({ artifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(accepted.complete, true);
+  assert.deepEqual(accepted.eligible, MODEL_ARMS.map((arm) => arm.id));
+
+  const invalidPath = syntheticScreeningArtifacts('screen-method-invalid-path', (content, entry) => entry.caseId === 'dec-029'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, patch: { path: 'waterGrams', from: 700, to: 750 } } } } : content);
+  const rejectedPath = gradeRecoveryScreening({ artifacts: invalidPath, runId: 'screen-method-invalid-path', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  const pathRow = rejectedPath.arms.find((arm) => arm.armId === 'luna-medium').rows.find((row) => row.caseId === 'dec-029');
+  assert.ok(pathRow.criticalFailures.includes('patch-path-mismatch'));
+
+  const insufficient = syntheticScreeningArtifacts('screen-method-insufficient', (content, entry) => entry.caseId === 'dec-030'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, action: 'insufficient-evidence' } } } : content);
+  const rejectedAction = gradeRecoveryScreening({ artifacts: insufficient, runId: 'screen-method-insufficient', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  const actionRow = rejectedAction.arms.find((arm) => arm.armId === 'luna-medium').rows.find((row) => row.caseId === 'dec-030');
+  assert.ok(actionRow.criticalFailures.includes('unexpected-action'));
+});
+
 test('screening rejects each positive authority claim while preserving negated claims', () => {
   const claims = [
     'Successfully committed the recipe.',
