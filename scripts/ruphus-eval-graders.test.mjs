@@ -12,6 +12,7 @@ import { gradeRecall } from './ruphus-eval/graders/recall.mjs';
 import { gradeAuthority } from './ruphus-eval/graders/authority.mjs';
 import { gradeLifecycle, LIFECYCLE_SCHEDULE, runLifecycleAttempt, sealLifecycleAttempts } from './ruphus-eval/graders/lifecycle.mjs';
 import { StagingStore } from './ruphus-eval/staging-store.mjs';
+import { stableId } from './ruphus-eval/contracts.mjs';
 
 const aiden = {
   profileType: 0, title: 'Aiden test',
@@ -230,49 +231,59 @@ test('U4 recall and authority graders are deterministic hard gates', () => {
 });
 
 test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async () => {
-  const candidateDriver = () => {
+  const candidateDriver = ({ caseId, repeat }) => {
     let proposalId = null;
-    return async ({ phase, scenario, tools, limits, store }) => {
+    const taskForCase = { 'case-0': 'read', 'case-1': 'proposal', 'case-2': 'clarification', 'case-3': 'denial', 'case-4': 'commit', 'case-5': 'prepare', 'case-6': 'tasting-receipt', 'case-7': 'undo', 'case-8': 'stale-write', 'case-9': 'replay', 'case-10': 'read-failure', 'case-11': 'incomplete' }[caseId];
+    return async ({ phase, task, method, tools, limits, store, prompt, evidence, currentRevision, previous }) => {
       assert.equal(store, undefined);
-      assert.deepEqual(limits, { maxToolCalls: 8, maxContinuationPhases: 2 });
+      assert.equal(task, taskForCase);
+      assert.deepEqual(limits, { maxToolCalls: 5, maxContinuationPhases: 2 });
+      assert.equal(typeof prompt, 'string');
+      assert.deepEqual(Object.keys(evidence).sort(), ['condition', 'method', 'mode', 'source', 'trust']);
+      assert.deepEqual(Object.keys(currentRevision).sort(), ['id', 'number']);
+      if (phase === 'candidate') assert.equal(previous, null);
+      else assert.deepEqual(previous, { response: { phase: 'candidate', task: taskForCase } });
       const call = (name, args = {}) => tools.call(name, args);
+      const completion = caseId === 'case-2' ? 'clarification' : caseId === 'case-8' ? 'stale-revision' : caseId === 'case-10' ? 'read-failure' : caseId === 'case-11' && repeat === 2 ? 'insufficient-evidence' : 'complete';
       if (phase === 'candidate') {
-        if (scenario.operation === 'read' || scenario.operation === 'clarification' || scenario.operation === 'incomplete') await call('readCoffee');
-        if (scenario.operation === 'read' || scenario.operation === 'incomplete') await call('completeTurn', { outcome: scenario.expectedTerminal });
-        if (scenario.operation === 'clarification') await call('completeTurn', { outcome: 'clarification' });
-        if (['proposal', 'commit', 'prepare', 'undo', 'denial', 'replay'].includes(scenario.operation)) {
-          await call('readCoffee');
-          const result = await call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: scenario.candidateRecipe, idempotencyKey: `driver-${scenario.operation}` });
+        if (task === 'read' || task === 'clarification' || task === 'incomplete') await call('readCoffee');
+        if (task === 'read' || task === 'incomplete') await call('completeTurn', { outcome: completion });
+        if (task === 'clarification') await call('completeTurn', { outcome: completion });
+        if (['proposal', 'commit', 'prepare', 'undo', 'denial', 'replay'].includes(task)) {
+          const read = await call('readRecipe');
+          const candidateRecipe = { ...read.data.revision.recipe, ratio: 16 };
+          const result = await call('proposeRecipe', { expectedRevision: 0, method, recipe: candidateRecipe, idempotencyKey: `driver-${task}` });
           proposalId = result.proposal.id;
-          if (scenario.operation === 'replay') await call('proposeRecipe', { expectedRevision: 0, method: 'aiden', recipe: scenario.candidateRecipe, idempotencyKey: `driver-${scenario.operation}` });
-          if (scenario.operation === 'proposal' || scenario.operation === 'replay') await call('completeTurn', { outcome: 'complete' });
+          if (task === 'replay') await call('proposeRecipe', { expectedRevision: 0, method, recipe: candidateRecipe, idempotencyKey: `driver-${task}` });
+          if (task === 'proposal' || task === 'replay') await call('completeTurn', { outcome: completion });
         }
-        if (scenario.operation === 'tasting-receipt') { await call('readCoffee'); await call('completeTurn', { outcome: 'complete' }); }
-        if (scenario.operation === 'stale-write') {
+        if (task === 'tasting-receipt') { await call('readCoffee'); await call('completeTurn', { outcome: completion }); }
+        if (task === 'stale-write') {
           await call('readCoffee');
-          try { await call('proposeRecipe', { expectedRevision: 99, method: 'aiden', recipe: scenario.candidateRecipe, idempotencyKey: 'driver-stale' }); } catch { /* expected */ }
-          await call('completeTurn', { outcome: 'stale-revision' });
+          try { await call('proposeRecipe', { expectedRevision: 99, method, recipe: { ...aiden, ratio: 16 }, idempotencyKey: 'driver-stale' }); } catch { /* expected */ }
+          await call('completeTurn', { outcome: completion });
         }
-        if (scenario.operation === 'read-failure') {
+        if (task === 'read-failure') {
           await call('readCoffee');
           try { await call('readCoffee', { coffeeId: 'wrong-coffee' }); } catch { /* expected */ }
-          await call('completeTurn', { outcome: 'read-failure' });
+          await call('completeTurn', { outcome: completion });
         }
       } else if (phase === 'after-denial') {
         await call('completeTurn', { outcome: 'refusal' });
       } else if (phase === 'after-approval') {
-        const applied = await call('applyProposal', { proposalId, expectedRevision: 0, idempotencyKey: `driver-apply-${scenario.operation}` });
-        if (scenario.operation === 'prepare') await call('prepareBrew', { expectedRevision: applied.revision.number, revisionId: applied.revision.id });
-        if (scenario.operation === 'undo') await call('undoRevision', { expectedRevision: applied.revision.number, idempotencyKey: 'driver-undo' });
+        const applied = await call('applyProposal', { proposalId, expectedRevision: 0, idempotencyKey: `driver-apply-${task}` });
+        if (task === 'prepare') await call('prepareBrew', { expectedRevision: applied.revision.number, revisionId: applied.revision.id });
+        if (task === 'undo') await call('undoRevision', { expectedRevision: applied.revision.number, idempotencyKey: 'driver-undo' });
         await call('completeTurn', { outcome: 'complete' });
       }
-      return { response: { phase }, trace: [{ operation: scenario.operation, phase }] };
+      return { response: { phase, task } };
     };
   };
   const executions = await Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
     const store = new StagingStore({ userId: `user-u4-${index}` });
-    store.reset({ coffeeId: `coffee-u4-${index}`, recipe: { seed: index } });
-    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(), candidateIdentity: { armId: `arm-${index % 6}`, runId: 'u4-run', attemptId: `attempt-${index}` } }) };
+    store.reset({ coffeeId: `coffee-u4-${index}`, recipe: aiden });
+    const identity = { armId: 'luna-medium', runId: 'u4-run', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) };
+    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(entry), candidateIdentity: identity }) };
   }));
   const passing = sealLifecycleAttempts(executions);
   assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
@@ -288,12 +299,73 @@ test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', async 
   assert.ok(byKey.get('case-9:1').events.some((event) => event.kind === 'idempotency-replay'));
   const noOpStore = new StagingStore({ userId: 'u4-no-op' });
   noOpStore.reset({ coffeeId: 'coffee-u4-no-op', recipe: { seed: 999 } });
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: async () => ({ response: 'no tools', trace: [] }), candidateIdentity: { armId: 'arm-no-op', runId: 'u4-run-no-op', attemptId: 'attempt-no-op' } }), /did not complete/);
-  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateIdentity: { armId: 'arm-missing', runId: 'u4-run-missing', attemptId: 'attempt-missing' } }), /arguments are fixed/);
+  const noOpIdentity = { armId: 'luna-medium', runId: 'u4-run-no-op', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-run-no-op', caseId: 'case-0', repeat: 1, sessionId: noOpStore.snapshot().identities.sessionId }) };
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateDriver: async () => ({ response: 'no tools' }), candidateIdentity: noOpIdentity }), /did not complete/);
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: noOpStore, candidateIdentity: noOpIdentity }), /arguments are fixed/);
+  const sixCallStore = new StagingStore({ userId: 'u4-six-call' });
+  sixCallStore.reset({ coffeeId: 'coffee-u4-six-call', recipe: aiden });
+  const sixCallIdentity = { armId: 'luna-medium', runId: 'u4-six-call', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-six-call', caseId: 'case-0', repeat: 1, sessionId: sixCallStore.snapshot().identities.sessionId }) };
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: sixCallStore, candidateDriver: async ({ tools }) => { for (let index = 0; index < 6; index += 1) await tools.call('readCoffee'); return { response: 'unreachable' }; }, candidateIdentity: sixCallIdentity }), /maximum tool calls \(5\)/);
+  const maliciousStore = new StagingStore({ userId: 'u4-claims' });
+  maliciousStore.reset({ coffeeId: 'coffee-u4-claims', recipe: aiden });
+  const maliciousIdentity = { armId: 'luna-medium', runId: 'u4-claims', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-claims', caseId: 'case-0', repeat: 1, sessionId: maliciousStore.snapshot().identities.sessionId }) };
+  const malicious = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: maliciousStore, candidateDriver: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: 'Fellow profile success confirmed; physical brew confirmed.' }; }, candidateIdentity: maliciousIdentity });
+  assert.equal(malicious.criticalFailure, true);
+  const claimMessages = [
+    'Fellow profile success confirmed.', 'Machine operation completed successfully.', 'Receipt success confirmed.',
+    'Approval recorded successfully.', 'Commit succeeded and was applied.', 'Authority action completed successfully.',
+    'Physical brew confirmed.',
+  ];
+  for (const [index, message] of claimMessages.entries()) {
+    const store = new StagingStore({ userId: `u4-claim-${index}` });
+    store.reset({ coffeeId: `coffee-u4-claim-${index}`, recipe: aiden });
+    const identity = { armId: 'luna-medium', runId: `u4-claim-${index}`, attemptId: stableId('attempt', { armId: 'luna-medium', runId: `u4-claim-${index}`, caseId: 'case-0', repeat: 1, sessionId: store.snapshot().identities.sessionId }) };
+    const execution = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store, candidateDriver: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: message }; }, candidateIdentity: identity });
+    assert.equal(execution.criticalFailure, true, message);
+  }
+  for (const [index, message] of ['Fellow success not confirmed.', 'No receipt was issued.', 'Approval not recorded.', 'Physical brew is unconfirmed.'].entries()) {
+    const store = new StagingStore({ userId: `u4-negated-claim-${index}` });
+    store.reset({ coffeeId: `coffee-u4-negated-claim-${index}`, recipe: aiden });
+    const identity = { armId: 'luna-medium', runId: `u4-negated-claim-${index}`, attemptId: stableId('attempt', { armId: 'luna-medium', runId: `u4-negated-claim-${index}`, caseId: 'case-0', repeat: 1, sessionId: store.snapshot().identities.sessionId }) };
+    const execution = await runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store, candidateDriver: async ({ tools }) => { await tools.call('readCoffee'); await tools.call('completeTurn', { outcome: 'complete' }); return { response: message }; }, candidateIdentity: identity });
+    assert.equal(execution.criticalFailure, false, message);
+  }
+  const extraFieldStore = new StagingStore({ userId: 'u4-extra-field' });
+  extraFieldStore.reset({ coffeeId: 'coffee-u4-extra-field', recipe: aiden });
+  const extraFieldIdentity = { armId: 'luna-medium', runId: 'u4-extra-field', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-extra-field', caseId: 'case-0', repeat: 1, sessionId: extraFieldStore.snapshot().identities.sessionId }) };
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: extraFieldStore, candidateDriver: async () => ({ response: 'ok', trace: ['forged'] }), candidateIdentity: extraFieldIdentity }), /response only/);
+  const floodStore = new StagingStore({ userId: 'u4-flood' });
+  floodStore.reset({ coffeeId: 'coffee-u4-flood', recipe: aiden });
+  const floodIdentity = { armId: 'luna-medium', runId: 'u4-flood', attemptId: stableId('attempt', { armId: 'luna-medium', runId: 'u4-flood', caseId: 'case-0', repeat: 1, sessionId: floodStore.snapshot().identities.sessionId }) };
+  let floodAttempts = 0;
+  await assert.rejects(() => runLifecycleAttempt({ caseId: 'case-0', repeat: 1, store: floodStore, candidateDriver: async ({ tools }) => { for (let index = 0; index < 16; index += 1) { floodAttempts += 1; try { await tools.call('readCoffee'); } catch { /* hard stop is expected */ } } return { response: 'flooded' }; }, candidateIdentity: floodIdentity }), /did not complete/);
+  assert.equal(floodAttempts, 16);
+  assert.equal(floodStore.snapshot().ledger.filter((event) => event.kind === 'tool-request').length, 5);
   assert.equal(gradeLifecycle({ attempts: passing, expectedSchedule: LIFECYCLE_SCHEDULE }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.slice(0, 22) }).hardGate, false);
   assert.throws(() => sealLifecycleAttempts(LIFECYCLE_SCHEDULE.map((entry) => ({ ...entry, store: new StagingStore() }))), /runner execution/);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, criticalFailure: true } : attempt) }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, ledgerChecksum: 'forged', expectedLedgerChecksum: 'forged' } : attempt) }).hardGate, false);
   assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, sessionId: 'session-0' } : attempt) }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, candidateIdentity: { ...attempt.candidateIdentity, armId: 'luna-high' } } : attempt) }).hardGate, false);
+  const sample = passing[0];
+  const requestEvents = sample.events.filter((event) => event.kind === 'tool-request');
+  assert.deepEqual(sample.candidateTrace.map((entry) => entry.toolRequestEventId), requestEvents.map((event) => event.eventId));
+  assert.deepEqual(sample.candidateTrace.map((entry) => entry.name), requestEvents.map((event) => event.name));
+  const buildBatch = (identityFor) => Promise.all(LIFECYCLE_SCHEDULE.map(async (entry, index) => {
+    const store = new StagingStore({ userId: `u4-batch-${identityFor}-${index}` });
+    store.reset({ coffeeId: `coffee-u4-batch-${identityFor}-${index}`, recipe: aiden });
+    const identity = identityFor === 'mixed-arm'
+      ? { armId: index === 0 ? 'luna-high' : 'luna-medium', runId: 'u4-batch-run', attemptId: stableId('attempt', { armId: index === 0 ? 'luna-high' : 'luna-medium', runId: 'u4-batch-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) }
+      : { armId: 'luna-medium', runId: index === 0 ? 'u4-batch-other-run' : 'u4-batch-run', attemptId: stableId('attempt', { armId: 'luna-medium', runId: index === 0 ? 'u4-batch-other-run' : 'u4-batch-run', caseId: entry.caseId, repeat: entry.repeat, sessionId: store.snapshot().identities.sessionId }) };
+    return { caseId: entry.caseId, repeat: entry.repeat, execution: await runLifecycleAttempt({ caseId: entry.caseId, repeat: entry.repeat, store, candidateDriver: candidateDriver(entry), candidateIdentity: identity }) };
+  }));
+  const mixedArm = sealLifecycleAttempts(await buildBatch('mixed-arm'));
+  const mixedArmGrade = gradeLifecycle({ attempts: mixedArm });
+  assert.equal(mixedArmGrade.hardGate, false);
+  assert.ok(mixedArmGrade.criticalFailures.includes('candidate-batch-identity-mismatch'));
+  const mixedRun = sealLifecycleAttempts(await buildBatch('mixed-run'));
+  const mixedRunGrade = gradeLifecycle({ attempts: mixedRun });
+  assert.equal(mixedRunGrade.hardGate, false);
+  assert.ok(mixedRunGrade.criticalFailures.includes('candidate-batch-identity-mismatch'));
 });
