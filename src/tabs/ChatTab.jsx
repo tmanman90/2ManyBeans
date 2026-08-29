@@ -399,7 +399,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const apiMessages = useRef([
     { role: 'assistant', content: messages[0].content },
   ]);
-  const { hydratedMessages, hydratedContext, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
+  const { hydratedMessages, hydratedContext, hydratedArtifacts, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
   const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
   const [agentContext, setAgentContext] = useState(null);
   const [agentFrame, setAgentFrame] = useState(null);
@@ -464,6 +464,17 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       agentContextRef.current = hydratedContext;
     }
   }, [agentEnabled, hydratedContext]);
+
+  useEffect(() => {
+    if (!agentEnabled || !hydratedArtifacts?.length) return;
+    const canonical = new Map(hydratedArtifacts.map(artifact => [artifact.id, artifact]));
+    setMessages(previous => previous.map(message => ({
+      ...message,
+      artifacts: Array.isArray(message.artifacts)
+        ? message.artifacts.map(artifact => canonical.get(artifact.id) ? { ...artifact, ...canonical.get(artifact.id) } : artifact)
+        : message.artifacts,
+    })));
+  }, [agentEnabled, hydratedArtifacts]);
 
   // Revokes a URL if it's a blob: URL. No-op for data: URLs and anything else.
   const safeRevokeBlobUrl = (url) => {
@@ -833,9 +844,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       sendingRef.current = false;
     };
 
-    const sendAgentTurn = async () => {
+    const sendAgentTurn = async (contextOverride = null) => {
       const turnId = crypto.randomUUID();
-      const contextRef = agentContextOverride || agentContextRef.current || agentContext;
+      const contextRef = contextOverride || agentContextOverride || agentContextRef.current || agentContext;
       setAgentFrame({ type: 'context_loading', turnId });
       setAgentText(''); agentTextRef.current = '';
       setAgentArtifacts([]); agentArtifactsRef.current = [];
@@ -859,7 +870,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       const assistant = newMessage({ role: 'assistant', content: agentTextRef.current || result.text || '', turnId, artifacts: agentArtifactsRef.current });
       commitAssistantMessage(assistant);
       persist(threadForPersistence([...messages, displayMsg, assistant]), {
-        protocolVersion: 1, contextRef, turns: [{ id: turnId, status: 'completed' }],
+        protocolVersion: 1, contextRef: { ...contextRef, sessionId: turnId }, turns: [{ id: turnId, status: 'completed' }],
       });
       setAgentText(''); agentTextRef.current = ''; agentArtifactsRef.current = []; setAgentFrame(null);
     };
@@ -964,8 +975,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             });
           };
 
-          if (agentEnabled && agentContext) {
-            await sendAgentTurn();
+          const turnContext = agentContextOverride || agentContextRef.current || agentContext;
+          if (agentEnabled && turnContext) {
+            await sendAgentTurn(turnContext);
             complete();
             return;
           }

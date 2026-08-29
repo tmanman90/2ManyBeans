@@ -26,6 +26,56 @@ test('context builder scopes readers to decoded owner', async () => {
   assert.equal(built.ownerId, undefined); assert.deepEqual(owners, ['user-1', 'user-1']);
 });
 
+test('context builder returns sanitized bounded user text for provider input', async () => {
+  const built = await buildRuphusContext({ uid: 'user-1', userText: '  safe --- marker  ', contextRef: { coffeeId: 'bean-1', method: 'v60', slotKey: 'v60_hot' }, evidenceByteCap: 10000, readers: { readCoffee: async () => ({ id: 'bean-1', name: 'Test' }), readRecipe: async () => ({ method: 'v60', device: 'v60', mode: 'hot' }) } });
+  assert.equal(built.userText, 'safe marker');
+  await assert.rejects(() => buildRuphusContext({ uid: 'user-1', userText: 'x'.repeat(200), contextRef: { coffeeId: 'bean-1', method: 'v60', slotKey: 'v60_hot' }, evidenceByteCap: 20, readers: { readCoffee: async () => ({ id: 'bean-1', name: 'Test' }) } }), /byte cap/);
+});
+
+test('proposal diff ignores resolver provenance metadata and accepts one control change', async () => {
+  const current = context();
+  const tools = createRuphusTools({ uid: 'user-1', context: { ...current, recipe: { ...current.recipe, selectedPath: 'handBrewRecipes.v60', selectedHash: 'source-hash' } } });
+  const after = { ...current.recipe, waterTemp: { ...current.recipe.waterTemp, celsius: current.recipe.waterTemp.celsius - 2 } };
+  const result = await tools.call('propose_recipe_change', { coffeeId: 'bean-1', afterRecipe: after });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.artifact.changedPaths, ['waterTemp.celsius']);
+});
+
+test('read tools expose native context, recipe, and gap artifacts', async () => {
+  const current = context();
+  const tools = createRuphusTools({ uid: 'user-1', context: current });
+  assert.equal((await tools.call('read_coffee', { coffeeId: 'bean-1' })).artifact.type, 'coffee_context');
+  assert.equal((await tools.call('read_recipe', { coffeeId: 'bean-1' })).artifact.type, 'current_recipe');
+  const gapTools = createRuphusTools({ uid: 'user-1', context: { ...current, recipe: null } });
+  assert.equal((await gapTools.call('read_recipe', { coffeeId: 'bean-1' })).artifact.type, 'data_gap');
+  assert.equal((await gapTools.call('propose_recipe_change', { coffeeId: 'bean-1', afterRecipe: current.recipe })).artifact.type, 'data_gap');
+});
+
+test('proposal schema keeps heterogeneous controls strict while allowing absent method fields', () => {
+  const current = context();
+  const { definitions } = createRuphusTools({ uid: 'user-1', context: current });
+  const proposal = definitions.find((item) => item.name === 'propose_recipe_change');
+  const recipe = proposal.parameters.properties.afterRecipe;
+  assert.equal(proposal.strict, true);
+  assert.equal(recipe.additionalProperties, false);
+  assert.deepEqual(recipe.required, Object.keys(recipe.properties));
+  assert.deepEqual(recipe.properties.dose.anyOf.at(-1), { type: 'null' });
+  assert.equal(recipe.properties.waterTemp.anyOf[0].additionalProperties, false);
+  assert.equal(Object.hasOwn(recipe.properties, 'sourceLineage'), false);
+});
+
+test('strict-schema-shaped V60 candidate ignores null optional controls during diff', async () => {
+  const current = context();
+  const tools = createRuphusTools({ uid: 'user-1', context: current });
+  const schema = tools.definitions.find((item) => item.name === 'propose_recipe_change').parameters.properties.afterRecipe;
+  const after = { ...current.recipe, waterTemp: { ...current.recipe.waterTemp, celsius: current.recipe.waterTemp.celsius - 2 } };
+  schema.required.forEach((key) => { if (!(key in after)) after[key] = null; });
+  after.reasoning = null;
+  const result = await tools.call('propose_recipe_change', { coffeeId: 'bean-1', afterRecipe: after });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.artifact.changedPaths, ['waterTemp.celsius']);
+});
+
 test('server allowlist is exact and empty by default', () => {
   const previous = process.env.RUPHUS_AGENT_V3_UIDS;
   delete process.env.RUPHUS_AGENT_V3_UIDS;

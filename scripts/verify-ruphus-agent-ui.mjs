@@ -1,17 +1,44 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { chromium } from 'playwright';
 
-const baseUrl = process.env.RUPHUS_UI_BASE_URL || 'http://127.0.0.1:5173/';
-const browser = await chromium.launch({ headless: true });
+let server = null;
+let baseUrl = process.env.RUPHUS_UI_BASE_URL;
 const errors = [];
 const requests = [];
-const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-page.on('pageerror', error => errors.push(error.message));
-page.on('request', request => { if (request.method() !== 'GET') requests.push(`${request.method()} ${request.url()}`); });
 
-await page.goto(`${baseUrl}?ruphus-harness=1`, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('[data-ruphus-harness="true"]');
+async function startLocalServer() {
+  server = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '0'], {
+    env: { ...process.env, TMB_APP_VARIANT: 'dev' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  const onData = chunk => { output += chunk.toString(); };
+  server.stdout.on('data', onData);
+  server.stderr.on('data', onData);
+  await new Promise((resolve, reject) => {
+    const onReady = () => {
+      const match = output.match(/Local:\s+http:\/\/(127\.0\.0\.1:\d+)\//);
+      if (match) { cleanup(); baseUrl = `http://${match[1]}/`; resolve(); }
+    };
+    const onExit = (_, signal) => { cleanup(); reject(new Error(`local Vite server exited (${signal || 'unknown'}): ${output}`)); };
+    const cleanup = () => { server.stdout.off('data', onData); server.stderr.off('data', onData); server.stdout.off('data', onReady); server.stderr.off('data', onReady); server.off('exit', onExit); };
+    server.stdout.on('data', onReady); server.stderr.on('data', onReady); server.once('exit', onExit);
+    onReady();
+  });
+}
+
+const browser = await chromium.launch({ headless: true });
+try {
+  if (!baseUrl) await startLocalServer();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => { if (request.method() !== 'GET') requests.push(`${request.method()} ${request.url()}`); });
+
+  await page.goto(`${baseUrl}?ruphus-harness=1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-ruphus-harness="true"]');
 assert.match(await page.title(), /2manybeans|Coffee Hub|Vite/i);
 assert.match(await page.locator('body').innerText(), /Ruphus browser harness/);
 assert.equal(await page.locator('[data-ruphus-entry]').count(), 2);
@@ -27,15 +54,21 @@ await page.waitForSelector('[data-ruphus-message="agent-v3"]', { state: 'visible
 await page.waitForSelector('[data-artifact="recipe_proposal"]', { state: 'visible' });
 await page.locator('[data-keyboard-input]').focus();
 assert.equal(await page.locator('[data-keyboard-visible="true"]').count(), 1);
-await page.screenshot({ path: '/tmp/ruphus-agent-v3-mobile.png', fullPage: false });
+  await page.screenshot({ path: '/tmp/ruphus-agent-v3-mobile.png', fullPage: false });
 
-const legacy = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-await legacy.goto(`${baseUrl}?ruphus-harness=1&legacy=1`, { waitUntil: 'domcontentloaded' });
-await legacy.waitForSelector('[data-ruphus-harness="true"]');
+  const legacy = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await legacy.goto(`${baseUrl}?ruphus-harness=1&legacy=1`, { waitUntil: 'domcontentloaded' });
+  await legacy.waitForSelector('[data-ruphus-harness="true"]');
 assert.equal(await legacy.locator('[data-agent-enabled="false"]').count(), 1);
 assert.equal(await legacy.locator('[data-legacy-route="true"]').count(), 1);
 await legacy.screenshot({ path: '/tmp/ruphus-agent-v3-legacy.png', fullPage: false });
 assert.deepEqual(requests, []);
-assert.deepEqual(errors, []);
-await browser.close();
-console.log('Ruphus rendered browser harness passed: 2 entries, pinned context, symptom choice, disabled command, Agent frames/artifact, legacy route, keyboard padding, no writes, mobile+desktop.');
+  assert.deepEqual(errors, []);
+  console.log('Ruphus rendered browser harness passed: 2 entries, pinned context, symptom choice, disabled command, Agent frames/artifact, legacy route, keyboard padding, no writes, mobile+desktop.');
+} finally {
+  await browser.close();
+  if (server && !server.killed) {
+    server.kill('SIGTERM');
+    await once(server, 'exit').catch(() => {});
+  }
+}

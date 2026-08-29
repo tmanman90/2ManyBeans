@@ -20,7 +20,7 @@ export async function buildRuphusContext({ uid, contextRef, userText = '', reade
   const dynamic = sanitizeEvidence({ userText, context: contextRef }, { maxBytes: evidenceByteCap });
   if (dynamic.truncated) throw Object.assign(new Error('dynamic context exceeds configured byte cap'), { code: 'evidence_too_large' });
   const safe = sanitizeEvidence({ coffee, recipe, tastings, attempts, context: dynamic.value.context }, { maxBytes: evidenceByteCap });
-  return { version: 1, context: clone(dynamic.value.context), coffee: safe.value.coffee, recipe: safe.value.recipe, tastings: safe.value.tastings || [], attempts: safe.value.attempts || [], evidenceHash: canonicalHash(safe.value), truncated: safe.truncated };
+  return { version: 1, context: clone(dynamic.value.context), userText: dynamic.value.userText, coffee: safe.value.coffee, recipe: safe.value.recipe, tastings: safe.value.tastings || [], attempts: safe.value.attempts || [], evidenceHash: canonicalHash(safe.value), truncated: safe.truncated };
 }
 
 export function resolveContextRecipe(bean, contextRef) {

@@ -390,13 +390,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                       <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
-                      <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label={agentV3Enabled ? 'Ask Ruphus' : 'Learn'} onClick={() => {
-                        if (agentV3Enabled) {
-                          const method = preferences.brewMethod === 'aiden' ? 'aiden' : preferences.brewMethod === 'kalita' ? 'kalita' : 'v60';
-                          const mode = method === 'aiden' ? 'hot' : (bean.handBrewRecipe?.mode || 'hot');
-                          onOpenRuphus?.({ coffeeId: bean.id, coffeeName: bean.name, method, mode, slotKey: method === 'aiden' ? 'aiden' : `${method}_${mode}` }, 'What should I change for this coffee?');
-                        } else (isDemo ? onDemoAction : handleLearn)?.(bean);
-                      }} />
+                      <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label="Learn" onClick={() => (isDemo ? onDemoAction : handleLearn)?.(bean)} />
                       <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
                     </div>
                   </div>

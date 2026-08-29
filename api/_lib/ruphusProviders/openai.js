@@ -24,11 +24,14 @@ export function buildOpenAIRequest({ instructions, input, tools, model = RUPHUS_
 
 export function createOpenAIProvider({ client, instructions = '', maxOutputTokens } = {}) {
   const sdk = client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const inputSequences = new Map();
   return Object.freeze({
-    async runTurn({ context, userText, tools, previous, toolResult }) {
+    async runTurn({ turnId = 'default', context, userText, tools, previous, toolResult }) {
+      const results = (toolResult?.results || (toolResult ? [toolResult] : [])).map((item) => ({ type: 'function_call_output', call_id: item.callId || item.name, output: JSON.stringify(item.result) }));
       const input = previous && toolResult
-        ? [...(previous.outputItems || []), ...(toolResult.results || [toolResult]).map((item) => ({ type: 'function_call_output', call_id: item.callId || item.name, output: JSON.stringify(item.result) }))]
+        ? [...(inputSequences.get(turnId) || []), ...(previous.outputItems || []), ...results]
         : [{ role: 'user', content: `${userText}\n\nCanonical context:\n${JSON.stringify(context)}` }];
+      inputSequences.set(turnId, input);
       const response = await sdk.responses.create(buildOpenAIRequest({ instructions, input, tools, maxOutputTokens }));
       return outputParts(response);
     },

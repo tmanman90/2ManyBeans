@@ -28,7 +28,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const db = getDb(); const readers = firestoreReaders(db); const context = await buildRuphusContext({ uid, contextRef: { ...contextRef, sessionId: contextRef.sessionId || turnId }, userText, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES) });
     const tools = createRuphusTools({ uid, context, readers, proposalStore: (input) => persistProposal({ db, ...input }) });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
-    const turnResult = await runRuphusTurn({ turnId, context, userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => writeFrame(res, frame) });
+    const turnResult = await runRuphusTurn({ turnId, context, userText: context.userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => writeFrame(res, frame) });
     logApiUsage({ uid, provider: 'openai', model: turnResult.model || RUPHUS_OPENAI_MODEL, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', usage: turnResult.usage });
     // streamWithAuth uses the shipped terminal usage envelope for retry and
     // completion semantics; transport usage is not a lifecycle frame.

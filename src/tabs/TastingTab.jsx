@@ -25,6 +25,7 @@ import { shareImage } from '../lib/share';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 
 // ─────────────────────────────────────────────────────────────
 // List-mode helpers (added for redesign)
@@ -55,6 +56,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [sel, setSel] = useState(active[0]?.id || sealed[0]?.id || '');
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
+  const agentV3Enabled = isRuphusAgentV3Enabled({ isDemo });
   const { errorMsg, showError, hideError } = useErrorToast();
   // Background tasting score conversion for spider chart overlay
   const convertScoresInBackground = (tastingId, tastingData) => {
@@ -231,7 +233,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           onDraftChange={setWizardDraft}
           onSave={saveWizardTasting}
           onClose={closeWizard}
-          onOpenRuphus={(contextRef, starterIntent) => onOpenRuphus?.(contextRef, starterIntent)}
+          onOpenRuphus={agentV3Enabled ? ((contextRef, starterIntent) => onOpenRuphus?.(contextRef, starterIntent)) : undefined}
           onSwitchToManual={() => { setWizardDraft(null); setWizardOpen(false); setMode('form'); }}
         />
       )}

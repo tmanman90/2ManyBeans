@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { cacheRead, cacheWrite, chatKey } from '../lib/offlineCache';
 import { resolveTerminal } from '../lib/streamChat';
@@ -72,6 +72,12 @@ function createDefaultAdapter(uid) {
     deleteRemote() {
       return deleteDoc(ref);
     },
+    async loadRemoteArtifacts(session) {
+      const sessionId = session?.contextRef?.sessionId;
+      if (!sessionId) return [];
+      const records = await getDocs(query(collection(db, 'users', uid, 'proposals'), where('sessionId', '==', sessionId)));
+      return records.docs.map(item => ({ id: item.id, ...item.data() }));
+    },
     loadLocal() {
       return cacheRead(key);
     },
@@ -89,6 +95,7 @@ function createDefaultAdapter(uid) {
 export function useChatSession({ uid, isDemo, adapter } = {}) {
   const [hydratedMessages, setHydratedMessages] = useState([]);
   const [hydratedContext, setHydratedContext] = useState(null);
+  const [hydratedArtifacts, setHydratedArtifacts] = useState([]);
   const [hydrationState, setHydrationState] = useState(isDemo || !uid ? 'idle' : 'loading');
   const adapterRef = useRef(null);
   const hydratedRef = useRef(false);
@@ -99,6 +106,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       hydratedRef.current = false;
       setHydratedMessages([]);
       setHydratedContext(null);
+      setHydratedArtifacts([]);
       setHydrationState('idle');
       return undefined;
     }
@@ -106,8 +114,9 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     const storage = adapter || createDefaultAdapter(uid);
     adapterRef.current = storage;
     hydratedRef.current = false;
-      setHydratedMessages([]);
-      setHydratedContext(null);
+    setHydratedMessages([]);
+    setHydratedContext(null);
+    setHydratedArtifacts([]);
     setHydrationState('loading');
     let cancelled = false;
     const timers = [];
@@ -116,6 +125,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       if (cancelled || !local?.messages) return;
       setHydratedMessages(local.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(local).messages : inflateMessages(local.messages));
       if (local.protocolVersion === AGENT_PROTOCOL_VERSION) setHydratedContext(local.contextRef || null);
+      if (local.protocolVersion === AGENT_PROTOCOL_VERSION) setHydratedArtifacts(Array.isArray(local.artifacts) ? local.artifacts : []);
       setHydrationState('local');
     }).catch(err => console.warn('[ChatSession] Local hydrate failed:', err));
 
@@ -125,6 +135,12 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
         hydratedRef.current = true;
         setHydratedMessages(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(remote).messages : inflateMessages(remote?.messages || []));
         setHydratedContext(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? remote.contextRef || null : null);
+        setHydratedArtifacts([]);
+        if (remote?.protocolVersion === AGENT_PROTOCOL_VERSION && storage.loadRemoteArtifacts) {
+          Promise.resolve(storage.loadRemoteArtifacts(remote)).then(records => {
+            if (!cancelled) setHydratedArtifacts(Array.isArray(records) ? records : []);
+          }).catch(err => console.warn('[ChatSession] Agent artifact reconcile failed:', err));
+        }
         setHydrationState('hydrated');
       }).catch(err => {
         if (cancelled) return;
@@ -171,5 +187,5 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       .catch(err => console.warn('[ChatSession] Local clear failed:', err));
   }, [isDemo, uid]);
 
-  return { hydratedMessages, hydratedContext, hydrationState, persist, clear };
+  return { hydratedMessages, hydratedContext, hydratedArtifacts, hydrationState, persist, clear };
 }

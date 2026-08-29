@@ -109,11 +109,32 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if request.auth != null && request.auth.uid == userId
         && sessionId == 'active'
-        && request.resource.data.keys().hasOnly(['messages', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['protocolVersion', 'messages', 'turns', 'contextRef', 'pendingActionIds', 'updatedAt'])
         && request.resource.data.messages is list
         && request.resource.data.messages.size() <= 50
+        // Legacy sessions omit the Agent fields; only validate v3 fields when
+        // they are present so field access cannot reject a legacy write.
+        && (!('protocolVersion' in request.resource.data) || request.resource.data.protocolVersion == 1)
+        && (!('turns' in request.resource.data) || request.resource.data.turns is list)
+        && (!('contextRef' in request.resource.data) || request.resource.data.contextRef is map)
+        && (!('pendingActionIds' in request.resource.data) || request.resource.data.pendingActionIds is list)
         && request.resource.data.updatedAt is number;
       allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Agent v3 authority records are server-written and owner-readable. The
+    // client may reconcile proposal status but cannot mint or alter records.
+    match /users/{userId}/proposals/{proposalId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+    match /users/{userId}/recipeRevisions/{revisionId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+    match /users/{userId}/brewAttempts/{attemptId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
     }
 
     // Redemption codes & ledger: Admin SDK only. Default-deny would already
