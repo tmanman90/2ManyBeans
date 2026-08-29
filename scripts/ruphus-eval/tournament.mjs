@@ -21,6 +21,12 @@ function terminalVocabularyFor(caseDefinition) {
 }
 const EVIDENCE_TYPE_CODES = Object.freeze({ terminal: 't', boolean: 'b', string: 's', 'finite-number': 'n', 'string[]': 'a', object: 'o', proposal: 'p', diagnosis: 'd', grind: 'g', fault: 'f' });
 const EVIDENCE_TYPE_LABELS = Object.freeze({ t: 'terminal', b: 'bool', s: 'str', n: 'finite', a: 'str[]', o: 'obj', p: 'proposal', d: 'diagnosis', g: 'grind', f: 'fault' });
+const NESTED_EVIDENCE_LEGENDS = Object.freeze({
+  p: 'proposalId,status,method,expectedRevision,diff(path,from,to),candidateRecipe,candidateRecipeHash',
+  d: 'cause,confidence,uncertainty,controlledChange,controls',
+  g: 'beforeMicrons,afterMicrons,direction',
+  f: 'boundary,errorCode',
+});
 
 const BASIC_SHAPES = Object.freeze({
   boolean: Object.freeze({ type: 'boolean' }),
@@ -112,11 +118,28 @@ function buildWireEvidenceContract(contract) {
     const code = EVIDENCE_TYPE_CODES[type] || 'o';
     groupedFields[code] = groupedFields[code] ? `${groupedFields[code]}|${key}` : key;
   }
+  const nested = Object.fromEntries(Object.keys(NESTED_EVIDENCE_LEGENDS)
+    .filter((code) => Object.hasOwn(groupedFields, code))
+    .map((code) => [code, NESTED_EVIDENCE_LEGENDS[code]]));
   return immutableSnapshot({
-    r: contract.required.join('|'),
     f: groupedFields,
+    ...(Object.keys(nested).length > 0 ? { n: nested } : {}),
     t: contract.terminalVocabulary.join('|'),
   });
+}
+
+function expandWireEvidenceContract(contract) {
+  if (!contract || typeof contract !== 'object' || !contract.f || typeof contract.f !== 'object') return contract;
+  const typeShapes = {
+    t: { type: 'string', enum: typeof contract.t === 'string' ? contract.t.split('|') : TERMINAL_VOCABULARY },
+    b: SHAPES.boolean, s: SHAPES.string, n: SHAPES.number, a: SHAPES.stringArray, o: SHAPES.object,
+    p: SHAPES.proposal, d: SHAPES.diagnosis, g: SHAPES.grind, f: SHAPES.fault,
+  };
+  const fields = {};
+  for (const [code, names] of Object.entries(contract.f)) for (const name of String(names).split('|')) fields[name] = code === 't' ? 'terminal' : code === 'b' ? 'boolean' : code === 's' ? 'string' : code === 'n' ? 'finite-number' : code === 'a' ? 'string[]' : code === 'p' ? 'proposal' : code === 'd' ? 'diagnosis' : code === 'g' ? 'grind' : code === 'f' ? 'fault' : 'object';
+  const required = Object.keys(fields);
+  const properties = Object.fromEntries(Object.entries(fields).map(([name, descriptor]) => [name, descriptor === 'terminal' ? typeShapes.t : descriptor === 'boolean' ? typeShapes.b : descriptor === 'string' ? typeShapes.s : descriptor === 'finite-number' ? typeShapes.n : descriptor === 'string[]' ? typeShapes.a : descriptor === 'proposal' ? typeShapes.p : descriptor === 'diagnosis' ? typeShapes.d : descriptor === 'grind' ? typeShapes.g : descriptor === 'fault' ? typeShapes.f : typeShapes.o]));
+  return { type: 'object', required, properties };
 }
 
 function validateEvidenceShape(value, shape, path) {
@@ -207,7 +230,7 @@ export function createEvaluationRequest({ caseDefinition, phase = 'qualification
   const typeLegend = Object.keys(wireEvidenceContract.f).map((code) => `${code}=${EVIDENCE_TYPE_LABELS[code]}`).join(',');
   return immutableSnapshot({
     phase, caseId: caseDefinition.id,
-    instructions: `JSON {reply,actual}; r required; f types ${typeLegend}; t only; no authority.`,
+    instructions: `{reply,actual};f required:${typeLegend};n required keys;no auth`,
     input: [{ role: 'user', content: caseDefinition.userPrompt }, { role: 'user', content: JSON.stringify({ evidence, evidenceContract: wireEvidenceContract }) }],
     responseFormat: Object.freeze({ type: 'json_object', required: Object.freeze([...ENVELOPE_KEYS]), additionalProperties: false }),
     evidenceContract,
@@ -228,7 +251,7 @@ export function parseCandidateResponse(raw, { evidenceContract = null } = {}) {
   }
   if (!object(value) || Object.keys(value).sort().join('|') !== ENVELOPE_KEYS.slice().sort().join('|') || typeof value.reply !== 'string' || !value.reply.trim() || !object(value.actual) || Buffer.byteLength(value.reply, 'utf8') > MAX_REPLY_BYTES) throw new Error('candidate response envelope is invalid');
   assertAcyclic(value.actual);
-  if (evidenceContract) validateEvidenceShape(value.actual, evidenceContract, 'actual');
+  if (evidenceContract) validateEvidenceShape(value.actual, expandWireEvidenceContract(evidenceContract), 'actual');
   return immutableSnapshot({ reply: value.reply, actual: value.actual });
 }
 

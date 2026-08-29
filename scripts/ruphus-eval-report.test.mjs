@@ -187,6 +187,24 @@ test('model requests resolve canonical recipe evidence without exposing answer k
   assert.deepEqual(JSON.parse(request.input[1].content).evidenceContract, request.evidenceContractWire);
 });
 
+test('wire evidence contract discloses applicable nested grader keys compactly', () => {
+  const calibration = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/calibration/cases.json', import.meta.url), 'utf8'));
+  const decision = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/decision/cases.json', import.meta.url), 'utf8'));
+  const proposal = createEvaluationRequest({ caseDefinition: calibration.find((item) => item.id === 'cal-003') });
+  const diagnosis = createEvaluationRequest({ caseDefinition: decision.find((item) => item.id === 'dec-013') });
+  const grind = createEvaluationRequest({ caseDefinition: decision.find((item) => item.id === 'dec-026') });
+  const failure = createEvaluationRequest({ caseDefinition: decision.find((item) => item.id === 'dec-051') });
+  const proposalContract = JSON.parse(proposal.input[1].content).evidenceContract;
+  assert.equal(proposalContract.r, undefined);
+  assert.match(proposalContract.n.p, /proposalId/);
+  assert.match(proposalContract.n.p, /diff\(path,from,to\)/);
+  assert.equal(proposalContract.n.d, undefined);
+  assert.match(JSON.parse(diagnosis.input[1].content).evidenceContract.n.d, /cause,confidence,uncertainty/);
+  assert.match(JSON.parse(grind.input[1].content).evidenceContract.n.g, /beforeMicrons,afterMicrons,direction/);
+  assert.match(JSON.parse(failure.input[1].content).evidenceContract.n.f, /boundary,errorCode/);
+  assert.ok(Buffer.byteLength(JSON.stringify({ instructions: proposal.instructions, input: proposal.input, tools: [], previousOutputItems: [], messages: [] })) <= DEFAULT_LIMITS.inputTokens);
+});
+
 test('model-facing full recipe evidence preserves every frozen proposal candidate hash', () => {
   const calibration = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/calibration/cases.json', import.meta.url), 'utf8'));
   const decision = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/decision/cases.json', import.meta.url), 'utf8'));
@@ -226,6 +244,7 @@ test('candidate parser accepts one optional JSON fence and enforces the category
   const response = { reply: 'ok', actual };
   const fenced = `\`\`\`json\n${JSON.stringify(response)}\n\`\`\``;
   assert.deepEqual(parseCandidateResponse(fenced, { evidenceContract: request.evidenceContract }).actual, actual);
+  assert.deepEqual(parseCandidateResponse(fenced, { evidenceContract: request.evidenceContractWire }).actual, actual);
   assert.throws(() => parseCandidateResponse(`${fenced} trailing`), /one complete JSON fence/);
   assert.throws(() => parseCandidateResponse(`${fenced}\n${fenced}`), /one complete JSON fence/);
   assert.throws(() => parseCandidateResponse('```json\n{"reply":"ok","actual":{}}\n```', { evidenceContract: request.evidenceContract }), /evidence field actual\.(approval|commit|committed|mutation|physicalClaim|record|terminal)/);

@@ -83,7 +83,7 @@ test('provider-neutral scored requests preserve instructions and evidence across
   assert.deepEqual(openai.input, anthropic.messages);
   assert.deepEqual(openai.input, common.input);
   const transmitted = JSON.parse(openai.input[1].content);
-  assert.ok(transmitted.evidenceContract.r.includes('terminal'));
+  assert.ok(transmitted.evidenceContract.f.t.includes('terminal'));
   assert.equal(Object.hasOwn(transmitted, 'expected'), false);
   assert.equal(Object.hasOwn(transmitted.evidenceContract, 'expected'), false);
   assert.deepEqual(JSON.parse(anthropic.messages[1].content).evidenceContract, transmitted.evidenceContract);
