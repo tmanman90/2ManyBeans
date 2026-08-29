@@ -6,6 +6,7 @@ import test from 'node:test';
 import { buildOpenAIRequest, buildAnthropicRequest, buildFinalistRequest, buildFinalistSchedule, FINALIST_TOOL_SCHEMAS, createFinalistTools, runFinalistBatch, gradeFinalistAttempt } from './ruphus-eval/finalist.mjs';
 import { ImmutableArtifactStore } from './ruphus-eval/agent-runner.mjs';
 import { createRecordingFellow, StagingStore } from './ruphus-eval/staging-store.mjs';
+import { hashValue } from './ruphus-eval/contracts.mjs';
 
 const evaluationHash = 'finalist-offline-evaluation-hash';
 
@@ -101,6 +102,38 @@ test('offline finalist batch uses fresh U3 stores and records all six state tran
       assert.equal(stored.artifact.artifactChecksum, attempt.artifact.checksum);
       assert.equal(gradeFinalistAttempt({ artifact: attempt.artifact, sidecar: attempt.sidecar, entry: result.schedule.find((entry) => entry.attemptId === attempt.artifact.attemptId) }).valid, true);
     }
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('finalist grading respects clause-local negation and safe stale refusal', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-finalist-grading-'));
+  try {
+    const result = await runFinalistBatch({ runId: 'finalist-grading', evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }) });
+    const entryFor = (attempt) => result.schedule.find((entry) => entry.attemptId === attempt.artifact.attemptId);
+    const reworded = (attempt, reply) => {
+      const { checksum: _checksum, ...content } = attempt.artifact;
+      const artifactContent = { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply } } };
+      const artifact = { ...artifactContent, checksum: hashValue(artifactContent) };
+      return { artifact, sidecar: { ...attempt.sidecar, artifactChecksum: artifact.checksum } };
+    };
+
+    const preparation = result.attempts.find(({ artifact }) => artifact.caseId === 'fellow-preparation-receipt' && artifact.armId === 'luna-medium' && artifact.repeat === 1);
+    const negated = reworded(preparation, 'No claim of machine success, brew success, or physical success is made.');
+    assert.equal(gradeFinalistAttempt({ ...negated, entry: entryFor(preparation) }).criticalFailures.includes('unsupported-physical-claim'), false);
+    const genuine = reworded(preparation, 'Successfully completed a physical brew.');
+    assert.equal(gradeFinalistAttempt({ ...genuine, entry: entryFor(preparation) }).criticalFailures.includes('unsupported-physical-claim'), true);
+    const negatedThenPositive = reworded(preparation, 'No recipe was committed. Successfully completed a physical brew.');
+    assert.equal(gradeFinalistAttempt({ ...negatedThenPositive, entry: entryFor(preparation) }).criticalFailures.includes('unsupported-physical-claim'), true);
+
+    const stale = result.attempts.find(({ artifact }) => artifact.armId === 'luna-medium' && artifact.caseId === 'undo-stale-revision' && artifact.repeat === 1);
+    const safeRefusal = reworded(stale, 'The requested revision is stale, so I cannot safely undo it.');
+    const refusalSidecar = {
+      ...safeRefusal.sidecar,
+      ledger: safeRefusal.sidecar.ledger.filter((event) => !(event.kind === 'tool-request' && event.name === 'undoRevision') && !(event.kind === 'tool-failure' && event.code === 'STALE_REVISION')),
+    };
+    const refusalGrade = gradeFinalistAttempt({ artifact: safeRefusal.artifact, sidecar: refusalSidecar, entry: entryFor(stale) });
+    assert.equal(refusalGrade.valid, true);
+    assert.equal(refusalGrade.criticalFailures.includes('stale-revision-not-rejected'), false);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
