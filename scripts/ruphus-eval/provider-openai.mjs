@@ -3,6 +3,7 @@ import { normalizeUsage } from '../../api/_lib/modelPricing.js';
 
 export const OPENAI_PROVIDER = 'openai';
 export const OPENAI_ENDPOINT = 'https://api.openai.com/v1/responses';
+export const OPENAI_PROBE_MIN_OUTPUT_TOKENS = 16;
 
 function exactObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
@@ -122,7 +123,7 @@ async function probeOpenAI({ client, arm } = {}) {
     const result = await runOpenAITurn({
       client, model: arm.model, effort: arm.effort,
       instructions: 'Return a minimal probe acknowledgement.',
-      input: [{ role: 'user', content: 'probe' }], maxOutputTokens: 1, tools: [],
+      input: [{ role: 'user', content: 'probe' }], maxOutputTokens: OPENAI_PROBE_MIN_OUTPUT_TOKENS, tools: [],
     });
     const completeUsage = Boolean(result.rawUsage && result.usage && Number.isFinite(result.usage.inputTokens) && Number.isFinite(result.usage.outputTokens));
     return immutableSnapshot({

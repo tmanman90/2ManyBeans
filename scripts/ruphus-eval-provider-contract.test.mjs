@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createOpenAIAdapter, buildOpenAIRequest } from './ruphus-eval/provider-openai.mjs';
+import { createOpenAIAdapter, buildOpenAIRequest, normalizeOpenAIResponse } from './ruphus-eval/provider-openai.mjs';
 import { createAnthropicAdapter, buildAnthropicRequest } from './ruphus-eval/provider-anthropic.mjs';
+import { MODEL_ARMS } from './ruphus-eval/models.mjs';
 
 const usage = { input_tokens: 100, output_tokens: 20, input_tokens_details: { cached_tokens: 10, cache_write_tokens: 5 } };
 
@@ -55,6 +56,8 @@ test('Anthropic Messages adapter preserves thinking/tool blocks and usage', asyn
   assert.equal(calls.length, 1);
   assert.equal(calls[0].stream, true);
   assert.deepEqual(calls[0].thinking, { type: 'adaptive' });
+  assert.deepEqual(calls[0].output_config, { effort: 'high' });
+  assert.equal(calls[0].effort, undefined);
   assert.equal(calls[0].tools[0].strict, true);
   assert.equal(result.requestId, 'sdk-anthropic-1');
   assert.equal(result.responseId, 'msg-1');
@@ -69,4 +72,33 @@ test('Anthropic Messages adapter preserves thinking/tool blocks and usage', asyn
 test('Anthropic request rejects non-function tool types', () => {
   assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', tools: [{ type: 'computer' }] }), /custom function/);
   assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', tools: [{ name: 'readCoffee', strict: false }] }), /must be strict/);
+});
+
+test('probe uses the provider minimum and never substitutes a response id for request id', async () => {
+  let openAIRequest;
+  const openAI = createOpenAIAdapter({ client: { responses: { create: async (request) => { openAIRequest = request; const stream = (async function* () { yield { type: 'response.completed', response: { id: 'response-only', model: request.model, status: 'completed', usage } }; })(); return stream; } } } });
+  const probe = await openAI.probe(MODEL_ARMS[0]);
+  assert.equal(probe.completeUsage, true);
+  assert.equal(openAIRequest.max_output_tokens, 16);
+  assert.equal(probe.requestId, null);
+  assert.equal(normalizeOpenAIResponse({ model: 'gpt-5.6-luna', responseId: 'response-only', usage }, 'gpt-5.6-luna').requestId, null);
+});
+
+test('Anthropic streaming withResponse preserves SDK request id and adaptive effort shape', async () => {
+  let requestSeen;
+  const client = { messages: { stream: (request) => {
+    requestSeen = request;
+    const stream = (async function* () {
+      yield { type: 'message_start', message: { id: 'message-only', model: 'claude-sonnet-5', usage: { input_tokens: 1 } } };
+      yield { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } };
+      yield { type: 'message_stop' };
+    })();
+    stream.withResponse = async () => ({ response: { _request_id: 'sdk-header-request' } });
+    return stream;
+  } } };
+  const result = await createAnthropicAdapter({ client }).runTurn({ model: 'claude-sonnet-5', thinking: 'adaptive', effort: 'high', messages: [{ role: 'user', content: 'probe' }] });
+  assert.deepEqual(requestSeen.output_config, { effort: 'high' });
+  assert.equal(requestSeen.effort, undefined);
+  assert.equal(result.requestId, 'sdk-header-request');
+  assert.equal(result.responseId, 'message-only');
 });

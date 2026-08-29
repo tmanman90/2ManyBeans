@@ -33,7 +33,7 @@ export function buildAnthropicRequest({ model, system, messages = [], tools = []
   if (system != null) request.system = system;
   if (thinking !== 'disabled') {
     request.thinking = { type: thinking === 'adaptive' ? 'adaptive' : 'enabled' };
-    if (effort != null) request.effort = effort;
+    if (effort != null) request.output_config = { effort };
   }
   if (signal) request.signal = signal;
   return immutableSnapshot(request);
@@ -140,10 +140,21 @@ async function probeAnthropic({ client, arm } = {}) {
 }
 
 export async function runAnthropicTurn({ client, ...options } = {}) {
-  if (!client?.messages || typeof client.messages.create !== 'function') throw new Error('Anthropic Messages client is required');
+  if (!client?.messages || (typeof client.messages.create !== 'function' && typeof client.messages.stream !== 'function')) throw new Error('Anthropic Messages client is required');
   const request = buildAnthropicRequest(options);
   const { signal, ...providerRequest } = request;
-  const response = await client.messages.create(providerRequest, signal ? { signal } : undefined);
+  let response;
+  let requestId = null;
+  if (typeof client.messages.stream === 'function') {
+    response = client.messages.stream(providerRequest, signal ? { signal } : undefined);
+    const metadata = typeof response?.withResponse === 'function' ? Promise.resolve(response.withResponse()).catch(() => null) : null;
+    const state = await collectResponse(response);
+    const result = metadata ? await metadata : null;
+    requestId = result?.response?._request_id || result?._request_id || null;
+    state.requestId ||= requestId;
+    return normalizeAnthropicResponse(state, options.model);
+  }
+  response = await client.messages.create(providerRequest, signal ? { signal } : undefined);
   const state = await collectResponse(response);
   return normalizeAnthropicResponse(state, options.model);
 }
