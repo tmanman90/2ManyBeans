@@ -202,7 +202,7 @@ function nextInput(provider, previous, toolResults) {
   return { messages: [...previous.messages, { role: 'assistant', content: previous.assistantContent }, { role: 'user', content: toolResults.map((toolResult) => ({ type: 'tool_result', tool_use_id: toolResult.callId, content: JSON.stringify(toolResult.result) })) }] };
 }
 
-export async function runAgentAttempt({ adapter, arm, request = {}, tools = null, attemptId, runId = null, evaluationHash = null, phase: attemptPhase = null, caseId = null, repeat = null, maxTurns = MAX_TOOL_TURNS, maxPhases = MAX_PROVIDER_PHASES, artifactStore = null, retry = { maxAttempts: 1 }, onTelemetry = null, beforeRequest = null } = {}) {
+export async function runAgentAttempt({ adapter, arm, request = {}, tools = null, onSubmitResult = null, attemptId, runId = null, evaluationHash = null, phase: attemptPhase = null, caseId = null, repeat = null, maxTurns = MAX_TOOL_TURNS, maxPhases = MAX_PROVIDER_PHASES, artifactStore = null, retry = { maxAttempts: 1 }, onTelemetry = null, beforeRequest = null } = {}) {
   if (!adapter || typeof adapter.runTurn !== 'function') throw new Error('provider adapter is required');
   const resolvedArm = typeof arm === 'string' ? getArm(arm) : getArm(arm?.id);
   if (!resolvedArm) throw new Error('exact canonical model arm is required');
@@ -217,6 +217,7 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
   let phase = 0;
   let current = { outputItems: [], messages: Array.isArray(request.messages) ? request.messages : [], input: request.input || [] };
   let last = null;
+  let submitResult = null;
   while (phase < maxPhases) {
     phase += 1;
     let result;
@@ -251,22 +252,32 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
     const callsForTurn = Array.isArray(result.toolCalls) ? result.toolCalls : [];
     if (callsForTurn.length === 0) break;
     const toolResults = [];
+    let submitted = false;
     for (const toolCall of callsForTurn) {
       calls += 1;
       if (calls > maxTurns) throw Object.assign(new Error('maximum tool calls exceeded'), { code: 'MAX_TOOL_CALLS', classification: 'semantic-candidate-failure', telemetry });
-      if (!tools || typeof tools.call !== 'function' || typeof toolCall.name !== 'string' || !toolCall.callId) throw Object.assign(new Error('malformed or unauthorized model tool call'), { code: 'INVALID_TOOL_INPUT', semantic: true, classification: 'semantic-candidate-failure', telemetry });
+      if (typeof toolCall.name !== 'string' || !toolCall.callId) throw Object.assign(new Error('malformed or unauthorized model tool call'), { code: 'INVALID_TOOL_INPUT', semantic: true, classification: 'semantic-candidate-failure', telemetry });
       let args = toolCall.args;
       if (args == null && typeof toolCall.argumentsText === 'string') { try { args = JSON.parse(toolCall.argumentsText); } catch { args = null; } }
       if (!isObject(args)) throw Object.assign(new Error('malformed model tool input'), { code: 'INVALID_TOOL_INPUT', semantic: true, classification: 'semantic-candidate-failure', telemetry });
+      if (toolCall.name === 'submit_result') {
+        if (typeof onSubmitResult !== 'function') throw Object.assign(new Error('submit_result handler is unavailable'), { code: 'INVALID_TOOL_INPUT', semantic: true, classification: 'semantic-candidate-failure', telemetry });
+        await onSubmitResult(immutableSnapshot(args));
+        submitResult = immutableSnapshot(args);
+        submitted = true;
+        break;
+      }
+      if (!tools || typeof tools.call !== 'function') throw Object.assign(new Error('malformed or unauthorized model tool call'), { code: 'INVALID_TOOL_INPUT', semantic: true, classification: 'semantic-candidate-failure', telemetry });
       let toolResult;
       try { toolResult = await tools.call(toolCall.name, args); } catch (error) { throw Object.assign(error, { classification: error.classification || 'semantic-candidate-failure', telemetry }); }
       toolResults.push({ callId: toolCall.callId, result: toolResult });
     }
+    if (submitted) break;
     if (phase >= maxPhases) throw Object.assign(new Error('maximum continuation phases exceeded'), { code: 'MAX_CONTINUATION_PHASES', classification: 'semantic-candidate-failure', telemetry });
     current = nextInput(resolvedArm.provider, { outputItems: result.outputItems || [], messages: current.messages, assistantContent: result.content || result.outputItems || [] }, toolResults);
   }
   if (!last) throw Object.assign(new Error('provider produced no response'), { classification: 'provider-operational-failure' });
-  const artifact = immutableSnapshot({ attemptId, runId, evaluationHash, armId: resolvedArm.id, model: resolvedArm.model, provider: resolvedArm.provider, phase: attemptPhase, caseId, repeat, telemetry, attemptBinding: hashValue({ runId, evaluationHash, armId: resolvedArm.id, attemptId, phase: attemptPhase, caseId, repeat, providerRequestIds: telemetry.map((turn) => turn.providerRequestId), phases: telemetry.map((turn) => turn.phase) }), response: { requestId: last.requestId, responseId: last.responseId || null, text: last.text || '', stopReason: last.stopReason || null } });
+  const artifact = immutableSnapshot({ attemptId, runId, evaluationHash, armId: resolvedArm.id, model: resolvedArm.model, provider: resolvedArm.provider, phase: attemptPhase, caseId, repeat, telemetry, attemptBinding: hashValue({ runId, evaluationHash, armId: resolvedArm.id, attemptId, phase: attemptPhase, caseId, repeat, providerRequestIds: telemetry.map((turn) => turn.providerRequestId), phases: telemetry.map((turn) => turn.phase) }), response: { requestId: last.requestId, responseId: last.responseId || null, text: last.text || '', stopReason: last.stopReason || null, submitResult } });
   if (artifactStore) await artifactStore.write(attemptId, artifact);
   return artifact;
 }

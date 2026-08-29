@@ -21,7 +21,7 @@ function normalizeTool(tool) {
   return { type: 'function', name: tool.name, description: tool.description || '', parameters, strict: tool.strict !== false };
 }
 
-export function buildOpenAIRequest({ model, instructions, input, previousOutputItems = [], tools = [], maxOutputTokens = 1800, effort, signal } = {}) {
+export function buildOpenAIRequest({ model, instructions, input, previousOutputItems = [], tools = [], toolChoice = null, maxOutputTokens = 1800, effort, signal } = {}) {
   if (typeof model !== 'string' || !model.trim()) throw new Error('OpenAI model is required');
   if (typeof maxOutputTokens !== 'number' || !Number.isFinite(maxOutputTokens) || maxOutputTokens <= 0) throw new Error('OpenAI output ceiling must be positive');
   assertNoHostedFeatures(tools);
@@ -36,6 +36,10 @@ export function buildOpenAIRequest({ model, instructions, input, previousOutputI
     stream: true,
   };
   if (instructions != null) request.instructions = instructions;
+  if (toolChoice != null) {
+    if (!exactObject(toolChoice) || typeof toolChoice.name !== 'string' || toolChoice.name !== 'submit_result') throw new Error('OpenAI evaluation only permits the frozen submit_result tool choice');
+    request.tool_choice = { type: 'function', name: toolChoice.name };
+  }
   if (effort != null) request.reasoning = { effort };
   if (Object.hasOwn(request, 'previous_response_id')) throw new Error('OpenAI evaluation forbids provider-stored continuation state');
   if (signal) request.signal = signal;
