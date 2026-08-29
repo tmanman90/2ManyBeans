@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { buildOpenAIRequest, buildAnthropicRequest, buildFinalistRequest, buildFinalistSchedule, FINALIST_TOOL_SCHEMAS, runFinalistBatch, gradeFinalistAttempt } from './ruphus-eval/finalist.mjs';
+import { ImmutableArtifactStore } from './ruphus-eval/agent-runner.mjs';
+
+const evaluationHash = 'finalist-offline-evaluation-hash';
+
+test('finalist contract has exactly six workflows, two repeats, and no approval tool', () => {
+  const schedule = buildFinalistSchedule({ runId: 'finalist-schedule' });
+  assert.equal(schedule.length, 24);
+  assert.deepEqual([...new Set(schedule.map((entry) => entry.armId))], ['luna-medium', 'terra-medium']);
+  for (const armId of ['luna-medium', 'terra-medium']) {
+    const entries = schedule.filter((entry) => entry.armId === armId);
+    assert.equal(entries.length, 12);
+    assert.deepEqual([...new Set(entries.map((entry) => entry.scenario))].sort(), ['approval-bound-apply', 'fellow-preparation-receipt', 'recipe-proposal', 'read-stats', 'tasting-diagnosis', 'undo-stale-revision'].sort());
+    for (const scenario of new Set(entries.map((entry) => entry.scenario))) assert.deepEqual(entries.filter((entry) => entry.scenario === scenario).map((entry) => entry.repeat).sort(), [1, 2]);
+  }
+  assert.equal(FINALIST_TOOL_SCHEMAS.some((tool) => tool.name === 'approveProposal'), false);
+  assert.equal(FINALIST_TOOL_SCHEMAS.some((tool) => tool.name === 'recordTasting'), false);
+  const proposal = FINALIST_TOOL_SCHEMAS.find((tool) => tool.name === 'proposeRecipe');
+  assert.deepEqual(proposal.parameters.required, ['path', 'from', 'to']);
+  assert.equal(proposal.parameters.additionalProperties, false);
+});
+
+test('finalist tool schemas translate identically at OpenAI and Anthropic boundaries', () => {
+  const request = buildFinalistRequest({ scenarioId: 'recipe-proposal' });
+  const openai = buildOpenAIRequest({ ...request, model: 'gpt-5.6-luna' });
+  const anthropic = buildAnthropicRequest({ ...request, model: 'claude-sonnet-5', system: request.instructions, messages: request.input });
+  assert.deepEqual(openai.tools.map((tool) => tool.name), anthropic.tools.map((tool) => tool.name));
+  assert.deepEqual(openai.tools.map((tool) => tool.parameters), anthropic.tools.map((tool) => tool.input_schema));
+  assert.ok(openai.tools.length > 0 && openai.tools.length < FINALIST_TOOL_SCHEMAS.length);
+  assert.ok(openai.tools.every((tool) => tool.strict === true && tool.parameters.additionalProperties === false));
+  assert.doesNotMatch(JSON.stringify(request), /luna-medium|terra-medium|armId|expectedTerminal|answerKey/);
+});
+
+test('offline finalist batch uses fresh U3 stores and records all six state transitions', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-finalist-'));
+  try {
+    const store = new ImmutableArtifactStore({ directory });
+    const result = await runFinalistBatch({ runId: 'finalist-offline', evaluationHash, artifactStore: store });
+    assert.equal(result.attemptCount, 24);
+    assert.equal(result.summaries.length, 24);
+    assert.ok(result.summaries.every((summary) => summary.valid && summary.criticalFailures.length === 0 && summary.retries === 0 && summary.latencyMs >= 0));
+    assert.ok(result.summaries.every((summary) => !summary.toolNames.includes('approveProposal') && !summary.toolNames.includes('recordTasting')));
+    assert.ok(result.summaries.find((summary) => summary.scenario === 'approval-bound-apply').toolNames.includes('applyProposal'));
+    assert.ok(result.summaries.find((summary) => summary.scenario === 'undo-stale-revision').toolNames.includes('undoRevision'));
+    assert.ok(result.summaries.find((summary) => summary.scenario === 'fellow-preparation-receipt').toolNames.includes('prepareBrew'));
+    assert.equal(new Set(result.attempts.map(({ sidecar }) => sidecar.sessionId)).size, 24);
+    assert.equal(new Set(result.attempts.map(({ artifact }) => artifact.checksum)).size, 24);
+    const byScenario = new Map(result.attempts.map(({ artifact, sidecar }) => [`${artifact.armId}:${artifact.caseId}:${artifact.repeat}`, { artifact, sidecar }]));
+    for (const armId of ['luna-medium', 'terra-medium']) {
+      assert.equal(byScenario.get(`${armId}:read-stats:1`).sidecar.snapshot.revisions.at(-1).number, 0);
+      assert.equal(byScenario.get(`${armId}:tasting-diagnosis:1`).sidecar.snapshot.revisions.at(-1).number, 0);
+      const proposal = byScenario.get(`${armId}:recipe-proposal:1`).sidecar;
+      assert.equal(proposal.snapshot.revisions.at(-1).number, 0);
+      assert.equal(proposal.snapshot.proposals.at(-1).status, 'pending');
+      assert.equal(proposal.snapshot.approvals.length, 0);
+      const applied = byScenario.get(`${armId}:approval-bound-apply:1`).sidecar;
+      assert.equal(applied.snapshot.revisions.at(-1).number, 1);
+      assert.equal(applied.snapshot.proposals.at(-1).status, 'applied');
+      assert.equal(applied.snapshot.approvals.length, 1);
+      const stale = byScenario.get(`${armId}:undo-stale-revision:1`).sidecar;
+      assert.equal(stale.snapshot.revisions.at(-1).number, 1);
+      assert.ok(stale.ledger.some((event) => event.kind === 'tool-failure' && event.code === 'STALE_REVISION'));
+      const prepared = byScenario.get(`${armId}:fellow-preparation-receipt:1`);
+      assert.equal(prepared.sidecar.snapshot.revisions.at(-1).number, 1);
+      assert.ok(prepared.sidecar.snapshot.brews.some((brew) => brew.status === 'coffee-prepared'));
+      assert.deepEqual(prepared.sidecar.snapshot.brews.at(-1).status, 'coffee-prepared');
+      assert.deepEqual(result.attempts.filter(({ artifact }) => artifact.armId === armId).flatMap(({ fellowCalls }) => fellowCalls).map(({ boundary }) => boundary).filter(Boolean).slice(-7), ['timeout', 'interruption', 'auth', 'device', 'create', 'share', 'cleanup']);
+    }
+    for (const attempt of result.attempts) {
+      const stored = await store.read(`${attempt.artifact.attemptId}.state`);
+      assert.equal(stored.ok, true);
+      assert.equal(stored.artifact.artifactChecksum, attempt.artifact.checksum);
+      assert.equal(gradeFinalistAttempt({ artifact: attempt.artifact, sidecar: attempt.sidecar, entry: result.schedule.find((entry) => entry.attemptId === attempt.artifact.attemptId) }).valid, true);
+    }
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('finalist grading fails closed on sidecar or artifact mismatch', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-finalist-mismatch-'));
+  try {
+    const result = await runFinalistBatch({ runId: 'finalist-mismatch', evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }) });
+    const entry = result.schedule[0];
+    assert.equal(gradeFinalistAttempt({ artifact: result.attempts[0].artifact, sidecar: { ...result.attempts[0].sidecar, artifactChecksum: 'forged' }, entry }).valid, false);
+    assert.equal(gradeFinalistAttempt({ artifact: { ...result.attempts[0].artifact, checksum: 'forged' }, sidecar: result.attempts[0].sidecar, entry }).valid, false);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
