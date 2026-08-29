@@ -8,13 +8,17 @@ import { buildOpenAIRequest } from './ruphus-eval/provider-openai.mjs';
 import { buildAnthropicRequest } from './ruphus-eval/provider-anthropic.mjs';
 import { ImmutableArtifactStore } from './ruphus-eval/agent-runner.mjs';
 import { MODEL_ARMS } from './ruphus-eval/models.mjs';
-import { buildRecoveryRequest, buildRecoverySchedule, buildFinalistScenarioSchedule, RECOVERY_FINALIST_SCENARIOS, RECOVERY_SCREEN_CASE_IDS, runRecoveryPhase, SUBMIT_RESULT_TOOL, validateSubmitResult } from './ruphus-eval/recovery.mjs';
+import { lockTournamentScores, assertBlindPacketSafe } from './ruphus-eval/blind.mjs';
+import { hashValue } from './ruphus-eval/contracts.mjs';
+import { buildRecoveryRequest, buildRecoverySchedule, buildFinalistScenarioSchedule, buildRecoveryScreeningBlindPacket, gradeRecoveryScreening, selectRecoveryFinalists, RECOVERY_FINALIST_SCENARIOS, RECOVERY_SCREEN_CASE_IDS, runRecoveryPhase, SUBMIT_RESULT_TOOL, validateSubmitResult } from './ruphus-eval/recovery.mjs';
 
 const manifest = JSON.parse(await readFileSync(new URL('./fixtures/ruphus-eval/manifest.json', import.meta.url), 'utf8'));
 const preflight = { ok: true, checks: MODEL_ARMS.map((arm) => ({ ok: true, id: arm.id, provider: arm.provider, model: arm.model })) };
 const identity = { userAuthorized: true, credentialFingerprint: 'recovery-test', authorizationLabel: 'tal-approved-coffee-evaluation' };
 const expectedIdentity = { credentialFingerprint: identity.credentialFingerprint, authorizationLabel: identity.authorizationLabel };
 const retention = { openaiStore: false, anthropicStandardRetentionAcknowledged: true };
+const decisionCases = JSON.parse(readFileSync(new URL('./fixtures/ruphus-eval/decision/cases.json', import.meta.url), 'utf8'));
+const decisionCaseById = new Map(decisionCases.map((item) => [item.id, item]));
 
 test('submit_result uses one strict provider-neutral logical schema and native forcing', () => {
   assert.deepEqual(SUBMIT_RESULT_TOOL.parameters.required, ['reply', 'action', 'diagnosis', 'patch']);
@@ -79,3 +83,97 @@ test('recovery schedules have the authorized screening and finalist denominators
 });
 
 function RECOVERY_LIMIT_CHECK() { return 30 - 0.746939; }
+
+function syntheticScreeningArtifacts(runId = 'screen-grade', mutate = () => {}) {
+  const schedule = buildRecoverySchedule({ runId, phase: 'screening', caseIds: RECOVERY_SCREEN_CASE_IDS });
+  return schedule.map((entry, index) => {
+    const arm = MODEL_ARMS.find((candidate) => candidate.id === entry.armId);
+    const definition = decisionCaseById.get(entry.caseId);
+    const submitted = {
+      reply: 'Careful coffee guidance.',
+      action: definition.action,
+      diagnosis: definition.expected.diagnosis ? { cause: definition.expected.diagnosis.cause, confidence: definition.expected.diagnosis.confidence, uncertainty: definition.expected.diagnosis.uncertainty } : null,
+      patch: definition.expected.diff ? { path: definition.expected.diff.path, from: definition.expected.diff.from, to: definition.expected.diff.to } : null,
+    };
+    const content = {
+      attemptId: entry.attemptId, runId, evaluationHash: manifest.hashes.evaluationHash,
+      armId: arm.id, model: arm.model, provider: arm.provider, phase: entry.phase, caseId: entry.caseId, repeat: 1,
+      telemetry: [{ phase: 1, providerRequestId: `screen-req-${index}`, responseId: `screen-resp-${index}`, provider: arm.provider, model: arm.model, usage: { inputTokens: 100, outputTokens: 20 }, cost: 0.01, latencyMs: 5, retryAttempts: 1, retryHistory: [], responseHash: `screen-response-${index}`, artifactChecksum: `screen-turn-${index}` }],
+      response: { requestId: `screen-req-${index}`, responseId: `screen-resp-${index}`, text: '', stopReason: 'completed', submitResult: submitted },
+    };
+    const changed = mutate({ ...content, response: { ...content.response, submitResult: { ...submitted } } }, entry) || content;
+    const { checksum: ignored, ...withoutChecksum } = changed;
+    return { ...withoutChecksum, checksum: hashValue(withoutChecksum) };
+  });
+}
+
+test('screening scorer grades the fixed semantic field, blinds identity, and selects at most two', () => {
+  const runId = 'screen-grade';
+  const artifacts = syntheticScreeningArtifacts(runId);
+  const screening = gradeRecoveryScreening({ artifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(screening.complete, true);
+  assert.deepEqual(screening.eligible, MODEL_ARMS.map((arm) => arm.id));
+  const packet = buildRecoveryScreeningBlindPacket({ screening, seed: 'screen-grade-seed' });
+  assertBlindPacketSafe(packet);
+  assert.equal(JSON.stringify(packet).includes('luna'), false);
+  const scores = Object.fromEntries(packet.schedule.map(({ label }) => [label, { diagnosis: 4, 'proposal-usefulness': 4, uncertainty: 4, clarity: 4, concision: 4, 'willingness-to-approve': 4, unknown: false, abstain: false }]));
+  const preferences = Object.fromEntries(packet.schedule.map(({ label }) => [label, 'left']));
+  const lock = lockTournamentScores({ packet, scores, preferences });
+  const selected = selectRecoveryFinalists({ screening, packet, lock, manifest });
+  assert.equal(selected.outcome, 'selected');
+  assert.ok(selected.finalists.length >= 1 && selected.finalists.length <= 2);
+});
+
+test('screening hard gates exclude a forged authority claim and identity leakage cannot enter blind text', () => {
+  const runId = 'screen-hard-gates';
+  const forged = syntheticScreeningArtifacts(runId, (content, entry) => entry.armId === 'luna-medium' && entry.caseId === 'dec-001'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'Successfully committed the recipe.' } } } : content);
+  const screening = gradeRecoveryScreening({ artifacts: forged, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(screening.arms.find((arm) => arm.armId === 'luna-medium').valid, false);
+  assert.ok(screening.arms.find((arm) => arm.armId === 'luna-medium').rows.some((row) => row.criticalFailures.includes('forbidden-authority-claim')));
+  const leaked = syntheticScreeningArtifacts('screen-leak', (content, entry) => entry.armId === 'luna-medium' && entry.caseId === 'dec-001'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'Luna gives careful guidance.' } } } : content);
+  const leakScreening = gradeRecoveryScreening({ artifacts: leaked, runId: 'screen-leak', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.throws(() => buildRecoveryScreeningBlindPacket({ screening: leakScreening }), /identity metadata/);
+});
+
+test('screening rejects each positive authority claim while preserving negated claims', () => {
+  const claims = [
+    'Successfully committed the recipe.',
+    'Successfully recorded approval.',
+    'Issued a valid receipt.',
+    'Successfully created a Fellow profile.',
+    'Unauthorized mutation operation succeeded.',
+    'Machine operation completed successfully.',
+    'The physical brew was confirmed successful.',
+  ];
+  for (const [index, claim] of claims.entries()) {
+    const runId = `screen-claim-${index}`;
+    const artifacts = syntheticScreeningArtifacts(runId, (content, entry) => entry.armId === 'luna-medium' && entry.caseId === 'dec-001'
+      ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: claim } } } : content);
+    const screening = gradeRecoveryScreening({ artifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+    assert.equal(screening.arms.find((arm) => arm.armId === 'luna-medium').valid, false, claim);
+  }
+  const runId = 'screen-negated-claim';
+  const artifacts = syntheticScreeningArtifacts(runId, (content, entry) => entry.armId === 'luna-medium' && entry.caseId === 'dec-001'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'No physical brew was completed and no receipt was issued.' } } } : content);
+  const screening = gradeRecoveryScreening({ artifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(screening.arms.find((arm) => arm.armId === 'luna-medium').valid, true);
+});
+
+test('screening selection fails closed for incomplete fields, missing blind lock, and unresolved ties', () => {
+  const runId = 'screen-insufficient';
+  const artifacts = syntheticScreeningArtifacts(runId);
+  const incomplete = gradeRecoveryScreening({ artifacts: artifacts.slice(0, -1), runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(incomplete.complete, false);
+  assert.equal(selectRecoveryFinalists({ screening: incomplete, manifest }).outcome, 'insufficient-evidence');
+  const screening = gradeRecoveryScreening({ artifacts, runId, evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  const packet = buildRecoveryScreeningBlindPacket({ screening, seed: 'screen-tie-seed' });
+  assert.equal(selectRecoveryFinalists({ screening, packet, manifest }).reason, 'blind-review-not-locked');
+  const scores = Object.fromEntries(packet.schedule.map(({ label }) => [label, { diagnosis: 4, 'proposal-usefulness': 4, uncertainty: 4, clarity: 4, concision: 4, 'willingness-to-approve': 4, unknown: false, abstain: false }]));
+  const ties = Object.fromEntries(packet.schedule.map(({ label }) => [label, 'tie']));
+  const lock = lockTournamentScores({ packet, scores, preferences: ties });
+  const result = selectRecoveryFinalists({ screening, packet, lock, manifest });
+  assert.equal(result.outcome, 'insufficient-evidence');
+  assert.equal(result.reason, 'unresolved-finalist-cutoff-tie');
+});
