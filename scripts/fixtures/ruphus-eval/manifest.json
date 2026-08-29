@@ -1,0 +1,32 @@
+{
+  "manifestVersion": "ruphus-u4-provisional-1",
+  "status": "provisional-before-calibration",
+  "evidenceMode": "synthetic-adjudicated-offline",
+  "seed": "ruphus-u4-blind-seed-2026-08-28",
+  "budget": {"providerCapUsd": 30, "approvedDispatchReservationUsd": 27.798201000000006, "headroomUsd": 2.201798999999994},
+  "arms": ["luna-medium", "luna-high", "terra-medium", "terra-high", "sonnet-disabled", "sonnet-adaptive-high"],
+  "corpus": {"calibrationPath": "calibration/cases.json", "decisionPath": "decision/cases.json", "minimumUniqueDecisionCases": 60, "disjointQualificationPartitionCases": 20, "disjointFinalistDecisionCases": 24},
+  "schedule": {"calibrationPassesMaximum": 2, "calibrationCasesPerArm": 6, "qualificationCasesPerArm": 20, "qualificationRepeats": 2, "finalistMaximum": 2, "finalistDecisionCases": 24, "finalistDecisionRepeats": 2, "lifecycleOwnedBy": "U7", "warmTurnsReserved": 80, "retryReserveRate": 0.25, "contingencyRate": 0.1},
+  "terminalStates": ["read-only", "diagnosis-only", "proposal-pending", "clarification", "refusal", "unauthorized", "insufficient-evidence", "invalid-recipe", "stale-revision", "approval-required", "approval-unavailable", "wrong-coffee", "advisory-only", "incomplete", "inconclusive-sensory", "preparation-failed", "partial-preparation", "resume-idempotent", "no-pass"],
+  "outcomeTable": {"passing-selection":"select-passing-configuration", "zero-eligible":"no-pass", "missing-or-unmeterable-arm":"insufficient-evidence", "invalid-batch":"insufficient-evidence", "retry-or-budget-stop":"insufficient-evidence", "unresolved-cutoff-tie":"insufficient-evidence", "unlocked-review":"insufficient-evidence", "incomplete-six-arm-field":"insufficient-evidence", "incomplete-physical":"insufficient-evidence"},
+  "absoluteUxFloor": {"dimensions":["diagnosis", "proposal-usefulness", "uncertainty", "clarity", "concision", "willingness-to-approve"], "minimumScore":3, "scale":5, "unknownFailsFloor":true},
+  "blindSchedules": {"initial":{"source":"qualification-partition", "reviewComparisons":"balanced-stratified"}, "finalist":{"source":"finalist-decision-partition", "reviewComparisons":"larger-stratified"}, "seededOrder":true, "randomizedLeftRight":true, "opaqueLabels":true, "unblinding":"after-score-lock"},
+  "qualitativeDimensions": ["diagnosis", "proposal-usefulness", "uncertainty", "clarity", "concision", "willingness-to-approve"],
+  "winnerOrdering": ["critical-failure-veto", "hard-gates", "absolute-blind-floor", "ordinal-preference", "cold-cost-per-success", "latency", "variance"],
+  "promptContract": {"mode": "provider-neutral", "groundTruth": "fixture-only", "qualificationContinuation": "none", "lifecycle": "U7"},
+  "toolContract": {"approval": "out-of-band", "tasting": "out-of-band", "physicalClaims": "human-evidence-only", "providers": "none-in-U4"},
+  "validatorRefs": ["src/lib/aidenProfileValidation.js", "src/lib/v60Adapter.js", "src/lib/kalitaAdapter.js", "src/lib/v60SwitchAdapter.js", "src/lib/v60IcedAdapter.js", "src/lib/kalitaIcedAdapter.js"],
+  "graderRefs": ["scripts/ruphus-eval/graders/recall.mjs", "scripts/ruphus-eval/graders/authority.mjs", "scripts/ruphus-eval/graders/lifecycle.mjs"],
+  "rubricRef": "docs/data/ruphus-model-eval/rubric.md",
+  "hashes": {
+    "corpora": "58970a3a40847bd5366683651217909dcf3db14d82c18de508c4a7d9389cbbc5",
+    "prompts": "fe1f32430fbda828c47ded47806a7156c60305b3785283ddce7b6e47a70ab851",
+    "tools": "bd5fd77fecdec1e8aa213fdc78ab7c0685a2786a2afd0ba584350e4d7d3bbd2b",
+    "validators": "282143bcfc018f9f0697ce92f6548abd046686176e2aaf9835ddfda3cc2feb78",
+    "graders": "abbdb12e338c07bef9455d7c4609c71189660288c8ad355a0fc047dae7d5c023",
+    "rubric": "194d809ed4d880e20378b5caf1072a4d3478a8dc94b071341719ecbc059fe245",
+    "winnerOrdering": "e41e727acc8d7c118a9c2abd466907fe90e282aa0c62f51580cc2af6c890f753",
+    "retryPolicy": "0e74cbf8f9b08416bbf3af463ad11e6e028eaa0515db47c7ce33272ae99ece49",
+    "schedule": "05c3fc5019f50e8368780a3f2a31dd1f4ca8a24d07c7f89048c09611fcc936b2"
+  }
+}

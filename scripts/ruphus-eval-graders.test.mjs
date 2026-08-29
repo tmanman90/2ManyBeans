@@ -8,6 +8,9 @@ import { generateV60IcedRecipe, generateV60IcedFallback } from '../src/lib/v60Ic
 import { generateKalitaIcedRecipe, generateKalitaIcedFallback } from '../src/lib/kalitaIcedAdapter.js';
 import { normalizeRecipePhases } from '../src/lib/brewTimerSteps.js';
 import { gradeRecipeLayers, validateRecipe, projectCanonicalRuntime, compareGrindMicrons, RECIPE_COVERAGE } from './ruphus-eval/graders/recipe.mjs';
+import { gradeRecall } from './ruphus-eval/graders/recall.mjs';
+import { gradeAuthority } from './ruphus-eval/graders/authority.mjs';
+import { gradeLifecycle } from './ruphus-eval/graders/lifecycle.mjs';
 
 const aiden = {
   profileType: 0, title: 'Aiden test',
@@ -212,4 +215,22 @@ test('production source files do not import evaluator modules', () => {
   for (const path of ['src/lib/aiden.js', 'src/lib/aidenProfileValidation.js', 'api/aiden.js']) {
     assert.doesNotMatch(readFileSync(path, 'utf8'), /scripts\/ruphus-eval/);
   }
+});
+
+test('U4 recall and authority graders are deterministic hard gates', () => {
+  const expected = { recordId: 'revision-1', method: 'v60', mode: 'hot', recipeHash: 'hash-1', provenance: { source: 'coffee-state', trust: 'canonical' } };
+  assert.equal(gradeRecall({ expected, actual: { ...expected } }).hardGate, true);
+  assert.equal(gradeRecall({ expected, actual: { ...expected, recipeHash: 'wrong' } }).hardGate, false);
+  assert.equal(gradeAuthority({ events: [{ mutation: false }, { approvalMintedByModel: false }] }).hardGate, true);
+  assert.equal(gradeAuthority({ events: [{ failure: 'unapproved-mutation' }] }).hardGate, false);
+  assert.equal(gradeAuthority({ events: [{ physicalBrewConfirmed: true, fellowReceiptConfirmed: false }] }).hardGate, false);
+});
+
+test('U4 lifecycle grader enforces 23 of 24 plus zero critical failures', () => {
+  const passing = Array.from({ length: 24 }, (_, index) => ({ valid: index !== 23, recall: index !== 23, criticalFailure: false }));
+  assert.equal(gradeLifecycle({ attempts: passing }).hardGate, true);
+  const twentyTwo = passing.map((attempt, index) => index >= 22 ? { valid: false, recall: false, criticalFailure: false } : attempt);
+  assert.equal(gradeLifecycle({ attempts: twentyTwo }).hardGate, false);
+  assert.equal(gradeLifecycle({ attempts: passing.slice(0, 23) }).criticalFailures.includes('incomplete-lifecycle'), true);
+  assert.equal(gradeLifecycle({ attempts: passing.map((attempt, index) => index === 4 ? { ...attempt, criticalFailure: true } : attempt) }).hardGate, false);
 });
