@@ -31,9 +31,21 @@ export function useAidenBrew(updateBean) {
   const [aidenBean, setAidenBean] = useState(null);
   const [aidenResearch, setAidenResearch] = useState(null);
   const [aidenPhase, setAidenPhase] = useState(null);
+  const [attemptContext, setAttemptContext] = useState(null);
   const [icedResult, setIcedResult] = useState(null);
   const [icedLoading, setIcedLoading] = useState(false);
   const [icedError, setIcedError] = useState(null);
+
+  const openAttempt = useCallback((bean, attempt) => {
+    if (!bean?.id || !attempt?.snapshot) return;
+    setAidenBean(bean);
+    setAidenRecipe(attempt.snapshot);
+    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null });
+    setAidenResult(null);
+    setAidenError(null);
+    setAidenPhase('push');
+    setAidenModal(true);
+  }, []);
 
   // Returns true if this async chain should still be applying state updates.
   const isActive = (requestId) => mountedRef.current && activeRequestRef.current === requestId;
@@ -211,13 +223,14 @@ export function useAidenBrew(updateBean) {
     // Cancel any in-flight request so its tail doesn't re-populate state after close.
     activeRequestRef.current = null;
     setAidenModal(false);
+    setAttemptContext(null);
   };
 
   return {
     aidenModal, aidenRecipe, aidenResult, aidenLoading, aidenError,
-    aidenPhase, aidenBean, aidenResearch,
+    aidenPhase, aidenBean, aidenResearch, attemptContext,
     icedResult, icedLoading, icedError,
-    handleBrewWithAiden, closeAidenModal,
+    handleBrewWithAiden, closeAidenModal, openAttempt,
     onRetry: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined,
     onRetryPush: aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined,
     onRegenerate: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch, true) : undefined,

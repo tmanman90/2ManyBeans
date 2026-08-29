@@ -13,6 +13,7 @@ import { Capacitor } from '@capacitor/core';
 import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
 import { shareImage } from '../lib/share';
 import { transformAiden } from '../lib/flashBrewTransform';
+import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
 
 const openExternalLink = (url) => {
   if (Capacitor.isNativePlatform()) {
@@ -371,7 +372,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
@@ -469,6 +470,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           <BeanChip bean={bean} />
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
+          {attemptId && <RecipeProvenanceStrip provenance={{ revisionId }} />}
 
           <DialCard recipe={recipe} />
 

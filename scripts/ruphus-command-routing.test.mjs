@@ -11,6 +11,8 @@ const bean = { id: 'bean-1', handBrewRecipe: recipe, handBrewRecipes: { v60: rec
 
 test('every protected writer shape resolves to a canonical command mode', () => {
   assert.equal(commandForBeanUpdate(bean, { aidenGrind: { singleServe: 5 } }).mode, 'set_aiden_grind');
+  assert.equal(commandForBeanUpdate(bean, { aidenGrind: { singleServe: 5 }, aidenLink: 'https://example.test' }).mode, 'set_aiden_grind');
+  assert.equal(commandForBeanUpdate(bean, { aidenRecipe: bean.aidenRecipe, aidenGrind: { singleServe: 5 }, aidenLink: null }).mode, 'replace_active_recipe');
   assert.equal(commandForBeanUpdate(bean, { aidenLink: 'https://example.test', aidenUsedRelay: false }).mode, 'set_aiden_link');
   assert.equal(commandForBeanUpdate(bean, { 'handBrewRecipe.userCoffeeGrams': 16, 'handBrewRecipes.v60.userCoffeeGrams': 16 }).mode, 'set_dose');
   assert.equal(commandForBeanUpdate(bean, { 'handBrewIcedRecipes.v60': iced }).slotKey, 'v60_iced');
@@ -24,4 +26,14 @@ test('the app update seam intercepts protected fields before direct Firestore up
   assert.match(source, /executeRecipeCommand\(/);
   assert.match(source, /await updateDoc\(beanRef/);
   assert.ok(source.indexOf('isProtectedRecipeUpdate(updates)') < source.indexOf('await updateDoc(beanRef'));
+});
+
+test('mixed Edit Bean payload routes its protected generation field without swallowing ordinary fields', () => {
+  const command = commandForBeanUpdate(bean, {
+    displayName: 'Updated label',
+    sourceContextHash: 'new-source',
+    aidenGrind: { singleServe: 6, batch: 7 },
+  });
+  assert.equal(command.mode, 'set_aiden_grind');
+  assert.deepEqual(command.patch, { aidenGrind: { singleServe: 6, batch: 7 } });
 });

@@ -11,11 +11,15 @@ const INVALID = (message) => Object.assign(new Error(message), { code: 'invalid_
 export function applyRuphusTastingState({ attempt, tastingId, coffeeId, sensory, now = new Date().toISOString() }) {
   if (!attempt || attempt.coffeeId !== coffeeId) throw INVALID('Attempt does not belong to this coffee.');
   if (!tastingId || typeof tastingId !== 'string' || !sensory || typeof sensory !== 'object' || Array.isArray(sensory)) throw INVALID('A tasting id and sensory evidence are required.');
-  if (!['created', 'preparing', 'completed', 'tasted'].includes(attempt.status)) throw INVALID('Attempt is not available for tasting.');
+  if (attempt.status !== 'completed') throw INVALID('Attempt must be completed before tasting.');
   const provenance = {
     attemptId: attempt.id,
     revisionId: attempt.revisionId || null,
+    proposalId: attempt.proposalId || null,
+    slotKey: attempt.slotKey || null,
+    coffeeId,
     snapshotHash: attempt.snapshotHash || canonicalHash(attempt.snapshot),
+    linkedAt: now,
     source: 'ruphus-agent-v3',
   };
   return {

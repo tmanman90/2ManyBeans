@@ -1,10 +1,16 @@
 import { withCorsAuth } from './_lib/cors-auth.js';
 import { executeRecipeCommand, MUTATION_MODES, ORDINARY_MODES } from './_lib/ruphusCommandService.js';
 import { getDb } from './_lib/cors-auth.js';
+import { checkEntitlement } from './_lib/checkEntitlement.js';
 import { validateCommandRequest } from '../src/lib/ruphus/contracts.js';
 
 const allowedModes = new Set([...MUTATION_MODES, ...ORDINARY_MODES]);
 const mutationUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_MUTATION_UIDS || '').split(',').map((value) => value.trim()).filter(Boolean));
+const requiredTierFor = (mode) => {
+  if (mode === 'set_aiden_link' || mode === 'prepare_attempt') return 'ultra';
+  if (mode === 'replace_active_recipe' || mode === 'set_aiden_grind' || MUTATION_MODES.includes(mode)) return 'pro';
+  return null;
+};
 
 export default withCorsAuth(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
@@ -14,6 +20,13 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   if (Object.hasOwn(command, 'uid') || Object.hasOwn(command, 'ownerId') || Object.hasOwn(command, 'userId')) return res.status(400).json({ error: 'owner_identity_is_server_bound' });
   if (MUTATION_MODES.includes(command.mode) && !mutationUids().has(uid)) return res.status(404).json({ error: 'mutation_unavailable' });
   try {
+    const requiredTier = requiredTierFor(command.mode);
+    if (requiredTier) {
+      const entitlement = await checkEntitlement(uid);
+      if (entitlement.unavailable) return res.status(503).json({ error: 'entitlement_check_unavailable', message: 'Subscription service temporarily unavailable. Please try again in a moment.' });
+      const entitled = requiredTier === 'ultra' ? entitlement.ultra : entitlement.pro;
+      if (!entitled) return res.status(403).json({ error: 'subscription_required', tier: requiredTier, message: requiredTier === 'ultra' ? 'This feature requires a Coffee Hub Ultra subscription.' : 'This feature requires a Coffee Hub Pro subscription.' });
+    }
     const result = await executeRecipeCommand({ db: getDb(), uid, ...command });
     return res.status(200).json(result);
   } catch (error) {
@@ -22,4 +35,4 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   }
 });
 
-export { allowedModes, mutationUids };
+export { allowedModes, mutationUids, requiredTierFor };

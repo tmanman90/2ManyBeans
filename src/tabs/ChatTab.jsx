@@ -388,7 +388,7 @@ const ChatInputBar = memo(function ChatInputBar({
   );
 });
 
-export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTiming, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter, ruphusLaunch = null, onRuphusLaunchConsumed }) => {
+export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTiming, addTasting, updateTasting, profile, uid, isActive, onStartTastingSession, onNavigateToTasting, isDemo, onDemoAction, chatSessionAdapter, ruphusLaunch = null, onRuphusLaunchConsumed, onRuphusAttempt }) => {
   const reduceMotion = useReducedMotion();
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
@@ -403,9 +403,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const { hydratedMessages, hydratedContext, hydratedArtifacts, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
   const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
   const mutationEnabled = isRuphusMutationEnabled({ uid, isDemo });
-  const { run: runRuphusAction } = useRuphusAction({ onReceipt: (result) => {
+  const { run: runRuphusAction } = useRuphusAction({ uid, onReceipt: (result) => {
     if (!result?.receipt) return;
     const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
+    if (result.attempt) onRuphusAttempt?.(result.attempt);
     setAgentArtifacts((previous) => [...previous.filter((item) => item.id !== artifact.id), artifact]);
   } });
   const [agentContext, setAgentContext] = useState(null);

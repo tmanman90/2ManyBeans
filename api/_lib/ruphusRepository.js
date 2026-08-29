@@ -94,15 +94,15 @@ export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, a
     const validation = validateExecutableRecipe(candidate, slotKey);
     if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
     let activeRevisionId = bean.activeRevisionIds?.[slotKey] || null;
+    if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
+    const pairQuery = proposals.where('sessionId', '==', sessionId).where('coffeeId', '==', coffeeId).where('slotKey', '==', slotKey).where('status', '==', 'proposed');
+    const sessionQuery = proposals.where('sessionId', '==', sessionId).where('status', '==', 'proposed');
+    const [pairSnap, sessionSnap] = await Promise.all([tx.get(pairQuery), tx.get(sessionQuery)]);
     if (!activeRevisionId) {
       activeRevisionId = id('revision');
       tx.set(revisions.doc(activeRevisionId), { id: activeRevisionId, ownerId: uid, coffeeId, slotKey, snapshot: clone(resolved.recipe), snapshotHash: canonicalHash(resolved.recipe), status: 'active', parentId: null, createdAt });
       tx.update(beanRef, { activeRevisionIds: { ...(bean.activeRevisionIds || {}), [slotKey]: activeRevisionId } });
     }
-    if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
-    const pairQuery = proposals.where('sessionId', '==', sessionId).where('coffeeId', '==', coffeeId).where('slotKey', '==', slotKey).where('status', '==', 'proposed');
-    const sessionQuery = proposals.where('sessionId', '==', sessionId).where('status', '==', 'proposed');
-    const [pairSnap, sessionSnap] = await Promise.all([tx.get(pairQuery), tx.get(sessionQuery)]);
     pairSnap.docs.forEach((doc) => tx.update(doc.ref, { status: 'superseded', supersededAt: createdAt }));
     const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before: resolved.recipe, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: canonicalHash(resolved.recipe), createdAt });
     tx.create(proposalRef, proposal);

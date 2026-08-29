@@ -16,3 +16,9 @@ test('bean protected-field rule remains deferred until command-capable census', 
   assert.match(rules, /Agent v3 authority records are server-written/);
   assert.doesNotMatch(rules, /affectedKeys\(\)\.hasAny\(\['aidenRecipe'/);
 });
+
+test('client tasting writes cannot forge attempt or recipe provenance', () => {
+  const block = rules.slice(rules.indexOf('match /users/{userId}/tastings/'), rules.indexOf('\n    }', rules.indexOf('match /users/{userId}/tastings/')) + 6);
+  assert.match(block, /agentProvenance/);
+  assert.match(block, /affectedKeys\(\)\.hasAny/);
+});

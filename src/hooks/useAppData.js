@@ -10,7 +10,7 @@ import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
 import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
-import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate } from '../lib/recipeCommands';
+import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate, protectedRecipeUpdates } from '../lib/recipeCommands';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -217,9 +217,14 @@ export const useAppData = (uid) => {
     if (isProtectedRecipeUpdate(updates)) {
       const bean = beansStateRef.current.find((item) => item.id === beanId);
       if (!bean) throw new Error('This bean is no longer available.');
-      const command = commandForBeanUpdate(bean, updates);
+      const protectedUpdates = protectedRecipeUpdates(updates);
+      const command = commandForBeanUpdate(bean, protectedUpdates);
       if (!command.recipe && command.mode === 'replace_active_recipe') throw new Error('A complete recipe is required for this change.');
-      await executeRecipeCommand({ ...command, patch: (command.mode === 'replace_active_recipe' || command.mode === 'set_aiden_link') ? updates : undefined });
+      await executeRecipeCommand({ ...command, patch: (command.mode === 'replace_active_recipe' || command.mode === 'set_aiden_link' || command.mode === 'set_aiden_grind') ? protectedUpdates : undefined });
+      const ordinaryUpdates = Object.fromEntries(Object.entries(updates).filter(([key]) => !Object.hasOwn(protectedUpdates, key)));
+      if (Object.keys(ordinaryUpdates).length) {
+        await updateDoc(doc(db, 'users', uid, 'beans', beanId), { ...ordinaryUpdates, updatedAt: serverTimestamp() });
+      }
       await refetch();
       return;
     }
@@ -250,6 +255,17 @@ export const useAppData = (uid) => {
           updatedAt: serverTimestamp(),
         });
       });
+      if (event.attemptId && event.completionKind !== 'skipped') {
+        const slotKey = event.device === 'aiden' ? 'aiden' : `${event.device === 'kalita' ? 'kalita' : 'v60'}_${event.mode === 'iced' ? 'iced' : 'hot'}`;
+        await executeRecipeCommand({
+          actionId: `complete_${event.attemptId}`,
+          mode: 'complete_attempt',
+          coffeeId: beanId,
+          slotKey,
+          attemptId: event.attemptId,
+          expectedRevisionId: event.revisionId || undefined,
+        });
+      }
       await refetch();
       return { status: 'saved' };
     } catch (error) {

@@ -33,6 +33,18 @@ test('Brew once preserves the active projection and binds the exact proposal sna
   assert.equal(store.getBean('bean-1').activeRevisionIds['v60_hot'], replaced.revision.id);
 });
 
+test('brew attempt completion is an idempotent server transition before tasting', () => {
+  const { store, recipe } = setup();
+  const current = store.execute({ actionId: 'complete-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
+  store.seedProposal({ id: 'proposal-complete', ownerId: 'user-1', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: current.id, sourceHash: current.snapshotHash, after: recipe, status: 'proposed' });
+  const brewed = store.execute({ actionId: 'complete-brew', mode: 'brew_once', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-complete' });
+  const completed = store.execute({ actionId: 'complete-attempt', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
+  const replay = store.execute({ actionId: 'complete-attempt', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
+  assert.equal(completed.attempt.status, 'completed');
+  assert.equal(replay.attempt.status, 'completed');
+  assert.equal(completed.receipt.physicalBrewConfirmed, true);
+});
+
 test('Undo rejects stale revision and restores only the targeted slot', () => {
   const { store, recipe } = setup();
   const replaced = store.execute({ actionId: 'replace-3', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe });
@@ -85,7 +97,7 @@ test('A tasted Brew-once attempt can be promoted only after provenance transitio
   store.seedProposal({ id: 'proposal-promote', ownerId: 'user-1', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: current.id, sourceHash: current.snapshotHash, after: { ...recipe, waterTemp: { ...recipe.waterTemp, celsius: 96 } }, status: 'proposed' });
   const brewed = store.execute({ actionId: 'promote-brew', mode: 'brew_once', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-promote' });
   assert.throws(() => store.execute({ actionId: 'promote-too-soon', mode: 'promote_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id }), /tasted/);
-  const tasting = applyRuphusTastingState({ attempt: brewed.attempt, tastingId: 'tasting-promote', coffeeId: 'bean-1', sensory: { notes: 'balanced' } });
+  const tasting = applyRuphusTastingState({ attempt: { ...brewed.attempt, status: 'completed' }, tastingId: 'tasting-promote', coffeeId: 'bean-1', sensory: { notes: 'balanced' } });
   store.seedAttempt({ ...brewed.attempt, ...tasting.attempt });
   const promoted = store.execute({ actionId: 'promote-1', mode: 'promote_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
   assert.equal(promoted.revision.snapshot.waterTemp.celsius, 96);

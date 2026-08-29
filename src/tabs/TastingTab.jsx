@@ -47,7 +47,7 @@ const formatDateRelative = (iso) => {
 };
 
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, onPendingTastingConsumed, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
+export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -79,6 +79,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [editForm, setEditForm] = useState(null);
   // Intelligent tasting wizard — the guided-tasting experience (replaces the chat takeover).
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardAttemptId, setWizardAttemptId] = useState(null);
   const setWizardDraft = onWizardDraftChange;
 
   const tastingFields = {
@@ -161,7 +162,8 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       } else {
         await onAddTasting(record);
       }
-      setWizardDraft(null);
+    setWizardDraft(null);
+      setWizardAttemptId(null);
       setWizardOpen(false);
       setMode('list');
     } catch (err) {
@@ -187,6 +189,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       return;
     }
     if (wizardDraft?.beanId && wizardDraft.beanId !== pendingTastingBeanId) setWizardDraft(null);
+    setWizardAttemptId(pendingTastingAttemptId || null);
     setSel(pendingTastingBeanId);
     setWizardOpen(true);
     onPendingTastingConsumed?.();
@@ -239,6 +242,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           reduce={reduceMotion}
           draft={wizardDraft}
           onDraftChange={setWizardDraft}
+          attemptId={wizardAttemptId}
           onSave={saveWizardTasting}
           onClose={closeWizard}
           onOpenRuphus={agentV3Enabled ? ((contextRef, starterIntent) => onOpenRuphus?.(contextRef, starterIntent)) : undefined}

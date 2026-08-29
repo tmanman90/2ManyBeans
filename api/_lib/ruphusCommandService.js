@@ -1,7 +1,7 @@
 import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
 import { resolveLegacyRecipe, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 
-export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
+export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
 export const ORDINARY_MODES = Object.freeze(['replace_active_recipe', 'set_dose', 'set_aiden_grind', 'set_aiden_link']);
 
 const id = (prefix, actionId) => `${prefix}_${String(actionId || Date.now().toString(36)).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 48)}`;
@@ -30,12 +30,22 @@ const stableProjectionHash = (recipe, slotKey) => {
   delete value.recipeHash;
   return canonicalHash(value);
 };
+const exactProjectionHash = (recipe, slotKey) => {
+  const value = clone(recipe || {});
+  value.method = slotMethod(slotKey); value.device = slotMethod(slotKey); value.mode = slotMode(slotKey);
+  delete value.recipeHash;
+  return canonicalHash(value);
+};
 const revisionFor = (state, bean, coffeeId, slotKey) => {
   const revisionId = bean.activeRevisionIds?.[slotKey];
   if (revisionId && state.revisions.has(revisionId)) {
     const current = state.revisions.get(revisionId);
     const live = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
-    if (live.ok && stableProjectionHash(live.recipe, slotKey) !== stableProjectionHash(current.snapshot, slotKey)) fail('source_drift', 'The saved recipe changed outside the command boundary; refresh before trying this action.');
+    if (!live.ok) fail('source_drift', 'The saved recipe is missing or ambiguous outside the command boundary; refresh before trying this action.');
+    const strict = ['apply_proposal', 'brew_once', 'keep_current', 'undo_revision', 'promote_attempt'].includes(state.commandMode);
+    const liveHash = strict ? exactProjectionHash(live.recipe, slotKey) : stableProjectionHash(live.recipe, slotKey);
+    const currentHash = strict ? exactProjectionHash(current.snapshot, slotKey) : stableProjectionHash(current.snapshot, slotKey);
+    if (liveHash !== currentHash) fail('source_drift', 'The saved recipe changed outside the command boundary; refresh before trying this action.');
     return current;
   }
   const resolved = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
@@ -67,7 +77,7 @@ const applyBeanPatch = (target, patch = {}) => {
 };
 const assertRecipePatch = (patch) => {
   if (!patch) return;
-  const allowed = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenUsedRelay', 'aidenIcedLink', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'activeRevisionIds', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
+  const allowed = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenUsedRelay', 'aidenIcedLink', 'aidenIcedUsedRelay', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
   if (Object.keys(patch).some((key) => !allowed.has(key) && !key.startsWith('handBrewRecipes.') && !key.startsWith('handBrewIcedRecipes.') && !key.startsWith('handBrewRecipe.'))) fail('invalid_action', 'Only recipe projection fields may be updated by this command.');
 };
 const receipt = ({ actionId, mode, status = 'succeeded', ...fields }) => ({ id: id('receipt', actionId), actionId, mode, status, ...fields, createdAt: new Date().toISOString() });
@@ -87,6 +97,7 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
     if (!bean || bean.ownerId && bean.ownerId !== state.uid) fail('not_found', 'Coffee is not available.');
     const slotKey = command.slotKey || (command.mode === 'set_aiden_grind' ? 'aiden' : command.mode === 'set_dose' ? 'v60_hot' : null);
     if (!slotKey) fail('invalid_action', 'slotKey is required');
+    state.commandMode = command.mode;
     const current = revisionFor(state, bean, command.coffeeId, slotKey);
     checkExpected(current, command);
     const mode = command.mode;
@@ -105,7 +116,9 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
       state.beans.set(command.coffeeId, next);
       result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: current.id, status: 'succeeded' }), bean: next };
     } else if (mode === 'set_aiden_grind') {
+      assertRecipePatch(command.patch);
       const next = { ...bean, aidenGrind: clone(command.grind) };
+      applyBeanPatch(next, command.patch);
       state.beans.set(command.coffeeId, next);
       result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: current.id, status: 'succeeded' }), bean: next };
     } else if (mode === 'set_aiden_link') {
@@ -147,6 +160,12 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
       checkExpected(current, command);
       if (attempt.snapshotHash === current.snapshotHash) result = { ok: true, revision: clone(current), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, revisionId: current.id, unchanged: true }) };
       else { result = commitRevision(state, bean, current, command, attempt.snapshot, 'promote', null); attempt.status = 'promoted'; attempt.promotedRevisionId = result.revision.id; result.attempt = clone(attempt); }
+    } else if (mode === 'complete_attempt') {
+      const attempt = state.attempts.get(command.attemptId);
+      if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.');
+      if (!['created', 'preparing'].includes(attempt.status)) fail('invalid_attempt_state', 'Only an active attempt can be completed.');
+      attempt.status = 'completed'; attempt.completedAt = new Date(state.now()).toISOString();
+      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, physicalBrewConfirmed: true }) };
     } else {
       const attempt = state.attempts.get(command.attemptId);
       if (!attempt || attempt.ownerId !== state.uid) fail('not_found', 'Attempt is unavailable.');
@@ -209,7 +228,7 @@ export async function executeRecipeCommand({ db, uid, ...command }) {
     if (command.proposalId) refs.push({ kind: 'proposal', ref: db.collection('users').doc(uid).collection('proposals').doc(command.proposalId) });
     if (command.attemptId) refs.push({ kind: 'attempt', ref: db.collection('users').doc(uid).collection('brewAttempts').doc(command.attemptId) });
     const snapshots = await Promise.all(refs.map(({ ref }) => tx.get(ref)));
-    const state = { uid, now: () => Date.now(), beans: new Map([[command.coffeeId, bean]]), revisions: new Map(), proposals: new Map(), attempts: new Map(), actions: new Map(), receipts: new Map() };
+    const state = { uid, now: () => Date.now(), commandMode: command.mode, beans: new Map([[command.coffeeId, bean]]), revisions: new Map(), proposals: new Map(), attempts: new Map(), actions: new Map(), receipts: new Map() };
     refs.forEach(({ kind }, index) => {
       const snap = snapshots[index];
       if (!snap.exists) return;
@@ -253,6 +272,7 @@ function executeOnState(state, command) {
   const fingerprint = canonicalHash({ ...command, uid: state.uid });
   const bean = state.beans.get(command.coffeeId);
   if (!bean) fail('not_found', 'Coffee is not available.');
+  state.commandMode = command.mode;
   const current = revisionFor(state, bean, command.coffeeId, command.slotKey);
   checkExpected(current, command);
   const mode = command.mode;
@@ -268,7 +288,8 @@ function executeOnState(state, command) {
     const next = projection(bean, command.slotKey, { ...current.snapshot, userCoffeeGrams: command.dose }); state.beans.set(command.coffeeId, next);
     result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id }) };
   } else if (mode === 'set_aiden_grind') {
-    state.beans.set(command.coffeeId, { ...bean, aidenGrind: clone(command.grind) });
+    assertRecipePatch(command.patch);
+    const next = { ...bean, aidenGrind: clone(command.grind) }; applyBeanPatch(next, command.patch); state.beans.set(command.coffeeId, next);
     result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id }) };
   } else if (mode === 'set_aiden_link') {
     assertLinkPatch(command.patch);
@@ -286,6 +307,8 @@ function executeOnState(state, command) {
     if (!current.parentId) fail('nothing_to_undo', 'The initial recipe cannot be undone.'); const parent = state.revisions.get(current.parentId); if (!parent) fail('not_found', 'The revision to restore is unavailable.'); result = commitRevision(state, bean, current, command, parent.snapshot, 'undo', null, current.id); result.receipt = receipt({ actionId: command.actionId, mode, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: parent.id });
   } else if (mode === 'promote_attempt') {
     const attempt = state.attempts.get(command.attemptId); if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId || attempt.status !== 'tasted') fail('promote_requires_tasting', 'A tasted attempt is required before promotion.'); if (attempt.snapshotHash === current.snapshotHash) result = { ok: true, revision: clone(current), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id, unchanged: true }) }; else { result = commitRevision(state, bean, current, command, attempt.snapshot, 'promote'); attempt.status = 'promoted'; attempt.promotedRevisionId = result.revision.id; }
+  } else if (mode === 'complete_attempt') {
+    const attempt = state.attempts.get(command.attemptId); if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.'); if (!['created', 'preparing'].includes(attempt.status)) fail('invalid_attempt_state', 'Only an active attempt can be completed.'); attempt.status = 'completed'; attempt.completedAt = new Date().toISOString(); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, physicalBrewConfirmed: true }) };
   } else if (mode === 'prepare_attempt') {
     const attempt = state.attempts.get(command.attemptId); if (!attempt) fail('not_found', 'Attempt is unavailable.'); attempt.status = 'preparing'; result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, preparation: 'pending', physicalBrewConfirmed: false }) };
   } else fail('unsupported_mode', 'Unsupported recipe command.');

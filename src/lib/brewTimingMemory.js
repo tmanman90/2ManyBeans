@@ -41,6 +41,8 @@ export function buildTimingEvent(snapshot) {
   const kalitaSize = snapshot?.kalitaSize == null ? null : String(snapshot.kalitaSize);
   const v60Variant = snapshot?.v60Variant == null ? null : String(snapshot.v60Variant);
   const configurationKey = stringOrNull(snapshot?.configurationKey);
+  const attemptId = stringOrNull(snapshot?.attemptId);
+  const revisionId = stringOrNull(snapshot?.revisionId);
 
   if (!sessionId || !beanId || !device || !mode || !COMPLETION_KINDS.has(completionKind)
     || !finitePositive(doseGrams) || !finiteNonNegative(actualElapsedMs)
@@ -59,6 +61,8 @@ export function buildTimingEvent(snapshot) {
     kalitaSize: device === 'kalita' ? kalitaSize : null,
     v60Variant: device === 'v60' ? (v60Variant || 'classic') : null,
     mode,
+    attemptId,
+    revisionId,
     configurationKey,
     doseGrams,
     actualElapsedMs: Math.round(actualElapsedMs),

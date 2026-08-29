@@ -294,7 +294,7 @@ function ControlButton({ onClick, children, ariaLabel, primary, disabled }) {
   );
 }
 
-export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveTimingEvent }) => {
+export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = null, onClose, onStartTasting, onSaveTimingEvent }) => {
   const timer = useBrewTimer(recipe);
   const {
     phase, stepIndex, timerSteps, currentStep, currentStepDurationMs,
@@ -340,11 +340,13 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
       const context = timingContextFromRecipe({ beanId: bean.id, recipe, mode: recipe.isIced ? 'iced' : 'hot' });
       sessionRef.current = {
         ...context,
-        sessionId: globalThis.crypto?.randomUUID?.() || `brew-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        sessionId: attemptId || globalThis.crypto?.randomUUID?.() || `brew-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        attemptId,
+        revisionId,
         createdAt: Date.now(),
       };
     }
-  }, [open, recipe, bean?.id]);
+  }, [open, recipe, bean?.id, attemptId, revisionId]);
 
   const persistCompletion = useCallback(async () => {
     const session = sessionRef.current;

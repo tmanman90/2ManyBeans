@@ -4,7 +4,7 @@
 // slide-up sheet (iOS curve), swipe-to-dismiss. Presentation only — no data writes here.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Share2, Pencil, Trash2 } from 'lucide-react';
+import { Share2, Pencil, Trash2, Sparkles } from 'lucide-react';
 import { C, fonts, type, glass, shadows, radius } from '../styles/theme';
 import { m } from '../lib/motion';
 import { useReducedMotion, useDragControls } from 'framer-motion';
@@ -45,7 +45,7 @@ function ActionBtn({ icon, label, danger, onClick }) {
   );
 }
 
-export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete, z = 1200 }) {
+export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete, onOpenRuphus, z = 1200 }) {
   const reduce = useReducedMotion();
   const dragControls = useDragControls();
   const [mounted, setMounted] = useState(false);
@@ -81,6 +81,22 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
   // so flavors show as their own element and "Your notes" is the reflection, not the auto line.
   const { flavors: flavorStr, reflection } = splitTastingNotes(tasting.notes);
   const flavorList = flavorStr ? flavorStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const openRuphusFromTasting = () => {
+    if (!onOpenRuphus || !bean?.id) return;
+    const method = String(tasting.method || bean.handBrewRecipe?.device || (bean.aidenRecipe ? 'aiden' : 'v60')).toLowerCase();
+    const mode = tasting.mode === 'iced' ? 'iced' : 'hot';
+    const slotKey = method === 'aiden' ? 'aiden' : `${method === 'kalita' ? 'kalita' : 'v60'}_${mode}`;
+    onOpenRuphus({
+      coffeeId: bean.id,
+      coffeeName: bean.name,
+      method,
+      mode,
+      slotKey,
+      userText: reflection || tasting.notes || '',
+      tastingEvidence: { rating: tasting.rating || null, oneWord: tasting.oneWord || null, notes: tasting.notes || null },
+    }, 'This was my last cup. What should I change for the next brew?');
+    onClose?.();
+  };
   const reveal = (i) => reduce ? {} : {
     initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 },
     transition: { delay: 0.15 + i * 0.05, duration: 0.28, ease: [0.16, 1, 0.3, 1] },
@@ -176,6 +192,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
 
           {/* actions */}
           <div style={{ display: 'flex', gap: 8, padding: '16px 20px 8px' }}>
+            {onOpenRuphus && <ActionBtn icon={<Sparkles size={17} />} label="Ask Ruphus" onClick={openRuphusFromTasting} />}
             {onShare && <ActionBtn icon={<Share2 size={17} />} label="Share" onClick={() => onShare(tasting)} />}
             {onEdit && <ActionBtn icon={<Pencil size={17} />} label="Edit" onClick={() => { close(); onEdit(tasting); }} />}
             {onDelete && <ActionBtn icon={<Trash2 size={17} />} label="Delete" danger onClick={() => onDelete(tasting)} />}

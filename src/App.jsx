@@ -24,6 +24,7 @@ import { TourOverlay } from './components/TourOverlay';
 import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
 import { Modal } from './components/Modal';
+import { useRuphusAttemptOutbox } from './hooks/useRuphusAttemptOutbox';
 
 // Minimal fallback while a lazy tab chunk is fetching. Matches the app
 // background so it doesn't flash white on iOS WKWebView.
@@ -62,7 +63,9 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // Mirrors pendingAddBeanMode: set here, consumed by TastingTab which
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
+  const [pendingTastingAttemptId, setPendingTastingAttemptId] = useState(null);
   const [ruphusLaunch, setRuphusLaunch] = useState(null);
+  const { attempt: ruphusAttempt, put: putRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
   // In-session tasting wizard draft. Kept above TastingTab so tab navigation
   // cannot discard an unfinished guided tasting; never persisted to Firebase.
   const [tastingWizardDraft, setTastingWizardDraft] = useState(null);
@@ -82,9 +85,11 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     }
   }, [beans.length]);
 
-  const handleStartTastingSession = (beanId) => {
+  const handleStartTastingSession = (beanId, attemptId = null) => {
     if (!beanId) return;
+    if (attemptId) clearRuphusAttempt();
     setPendingTastingBeanId(beanId);
+    setPendingTastingAttemptId(attemptId);
     setTab('tasting');
   };
 
@@ -95,6 +100,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     if (!contextRef?.coffeeId) return;
     setRuphusLaunch({ contextRef, starterIntent });
     setTab('chat');
+  };
+  const handleRuphusAttempt = (attempt) => {
+    putRuphusAttempt(attempt);
+    setTab('rotation');
   };
 
   const handleOpenBean = (preselectedBeanId, slot) => {
@@ -300,6 +309,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
             isDemo={isDemo}
             onDemoAction={onDemoAction}
             onOpenRuphus={(contextRef, starterIntent) => openRuphus(contextRef, starterIntent)}
+            ruphusAttempt={ruphusAttempt}
           />
         )}
         {tab === 'inventory' && (
@@ -337,7 +347,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               wizardDraft={tastingWizardDraft}
               onWizardDraftChange={setTastingWizardDraft}
               pendingTastingBeanId={pendingTastingBeanId}
-              onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
+              pendingTastingAttemptId={pendingTastingAttemptId}
+              onPendingTastingConsumed={() => { setPendingTastingBeanId(null); setPendingTastingAttemptId(null); }}
               onOpenRuphus={openRuphus}
               onboardingPalate={onboardingPalate}
               isDemo={isDemo}
@@ -368,6 +379,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
                 onDemoAction={onDemoAction}
                 ruphusLaunch={ruphusLaunch}
                 onRuphusLaunchConsumed={() => setRuphusLaunch(null)}
+                onRuphusAttempt={handleRuphusAttempt}
               />
             </Suspense>
           </div>

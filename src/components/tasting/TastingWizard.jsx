@@ -45,7 +45,7 @@ const BONE_REVEAL_ADVANCE_MS = 1100;
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge, onboardingPalate = null, onOpenRuphus }) {
+export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge, onboardingPalate = null, onOpenRuphus, attemptId = null }) {
   const [initialState] = useState(() => normalizeDraft(draft, bean?.id));
 
   const [phase, setPhase] = useState(initialState.phase); // intro | steps | reveal
@@ -175,7 +175,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   const canAdvance = phase === 'intro' || phase === 'reveal' || stepComplete(step, answers);
 
   const handleSave = useCallback(() => {
-    const record = buildTastingFromAnswers(answers, bean?.id, todayISO());
+    const record = { ...buildTastingFromAnswers(answers, bean?.id, todayISO()), ...(attemptId ? { attemptId } : {}) };
     haptic.success();
     onSave?.(record);
   }, [answers, bean, onSave]);

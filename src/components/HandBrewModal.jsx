@@ -18,6 +18,7 @@ import { kalitaDoseBounds } from '../data/kalitaConfiguration';
 import { V60_SWITCH_DOSE_BOUNDS } from '../data/v60SwitchConfiguration';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
+import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
@@ -422,7 +423,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 
 export const HandBrewModal = ({
   open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, icedUnsupported = false, onRetryIced, loading, error, phase, onRetry, onRegenerate,
-  extraFooter, bean, onStartTasting,
+  extraFooter, bean, attemptId = null, revisionId = null, onStartTasting,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
 }) => {
@@ -472,7 +473,7 @@ export const HandBrewModal = ({
       if (isDeterministicV60Hot(displayRecipe) || isDeterministicKalitaHot(displayRecipe)) return null;
       return displayRecipe ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null;
     },
-    [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose]
+    [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose, icedUnsupported]
   );
 
   const handleEnterIced = () => {
@@ -598,6 +599,7 @@ export const HandBrewModal = ({
               </div>
             )}
           </div>
+          {attemptId && <RecipeProvenanceStrip provenance={{ revisionId }} />}
 
           {recipe.device === 'kalita' && (
             <KalitaSizeSwitch
@@ -1115,13 +1117,15 @@ export const HandBrewModal = ({
       open={timerOpen}
       recipe={timerRecipe}
       bean={bean}
+      attemptId={attemptId}
+      revisionId={revisionId}
       onSaveTimingEvent={onSaveTimingEvent}
       onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
       onStartTasting={(beanId) => {
         setTimerOpen(false);
         setTimerRecipeOverride(null);
         handleClose();
-        onStartTasting?.(beanId);
+        onStartTasting?.(beanId, attemptId);
       }}
     />
     </>

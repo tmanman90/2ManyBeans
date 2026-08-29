@@ -3,7 +3,7 @@ import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 
 export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['read_coffee', 'read_recipe', 'read_tastings', 'read_attempts', 'propose_recipe_change']);
-export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
+export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
 // Responses strict schemas cannot express optional object properties. Every
 // canonical field is therefore required but nullable, so a real V60/Aiden
 // recipe can carry only its method-valid controls while remaining strict.

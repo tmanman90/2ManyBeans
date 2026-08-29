@@ -65,6 +65,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   const [handBrewError, setHandBrewError] = useState(null);
   const [handBrewBean, setHandBrewBean] = useState(null);
   const [handBrewResearch, setHandBrewResearch] = useState(null);
+  const [attemptContext, setAttemptContext] = useState(null);
   const [handBrewPhase, setHandBrewPhase] = useState(null);
   const [userCoffeeGrams, setUserCoffeeGrams] = useState(undefined);
   useEffect(() => {
@@ -73,6 +74,17 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   }, [handBrewRecipe]);
 
   const isActive = (rid) => mountedRef.current && activeRequestRef.current === rid;
+
+  const openAttempt = useCallback((bean, attempt) => {
+    if (!bean?.id || !attempt?.snapshot) return;
+    setHandBrewBean(bean);
+    setHandBrewRecipe(attempt.snapshot);
+    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null });
+    setHandBrewIcedRecipe(null);
+    setHandBrewError(null);
+    setHandBrewPhase('recipe');
+    setHandBrewModal(true);
+  }, []);
 
   const queueLatestRecipeWrite = (beanId, payload) => {
     return recipeWriteQueueRef.current.enqueue(beanId, {
@@ -597,6 +609,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     requestedFingerprintRef.current = null;
     activeRequestRef.current = null;
     setHandBrewModal(false);
+    setAttemptContext(null);
   };
 
   const attachHandBrewBeanId = useCallback((beanId) => {
@@ -663,8 +676,8 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
 
   return {
     handBrewModal, handBrewRecipe, handBrewIcedRecipe, handBrewIcedLoading, handBrewIcedError, handBrewIcedUnsupported, handBrewLoading, handBrewError,
-    handBrewPhase, handBrewBean, handBrewResearch,
-    handleBrewHandBrew, closeHandBrewModal,
+    handBrewPhase, handBrewBean, handBrewResearch, attemptContext,
+    handleBrewHandBrew, closeHandBrewModal, openAttempt,
     handleKalitaSizeChange,
     handleV60VariantChange,
     handleKalitaIcedChillingMethodChange,

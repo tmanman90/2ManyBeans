@@ -139,7 +139,16 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     const userRef = db.collection('users').doc(uid);
 
     const subcols = await userRef.listCollections();
-    await Promise.all(subcols.map((col) => deleteCollection(col)));
+    // Keep the Agent v3 authority collections explicit as well as covered by
+    // discovery, so deletion remains complete if an empty collection is not
+    // returned by a provider emulator or a future SDK implementation.
+    const agentCollections = ['proposals', 'recipeRevisions', 'brewAttempts', 'actions', 'receipts'];
+    const collections = new Map(subcols.map((col) => [col.path, col]));
+    agentCollections.forEach((name) => {
+      const col = userRef.collection(name);
+      if (!collections.has(col.path)) collections.set(col.path, col);
+    });
+    await Promise.all([...collections.values()].map((col) => deleteCollection(col)));
 
     // emailList sits at the top level, scoped by uid
     try {
