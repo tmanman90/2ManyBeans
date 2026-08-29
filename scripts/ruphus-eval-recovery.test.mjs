@@ -182,6 +182,27 @@ test('diagnosis grading accepts a controlled grind patch and rejects its opposit
   assert.ok(row.criticalFailures.includes('diagnosis-direction-mismatch'));
 });
 
+test('diagnosis grading accepts frozen cause and direction paraphrases without reading observed-state text as advice', () => {
+  const paraphrased = syntheticScreeningArtifacts('screen-diagnosis-paraphrase', (content, entry) => {
+    if (entry.caseId === 'dec-013') {
+      return { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'Tighten the grind.', diagnosis: { cause: 'Fast drawdown indicates insufficient extraction with a thin, drying cup.', confidence: 'moderate', uncertainty: 'Evidence is directional.' } } } };
+    }
+    if (entry.caseId === 'dec-014') {
+      return { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'Coarsen the grind.', diagnosis: { cause: 'Slow drawdown indicates excessive contact and bitter extraction.', confidence: 'moderate', uncertainty: 'Evidence is directional.' } } } };
+    }
+    return content;
+  });
+  const accepted = gradeRecoveryScreening({ artifacts: paraphrased, runId: 'screen-diagnosis-paraphrase', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  assert.equal(accepted.arms.every((arm) => arm.valid), true);
+
+  const sonnetRejected = syntheticScreeningArtifacts('screen-diagnosis-sonnet-reject', (content, entry) => entry.caseId === 'dec-013'
+    ? { ...content, response: { ...content.response, submitResult: { ...content.response.submitResult, reply: 'The one-step-coarser setting is appropriate.', diagnosis: { cause: 'Thin and drying cup.', confidence: 'moderate', uncertainty: 'Evidence is directional.' } } } } : content);
+  const rejected = gradeRecoveryScreening({ artifacts: sonnetRejected, runId: 'screen-diagnosis-sonnet-reject', evaluationHash: manifest.hashes.evaluationHash, cases: decisionCases });
+  const row = rejected.arms.find((arm) => arm.armId === 'sonnet-disabled').rows.find((candidate) => candidate.caseId === 'dec-013');
+  assert.equal(row.valid, false);
+  assert.ok(row.criticalFailures.includes('diagnosis-direction-mismatch'));
+});
+
 test('screening rejects each positive authority claim while preserving negated claims', () => {
   const claims = [
     'Successfully committed the recipe.',

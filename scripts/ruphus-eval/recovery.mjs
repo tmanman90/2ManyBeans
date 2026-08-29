@@ -186,9 +186,11 @@ function verifyScreeningArtifact(artifact, expected, evaluationHash) {
 function semanticDirection(submitted) {
   const patch = submitted?.patch;
   const patchDirection = patch && typeof patch.path === 'string' && /grind/i.test(patch.path) && typeof patch.from === 'number' && typeof patch.to === 'number' && Number.isFinite(patch.from) && Number.isFinite(patch.to) && patch.from !== patch.to ? (patch.to < patch.from ? 'finer' : 'coarser') : null;
-  const text = [submitted?.reply, submitted?.diagnosis?.cause, submitted?.diagnosis?.uncertainty].filter((value) => typeof value === 'string').join(' ');
-  const finer = /\bfiner\b|smaller\s+grind|lower\s+grind(?:\s+size)?/i.test(text);
-  const coarser = /\bcoarser\b|larger\s+grind|higher\s+grind(?:\s+size)?/i.test(text);
+  // Cause and uncertainty describe the observed state, not the controlled
+  // recommendation. Only the patch target or reply may establish direction.
+  const text = [submitted?.patch?.to, submitted?.reply].filter((value) => typeof value === 'string').join(' ');
+  const finer = /\bfiner\b|tighten\s+(?:up\s+)?the\s+grind|smaller\s+grind|lower\s+grind(?:\s+size)?/i.test(text);
+  const coarser = /\bcoarser\b|coarsen\s+(?:up\s+)?the\s+grind|larger\s+grind|higher\s+grind(?:\s+size)?/i.test(text);
   const textDirection = finer === coarser ? null : finer ? 'finer' : 'coarser';
   return patchDirection && textDirection && patchDirection !== textDirection ? null : patchDirection || textDirection;
 }
@@ -196,10 +198,12 @@ function semanticDirection(submitted) {
 function diagnosisMeaning(cause, expectedCause) {
   if (typeof cause !== 'string' || !cause.trim()) return false;
   const text = cause.toLowerCase();
-  const expectedUnder = /under-extract|under extract|sour|thin/.test(String(expectedCause).toLowerCase());
-  const expectedOver = /over-extract|over extract|bitter|dry|harsh/.test(String(expectedCause).toLowerCase());
-  const under = /under-extract|under extract|sour|thin/.test(text);
-  const over = /over-extract|over extract|bitter|dry|harsh/.test(text);
+  const underPattern = /under[- ]?extract(?:ed|ion)?|fast\s+drawdown|insufficient\s+extraction|low\s+extraction|sour|thin|drying/;
+  const overPattern = /over[- ]?extract(?:ed|ion)?|slow\s+drawdown|excessive\s+contact|bitter|harsh|\bdry\b/;
+  const expectedUnder = underPattern.test(String(expectedCause).toLowerCase());
+  const expectedOver = overPattern.test(String(expectedCause).toLowerCase());
+  const under = underPattern.test(text);
+  const over = overPattern.test(text);
   return (expectedUnder && under && !over) || (expectedOver && over && !under);
 }
 
