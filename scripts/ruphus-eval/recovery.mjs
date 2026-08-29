@@ -75,6 +75,7 @@ export async function runRecoveryPhase({ adapters = {}, preflight, env = {}, end
   const lease = createRunLease({ runId, evaluationHash, artifactStore });
   await lease.acquire();
   const artifacts = [];
+  const failures = [];
   let actualSpend = 0;
   try {
     const prior = await artifactStore.list({ runId });
@@ -96,10 +97,10 @@ export async function runRecoveryPhase({ adapters = {}, preflight, env = {}, end
         artifacts.push(artifact);
         actualSpend += artifact.telemetry.reduce((sum, turn) => sum + turn.cost, 0);
       } catch (error) {
-        return immutableSnapshot({ ok: false, classification: error.classification || 'insufficient-evidence', dispatched: true, errors: [error.code || 'RECOVERY_ATTEMPT_FAILED'], artifacts, spend: actualSpend });
+        failures.push({ attemptId, armId: arm.id, model: arm.model, provider: arm.provider, classification: error.classification || 'insufficient-evidence', code: error.code || 'RECOVERY_ATTEMPT_FAILED' });
       }
     }
-    return immutableSnapshot({ ok: true, classification: 'completed', dispatched: true, artifacts, spend: actualSpend, attemptCount: artifacts.length, evidenceHash: hashValue(artifacts.map((artifact) => artifact.checksum || artifact.attemptBinding)) });
+    return immutableSnapshot({ ok: failures.length === 0, classification: failures.length === 0 ? 'completed' : 'insufficient-evidence', dispatched: true, errors: failures.map((failure) => failure.code), failures, artifacts, spend: actualSpend, attemptCount: artifacts.length, evidenceHash: hashValue(artifacts.map((artifact) => artifact.checksum || artifact.attemptBinding)) });
   } finally { await lease.release(); }
 }
 
