@@ -1,12 +1,14 @@
-import { link, mkdir, open, readFile, rm } from 'node:fs/promises';
+import { link, mkdir, open, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { priceUsage } from '../../api/_lib/modelPricing.js';
 import { checkEgress, checkEnvironment, validatePreflight } from './capability-preflight.mjs';
-import { APPROVED_DISPATCH_RESERVATION_USD, DEFAULT_LIMITS, EVALUATION_CAP_USD, MODEL_ARMS, getArm, validateLimits } from './models.mjs';
+import { APPROVED_DISPATCH_RESERVATION_USD, DEFAULT_LIMITS, EVALUATION_CAP_USD, MODEL_ARMS, getArm, estimateTurnCost, validateLimits } from './models.mjs';
 import { hashValue, immutableSnapshot, stableId } from './contracts.mjs';
 
 export const RETRYABLE_STATUS_CODES = Object.freeze(new Set([408, 409, 425, 429, 500, 502, 503, 504, 529]));
 export const RETRYABLE_ERROR_CODES = Object.freeze(new Set(['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT']));
+export const MAX_TOOL_TURNS = 5;
+export const MAX_PROVIDER_PHASES = 2;
 const ACTIVE_LEASES = new Map();
 
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
@@ -34,22 +36,31 @@ export function classifyProviderError(error = {}) {
   return 'provider-operational-failure';
 }
 
-export function createRunLease({ runId, evaluationHash, now = () => Date.now() } = {}) {
+export function createRunLease({ runId, evaluationHash, artifactStore = null, now = () => Date.now() } = {}) {
   if (typeof runId !== 'string' || !runId || typeof evaluationHash !== 'string' || !evaluationHash) throw new Error('run lease requires run and evaluation identities');
+  const lockPath = artifactStore instanceof ImmutableArtifactStore ? join(artifactStore.directory, `.run-${hashValue(runId)}.lease`) : null;
   let acquired = false;
+  let lockHandle = null;
   return Object.freeze({
-    acquire() {
+    async acquire() {
       const current = ACTIVE_LEASES.get(runId);
       if (current && current.evaluationHash !== evaluationHash) throw new Error('run lease is held by another evaluation hash');
       if (current) throw new Error('run lease is already held');
+      if (lockPath) {
+        await artifactStore.init();
+        try { lockHandle = await open(lockPath, 'wx', 0o600); await lockHandle.writeFile(JSON.stringify({ runId, evaluationHash, acquiredAt: now() })); await lockHandle.close(); lockHandle = null; }
+        catch (error) { await lockHandle?.close().catch(() => {}); lockHandle = null; if (error.code === 'EEXIST') throw new Error('run lease is already held'); throw error; }
+      }
       ACTIVE_LEASES.set(runId, { evaluationHash, acquiredAt: now() }); acquired = true;
       return immutableSnapshot({ runId, evaluationHash, acquiredAt: ACTIVE_LEASES.get(runId).acquiredAt });
     },
-    release() {
+    async release() {
       if (!acquired) return false;
       const current = ACTIVE_LEASES.get(runId);
       if (current?.evaluationHash !== evaluationHash) throw new Error('run lease ownership changed');
-      ACTIVE_LEASES.delete(runId); acquired = false; return true;
+      ACTIVE_LEASES.delete(runId); acquired = false;
+      if (lockPath) await rm(lockPath, { force: true });
+      return true;
     },
   });
 }
@@ -104,23 +115,44 @@ export class ImmutableArtifactStore {
       return { ok: false, reason: 'corrupt-artifact' };
     }
   }
+
+  async list({ runId = null, evaluationHash = null } = {}) {
+    await this.init();
+    const names = await readdir(this.directory);
+    const artifacts = [];
+    for (const name of names.filter((candidate) => candidate.endsWith('.json'))) {
+      const identity = name.slice(0, -5);
+      const result = await this.read(identity);
+      if (!result.ok) { if (result.reason === 'corrupt-artifact') throw new Error(`corrupt artifact ${identity}`); continue; }
+      if ((runId != null && result.artifact.runId !== runId) || (evaluationHash != null && result.artifact.evaluationHash !== evaluationHash)) continue;
+      artifacts.push(result.artifact);
+    }
+    return artifacts;
+  }
 }
 
-export function validateColdSchedule(schedule, { requireAllArms = true } = {}) {
+export function validateColdSchedule(schedule, { requireAllArms = true, manifest = null } = {}) {
   if (!Array.isArray(schedule) || schedule.length === 0) throw new Error('evaluation schedule is required');
   const seen = new Set();
   for (const entry of schedule) {
     if (!isObject(entry) || typeof entry.armId !== 'string' || !getArm(entry.armId)) throw new Error('schedule contains an unknown exact arm');
+    if (!['qualification', 'finalist-decision'].includes(entry.phase) || typeof entry.caseId !== 'string' || !entry.caseId || !Number.isInteger(entry.repeat) || entry.repeat < 1 || entry.repeat > 2) throw new Error('schedule entry requires an authorized phase, case, and repeat');
+    if (manifest?.partitions) {
+      const authorized = manifest.partitions[entry.phase === 'qualification' ? 'qualification' : 'finalistDecision'];
+      if (!Array.isArray(authorized) || !authorized.includes(entry.caseId)) throw new Error('schedule case is not authorized by the sealed manifest');
+    }
     if ((entry.cacheRegime || getArm(entry.armId).cacheRegime) !== 'cold') throw new Error('U5 quality schedule must be cold-cache');
     const key = `${entry.armId}:${entry.caseId}:${entry.repeat}`;
     if (seen.has(key)) throw new Error('schedule contains duplicate attempt identity');
     seen.add(key);
   }
-  if (requireAllArms && new Set(schedule.map((entry) => entry.armId)).size !== MODEL_ARMS.length) throw new Error('schedule must include all six exact arms');
+  const arms = new Set(schedule.map((entry) => entry.armId));
+  if (requireAllArms && schedule.some((entry) => entry.phase === 'qualification') && arms.size !== MODEL_ARMS.length) throw new Error('schedule must include all six exact arms');
+  if (schedule.every((entry) => entry.phase === 'finalist-decision') && (arms.size < 1 || arms.size > 2)) throw new Error('finalist schedule must contain at most two arms');
   return true;
 }
 
-export function validateRunnerGates({ preflight, env = process.env, endpoint, endpoints = null, retention, paidRun = false, manifest = null, evaluationHash = null } = {}) {
+export function validateRunnerGates({ preflight, env = process.env, endpoint, endpoints = null, retention, paidRun = false, manifest = null, evaluationHash = null, artifactStore = null } = {}) {
   const checked = Array.isArray(preflight?.checks)
     ? { ...preflight, errors: preflight.ok === true && preflight.checks.every((check) => check.ok === true) ? [] : ['all six exact provider preflight checks must pass'] }
     : validatePreflight(preflight || {});
@@ -134,6 +166,7 @@ export function validateRunnerGates({ preflight, env = process.env, endpoint, en
   if (!retention || retention.openaiStore !== false || retention.anthropicZdrVerified !== true) errors.push('verified non-persistent provider retention is required');
   if (!manifest || manifest.status !== 'calibrated-sealed' || typeof manifest.evaluationHash !== 'string' || !manifest.evaluationHash) errors.push('accepted calibration must seal the final manifest before dispatch');
   if (evaluationHash != null && (!manifest || evaluationHash !== manifest.evaluationHash)) errors.push('runner evaluation hash must match the sealed manifest');
+  if (paidRun === true && !(artifactStore instanceof ImmutableArtifactStore)) errors.push('paid dispatch requires a real immutable artifact store');
   if (paidRun !== true) errors.push('explicit paid-run flag is required');
   return { ok: errors.length === 0, errors, preflight: checked, environment, egress };
 }
@@ -148,7 +181,7 @@ function nextInput(provider, previous, toolResults) {
   return { messages: [...previous.messages, { role: 'assistant', content: previous.assistantContent }, { role: 'user', content: toolResults.map((toolResult) => ({ type: 'tool_result', tool_use_id: toolResult.callId, content: JSON.stringify(toolResult.result) })) }] };
 }
 
-export async function runAgentAttempt({ adapter, arm, request = {}, tools = null, attemptId, runId = null, evaluationHash = null, maxTurns = 5, maxPhases = 2, artifactStore = null, retry = { maxAttempts: 1 }, onTelemetry = null } = {}) {
+export async function runAgentAttempt({ adapter, arm, request = {}, tools = null, attemptId, runId = null, evaluationHash = null, maxTurns = MAX_TOOL_TURNS, maxPhases = MAX_PROVIDER_PHASES, artifactStore = null, retry = { maxAttempts: 1 }, onTelemetry = null, beforeRequest = null } = {}) {
   if (!adapter || typeof adapter.runTurn !== 'function') throw new Error('provider adapter is required');
   const resolvedArm = typeof arm === 'string' ? getArm(arm) : getArm(arm?.id);
   if (!resolvedArm) throw new Error('exact canonical model arm is required');
@@ -156,6 +189,8 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
   if (!Number.isInteger(maxTurns) || maxTurns <= 0 || !Number.isInteger(maxPhases) || maxPhases <= 0) throw new Error('runner turn limits are invalid');
   if (typeof attemptId !== 'string' || !attemptId) throw new Error('attempt identity is required');
   if (!isObject(retry) || !Number.isInteger(retry.maxAttempts) || retry.maxAttempts < 1) throw new Error('retry policy must be a positive integer');
+  const maxOutputTokens = request.maxOutputTokens ?? DEFAULT_LIMITS.outputTokens;
+  if (!Number.isFinite(maxOutputTokens) || maxOutputTokens <= 0 || maxOutputTokens > DEFAULT_LIMITS.outputTokens) throw Object.assign(new Error('provider output ceiling exceeds the frozen request maximum'), { code: 'OUTPUT_CEILING_EXCEEDED', classification: 'budget-stop' });
   const telemetry = [];
   let calls = 0;
   let phase = 0;
@@ -169,11 +204,16 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
     while (true) {
       attempts += 1;
       try {
-        result = await adapter.runTurn({ ...request, ...current, model: resolvedArm.model, effort: resolvedArm.effort, thinking: resolvedArm.thinking, maxOutputTokens: request.maxOutputTokens || DEFAULT_LIMITS.outputTokens });
+        const serializedInput = JSON.stringify({ instructions: request.instructions, system: request.system, tools: request.tools, input: current.input, previousOutputItems: current.outputItems, messages: current.messages });
+        const inputBytes = Buffer.byteLength(serializedInput);
+        if (inputBytes > DEFAULT_LIMITS.inputTokens) throw Object.assign(new Error('provider input exceeds the frozen request maximum'), { code: 'INPUT_CEILING_EXCEEDED', classification: 'budget-stop' });
+        await beforeRequest?.({ arm: resolvedArm, phase, attempt: attempts, isRetry: attempts > 1, estimatedCost: estimateTurnCost(resolvedArm, DEFAULT_LIMITS), inputBytes, maxOutputTokens });
+        result = await adapter.runTurn({ ...request, ...current, model: resolvedArm.model, effort: resolvedArm.effort, thinking: resolvedArm.thinking, maxOutputTokens });
         break;
       } catch (error) {
         const classification = classifyProviderError(error);
         retryHistory.push({ attempt: attempts, classification, status: Number.isInteger(error.status) ? error.status : null, code: typeof error.code === 'string' ? error.code : null });
+        if (error.code === 'BUDGET_PRE_DISPATCH' || error.code === 'INPUT_CEILING_EXCEEDED' || error.code === 'OUTPUT_CEILING_EXCEEDED') throw Object.assign(error, { classification: 'budget-stop', attempts, telemetry });
         if (classification !== 'transient-provider' || attempts >= retry.maxAttempts) throw Object.assign(error, { classification, attempts, telemetry });
       }
     }
@@ -182,7 +222,7 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
     if (!costRecord) throw Object.assign(new Error('provider usage could not be metered'), { code: 'UNMETERABLE_USAGE', classification: 'provider-operational-failure' });
     const responsePayload = result.outputItems || result.content || { text: result.text || '' };
     const providerEvidence = { armId: resolvedArm.id, model: result.model, provider: result.provider, runId, attemptId, phase, providerRequestId: result.requestId, responseHash: hashValue(responsePayload) };
-    const record = immutableSnapshot({ attemptId, armId: resolvedArm.id, phase, retryAttempts: attempts, retryHistory, requestId: result.requestId, providerRequestId: result.requestId, model: result.model, provider: result.provider, responseHash: providerEvidence.responseHash, artifactChecksum: hashValue(providerEvidence), rawUsage: result.rawUsage, usage: result.usage, cost: costRecord.cost, outputItems: responsePayload, text: result.text || '', stopReason: result.stopReason || null });
+    const record = immutableSnapshot({ attemptId, armId: resolvedArm.id, phase, retryAttempts: attempts, retryHistory, requestId: result.requestId, responseId: result.responseId || null, providerRequestId: result.requestId, model: result.model, provider: result.provider, responseHash: providerEvidence.responseHash, artifactChecksum: hashValue(providerEvidence), rawUsage: result.rawUsage, usage: result.usage, cost: costRecord.cost, outputItems: responsePayload, text: result.text || '', stopReason: result.stopReason || null });
     telemetry.push(record); onTelemetry?.(record);
     last = result;
     const callsForTurn = Array.isArray(result.toolCalls) ? result.toolCalls : [];
@@ -203,7 +243,7 @@ export async function runAgentAttempt({ adapter, arm, request = {}, tools = null
     current = nextInput(resolvedArm.provider, { outputItems: result.outputItems || [], messages: current.messages, assistantContent: result.content || result.outputItems || [] }, toolResults);
   }
   if (!last) throw Object.assign(new Error('provider produced no response'), { classification: 'provider-operational-failure' });
-  const artifact = immutableSnapshot({ attemptId, runId, evaluationHash, armId: resolvedArm.id, model: resolvedArm.model, provider: resolvedArm.provider, telemetry, attemptBinding: hashValue({ runId, evaluationHash, armId: resolvedArm.id, attemptId, providerRequestIds: telemetry.map((turn) => turn.providerRequestId), phases: telemetry.map((turn) => turn.phase) }), response: { requestId: last.requestId, text: last.text || '', stopReason: last.stopReason || null } });
+  const artifact = immutableSnapshot({ attemptId, runId, evaluationHash, armId: resolvedArm.id, model: resolvedArm.model, provider: resolvedArm.provider, telemetry, attemptBinding: hashValue({ runId, evaluationHash, armId: resolvedArm.id, attemptId, providerRequestIds: telemetry.map((turn) => turn.providerRequestId), phases: telemetry.map((turn) => turn.phase) }), response: { requestId: last.requestId, responseId: last.responseId || null, text: last.text || '', stopReason: last.stopReason || null } });
   if (artifactStore) await artifactStore.write(attemptId, artifact);
   return artifact;
 }
@@ -212,30 +252,41 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
   validateLimits(DEFAULT_LIMITS);
   if (typeof runId !== 'string' || !runId || typeof evaluationHash !== 'string' || !evaluationHash) throw new Error('runner identities are required');
   if (reservationUsd !== APPROVED_DISPATCH_RESERVATION_USD) throw new Error('runner must use the exact approved dispatch reservation');
-  const lease = createRunLease({ runId, evaluationHash });
+  const lease = createRunLease({ runId, evaluationHash, artifactStore });
   return Object.freeze({
     runId, evaluationHash, reservationUsd,
-    gates: () => validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash }),
+    gates: () => validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash, artifactStore }),
     async runAttempt(options = {}) {
-      const gate = validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash });
+      const gate = validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash, artifactStore });
       if (!gate.ok) return immutableSnapshot({ ok: false, classification: 'insufficient-evidence', errors: gate.errors, dispatched: false });
+      if ((options.maxTurns !== undefined && options.maxTurns !== MAX_TOOL_TURNS) || (options.maxPhases !== undefined && options.maxPhases !== MAX_PROVIDER_PHASES)) throw new Error('runner must use the frozen five-turn, two-phase limits');
+      if (paidRun === true) return immutableSnapshot({ ok: false, classification: 'insufficient-evidence', errors: ['single-attempt paid dispatch is disabled; use the sealed schedule'], dispatched: false });
       const arm = typeof options.arm === 'string' ? getArm(options.arm) : options.arm;
       const adapter = options.adapter || adapters[arm?.provider];
-      lease.acquire();
+      await lease.acquire();
       try {
         return immutableSnapshot({ ok: true, dispatched: true, artifact: await runAgentAttempt({ ...options, arm, adapter, runId, evaluationHash, artifactStore }) });
-      } finally { lease.release(); }
+      } finally { await lease.release(); }
     },
     async runSchedule({ schedule, toolsFor = null, requestFor = null, maxTurns = 5, maxPhases = 2, retry = { maxAttempts: 1 } } = {}) {
-      const gate = validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash });
+      const gate = validateRunnerGates({ preflight, env, endpoint, endpoints, retention, paidRun, manifest, evaluationHash, artifactStore });
       if (!gate.ok) return immutableSnapshot({ ok: false, classification: 'insufficient-evidence', dispatched: false, errors: gate.errors, artifacts: [] });
-      validateColdSchedule(schedule);
-      lease.acquire();
+      validateColdSchedule(schedule, { manifest });
+      if (maxTurns !== MAX_TOOL_TURNS || maxPhases !== MAX_PROVIDER_PHASES) throw new Error('runner must use the frozen five-turn, two-phase limits');
+      await lease.acquire();
       const artifacts = [];
       let spend = 0;
       let retrySpend = 0;
-      const retryPool = reservationUsd * DEFAULT_LIMITS.retryReserveRate;
+      let baseReserved = 0;
+      let retryReserved = 0;
+      const baseEnvelope = reservationUsd / (1 + DEFAULT_LIMITS.retryReserveRate + DEFAULT_LIMITS.contingencyRate);
+      const retryPool = baseEnvelope * DEFAULT_LIMITS.retryReserveRate;
       try {
+        const priorArtifacts = await artifactStore.list({ runId, evaluationHash });
+        spend = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + turn.cost, 0), 0);
+        retrySpend = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + Math.max(0, turn.retryAttempts - 1) * turn.cost, 0), 0);
+        baseReserved = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + estimateTurnCost(getArm(artifact.armId), DEFAULT_LIMITS), 0), 0);
+        retryReserved = priorArtifacts.reduce((sum, artifact) => sum + (artifact.telemetry || []).reduce((turnSum, turn) => turnSum + Math.max(0, turn.retryAttempts - 1) * estimateTurnCost(getArm(artifact.armId), DEFAULT_LIMITS), 0), 0);
         for (const entry of schedule) {
           const arm = getArm(entry.armId);
           const attemptId = entry.attemptId || stableId('u5-attempt', { runId, evaluationHash, armId: arm.id, caseId: entry.caseId, repeat: entry.repeat });
@@ -244,14 +295,24 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
             if (existing.ok) {
               if (existing.artifact.runId !== runId || existing.artifact.evaluationHash !== evaluationHash || existing.artifact.attemptId !== attemptId || existing.artifact.armId !== arm.id) return immutableSnapshot({ ok: false, classification: 'insufficient-evidence', dispatched: false, errors: [`artifact identity mismatch ${attemptId}`], artifacts });
               if (existing.artifact.status === 'failed') return immutableSnapshot({ ok: false, classification: existing.artifact.classification || 'insufficient-evidence', dispatched: false, errors: [existing.artifact.error?.code || 'prior-attempt-failed'], artifacts: [...artifacts, existing.artifact] });
-              artifacts.push(existing.artifact); spend += existing.artifact.telemetry.reduce((sum, turn) => sum + turn.cost, 0); continue;
+              artifacts.push(existing.artifact); continue;
             }
             if (existing.reason === 'corrupt-artifact') return immutableSnapshot({ ok: false, classification: 'insufficient-evidence', dispatched: false, errors: [`corrupt artifact ${attemptId}`], artifacts });
           }
           const adapter = adapters[arm.provider];
           let artifact;
           try {
-            artifact = await runAgentAttempt({ adapter, arm, attemptId, runId, evaluationHash, request: requestFor?.(entry) || entry.request || {}, tools: toolsFor?.(entry) || null, maxTurns, maxPhases, artifactStore, retry });
+            artifact = await runAgentAttempt({ adapter, arm, attemptId, runId, evaluationHash, request: requestFor?.(entry) || entry.request || {}, tools: toolsFor?.(entry) || null, maxTurns, maxPhases, artifactStore, retry, beforeRequest: ({ isRetry, estimatedCost }) => {
+              if (spend + estimatedCost > reservationUsd + 1e-12) throw Object.assign(new Error('metered spend plus next request would exceed the approved envelope'), { code: 'BUDGET_PRE_DISPATCH' });
+              if (isRetry) {
+                if (retryReserved + estimatedCost > retryPool + 1e-12 || retrySpend + estimatedCost > retryPool + 1e-12) throw Object.assign(new Error('retry reservation would exceed the frozen global retry pool'), { code: 'BUDGET_PRE_DISPATCH' });
+                retryReserved += estimatedCost;
+              } else {
+                if (baseReserved + estimatedCost > baseEnvelope + 1e-12 || spend + estimatedCost > reservationUsd + 1e-12) throw Object.assign(new Error('base reservation would exceed the frozen schedule envelope'), { code: 'BUDGET_PRE_DISPATCH' });
+                baseReserved += estimatedCost;
+              }
+              if (baseReserved + retryReserved > reservationUsd + 1e-12) throw Object.assign(new Error('dispatch reservation would exceed the approved envelope'), { code: 'BUDGET_PRE_DISPATCH' });
+            } });
           } catch (error) {
             const failure = immutableSnapshot({ attemptId, runId, evaluationHash, armId: arm.id, model: arm.model, provider: arm.provider, status: 'failed', classification: error.classification || classifyProviderError(error), error: { code: typeof error.code === 'string' ? error.code : 'RUN_ATTEMPT_FAILED', status: Number.isInteger(error.status) ? error.status : null }, telemetry: error.telemetry || [] });
             if (artifactStore) await artifactStore.write(attemptId, failure).catch(() => {});
@@ -265,7 +326,7 @@ export function createAgentRunner({ adapters = {}, artifactStore = null, runId, 
           artifacts.push(artifact);
         }
         return immutableSnapshot({ ok: true, classification: 'completed', dispatched: true, artifacts, spend, retrySpend });
-      } finally { lease.release(); }
+      } finally { await lease.release(); }
     },
   });
 }

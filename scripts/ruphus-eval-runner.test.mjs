@@ -37,11 +37,13 @@ test('runner gates fail closed without dispatch when identity, retention, or pai
 });
 
 test('cold schedule requires every exact arm and rejects warm or duplicate identities', () => {
-  const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, caseId: 'cal-1', repeat: 1, cacheRegime: 'cold' }));
+  const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
   assert.equal(validateColdSchedule(schedule), true);
   assert.throws(() => validateColdSchedule(schedule.slice(0, 5)), /six exact arms/);
+  assert.throws(() => validateColdSchedule(schedule.map(({ phase, ...entry }) => entry)), /authorized phase/);
   assert.throws(() => validateColdSchedule(schedule.map((entry, index) => index === 0 ? { ...entry, cacheRegime: 'warm' } : entry)), /cold-cache/);
   assert.throws(() => validateColdSchedule([...schedule, schedule[0]]), /duplicate/);
+  assert.throws(() => validateColdSchedule(schedule, { manifest: { partitions: { qualification: ['dec-002'], finalistDecision: [] } } }), /not authorized/);
 });
 
 test('runner records attributed usage, retries only transient failures, and writes no-overwrite checksummed artifacts', async () => {
@@ -86,6 +88,7 @@ test('runner gate evidence requires HTTPS provider host and verified retention',
   assert.throws(() => createAgentRunner({ runId: 'bad-reserve', evaluationHash: 'bad-reserve', preflight, endpoint: 'https://api.openai.com', retention, paidRun: true, reservationUsd: 30 }), /exact approved/);
   assert.equal(validateEvaluationEnvironment({ OPENAI_API_KEY: 'injected-only', RUPHUS_EVAL_RUN_ID: 'r' }).ok, true);
   assert.equal(validateEvaluationEnvironment({ AWS_SECRET_ACCESS_KEY: 'must-not-enter' }).ok, false);
+  assert.equal(validateRunnerGates({ preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true, manifest: sealedManifest }).ok, false);
 });
 
 test('resumable schedule skips only checksum-valid attempts under one lease', async () => {
@@ -97,7 +100,7 @@ test('resumable schedule skips only checksum-valid attempts under one lease', as
       anthropic: { runTurn: async ({ model }) => { calls += 1; return { provider: 'anthropic', model, requestId: `schedule-${calls}`, content: [], text: 'done', toolCalls: [], stopReason: 'end_turn', rawUsage: { input_tokens: 10, output_tokens: 5 }, usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: false } }; } },
     };
     const runner = createAgentRunner({ adapters, artifactStore: new ImmutableArtifactStore({ directory }), runId: 'schedule-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
-    const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
+    const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
     const first = await runner.runSchedule({ schedule });
     assert.equal(first.ok, true);
     assert.equal(first.artifacts.length, 6);
@@ -115,17 +118,49 @@ test('runner rejects a hash that is not the sealed manifest identity', () => {
 });
 
 test('concurrent schedules cannot acquire a second lease for the same run', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u5-lease-'));
+  try {
   let release;
   const runTurn = async ({ model }) => { if (!release) await new Promise((resolve) => { release = resolve; }); return { provider: model.startsWith('claude-') ? 'anthropic' : 'openai', model, requestId: `lease-${model}`, outputItems: [], content: [], text: 'done', toolCalls: [], stopReason: 'completed', rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } }; };
   const adapters = { openai: { runTurn }, anthropic: { runTurn } };
-  const runner = createAgentRunner({ adapters, runId: 'lease-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
-  const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
+  const artifactStore = new ImmutableArtifactStore({ directory });
+  const runner = createAgentRunner({ adapters, artifactStore, runId: 'lease-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
+  const competingRunner = createAgentRunner({ adapters, artifactStore, runId: 'lease-run', evaluationHash: sealedManifest.evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
+  const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
   const first = runner.runSchedule({ schedule, retry: { maxAttempts: 1 } });
-  await new Promise((resolve) => setImmediate(resolve));
-  await assert.rejects(() => runner.runSchedule({ schedule }), /lease is already held/);
+  while (!release) await new Promise((resolve) => setTimeout(resolve, 1));
+  await assert.rejects(() => competingRunner.runSchedule({ schedule }), /lease is already held/);
   release();
   const outcome = await first;
   assert.equal(outcome.ok, true);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('paid runner requires a real artifact store and cumulative reservation before dispatch', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u5-budget-'));
+  try {
+    const artifactStore = new ImmutableArtifactStore({ directory });
+    const runId = 'budget-run';
+    const evaluationHash = sealedManifest.evaluationHash;
+    const terra = MODEL_ARMS.find((arm) => arm.id === 'terra-medium');
+    const estimated = 0.0316;
+    await artifactStore.write('prior-budget', { runId, evaluationHash, attemptId: 'prior-budget', armId: terra.id, model: terra.model, provider: terra.provider, telemetry: Array.from({ length: 650 }, (_, index) => ({ attemptId: `prior-budget-${index}`, armId: terra.id, phase: 1, retryAttempts: 1, cost: estimated })) });
+    let calls = 0;
+    const adapters = { openai: { runTurn: async ({ model }) => { calls += 1; return { provider: 'openai', model, requestId: 'must-not-dispatch', outputItems: [], text: 'done', toolCalls: [], rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } }; } }, anthropic: { runTurn: async () => { calls += 1; throw new Error('must not dispatch'); } } };
+    const runner = createAgentRunner({ adapters, artifactStore, runId, evaluationHash, manifest: sealedManifest, preflight, env: {}, endpoint: 'https://api.openai.com', retention, paidRun: true });
+    const schedule = MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' }));
+    const single = await runner.runAttempt({ arm: 'luna-medium', attemptId: 'single-paid' });
+    assert.equal(single.dispatched, false);
+    await assert.rejects(() => runner.runAttempt({ arm: 'luna-medium', attemptId: 'over-limit', maxTurns: 6 }), /frozen five-turn/);
+    const first = await runner.runSchedule({ schedule });
+    assert.equal(first.ok, false);
+    assert.equal(first.classification, 'budget-stop');
+    assert.equal(calls, 3);
+    const resumed = await runner.runSchedule({ schedule });
+    assert.equal(resumed.ok, false);
+    assert.equal(resumed.classification, 'budget-stop');
+    assert.equal(calls, 3);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test('top-level runner fails closed before schedule or provider dispatch without identity evidence', async () => {
@@ -137,12 +172,15 @@ test('top-level runner fails closed before schedule or provider dispatch without
 });
 
 test('top-level dispatch requires sealed calibration and every arm preflight before mock calls', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u5-top-level-'));
+  try {
   let calls = 0;
   const adapters = [
     { provider: 'openai', probe: (arm) => ({ modelAccess: true, streaming: true, completeUsage: true, requestId: `pre-${arm.id}`, providerHost: 'https://api.openai.com', returnedModel: arm.model }), runTurn: async ({ model }) => ({ provider: 'openai', model, requestId: `mock-${++calls}`, outputItems: [], text: 'ok', toolCalls: [], rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: true } }) },
     { provider: 'anthropic', probe: (arm) => ({ modelAccess: true, streaming: true, completeUsage: true, requestId: `pre-${arm.id}`, providerHost: 'https://api.anthropic.com', returnedModel: arm.model }), runTurn: async ({ model }) => ({ provider: 'anthropic', model, requestId: `mock-${++calls}`, content: [], text: 'ok', toolCalls: [], rawUsage: { input_tokens: 1, output_tokens: 1 }, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, inputIncludesCache: false } }) },
   ];
-  const outcome = await runEvaluation({ adapters, identity, expectedIdentity, env: {}, retention, endpoints: ['https://api.openai.com', 'https://api.anthropic.com'], paidRun: true, manifest: sealedManifest, runId: 'top-level-run', evaluationHash: sealedManifest.evaluationHash, schedule: MODEL_ARMS.map((arm) => ({ armId: arm.id, caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' })), dispatch: true });
+  const outcome = await runEvaluation({ adapters, identity, expectedIdentity, env: {}, retention, endpoints: ['https://api.openai.com', 'https://api.anthropic.com'], paidRun: true, manifest: sealedManifest, runId: 'top-level-run', evaluationHash: sealedManifest.evaluationHash, artifactStore: new ImmutableArtifactStore({ directory }), schedule: MODEL_ARMS.map((arm) => ({ armId: arm.id, phase: 'qualification', caseId: 'dec-001', repeat: 1, cacheRegime: 'cold' })), dispatch: true });
   assert.equal(outcome.ok, true);
   assert.equal(calls, 6);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

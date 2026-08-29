@@ -50,7 +50,7 @@ function absorbEvent(state, event) {
     state.message = event.message;
     if (Array.isArray(event.message.content)) state.content = event.message.content.slice();
     if (event.message.usage) state.usage = mergeUsage(state.usage, event.message.usage);
-    state.requestId ||= event.message.id || null;
+    state.responseId ||= event.message.id || null;
     state.model ||= event.message.model || null;
     state.stopReason ||= event.message.stop_reason || null;
   }
@@ -60,13 +60,15 @@ function absorbEvent(state, event) {
     const block = state.content.at(-1);
     if (event.delta.type === 'text_delta' && typeof event.delta.text === 'string') state.text += event.delta.text;
     if (block && event.delta.type === 'input_json_delta') state.content[state.content.length - 1] = { ...block, input: `${typeof block.input === 'string' ? block.input : ''}${event.delta.partial_json || ''}` };
+    if (block && event.delta.type === 'thinking_delta') state.content[state.content.length - 1] = { ...block, thinking: `${typeof block.thinking === 'string' ? block.thinking : ''}${event.delta.thinking || ''}` };
+    if (block && event.delta.type === 'signature_delta') state.content[state.content.length - 1] = { ...block, signature: `${typeof block.signature === 'string' ? block.signature : ''}${event.delta.signature || ''}` };
   }
   if (event.type === 'message_delta') {
     state.stopReason = event.delta?.stop_reason || state.stopReason;
     if (event.usage) state.usage = mergeUsage(state.usage, event.usage);
   }
   if (event.type === 'message_start') {
-    state.requestId ||= event.message?.id || null;
+    state.responseId ||= event.message?.id || null;
     state.model ||= event.message?.model || null;
     if (event.message?.usage) state.usage = mergeUsage(state.usage, event.message.usage);
   }
@@ -74,7 +76,7 @@ function absorbEvent(state, event) {
 }
 
 async function collectResponse(response) {
-  const state = { message: null, content: [], text: '', usage: null, requestId: null, model: null, stopReason: null };
+  const state = { message: null, content: [], text: '', usage: null, requestId: null, responseId: null, model: null, stopReason: null };
   if (response && typeof response[Symbol.asyncIterator] === 'function') {
     for await (const event of response) absorbEvent(state, event);
     state.requestId ||= response._request_id || response.request_id || null;
@@ -82,7 +84,8 @@ async function collectResponse(response) {
   const final = state.message || (response && typeof response === 'object' ? response : null) || {};
   if (Array.isArray(final.content) && state.content.length === 0) state.content = final.content.slice();
   if (final.usage) state.usage = mergeUsage(state.usage, final.usage);
-  state.requestId ||= final.id || final._request_id || final.request_id || null;
+  state.requestId ||= final._request_id || final.request_id || null;
+  state.responseId ||= final.id || null;
   state.model ||= final.model || null;
   state.stopReason ||= final.stop_reason || null;
   return state;
@@ -102,7 +105,8 @@ export function normalizeAnthropicResponse(state, requestedModel) {
   return immutableSnapshot({
     provider: ANTHROPIC_PROVIDER,
     model: state?.model || requestedModel || null,
-    requestId: state?.requestId || null,
+    requestId: state?.requestId || state?.responseId || null,
+    responseId: state?.responseId || null,
     content,
     text: state?.text || content.filter((block) => block?.type === 'text').map((block) => block.text || '').join(''),
     toolCalls: toolCalls(content),

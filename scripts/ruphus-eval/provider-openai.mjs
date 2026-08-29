@@ -55,7 +55,7 @@ function absorbEvent(state, event) {
     if (Array.isArray(response.output)) state.outputItems = response.output.slice();
     if (typeof response.output_text === 'string') state.text = response.output_text;
     if (typeof response.model === 'string') state.model = response.model;
-    if (typeof response.id === 'string') state.requestId = response.id;
+    if (typeof response.id === 'string') state.responseId = response.id;
     if (response.status) state.stopReason = response.status;
   }
   if (event.usage) state.usage = mergeUsage(state.usage, event.usage);
@@ -69,7 +69,7 @@ function absorbEvent(state, event) {
 }
 
 async function collectResponse(response) {
-  const state = { response: null, outputItems: [], text: '', usage: null, requestId: null, model: null, stopReason: null };
+  const state = { response: null, outputItems: [], text: '', usage: null, requestId: null, responseId: null, model: null, stopReason: null };
   if (response && typeof response[Symbol.asyncIterator] === 'function') {
     for await (const event of response) absorbEvent(state, event);
     state.requestId ||= response._request_id || response.request_id || null;
@@ -78,7 +78,8 @@ async function collectResponse(response) {
   if (Array.isArray(final.output) && state.outputItems.length === 0) state.outputItems = final.output.slice();
   if (typeof final.output_text === 'string' && !state.text) state.text = final.output_text;
   if (final.usage) state.usage = mergeUsage(state.usage, final.usage);
-  state.requestId ||= final.id || final._request_id || final.request_id || null;
+  state.requestId ||= final._request_id || final.request_id || null;
+  state.responseId ||= final.id || null;
   state.model ||= final.model || null;
   state.stopReason ||= final.status || null;
   return state;
@@ -99,7 +100,8 @@ export function normalizeOpenAIResponse(state, requestedModel) {
   return immutableSnapshot({
     provider: OPENAI_PROVIDER,
     model: state?.model || requestedModel || null,
-    requestId: state?.requestId || null,
+    requestId: state?.requestId || state?.responseId || null,
+    responseId: state?.responseId || null,
     outputItems,
     text: state?.text || '',
     toolCalls: toolCalls(outputItems),
