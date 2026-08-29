@@ -92,6 +92,33 @@ test('manual projection sweep accepts production boundary variants without sampl
   }
 });
 
+test('complete manual adapter boundary sweep remains 122 for 122 exact projections', () => {
+  const cases = [];
+  for (const dose of [12, 15, 18, 21, 24, 27, 30]) for (const grinder of ['fellow-ode-gen2', 'fellow-opus', 'custom']) cases.push(['v60', generateV60Recipe({}, { dose, grinder })]);
+  for (const dose of [12, 20, 30]) cases.push(['v60', generateV60Fallback({ dose })]);
+  for (const [size, doses] of [['155', [12, 15, 20]], ['185', [15, 20, 30, 36]]]) for (const dose of doses) for (const grinder of ['fellow-ode-gen2', 'custom', 'fellow-opus']) cases.push(['kalita', generateKalitaRecipe({}, { dose, size, grinder })]);
+  for (const dose of [15, 20, 25]) for (const roast of ['light', 'medium', 'dark']) for (const grinder of ['fellow-ode-gen2', 'custom']) cases.push(['v60-switch', generateV60SwitchRecipe({}, { dose, roast, grinder })]);
+  for (const dose of [15, 20, 25]) cases.push(['v60-switch', generateV60SwitchRecipe({}, { dose, roast: 'light', closedBloomSeconds: 15 })]);
+  for (const dose of [15, 20, 30]) cases.push(['v60-switch', generateV60SwitchFallback({ dose })]);
+  for (const dose of [12, 15, 20, 25, 30]) for (const grinder of ['fellow-ode-gen2', 'custom', 'fellow-opus']) cases.push(['v60-iced', generateV60IcedRecipe({}, { dose, grinder })]);
+  for (const dose of [12, 20, 30]) cases.push(['v60-iced', generateV60IcedFallback({ dose })]);
+  for (const [size, doses] of [['155', [12, 15, 20]], ['185', [15, 20, 30, 36]]]) {
+    for (const dose of doses) for (const chillingMethod of ['auto', 'brew-over-ice', 'chill-after']) cases.push(['kalita-iced', generateKalitaIcedRecipe({}, { dose, size, chillingMethod })]);
+    for (const dose of doses.slice(0, size === '155' ? 3 : 3)) cases.push(['kalita-iced', generateKalitaIcedRecipe({}, { dose, size, chillingMethod: 'auto', grinder: 'custom' })]);
+  }
+  for (const size of ['155', '185']) for (const grinder of ['fellow-ode-gen2', 'custom']) cases.push(['kalita-iced', generateKalitaIcedFallback({ dose: size === '155' ? 15 : 20, size, grinder })]);
+  cases.push(['kalita-iced', generateKalitaIcedRecipe({}, { dose: 30, size: '185', chillingMethod: 'auto', grinder: 'custom' })]);
+  cases.push(['kalita-iced', generateKalitaIcedRecipe({}, { dose: 12, size: '155', chillingMethod: 'brew-over-ice', grinder: 'custom' })]);
+  cases.push(['kalita-iced', generateKalitaIcedRecipe({}, { dose: 15, size: '185', chillingMethod: 'chill-after', grinder: 'custom' })]);
+  cases.push(['kalita-iced', generateKalitaIcedRecipe({}, { dose: 36, size: '185', chillingMethod: 'chill-after', grinder: 'custom' })]);
+  assert.equal(cases.length, 122);
+  for (const [method, recipe] of cases) {
+    const projection = projectCanonicalRuntime(method, recipe);
+    assert.equal(projection.valid, true, method);
+    assert.deepEqual(projection.runtime, normalizeRecipePhases(recipe), method);
+  }
+});
+
 test('manual projections reject recursively embedded authority claims', () => {
   const recipe = generateV60Recipe({}, { dose: 15 });
   for (const field of ['reasoning', 'sourceLineage', 'tips']) {
@@ -102,6 +129,9 @@ test('manual projections reject recursively embedded authority claims', () => {
   }
   const nested = { ...recipe, sourceLineage: { ...recipe.sourceLineage, parameterSources: { ...recipe.sourceLineage.parameterSources, machineReceived: true } } };
   assert.equal(projectCanonicalRuntime('v60', nested).valid, false);
+  const snakeCase = { ...recipe, reasoning: { physical_brew_confirmed: true } };
+  assert.equal(projectCanonicalRuntime('v60', snakeCase).valid, false);
+  assert.equal(projectCanonicalRuntime('v60', { ...recipe, title: { claims: 'fake claim' } }).valid, false);
 });
 
 test('material repair remains visible while post-repair and downstream validity decide the gate', () => {

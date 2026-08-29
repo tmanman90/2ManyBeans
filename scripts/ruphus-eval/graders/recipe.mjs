@@ -49,6 +49,19 @@ function shapeFor(value) {
 function mergeShapes(left, right) {
   if (!left) return right;
   if (!right) return left;
+  if (left.kind === 'union' || right.kind === 'union') {
+    const union = { kind: 'union', primitive: false, object: null, array: null };
+    const add = (shape) => {
+      if (shape.kind === 'union') {
+        union.primitive ||= shape.primitive;
+        if (shape.object) union.object = union.object ? mergeShapes(union.object, shape.object) : shape.object;
+        if (shape.array) union.array = union.array ? mergeShapes(union.array, shape.array) : shape.array;
+      } else if (shape.kind === 'primitive') union.primitive = true;
+      else union[shape.kind] = union[shape.kind] ? mergeShapes(union[shape.kind], shape) : shape;
+    };
+    add(left); add(right);
+    return union;
+  }
   if (left.kind === 'object' && right.kind === 'object') {
     const fields = new Map(left.fields);
     for (const [key, child] of right.fields) fields.set(key, mergeShapes(fields.get(key), child));
@@ -56,7 +69,12 @@ function mergeShapes(left, right) {
   }
   if (left.kind === 'array' && right.kind === 'array') return { kind: 'array', item: mergeShapes(left.item, right.item) };
   if (left.kind === 'primitive' && right.kind === 'primitive') return primitiveShape();
-  return primitiveShape();
+  const union = { kind: 'union', primitive: false, object: null, array: null };
+  for (const shape of [left, right]) {
+    if (shape.kind === 'primitive') union.primitive = true;
+    else union[shape.kind] = union[shape.kind] ? mergeShapes(union[shape.kind], shape) : shape;
+  }
+  return union;
 }
 
 const MANUAL_SHAPES = new Map();
@@ -75,7 +93,8 @@ function assertNoReservedAuthority(value, path = 'recipe', seen = new WeakSet())
   if (seen.has(value)) throw new Error(`cyclic recipe at ${path}`);
   seen.add(value);
   for (const [key, child] of Object.entries(value)) {
-    if (RESERVED_AUTHORITY_FIELDS.has(key.toLowerCase())) throw new Error(`reserved-authority:${path}.${key}`);
+    const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, '');
+    if (RESERVED_AUTHORITY_FIELDS.has(normalizedKey)) throw new Error(`reserved-authority:${path}.${key}`);
     assertNoReservedAuthority(child, `${path}.${key}`, seen);
   }
   seen.delete(value);
@@ -83,9 +102,17 @@ function assertNoReservedAuthority(value, path = 'recipe', seen = new WeakSet())
 
 function projectByShape(value, shape, path = 'recipe') {
   if (!shape) throw new Error(`unknown production shape at ${path}`);
-  if (value === null) return null;
   if (shape.kind === 'primitive') {
+    if (value === null) return null;
+    if (typeof value === 'object') throw new Error(`invalid scalar container at ${path}`);
     return value;
+  }
+  if (shape.kind === 'union') {
+    if (value === null && shape.primitive) return null;
+    if (Array.isArray(value) && shape.array) return projectByShape(value, shape.array, path);
+    if (value && typeof value === 'object' && !Array.isArray(value) && shape.object) return projectByShape(value, shape.object, path);
+    if (typeof value !== 'object' && shape.primitive) return value;
+    throw new Error(`invalid production container at ${path}`);
   }
   if (shape.kind === 'array') {
     if (!Array.isArray(value) || (value.length > 0 && !shape.item)) throw new Error(`invalid production array at ${path}`);

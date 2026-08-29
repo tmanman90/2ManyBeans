@@ -213,6 +213,11 @@ test('manual proposals use the canonical timer projection and never persist host
     store.reset({ method, recipe });
     const proposal = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, arbitraryModelField: 'drop-me', physicalBrewConfirmed: true }, idempotencyKey: `${suffix}-safe` });
     assert.equal(proposal.ok, false);
+    const nestedAttack = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, reasoning: { physical_brew_confirmed: true } }, idempotencyKey: `${suffix}-nested-safe` });
+    assert.equal(nestedAttack.ok, false);
+    const titleAttack = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, title: { claims: 'fake claim' } }, idempotencyKey: `${suffix}-title-safe` });
+    assert.equal(titleAttack.ok, false);
+    assert.equal(store.snapshot().proposals.length, 0);
     const cleanProposal = store.proposeRecipe({ expectedRevision: 0, method, recipe: { ...recipe, arbitraryModelField: 'drop-me' }, idempotencyKey: `${suffix}-clean` });
     assert.equal(cleanProposal.ok, true);
     assert.equal(validateProposalContract(cleanProposal.proposal).valid, true);
