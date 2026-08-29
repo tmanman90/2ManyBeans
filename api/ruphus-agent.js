@@ -8,7 +8,7 @@ import { createOpenAIProvider, RUPHUS_OPENAI_MODEL } from './_lib/ruphusProvider
 import { persistProposal } from './_lib/ruphusRepository.js';
 import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
-import { isAgentAccessAllowed, normalizeTelemetryUsage, persistRuphusTrace, recordRuphusCensus } from './_lib/ruphusRollout.js';
+import { isAgentAccessAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
 
 export const allowedAgentUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_UIDS || '').split(',').map((uid) => uid.trim()).filter(Boolean));
 function writeFrame(res, frame) { res.write(`${JSON.stringify(frame)}\n`); }
@@ -30,14 +30,13 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
   let db;
   try {
     db = getDb();
-    await recordRuphusCensus({ db, uid, clientVersion: req.body?.clientVersion, commandCapabilities: req.body?.commandCapabilities, source: 'agent' }).catch(() => {});
     const readers = firestoreReaders(db); const context = await buildRuphusContext({ uid, contextRef: { ...contextRef, sessionId: contextRef.sessionId || turnId }, userText, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES) });
     const tools = createRuphusTools({ uid, context, readers, proposalStore: (input) => persistProposal({ db, ...input }) });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
     const turnResult = await runRuphusTurn({ turnId, context, userText: context.userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => { if (!firstFrameAt) firstFrameAt = Date.now(); writeFrame(res, frame); } });
     logApiUsage({ uid, provider: 'openai', model: turnResult.model || RUPHUS_OPENAI_MODEL, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', usage: turnResult.usage });
     const model = turnResult.model || RUPHUS_OPENAI_MODEL;
-    await persistRuphusTrace({ db, uid, event: { provider: 'openai', model, contextHash: context.evidenceHash, requestId: turnResult.requestId, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', toolNames: turnResult.toolNames, totalMs: Date.now() - startedAt, ttffMs: firstFrameAt ? firstFrameAt - startedAt : undefined, retryCount: turnResult.retryCount, ...normalizeTelemetryUsage('openai', model, turnResult.usage), failureCode: turnResult.ok ? undefined : turnResult.code, recovered: false }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
+    await persistRuphusTrace({ db, uid, event: { provider: 'openai', model, contextHash: context.evidenceHash, requestId: turnResult.requestId, proposalIds: turnResult.proposalIds, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', toolNames: turnResult.toolNames, totalMs: Date.now() - startedAt, ttffMs: firstFrameAt ? firstFrameAt - startedAt : undefined, retryCount: turnResult.retryCount, ...normalizeTelemetryUsage('openai', model, turnResult.usage), failureCode: turnResult.ok ? undefined : turnResult.code, recovered: false }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
     // streamWithAuth uses the shipped terminal usage envelope for retry and
     // completion semantics; transport usage is not a lifecycle frame.
     writeFrame(res, { type: 'usage', usage: turnResult.usage || null });

@@ -142,7 +142,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     // Keep the Agent v3 authority collections explicit as well as covered by
     // discovery, so deletion remains complete if an empty collection is not
     // returned by a provider emulator or a future SDK implementation.
-    const agentCollections = ['proposals', 'recipeRevisions', 'brewAttempts', 'actions', 'receipts', 'ruphusTelemetry', 'ruphusCensus'];
+    const agentCollections = ['proposals', 'recipeRevisions', 'brewAttempts', 'actions', 'receipts', 'ruphusTelemetry'];
     const collections = new Map(subcols.map((col) => [col.path, col]));
     agentCollections.forEach((name) => {
       const col = userRef.collection(name);

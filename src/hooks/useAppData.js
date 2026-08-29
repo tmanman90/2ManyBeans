@@ -12,6 +12,7 @@ import { cacheRead, cacheWrite } from '../lib/offlineCache';
 import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
 import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate, protectedRecipeUpdates, splitProtectedRecipeUpdates } from '../lib/recipeCommands';
 import { canonicalHash } from '../lib/ruphus/contracts';
+import { ruphusClientVersion } from '../lib/ruphus/census';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -202,13 +203,13 @@ export const useAppData = (uid) => {
     if (existingId) {
       // Use pre-allocated ID (from product shot pre-generation)
       const beanRef = doc(db, 'users', uid, 'beans', existingId);
-      await setDoc(beanRef, { ...beanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await setDoc(beanRef, { ...beanData, clientVersion: ruphusClientVersion(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       await refetch();
       return existingId;
     }
     // Default: auto-generate ID
     const beansColl = collection(db, 'users', uid, 'beans');
-    const docRef = await addDoc(beansColl, { ...beanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    const docRef = await addDoc(beansColl, { ...beanData, clientVersion: ruphusClientVersion(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     await refetch();
     return docRef.id;
   }, [uid, refetch]);
@@ -226,7 +227,7 @@ export const useAppData = (uid) => {
       }
       const ordinaryUpdates = Object.fromEntries(Object.entries(updates).filter(([key]) => !Object.hasOwn(protectedUpdates, key)));
       if (Object.keys(ordinaryUpdates).length) {
-        await updateDoc(doc(db, 'users', uid, 'beans', beanId), { ...ordinaryUpdates, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, 'users', uid, 'beans', beanId), { ...ordinaryUpdates, clientVersion: ruphusClientVersion(), updatedAt: serverTimestamp() });
       }
       await refetch();
       return;
@@ -234,6 +235,7 @@ export const useAppData = (uid) => {
     const beanRef = doc(db, 'users', uid, 'beans', beanId);
     await updateDoc(beanRef, {
       ...updates,
+      clientVersion: ruphusClientVersion(),
       updatedAt: serverTimestamp(),
     });
     await refetch();
@@ -255,6 +257,7 @@ export const useAppData = (uid) => {
         const history = mergeTimingEvent(current.data().handBrewTimingMemory, event);
         transaction.update(beanRef, {
           handBrewTimingMemory: history,
+          clientVersion: ruphusClientVersion(),
           updatedAt: serverTimestamp(),
         });
       });
@@ -347,6 +350,7 @@ export const useAppData = (uid) => {
           atmosSlot: deleteField(),
           status: 'SEALED',
           openDate: null,
+          clientVersion: ruphusClientVersion(),
           updatedAt: serverTimestamp(),
         });
       }
@@ -355,6 +359,7 @@ export const useAppData = (uid) => {
         jarSlot: slot,
         atmosSlot: deleteField(),
         openDate: today(),
+        clientVersion: ruphusClientVersion(),
         updatedAt: serverTimestamp(),
       });
       await batch.commit();
@@ -423,6 +428,7 @@ export const useAppData = (uid) => {
       const { seedId: _seedId, ...beanData } = bean;
       batch.set(beanRef, {
         ...beanData,
+        clientVersion: ruphusClientVersion(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

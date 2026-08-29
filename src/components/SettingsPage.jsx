@@ -25,6 +25,7 @@ import { redeemCode } from '../lib/redeemCode';
 import { sanitizeUserText } from '../lib/sanitizeUserText';
 import { reauthenticateForAccountDeletion } from '../lib/reauth';
 import { m, scrim, sheet, popIn } from '../lib/motion';
+import { ruphusClientVersion } from '../lib/ruphus/census';
 
 // Reason-code -> user copy for the inline redeem row. Unknown codes fall
 // back to a generic message. Kept here (consumer) instead of the helper
@@ -391,6 +392,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           jarSlot: null,
           atmosSlot: deleteField(),
           openDate: null,
+          clientVersion: ruphusClientVersion(),
           updatedAt: serverTimestamp(),
         });
       }

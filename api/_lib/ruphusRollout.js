@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { calculateCost, normalizeUsage } from './modelPricing.js';
+import { RUPHUS_READ_TOOL_NAMES } from './ruphusTools.js';
 
 // These are rollout controls, not client feature flags. A missing or malformed
 // server value must leave the capability unavailable.
@@ -18,8 +19,6 @@ export const MUTATION_ROLLOUT_MODES = new Set([
   'brew_once',
   'keep_current',
   'start_attempt',
-  'timer_started',
-  'complete_attempt',
   'prepare_attempt',
   'promote_attempt',
 ]);
@@ -37,8 +36,57 @@ export function isAgentAccessAllowed({ uid, rawUids = process.env.RUPHUS_AGENT_V
   return isUidAllowed(uid, rawUids);
 }
 
-export function isMutationAllowed({ uid, mode, rawUids = process.env.RUPHUS_AGENT_V3_MUTATION_UIDS } = {}) {
-  return MUTATION_ROLLOUT_MODES.has(mode) && isUidAllowed(uid, rawUids);
+export function isMutationAllowed({ uid, mode, rawUids = process.env.RUPHUS_AGENT_V3_MUTATION_UIDS, rawAccessUids = process.env.RUPHUS_AGENT_V3_UIDS } = {}) {
+  return MUTATION_ROLLOUT_MODES.has(mode) && isUidAllowed(uid, rawUids) && isUidAllowed(uid, rawAccessUids);
+}
+
+export function parseClientVersion(value) {
+  if (typeof value !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.trim())) return null;
+  const parsed = value.trim().split('.').map(Number);
+  return parsed.every((part) => Number.isSafeInteger(part)) ? parsed : null;
+}
+
+export function normalizeClientVersion(value) {
+  return parseClientVersion(value) ? value.trim() : null;
+}
+
+export function compareClientVersions(left, right) {
+  const a = parseClientVersion(left); const b = parseClientVersion(right);
+  if (!a || !b) return null;
+  for (let index = 0; index < 3; index += 1) if (a[index] !== b[index]) return a[index] > b[index] ? 1 : -1;
+  return 0;
+}
+
+export function evaluateBeanCensus({ beans = [], minimumVersion, acceptedStragglers = [] } = {}) {
+  if (!parseClientVersion(minimumVersion)) return { ready: false, reason: 'minimum_version_invalid', observedUids: [], stragglers: [] };
+  const accepted = new Set(acceptedStragglers.filter((uid) => typeof uid === 'string' && uid));
+  const observedUids = [...new Set(beans.map((bean) => bean?.uid).filter((uid) => typeof uid === 'string' && uid))].sort();
+  if (!observedUids.length) return { ready: false, reason: 'no_observed_beans', observedUids, stragglers: [] };
+  const stragglers = [];
+  for (const uid of observedUids) {
+    const versions = beans.filter((bean) => bean?.uid === uid).map((bean) => bean.clientVersion);
+    if (!versions.length || versions.some((version) => !parseClientVersion(version) || compareClientVersions(version, minimumVersion) < 0)) stragglers.push(uid);
+  }
+  return { ready: stragglers.every((uid) => accepted.has(uid)), reason: stragglers.length ? 'stragglers' : 'ready', observedUids, stragglers };
+}
+
+function timestampMs(value) {
+  if (value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number') return value;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+export async function readRuphusBeanCensus({ db, minimumVersion, acceptedStragglers = [], now = Date.now() } = {}) {
+  if (!db?.collectionGroup) return { ready: false, reason: 'census_unavailable', observedUids: [], stragglers: [] };
+  const cutoff = now - CENSUS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const snap = await db.collectionGroup('beans').where('updatedAt', '>=', new Date(cutoff)).get();
+  const beans = snap.docs.map((doc) => {
+    const segments = String(doc.ref?.path || '').split('/');
+    return { uid: segments[1], clientVersion: doc.data()?.clientVersion, updatedAt: doc.data()?.updatedAt };
+  }).filter((bean) => timestampMs(bean.updatedAt) >= cutoff);
+  return evaluateBeanCensus({ beans, minimumVersion, acceptedStragglers });
 }
 
 export function isTraceRetentionConfigured(raw = process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS) {
@@ -62,6 +110,23 @@ export function normalizeTelemetryUsage(provider, model, usage) {
     totalTokens: tokens.totalTokens,
     estimatedCost: calculateCost(model, tokens),
   };
+}
+
+export function aggregateProviderUsage(provider, usages = []) {
+  const normalized = usages.map((usage) => normalizeUsage(provider, usage)).filter(Boolean);
+  if (!normalized.length) return null;
+  const sum = (key) => normalized.reduce((total, value) => total + (Number(value[key]) || 0), 0);
+  return {
+    input_tokens: sum('inputTokens'),
+    output_tokens: sum('outputTokens'),
+    input_tokens_details: { cached_tokens: sum('cacheReadTokens') },
+    output_tokens_details: { reasoning_tokens: sum('reasoningTokens') },
+  };
+}
+
+export function aggregateProviderRetryCount(usages = []) {
+  const values = usages.map((usage) => usage?.retryCount ?? usage?.retry_count).filter((value) => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  return values.length ? values.reduce((total, value) => total + value, 0) : undefined;
 }
 
 function finiteNumber(value) {
@@ -99,12 +164,15 @@ export function redactRuphusTelemetry(input = {}) {
   const receiptHash = hashTelemetryId(input.receiptHash || input.receiptId);
   const actionHash = hashTelemetryId(input.actionHash || input.actionId);
   const requestHash = hashTelemetryId(input.requestHash || input.requestId);
+  const proposalHash = hashTelemetryId(input.proposalHash || input.proposalId);
   if (contextHash) output.contextHash = String(contextHash);
   if (receiptHash) output.receiptHash = String(receiptHash);
   if (actionHash) output.actionHash = String(actionHash);
   if (requestHash) output.requestHash = String(requestHash);
+  if (proposalHash) output.proposalHash = String(proposalHash);
+  if (Array.isArray(input.proposalIds)) output.proposalHashes = input.proposalIds.map(hashTelemetryId).filter(Boolean);
   if (Array.isArray(input.toolNames)) {
-    output.toolNames = input.toolNames.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim());
+    output.toolNames = input.toolNames.filter((name) => typeof name === 'string' && RUPHUS_READ_TOOL_NAMES.includes(name.trim())).map((name) => name.trim());
   }
   if (typeof input.proposalValid === 'boolean') output.proposalValid = input.proposalValid;
   if (typeof input.recovered === 'boolean') output.recovered = input.recovered;
@@ -125,15 +193,4 @@ export async function persistRuphusTrace({ db, uid, event, retentionRaw = proces
   const ref = db.collection('users').doc(uid).collection('ruphusTelemetry');
   await ref.add({ ...trace, retentionDays: retention.days, createdAt: new Date(now), expiresAt: new Date(now + retention.days * 24 * 60 * 60 * 1000) });
   return { written: true, retentionDays: retention.days };
-}
-
-export async function recordRuphusCensus({ db, uid, clientVersion, commandCapabilities = [], source = 'client' } = {}) {
-  const normalizedVersion = typeof clientVersion === 'string' ? clientVersion.trim() : '';
-  if (!db || typeof uid !== 'string' || !uid || !/^[A-Za-z0-9._+-]{1,180}$/.test(normalizedVersion)) {
-    return { written: false, reason: 'census_invalid' };
-  }
-  const capabilities = [...new Set(commandCapabilities.filter((mode) => typeof mode === 'string' && CENSUS_CAPABILITIES.has(mode)))].sort();
-  const ref = db.collection('users').doc(uid).collection('ruphusCensus');
-  await ref.add({ clientVersion: normalizedVersion, commandCapabilities: capabilities, source: source === 'server' ? 'server' : 'client', windowDays: CENSUS_WINDOW_DAYS, observedAt: new Date() });
-  return { written: true, windowDays: CENSUS_WINDOW_DAYS };
 }

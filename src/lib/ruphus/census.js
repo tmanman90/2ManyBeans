@@ -5,5 +5,5 @@ export const RUPHUS_CLIENT_COMMAND_CAPABILITIES = Object.freeze([
 ]);
 
 export function ruphusClientVersion() {
-  return typeof __APP_VERSION__ !== 'undefined' && __APP_VERSION__ ? String(__APP_VERSION__) : 'dev';
+  return typeof __APP_VERSION__ !== 'undefined' && /^\d+\.\d+\.\d+$/.test(String(__APP_VERSION__)) ? String(__APP_VERSION__) : null;
 }

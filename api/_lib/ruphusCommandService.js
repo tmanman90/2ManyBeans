@@ -255,7 +255,7 @@ function commitRevision(state, bean, current, command, recipe, source, proposal 
   return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.id, proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' }) };
 }
 
-export async function executeRecipeCommand({ db, uid, ...command }) {
+export async function executeRecipeCommand({ db, uid, clientVersion = null, ...command }) {
   if (!db?.runTransaction || !db?.collection) throw new Error('Firestore database is required');
   if (!uid) fail('owner_required', 'Authenticated owner is required.');
   return db.runTransaction(async (tx) => {
@@ -298,7 +298,7 @@ export async function executeRecipeCommand({ db, uid, ...command }) {
     const result = executeState(state, { ...command, slotKey });
     const changedBean = state.beans.get(command.coffeeId);
     const { id: _id, ownerId: _ownerId, ...beanUpdate } = changedBean;
-    if (canonicalHash(beforeBean) !== canonicalHash(changedBean)) tx.update(beanRef, { ...beanUpdate, updatedAt: new Date().toISOString() });
+    if (canonicalHash(beforeBean) !== canonicalHash(changedBean)) tx.update(beanRef, { ...beanUpdate, ...(clientVersion ? { clientVersion } : {}), updatedAt: new Date().toISOString() });
     const revisions = db.collection('users').doc(uid).collection('recipeRevisions');
     if (command.proposalId && state.proposals.has(command.proposalId)) tx.set(db.collection('users').doc(uid).collection('proposals').doc(command.proposalId), clone(state.proposals.get(command.proposalId)), { merge: true });
     if (command.attemptId && state.attempts.has(command.attemptId)) tx.set(db.collection('users').doc(uid).collection('brewAttempts').doc(command.attemptId), clone(state.attempts.get(command.attemptId)), { merge: true });

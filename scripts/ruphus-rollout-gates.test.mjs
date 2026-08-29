@@ -4,14 +4,20 @@ import test from 'node:test';
 import {
   CENSUS_WINDOW_DAYS,
   MUTATION_ROLLOUT_MODES,
+  aggregateProviderUsage,
+  aggregateProviderRetryCount,
+  evaluateBeanCensus,
   isAgentAccessAllowed,
   isMutationAllowed,
   isTraceRetentionConfigured,
+  normalizeTelemetryUsage,
+  readRuphusBeanCensus,
   persistRuphusTrace,
-  recordRuphusCensus,
   redactRuphusTelemetry,
 } from '../api/_lib/ruphusRollout.js';
 import { recoveryForAgentFrame } from '../src/lib/ruphus/recovery.js';
+import { resolveAgentStreamResult } from '../src/lib/ruphus/streamAgent.js';
+import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 
 function fakeDb() {
   const writes = [];
@@ -28,10 +34,11 @@ test('server gates ignore forged client hints and fail closed when UID config is
   assert.equal(isAgentAccessAllowed({ uid: 'u-1', rawUids: 'u-2', clientEnabled: true }), false);
   assert.equal(isAgentAccessAllowed({ uid: 'u-1', rawUids: 'u-1' }), true);
   assert.equal(isMutationAllowed({ uid: 'u-1', mode: 'timer_started', rawUids: '' }), false);
-  assert.equal(isMutationAllowed({ uid: 'u-1', mode: 'timer_started', rawUids: 'u-1' }), true);
+  assert.equal(isMutationAllowed({ uid: 'u-1', mode: 'timer_started', rawUids: 'u-1', rawAccessUids: 'u-1' }), false);
   for (const mode of MUTATION_ROLLOUT_MODES) {
-    assert.equal(isMutationAllowed({ uid: 'u-1', mode, rawUids: 'u-1' }), true, mode);
+    assert.equal(isMutationAllowed({ uid: 'u-1', mode, rawUids: 'u-1', rawAccessUids: 'u-1' }), true, mode);
     assert.equal(isMutationAllowed({ uid: 'u-1', mode, rawUids: '' }), false, mode);
+    assert.equal(isMutationAllowed({ uid: 'u-1', mode, rawUids: 'u-1', rawAccessUids: '' }), false, mode);
   }
 });
 
@@ -43,13 +50,15 @@ test('ordinary generation, dose, grind, and link modes never use the mutation ga
   const source = fs.readFileSync(new URL('../api/recipe-command.js', import.meta.url), 'utf8');
   assert.match(source, /requiredTierFor/);
   assert.match(source, /isMutationAllowed/);
+  assert.match(source, /rawAccessUids: process\.env\.RUPHUS_AGENT_V3_UIDS/);
   assert.match(source, /approvalSource: MUTATION_MODES\.includes\(command\.mode\) \? 'native_card' : 'ordinary_app'/);
   assert.match(source, /const \{ clientVersion: _clientVersion, commandCapabilities: _commandCapabilities, \.\.\.serverCommand \} = command/);
+  assert.match(source, /normalizeClientVersion\(command\.clientVersion\)/);
 });
 
 test('redaction emits only owner-safe telemetry fields', () => {
   const event = redactRuphusTelemetry({
-    provider: 'openai', model: 'gpt-5.6-luna', contextId: 'private-context', toolNames: ['read_recipe'],
+    provider: 'openai', model: 'gpt-5.6-luna', contextId: 'private-context', toolNames: ['read_recipe', 'malicious_unknown_tool'],
     proposalValid: true, approvalSource: 'user_button', receiptId: 'receipt-private', actionId: 'action-private',
     latencyMs: 12, ttffMs: 4, totalMs: 20, retryCount: 1, inputTokens: 10, outputTokens: 8, estimatedCost: 0.01,
     prompt: 'private prompt', userText: 'raw tasting prose', uid: 'owner-private', credentials: 'secret', recordId: 'bean-private',
@@ -63,6 +72,31 @@ test('redaction emits only owner-safe telemetry fields', () => {
   assert.match(serialized, /contextHash/);
   assert.match(serialized, /actionHash/);
   assert.deepEqual(event.toolNames, ['read_recipe']);
+});
+
+test('provider usage aggregates across tool rounds while retries remain provider-reported only', () => {
+  const usage = aggregateProviderUsage('openai', [{ input_tokens: 100, output_tokens: 10 }, { input_tokens: 40, output_tokens: 4 }]);
+  assert.deepEqual(normalizeTelemetryUsage('openai', 'gpt-5.6-luna', usage), { inputTokens: 140, outputTokens: 14, totalTokens: 154, estimatedCost: 0.000045 });
+  assert.equal(aggregateProviderRetryCount([{ retryCount: 1 }, { retry_count: 2 }]), 3);
+  assert.equal(aggregateProviderRetryCount([{ usage: { input_tokens: 1 } }]), undefined);
+});
+
+test('orchestrator aggregates two provider rounds and rejects unknown names before lifecycle/tool dispatch', async () => {
+  const calls = []; const frames = [];
+  const provider = { runTurn: async (input) => {
+    calls.push(input);
+    if (calls.length === 1) return { model: 'gpt-5.6-luna', usage: { input_tokens: 100, output_tokens: 10 }, toolCalls: [{ callId: 'c1', name: 'read_recipe', args: {} }] };
+    return { model: 'gpt-5.6-luna', usage: { input_tokens: 40, output_tokens: 4 }, retryCount: 1, text: 'done' };
+  } };
+  const result = await runRuphusTurn({ turnId: 'turn-aggregate', context: {}, userText: 'test', provider, tools: { names: ['read_recipe'], definitions: [], call: async () => ({ ok: true }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(result.usage.input_tokens, 140);
+  assert.equal(result.usage.output_tokens, 14);
+  assert.equal(result.retryCount, 1);
+  let dispatched = false;
+  const denied = await runRuphusTurn({ turnId: 'turn-unknown', context: {}, userText: 'test', provider: { runTurn: async () => ({ toolCalls: [{ name: 'unknown_provider_tool', args: {} }] }) }, tools: { names: ['read_recipe'], definitions: [], call: async () => { dispatched = true; } }, emit: (frame) => frames.push(frame) });
+  assert.equal(denied.ok, false);
+  assert.equal(dispatched, false);
+  assert.equal(frames.filter((frame) => frame.turnId === 'turn-unknown' && frame.type === 'tool_started').length, 0);
 });
 
 test('raw trace writes fail closed until an explicit valid retention config exists', async () => {
@@ -79,13 +113,31 @@ test('raw trace writes fail closed until an explicit valid retention config exis
   assert.equal(fake.writes[0].value.expiresAt.getTime() > fake.writes[0].value.createdAt.getTime(), true);
 });
 
-test('census is owner-scoped, carries the plan-authorized observation window, and has no raw IDs', async () => {
-  const fake = fakeDb();
-  const result = await recordRuphusCensus({ db: fake.db, uid: 'owner-1', clientVersion: '1.1.243', commandCapabilities: ['set_dose', 'set_dose', 'timer_started'], source: 'client' });
-  assert.equal(result.written, true);
-  assert.equal(result.windowDays, CENSUS_WINDOW_DAYS);
-  assert.deepEqual(fake.writes[0].value.commandCapabilities, ['set_dose', 'timer_started']);
-  assert.equal(JSON.stringify(fake.writes[0].value).includes('owner-1'), false);
+test('bean census treats missing/malformed/old versions as stragglers and accepts only explicit exceptions', () => {
+  const beans = [
+    { uid: 'new', clientVersion: '1.2.4' },
+    { uid: 'missing' },
+    { uid: 'malformed', clientVersion: '1.2' },
+    { uid: 'old', clientVersion: '1.2.3' },
+  ];
+  const first = evaluateBeanCensus({ beans, minimumVersion: '1.2.4' });
+  assert.equal(first.ready, false);
+  assert.deepEqual(first.stragglers, ['malformed', 'missing', 'old']);
+  assert.equal(evaluateBeanCensus({ beans, minimumVersion: '1.2.4', acceptedStragglers: ['malformed', 'missing', 'old'] }).ready, true);
+  assert.equal(evaluateBeanCensus({ beans: [], minimumVersion: '1.2.4' }).ready, false);
+  assert.equal(CENSUS_WINDOW_DAYS, 14);
+});
+
+test('bean census reads only the exact 14-day window across users', async () => {
+  const now = Date.parse('2026-08-29T00:00:00.000Z');
+  const docs = [
+    { ref: { path: 'users/u-new/beans/b1' }, data: () => ({ clientVersion: '1.2.4', updatedAt: new Date(now - 1000) }) },
+    { ref: { path: 'users/u-old/beans/b2' }, data: () => ({ clientVersion: '1.0.0', updatedAt: new Date(now - 15 * 24 * 60 * 60 * 1000) }) },
+  ];
+  const query = { where: () => query, get: async () => ({ docs }) };
+  const result = await readRuphusBeanCensus({ db: { collectionGroup: () => query }, minimumVersion: '1.2.4', now });
+  assert.deepEqual(result.observedUids, ['u-new']);
+  assert.equal(result.ready, true);
 });
 
 test('failed/interrupted Agent frames offer explicit legacy recovery without replay', () => {
@@ -98,6 +150,12 @@ test('failed/interrupted Agent frames offer explicit legacy recovery without rep
   assert.match(source, /recovered_to_legacy/);
 });
 
+test('completed frame survives transport loss without replay while failed frames remain failures', () => {
+  assert.deepEqual(resolveAgentStreamResult({ terminalType: 'turn_completed', usageSeen: false, transportError: Object.assign(new Error('usage envelope lost'), { code: 'stream_incomplete' }) }), { ok: true, usageMissing: true });
+  assert.equal(resolveAgentStreamResult({ terminalType: 'turn_failed', usageSeen: false }).ok, false);
+  assert.equal(resolveAgentStreamResult({ terminalType: 'turn_interrupted', usageSeen: false }).ok, false);
+});
+
 test('Agent traces bind canonical evidence/request hashes and pricing-normalized usage', () => {
   const source = fs.readFileSync(new URL('../api/ruphus-agent.js', import.meta.url), 'utf8');
   assert.match(source, /contextHash: context\.evidenceHash/);
@@ -108,6 +166,15 @@ test('Agent traces bind canonical evidence/request hashes and pricing-normalized
 test('deletion source covers Agent telemetry and census collections', () => {
   const source = fs.readFileSync(new URL('../api/delete-account.js', import.meta.url), 'utf8');
   assert.match(source, /ruphusTelemetry/);
-  assert.match(source, /ruphusCensus/);
   assert.match(source, /apiUsage.*ruphus-agent-v3/s);
+});
+
+test('bean writers stamp strict client versions and telemetry TTL policy is source-controlled', () => {
+  const appData = fs.readFileSync(new URL('../src/hooks/useAppData.js', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../src/components/SettingsPage.jsx', import.meta.url), 'utf8');
+  assert.match(appData, /clientVersion: ruphusClientVersion\(\)/);
+  assert.match(settings, /clientVersion: ruphusClientVersion\(\)/);
+  const indexes = JSON.parse(fs.readFileSync(new URL('../firestore.indexes.json', import.meta.url), 'utf8'));
+  assert.deepEqual(indexes.fieldOverrides, [{ collectionGroup: 'ruphusTelemetry', fieldPath: 'expiresAt', ttl: true, indexes: [] }]);
+  assert.equal(appData.includes('ruphusCensus'), false);
 });
