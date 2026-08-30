@@ -76,6 +76,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const trustedWiden = context.historyWidened === true || context.__ruphusHistoryWidened === true;
       const evidence = await readCoffeeEvidence({ uid, coffeeId, launchItem, readers, windowDays: trustedWiden ? null : args.windowDays, now: args.now, timeoutMs: args.timeoutMs });
       const snapshotCoffee = snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef);
+      const methodCorrected = /\b(?:actually|no[, ]|correction|instead|i (?:meant|brewed|used)|it was)\b[\s\S]*\b(?:aiden|v60|kalita|hot|iced)\b/i.test(context.userText || '');
+      if (methodCorrected) context.__ruphusLaunchHintConsumed = true;
       const method = resolveMethod({
         userText: context.userText || '',
         launchItem,
@@ -88,6 +90,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         defaultMethod: snapshot.setup?.defaultMethod,
         now: args.now,
         historyDays: evidence.windowDays,
+        launchHintConsumed: methodCorrected || context.__ruphusLaunchHintConsumed === true,
+        methodCorrected,
+        focusChanged: Boolean(context.launchCoffeeId && context.launchCoffeeId !== args.coffeeRef),
       });
       if (launchItem) context.__ruphusLaunchHintConsumed = true;
       context.ledger = appendLedger(context.ledger, ledgerEntryFromEvidence(evidence, { coffee: evidence.coffee?.coffee }), { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });

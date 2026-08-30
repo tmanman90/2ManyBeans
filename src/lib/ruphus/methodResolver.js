@@ -74,7 +74,10 @@ export function resolveMethod(input = {}) {
   }
   if (uniqueRecorded.length === 1) return methodResult(uniqueRecorded[0], 'M2');
 
-  const rawRecipes = Array.isArray(input.recipeSlots) ? input.recipeSlots : Array.isArray(input.recipes) ? input.recipes : Object.keys(input.recipes || {});
+  const rawRecipes = [
+    ...(Array.isArray(input.recipeSlots) ? input.recipeSlots : []),
+    ...(Array.isArray(input.recipes) ? input.recipes : Object.keys(input.recipes || {})),
+  ];
   const recipes = rawRecipes.map((recipe) => slot(typeof recipe === 'string' ? recipe : recipe?.slotKey || recipe?.slot || recipe?.method)).filter(Boolean);
   const uniqueRecipes = [...new Set(recipes)];
   if (uniqueRecipes.length === 1) {

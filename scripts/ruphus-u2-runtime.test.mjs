@@ -22,6 +22,12 @@ test('orchestrator buffers text, rejects premature proposal, and regenerates one
   const result = await runRuphusTurn({ turnId: 't1', context: base, userText: 'Go ahead and make that change.', provider, tools, emit: (frame) => frames.push(frame) });
   assert.equal(result.ok, true); assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 1); assert.equal(frames.find((frame) => frame.type === 'text_delta').text, 'Try one step finer than Ode 4.2.'); assert.equal(result.trace.regenerations.length, 1);
 });
+test('method correction permanently drops the launch hint before evidence resolution', async () => {
+  const current = { ...base, launchCoffeeId: 'c1', launchContext: { surface: 'recipe_aiden', launchItem: { kind: 'recipe', ref: 'recipe-1', method: 'aiden' } }, userText: 'Actually, I used v60', __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'recipe-1', method: 'aiden' } }, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map() };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readCoffee: async () => ({ name: 'El Vergel' }), readRecipe: async () => [{ slotKey: 'v60_hot', dose: 15 }], readBrews: async () => [], readTastings: async () => [] } });
+  const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(result.method.slot, 'v60_hot'); assert.equal(current.__ruphusLaunchHintConsumed, true);
+});
 
 test('RT3 delivers regenerated length/markup text and carries corrective instruction plus all tool evidence', async () => {
   const frames = []; let runs = 0; const seen = [];
