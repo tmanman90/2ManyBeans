@@ -56,9 +56,11 @@ export async function createFirestoreSessionReset({ projectId, fixtureUid } = {}
   return async ({ fixture, repetition, stage, session = null } = {}) => {
     const now = Date.now();
     const ageDays = Number(session?.lastActivityOffsetDays) || 0;
+    const storedMessages = Array.isArray(session?.messages) ? session.messages : [];
+    const boundaryIndex = Number.isInteger(session?.boundaryIndex) ? session.boundaryIndex : 0;
     await db.collection('users').doc(fixtureUid).collection('chatSessions').doc('active').set({
-      protocolVersion: 1, messages: [], turns: [], contextRef: fixture?.launchContext || null, launchContext: fixture?.launchContext || null,
-      ledger: { version: 1, entries: [], namedCoffees: [], bytes: 0 }, boundaryIndex: 0, lastActivityAt: now - ageDays * 24 * 60 * 60 * 1000,
+      protocolVersion: 1, messages: storedMessages, turns: Array.isArray(session?.turns) ? session.turns : [], contextRef: fixture?.launchContext || null, launchContext: fixture?.launchContext || null,
+      ledger: session?.ledger || { version: 1, entries: [], namedCoffees: [], bytes: 0 }, boundaryIndex, lastActivityAt: Number.isFinite(Number(session?.lastActivityAt)) ? Number(session.lastActivityAt) : now - ageDays * 24 * 60 * 60 * 1000,
       launchHintConsumed: false, historyWidened: false, updatedAt: now, u3Stage: stage || 'injected', u3Repetition: repetition || 1,
     });
   };
