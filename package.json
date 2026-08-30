@@ -44,7 +44,7 @@
     "@capgo/capacitor-social-login": "^8.3.9",
     "@capgo/capacitor-updater": "^8.45.0",
     "@google/generative-ai": "^0.24.1",
-    "@revenuecat/purchases-capacitor": "^12.3.2",
+    "@revenuecat/purchases-capacitor": "13.2.0",
     "firebase": "^12.9.0",
     "firebase-admin": "^13.9.0",
     "framer-motion": "^12.40.0",
