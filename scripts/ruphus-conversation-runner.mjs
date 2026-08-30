@@ -368,7 +368,7 @@ export function nextBranchTurn(fixture, index, reply) {
 function resolveFixtureRef(value, refMap) {
   if (!value) return null;
   if (refMap[value]) return refMap[value];
-  return Object.entries(refMap).find(([, id]) => id === value)?.[0] || value;
+  return value;
 }
 
 function factualEvidenceText(fixture, frames, factSheet = '') {
@@ -384,20 +384,23 @@ function hasUnsupportedFactualClaim(reply, knownText) {
   if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
   const factualPhrases = value.match(/\b(?:brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)\b[^.!?]{0,80}/gi) || [];
   return factualPhrases.some((phrase) => {
-    const words = phrase.toLowerCase().split(/\s+/).filter((word) => word.length > 3 && !/^(?:your|the|was|is|and|with|for|this|that|a|an|on|of|to)$/.test(word));
-    return words.length > 0 && !words.some((word) => knownText.includes(word.replace(/[^a-z0-9.]/g, '')));
+    const words = phrase.toLowerCase().split(/\s+/).map((word) => word.replace(/[^a-z0-9.]/g, '')).filter((word) => word.length > 3 && !/^(?:your|the|was|is|and|with|for|this|that|a|an|on|of|to|had|like|called|about)$/.test(word));
+    const distinctive = words.filter((word) => !/^(?:brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)$/.test(word));
+    return distinctive.length > 0 && distinctive.some((word) => !knownText.includes(word));
   });
 }
 
-export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '' } = {}) {
+export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [] } = {}) {
   const toolResults = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {}).filter(object);
-  const rawActual = toolResults.map((result) => result.coffeeRef || result.actualCoffeeId || result.focusCoffeeId || result.focus?.coffeeRef || result.focus?.coffeeId || result.evidence?.coffeeRef || result.coffee?.id).find(Boolean) || null;
+  const rawActual = [...toolResults].reverse().map((result) => result.coffeeRef || result.actualCoffeeId || result.focusCoffeeId || result.focus?.coffeeRef || result.focus?.coffeeId || result.evidence?.coffeeRef || result.coffee?.id).find(Boolean) || null;
   const actual = resolveFixtureRef(rawActual, refMap);
   const expectation = fixture?.expected?.turns?.[turnIndex] || fixture?.expected?.perTurn?.[turnIndex] || {};
   const expectedRaw = expectation.focus || (fixture?.expected?.focus?.length === 1 ? fixture.expected.focus[0] : null) || fixture?.launchContext?.coffeeRef;
   const expected = resolveFixtureRef(expectedRaw, refMap);
+  const replyCoffee = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.name && new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(reply)).map((coffee) => coffee.id);
+  const fallback = replyCoffee.length === 1 ? replyCoffee[0] : resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
   const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet));
-  return { expectedCoffeeId: expected, actualCoffeeId: actual, focusCoffeeId: actual, fabricatedEvidence: fabricated, expectedFocus: expected, ambiguity: expectation.ambiguity === true };
+  return { expectedCoffeeId: expected || fallback, actualCoffeeId: actual || fallback, focusCoffeeId: actual || fallback, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
 
 export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl = globalThis.fetch }) {
@@ -411,10 +414,16 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl 
   let body;
   const contentType = response.headers?.get?.('content-type') || '';
   if (contentType.includes('ndjson') && typeof response.text === 'function') {
-    const frames = (await response.text()).split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+    let text = '';
+    if (response.body?.getReader) {
+      const reader = response.body.getReader(); const decoder = new TextDecoder();
+      while (true) { const chunk = await reader.read(); if (chunk.done) break; text += decoder.decode(chunk.value, { stream: true }); }
+      text += decoder.decode();
+    } else text = await response.text();
+    const frames = text.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
     const completed = frames.find((frame) => frame.type === 'turn_completed');
     const delta = frames.filter((frame) => frame.type === 'text_delta').map((frame) => frame.text || '').join('');
-    body = { ...(completed || {}), text: completed?.text || delta, frames, usage: frames.find((frame) => frame.type === 'usage')?.usage || null };
+    body = { ...(completed || {}), text: completed?.text || delta, frames, usage: frames.find((frame) => frame.type === 'usage')?.usage || null, timing: completed?.timing || frames.find((frame) => frame.type === 'timing')?.timing || null };
   } else if (typeof response.json === 'function') body = await response.json();
   else throw new Error('U3 endpoint returned an unreadable response');
   if (!body || typeof body.text !== 'string') throw new Error('U3 endpoint returned no visible reply');
@@ -435,7 +444,7 @@ export function createLiveJudgeAdapter({ endpoint = process.env.RUPHUS_JUDGE_END
   return adapter;
 }
 
-export async function runLiveCase(account, fixture, { endpoint, token, costGuard, fetchImpl, onTurn = null } = {}) {
+export async function runLiveCase(account, fixture, { endpoint, token, costGuard, fetchImpl, onTurn = null, stageRunId = 'live', repetition = 1 } = {}) {
   const context = fixtureContext(account, fixture);
   const transcript = [];
   const results = [];
@@ -449,7 +458,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     await costGuard?.persistState?.();
     let result;
     try { result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
-      turnId: `live-${fixture.id}-${index + 1}`, contextRef: context.launchContext, userText,
+      turnId: `${stageRunId}-${fixture.id}-r${repetition}-t${index + 1}`, contextRef: context.launchContext, userText,
       conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: false,
     } }); } catch (error) { if (reservation) costGuard.reconcile(reservation, 0); await costGuard?.persistState?.(); throw error; }
     const model = result.model || RUPHUS_OPENAI_MODEL;
@@ -458,16 +467,18 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     if (reservation) costGuard.reconcile(reservation, priced.cost); else costGuard?.charge(priced.cost);
     await costGuard?.persistState?.();
     transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });
-    const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account) });
+    const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account), coffees: account.coffees });
     const toolEvidenceText = JSON.stringify((result.frames || []).filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {})).toLowerCase();
     const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: { days: 14 }, evidence: { records: (result.frames || []).filter((frame) => frame?.type === 'tool_result') }, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
     if (/\b(?:history|earlier|previous|recorded|last tasting|last brew)\b/i.test(result.text) && !(result.frames || []).some((frame) => frame?.type === 'tool_result')) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence' });
     const expectedMethod = fixture.expected?.method;
     if (expectedMethod && !new RegExp(String(expectedMethod).replace('_', '|'), 'i').test(`${result.text} ${toolEvidenceText}`)) grader.ordinary.push({ code: 'U3_METHOD_SLOT_MISSING', category: 'ordinary', message: 'declared method slot was not evidenced' });
     const branch = nextBranchTurn(fixture, index, result);
-    const latencyMs = performance.now() - started;
+    const latencyMs = result.timing?.checkedReplyMs ?? performance.now() - started;
+    const regenerationCount = result.timing?.regenerationCount ?? (result.frames || []).filter((frame) => /regenerat|replac/i.test(String(frame?.type || ''))).length;
+    if (regenerationCount > 0) grader.ordinary.push({ code: 'U3_REGENERATION_OR_REPLACEMENT', category: 'ordinary', message: 'a regeneration or replacement was required' });
     if (latencyMs > 25000) grader.ordinary.push({ code: 'U3_TURN_OVER_25S', category: 'ordinary', message: 'turn exceeded the authoritative 25 second limit' });
-    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs, readRoundMs: result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: (result.frames || []).filter((frame) => /regenerat|replac/i.test(String(frame?.type || ''))).length, evidenceBeforeHistory: (result.frames || []).some((frame) => frame?.type === 'tool_result'), costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
+    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs, firstFrameMs: result.timing?.firstFrameMs ?? null, readRoundMs: result.timing?.readRoundMs ?? result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: regenerationCount, evidenceBeforeHistory: (result.frames || []).some((frame) => frame?.type === 'tool_result'), costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
     if (branch.unexpectedBranch) {
       turnResult.grader.ordinary.push({ code: 'U3_UNEXPECTED_BRANCH', category: 'ordinary', message: 'model asked an undeclared question branch; fixture stopped' });
       results.push(turnResult);
@@ -495,6 +506,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   const persistCost = (value) => persistCumulativeCostLedger(costLedgerPath, value);
   const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: priorCost.spentUsd, initialReservedUsd: priorCost.reservedUsd, persist: persistCost });
   await guard.persistState();
+  const startingSpentUsd = guard.spentUsd;
   const stageRunId = `u3-${Date.now()}`;
   const calibrationRecords = [];
   const judgeRecords = [];
@@ -512,7 +524,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
       const result = await dispatchMetered(judge, packet, guard);
       const kind = goldPacketIds.has(packet.packetId) ? 'gold' : 'knownBad';
       calibrationResults.push({ kind, result });
-      calibrationRecords.push({ kind, packetId: packet.packetId, provider: result?.provider || judge.provider || null, model: result?.model || judge.model || null, usage: result?.usage || null });
+      calibrationRecords.push({ kind, packetId: packet.packetId, mean: result?.result?.mean ?? result?.mean ?? null, scores: result?.result?.scores || result?.scores || null, rationale: result?.result?.rationale || result?.rationale || null, provider: result?.provider || judge.provider || null, model: result?.model || judge.model || null, usage: result?.usage || null });
     }
     // Split only after dispatch, keeping calibration labels out of packets.
     calibration = assessCalibration({ goldResults: calibrationResults.filter((item) => item.kind === 'gold').map((item) => item.result), knownBadResults: calibrationResults.filter((item) => item.kind === 'knownBad').map((item) => item.result) });
@@ -522,7 +534,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   for (const run of schedule) {
     const fixture = cases.cases.find((item) => item.id === run.fixtureId);
     await resetSession({ fixture, repetition: run.repeat, stage, session: fixture.session || null });
-    const candidate = await runLiveCase(account, fixture, { endpoint, token, costGuard: guard, fetchImpl });
+    const candidate = await runLiveCase(account, fixture, { endpoint, token, costGuard: guard, fetchImpl, stageRunId, repetition: run.repeat });
     const transcript = candidate.transcript;
     if (judge && stage !== 'smoke') {
       const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
@@ -546,7 +558,12 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   const latencyValues = results.flatMap((result) => result.results || []).map((turn) => turn.latencyMs).filter(Number.isFinite).sort((a, b) => a - b);
   const readValues = results.flatMap((result) => result.results || []).map((turn) => turn.readRoundMs).filter(Number.isFinite).sort((a, b) => a - b);
   const percentile = (values, fraction) => values.length ? values[Math.min(values.length - 1, Math.floor((values.length - 1) * fraction))] : null;
-  const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, calibration: stage === 'smoke' ? null : { ...calibration, records: calibrationRecords }, judge: { records: judgeRecords }, pairwise: { records: pairwiseRecords }, latency: { checkedReplyMs: { p50: percentile(latencyValues, 0.5), p90: percentile(latencyValues, 0.9) }, readRoundMs: { p50: percentile(readValues, 0.5), p90: percentile(readValues, 0.9) } }, results, costUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results) };
+  const checkedReplyMs = { p50: percentile(latencyValues, 0.5), p90: percentile(latencyValues, 0.9) };
+  const readRoundMs = { p50: percentile(readValues, 0.5), p90: percentile(readValues, 0.9) };
+  const latency = { checkedReplyMs, readRoundMs, budget: { checkedReplyP50: checkedReplyMs.p50 == null || checkedReplyMs.p50 <= 8000, checkedReplyP90: checkedReplyMs.p90 == null || checkedReplyMs.p90 <= 15000, readRoundP90: readRoundMs.p90 == null || readRoundMs.p90 <= 1500 } };
+  latency.passed = Object.values(latency.budget).every(Boolean);
+  const stageResult = stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results);
+  const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, calibration: stage === 'smoke' ? null : { ...calibration, records: calibrationRecords }, judge: { records: judgeRecords }, pairwise: { records: pairwiseRecords }, latency, ordinaryFailures: latency.passed ? [] : ['U3_LATENCY_BUDGET'], results, costUsd: guard.spentUsd - startingSpentUsd, cumulativeCostUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stageResult && latency.passed };
   if (artifactDirectory) await persistRunArtifact(artifactDirectory, report);
   if (stage === 'smoke' && smokeLedgerPath) await appendSmokeLedger(smokeLedgerPath, { commit, clean: report.clean });
   return report;

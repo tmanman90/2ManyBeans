@@ -50,7 +50,11 @@ export function proposalEligibleForTarget(context, request = {}) {
 
 export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
   if (!turnId || !provider?.runTurn || !tools?.call) throw new Error('turn requires identity, provider, and tools');
-  const send = (type, fields = {}) => emit?.(createLifecycleFrame(type, turnId, fields));
+  const turnStartedAt = performance.now(); let firstFrameAt = null; let readRoundMs = 0;
+  const send = (type, fields = {}) => {
+    if (type === 'text_delta' && firstFrameAt == null) firstFrameAt = performance.now();
+    return emit?.(createLifecycleFrame(type, turnId, fields));
+  };
   send('turn_accepted', { protocolVersion: RUPHUS_CONTRACT_VERSION });
   send('context_loading', { evidenceHash: context?.evidenceHash || null });
   let response; let toolCalls = 0; let readCalls = 0; let toolRounds = 0; let text = '';
@@ -79,6 +83,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       }
       if (proposalRequests.length) proposalClaimed = true;
       toolCalls += calls.length;
+      const readRoundStartedAt = performance.now();
       const results = await Promise.all(calls.map(async (request) => {
         send('tool_started', { name: request.name, ...(request.callId ? { callId: request.callId } : {}) }); toolNames.push(request.name);
         const result = await tools.call(request.name, request.args || {});
@@ -90,6 +95,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         if (result?.artifact) send('artifact_ready', { artifact: result.artifact });
         return { callId: request.callId, name: request.name, result };
       }));
+      readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
       response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results } }); rememberUsage(response);
     }
     let checked = text.trim();
@@ -106,8 +112,9 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       trace.regenerations.at(-1).delivered = checked === REPLACEMENT ? 'replacement' : 'regenerated';
     }
     if (checked) send('text_delta', { text: checked });
-    send('turn_completed', { text: checked });
-    return { ok: true, turnId, text: checked, toolCalls, toolNames, proposalIds, trace, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace }) };
+    const timing = { firstFrameMs: firstFrameAt == null ? null : firstFrameAt - turnStartedAt, checkedReplyMs: performance.now() - turnStartedAt, readRoundMs: readRoundMs || null, regenerationCount: trace.regenerations.length };
+    send('turn_completed', { text: checked, timing });
+    return { ok: true, turnId, text: checked, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace }) };
   } catch (error) {
     send(error.code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code: error.code || 'turn_failed', message: error.message });
     return { ok: false, turnId, code: error.code || 'turn_failed', text: '', toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };

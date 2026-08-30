@@ -4,6 +4,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
+import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
+import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
   appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
@@ -80,6 +82,16 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: fabricated }).catastrophic.some((item) => item.code === 'CF2_FABRICATED_EVIDENCE'), true);
   const fabricatedClaim = deriveFixtureTrace({ fixture, reply: 'Your brew used 99 grams and tasted like Moon Base.', frames: [{ type: 'tool_result', result: { coffeeRef: 'fixture-right', evidence: { coffeeRef: 'fixture-right', dose: 15 } } }] });
   assert.equal(fabricatedClaim.fabricatedEvidence, true);
+  const snapshot = buildRotationSnapshot({ coffees: [{ id: 'fixture-right', name: 'Right', jarSlot: 1, status: 'ACTIVE' }], setup: {} });
+  const ref = Object.keys(snapshot.refs)[0];
+  const expected = deriveFixtureTrace({ fixture: { expected: { focus: ['fixture-right'] } }, refMap: snapshot.refs, frames: [{ type: 'tool_result', result: { coffeeRef: ref } }] });
+  assert.equal(expected.expectedCoffeeId, 'fixture-right');
+  assert.equal(expected.actualCoffeeId, 'fixture-right');
+  assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: expected, expectedCoffeeId: expected.expectedCoffeeId, actualCoffeeId: expected.actualCoffeeId }).catastrophic.length, 0);
+  const wrongFocus = deriveFixtureTrace({ fixture: { expected: { focus: ['fixture-right'] } }, refMap: snapshot.refs, frames: [{ type: 'tool_result', result: { coffeeRef: 'fixture-wrong' } }] });
+  assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: wrongFocus, expectedCoffeeId: wrongFocus.expectedCoffeeId, actualCoffeeId: wrongFocus.actualCoffeeId }).catastrophic.some((item) => item.code === 'CF1_WRONG_COFFEE'), true);
+  const grounded = deriveFixtureTrace({ fixture, reply: 'The tasting was thin and sour.', factSheet: 'The tasting was thin and sour.', frames: [] });
+  assert.equal(grounded.fabricatedEvidence, false);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
@@ -109,14 +121,19 @@ test('live playback follows a declared model-question branch and rejects unmeter
   const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
   assert.equal(payloads[1].userText, 'actual answer');
   assert.equal(result.results[0].unexpectedBranch, false);
+  assert.match(payloads[0].turnId, /-r1-t1$/);
+  assert.notEqual(payloads[0].turnId, payloads[1].turnId);
+  await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost, stageRunId: 'stage-2', repetition: 2 });
+  assert.notEqual(payloads[0].turnId, payloads[2].turnId);
   assert.ok(cost.spentUsd > 0);
   await assert.rejects(() => runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl: async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"turn_completed","text":"x"}\n' }), costGuard: { assertCanCall() {}, charge() {} } }), /unpriceable usage/);
 });
 
 test('live adapter consumes NDJSON and persisted artifacts redact canary secrets', async () => {
-  const response = { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"text_delta","text":"done"}\n{"type":"turn_completed","text":"done"}\n' };
+  const response = { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"text_delta","text":"done"}\n{"type":"turn_completed","text":"done","timing":{"firstFrameMs":12,"checkedReplyMs":30,"readRoundMs":4,"regenerationCount":0}}\n' };
   const result = await runLiveEndpointTurn({ endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'canary-token', payload: {}, fetchImpl: async () => response });
   assert.equal(result.text, 'done');
+  assert.equal(result.timing.checkedReplyMs, 30);
   assert.equal(redactDiagnostic({ token: 'canary-token', email: 'person@example.com', uid: 'fixture-owner' }).includes('canary-token'), false);
   const directory = await mkdtemp(join(tmpdir(), 'ruphus-u3-artifact-'));
   try {
@@ -130,4 +147,18 @@ test('live adapter consumes NDJSON and persisted artifacts redact canary secrets
     const ledger = await appendSmokeLedger(join(directory, 'smoke-ledger.json'), { commit: 'abc', clean: true });
     assert.deepEqual(ledger.map((entry) => entry.commit), ['abc']);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('orchestrator emits safe timing on the completed frame without exposing evidence', async () => {
+  const frames = [];
+  const result = await runRuphusTurn({
+    turnId: 'timing-test', userText: 'hello', context: { conversation: [] },
+    provider: { runTurn: async () => ({ text: 'A short coffee reply.', usage: { input_tokens: 1, output_tokens: 1 }, model: 'gpt-5.6-luna' }) },
+    tools: { definitions: [], names: [], call: async () => ({}) }, emit: (frame) => frames.push(frame),
+  });
+  const completed = frames.find((frame) => frame.type === 'turn_completed');
+  assert.equal(completed.timing.regenerationCount, 0);
+  assert.equal(typeof completed.timing.checkedReplyMs, 'number');
+  assert.equal(result.turnId, 'timing-test');
+  assert.equal(Object.hasOwn(completed.timing, 'evidence'), false);
 });
