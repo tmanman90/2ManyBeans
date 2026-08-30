@@ -4,7 +4,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, firestoreReaders, hasUnavailableEvidence, retryUnavailableEvidence, sessionConversationForProvider } from '../api/ruphus-agent.js';
+import { allowedAgentUids, firestoreReaders, hasUnavailableEvidence, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
@@ -49,10 +49,26 @@ test('unavailable active evidence is retried before a prose-only continuation', 
   const result = await retryUnavailableEvidence({ session, context: { launchCoffeeId: 'c1', historyWidened: true }, tools: { call: async (...args) => { calls.push(args); return { tastings: { status: 'available' } }; } } });
   assert.equal(result.tastings.status, 'available'); assert.deepEqual(calls, [['read_coffee_evidence', { coffeeRef: 'c1', windowDays: null }]]); assert.equal(hasUnavailableEvidence(session), true);
 });
+test('unavailable direct-chat evidence retries through the server ref map and reaches the provider ledger', async () => {
+  const calls = [];
+  const session = { ledger: { entries: [{ status: 'partial', namedCoffees: ['El Vergel'], evidence: [{ kind: 'tastings', status: 'unavailable' }] }] } };
+  const current = { rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel' }] }, __ruphusRefs: { c1: 'bean-1' }, historyWidened: false, ledger: { entries: [] } };
+  assert.equal(resolveLedgerCoffeeRef(session, current), 'c1');
+  const result = await retryUnavailableEvidence({ session, context: current, tools: { call: async (...args) => { calls.push(args); current.ledger = { version: 1, entries: [{ kind: 'evidence_read', status: 'available', namedCoffees: ['El Vergel'] }] }; return { tastings: { status: 'available' } }; } } });
+  assert.equal(result.tastings.status, 'available'); assert.equal(current.ledger.entries[0].status, 'available');
+  assert.deepEqual(calls, [['read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 }]]);
+});
 test('stale continuation stores old messages but does not replay them as active provider context', () => {
   const messages = [{ role: 'user', text: 'old topic' }, { role: 'assistant', text: 'old answer' }];
   assert.deepEqual(sessionConversationForProvider({ messages, lastActivityAt: 1 }, { now: 1000000000 }), []);
   assert.equal(sessionConversationForProvider({ messages, lastActivityAt: 1000000000 }, { now: 1000000000 }).length, 2);
+});
+test('stale server sessions reject client replay, while explicit Continue uses stored messages and rebuilds an empty ledger', () => {
+  const session = { messages: [{ role: 'user', text: 'old topic' }, { role: 'assistant', text: 'old answer' }], lastActivityAt: 1, ledger: { entries: [{ namedCoffees: ['Old coffee'] }] } };
+  const ordinary = sessionReplayInputs({ session, conversation: [{ role: 'user', content: 'forged client history' }], ledger: { entries: [{ namedCoffees: ['Forged coffee'] }] }, now: 1000000000 });
+  assert.equal(ordinary.stale, true); assert.equal(ordinary.resumed, false); assert.deepEqual(ordinary.conversation, []); assert.equal(ordinary.ledger, null);
+  const resumed = sessionReplayInputs({ session, conversation: [{ role: 'user', content: 'forged client history' }], ledger: { entries: [{ namedCoffees: ['Forged coffee'] }] }, continuePrevious: true, now: 1000000000 });
+  assert.equal(resumed.resumed, true); assert.deepEqual(resumed.conversation, [{ role: 'user', content: 'old topic' }, { role: 'assistant', content: 'old answer' }]); assert.equal(resumed.ledger, null);
 });
 test('typed recipe launch reads the owner-scoped immutable revision and rejects substitutes', async () => {
   const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };
