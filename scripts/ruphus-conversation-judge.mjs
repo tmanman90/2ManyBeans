@@ -105,7 +105,14 @@ export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_A
     const request = buildAnthropicRequest({ model, system: packet.left ? PAIRWISE_INSTRUCTIONS : JUDGE_INSTRUCTIONS, messages: [{ role: 'user', content: JSON.stringify(packet) }], maxOutputTokens: Number(process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) });
     const response = await fetchImpl(ANTHROPIC_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': token, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(request) });
     if (!response.ok) throw new Error(`U3 Anthropic judge returned HTTP ${response.status}`);
-    const payload = await response.json();
+    let payload;
+    if ((response.headers?.get?.('content-type') || '').includes('event-stream') && typeof response.text === 'function') {
+      const events = (await response.text()).split(/\r?\n/).filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).filter((line) => line !== '[DONE]').map((line) => JSON.parse(line));
+      const message = events.find((event) => event.type === 'message_start')?.message || {};
+      const text = events.filter((event) => event.type === 'content_block_delta' && event.delta?.type === 'text_delta').map((event) => event.delta.text || '').join('');
+      const usage = { ...(message.usage || {}), ...(events.find((event) => event.type === 'message_delta')?.usage || {}) };
+      payload = { content: [{ type: 'text', text }], usage, model: message.model || model };
+    } else payload = await response.json();
     const text = (payload.content || []).filter((block) => block?.type === 'text').map((block) => block.text || '').join('').trim().replace(/^```json\s*|\s*```$/g, '');
     let result; try { result = JSON.parse(text); } catch { throw new Error('U3 Anthropic judge returned non-JSON output'); }
     return { result, usage: payload.usage, model: payload.model || model, provider: 'anthropic' };

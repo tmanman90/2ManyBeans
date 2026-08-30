@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assessCalibration, createBlindJudgePacket, createBlindPairwisePacket, createCalibrationPackets, JUDGE_DIMENSIONS, JUDGE_INSTRUCTIONS, JUDGE_SCHEMA_VERSION, pairwisePass, validateJudgeResult, validatePairwiseResult } from './ruphus-conversation-judge.mjs';
+import { assessCalibration, createAnthropicJudgeAdapter, createBlindJudgePacket, createBlindPairwisePacket, createCalibrationPackets, JUDGE_DIMENSIONS, JUDGE_INSTRUCTIONS, JUDGE_SCHEMA_VERSION, pairwisePass, validateJudgeResult, validatePairwiseResult } from './ruphus-conversation-judge.mjs';
 
 const scores = (value) => Object.fromEntries(JUDGE_DIMENSIONS.map((dimension) => [dimension, value]));
 const judged = (value) => ({ schemaVersion: JUDGE_SCHEMA_VERSION, scores: scores(value), mean: value, rationale: 'bounded rationale' });
@@ -36,4 +36,17 @@ test('calibration packets are exactly 11 plus 11 and carry no calibration label'
   assert.equal(packets.length, 22);
   assert.equal(packets.every((packet) => !JSON.stringify(packet).includes('known-bad') && !JSON.stringify(packet).includes('gold')), true);
   assert.equal(Object.isFrozen(JUDGE_INSTRUCTIONS), true);
+});
+
+test('Anthropic judge adapter uses frozen instructions and parses streamed usage without printing auth', async () => {
+  const prior = process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = '100';
+  try {
+    const result = judged(4);
+    const response = { ok: true, headers: { get: () => 'text/event-stream' }, text: async () => `data: ${JSON.stringify({ type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 10 } }})}\n\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(result) }})}\n\ndata: ${JSON.stringify({ type: 'message_delta', usage: { output_tokens: 10 }})}\n\n` };
+    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); assert.match(JSON.parse(request.body).system, /friendNotForm/); return response; } });
+    const envelope = await adapter({ promptVersion: 'v1' });
+    assert.equal(envelope.provider, 'anthropic');
+    assert.equal(envelope.usage.input_tokens, 10);
+    assert.equal(validateJudgeResult(envelope.result).valid, true);
+  } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
 });
