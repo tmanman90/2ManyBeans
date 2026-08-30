@@ -3,7 +3,7 @@ import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
 import { resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
-import { readCoffeeEvidence } from './ruphusEvidence.js';
+import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 
 export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
 export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
@@ -33,11 +33,18 @@ function recipeValue(recipe) {
   const stack = [value]; while (stack.length) { const current = stack.pop(); if (!current || typeof current !== 'object') continue; for (const key of Object.keys(current)) { if (current[key] === null) delete current[key]; else if (typeof current[key] === 'object') stack.push(current[key]); } }
   return value;
 }
+function modelRecipe(recipe) {
+  if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
+  const result = {};
+  for (const key of Object.keys(RECIPE_PROPERTIES)) if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
+  return result;
+}
 
 export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true } = {}) {
   if (!uid || !context) throw new Error('tools require owner and context');
-  const snapshot = context.rotationSnapshot || { coffees: [], refs: {} };
-  const refs = { ...(snapshot.refs || {}) };
+  if (!(context.__ruphusResolvedTargets instanceof Map)) Object.defineProperty(context, '__ruphusResolvedTargets', { value: new Map(), enumerable: false, writable: true, configurable: true });
+  const snapshot = context.__ruphusServerSnapshot || context.rotationSnapshot || { coffees: [], refs: {} };
+  const refs = context.__ruphusRefs ? { ...context.__ruphusRefs } : { ...(snapshot.refs || {}) };
   const resolveId = (coffeeRef) => refs[coffeeRef] || null;
   const list = async () => {
     const coffees = typeof readers.listCoffees === 'function' ? await readers.listCoffees({ uid }) : snapshot.coffees || [];
@@ -58,14 +65,16 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!result.ok) return { ok: false, reason: result.reason, candidates: (result.candidates || []).map((item) => cleanInventory(item.coffee)) };
       const resolvedRef = Object.entries(refs).find(([, id]) => id === result.coffee?.id)?.[0] || result.ref;
       if (result.coffee?.id && !refs[resolvedRef]) refs[resolvedRef] = result.coffee.id;
+      if (context.launchCoffeeId && resolvedRef !== context.launchCoffeeId) context.__ruphusLaunchHintConsumed = true;
       return { ok: true, coffeeRef: resolvedRef, coffee: cleanInventory({ ...result.coffee, refKey: resolvedRef }), match: result.source };
     }
     requireRef(args);
     const coffeeId = resolveId(args.coffeeRef);
     if (!coffeeId) throw Object.assign(new Error('coffee reference is outside the current owner-scoped context'), { code: 'cross_owner_or_context' });
     if (name === 'read_coffee_evidence') {
-      const launchItem = context.launchCoffeeId === args.coffeeRef ? context.launchContext?.launchItem || null : null;
-      const evidence = await readCoffeeEvidence({ uid, coffeeId, launchItem, readers, windowDays: args.windowDays, now: args.now, timeoutMs: args.timeoutMs });
+      const launchItem = context.launchCoffeeId === args.coffeeRef && !context.__ruphusLaunchHintConsumed ? context.__ruphusLaunchContext?.launchItem || null : null;
+      const trustedWiden = context.historyWidened === true || context.__ruphusHistoryWidened === true;
+      const evidence = await readCoffeeEvidence({ uid, coffeeId, launchItem, readers, windowDays: trustedWiden ? null : args.windowDays, now: args.now, timeoutMs: args.timeoutMs });
       const snapshotCoffee = snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef);
       const method = resolveMethod({
         userText: context.userText || '',
@@ -80,27 +89,42 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         now: args.now,
         historyDays: evidence.windowDays,
       });
-      return { ...evidence, method };
+      if (launchItem) context.__ruphusLaunchHintConsumed = true;
+      context.ledger = appendLedger(context.ledger, ledgerEntryFromEvidence(evidence, { coffee: evidence.coffee?.coffee }), { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
+      const target = evidence.recipe?.records?.find((item) => item?.slotKey || item?.slot || item?.method);
+      if (target && context.__ruphusResolvedTargets instanceof Map) {
+        const rawSlot = target.slotKey || target.slot || target.method;
+        const slotKey = SLOT_KEYS.includes(rawSlot) ? rawSlot : ['v60', 'kalita'].includes(rawSlot) ? `${rawSlot}_${target.mode === 'iced' ? 'iced' : 'hot'}` : rawSlot;
+        context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: recipeValue(target), sourceHash: target.selectedHash || canonicalHash(recipeValue(target)) });
+        if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
+      }
+      return { ...publicEvidence(evidence), method, coffeeRef: args.coffeeRef };
     }
     const slotKey = args.slot || args.slotKey;
     if (name === 'read_recipe') {
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       const recipe = await readRecipe(coffeeId, slotKey);
       if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
-      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: clone(recipe) };
+      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: recipeValue(recipe), sourceHash: recipe.selectedHash || canonicalHash(recipeValue(recipe)) });
+      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: modelRecipe(recipe) };
     }
     if (!canPropose) throw Object.assign(new Error('proposal is not yet earned'), { code: 'proposal_timing' });
     if (!args.afterRecipe || typeof args.afterRecipe !== 'object' || Array.isArray(args.afterRecipe)) return { ok: false, code: 'invalid_proposal', message: 'A complete candidate recipe is required.' };
     if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
+    const target = context.__ruphusResolvedTargets instanceof Map ? context.__ruphusResolvedTargets.get(`${args.coffeeRef}:${slotKey}`) : null;
+    if (!target || target.coffeeId !== coffeeId || target.coffeeRef !== args.coffeeRef) return { ok: false, code: 'proposal_target_required', message: 'Read the exact coffee and recipe before suggesting a change.' };
+    if (context.proposalState?.target && (context.proposalState.target.coffeeRef !== args.coffeeRef || context.proposalState.target.slot !== slotKey)) return { ok: false, code: 'proposal_target_mismatch', message: 'That suggestion is bound to a different coffee and recipe.' };
     const recipe = await readRecipe(coffeeId, slotKey);
     if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
-    const before = recipeValue(recipe); const after = recipeValue(args.afterRecipe); const paths = changedPaths(before, after).filter(Boolean);
+    const before = clone(target.before); const after = recipeValue(args.afterRecipe); const paths = changedPaths(before, after).filter(Boolean);
+    if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (paths.length !== 1 || paths[0].startsWith('method') || paths[0].startsWith('device') || paths[0].startsWith('mode')) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
     const validationRecipe = recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
     const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after }).slice(0, 16)}`, status: 'proposed', coffeeId, slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
+    if (context.proposalState) context.proposalState.proposalIssued = true;
     return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}) }) };
   };
   const definitions = RUPHUS_READ_TOOL_NAMES.map((name) => {

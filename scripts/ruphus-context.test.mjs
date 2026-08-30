@@ -12,3 +12,7 @@ test('context rejects legacy cage fields and forged owner hints', async () => {
   await assert.rejects(() => buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct', slotKey: 'v60_hot' }, readers }), /not valid/);
   await assert.rejects(() => buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct', ownerId: 'evil' }, readers }), /server-bound/);
 });
+test('context keeps raw refs server-side and carries validated session state', async () => {
+  const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct', coffeeRef: 'coffee-1', launchItem: { kind: 'brew', ref: 'brew-1' } }, userText: 'older brew', conversation: [{ role: 'user', content: 'older brew' }], sessionState: { lastActivityAt: 1, boundaryIndex: 0, launchHintConsumed: true, olderReference: true }, evidenceByteCap: 10000, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1, status: 'ACTIVE', recipes: ['v60_hot'] }], readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'Ode', units: 'metric' }), readLaunchItem: async ({ coffeeRef }) => { assert.equal(coffeeRef, 'coffee-1'); return { ok: true }; } } });
+  assert.equal(context.rotationSnapshot.refs, undefined); assert.doesNotMatch(JSON.stringify(context.rotationSnapshot), /coffee-1/); assert.equal(context.sessionState.launchHintConsumed, true); assert.equal(context.historyWidened, true); assert.equal(Object.values(context.__ruphusRefs).includes('coffee-1'), true);
+});

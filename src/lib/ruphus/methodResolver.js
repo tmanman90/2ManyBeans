@@ -46,8 +46,8 @@ export function resolveMethod(input = {}) {
   const launch = input.launchItem?.method || input.launchMethod;
   const launchCoffee = input.launchCoffeeRef || input.launchItem?.coffeeRef;
   const focus = input.coffeeRef || input.focusCoffeeRef;
-  if (launch && mode && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(applyMode(slot(launch), mode), 'M1');
-  if (launch && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(slot(launch), 'M1b');
+  if (launch && !input.launchHintConsumed && mode && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(applyMode(slot(launch), mode), 'M1');
+  if (launch && !input.launchHintConsumed && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(slot(launch), 'M1b');
 
   const now = input.now == null ? Date.now() : (input.now instanceof Date ? input.now.getTime() : Number(input.now));
   const days = Number(input.historyDays || 14);
@@ -58,6 +58,19 @@ export function resolveMethod(input = {}) {
     const matchingRecorded = uniqueRecorded.filter((item) => item === 'aiden' || item.endsWith(`_${mode}`));
     if (matchingRecorded.length === 1) return methodResult(matchingRecorded[0], 'M1');
     if (matchingRecorded.length > 1) return { ask: matchingRecorded.map((item) => ({ slot: item, displayName: DISPLAY[item] })), tier: 'M6' };
+    // An explicit mode correction cannot silently select the opposite mode
+    // through M2/M4. Continue only with an explicitly matching recipe or the
+    // configured method fallback below.
+    if (mode) {
+      const matchingRecipes = [...new Set((Array.isArray(input.recipeSlots) ? input.recipeSlots : Array.isArray(input.recipes) ? input.recipes : Object.keys(input.recipes || {})).map((item) => slot(typeof item === 'string' ? item : item?.slotKey || item?.slot || item?.method)).filter((item) => item && (item === 'aiden' || item.endsWith(`_${mode}`))))];
+      if (matchingRecipes.length === 1) return methodResult(matchingRecipes[0], 'M3');
+      if (matchingRecipes.length > 1) return { ask: matchingRecipes.map((item) => ({ slot: item, displayName: DISPLAY[item] })), tier: 'M6' };
+      if (input.defaultMethod) {
+        const base = slot(input.defaultMethod);
+        if (base) return methodResult(base === 'aiden' ? base : `${base.split('_')[0]}_${mode}`, 'M5');
+      }
+      return { ask: [], tier: 'M6' };
+    }
   }
   if (uniqueRecorded.length === 1) return methodResult(uniqueRecorded[0], 'M2');
 

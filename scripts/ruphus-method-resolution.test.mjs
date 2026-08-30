@@ -26,3 +26,11 @@ test('M4 general questions choose the most recently evidenced recipe, never arra
   });
   assert.equal(result.tier, 'M4'); assert.equal(result.slot, 'kalita_hot');
 });
+test('explicit mode correction never falls through to opposite recorded mode', () => {
+  const result = resolveMethod({ userText: 'Actually, I used hot', brews: [{ slot: 'v60_iced' }], recipes: ['v60_iced'] });
+  assert.notEqual(result.slot, 'v60_iced'); assert.equal(result.ask?.length ?? 0, 0);
+});
+test('launch hint is one-shot and stays dropped on later return', () => {
+  const result = resolveMethod({ launchItem: { method: 'kalita_hot' }, launchCoffeeRef: 'a', coffeeRef: 'a', launchHintConsumed: true, recipes: ['v60_iced'] });
+  assert.equal(result.slot, 'v60_iced'); assert.notEqual(result.tier, 'M1b');
+});
