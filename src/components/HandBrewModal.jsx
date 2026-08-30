@@ -19,6 +19,7 @@ import { V60_SWITCH_DOSE_BOUNDS } from '../data/v60SwitchConfiguration';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
+import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
@@ -461,6 +462,12 @@ export const HandBrewModal = ({
   const timerReady = Boolean(hotTimerSteps) && !doseUpdating;
 
   const device = deviceKey || recipe?.device || 'v60';
+  const handDevice = device === 'kalita' ? 'kalita' : 'v60';
+  const recipeLaunchContext = (mode, displayedRecipe, provenance = null) => {
+    const slot = `${handDevice}_${mode}`;
+    const ref = displayedRecipe?.revisionId || (mode === 'hot' ? revisionId || provenance?.revisionId : null) || bean?.activeRevisionIds?.[slot] || null;
+    return buildRecipeLaunchContext({ coffeeRef: bean?.id, surface: 'recipe_kalita_v60', slot, ref });
+  };
 
   const icedRecipe = useMemo(
     () => {
@@ -601,7 +608,7 @@ export const HandBrewModal = ({
             )}
           </div>
           <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot` } : recipeProvenance} />
-          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeRef: bean?.id, surface: 'recipe_kalita_v60', launchItem: { kind: 'recipe', ref: revisionId || recipeProvenance?.revisionId || `${bean?.id}:${device === 'kalita' ? 'kalita' : 'v60'}_hot`, method: device === 'kalita' ? 'kalita_hot' : 'v60_hot' } }, 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext('hot', recipe, recipeProvenance), 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           {recipe.device === 'kalita' && (
             <KalitaSizeSwitch
@@ -926,6 +933,7 @@ export const HandBrewModal = ({
                 )}
               </div>
             )}
+            {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext('iced', icedRecipe), 'How should I improve this iced recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
           </div>
 
           {icedRecipe.device === 'kalita' && (

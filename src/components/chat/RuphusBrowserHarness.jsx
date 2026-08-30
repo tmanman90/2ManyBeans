@@ -7,6 +7,10 @@ import { RuphusOpening } from './RuphusOpening';
 import { RuphusContinuePrevious } from './RuphusContinuePrevious';
 import { continuePrevious, sessionPresentation, startNewChat } from '../../lib/ruphus/session';
 
+const HARNESS_CLOCK = Date.now();
+const HARNESS_STALE_AGE = 8 * 24 * 60 * 60 * 1000;
+const createHarnessSession = () => ({ protocolVersion: 1, messages: [{ id: 'old-1', role: 'user', text: 'Tell me about my last cup.', createdAt: HARNESS_CLOCK - HARNESS_STALE_AGE }], contextRef: { surface: 'direct' }, ledger: { entries: [{ kind: 'evidence_read', namedCoffees: ['House Blend'] }] }, boundaryIndex: 0, lastActivityAt: HARNESS_CLOCK - HARNESS_STALE_AGE });
+
 // Local rendered integration surface for the M1 browser contract. It uses the
 // same entry, message, lifecycle, and artifact components as App/ChatTab but
 // has no auth/provider dependency and cannot write Coffee data.
@@ -16,8 +20,8 @@ export function RuphusBrowserHarness({ legacy = false }) {
   const [focused, setFocused] = useState(false);
   const [writeCount, setWriteCount] = useState(0);
   const [dataLoaded, setDataLoaded] = useState(true);
-  const [session, setSession] = useState({ protocolVersion: 1, messages: [{ id: 'old-1', role: 'user', text: 'Tell me about my last cup.', createdAt: Date.now() - 8 * 24 * 60 * 60 * 1000 }], contextRef: { surface: 'direct' }, ledger: { entries: [{ kind: 'evidence_read', namedCoffees: ['House Blend'] }] }, boundaryIndex: 0, lastActivityAt: Date.now() - 8 * 24 * 60 * 60 * 1000 });
-  const presentation = sessionPresentation(session);
+  const [session, setSession] = useState(() => createHarnessSession());
+  const presentation = sessionPresentation(session, { now: HARNESS_CLOCK });
   const agentEnabled = !legacy;
   const runStream = () => {
     setFrames([{ type: 'context_loading' }]);
@@ -32,12 +36,12 @@ export function RuphusBrowserHarness({ legacy = false }) {
       <button type="button" data-ruphus-entry="bean-detail" onClick={() => setContext({ coffeeRef: 'bean-1', surface: 'bean_card' })}>Ask Professor Ruphus · bean detail</button>
       <button type="button" data-ruphus-entry="tasting-wizard-reveal" onClick={() => setContext({ coffeeRef: 'bean-1', surface: 'tasting_wizard' })}>Ask Professor Ruphus · tasting reveal</button>
       <button type="button" data-ruphus-hydration-toggle="true" onClick={() => setDataLoaded(value => !value)}>Toggle hydration</button>
-      <button type="button" data-ruphus-make-stale="true" onClick={() => setSession(value => ({ ...value, lastActivityAt: Date.now() - 8 * 24 * 60 * 60 * 1000 }))}>Make session stale</button>
-      <button type="button" data-ruphus-new-chat="true" onClick={() => setSession(value => startNewChat(value))}>New chat boundary</button>
+      <button type="button" data-ruphus-make-stale="true" onClick={() => setSession(value => ({ ...value, lastActivityAt: HARNESS_CLOCK - HARNESS_STALE_AGE }))}>Make session stale</button>
+      <button type="button" data-ruphus-new-chat="true" onClick={() => setSession(value => startNewChat(value, { now: HARNESS_CLOCK }))}>New chat boundary</button>
     </section>
     <RuphusOpening dataLoaded={dataLoaded} coffees={[{ name: 'House Blend', status: 'ACTIVE' }]} />
-    {presentation.showContinue && <RuphusContinuePrevious session={session} firstLine={session.messages?.[0]?.text} onContinue={() => setSession(value => continuePrevious(value))} />}
-    <div data-ruphus-boundary-state={presentation.state} data-ruphus-stored-messages={session.messages?.length || 0} data-ruphus-boundary-index={session.boundaryIndex || 0} />
+    {presentation.showContinue && <RuphusContinuePrevious session={session} firstLine={session.messages?.[0]?.text} onContinue={() => setSession(value => continuePrevious(value, { now: HARNESS_CLOCK }))} />}
+    <div data-ruphus-boundary-state={presentation.state} data-ruphus-stored-messages={session.messages?.length || 0} data-ruphus-boundary-index={session.boundaryIndex || 0} data-ruphus-last-activity={session.lastActivityAt} />
     <section data-ruphus-stage="true" style={{ display: 'grid', gap: 10, marginTop: 16 }}>
       <button type="button" data-ruphus-stream="true" onClick={runStream}>Simulate Agent stream</button>
       {frames.some(frame => frame.type === 'context_loading') && <RuphusLifecycleCaption frame={{ type: 'context_loading' }} />}

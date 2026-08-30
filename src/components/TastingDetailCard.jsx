@@ -12,6 +12,7 @@ import { StarRating } from './StarRating';
 import { SwipeDownHandle } from './SwipeDownHandle';
 import { splitTastingNotes } from '../lib/tastingHero';
 import { FlavorRadar } from './FlavorRadar';
+import { resolveTastingLaunchMethod } from '../lib/ruphus/launch.js';
 
 const IOS = 'cubic-bezier(0.32, 0.72, 0, 1)';
 // The organized flavor rows — one descriptor per line (no wall of text).
@@ -82,7 +83,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
   const flavorList = flavorStr ? flavorStr.split(',').map(s => s.trim()).filter(Boolean) : [];
   const openRuphusFromTasting = () => {
     if (!onOpenRuphus || !bean?.id) return;
-    const recordedMethod = tasting.method || tasting.brewMethod || tasting.attemptMethod || null;
+    const recordedMethod = resolveTastingLaunchMethod(tasting);
     onOpenRuphus({
       coffeeRef: bean.id,
       surface: 'tasting_card',

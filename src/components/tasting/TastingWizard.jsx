@@ -501,7 +501,10 @@ function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswer
         type="button"
         data-ruphus-entry="tasting-wizard-reveal"
         onClick={() => {
-          const starter = [answers.oneWord, answers.notes, answers.flavorChips?.join(', ')].filter(Boolean).join('. ');
+          const scoreLabels = [['fragranceAroma', 'aroma'], ['acidity', 'acidity'], ['sweetness', 'sweetness'], ['body', 'body'], ['flavor', 'flavor'], ['balance', 'balance']];
+          const scoreEvidence = scoreLabels.map(([key, label]) => Number.isFinite(Number(scores[key])) ? `${label} ${scores[key]}/10` : null).filter(Boolean).join(', ');
+          const finishEvidence = Number.isFinite(Number(answers.finishLevel)) ? `finish ${answers.finishLevel}/10` : '';
+          const starter = [scoreEvidence || finishEvidence ? `Scores: ${[scoreEvidence, finishEvidence].filter(Boolean).join(', ')}` : '', answers.oneWord, answers.notes, answers.flavorChips?.join(', ')].filter(Boolean).join('. ');
           onOpenRuphus(Object.freeze({ coffeeRef: bean.id, surface: 'tasting_wizard' }), `Help me understand this cup${starter ? `: ${starter}` : ''}.`);
         }}
         style={{ width: '100%', minHeight: 48, marginTop: 12, border: `1px solid ${C.border}`, borderRadius: radius.lg, background: C.cream, color: C.accent, fontFamily: fonts.body, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}

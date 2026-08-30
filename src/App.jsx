@@ -25,6 +25,7 @@ import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
 import { Modal } from './components/Modal';
 import { useRuphusAttemptOutbox } from './hooks/useRuphusAttemptOutbox';
+import { validateLaunchContext } from './lib/ruphus/conversationContract.js';
 
 // Minimal fallback while a lazy tab chunk is fetching. Matches the app
 // background so it doesn't flash white on iOS WKWebView.
@@ -106,7 +107,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // construct cross-tab navigation state themselves; they receive this bound
   // context and one starter intent.
   const openRuphus = (launchContext, starterIntent = '') => {
-    if (!launchContext?.coffeeRef && !launchContext?.surface) return;
+    if (!launchContext?.coffeeRef || !validateLaunchContext(launchContext).valid) return;
     setRuphusLaunch({ contextRef: launchContext, starterIntent });
     setTab('chat');
   };

@@ -829,6 +829,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       apiContent = text;
     }
 
+    const previousApiMessages = apiMsgOverride && apiMessages.current.at(-1) === apiMsgOverride
+      ? apiMessages.current.slice(0, -1)
+      : apiMessages.current.slice();
     const apiMsg = apiMsgOverride || { role: 'user', content: apiContent };
     if (appendUser) apiMessages.current = [...apiMessages.current, apiMsg];
 
@@ -851,7 +854,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       sendingRef.current = false;
     };
 
-    const sendAgentTurn = async (contextOverride = null) => {
+    const sendAgentTurn = async (contextOverride = null, userEvidence = text, conversation = previousApiMessages) => {
       const turnId = crypto.randomUUID();
       const startingContext = contextOverride || agentContextOverride || agentContextRef.current || agentContext;
       const sessionId = startingContext.sessionId || agentSessionIdRef.current || crypto.randomUUID();
@@ -876,7 +879,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       };
       const result = await streamAgentWithAuth({
         url: ruphusApiUrl('/api/ruphus-agent'),
-        body: { turnId, contextRef, userText: text, conversation: apiMessages.current.slice(-16), clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES },
+        body: { turnId, contextRef, userText: userEvidence, conversation: conversation.filter(message => message?.role && typeof message.content === 'string').slice(-16), clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES },
         onFrame,
       });
       if (!result.ok) throw result.error || new Error('Agent turn failed');
@@ -896,6 +899,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       };
 
       (async () => {
+        let attemptedAgent = false;
+        let attemptedAgentContext = null;
         try {
           const recordAssistantForApi = (content) => {
             apiMessages.current = [...apiMessages.current, { role: 'assistant', content }];
@@ -989,9 +994,19 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             });
           };
 
-          const turnContext = agentContextOverride || agentContextRef.current || agentContext;
-          if (agentEnabled && !legacyChatOverride && turnContext) {
-            await sendAgentTurn(turnContext);
+          let agentUserEvidence = text || (turnPhotos.length > 0 ? 'I shared a coffee photo. Please help me understand it.' : '');
+          if (turnPhotos.length > 0) {
+            const described = await prepareChatMessagesForClaude([apiMsg], {
+              onImageDescribeStart: () => setThinkingCaptions(['Reading your labels']),
+            });
+            const describedTurn = described.messages[0]?.content;
+            agentUserEvidence = typeof describedTurn === 'string' ? describedTurn : agentUserEvidence;
+          }
+          const turnContext = agentContextOverride || agentContextRef.current || agentContext || { surface: 'direct' };
+          attemptedAgent = agentEnabled && !legacyChatOverride;
+          attemptedAgentContext = turnContext;
+          if (agentEnabled && !legacyChatOverride) {
+            await sendAgentTurn(turnContext, agentUserEvidence);
             complete();
             return;
           }
@@ -1086,23 +1101,27 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             const strippedErrText = search.found ? search.cleanText : err.terminalText;
             const scan = parseBeanScan(strippedErrText);
             const recipe = parseRecipeCard(scan.cleanText);
-            commitAssistantMessage(newMessage({
+            const errorMessage = newMessage({
               role: 'assistant',
               content: recipe.cleanText || "Couldn't reach the AI. Try again in a sec.",
               recipeCard: recipe.recipeCard,
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
-            }));
+            });
+            commitAssistantMessage(errorMessage);
+            if (attemptedAgent) setAgentRecovery(prev => ({ ...(prev || { reason: 'failed' }), retryTurn: { text, displayMsg, apiMsg, agentContextOverride: attemptedAgentContext }, erroredMessageId: errorMessage.id }));
           } else {
             // errored: a transient failure must not persist into the session
             // doc (a durable "Couldn't reach the AI" haunts every resume) —
             // and the flag buys the tap-to-retry affordance for free.
-            commitAssistantMessage(newMessage({
+            const errorMessage = newMessage({
               role: 'assistant',
               content: "Couldn't reach the AI. Try again in a sec.",
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
-            }));
+            });
+            commitAssistantMessage(errorMessage);
+            if (attemptedAgent) setAgentRecovery(prev => ({ ...(prev || { reason: 'failed' }), retryTurn: { text, displayMsg, apiMsg, agentContextOverride: attemptedAgentContext }, erroredMessageId: errorMessage.id }));
           }
           complete();
         }
@@ -1130,23 +1149,17 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ruphusLaunch, agentEnabled]);
 
-  const handleAgentRecovery = () => {
-    // The failed/interrupted provider turn is deliberately not retried here.
-    // The user explicitly chooses the established production chat and can
-    // submit the message again as a fresh legacy turn.
-    if (agentRecovery?.turnId) {
-      persist(threadForPersistence(messages), {
-        protocolVersion: 1,
-        contextRef: agentContext ? { ...agentContext, sessionId: agentSessionIdRef.current || agentContext.sessionId || agentRecovery.turnId } : undefined,
-        turns: [{ id: agentRecovery.turnId, status: 'recovered_to_legacy' }],
-      });
-    }
+  const handleAgentRecovery = async () => {
+    const retry = agentRecovery?.retryTurn;
+    if (!retry || sendingRef.current) return;
+    if (agentRecovery.erroredMessageId) setMessages(prev => prev.filter(item => item.id !== agentRecovery.erroredMessageId));
     setAgentRecovery(null);
     setAgentFrame(null);
     setAgentText('');
     agentTextRef.current = '';
     setAgentArtifacts([]);
     agentArtifactsRef.current = [];
+    await sendTurn({ text: retry.text, appendUser: false, apiMsgOverride: retry.apiMsg, retryTurn: retry, agentContextOverride: retry.agentContextOverride });
   };
 
   // Text comes from ChatInputBar (child owns the input state).
@@ -1294,7 +1307,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         </div>
       </div>
 
-      {agentEnabled && hydrationState === 'hydrated' && hydratedMessages.length > 0 && isIntroState && sessionPresentation(hydratedSession || hydratedContext).showContinue && <RuphusContinuePrevious session={hydratedSession || hydratedContext} onContinue={() => { const resumed = continuePrevious(hydratedSession || hydratedContext); setAgentContext(resumed); agentContextRef.current = resumed; persist(hydratedMessages, resumed); hydrateThread(hydratedMessages); }} firstLine={hydratedMessages[0]?.content} />}
+      {agentEnabled && hydrationState === 'hydrated' && hydratedMessages.length > 0 && isIntroState && sessionPresentation(hydratedSession || hydratedContext).showContinue && <RuphusContinuePrevious session={hydratedSession || hydratedContext} onContinue={() => { const resumed = continuePrevious(hydratedSession || hydratedContext); const resumedContext = resumed?.contextRef || null; setAgentContext(resumedContext); agentContextRef.current = resumedContext; agentSessionIdRef.current = resumedContext?.sessionId || null; persist(hydratedMessages, resumed); hydrateThread(hydratedMessages); }} firstLine={hydratedMessages[0]?.content} />}
 
       <div
         ref={scrollRef}

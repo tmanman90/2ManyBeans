@@ -364,11 +364,10 @@ const Root = () => {
             // Catches both new users (post-onboarding) and existing
             // users who completed onboarding before this gate existed.
             <AiDataConsentModal updateProfile={updateProfile} />
-          ) : !dataLoaded ? (
-            // Gate 6a: Waiting for Firestore data
-            <LoadingScreen />
           ) : (
-            // Gate 6b: Main app
+            // Gate 6: Main app can mount while data hydrates so Chat's opening
+            // remains truthful instead of treating transient empty arrays as
+            // an empty rotation.
             <UserPreferencesProvider value={contextValue}>
               <App
                 uid={user.uid}
