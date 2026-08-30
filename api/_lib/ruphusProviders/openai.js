@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { buildDynamicEvidenceBlock } from '../ruphusPrompt.js';
 
 export const RUPHUS_OPENAI_MODEL = 'gpt-5.6-luna';
 export const RUPHUS_REASONING_EFFORT = 'medium';
@@ -29,11 +30,18 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
   const sdk = client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
   const inputSequences = new Map();
   return Object.freeze({
-    async runTurn({ turnId = 'default', context, userText, tools, previous, toolResult }) {
+    async runTurn({ turnId = 'default', context, userText, conversation = [], tools, previous, toolResult }) {
       const results = (toolResult?.results || (toolResult ? [toolResult] : [])).map((item) => ({ type: 'function_call_output', call_id: item.callId || item.name, output: JSON.stringify(item.result) }));
+      const launchContext = context?.launchContext || context?.context || {};
+      const evidenceBlock = buildDynamicEvidenceBlock(context || {});
+      const recentConversation = (Array.isArray(conversation) ? conversation : [])
+        .filter((message) => ['user', 'assistant'].includes(message?.role) && typeof message?.content === 'string');
       const input = previous && toolResult
         ? [...(inputSequences.get(turnId) || []), ...(previous.outputItems || []), ...results]
-        : [{ role: 'user', content: `${userText}\n\nCanonical context:\n${JSON.stringify(context)}` }];
+        : [
+            { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },
+            ...(recentConversation.length ? recentConversation : [{ role: 'user', content: userText }]),
+          ];
       inputSequences.set(turnId, input);
       const response = await sdk.responses.create(buildOpenAIRequest({ instructions, input, tools, maxOutputTokens }));
       return outputParts(response);

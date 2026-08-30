@@ -7,7 +7,7 @@ const TRANSITIONS = {
   context_loading: new Set(['context_loading', 'text_delta', 'tool_started', 'artifact_ready', 'turn_completed', 'turn_failed', 'turn_interrupted']),
   text_delta: new Set(['text_delta', 'tool_started', 'artifact_ready', 'awaiting_approval', 'turn_completed', 'turn_failed', 'turn_interrupted']),
   tool_started: new Set(['tool_result', 'turn_failed', 'turn_interrupted']), tool_result: new Set(['tool_started', 'text_delta', 'artifact_ready', 'awaiting_approval', 'turn_completed', 'turn_failed', 'turn_interrupted']),
-  artifact_ready: new Set(['artifact_ready', 'text_delta', 'awaiting_approval', 'turn_completed', 'turn_failed', 'turn_interrupted']), awaiting_approval: new Set(['text_delta', 'artifact_ready', 'turn_completed', 'turn_failed', 'turn_interrupted']),
+  artifact_ready: new Set(['tool_started', 'artifact_ready', 'text_delta', 'awaiting_approval', 'turn_completed', 'turn_failed', 'turn_interrupted']), awaiting_approval: new Set(['text_delta', 'artifact_ready', 'turn_completed', 'turn_failed', 'turn_interrupted']),
 };
 
 function frameError(code, message) { return Object.assign(new Error(message), { code }); }

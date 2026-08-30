@@ -31,7 +31,8 @@ test('stateless continuation accumulates the complete multi-round input sequence
   const first = await provider.runTurn({ turnId: 'turn-1', context: { coffeeId: 'bean-1' }, userText: 'diagnose', tools: [] });
   const second = await provider.runTurn({ turnId: 'turn-1', context: { coffeeId: 'bean-1' }, userText: 'diagnose', tools: [], previous: first, toolResult: { results: [{ callId: 'call-1', result: { ok: true, data: 'coffee' } }] } });
   await provider.runTurn({ turnId: 'turn-1', context: { coffeeId: 'bean-1' }, userText: 'diagnose', tools: [], previous: second, toolResult: { results: [{ callId: 'call-2', result: { ok: true, data: 'recipe' } }] } });
-  assert.equal(requests[2].input[0].role, 'user');
+  assert.equal(requests[2].input[0].role, 'developer');
+  assert.equal(requests[2].input[1].role, 'user');
   assert.equal(requests[2].input.filter((item) => item.type === 'function_call_output').length, 2);
   assert.deepEqual(requests[2].input.slice(-3), [
     { type: 'function_call_output', call_id: 'call-1', output: '{"ok":true,"data":"coffee"}' },

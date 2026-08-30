@@ -1,0 +1,95 @@
+import { SLOT_KEYS } from './contracts.js';
+
+const DISPLAY = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' });
+const slot = (value) => {
+  const valueText = String(value || '').toLowerCase().replace(/\s+/g, '_');
+  if (SLOT_KEYS.includes(valueText)) return valueText;
+  if (valueText === 'aiden') return 'aiden';
+  if (valueText.includes('kalita')) return valueText.includes('iced') ? 'kalita_iced' : 'kalita_hot';
+  if (valueText.includes('v60') || valueText === 'v60') return valueText.includes('iced') ? 'v60_iced' : 'v60_hot';
+  return null;
+};
+const methodResult = (value, tier) => value ? { slot: value, displayName: DISPLAY[value], tier } : null;
+const recordsFor = (input) => [...(Array.isArray(input.brews) ? input.brews : []), ...(Array.isArray(input.attempts) ? input.attempts : []), ...(Array.isArray(input.tastings) ? input.tastings : [])];
+const recent = (record, now, days) => {
+  if (!record) return false;
+  const date = Date.parse(record.date || record.createdAt || record.updatedAt || '');
+  if (!Number.isFinite(date)) return true;
+  return !Number.isFinite(now) || now - date <= days * 86400000;
+};
+const explicitMode = (text) => /\biced\b|\bcold\b/i.test(String(text || '')) ? 'iced' : /\bhot\b/i.test(String(text || '')) ? 'hot' : null;
+const applyMode = (value, mode) => value === 'aiden' || !mode || !value ? value : `${value.split('_')[0]}_${mode}`;
+const recordTime = (record) => {
+  const value = Date.parse(record?.date || record?.createdAt || record?.updatedAt || record?.lastBrewDate || '');
+  return Number.isFinite(value) ? value : -Infinity;
+};
+
+function latestRecipeSlot(recipes, records) {
+  const candidates = [...new Set((Array.isArray(recipes) ? recipes : []).map((item) => slot(typeof item === 'string' ? item : item?.slotKey || item?.slot || item?.method)).filter(Boolean))];
+  if (!candidates.length) return null;
+  const ranked = candidates.map((candidate) => {
+    const recipe = (Array.isArray(recipes) ? recipes : []).find((item) => slot(typeof item === 'string' ? item : item?.slotKey || item?.slot || item?.method) === candidate);
+    const recipeTime = recordTime(recipe);
+    const brewTime = records.filter((record) => slot(record.slotKey || record.slot || record.method || record.brewMethod || record.device) === candidate).reduce((max, record) => Math.max(max, recordTime(record)), -Infinity);
+    return { candidate, time: Math.max(recipeTime, brewTime) };
+  });
+  ranked.sort((left, right) => right.time - left.time || left.candidate.localeCompare(right.candidate));
+  return ranked[0]?.candidate || null;
+}
+
+export function resolveMethod(input = {}) {
+  const requestText = input.userText || input.request || '';
+  const explicitMatch = requestText.match(/(?:on|the|using|with|use)\s+(?:the\s+)?(?:(hot|iced)\s+)?(aiden|v60|kalita)\b/i);
+  const explicit = slot(input.explicitMethod || input.explicitSlot || explicitMatch?.[0]);
+  if (explicit) return methodResult(explicit, 'M1');
+  const mode = explicitMode(requestText);
+  const launch = input.launchItem?.method || input.launchMethod;
+  const launchCoffee = input.launchCoffeeRef || input.launchItem?.coffeeRef;
+  const focus = input.coffeeRef || input.focusCoffeeRef;
+  if (launch && mode && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(applyMode(slot(launch), mode), 'M1');
+  if (launch && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(slot(launch), 'M1b');
+
+  const now = input.now == null ? Date.now() : (input.now instanceof Date ? input.now.getTime() : Number(input.now));
+  const days = Number(input.historyDays || 14);
+  const records = recordsFor(input).filter((record) => recent(record, now, days));
+  const recorded = records.map((record) => slot(record.slotKey || record.slot || record.method || record.brewMethod || record.device)).filter(Boolean);
+  const uniqueRecorded = [...new Set(recorded)];
+  if (mode && uniqueRecorded.length) {
+    const matchingRecorded = uniqueRecorded.filter((item) => item === 'aiden' || item.endsWith(`_${mode}`));
+    if (matchingRecorded.length === 1) return methodResult(matchingRecorded[0], 'M1');
+    if (matchingRecorded.length > 1) return { ask: matchingRecorded.map((item) => ({ slot: item, displayName: DISPLAY[item] })), tier: 'M6' };
+  }
+  if (uniqueRecorded.length === 1) return methodResult(uniqueRecorded[0], 'M2');
+
+  const rawRecipes = Array.isArray(input.recipeSlots) ? input.recipeSlots : Array.isArray(input.recipes) ? input.recipes : Object.keys(input.recipes || {});
+  const recipes = rawRecipes.map((recipe) => slot(typeof recipe === 'string' ? recipe : recipe?.slotKey || recipe?.slot || recipe?.method)).filter(Boolean);
+  const uniqueRecipes = [...new Set(recipes)];
+  if (uniqueRecipes.length === 1) {
+    const only = uniqueRecipes[0];
+    if (mode && !only.endsWith(mode)) return methodResult(`${only.split('_')[0]}_${mode}`, 'M3');
+    return methodResult(only, 'M3');
+  }
+  const changeRequest = input.isChangeRequest === true || /\b(?:change|adjust|tune|recommend|improve|fix|what should I)\b/i.test(requestText);
+  if (!changeRequest && uniqueRecorded.length > 1) {
+    const latest = records.map((record) => ({ record, slot: slot(record.slotKey || record.slot || record.method || record.brewMethod || record.device), time: recordTime(record) })).filter((item) => item.slot).sort((left, right) => right.time - left.time || left.slot.localeCompare(right.slot))[0];
+    const latestSlot = latest?.slot;
+    if (latestSlot) return methodResult(latestSlot, 'M4');
+  }
+  if (!changeRequest && uniqueRecipes.length > 1) {
+    const latest = latestRecipeSlot(rawRecipes, records);
+    if (latest) return methodResult(latest, 'M4');
+  }
+  if (!uniqueRecipes.length && !recorded.length && input.defaultMethod) return methodResult(slot(input.defaultMethod), 'M5');
+  if (mode && uniqueRecipes.length) {
+    const candidates = uniqueRecipes.filter((item) => item.endsWith(mode));
+    if (candidates.length === 1) return methodResult(candidates[0], 'M6');
+  }
+  const candidates = uniqueRecipes.length > 1 ? uniqueRecipes : [...new Set([...uniqueRecorded])];
+  if (changeRequest && candidates.length > 1) return { ask: candidates.map((item) => ({ slot: item, displayName: DISPLAY[item] })), tier: 'M6' };
+  if (candidates.length === 1) return methodResult(candidates[0], 'M6');
+  if (mode && input.defaultMethod) return methodResult(`${slot(input.defaultMethod)?.split('_')[0] || 'v60'}_${mode}`, 'M5');
+  return { ask: [], tier: 'M6' };
+}
+
+export const methodResolver = resolveMethod;
+export const METHOD_DISPLAY_NAMES = DISPLAY;

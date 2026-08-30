@@ -8,29 +8,38 @@ import { createOpenAIProvider, RUPHUS_OPENAI_MODEL } from './_lib/ruphusProvider
 import { persistProposal } from './_lib/ruphusRepository.js';
 import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
+import { SLOT_KEYS } from '../src/lib/ruphus/contracts.js';
 import { isAgentAccessAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
 
 export const allowedAgentUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_UIDS || '').split(',').map((uid) => uid.trim()).filter(Boolean));
 function writeFrame(res, frame) { res.write(`${JSON.stringify(frame)}\n`); }
 function firestoreReaders(db) {
   return {
+    async listCoffees({ uid }) { const snap = await db.collection('users').doc(uid).collection('beans').get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
     async readCoffee({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get(); return snap.exists ? { id: coffeeId, ...snap.data() } : null; },
-    async readRecipe({ uid, coffeeId, slotKey }) { const bean = await this.readCoffee({ uid, coffeeId }); if (!bean) return null; const result = resolveLegacyRecipe(bean, slotKey); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash } : { code: result.code }; },
+    async readRecipe({ uid, coffeeId, slotKey, slot }) {
+      const bean = await this.readCoffee({ uid, coffeeId }); if (!bean) return null;
+      const requested = slotKey || slot;
+      if (requested) { const result = resolveLegacyRecipe(bean, requested); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested } : { code: result.code }; }
+      return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);
+    },
     async readTastings({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('tastings').where('beanId', '==', coffeeId).get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
     async readAttempts({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('brewAttempts').where('coffeeId', '==', coffeeId).get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
+    async readBrews(args) { return this.readAttempts(args); },
+    async readSetup() { return {}; },
   };
 }
 
 export default withCorsAuthPro(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid; if (!isAgentAccessAllowed({ uid, rawUids: process.env.RUPHUS_AGENT_V3_UIDS })) return res.status(404).json({ error: 'agent_v3_unavailable' });
-  const { turnId, contextRef, userText = '' } = req.body || {};
+  const { turnId, contextRef, userText = '', conversation = [], ledger = null } = req.body || {};
   if (!uid || typeof turnId !== 'string' || !contextRef || typeof userText !== 'string') return res.status(400).json({ error: 'turnId, contextRef, and userText are required' });
   const startedAt = Date.now();
   let firstFrameAt = null;
   let db;
   try {
     db = getDb();
-    const readers = firestoreReaders(db); const context = await buildRuphusContext({ uid, contextRef: { ...contextRef, sessionId: contextRef.sessionId || turnId }, userText, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES) });
+    const readers = firestoreReaders(db); const context = await buildRuphusContext({ uid, contextRef, userText, conversation, ledger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES) }); context.sessionId = turnId;
     const tools = createRuphusTools({ uid, context, readers, proposalStore: (input) => persistProposal({ db, ...input }) });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
     const turnResult = await runRuphusTurn({ turnId, context, userText: context.userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => { if (!firstFrameAt) firstFrameAt = Date.now(); writeFrame(res, frame); } });

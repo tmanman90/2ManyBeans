@@ -42,6 +42,33 @@ test('legacy resolver chooses the slot map and only uses a matching flat fallbac
   assert.equal(resolveRequestedRecipe({ handBrewRecipe: switchFlat }, { slotKey: 'v60_hot', method: 'v60', mode: 'hot', v60Variant: 'switch' }).ok, true);
 });
 
+test('legacy resolver upgrades an exact Aiden slot profile that predates identity and title fields', () => {
+  const legacyAiden = {
+    profileType: 0,
+    ratio: 16,
+    bloomEnabled: true,
+    bloomRatio: 2,
+    bloomDuration: 30,
+    bloomTemperature: 96,
+    ssPulsesEnabled: true,
+    ssPulsesNumber: 1,
+    ssPulsesInterval: 20,
+    ssPulseTemperatures: [96],
+    batchPulsesEnabled: true,
+    batchPulsesNumber: 1,
+    batchPulsesInterval: 30,
+    batchPulseTemperatures: [96],
+  };
+  const resolved = resolveLegacyRecipe({ name: 'Rwanda, Rambagirakawa', aidenRecipe: legacyAiden }, 'aiden');
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.source, 'aidenRecipe');
+  assert.equal(resolved.recipe.method, 'aiden');
+  assert.equal(resolved.recipe.device, 'aiden');
+  assert.equal(resolved.recipe.mode, 'hot');
+  assert.equal(resolved.recipe.title, 'Rwanda, Rambagirakawa');
+  assert.equal(resolved.validation.valid, true);
+});
+
 test('canonical identity excludes user dose and Aiden grind projection state', () => {
   const recipe = generateV60Recipe({}, { dose: 15 });
   const one = canonicalRecipeSnapshot({ ...recipe, userCoffeeGrams: 15 }, 'v60_hot');
@@ -50,8 +77,8 @@ test('canonical identity excludes user dose and Aiden grind projection state', (
 });
 
 test('contracts reject forged authority and malformed lifecycle frames', () => {
-  assert.equal(validateContextRef({ coffeeId: 'bean-1', method: 'v60', slotKey: 'v60_hot' }).valid, true);
-  assert.equal(validateContextRef({ coffeeId: 'bean-1', method: 'v60', slotKey: 'chemex_hot' }).valid, false);
+  assert.equal(validateContextRef({ surface: 'direct', coffeeRef: 'bean-1' }).valid, true);
+  assert.equal(validateContextRef({ surface: 'direct', coffeeId: 'bean-1', slotKey: 'v60_hot' }).valid, false);
   assert.equal(validateCommandRequest({ actionId: 'a', mode: 'apply_proposal', coffeeId: 'b', uid: 'forged' }).valid, false);
   assert.equal(validateRecipeSnapshot({ method: 'v60', device: 'v60', mode: 'hot', coffeeGrams: 15, waterGrams: 250 }).valid, true);
   assert.equal(validateProposal({ id: 'p', coffeeId: 'b', slotKey: 'v60_hot', sourceHash: 's', recipeHash: 'r', before: {}, after: {}, status: 'proposed', receipt: {} }).valid, false);

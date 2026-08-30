@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
 import {
   gradeReply, fixtureManifestShape, validateLaunchContext, CONTRACT_VERSION,
 } from '../src/lib/ruphus/conversationContract.js';
@@ -82,21 +83,24 @@ export function redactDiagnostic(value) {
 }
 
 function fixtureContext(account, fixture) {
+  const snapshot = buildRotationSnapshot({ coffees: account.coffees, setup: account.setup });
   const id = fixture.launchContext?.coffeeRef || account.coffees.find((coffee) => coffee.jarSlot === 1)?.id || account.coffees[0].id;
   const coffee = account.coffees.find((item) => item.id === id) || account.coffees[0];
   const slot = fixture.launchContext?.launchItem?.method || coffee.recipes?.[0];
+  const coffeeRef = Object.entries(snapshot.refs).find(([, value]) => value === coffee.id)?.[0] || null;
+  const launchContext = { ...fixture.launchContext, ...(coffeeRef ? { coffeeRef } : {}) };
   return {
-    context: { coffeeId: coffee.id, slotKey: slot || 'v60_hot', method: String(slot || 'v60_hot').split('_')[0], sessionId: 'injected-session' },
-    coffee,
-    recipe: slot ? account.recipes[`${coffee.id}:${slot}`] || null : null,
-    tastings: account.tastings.filter((item) => item.coffeeId === coffee.id),
-    attempts: account.attempts.filter((item) => item.coffeeId === coffee.id),
+    launchContext,
+    rotationSnapshot: snapshot,
+    ledger: { version: 1, entries: [], namedCoffees: [], bytes: 0 },
+    conversation: [],
+    sessionId: 'injected-session',
     evidenceHash: fixture.id,
   };
 }
 
-function defaultProvider(fixture, reply) {
-  return { runTurn: async () => ({ text: reply || `Got it. I’m ready to talk through ${fixture.intent.toLowerCase()}.`, toolCalls: [], model: 'injected-fixture-provider' }) };
+function defaultProvider(_fixture, reply) {
+  return { runTurn: async () => ({ text: reply || 'Got it. I’m ready to talk through your coffee.', toolCalls: [], model: 'injected-fixture-provider' }) };
 }
 
 function defaultTools(account, fixture) {
@@ -131,7 +135,7 @@ export function runInjectedCase(fixture, { reply = null, provider = null, tools 
 
 export async function runInjectedCorpus(root = FIXTURE_ROOT) {
   const { account, cases } = await loadFixtureManifest(root);
-  const results = cases.cases.map((fixture) => runInjectedCase(fixture));
+  const results = await Promise.all(cases.cases.map((fixture) => runInjectedTurn(account, fixture)));
   return { mode: 'injected', label: 'plumbing only', contractVersion: CONTRACT_VERSION, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, results, passed: results.every((result) => result.grader.catastrophic.length === 0) };
 }
 

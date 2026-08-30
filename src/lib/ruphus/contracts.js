@@ -1,9 +1,10 @@
+import { validateLaunchContext, LAUNCH_SURFACES, LAUNCH_ITEM_KINDS, RECIPE_SLOTS } from './conversationContract.js';
+
 // Browser/server-neutral contracts for the Agent v3 boundary.  This module is
 // intentionally free of Firebase, React, provider SDKs, and evaluator code.
 
 export const RUPHUS_PROTOCOL_VERSION = 'ruphus-agent-v3';
 export const RUPHUS_CONTRACT_VERSION = 1;
-export const MAX_TOOL_CALLS = 4;
 
 export const LIFECYCLE_TYPES = Object.freeze([
   'turn_accepted', 'context_loading', 'text_delta', 'tool_started', 'tool_result',
@@ -12,8 +13,8 @@ export const LIFECYCLE_TYPES = Object.freeze([
 ]);
 
 export const ARTIFACT_TYPES = Object.freeze([
-  'coffee_context', 'current_recipe', 'recipe_proposal', 'brew_comparison',
-  'brew_history_chart', 'data_gap', 'action_receipt', 'fellow_handoff_result',
+  'current_recipe', 'recipe_proposal', 'brew_comparison',
+  'brew_history_chart', 'action_receipt', 'fellow_handoff_result',
   'undo_receipt', 'recipe_provenance',
 ]);
 
@@ -94,15 +95,10 @@ export function clone(value) {
 }
 
 export function validateContextRef(value) {
-  const errors = [];
-  if (!object(value)) return { valid: false, errors: ['context must be an object'] };
-  if (!text(value.coffeeId, 160)) errors.push('coffeeId is required');
-  for (const key of ['method', 'slotKey']) if (!text(value[key], 80)) errors.push(`${key} is required`);
-  if (value.slotKey && !SLOT_KEYS.includes(value.slotKey)) errors.push('unsupported slotKey');
-  if (value.attemptId != null && !text(value.attemptId, 160)) errors.push('invalid attemptId');
-  if (value.tastingId != null && !text(value.tastingId, 160)) errors.push('invalid tastingId');
-  return { valid: errors.length === 0, errors };
+  return validateLaunchContext(value);
 }
+
+export { validateLaunchContext, LAUNCH_SURFACES, LAUNCH_ITEM_KINDS, RECIPE_SLOTS };
 
 export function validateRecipeSnapshot(value) {
   const errors = [];
