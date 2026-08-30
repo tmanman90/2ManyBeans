@@ -17,6 +17,7 @@ const daysAgo = (value, now = Date.now()) => { const date = asDate(value); retur
 const slotDisplay = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' });
 const LEDGER_FIELDS = Object.freeze(['kind', 'status', 'summary', 'windowDays', 'count', 'at', 'namedCoffees', 'coffee', 'evidence']);
 const COFFEE_FIELDS = Object.freeze(['name', 'roaster', 'origin', 'process']);
+const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 
 function safeLedgerValue(value) {
   if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
@@ -113,10 +114,10 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
 export function appendLedger(ledger, entry, { maxBytes = MAX_LEDGER_BYTES, maxEntries = MAX_LEDGER_ENTRIES } = {}) {
   const entries = Array.isArray(ledger?.entries) ? ledger.entries.slice() : [];
   entries.push(sanitizeLedgerEntry(entry));
-  while ((Number.isFinite(maxBytes) && JSON.stringify(entries).length > maxBytes || Number.isFinite(maxEntries) && entries.length > maxEntries) && entries.length > 1) entries.shift();
-  if (Number.isFinite(maxBytes) && JSON.stringify(entries).length > maxBytes) return { version: 1, entries: [], namedCoffees: [], bytes: 0 };
+  while ((Number.isFinite(maxBytes) && byteLength(JSON.stringify(entries)) > maxBytes || Number.isFinite(maxEntries) && entries.length > maxEntries) && entries.length > 1) entries.shift();
+  if (Number.isFinite(maxBytes) && byteLength(JSON.stringify(entries)) > maxBytes) return { version: 1, entries: [], namedCoffees: [], bytes: 0 };
   const named = [...new Set(entries.flatMap((item) => Array.isArray(item.namedCoffees) ? item.namedCoffees : item.coffee?.name ? [item.coffee.name] : []))];
-  return { version: 1, entries, namedCoffees: named, bytes: JSON.stringify(entries).length };
+  return { version: 1, entries, namedCoffees: named, bytes: byteLength(JSON.stringify(entries)) };
 }
 export function clearLedger() { return { version: 1, entries: [], namedCoffees: [], bytes: 0 }; }
 export function boundLedger(ledger, options = {}) { return (Array.isArray(ledger?.entries) ? ledger.entries : []).reduce((value, entry) => appendLedger(value, entry, options), clearLedger()); }

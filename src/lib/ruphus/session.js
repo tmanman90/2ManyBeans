@@ -1,6 +1,7 @@
 const AGENT_PROTOCOL_VERSION = 1;
 const MAX_LEDGER_ENTRIES = 8;
 const MAX_LEDGER_BYTES = 4096;
+const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 const textValue = (value) => String(value || '').trim();
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 const safeLedgerEntry = (entry = {}) => {
@@ -12,9 +13,9 @@ const safeLedgerEntry = (entry = {}) => {
 };
 const boundedLedger = (ledger, { maxBytes = MAX_LEDGER_BYTES, maxEntries = MAX_LEDGER_ENTRIES } = {}) => {
   const entries = Array.isArray(ledger?.entries) ? ledger.entries.map(safeLedgerEntry).slice(-maxEntries) : [];
-  while (Number.isFinite(maxBytes) && JSON.stringify(entries).length > maxBytes && entries.length > 1) entries.shift();
-  if (Number.isFinite(maxBytes) && JSON.stringify(entries).length > maxBytes) return emptyLedger();
-  return { version: 1, entries, namedCoffees: [...new Set(entries.flatMap((entry) => entry.namedCoffees || entry.coffee?.name ? [entry.coffee?.name || entry.namedCoffees].flat() : []))].filter(Boolean), bytes: JSON.stringify(entries).length };
+  while (Number.isFinite(maxBytes) && byteLength(JSON.stringify(entries)) > maxBytes && entries.length > 1) entries.shift();
+  if (Number.isFinite(maxBytes) && byteLength(JSON.stringify(entries)) > maxBytes) return emptyLedger();
+  return { version: 1, entries, namedCoffees: [...new Set(entries.flatMap((entry) => entry.namedCoffees || entry.coffee?.name ? [entry.coffee?.name || entry.namedCoffees].flat() : []))].filter(Boolean), bytes: byteLength(JSON.stringify(entries)) };
 };
 
 export function normalizeAgentSession(session, options = {}) {
