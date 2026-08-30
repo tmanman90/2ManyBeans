@@ -10,7 +10,7 @@ import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { SLOT_KEYS } from '../src/lib/ruphus/contracts.js';
 import { isAgentAccessAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
-import { normalizeAgentSession, prepareSession } from '../src/lib/ruphus/session.js';
+import { normalizeAgentSession, prepareSession, sessionAge } from '../src/lib/ruphus/session.js';
 import { boundLedger, MAX_LEDGER_BYTES } from './_lib/ruphusEvidence.js';
 
 export const allowedAgentUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_UIDS || '').split(',').map((uid) => uid.trim()).filter(Boolean));
@@ -26,13 +26,30 @@ async function writeActiveSession(db, uid, session, options = {}) {
   const normalized = normalizeAgentSession(session, options);
   await activeSessionRef(db, uid).set(normalized, { merge: true });
 }
+export function hasUnavailableEvidence(session) {
+  return Boolean(session?.ledger?.entries?.some((entry) => entry.status === 'partial' && entry.evidence?.some((item) => item.status === 'unavailable')));
+}
+export async function retryUnavailableEvidence({ session, context, tools } = {}) {
+  if (!hasUnavailableEvidence(session) || !context?.launchCoffeeId || !tools?.call) return null;
+  return tools.call('read_coffee_evidence', { coffeeRef: context.launchCoffeeId, windowDays: context.historyWidened ? null : 14 });
+}
+export function sessionConversationForProvider(session, { now = Date.now() } = {}) {
+  if (!session || sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale') return [];
+  return (session.messages || []).map((message) => ({ role: message.role, content: message.text })).filter((message) => message.role === 'user' || message.role === 'assistant');
+}
 function firestoreReaders(db) {
   return {
     async listCoffees({ uid }) { const snap = await db.collection('users').doc(uid).collection('beans').get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
     async readCoffee({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get(); return snap.exists ? { id: coffeeId, ...snap.data() } : null; },
-    async readRecipe({ uid, coffeeId, slotKey, slot }) {
+    async readRecipe({ uid, coffeeId, slotKey, slot, launchItem }) {
       const bean = await this.readCoffee({ uid, coffeeId }); if (!bean) return null;
       const requested = slotKey || slot;
+      if (launchItem?.kind === 'recipe') {
+        const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(launchItem.ref).get();
+        if (!revision?.exists || revision.data()?.coffeeId !== coffeeId || revision.data()?.slotKey !== requested) return { code: 'launch_item_not_found' };
+        const data = revision.data() || {};
+        return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${launchItem.ref}`, selectedHash: data.snapshotHash || null, slotKey: requested };
+      }
       if (requested) { const result = resolveLegacyRecipe(bean, requested); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested } : { code: result.code }; }
       return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);
     },
@@ -52,6 +69,9 @@ function firestoreReaders(db) {
       if (item.kind === 'recipe') {
         if (!item.method || !SLOT_KEYS.includes(item.method)) return { ok: false, code: 'slot_required' };
         if (coffeeRef && !coffees.some((coffee) => coffee.id === coffeeRef || coffee.refKey === coffeeRef)) return { ok: false, code: 'cross_owner_or_context' };
+        const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(item.ref).get();
+        const data = revision?.exists ? revision.data() || {} : null;
+        if (!data || data.coffeeId !== coffeeRef || data.slotKey !== item.method) return { ok: false, code: 'launch_item_not_found' };
         return { ok: true };
       }
       const collection = item.kind === 'tasting' ? 'tastings' : 'brewAttempts';
@@ -76,9 +96,10 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     db = getDb();
     const readers = firestoreReaders(db);
     activeSession = prepareSession(await readActiveSession(db, uid), { now: startedAt });
-    const replayConversation = activeSession?.messages?.map((message) => ({ role: message.role, content: message.text })) || [];
-    const suppliedConversation = Array.isArray(conversation) && conversation.length ? conversation : replayConversation;
-    const replayLedger = activeSession?.ledger || null;
+    const stale = Boolean(activeSession && sessionAge({ lastActivityAt: activeSession.lastActivityAt, now: startedAt }).state === 'stale');
+    const replayConversation = sessionConversationForProvider(activeSession, { now: startedAt });
+    const suppliedConversation = Array.isArray(conversation) && conversation.length ? conversation : (stale ? [] : replayConversation);
+    const replayLedger = stale ? null : activeSession?.ledger || null;
     const priorText = suppliedConversation.map((message) => message?.content || message?.text || '').join(' ');
     const olderReference = activeSession?.historyWidened === true || /\b(?:older|last month|three weeks?|weeks? ago|before that|historical|earlier)\b/i.test(priorText);
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
@@ -87,6 +108,8 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     context.sessionState.lastActivityAt = activeSession?.lastActivityAt || null;
     context.sessionState.boundaryIndex = activeSession?.boundaryIndex || 0;
     const tools = createRuphusTools({ uid, context, readers, proposalStore: (input) => persistProposal({ db, ...input }) });
+    // E5: retry the unavailable active-topic read before allowing a prose-only turn.
+    await retryUnavailableEvidence({ session: activeSession, context, tools });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
     const turnResult = await runRuphusTurn({ turnId, context, userText: context.userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => { if (!firstFrameAt) firstFrameAt = Date.now(); writeFrame(res, frame); } });
     const priorMessages = activeSession?.messages || [];

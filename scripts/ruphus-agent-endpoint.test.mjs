@@ -4,7 +4,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids } from '../api/ruphus-agent.js';
+import { allowedAgentUids, firestoreReaders, hasUnavailableEvidence, retryUnavailableEvidence, sessionConversationForProvider } from '../api/ruphus-agent.js';
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
@@ -42,4 +42,24 @@ test('provider receives the bounded conversation and launch clue', async () => {
 
 test('server allowlist is exact and empty by default', () => {
   const previous = process.env.RUPHUS_AGENT_V3_UIDS; delete process.env.RUPHUS_AGENT_V3_UIDS; assert.equal(allowedAgentUids().size, 0); process.env.RUPHUS_AGENT_V3_UIDS = 'u-1, u-2'; assert.equal(allowedAgentUids().has('u-1'), true); assert.equal(allowedAgentUids().has('u-3'), false); if (previous == null) delete process.env.RUPHUS_AGENT_V3_UIDS; else process.env.RUPHUS_AGENT_V3_UIDS = previous;
+});
+test('unavailable active evidence is retried before a prose-only continuation', async () => {
+  const calls = [];
+  const session = { ledger: { entries: [{ status: 'partial', evidence: [{ kind: 'tastings', status: 'unavailable' }] }] } };
+  const result = await retryUnavailableEvidence({ session, context: { launchCoffeeId: 'c1', historyWidened: true }, tools: { call: async (...args) => { calls.push(args); return { tastings: { status: 'available' } }; } } });
+  assert.equal(result.tastings.status, 'available'); assert.deepEqual(calls, [['read_coffee_evidence', { coffeeRef: 'c1', windowDays: null }]]); assert.equal(hasUnavailableEvidence(session), true);
+});
+test('stale continuation stores old messages but does not replay them as active provider context', () => {
+  const messages = [{ role: 'user', text: 'old topic' }, { role: 'assistant', text: 'old answer' }];
+  assert.deepEqual(sessionConversationForProvider({ messages, lastActivityAt: 1 }, { now: 1000000000 }), []);
+  assert.equal(sessionConversationForProvider({ messages, lastActivityAt: 1000000000 }, { now: 1000000000 }).length, 2);
+});
+test('typed recipe launch reads the owner-scoped immutable revision and rejects substitutes', async () => {
+  const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };
+  const db = { collection: (name) => ({ doc: (id) => ({ collection: (child) => ({ doc: (childId) => ({ get: async () => ({ exists: child === 'beans' || name === 'users' && child === 'recipeRevisions' && childId === 'rev-1', data: () => child === 'beans' ? { name: 'El Vergel' } : revision }) }) }) }) }) };
+  const readers = firestoreReaders(db);
+  assert.equal((await readers.readLaunchItem({ uid: 'u', item: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' }, coffeeRef: 'bean-1', coffees: [{ id: 'bean-1' }] })).ok, true);
+  assert.equal((await readers.readLaunchItem({ uid: 'u', item: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' }, coffeeRef: 'bean-2', coffees: [{ id: 'bean-2' }] })).ok, false);
+  const resolved = await readers.readRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot', launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } });
+  assert.equal(resolved.selectedHash, 'hash-1'); assert.equal(resolved.dose, 15);
 });

@@ -186,6 +186,21 @@ export function redactRuphusTelemetry(input = {}) {
   if (Array.isArray(input.toolNames)) {
     output.toolNames = input.toolNames.filter((name) => typeof name === 'string' && RUPHUS_READ_TOOL_NAMES.includes(name.trim())).map((name) => name.trim());
   }
+  if (input.trace && typeof input.trace === 'object') {
+    const trace = {};
+    if (Array.isArray(input.trace.reads)) trace.reads = input.trace.reads
+      .filter((item) => RUPHUS_READ_TOOL_NAMES.includes(item?.name))
+      .map((item) => ({ name: item.name, ...(typeof item.at === 'string' ? { at: item.at } : {}) }));
+    if (Array.isArray(input.trace.focusChanges)) trace.focusChanges = input.trace.focusChanges
+      .filter((item) => item && (item.from != null || item.to != null))
+      .map((item) => ({ ...(hashTelemetryId(item.from) ? { fromRefHash: hashTelemetryId(item.from) } : {}), ...(hashTelemetryId(item.to) ? { toRefHash: hashTelemetryId(item.to) } : {}) }));
+    if (Array.isArray(input.trace.regenerations)) trace.regenerations = input.trace.regenerations.map((item) => ({
+      ...(Array.isArray(item?.triggers) ? { triggers: item.triggers.filter((value) => typeof value === 'string' && /^[A-Z0-9_]+$/.test(value)) } : {}),
+      ...(Array.isArray(item?.secondFailure) ? { secondFailure: item.secondFailure.filter((value) => typeof value === 'string' && /^[A-Z0-9_]+$/.test(value)) } : {}),
+      ...(typeof item?.at === 'string' ? { at: item.at } : {}),
+    }));
+    if (Object.keys(trace).length) output.trace = trace;
+  }
   if (typeof input.proposalValid === 'boolean') output.proposalValid = input.proposalValid;
   if (typeof input.recovered === 'boolean') output.recovered = input.recovered;
   for (const key of ['latencyMs', 'ttffMs', 'totalMs', 'retryCount', 'inputTokens', 'outputTokens', 'totalTokens', 'estimatedCost']) {

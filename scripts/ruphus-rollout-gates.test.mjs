@@ -16,7 +16,7 @@ import {
   redactRuphusTelemetry,
 } from '../api/_lib/ruphusRollout.js';
 import { recoveryForAgentFrame } from '../src/lib/ruphus/recovery.js';
-import { resolveAgentStreamResult } from '../src/lib/ruphus/streamAgent.js';
+import { createAgentFrameParser, resolveAgentStreamResult } from '../src/lib/ruphus/streamAgent.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createOpenAIProvider } from '../api/_lib/ruphusProviders/openai.js';
 
@@ -74,6 +74,11 @@ test('redaction emits only owner-safe telemetry fields', () => {
   assert.match(serialized, /contextHash/);
   assert.match(serialized, /actionHash/);
   assert.deepEqual(event.toolNames, ['read_recipe']);
+});
+test('trace redaction preserves bounded read, focus, and regeneration signals without raw values', () => {
+  const event = redactRuphusTelemetry({ trace: { reads: [{ name: 'read_coffee_evidence', at: 'now' }, { name: 'private_reader' }], focusChanges: [{ from: 'c-private', to: 'c-next' }], regenerations: [{ triggers: ['RT2_LENGTH', 'private prose'], secondFailure: ['CF5_MACHINE_TOKEN'], at: 'now' }] } });
+  assert.equal(event.trace.reads.length, 1); assert.equal(event.trace.reads[0].name, 'read_coffee_evidence'); assert.equal(event.trace.focusChanges[0].fromRefHash.length, 16); assert.equal(event.trace.regenerations[0].triggers[0], 'RT2_LENGTH');
+  assert.doesNotMatch(JSON.stringify(event), /c-private|private prose|private_reader/);
 });
 
 test('provider usage aggregates across tool rounds while retries remain provider-reported only', () => {
@@ -134,6 +139,9 @@ test('raw trace writes fail closed until an explicit valid retention config exis
   assert.equal(fake.writes[0].value.retentionDays, 14);
   assert.equal(fake.writes[0].value.expiresAt instanceof Date, true);
   assert.equal(fake.writes[0].value.expiresAt.getTime() > fake.writes[0].value.createdAt.getTime(), true);
+  const traced = fakeDb();
+  await persistRuphusTrace({ db: traced.db, uid: 'u-1', event: { trace: { reads: [{ name: 'read_recipe', at: 'now' }], focusChanges: [{ from: 'opaque-a', to: 'opaque-b' }], regenerations: [{ triggers: ['RT2_LENGTH'], secondFailure: ['CF5_MACHINE_TOKEN'] }] }, privateText: 'never' }, retentionRaw: '14' });
+  assert.equal(traced.writes[0].value.trace.reads[0].name, 'read_recipe'); assert.equal(traced.writes[0].value.trace.focusChanges[0].fromRefHash.length, 16); assert.equal(JSON.stringify(traced.writes[0].value).includes('never'), false);
 });
 
 test('bean census treats missing/malformed/old versions as stragglers and accepts only explicit exceptions', () => {
@@ -191,6 +199,25 @@ test('completed frame survives transport loss without replay while failed frames
   assert.equal(resolveAgentStreamResult({ terminalType: 'turn_interrupted', usageSeen: false }).ok, false);
 });
 
+test('client accepts another read tool after an artifact before turn completion', () => {
+  const parser = createAgentFrameParser();
+  const turnId = 'multi-tool-turn';
+  const frame = (type, fields = {}) => ({ version: 1, protocol: 'ruphus-agent-v3', type, turnId, ...fields });
+  const sequence = [
+    frame('turn_accepted'),
+    frame('context_loading'),
+    frame('tool_started', { name: 'read_recipe' }),
+    frame('tool_result', { name: 'read_recipe', result: { ok: false } }),
+    frame('artifact_ready', { artifact: { id: 'gap-1', type: 'data_gap' } }),
+    frame('tool_started', { name: 'read_coffee' }),
+    frame('tool_result', { name: 'read_coffee', result: { ok: true } }),
+    frame('text_delta', { text: 'Use the current coffee context.' }),
+    frame('turn_completed', { text: 'Use the current coffee context.' }),
+  ];
+  assert.doesNotThrow(() => sequence.forEach((item) => parser.accept(item)));
+  assert.equal(parser.terminalType, 'turn_completed');
+});
+
 test('Agent traces bind canonical evidence/request hashes and pricing-normalized usage', () => {
   const source = fs.readFileSync(new URL('../api/ruphus-agent.js', import.meta.url), 'utf8');
   assert.match(source, /contextHash: context\.evidenceHash/);
@@ -227,9 +254,11 @@ test('native dev builds route only Ruphus authority calls to the preview backend
   assert.match(apiBase, /VITE_RUPHUS_API_BASE/);
   assert.match(apiBase, /Capacitor\.isNativePlatform\(\) && isDevVariant/);
   assert.match(apiBase, /\? configuredRuphusBase\s*:\s*API_BASE/);
-  assert.match(chat, /RUPHUS_API_BASE.*\/api\/ruphus-agent/s);
-  assert.match(commands, /RUPHUS_API_BASE.*\/api\/recipe-command/s);
-  assert.match(tasting, /RUPHUS_API_BASE.*\/api\/ruphus-tasting/s);
-  assert.match(aiden, /RUPHUS_API_BASE.*\/api\/aiden/s);
+  assert.match(apiBase, /export function ruphusApiUrl/);
+  assert.match(apiBase, /base\.searchParams/);
+  assert.match(chat, /ruphusApiUrl\('\/api\/ruphus-agent'\)/);
+  assert.match(commands, /ruphusApiUrl\('\/api\/recipe-command'\)/);
+  assert.match(tasting, /ruphusApiUrl\('\/api\/ruphus-tasting'\)/);
+  assert.match(aiden, /ruphusApiUrl\('\/api\/aiden'\)/);
   assert.match(chat, /API_BASE.*\/api\/claude-stream/s);
 });
