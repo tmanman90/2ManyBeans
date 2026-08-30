@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
-import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
+import { buildRotationSnapshot, MAX_TOOL_ROUNDS } from '../api/_lib/ruphusEvidence.js';
 import { priceUsage } from '../api/_lib/modelPricing.js';
 import { RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
 import {
@@ -22,6 +22,7 @@ export const U3_STAGE_RULES = Object.freeze({
 });
 export const CRITICAL_FIXTURE_IDS = Object.freeze(['AE01', 'AE02', 'AE03', 'AE04', 'AE05', 'AE06', 'AE07', 'AE08', 'AE09', 'AE10', 'AE14']);
 export const SUPPORTING_FIXTURE_IDS = Object.freeze(['AE11', 'AE12', 'AE13']);
+export const U3_TOTAL_LIVE_COST_CAP_USD = 30;
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const cloneWithout = (value, keys) => Object.fromEntries(Object.entries(value || {}).filter(([key]) => !keys.includes(key)));
 
@@ -190,16 +191,19 @@ export function validateCostCap(costCapUsd) {
   return amount;
 }
 
-export function createCostGuard(costCapUsd) {
+export function createCostGuard(costCapUsd, { initialSpentUsd = 0, initialReservedUsd = 0, persist = null } = {}) {
   const capUsd = validateCostCap(costCapUsd);
-  let spentUsd = 0;
-  let reservedUsd = 0;
+  let spentUsd = Number(initialSpentUsd) || 0;
+  let reservedUsd = Number(initialReservedUsd) || 0;
+  if (spentUsd < 0 || reservedUsd < 0 || spentUsd + reservedUsd > capUsd) throw new Error('U3 cumulative cost ledger already exceeds its authorized ceiling');
   let sequence = 0;
   const reservations = new Map();
   return {
     get spentUsd() { return spentUsd; },
     get reservedUsd() { return reservedUsd; },
     get remainingUsd() { return capUsd - spentUsd - reservedUsd; },
+    snapshot() { return { spentUsd, reservedUsd }; },
+    async persistState() { if (typeof persist === 'function') await persist({ spentUsd, reservedUsd }); },
     assertCanCall() {
       if (spentUsd >= capUsd) throw new Error('U3 cost cap reached; hard stop before another provider call');
       return true;
@@ -227,6 +231,26 @@ export function createCostGuard(costCapUsd) {
   };
 }
 
+export async function loadCumulativeCostLedger(path) {
+  try {
+    const value = JSON.parse(await readFile(path, 'utf8'));
+    if (!value || typeof value !== 'object' || !Number.isFinite(value.spentUsd) || !Number.isFinite(value.reservedUsd || 0)) throw new Error('cumulative U3 cost ledger is invalid');
+    return { spentUsd: value.spentUsd, reservedUsd: value.reservedUsd || 0, authorizedCapUsd: value.authorizedCapUsd || U3_TOTAL_LIVE_COST_CAP_USD };
+  } catch (error) {
+    if (error.code === 'ENOENT') return { spentUsd: 0, reservedUsd: 0, authorizedCapUsd: U3_TOTAL_LIVE_COST_CAP_USD };
+    throw error;
+  }
+}
+
+export async function persistCumulativeCostLedger(path, ledger) {
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(temporary, `${JSON.stringify({ authorizedCapUsd: U3_TOTAL_LIVE_COST_CAP_USD, spentUsd: ledger.spentUsd, reservedUsd: ledger.reservedUsd }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+  const { rename } = await import('node:fs/promises');
+  await rename(temporary, path);
+  return ledger;
+}
+
 export function configuredCallMaximum({ model = RUPHUS_OPENAI_MODEL, provider = 'openai', inputTokens = process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS, outputTokens = process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS } = {}) {
   const input = Number(inputTokens); const output = Number(outputTokens);
   if (!Number.isFinite(input) || input <= 0 || !Number.isFinite(output) || output <= 0) throw new Error('U3 dispatch maximum requires configured input and output token caps');
@@ -236,18 +260,30 @@ export function configuredCallMaximum({ model = RUPHUS_OPENAI_MODEL, provider = 
   return priced.cost;
 }
 
+// The endpoint may make its initial call, one continuation for each exported
+// tool round, and one replacement call after a failed/empty turn. Keep the
+// reservation tied to those production constants rather than a runner cap.
+export const endpointCallMultiplier = Object.freeze({
+  initial: 1,
+  continuations: MAX_TOOL_ROUNDS,
+  regeneration: 1,
+  total: 1 + MAX_TOOL_ROUNDS + 1,
+});
+
 async function dispatchMetered(adapter, packet, guard) {
   const provider = adapter.provider || 'anthropic'; const model = adapter.model || process.env.RUPHUS_JUDGE_MODEL || 'claude-sonnet-5';
   const maximum = configuredCallMaximum({ provider, model, inputTokens: process.env.RUPHUS_JUDGE_MAX_INPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS, outputTokens: process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS });
   const reservation = guard.reserveMaximum(maximum);
+  await guard.persistState?.();
   try {
     const response = await adapter(packet);
     const usage = response?.usage;
     const priced = priceUsage({ provider, model: response?.model || model, usage });
     if (!priced) throw new Error('U3 judge returned incomplete or unpriceable usage');
     guard.reconcile(reservation, priced.cost);
+    await guard.persistState?.();
     return response;
-  } catch (error) { guard.reconcile(reservation, 0); throw error; }
+  } catch (error) { guard.reconcile(reservation, 0); await guard.persistState?.(); throw error; }
 }
 
 export function smokeIsClean(results) {
@@ -329,13 +365,39 @@ export function nextBranchTurn(fixture, index, reply) {
   return { text: branch?.answer || planned, unexpectedBranch: !branch, question };
 }
 
-export function deriveFixtureTrace({ fixture, frames = [], refMap = {} } = {}) {
+function resolveFixtureRef(value, refMap) {
+  if (!value) return null;
+  if (refMap[value]) return refMap[value];
+  return Object.entries(refMap).find(([, id]) => id === value)?.[0] || value;
+}
+
+function factualEvidenceText(fixture, frames, factSheet = '') {
+  const fixtureFacts = fixture?.factSheet || fixture?.facts || fixture?.expected || {};
+  const toolFacts = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {});
+  return JSON.stringify({ factSheet, fixtureFacts, toolFacts }).toLowerCase();
+}
+
+function hasUnsupportedFactualClaim(reply, knownText) {
+  const value = String(reply || '');
+  if (!/\b(?:history|earlier|previous|recorded|brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)\b/i.test(value)) return false;
+  const numbers = value.match(/\b\d+(?:\.\d+)?\b/g) || [];
+  if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
+  const factualPhrases = value.match(/\b(?:brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)\b[^.!?]{0,80}/gi) || [];
+  return factualPhrases.some((phrase) => {
+    const words = phrase.toLowerCase().split(/\s+/).filter((word) => word.length > 3 && !/^(?:your|the|was|is|and|with|for|this|that|a|an|on|of|to)$/.test(word));
+    return words.length > 0 && !words.some((word) => knownText.includes(word.replace(/[^a-z0-9.]/g, '')));
+  });
+}
+
+export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '' } = {}) {
   const toolResults = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {}).filter(object);
   const rawActual = toolResults.map((result) => result.coffeeRef || result.actualCoffeeId || result.focusCoffeeId || result.focus?.coffeeRef || result.focus?.coffeeId || result.evidence?.coffeeRef || result.coffee?.id).find(Boolean) || null;
-  const actual = refMap[rawActual] || rawActual;
-  const expected = fixture?.expected?.focus?.length === 1 ? fixture.expected.focus[0] : null;
-  const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0));
-  return { expectedCoffeeId: expected, actualCoffeeId: actual, focusCoffeeId: actual, fabricatedEvidence: fabricated };
+  const actual = resolveFixtureRef(rawActual, refMap);
+  const expectation = fixture?.expected?.turns?.[turnIndex] || fixture?.expected?.perTurn?.[turnIndex] || {};
+  const expectedRaw = expectation.focus || (fixture?.expected?.focus?.length === 1 ? fixture.expected.focus[0] : null) || fixture?.launchContext?.coffeeRef;
+  const expected = resolveFixtureRef(expectedRaw, refMap);
+  const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet));
+  return { expectedCoffeeId: expected, actualCoffeeId: actual, focusCoffeeId: actual, fabricatedEvidence: fabricated, expectedFocus: expected, ambiguity: expectation.ambiguity === true };
 }
 
 export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl = globalThis.fetch }) {
@@ -382,22 +444,30 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const userText = turns[index];
     const started = performance.now();
     costGuard?.assertCanCall();
-    const maximum = costGuard?.reserveMaximum ? configuredCallMaximum() : null;
+    const maximum = costGuard?.reserveMaximum ? configuredCallMaximum() * endpointCallMultiplier.total : null;
     const reservation = maximum ? costGuard.reserveMaximum(maximum) : null;
+    await costGuard?.persistState?.();
     let result;
     try { result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
       turnId: `live-${fixture.id}-${index + 1}`, contextRef: context.launchContext, userText,
       conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: false,
-    } }); } catch (error) { if (reservation) costGuard.reconcile(reservation, 0); throw error; }
+    } }); } catch (error) { if (reservation) costGuard.reconcile(reservation, 0); await costGuard?.persistState?.(); throw error; }
     const model = result.model || RUPHUS_OPENAI_MODEL;
     const priced = priceUsage({ model, provider: 'openai', usage: result.usage });
     if (!priced) throw new Error('U3 provider returned incomplete or unpriceable usage; refusing unmetered evidence');
     if (reservation) costGuard.reconcile(reservation, priced.cost); else costGuard?.charge(priced.cost);
+    await costGuard?.persistState?.();
     transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });
-    const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {} });
-    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
+    const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account) });
+    const toolEvidenceText = JSON.stringify((result.frames || []).filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {})).toLowerCase();
+    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: { days: 14 }, evidence: { records: (result.frames || []).filter((frame) => frame?.type === 'tool_result') }, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
+    if (/\b(?:history|earlier|previous|recorded|last tasting|last brew)\b/i.test(result.text) && !(result.frames || []).some((frame) => frame?.type === 'tool_result')) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence' });
+    const expectedMethod = fixture.expected?.method;
+    if (expectedMethod && !new RegExp(String(expectedMethod).replace('_', '|'), 'i').test(`${result.text} ${toolEvidenceText}`)) grader.ordinary.push({ code: 'U3_METHOD_SLOT_MISSING', category: 'ordinary', message: 'declared method slot was not evidenced' });
     const branch = nextBranchTurn(fixture, index, result);
-    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs: performance.now() - started, costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
+    const latencyMs = performance.now() - started;
+    if (latencyMs > 25000) grader.ordinary.push({ code: 'U3_TURN_OVER_25S', category: 'ordinary', message: 'turn exceeded the authoritative 25 second limit' });
+    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs, readRoundMs: result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: (result.frames || []).filter((frame) => /regenerat|replac/i.test(String(frame?.type || ''))).length, evidenceBeforeHistory: (result.frames || []).some((frame) => frame?.type === 'tool_result'), costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
     if (branch.unexpectedBranch) {
       turnResult.grader.ordinary.push({ code: 'U3_UNEXPECTED_BRANCH', category: 'ordinary', message: 'model asked an undeclared question branch; fixture stopped' });
       results.push(turnResult);
@@ -411,17 +481,25 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
   return { fixtureId: fixture.id, transcript, results, grader: { catastrophic: results.flatMap((result) => result.grader.catastrophic), ordinary: results.flatMap((result) => result.grader.ordinary) } };
 }
 
-export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtureIds = [], endpoint = process.env.RUPHUS_AGENT_ENDPOINT, token = process.env.RUPHUS_DEV_AUTH_TOKEN, costCapUsd, commit = process.env.RUPHUS_COMMIT || 'unknown', ledger = [], fetchImpl, judge = null, pairwise = null, resetSession = null, artifactDirectory = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval'), smokeLedgerPath = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval', 'smoke-ledger.json') } = {}) {
+export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtureIds = [], endpoint = process.env.RUPHUS_AGENT_ENDPOINT, token = process.env.RUPHUS_DEV_AUTH_TOKEN, costCapUsd, commit = process.env.RUPHUS_COMMIT || 'unknown', ledger = [], fetchImpl, judge = null, pairwise = null, resetSession = null, artifactDirectory = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval'), smokeLedgerPath = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval', 'smoke-ledger.json'), costLedgerPath = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval', 'live-cost-ledger.json') } = {}) {
   const cap = validateCostCap(costCapUsd);
+  if (cap > U3_TOTAL_LIVE_COST_CAP_USD) throw new Error(`U3 live cost cap cannot exceed the authorized cumulative $${U3_TOTAL_LIVE_COST_CAP_USD} ceiling`);
   if (typeof resetSession !== 'function') throw new Error('live U3 stage requires a Dev session reset adapter');
   if (stage === 'full' && !canStartFull(ledger, commit)) throw new Error('full U3 stage requires two consecutive clean smokes on the same commit');
   if (stage !== 'smoke' && (typeof judge !== 'function' || judge.modelFamily === 'openai')) throw new Error(`${stage} U3 stage requires the calibrated different-model-family judge`);
-  if (stage === 'full' && typeof pairwise !== 'function') throw new Error('full U3 stage requires a blind pairwise judge');
+  if ((stage === 'full' || stage === 'targeted') && typeof pairwise !== 'function') throw new Error(`${stage} U3 stage requires a blind pairwise judge`);
   const { account, cases } = await loadFixtureManifest(root);
   const schedule = stagePlan(stage, { fixtures: cases.cases, fixtureIds });
   const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew' };
-  const guard = createCostGuard(cap);
+  const priorCost = await loadCumulativeCostLedger(costLedgerPath);
+  const persistCost = (value) => persistCumulativeCostLedger(costLedgerPath, value);
+  const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: priorCost.spentUsd, initialReservedUsd: priorCost.reservedUsd, persist: persistCost });
+  await guard.persistState();
   const stageRunId = `u3-${Date.now()}`;
+  const calibrationRecords = [];
+  const judgeRecords = [];
+  const pairwiseRecords = [];
+  let calibration = null;
   if (stage !== 'smoke') {
     const references = { gold: [], knownBad: [] }; const goldIds = new Set();
     for (const fixture of cases.cases.filter((item) => item.critical)) {
@@ -430,9 +508,14 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     const goldPackets = createCalibrationPackets({ gold: references.gold, knownBad: references.knownBad, factSheet: fixtureFactSheet(account), seed: `${commit}:calibration` });
     const goldPacketIds = new Set(references.gold.map((item) => createBlindJudgePacket({ ...item, id: `${item.id}:gold`, seed: `${commit}:calibration` }).packetId));
     const calibrationResults = [];
-    for (const packet of goldPackets) calibrationResults.push({ kind: goldPacketIds.has(packet.packetId) ? 'gold' : 'knownBad', result: await dispatchMetered(judge, packet, guard) });
+    for (const packet of goldPackets) {
+      const result = await dispatchMetered(judge, packet, guard);
+      const kind = goldPacketIds.has(packet.packetId) ? 'gold' : 'knownBad';
+      calibrationResults.push({ kind, result });
+      calibrationRecords.push({ kind, packetId: packet.packetId, provider: result?.provider || judge.provider || null, model: result?.model || judge.model || null, usage: result?.usage || null });
+    }
     // Split only after dispatch, keeping calibration labels out of packets.
-    const calibration = assessCalibration({ goldResults: calibrationResults.filter((item) => item.kind === 'gold').map((item) => item.result), knownBadResults: calibrationResults.filter((item) => item.kind === 'knownBad').map((item) => item.result) });
+    calibration = assessCalibration({ goldResults: calibrationResults.filter((item) => item.kind === 'gold').map((item) => item.result), knownBadResults: calibrationResults.filter((item) => item.kind === 'knownBad').map((item) => item.result) });
     if (!calibration.calibrated) throw new Error('U3 judge calibration failed; candidate scoring is blocked');
   }
   const results = [];
@@ -445,17 +528,25 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
       const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       const judged = await judgeTranscript({ judge: async (input) => dispatchMetered(judge, input, guard), packet });
       candidate.judge = judged.sufficient ? judged.result : null;
+      candidate.judgeMeta = judged.sufficient ? { provider: judged.provider, model: judged.model, usage: judged.usage } : { sufficient: false };
+      judgeRecords.push({ fixtureId: fixture.id, repeat: run.repeat, provider: judged.provider, model: judged.model, usage: judged.usage, sufficient: judged.sufficient });
     }
-    if (pairwise && fixture.critical && stage === 'full') {
+    if (pairwise && fixture.critical && (stage === 'full' || stage === 'targeted')) {
       const reference = await loadTranscript(join(root, 'known-bad', `${names[fixture.id]}.md`));
       const packet = createBlindPairwisePacket({ candidate: transcript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       const pairwiseResult = await dispatchMetered(pairwise, packet, guard);
       candidate.pairwise = pairwisePass(pairwiseResult?.result || pairwiseResult, packet);
+      candidate.pairwiseProvenance = { provider: pairwiseResult?.provider || pairwise.provider || null, model: pairwiseResult?.model || pairwise.model || null, usage: pairwiseResult?.usage || null, packetId: packet.packetId, orderToken: packet.orderToken };
+      candidate.pairwiseRationale = pairwiseResult?.result?.rationale || pairwiseResult?.rationale || null;
+      pairwiseRecords.push({ fixtureId: fixture.id, repeat: run.repeat, winner: pairwiseResult?.result?.winner || pairwiseResult?.winner || null, rationale: candidate.pairwiseRationale, provenance: candidate.pairwiseProvenance });
     }
     results.push({ ...candidate, stage, kind: run.kind, commit, repeat: run.repeat, critical: fixture.critical });
     if (artifactDirectory) await persistRunArtifact(artifactDirectory, { ...candidate, stage, kind: run.kind, commit, repeat: run.repeat, critical: fixture.critical }, `${stageRunId}-${stage}-${run.kind}-${String(commit).replace(/[^A-Za-z0-9_-]/g, '_')}-${fixture.id}-${run.repeat}`);
   }
-  const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, results, costUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results) };
+  const latencyValues = results.flatMap((result) => result.results || []).map((turn) => turn.latencyMs).filter(Number.isFinite).sort((a, b) => a - b);
+  const readValues = results.flatMap((result) => result.results || []).map((turn) => turn.readRoundMs).filter(Number.isFinite).sort((a, b) => a - b);
+  const percentile = (values, fraction) => values.length ? values[Math.min(values.length - 1, Math.floor((values.length - 1) * fraction))] : null;
+  const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, calibration: stage === 'smoke' ? null : { ...calibration, records: calibrationRecords }, judge: { records: judgeRecords }, pairwise: { records: pairwiseRecords }, latency: { checkedReplyMs: { p50: percentile(latencyValues, 0.5), p90: percentile(latencyValues, 0.9) }, readRoundMs: { p50: percentile(readValues, 0.5), p90: percentile(readValues, 0.9) } }, results, costUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results) };
   if (artifactDirectory) await persistRunArtifact(artifactDirectory, report);
   if (stage === 'smoke' && smokeLedgerPath) await appendSmokeLedger(smokeLedgerPath, { commit, clean: report.clean });
   return report;

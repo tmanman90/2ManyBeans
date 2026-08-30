@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
-  appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, fixturePass, fullStagePass,
+  appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
   persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
 
@@ -25,6 +25,21 @@ test('U3 cost cap is explicit and hard-stops before overspend', () => {
   assert.equal(guard.charge(1.25), 1.25);
   assert.throws(() => guard.charge(0.76), /cost cap/);
   assert.equal(guard.spentUsd, 1.25);
+});
+
+test('U3 cumulative live ledger persists reconciled spend atomically and hard-stops the authorized ceiling', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u3-cost-'));
+  const path = join(directory, 'cost-ledger.json');
+  try {
+    const guard = createCostGuard(30, { persist: (value) => persistCumulativeCostLedger(path, value) });
+    const reservation = guard.reserveMaximum(2);
+    await guard.persistState();
+    guard.reconcile(reservation, 1.25);
+    await guard.persistState();
+    const ledger = await loadCumulativeCostLedger(path);
+    assert.equal(ledger.spentUsd, 1.25);
+    assert.throws(() => createCostGuard(30, { initialSpentUsd: 29, initialReservedUsd: 2 }), /authorized ceiling/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test('smoke and full pass semantics preserve catastrophic, ordinary, and 58/64 gates', () => {
@@ -63,10 +78,13 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: wrong, expectedCoffeeId: wrong.expectedCoffeeId, actualCoffeeId: wrong.actualCoffeeId }).catastrophic.some((item) => item.code === 'CF1_WRONG_COFFEE'), true);
   const fabricated = deriveFixtureTrace({ fixture, frames: [{ type: 'tool_result', result: { fabricatedEvidence: true } }] });
   assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: fabricated }).catastrophic.some((item) => item.code === 'CF2_FABRICATED_EVIDENCE'), true);
+  const fabricatedClaim = deriveFixtureTrace({ fixture, reply: 'Your brew used 99 grams and tasted like Moon Base.', frames: [{ type: 'tool_result', result: { coffeeRef: 'fixture-right', evidence: { coffeeRef: 'fixture-right', dose: 15 } } }] });
+  assert.equal(fabricatedClaim.fabricatedEvidence, true);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
   const maximum = configuredCallMaximum({ model: 'gpt-5.6-luna', inputTokens: 100, outputTokens: 100 });
+  assert.equal(endpointCallMultiplier.total, 1 + endpointCallMultiplier.continuations + endpointCallMultiplier.regeneration);
   const guard = createCostGuard(maximum * 2);
   const reservation = guard.reserveMaximum(maximum);
   assert.equal(guard.reservedUsd, maximum);
@@ -74,6 +92,7 @@ test('candidate dispatch reserves configured priced maximums and targeted pass p
   assert.equal(guard.spentUsd, maximum / 2);
   const run = (kind, id, critical = true) => ({ kind, fixtureId: id, critical, grader: { catastrophic: [], ordinary: [] }, judge: critical ? { mean: 4, scores: { a: 4 } } : null, pairwise: critical });
   assert.equal(targetedStagePass([run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), ...Array.from({ length: 11 }, (_, index) => run('targeted-smoke', `AE0${index + 1}`))], ['AE05']), true);
+  assert.equal(targetedStagePass([run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05', true), ...Array.from({ length: 11 }, (_, index) => run('targeted-smoke', `AE0${index + 1}`))].map((item, index) => index === 4 ? { ...item, pairwise: false } : item), ['AE05']), false);
 });
 
 test('live playback follows a declared model-question branch and rejects unmetered usage', async () => {
