@@ -56,7 +56,7 @@ test('recipe command receipt exposes the canonical Fellow preparation action', a
   assert.match(aiden, /prepareAidenAttempt/);
 });
 
-test('M2 contextual recipe surfaces mount provenance and tasting detail entry', async () => {
+test('contextual recipe surfaces mount provenance and the typed tasting launch entry', async () => {
   const [hand, aiden, detail, rotation] = await Promise.all([
     source('src/components/HandBrewModal.jsx'),
     source('src/components/AidenModal.jsx'),
@@ -68,6 +68,10 @@ test('M2 contextual recipe surfaces mount provenance and tasting detail entry', 
   assert.match(hand, /recipeProvenance = null/);
   assert.match(aiden, /recipeProvenance = null/);
   assert.match(detail, /Ask Ruphus/);
-  assert.match(detail, /tastingEvidence/);
+  assert.match(detail, /surface: 'tasting_card'/);
+  assert.match(detail, /launchItem: \{ kind: 'tasting', ref: tasting\.id/);
+  assert.match(detail, /resolveTastingLaunchMethod\(tasting\)/);
+  assert.match(detail, /reflection \|\| tasting\.notes/);
+  assert.doesNotMatch(detail, /tastingEvidence/);
   assert.match(rotation, /onOpenRuphus=\{agentV3Enabled \? onOpenRuphus : undefined\}/);
 });
