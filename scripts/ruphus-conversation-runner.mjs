@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
@@ -9,9 +9,17 @@ import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
 import {
   gradeReply, fixtureManifestShape, validateLaunchContext, CONTRACT_VERSION,
 } from '../src/lib/ruphus/conversationContract.js';
+import { assessCalibration, createBlindJudgePacket, createBlindPairwisePacket, judgeTranscript, pairwisePass } from './ruphus-conversation-judge.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const FIXTURE_ROOT = join(HERE, 'fixtures', 'ruphus-conversation');
+export const U3_STAGE_RULES = Object.freeze({
+  smoke: Object.freeze({ criticalRuns: 1, supportingRuns: 0 }),
+  calibration: Object.freeze({ criticalRuns: 3, supportingRuns: 1 }),
+  full: Object.freeze({ criticalRuns: 5, supportingRuns: 3 }),
+});
+export const CRITICAL_FIXTURE_IDS = Object.freeze(['AE01', 'AE02', 'AE03', 'AE04', 'AE05', 'AE06', 'AE07', 'AE08', 'AE09', 'AE10', 'AE14']);
+export const SUPPORTING_FIXTURE_IDS = Object.freeze(['AE11', 'AE12', 'AE13']);
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const cloneWithout = (value, keys) => Object.fromEntries(Object.entries(value || {}).filter(([key]) => !keys.includes(key)));
 
@@ -79,7 +87,8 @@ export function redactDiagnostic(value) {
   return JSON.stringify(value ?? null)
     .replace(/(?:sk|pk|api[_-]?key|token|authorization|bearer)[^,}\s]*/gi, '[REDACTED]')
     .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED_EMAIL]')
-    .replace(/\b(?:uid|user)[_-][A-Za-z0-9_-]+\b/gi, '[REDACTED_UID]');
+    .replace(/\b(?:uid|user)[_-][A-Za-z0-9_-]+\b/gi, '[REDACTED_UID]')
+    .replace(/\bfixture-[A-Za-z0-9_-]+\b/g, '[REDACTED_REF]');
 }
 
 function fixtureContext(account, fixture) {
@@ -139,17 +148,189 @@ export async function runInjectedCorpus(root = FIXTURE_ROOT) {
   return { mode: 'injected', label: 'plumbing only', contractVersion: CONTRACT_VERSION, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, results, passed: results.every((result) => result.grader.catastrophic.length === 0) };
 }
 
+export function stagePlan(stage, { fixtures, fixtureIds = [] } = {}) {
+  if (!Object.hasOwn(U3_STAGE_RULES, stage) && stage !== 'targeted') throw new Error(`unknown U3 stage: ${stage}`);
+  const source = Array.isArray(fixtures) ? fixtures : [];
+  const byId = new Map(source.map((fixture) => [fixture.id, fixture]));
+  const critical = (ids) => ids.map((id) => byId.get(id)).filter(Boolean);
+  const schedule = [];
+  const add = (fixture, repeat, kind = stage) => { for (let index = 1; index <= repeat; index += 1) schedule.push({ fixtureId: fixture.id, critical: fixture.critical, repeat: index, kind }); };
+  if (stage === 'smoke') critical(CRITICAL_FIXTURE_IDS).forEach((fixture) => add(fixture, 1));
+  if (stage === 'calibration' || stage === 'full') {
+    critical(CRITICAL_FIXTURE_IDS).forEach((fixture) => add(fixture, U3_STAGE_RULES[stage].criticalRuns));
+    critical(SUPPORTING_FIXTURE_IDS).forEach((fixture) => add(fixture, U3_STAGE_RULES[stage].supportingRuns));
+  }
+  if (stage === 'targeted') {
+    if (!fixtureIds.length) throw new Error('targeted stage requires named fixture IDs');
+    for (const fixture of fixtureIds.map((id) => byId.get(id))) {
+      if (!fixture) throw new Error('targeted stage contains an unknown fixture');
+      add(fixture, fixture.critical ? U3_STAGE_RULES.full.criticalRuns : U3_STAGE_RULES.full.supportingRuns, 'targeted');
+    }
+    schedule.push(...stagePlan('smoke', { fixtures: source }).map((entry) => ({ ...entry, kind: 'targeted-smoke' })));
+  }
+  return schedule;
+}
+
+export function validateCostCap(costCapUsd) {
+  const amount = typeof costCapUsd === 'string' ? Number(costCapUsd) : costCapUsd;
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('live U3 stages require an explicit positive cost cap');
+  return amount;
+}
+
+export function createCostGuard(costCapUsd) {
+  const capUsd = validateCostCap(costCapUsd);
+  let spentUsd = 0;
+  return {
+    get spentUsd() { return spentUsd; },
+    get remainingUsd() { return capUsd - spentUsd; },
+    charge(amount) {
+      if (!Number.isFinite(amount) || amount < 0) throw new Error('provider usage must include a non-negative numeric cost');
+      if (spentUsd + amount > capUsd) throw new Error('U3 cost cap reached; hard stop before another provider call');
+      spentUsd += amount;
+      return spentUsd;
+    },
+  };
+}
+
+export function smokeIsClean(results) {
+  const catastrophic = results.reduce((sum, result) => sum + (result.grader?.catastrophic?.length || 0), 0);
+  const ordinaryRuns = results.filter((result) => (result.grader?.ordinary?.length || 0) > 0).length;
+  return catastrophic === 0 && ordinaryRuns <= 1;
+}
+
+export function fixturePass(results, { critical = true } = {}) {
+  const clean = results.filter((result) => !result.grader?.catastrophic?.length && !result.grader?.ordinary?.length).length;
+  if (!critical) return clean >= 2;
+  const judgePasses = results.filter((result) => result.judge?.mean >= 4 && !Object.values(result.judge?.scores || {}).some((score) => score < 3)).length;
+  const pairwiseWins = results.filter((result) => result.pairwise === true).length;
+  return clean >= 4 && judgePasses >= 4 && pairwiseWins === results.length;
+}
+
+export function fullStagePass(results) {
+  const clean = results.filter((result) => !result.grader?.catastrophic?.length && !result.grader?.ordinary?.length).length;
+  const byFixture = new Map();
+  for (const result of results) byFixture.set(result.fixtureId, [...(byFixture.get(result.fixtureId) || []), result]);
+  const fixtureResultsPass = [...byFixture.values()].every((runs) => fixturePass(runs, { critical: runs[0]?.critical !== false }));
+  return results.every((result) => !(result.grader?.catastrophic?.length)) && clean >= 58 && fixtureResultsPass;
+}
+
+export function canStartFull(ledger, commit) {
+  const smokes = (Array.isArray(ledger) ? ledger : []).filter((entry) => entry.stage === 'smoke' && entry.commit === commit);
+  const lastTwo = smokes.slice(-2);
+  return lastTwo.length === 2 && lastTwo.every((entry) => entry.clean === true);
+}
+
+export async function appendSmokeLedger(path, entry) {
+  let entries = [];
+  try { entries = JSON.parse(await readFile(path, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (!Array.isArray(entries)) throw new Error('smoke ledger must be a JSON array');
+  entries.push({ stage: 'smoke', commit: String(entry.commit || ''), clean: entry.clean === true, recordedAt: entry.recordedAt || new Date().toISOString() });
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
+  return entries;
+}
+
+export async function persistRunArtifact(directory, report, runId = `u3-${Date.now()}`) {
+  const target = join(directory, runId);
+  await mkdir(target, { recursive: true });
+  await writeFile(join(target, 'report.json'), `${redactDiagnostic(report)}\n`, { encoding: 'utf8', flag: 'wx' });
+  return target;
+}
+
+export function branchAwareTurns({ turns, replies }) {
+  const planned = Array.isArray(turns) ? turns : [];
+  const actual = Array.isArray(replies) ? replies : [];
+  return planned.map((text, index) => ({ text, branch: actual[index]?.question ? 'model-question' : 'scripted', unexpectedBranch: Boolean(actual[index]?.question && !actual[index]?.expectedQuestion) }));
+}
+
+export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl = globalThis.fetch }) {
+  if (!endpoint || !/^https:\/\//i.test(endpoint)) throw new Error('U3 live endpoint must be HTTPS');
+  if (!token) throw new Error('U3 live auth must be injected non-printingly');
+  if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for live U3 mode');
+  const response = await fetchImpl(endpoint, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`U3 endpoint returned HTTP ${response.status}`);
+  const body = await response.json();
+  if (!body || typeof body.text !== 'string') throw new Error('U3 endpoint returned no visible reply');
+  return body;
+}
+
+export async function runLiveCase(account, fixture, { endpoint, token, costGuard, fetchImpl, onTurn = null } = {}) {
+  const context = fixtureContext(account, fixture);
+  const transcript = [];
+  const results = [];
+  for (const [index, userText] of fixture.turns.entries()) {
+    const started = performance.now();
+    const result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
+      turnId: `live-${fixture.id}-${index + 1}`, userText, context,
+    } });
+    const usageCost = Number(result.costUsd || 0);
+    costGuard?.charge(usageCost);
+    transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });
+    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
+    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs: performance.now() - started, unexpectedBranch: Boolean(result.question && result.question !== fixture.turns[index + 1]) };
+    results.push(turnResult);
+    onTurn?.(turnResult);
+  }
+  return { fixtureId: fixture.id, transcript, results, grader: { catastrophic: results.flatMap((result) => result.grader.catastrophic), ordinary: results.flatMap((result) => result.grader.ordinary) } };
+}
+
+export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtureIds = [], endpoint = process.env.RUPHUS_AGENT_ENDPOINT, token = process.env.RUPHUS_DEV_AUTH_TOKEN, costCapUsd, commit = process.env.RUPHUS_COMMIT || 'unknown', ledger = [], fetchImpl, judge = null, pairwise = null, artifactDirectory = null, smokeLedgerPath = null } = {}) {
+  const cap = validateCostCap(costCapUsd);
+  if (stage === 'full' && !canStartFull(ledger, commit)) throw new Error('full U3 stage requires two consecutive clean smokes on the same commit');
+  if (stage !== 'smoke' && typeof judge !== 'function') throw new Error(`${stage} U3 stage requires the calibrated different-model-family judge`);
+  if (stage === 'full' && typeof pairwise !== 'function') throw new Error('full U3 stage requires a blind pairwise judge');
+  const { account, cases } = await loadFixtureManifest(root);
+  const schedule = stagePlan(stage, { fixtures: cases.cases, fixtureIds });
+  if (stage !== 'smoke') {
+    const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew' };
+    const references = { gold: [], knownBad: [] };
+    for (const fixture of cases.cases.filter((item) => item.critical)) {
+      for (const kind of ['gold', 'knownBad']) references[kind].push(await judgeTranscript({ judge, packet: createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript: await loadTranscript(join(root, kind === 'gold' ? 'gold' : 'known-bad', `${names[fixture.id]}.md`)), seed: `${commit}:${kind}:${fixture.id}` }) }));
+    }
+    const calibration = assessCalibration({ goldResults: references.gold.map((item) => item.result), knownBadResults: references.knownBad.map((item) => item.result) });
+    if (!calibration.calibrated) throw new Error('U3 judge calibration failed; candidate scoring is blocked');
+  }
+  const guard = createCostGuard(cap);
+  const results = [];
+  for (const run of schedule) {
+    const fixture = cases.cases.find((item) => item.id === run.fixtureId);
+    const candidate = await runLiveCase(account, fixture, { endpoint, token, costGuard: guard, fetchImpl });
+    const transcript = candidate.transcript;
+    if (judge && stage !== 'smoke') {
+      const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      const judged = await judgeTranscript({ judge, packet });
+      candidate.judge = judged.sufficient ? judged.result : null;
+    }
+    if (pairwise && fixture.critical && stage === 'full') {
+      const packet = createBlindPairwisePacket({ candidate: transcript, reference: [], intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      candidate.pairwise = pairwisePass(await pairwise(packet), packet);
+    }
+    results.push({ ...candidate, stage, commit, repeat: run.repeat, critical: fixture.critical });
+  }
+  const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, results, costUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : smokeIsClean(results) };
+  if (artifactDirectory) await persistRunArtifact(artifactDirectory, report);
+  if (stage === 'smoke' && smokeLedgerPath) await appendSmokeLedger(smokeLedgerPath, { commit, clean: report.clean });
+  return report;
+}
+
 function parseArgs(argv) {
   const values = Object.fromEntries(argv.filter((arg) => arg.startsWith('--')).map((arg) => { const [key, ...rest] = arg.slice(2).split('='); return [key, rest.join('=') || true]; }));
-  return { mode: values.mode || 'injected', stage: values.stage || 'smoke', root: values.root || FIXTURE_ROOT };
+  return { mode: values.mode || 'injected', stage: values.stage || 'smoke', root: values.root || FIXTURE_ROOT, costCapUsd: values['cost-cap-usd'], fixtures: values.fixtures };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const options = parseArgs(process.argv.slice(2));
-  if (options.mode !== 'injected') {
-    console.error('Live provider mode is reserved for U3 and requires an explicit staged runner configuration.');
-    process.exitCode = 2;
-  } else {
+  if (options.mode === 'live') {
+    try {
+      const report = await runLiveStage({ stage: options.stage, root: options.root, fixtureIds: options.fixtures ? String(options.fixtures).split(',') : [], costCapUsd: options.costCapUsd, commit: process.env.RUPHUS_COMMIT || 'unknown' });
+      console.log(redactDiagnostic({ stage: report.stage, commit: report.commit, fixtures: report.results.length, costUsd: report.costUsd, passed: report.passed }));
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 1;
+    }
+  } else if (options.mode === 'injected') {
     try {
       const report = await runInjectedCorpus(options.root);
       console.log(JSON.stringify({ mode: report.mode, label: report.label, stage: options.stage, manifestVersion: report.manifestVersion, fixtures: report.results.length, catastrophicFailures: report.results.reduce((count, result) => count + result.grader.catastrophic.length, 0), ordinaryFailures: report.results.reduce((count, result) => count + result.grader.ordinary.length, 0), passed: report.passed }));
@@ -157,5 +338,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       console.error(error.message);
       process.exitCode = 1;
     }
+  } else {
+    console.error('U3 mode must be injected or live.');
+    process.exitCode = 2;
   }
 }
