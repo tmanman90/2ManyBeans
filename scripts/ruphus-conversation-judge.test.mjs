@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assessCalibration, createBlindJudgePacket, createBlindPairwisePacket, JUDGE_DIMENSIONS, JUDGE_SCHEMA_VERSION, pairwisePass, validateJudgeResult, validatePairwiseResult } from './ruphus-conversation-judge.mjs';
+import { assessCalibration, createBlindJudgePacket, createBlindPairwisePacket, createCalibrationPackets, JUDGE_DIMENSIONS, JUDGE_INSTRUCTIONS, JUDGE_SCHEMA_VERSION, pairwisePass, validateJudgeResult, validatePairwiseResult } from './ruphus-conversation-judge.mjs';
 
 const scores = (value) => Object.fromEntries(JUDGE_DIMENSIONS.map((dimension) => [dimension, value]));
 const judged = (value) => ({ schemaVersion: JUDGE_SCHEMA_VERSION, scores: scores(value), mean: value, rationale: 'bounded rationale' });
@@ -27,4 +27,13 @@ test('blind packets contain only intent, fact sheet, and visible transcript', ()
   const pair = createBlindPairwisePacket({ candidate: [{ role: 'assistant', text: 'candidate' }], reference: [{ role: 'assistant', text: 'reference' }], intent: 'intent', factSheet: 'facts', seed: 'pair' });
   assert.equal(pair.left.length, 1);
   assert.equal(pairwisePass({ schemaVersion: JUDGE_SCHEMA_VERSION, winner: pair.orderToken, rationale: 'candidate is better' }, pair), true);
+});
+
+test('calibration packets are exactly 11 plus 11 and carry no calibration label', () => {
+  const gold = Array.from({ length: 11 }, (_, index) => ({ id: `AE${String(index + 1).padStart(2, '0')}`, intent: 'intent', transcript: [] }));
+  const knownBad = gold.map((item) => ({ ...item }));
+  const packets = createCalibrationPackets({ gold, knownBad, factSheet: 'facts', seed: 'frozen' });
+  assert.equal(packets.length, 22);
+  assert.equal(packets.every((packet) => !JSON.stringify(packet).includes('known-bad') && !JSON.stringify(packet).includes('gold')), true);
+  assert.equal(Object.isFrozen(JUDGE_INSTRUCTIONS), true);
 });

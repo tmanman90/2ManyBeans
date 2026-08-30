@@ -26,7 +26,10 @@ endpoint. `RUPHUS_AGENT_ENDPOINT`, `RUPHUS_DEV_AUTH_TOKEN`,
 `RUPHUS_DEV_PROJECT_ID`, and `RUPHUS_DEV_FIXTURE_UID` are injected through the
 environment and are never printed. Seeding requires
 `RUPHUS_DEV_SEED_AUTHORIZED=true`, rejects production-like targets, and writes
-only the fixture account. Do not use production credentials or data.
+only the fixture account. Before stage admission, the runner reads the seeded
+beans, recipe revisions, and setup back through the production Firestore
+reader seam, and clears `chatSessions/active` before every fixture repetition.
+Do not use production credentials or data.
 
 Run artifacts contain redacted visible transcripts, stage, commit, fixture,
 grader classes, judge result, latency, and spend. Raw provider prompts are
@@ -38,4 +41,3 @@ The decision record must report source/tests, live backend, rendered harness,
 simulator, physical-device, and owner-conversation evidence separately. A U3
 success is labelled `Backend conversation checkpoint PASS`; it is never
 Product PASS.
-

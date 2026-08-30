@@ -4,9 +4,10 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
+import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
-  appendSmokeLedger, branchAwareTurns, canStartFull, createCostGuard, fixturePass, fullStagePass,
-  persistRunArtifact, redactDiagnostic, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, validateCostCap,
+  appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, fixturePass, fullStagePass,
+  persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
 
 test('U3 stage denominators are frozen and targeted always appends smoke', async () => {
@@ -46,6 +47,33 @@ test('full stage requires two clean smokes on the current commit and branches ar
   assert.deepEqual(branchAwareTurns({ turns: ['one', 'two'], replies: [{ question: 'Which?' }, { text: 'done' }] }), [
     { text: 'one', branch: 'model-question', unexpectedBranch: true, question: 'Which?' }, { text: 'two', branch: 'scripted', unexpectedBranch: false, question: null },
   ]);
+});
+
+test('each injected fixture is reset before execution, including stale session metadata', async () => {
+  const resets = [];
+  const report = await runInjectedCorpus(undefined, { resetSession: async (input) => resets.push(input) });
+  assert.equal(report.results.length, 14);
+  assert.equal(resets.length, 14);
+  assert.equal(resets.find((entry) => entry.fixture.id === 'AE07').session.lastActivityOffsetDays, 14);
+});
+
+test('fixture expectations and tool-result traces enforce wrong-coffee and fabricated-evidence failures', () => {
+  const fixture = { expected: { focus: ['fixture-right'] } };
+  const wrong = deriveFixtureTrace({ fixture, frames: [{ type: 'tool_result', result: { coffeeRef: 'fixture-wrong' } }] });
+  assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: wrong, expectedCoffeeId: wrong.expectedCoffeeId, actualCoffeeId: wrong.actualCoffeeId }).catastrophic.some((item) => item.code === 'CF1_WRONG_COFFEE'), true);
+  const fabricated = deriveFixtureTrace({ fixture, frames: [{ type: 'tool_result', result: { fabricatedEvidence: true } }] });
+  assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: fabricated }).catastrophic.some((item) => item.code === 'CF2_FABRICATED_EVIDENCE'), true);
+});
+
+test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
+  const maximum = configuredCallMaximum({ model: 'gpt-5.6-luna', inputTokens: 100, outputTokens: 100 });
+  const guard = createCostGuard(maximum * 2);
+  const reservation = guard.reserveMaximum(maximum);
+  assert.equal(guard.reservedUsd, maximum);
+  guard.reconcile(reservation, maximum / 2);
+  assert.equal(guard.spentUsd, maximum / 2);
+  const run = (kind, id, critical = true) => ({ kind, fixtureId: id, critical, grader: { catastrophic: [], ordinary: [] }, judge: critical ? { mean: 4, scores: { a: 4 } } : null, pairwise: critical });
+  assert.equal(targetedStagePass([run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), run('targeted', 'AE05'), ...Array.from({ length: 11 }, (_, index) => run('targeted-smoke', `AE0${index + 1}`))], ['AE05']), true);
 });
 
 test('live playback follows a declared model-question branch and rejects unmetered usage', async () => {

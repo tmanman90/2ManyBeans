@@ -36,4 +36,5 @@ test('seed plan feeds the production reader collection names and revision shape'
   assert.equal(rows.get('users/fixture-account/tastings/t1').beanId, 'c1');
   assert.equal(rows.get('users/fixture-account/brewAttempts/b1').coffeeId, 'c1');
   assert.equal(rows.get('users/fixture-account').defaultMethod, 'v60_hot');
+  assert.deepEqual(rows.get('users/fixture-account').preferences, { brewMethod: 'v60_hot', grinder: 'Ode', units: 'metric' });
 });
