@@ -34,7 +34,7 @@ export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
     const [coffeeId, slotKey] = ref.split(':');
     operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { coffeeId, slotKey: recipe.slot || slotKey, snapshot: recipe, snapshotHash: canonicalHash(recipe) } });
   }
-  for (const tasting of seeded.tastings || []) operations.push({ path: `users/${fixtureUid}/tastings/${tasting.id}`, data: tasting });
+  for (const tasting of seeded.tastings || []) operations.push({ path: `users/${fixtureUid}/tastings/${tasting.id}`, data: { ...tasting, beanId: tasting.beanId || tasting.coffeeId } });
   for (const attempt of [...(seeded.brews || []), ...(seeded.attempts || [])]) operations.push({ path: `users/${fixtureUid}/brewAttempts/${attempt.id}`, data: attempt });
   return operations;
 }
