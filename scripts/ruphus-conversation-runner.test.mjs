@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
 import {
   appendSmokeLedger, branchAwareTurns, canStartFull, createCostGuard, fixturePass, fullStagePass,
-  persistRunArtifact, redactDiagnostic, runLiveEndpointTurn, smokeIsClean, stagePlan, validateCostCap,
+  persistRunArtifact, redactDiagnostic, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
 
 test('U3 stage denominators are frozen and targeted always appends smoke', async () => {
@@ -44,8 +44,26 @@ test('full stage requires two clean smokes on the current commit and branches ar
   assert.equal(canStartFull([{ stage: 'smoke', commit: 'a', clean: true }, { stage: 'smoke', commit: 'a', clean: true }], 'a'), true);
   assert.equal(canStartFull([{ stage: 'smoke', commit: 'a', clean: true }, { stage: 'smoke', commit: 'b', clean: true }], 'a'), false);
   assert.deepEqual(branchAwareTurns({ turns: ['one', 'two'], replies: [{ question: 'Which?' }, { text: 'done' }] }), [
-    { text: 'one', branch: 'model-question', unexpectedBranch: true }, { text: 'two', branch: 'scripted', unexpectedBranch: false },
+    { text: 'one', branch: 'model-question', unexpectedBranch: true, question: 'Which?' }, { text: 'two', branch: 'scripted', unexpectedBranch: false, question: null },
   ]);
+});
+
+test('live playback follows a declared model-question branch and rejects unmetered usage', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Tell me about a coffee', 'planned answer'], branches: [{ when: 'Which coffee', answer: 'actual answer' }] };
+  const payloads = [];
+  const fetchImpl = async (_endpoint, request) => {
+    const payload = JSON.parse(request.body); payloads.push(payload);
+    const first = payloads.length === 1;
+    const frame = first ? { type: 'turn_completed', text: 'Which coffee?' } : { type: 'turn_completed', text: 'specific answer' };
+    return { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${JSON.stringify(frame)}\n${JSON.stringify({ type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } })}\n` };
+  };
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(payloads[1].userText, 'actual answer');
+  assert.equal(result.results[0].unexpectedBranch, false);
+  assert.ok(cost.spentUsd > 0);
+  await assert.rejects(() => runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl: async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"turn_completed","text":"x"}\n' }), costGuard: { assertCanCall() {}, charge() {} } }), /unpriceable usage/);
 });
 
 test('live adapter consumes NDJSON and persisted artifacts redact canary secrets', async () => {
@@ -57,6 +75,9 @@ test('live adapter consumes NDJSON and persisted artifacts redact canary secrets
   try {
     const target = await persistRunArtifact(directory, { transcript: [{ text: 'canary-token' }], ref: 'fixture-secret' }, 'run-1');
     const contents = await readFile(join(target, 'report.json'), 'utf8');
+    const artifact = JSON.parse(contents);
+    assert.equal(artifact.retentionDays, 30);
+    assert.ok(artifact.expiresAt > artifact.generatedAt);
     assert.equal(contents.includes('canary-token'), false);
     assert.equal(contents.includes('fixture-secret'), false);
     const ledger = await appendSmokeLedger(join(directory, 'smoke-ledger.json'), { commit: 'abc', clean: true });

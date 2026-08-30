@@ -14,7 +14,9 @@ test('relative fixture dates are rewritten from one run clock and seed plan is i
   const account = { manifestVersion: 1, manifestHash: 'hash', setup: { grinder: 'Ode' }, coffees: [{ id: 'c1', name: 'Coffee' }], recipes: { 'c1:v60': { id: 'r1' } }, brews: [{ id: 'b1' }], tastings: [], attempts: [] };
   const plan = buildSeedPlan(account, { fixtureUid: 'fixture-account', now });
   assert.equal(plan[0].path, 'users/fixture-account');
-  assert.equal(plan.some((operation) => operation.path.endsWith('/recipes/c1:v60')), true);
+  assert.equal(plan.some((operation) => operation.path.endsWith('/recipeRevisions/c1:v60')), true);
+  assert.equal(plan.some((operation) => operation.path.endsWith('/beans/c1')), true);
+  assert.equal(plan.some((operation) => operation.path.endsWith('/brewAttempts/b1')), true);
   assert.equal(plan.every((operation) => !JSON.stringify(operation).includes('token')), true);
 });
 
@@ -25,3 +27,13 @@ test('seedFixture verifies the frozen account before creating writes', async () 
   assert.ok(result.operations.length > 1);
 });
 
+test('seed plan feeds the production reader collection names and revision shape', () => {
+  const account = { setup: { defaultMethod: 'v60_hot', grinder: 'Ode', units: 'metric' }, coffees: [{ id: 'c1' }], recipes: { 'c1:v60_hot': { slot: 'v60_hot', dose: 15 } }, tastings: [{ id: 't1', coffeeId: 'c1' }], brews: [{ id: 'b1', coffeeId: 'c1' }], attempts: [] };
+  const rows = new Map(buildSeedPlan(account, { fixtureUid: 'fixture-account' }).map((item) => [item.path, item.data]));
+  assert.equal(rows.get('users/fixture-account/beans/c1').id, 'c1');
+  assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').coffeeId, 'c1');
+  assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').slotKey, 'v60_hot');
+  assert.equal(rows.get('users/fixture-account/tastings/t1').coffeeId, 'c1');
+  assert.equal(rows.get('users/fixture-account/brewAttempts/b1').coffeeId, 'c1');
+  assert.equal(rows.get('users/fixture-account').defaultMethod, 'v60_hot');
+});

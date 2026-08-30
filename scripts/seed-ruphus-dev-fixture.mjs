@@ -2,6 +2,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIXTURE_ROOT, loadFixtureManifest } from './ruphus-conversation-runner.mjs';
+import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 
 export function assertDevTarget({ projectId, fixtureUid, authorized = false } = {}) {
   if (!authorized) throw new Error('fixture seeding requires explicit Dev authorization');
@@ -24,14 +25,17 @@ export function rewriteRelativeDates(value, now = new Date()) {
 export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
   if (!fixtureUid) throw new Error('fixture UID is required');
   const seeded = rewriteRelativeDates(account, now);
-  const collections = ['coffees', 'recipes', 'brews', 'tastings', 'attempts'];
-  const operations = [{ path: `users/${fixtureUid}`, data: { setup: seeded.setup, manifestVersion: seeded.manifestVersion, manifestHash: seeded.manifestHash } }];
-  for (const collection of collections) {
-    const records = seeded[collection];
-    if (!records) continue;
-    if (Array.isArray(records)) for (const record of records) operations.push({ path: `users/${fixtureUid}/${collection}/${record.id}`, data: record });
-    else for (const [id, record] of Object.entries(records)) operations.push({ path: `users/${fixtureUid}/${collection}/${id}`, data: record });
+  // Mirror the production readers exactly: beans, recipeRevisions, tastings,
+  // and brewAttempts. The fixture account remains a source manifest only.
+  const profile = { ...seeded.setup, manifestVersion: seeded.manifestVersion, manifestHash: seeded.manifestHash, account: seeded.account || 'ruphus-dev-fixture' };
+  const operations = [{ path: `users/${fixtureUid}`, data: profile }];
+  for (const coffee of seeded.coffees || []) operations.push({ path: `users/${fixtureUid}/beans/${coffee.id}`, data: coffee });
+  for (const [ref, recipe] of Object.entries(seeded.recipes || {})) {
+    const [coffeeId, slotKey] = ref.split(':');
+    operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { coffeeId, slotKey: recipe.slot || slotKey, snapshot: recipe, snapshotHash: canonicalHash(recipe) } });
   }
+  for (const tasting of seeded.tastings || []) operations.push({ path: `users/${fixtureUid}/tastings/${tasting.id}`, data: tasting });
+  for (const attempt of [...(seeded.brews || []), ...(seeded.attempts || [])]) operations.push({ path: `users/${fixtureUid}/brewAttempts/${attempt.id}`, data: attempt });
   return operations;
 }
 

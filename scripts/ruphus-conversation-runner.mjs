@@ -6,6 +6,8 @@ import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
+import { priceUsage } from '../api/_lib/modelPricing.js';
+import { RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
 import {
   gradeReply, fixtureManifestShape, validateLaunchContext, CONTRACT_VERSION,
 } from '../src/lib/ruphus/conversationContract.js';
@@ -84,12 +86,18 @@ export async function loadTranscript(file) {
 }
 
 export function redactDiagnostic(value) {
-  return JSON.stringify(value ?? null)
-    .replace(/(?:sk|pk|api[_-]?key|token|authorization|bearer)[^,}\s]*/gi, '[REDACTED]')
-    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED_EMAIL]')
-    .replace(/\b(?:uid|user)[_-][A-Za-z0-9_-]+\b/gi, '[REDACTED_UID]')
-    .replace(/\bfixture-[A-Za-z0-9_-]+\b/g, '[REDACTED_REF]')
-    .replace(/\bcanary-[A-Za-z0-9._-]+\b/gi, '[REDACTED]');
+  const sanitize = (input) => {
+    if (Array.isArray(input)) return input.map((item) => sanitize(item));
+    if (input && typeof input === 'object') return Object.fromEntries(Object.entries(input).map(([name, item]) => [name, /token|secret|authorization|api[_-]?key|bearer/i.test(name) ? '[REDACTED]' : sanitize(item, name)]));
+    if (typeof input !== 'string') return input;
+    return input
+      .replace(/(?:sk|pk)[-_][A-Za-z0-9._-]+/gi, '[REDACTED]')
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED_EMAIL]')
+      .replace(/\b(?:uid|user)[_-][A-Za-z0-9_-]+\b/gi, '[REDACTED_UID]')
+      .replace(/\bfixture-[A-Za-z0-9_-]+\b/g, '[REDACTED_REF]')
+      .replace(/\bcanary-[A-Za-z0-9._-]+\b/gi, '[REDACTED]');
+  };
+  return JSON.stringify(sanitize(value));
 }
 
 function fixtureContext(account, fixture) {
@@ -184,6 +192,10 @@ export function createCostGuard(costCapUsd) {
   return {
     get spentUsd() { return spentUsd; },
     get remainingUsd() { return capUsd - spentUsd; },
+    assertCanCall() {
+      if (spentUsd >= capUsd) throw new Error('U3 cost cap reached; hard stop before another provider call');
+      return true;
+    },
     charge(amount) {
       if (!Number.isFinite(amount) || amount < 0) throw new Error('provider usage must include a non-negative numeric cost');
       if (spentUsd + amount > capUsd) throw new Error('U3 cost cap reached; hard stop before another provider call');
@@ -234,14 +246,28 @@ export async function appendSmokeLedger(path, entry) {
 export async function persistRunArtifact(directory, report, runId = `u3-${Date.now()}`) {
   const target = join(directory, runId);
   await mkdir(target, { recursive: true });
-  await writeFile(join(target, 'report.json'), `${redactDiagnostic(report)}\n`, { encoding: 'utf8', flag: 'wx' });
+  const generatedAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  await writeFile(join(target, 'report.json'), `${redactDiagnostic({ ...report, generatedAt, expiresAt, retentionDays: 30 })}\n`, { encoding: 'utf8', flag: 'wx' });
   return target;
 }
 
 export function branchAwareTurns({ turns, replies }) {
   const planned = Array.isArray(turns) ? turns : [];
   const actual = Array.isArray(replies) ? replies : [];
-  return planned.map((text, index) => ({ text, branch: actual[index]?.question ? 'model-question' : 'scripted', unexpectedBranch: Boolean(actual[index]?.question && !actual[index]?.expectedQuestion) }));
+  return planned.map((text, index) => {
+    const question = actual[index]?.question || (/\?\s*$/.test(String(actual[index]?.text || '')) ? String(actual[index].text).trim() : null);
+    const branch = question && actual[index]?.branchAnswer ? actual[index].branchAnswer : text;
+    return { text: branch, branch: question ? 'model-question' : 'scripted', unexpectedBranch: Boolean(question && !actual[index]?.expectedQuestion), question: question || null };
+  });
+}
+
+export function nextBranchTurn(fixture, index, reply) {
+  const planned = fixture.turns?.[index + 1];
+  const question = reply?.question || (/\?\s*$/.test(String(reply?.text || '')) ? String(reply.text).trim() : null);
+  if (!question) return { text: planned, unexpectedBranch: false, question: null };
+  const branch = (fixture.branches || []).find((candidate) => new RegExp(candidate.when, 'i').test(question));
+  return { text: branch?.answer || planned, unexpectedBranch: !branch, question };
 }
 
 export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl = globalThis.fetch }) {
@@ -265,23 +291,44 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl 
   return body;
 }
 
+export function createLiveJudgeAdapter({ endpoint = process.env.RUPHUS_JUDGE_ENDPOINT, token = process.env.RUPHUS_JUDGE_AUTH_TOKEN, modelFamily = process.env.RUPHUS_JUDGE_MODEL_FAMILY, providerFamily = process.env.RUPHUS_PROVIDER_MODEL_FAMILY || 'openai', fetchImpl = globalThis.fetch } = {}) {
+  if (!endpoint || !token || !modelFamily) throw new Error('U3 calibration requires injected judge endpoint, auth, and model family');
+  if (modelFamily === providerFamily) throw new Error('U3 judge must use a different model family from the candidate provider');
+  const adapter = async (packet) => {
+    if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for the U3 judge');
+    const response = await fetchImpl(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ modelFamily, promptVersion: packet.promptVersion, packet }) });
+    if (!response.ok) throw new Error(`U3 judge returned HTTP ${response.status}`);
+    const result = await response.json();
+    return result.result || result;
+  };
+  Object.defineProperty(adapter, 'modelFamily', { value: modelFamily });
+  return adapter;
+}
+
 export async function runLiveCase(account, fixture, { endpoint, token, costGuard, fetchImpl, onTurn = null } = {}) {
   const context = fixtureContext(account, fixture);
   const transcript = [];
   const results = [];
-  for (const [index, userText] of fixture.turns.entries()) {
+  const turns = [...fixture.turns];
+  for (let index = 0; index < turns.length; index += 1) {
+    const userText = turns[index];
     const started = performance.now();
+    costGuard?.assertCanCall();
     const result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
       turnId: `live-${fixture.id}-${index + 1}`, contextRef: context.launchContext, userText,
       conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: false,
     } });
-    const usageCost = Number(result.costUsd || 0);
-    costGuard?.charge(usageCost);
+    const model = result.model || RUPHUS_OPENAI_MODEL;
+    const priced = priceUsage({ model, provider: 'openai', usage: result.usage });
+    if (!priced) throw new Error('U3 provider returned incomplete or unpriceable usage; refusing unmetered evidence');
+    costGuard?.charge(priced.cost);
     transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });
     const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
-    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs: performance.now() - started, unexpectedBranch: Boolean(result.question && result.question !== fixture.turns[index + 1]) };
+    const branch = nextBranchTurn(fixture, index, result);
+    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs: performance.now() - started, costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
     results.push(turnResult);
     onTurn?.(turnResult);
+    if (branch.question && index + 1 < turns.length) turns[index + 1] = branch.text;
   }
   return { fixtureId: fixture.id, transcript, results, grader: { catastrophic: results.flatMap((result) => result.grader.catastrophic), ordinary: results.flatMap((result) => result.grader.ordinary) } };
 }
@@ -289,7 +336,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
 export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtureIds = [], endpoint = process.env.RUPHUS_AGENT_ENDPOINT, token = process.env.RUPHUS_DEV_AUTH_TOKEN, costCapUsd, commit = process.env.RUPHUS_COMMIT || 'unknown', ledger = [], fetchImpl, judge = null, pairwise = null, artifactDirectory = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval'), smokeLedgerPath = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval', 'smoke-ledger.json') } = {}) {
   const cap = validateCostCap(costCapUsd);
   if (stage === 'full' && !canStartFull(ledger, commit)) throw new Error('full U3 stage requires two consecutive clean smokes on the same commit');
-  if (stage !== 'smoke' && typeof judge !== 'function') throw new Error(`${stage} U3 stage requires the calibrated different-model-family judge`);
+  if (stage !== 'smoke' && (typeof judge !== 'function' || judge.modelFamily === 'openai')) throw new Error(`${stage} U3 stage requires the calibrated different-model-family judge`);
   if (stage === 'full' && typeof pairwise !== 'function') throw new Error('full U3 stage requires a blind pairwise judge');
   const { account, cases } = await loadFixtureManifest(root);
   const schedule = stagePlan(stage, { fixtures: cases.cases, fixtureIds });
@@ -335,7 +382,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const options = parseArgs(process.argv.slice(2));
   if (options.mode === 'live') {
     try {
-      const report = await runLiveStage({ stage: options.stage, root: options.root, fixtureIds: options.fixtures ? String(options.fixtures).split(',') : [], costCapUsd: options.costCapUsd, commit: process.env.RUPHUS_COMMIT || 'unknown' });
+      const judge = options.stage === 'smoke' ? null : createLiveJudgeAdapter({});
+      const report = await runLiveStage({ stage: options.stage, root: options.root, fixtureIds: options.fixtures ? String(options.fixtures).split(',') : [], costCapUsd: options.costCapUsd, commit: process.env.RUPHUS_COMMIT || 'unknown', judge, pairwise: judge });
       console.log(redactDiagnostic({ stage: report.stage, commit: report.commit, fixtures: report.results.length, costUsd: report.costUsd, passed: report.passed }));
     } catch (error) {
       console.error(error.message);
