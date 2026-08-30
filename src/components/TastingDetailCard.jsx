@@ -51,6 +51,12 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
+  const close = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    setTimeout(() => { setMounted(false); setClosing(false); closingRef.current = false; onClose?.(); }, 240);
+  };
 
   useEffect(() => {
     if (!tasting) { setMounted(false); setClosing(false); closingRef.current = false; return; }
@@ -68,13 +74,6 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
 
   if (!tasting) return null;
 
-  const close = () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setClosing(true);
-    setTimeout(() => { setMounted(false); setClosing(false); closingRef.current = false; onClose?.(); }, 240);
-  };
-
   const visible = mounted && !closing;
   const rows = DETAIL_AXES.filter(([k]) => tasting[k] && String(tasting[k]).trim());
   // The named flavors + the user's own-words reflection are stored together in `notes`; split them
@@ -83,18 +82,12 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
   const flavorList = flavorStr ? flavorStr.split(',').map(s => s.trim()).filter(Boolean) : [];
   const openRuphusFromTasting = () => {
     if (!onOpenRuphus || !bean?.id) return;
-    const method = String(tasting.method || bean.handBrewRecipe?.device || (bean.aidenRecipe ? 'aiden' : 'v60')).toLowerCase();
-    const mode = tasting.mode === 'iced' ? 'iced' : 'hot';
-    const slotKey = method === 'aiden' ? 'aiden' : `${method === 'kalita' ? 'kalita' : 'v60'}_${mode}`;
+    const recordedMethod = tasting.method || tasting.brewMethod || tasting.attemptMethod || null;
     onOpenRuphus({
-      coffeeId: bean.id,
-      coffeeName: bean.name,
-      method,
-      mode,
-      slotKey,
-      userText: reflection || tasting.notes || '',
-      tastingEvidence: { rating: tasting.rating || null, oneWord: tasting.oneWord || null, notes: tasting.notes || null },
-    }, 'This was my last cup. What should I change for the next brew?');
+      coffeeRef: bean.id,
+      surface: 'tasting_card',
+      ...(tasting.id ? { launchItem: { kind: 'tasting', ref: tasting.id, ...(recordedMethod ? { method: recordedMethod } : {}) } } : {}),
+    }, reflection || tasting.notes || 'This was my last cup. What should I change for the next brew?');
     onClose?.();
   };
   const reveal = (i) => reduce ? {} : {

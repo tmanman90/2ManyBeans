@@ -47,7 +47,15 @@ export function startNewChat(session, { now = Date.now() } = {}) {
 export function continuePrevious(session, { now = Date.now() } = {}) {
   const normalized = normalizeAgentSession(session);
   if (!normalized) return null;
-  return { ...normalized, ledger: boundedLedger(normalized.ledger), lastActivityAt: Number(now), updatedAt: Number(now) };
+  const stale = sessionAge({ lastActivityAt: normalized.lastActivityAt, now }).state === 'stale';
+  return { ...normalized, ledger: stale ? emptyLedger() : boundedLedger(normalized.ledger), lastActivityAt: Number(now), updatedAt: Number(now), ...(stale ? { historyWidened: true } : {}) };
+}
+
+export function sessionPresentation(session, { now = Date.now() } = {}) {
+  const normalized = normalizeAgentSession(session);
+  if (!normalized) return { state: 'fresh', showOpening: false, showContinue: false, session: null };
+  const age = sessionAge({ lastActivityAt: normalized.lastActivityAt, now });
+  return { state: age.state, showOpening: age.state !== 'fresh', showContinue: age.state === 'stale', session: normalized };
 }
 
 export function rebuildStaleSession(session, { now = Date.now() } = {}) {

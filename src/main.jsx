@@ -386,6 +386,7 @@ const Root = () => {
                 returnBean={returnBean}
                 getBeanById={getBeanById}
                 profile={profile}
+                dataLoaded={dataLoaded}
                 updateProfile={updateProfile}
                 refetchBeans={refetch}
               />

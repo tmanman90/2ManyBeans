@@ -478,7 +478,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           {attemptId && result?.status === 'uncertain' && onRetryAttempt && <Btn variant="ghost" onClick={onRetryAttempt} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Check Fellow again</Btn>}
           {attemptId && result?.status === 'uncertain' && onSendAsNewProfile && <Btn variant="ghost" onClick={onSendAsNewProfile} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Send as a new profile</Btn>}
           {attemptId && result?.status === 'profile_prepared' && onCompleteAttempt && <Btn variant="primary" onClick={handleAttemptComplete} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Start tasting</Btn>}
-          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeId: bean?.id, coffeeName: bean?.name, method: 'aiden', mode: 'hot', slotKey: 'aiden', revisionId }, 'How should I improve this Aiden recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeRef: bean?.id, surface: 'recipe_aiden', launchItem: { kind: 'recipe', ref: revisionId || recipeProvenance?.revisionId || `${bean?.id}:aiden`, method: 'aiden' } }, 'How should I improve this Aiden recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           <DialCard recipe={recipe} />
 

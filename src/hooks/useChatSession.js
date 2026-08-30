@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { cacheRead, cacheWrite, chatKey } from '../lib/offlineCache';
 import { resolveTerminal } from '../lib/streamChat';
 import { parseBeanScan, parseRecipeCard } from '../lib/chatParse';
 import { recipeSummary } from '../components/chat/RecipeCard';
-import { normalizeAgentSession, inflateAgentSession } from '../lib/ruphus/session.js';
+import { normalizeAgentSession, inflateAgentSession, startNewChat } from '../lib/ruphus/session.js';
 
 const MAX_MESSAGES = 50;
 const MAX_TEXT = 2000;
@@ -69,9 +69,6 @@ function createDefaultAdapter(uid) {
     saveRemote(session) {
       return setDoc(ref, session);
     },
-    deleteRemote() {
-      return deleteDoc(ref);
-    },
     async loadRemoteArtifacts(session) {
       const sessionId = session?.contextRef?.sessionId;
       if (!sessionId) return [];
@@ -85,10 +82,6 @@ function createDefaultAdapter(uid) {
       cacheWrite(key, session);
       return Promise.resolve();
     },
-    deleteLocal() {
-      cacheWrite(key, null);
-      return Promise.resolve();
-    },
   };
 }
 
@@ -96,6 +89,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
   const [hydratedMessages, setHydratedMessages] = useState([]);
   const [hydratedContext, setHydratedContext] = useState(null);
   const [hydratedArtifacts, setHydratedArtifacts] = useState([]);
+  const [hydratedSession, setHydratedSession] = useState(null);
   const [hydrationState, setHydrationState] = useState(isDemo || !uid ? 'idle' : 'loading');
   const adapterRef = useRef(null);
   const hydratedRef = useRef(false);
@@ -107,6 +101,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       setHydratedMessages([]);
       setHydratedContext(null);
       setHydratedArtifacts([]);
+      setHydratedSession(null);
       setHydrationState('idle');
       return undefined;
     }
@@ -117,15 +112,23 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     setHydratedMessages([]);
     setHydratedContext(null);
     setHydratedArtifacts([]);
+    setHydratedSession(null);
     setHydrationState('loading');
     let cancelled = false;
     const timers = [];
 
     Promise.resolve(storage.loadLocal?.()).then(local => {
       if (cancelled || !local?.messages) return;
-      setHydratedMessages(local.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(local).messages : inflateMessages(local.messages));
-      if (local.protocolVersion === AGENT_PROTOCOL_VERSION) setHydratedContext(local.contextRef || null);
-      if (local.protocolVersion === AGENT_PROTOCOL_VERSION) setHydratedArtifacts(Array.isArray(local.artifacts) ? local.artifacts : []);
+      if (local.protocolVersion === AGENT_PROTOCOL_VERSION) {
+        const session = inflateAgentSession(local);
+        setHydratedSession(session);
+        setHydratedMessages(session.messages);
+        setHydratedContext(session.contextRef || null);
+        setHydratedArtifacts(Array.isArray(local.artifacts) ? local.artifacts : []);
+      } else {
+        setHydratedSession(null);
+        setHydratedMessages(inflateMessages(local.messages));
+      }
       setHydrationState('local');
     }).catch(err => console.warn('[ChatSession] Local hydrate failed:', err));
 
@@ -133,8 +136,10 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       Promise.resolve(storage.loadRemote?.()).then(remote => {
         if (cancelled) return;
         hydratedRef.current = true;
-        setHydratedMessages(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(remote).messages : inflateMessages(remote?.messages || []));
-        setHydratedContext(remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? remote.contextRef || null : null);
+        const session = remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(remote) : null;
+        setHydratedSession(session);
+        setHydratedMessages(session ? session.messages : inflateMessages(remote?.messages || []));
+        setHydratedContext(session?.contextRef || null);
         setHydratedArtifacts([]);
         if (remote?.protocolVersion === AGENT_PROTOCOL_VERSION && storage.loadRemoteArtifacts) {
           Promise.resolve(storage.loadRemoteArtifacts(remote)).then(records => {
@@ -178,14 +183,26 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
 
   const clear = useCallback(() => {
     if (isDemo || !uid || !adapterRef.current) return;
+    const now = Date.now();
+    const next = startNewChat({
+      protocolVersion: AGENT_PROTOCOL_VERSION,
+      messages: hydratedMessages,
+      contextRef: hydratedContext,
+      lastActivityAt: now,
+      updatedAt: now,
+    }, { now });
     hydratedRef.current = true;
-    setHydratedMessages([]);
+    const inflated = inflateAgentSession(next);
+    setHydratedSession(inflated);
+    setHydratedMessages(inflated.messages);
+    setHydratedContext(next.contextRef || null);
+    setHydratedArtifacts([]);
     setHydrationState('hydrated');
-    Promise.resolve(adapterRef.current.deleteRemote?.())
-      .catch(err => console.warn('[ChatSession] Remote clear failed:', err));
-    Promise.resolve(adapterRef.current.deleteLocal?.())
-      .catch(err => console.warn('[ChatSession] Local clear failed:', err));
-  }, [isDemo, uid]);
+    Promise.resolve(adapterRef.current.saveLocal?.(next))
+      .catch(err => console.warn('[ChatSession] Local boundary persist failed:', err));
+    Promise.resolve(adapterRef.current.saveRemote?.(next))
+      .catch(err => console.warn('[ChatSession] Remote boundary persist failed:', err));
+  }, [hydratedContext, hydratedMessages, isDemo, uid]);
 
-  return { hydratedMessages, hydratedContext, hydratedArtifacts, hydrationState, persist, clear };
+  return { hydratedMessages, hydratedContext, hydratedArtifacts, hydratedSession, hydrationState, persist, clear };
 }

@@ -1,2 +1,0 @@
-import { C, radius, shadows, type as typeScale } from '../../../styles/theme';
-export function CoffeeContextCard({ coffee = {}, context = {} }) { return <div data-artifact="coffee_context" style={{ padding: 14, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}><div style={typeScale.h3}>{coffee.name || context.coffeeId || 'Coffee'}</div><div style={{ ...typeScale.caption, color: C.textMuted }}>{[coffee.roaster, coffee.origin, context.method].filter(Boolean).join(' · ')}</div></div>; }

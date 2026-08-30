@@ -9,8 +9,20 @@ const errors = [];
 const requests = [];
 
 async function startLocalServer() {
+  // The DevRouter harness mounts before auth and data providers. Give Vite a
+  // complete, non-secret Firebase-shaped config so module initialization does
+  // not reject undefined credentials; the intentionally invalid project is
+  // never contacted because the harness has no auth or data calls.
+  const harnessFirebaseEnv = {
+    VITE_FIREBASE_API_KEY: 'ruphus-harness-not-a-key',
+    VITE_FIREBASE_AUTH_DOMAIN: 'ruphus-harness.invalid',
+    VITE_FIREBASE_PROJECT_ID: 'ruphus-harness',
+    VITE_FIREBASE_STORAGE_BUCKET: 'ruphus-harness.invalid',
+    VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000',
+    VITE_FIREBASE_APP_ID: '1:000000000000:web:ruphus-harness',
+  };
   server = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '0'], {
-    env: { ...process.env, TMB_APP_VARIANT: 'dev' },
+    env: { ...process.env, ...harnessFirebaseEnv, TMB_APP_VARIANT: 'dev' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';
@@ -41,12 +53,19 @@ try {
   await page.waitForSelector('[data-ruphus-harness="true"]');
 assert.match(await page.title(), /2manybeans|Coffee Hub|Vite/i);
 assert.match(await page.locator('body').innerText(), /Ruphus browser harness/);
-assert.equal(await page.locator('[data-ruphus-entry]').count(), 2);
+assert.equal(await page.locator('[data-ruphus-entry]').count(), 3);
 assert.equal(await page.locator('[data-agent-enabled="true"]').count(), 1);
 await page.locator('[data-ruphus-entry="bean-detail"]').click();
-assert.match(await page.locator('[data-ruphus-context-header]').innerText(), /House Blend/);
-await page.getByRole('button', { name: 'Bitter' }).click();
-assert.equal(await page.locator('[data-symptom-choice]').innerText(), 'Bitter');
+assert.match(await page.locator('[data-ruphus-opening]').innerText(), /House Blend/);
+assert.equal(await page.locator('[data-ruphus-hydration-toggle]').count(), 1);
+await page.locator('[data-ruphus-make-stale]').click();
+await page.waitForSelector('[data-ruphus-continue="true"]', { state: 'visible' });
+assert.match(await page.locator('[data-ruphus-continue="true"]').innerText(), /Earlier conversation|Continue/);
+await page.locator('[data-ruphus-continue="true"] button').click();
+assert.equal(await page.locator('[data-ruphus-continue="true"]').count(), 0);
+await page.locator('[data-ruphus-new-chat]').click();
+assert.equal(await page.locator('[data-ruphus-stored-messages]').getAttribute('data-ruphus-stored-messages'), '1');
+assert.equal(await page.locator('[data-ruphus-boundary-state]').getAttribute('data-ruphus-boundary-index'), '1');
 assert.equal(await page.locator('[data-command-write]').isDisabled(), true);
 await page.locator('[data-ruphus-stream]').click();
 await page.waitForSelector('[data-ruphus-lifecycle-caption]', { state: 'visible' });
@@ -64,7 +83,7 @@ assert.equal(await legacy.locator('[data-legacy-route="true"]').count(), 1);
 await legacy.screenshot({ path: '/tmp/ruphus-agent-v3-legacy.png', fullPage: false });
 assert.deepEqual(requests, []);
   assert.deepEqual(errors, []);
-  console.log('Ruphus rendered browser harness passed: 2 entries, pinned context, symptom choice, disabled command, Agent frames/artifact, legacy route, keyboard padding, no writes, mobile+desktop.');
+  console.log('Ruphus rendered browser harness passed: launch entries, context-free opening, hydration toggle, disabled command, Agent frames/artifact, legacy route, keyboard padding, no writes, mobile+desktop.');
 } finally {
   await browser.close();
   if (server && !server.killed) {

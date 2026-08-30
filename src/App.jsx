@@ -42,7 +42,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.webp' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTiming, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, isDemo, onDemoAction }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTiming, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, dataLoaded = true, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   // Onboarding palate seam (null for every pre-onboarding-100x profile).
@@ -105,9 +105,9 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // Single app-owned handoff for contextual Agent v3 entry points. Tabs never
   // construct cross-tab navigation state themselves; they receive this bound
   // context and one starter intent.
-  const openRuphus = (contextRef, starterIntent = '') => {
-    if (!contextRef?.coffeeId) return;
-    setRuphusLaunch({ contextRef, starterIntent });
+  const openRuphus = (launchContext, starterIntent = '') => {
+    if (!launchContext?.coffeeRef && !launchContext?.surface) return;
+    setRuphusLaunch({ contextRef: launchContext, starterIntent });
     setTab('chat');
   };
   const handleRuphusAttempt = (attempt) => {
@@ -381,6 +381,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
                 addTasting={addTasting}
                 updateTasting={updateTasting}
                 profile={profile}
+                dataLoaded={dataLoaded}
                 uid={uid}
                 isActive={tab === 'chat'}
                 onStartTastingSession={handleStartTastingSession}

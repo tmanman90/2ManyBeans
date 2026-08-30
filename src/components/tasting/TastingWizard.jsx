@@ -501,12 +501,8 @@ function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswer
         type="button"
         data-ruphus-entry="tasting-wizard-reveal"
         onClick={() => {
-          const method = bean?.aidenRecipe ? 'aiden' : String(bean?.handBrewRecipe?.method || '').toLowerCase().includes('kalita') ? 'kalita' : 'v60';
-          const mode = method === 'aiden' ? 'hot' : (bean?.handBrewRecipe?.mode || 'hot');
-          const tastingEvidence = Object.freeze({ scores: { ...scores }, flavorChips: [...answers.flavorChips], oneWord: answers.oneWord, notes: answers.notes });
-          Object.freeze(tastingEvidence.scores);
-          Object.freeze(tastingEvidence.flavorChips);
-          onOpenRuphus(Object.freeze({ coffeeId: bean.id, coffeeName: bean.name, method, mode, slotKey: method === 'aiden' ? 'aiden' : `${method}_${mode}`, tastingEvidence: tastingEvidence }), 'Help me understand this cup.');
+          const starter = [answers.oneWord, answers.notes, answers.flavorChips?.join(', ')].filter(Boolean).join('. ');
+          onOpenRuphus(Object.freeze({ coffeeRef: bean.id, surface: 'tasting_wizard' }), `Help me understand this cup${starter ? `: ${starter}` : ''}.`);
         }}
         style={{ width: '100%', minHeight: 48, marginTop: 12, border: `1px solid ${C.border}`, borderRadius: radius.lg, background: C.cream, color: C.accent, fontFamily: fonts.body, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
       ><MessageCircle size={17} aria-hidden="true" /> Ask Professor Ruphus about this cup</button>}

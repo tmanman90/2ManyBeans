@@ -601,7 +601,7 @@ export const HandBrewModal = ({
             )}
           </div>
           <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot` } : recipeProvenance} />
-          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeId: bean?.id, coffeeName: bean?.name, method: device === 'kalita' ? 'kalita' : 'v60', mode: 'hot', slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot`, revisionId }, 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus({ coffeeRef: bean?.id, surface: 'recipe_kalita_v60', launchItem: { kind: 'recipe', ref: revisionId || recipeProvenance?.revisionId || `${bean?.id}:${device === 'kalita' ? 'kalita' : 'v60'}_hot`, method: device === 'kalita' ? 'kalita_hot' : 'v60_hot' } }, 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           {recipe.device === 'kalita' && (
             <KalitaSizeSwitch

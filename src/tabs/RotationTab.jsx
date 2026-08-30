@@ -691,7 +691,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
               const method = preferences.brewMethod === 'aiden' ? 'aiden' : preferences.brewMethod === 'kalita' ? 'kalita' : 'v60';
               const mode = method === 'aiden' ? 'hot' : (b.handBrewRecipe?.mode || 'hot');
               const slotKey = method === 'aiden' ? 'aiden' : `${method}_${mode}`;
-              onOpenRuphus?.({ coffeeId: b.id, coffeeName: b.name, method, mode, slotKey }, 'What should I change for this coffee?');
+              onOpenRuphus?.({ coffeeRef: b.id, surface: 'bean_card' }, 'What should I change for this coffee?');
             } else (isDemo ? onDemoAction : handleLearn)?.(b);
           }}
           onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}
