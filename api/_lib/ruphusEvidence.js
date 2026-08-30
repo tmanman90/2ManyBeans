@@ -55,7 +55,7 @@ export function publicEvidence(evidence = {}) {
   for (const kind of ['coffee', 'recipe', 'brews', 'tastings']) {
     const value = evidence[kind];
     if (!value || typeof value !== 'object') continue;
-    result[kind] = Object.fromEntries(['kind', 'status', 'summary', 'windowDays', 'count', 'errorCode'].filter((key) => Object.hasOwn(value, key)).map((key) => [key, clone(value[key])]));
+    result[kind] = Object.fromEntries(['kind', 'status', 'summary', 'windowDays', 'count'].filter((key) => Object.hasOwn(value, key)).map((key) => [key, clone(value[key])]));
     if (value.coffee && typeof value.coffee === 'object') result[kind].coffee = Object.fromEntries(COFFEE_FIELDS.filter((field) => text(value.coffee[field])).map((field) => [field, text(value.coffee[field])]));
   }
   return { ...result, windowDays: evidence.windowDays, readAt: evidence.readAt, unavailable: Array.isArray(evidence.unavailable) ? evidence.unavailable.slice() : [] };
