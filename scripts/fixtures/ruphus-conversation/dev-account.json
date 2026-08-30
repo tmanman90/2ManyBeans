@@ -1,0 +1,36 @@
+{
+  "manifestVersion": 1,
+  "manifestHash": "a557c34bf0582334",
+  "account": "ruphus-dev-fixture",
+  "setup": {"defaultMethod": "v60_hot", "grinder": "Ode 4.2", "units": "metric"},
+  "sealedCounts": {"active": 4, "finished": 1, "sealed": 0},
+  "coffees": [
+    {"id":"fixture-el-vergel","name":"El Vergel","roaster":"Good Medicine Coffee","origin":"Colombia","process":"washed","status":"ACTIVE","jarSlot":1,"roastDate":"-18d","openDate":"-14d","recipes":["v60_hot"],"lastBrewDate":"-3d"},
+    {"id":"fixture-colombia-other","name":"Colombia La Esperanza","roaster":"Good Medicine Coffee","origin":"Colombia","process":"natural","status":"ACTIVE","jarSlot":2,"roastDate":"-9d","openDate":"-7d","recipes":["kalita_hot","v60_hot"],"lastBrewDate":"-1d"},
+    {"id":"fixture-rwanda","name":"Rwanda Rambagirakawa","roaster":"Heart Coffee","origin":"Rwanda","process":"washed","status":"ACTIVE","jarSlot":3,"roastDate":"-21d","openDate":"-19d","recipes":["aiden"],"lastBrewDate":"-2d"},
+    {"id":"fixture-kenya","name":"Kenya Gachatha","roaster":"Sey Coffee","origin":"Kenya","process":"washed","status":"ACTIVE","jarSlot":null,"roastDate":"-30d","openDate":"-28d","recipes":["kalita_hot"],"lastBrewDate":"-20d"},
+    {"id":"fixture-ethiopia","name":"Ethiopia Aricha","roaster":"Little Wolf","origin":"Ethiopia","process":"natural","status":"FINISHED","jarSlot":null,"roastDate":"-45d","openDate":"-43d","recipes":[],"lastBrewDate":null}
+  ],
+  "recipes": {
+    "fixture-el-vergel:v60_hot":{"slot":"v60_hot","displayName":"hot V60","method":"v60","mode":"hot","dose":15,"water":250,"grind":"Ode 4.2","temperature":94,"ratio":"1:16.7"},
+    "fixture-colombia-other:kalita_hot":{"slot":"kalita_hot","displayName":"hot Kalita","method":"kalita","mode":"hot","dose":15,"water":250,"grind":"Ode 4.2","temperature":94,"ratio":"1:16.7"},
+    "fixture-colombia-other:v60_hot":{"slot":"v60_hot","displayName":"hot V60","method":"v60","mode":"hot","dose":15,"water":250,"grind":"Ode 4.2","temperature":94,"ratio":"1:16.7"},
+    "fixture-rwanda:aiden":{"slot":"aiden","displayName":"Aiden","method":"aiden","mode":"hot","dose":18,"water":300,"grind":"Ode 4.2","temperature":93,"ratio":"1:16.7"},
+    "fixture-kenya:kalita_hot":{"slot":"kalita_hot","displayName":"hot Kalita","method":"kalita","mode":"hot","dose":20,"water":300,"grind":"Ode 4.2","temperature":93,"ratio":"1:15"}
+  },
+  "brews": [
+    {"id":"fixture-brew-el-1","coffeeId":"fixture-el-vergel","slot":"v60_hot","date":"-3d","dose":15,"water":250,"grind":"Ode 4.2","drawdown":"2:50"},
+    {"id":"fixture-brew-colombia-k","coffeeId":"fixture-colombia-other","slot":"kalita_hot","date":"-5d","dose":15,"water":250,"grind":"Ode 4.2","drawdown":"3:10"},
+    {"id":"fixture-brew-colombia-v","coffeeId":"fixture-colombia-other","slot":"v60_hot","date":"-1d","dose":15,"water":250,"grind":"Ode 4.2","drawdown":"2:45"},
+    {"id":"fixture-brew-rwanda","coffeeId":"fixture-rwanda","slot":"aiden","date":"-2d","dose":18,"water":300,"grind":"Ode 4.2","drawdown":"3:00"},
+    {"id":"fixture-brew-kenya","coffeeId":"fixture-kenya","slot":"kalita_hot","date":"-20d","dose":20,"water":300,"grind":"Ode 4.2","drawdown":"3:20"}
+  ],
+  "tastings": [
+    {"id":"fixture-tasting-el-old","coffeeId":"fixture-el-vergel","date":"-21d","notes":"thin and a little sour","score":3},
+    {"id":"fixture-tasting-colombia","coffeeId":"fixture-colombia-other","date":"-4d","notes":"sweet finish","score":4},
+    {"id":"fixture-tasting-rwanda","coffeeId":"fixture-rwanda","date":"-2d","notes":"clean and floral","score":4}
+  ],
+  "attempts": [
+    {"id":"fixture-attempt-kalita","coffeeId":"fixture-colombia-other","slot":"kalita_hot","date":"-5d","dose":15,"water":250,"grind":"Ode 4.2","drawdown":"3:10","notes":"watery"}
+  ]
+}
