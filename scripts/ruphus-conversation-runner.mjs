@@ -88,7 +88,8 @@ export function redactDiagnostic(value) {
     .replace(/(?:sk|pk|api[_-]?key|token|authorization|bearer)[^,}\s]*/gi, '[REDACTED]')
     .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED_EMAIL]')
     .replace(/\b(?:uid|user)[_-][A-Za-z0-9_-]+\b/gi, '[REDACTED_UID]')
-    .replace(/\bfixture-[A-Za-z0-9_-]+\b/g, '[REDACTED_REF]');
+    .replace(/\bfixture-[A-Za-z0-9_-]+\b/g, '[REDACTED_REF]')
+    .replace(/\bcanary-[A-Za-z0-9._-]+\b/gi, '[REDACTED]');
 }
 
 function fixtureContext(account, fixture) {
@@ -251,7 +252,15 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl 
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`U3 endpoint returned HTTP ${response.status}`);
-  const body = await response.json();
+  let body;
+  const contentType = response.headers?.get?.('content-type') || '';
+  if (contentType.includes('ndjson') && typeof response.text === 'function') {
+    const frames = (await response.text()).split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+    const completed = frames.find((frame) => frame.type === 'turn_completed');
+    const delta = frames.filter((frame) => frame.type === 'text_delta').map((frame) => frame.text || '').join('');
+    body = { ...(completed || {}), text: completed?.text || delta, frames, usage: frames.find((frame) => frame.type === 'usage')?.usage || null };
+  } else if (typeof response.json === 'function') body = await response.json();
+  else throw new Error('U3 endpoint returned an unreadable response');
   if (!body || typeof body.text !== 'string') throw new Error('U3 endpoint returned no visible reply');
   return body;
 }
@@ -263,7 +272,8 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
   for (const [index, userText] of fixture.turns.entries()) {
     const started = performance.now();
     const result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
-      turnId: `live-${fixture.id}-${index + 1}`, userText, context,
+      turnId: `live-${fixture.id}-${index + 1}`, contextRef: context.launchContext, userText,
+      conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: false,
     } });
     const usageCost = Number(result.costUsd || 0);
     costGuard?.charge(usageCost);
@@ -276,15 +286,15 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
   return { fixtureId: fixture.id, transcript, results, grader: { catastrophic: results.flatMap((result) => result.grader.catastrophic), ordinary: results.flatMap((result) => result.grader.ordinary) } };
 }
 
-export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtureIds = [], endpoint = process.env.RUPHUS_AGENT_ENDPOINT, token = process.env.RUPHUS_DEV_AUTH_TOKEN, costCapUsd, commit = process.env.RUPHUS_COMMIT || 'unknown', ledger = [], fetchImpl, judge = null, pairwise = null, artifactDirectory = null, smokeLedgerPath = null } = {}) {
+export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtureIds = [], endpoint = process.env.RUPHUS_AGENT_ENDPOINT, token = process.env.RUPHUS_DEV_AUTH_TOKEN, costCapUsd, commit = process.env.RUPHUS_COMMIT || 'unknown', ledger = [], fetchImpl, judge = null, pairwise = null, artifactDirectory = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval'), smokeLedgerPath = join(HERE, '..', 'docs', 'data', 'ruphus-agent-v3', 'conversation-eval', 'smoke-ledger.json') } = {}) {
   const cap = validateCostCap(costCapUsd);
   if (stage === 'full' && !canStartFull(ledger, commit)) throw new Error('full U3 stage requires two consecutive clean smokes on the same commit');
   if (stage !== 'smoke' && typeof judge !== 'function') throw new Error(`${stage} U3 stage requires the calibrated different-model-family judge`);
   if (stage === 'full' && typeof pairwise !== 'function') throw new Error('full U3 stage requires a blind pairwise judge');
   const { account, cases } = await loadFixtureManifest(root);
   const schedule = stagePlan(stage, { fixtures: cases.cases, fixtureIds });
+  const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew' };
   if (stage !== 'smoke') {
-    const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew' };
     const references = { gold: [], knownBad: [] };
     for (const fixture of cases.cases.filter((item) => item.critical)) {
       for (const kind of ['gold', 'knownBad']) references[kind].push(await judgeTranscript({ judge, packet: createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript: await loadTranscript(join(root, kind === 'gold' ? 'gold' : 'known-bad', `${names[fixture.id]}.md`)), seed: `${commit}:${kind}:${fixture.id}` }) }));
@@ -304,7 +314,8 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
       candidate.judge = judged.sufficient ? judged.result : null;
     }
     if (pairwise && fixture.critical && stage === 'full') {
-      const packet = createBlindPairwisePacket({ candidate: transcript, reference: [], intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      const reference = await loadTranscript(join(root, 'known-bad', `${names[fixture.id]}.md`));
+      const packet = createBlindPairwisePacket({ candidate: transcript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       candidate.pairwise = pairwisePass(await pairwise(packet), packet);
     }
     results.push({ ...candidate, stage, commit, repeat: run.repeat, critical: fixture.critical });

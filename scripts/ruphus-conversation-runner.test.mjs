@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
 import {
-  branchAwareTurns, canStartFull, createCostGuard, fixturePass, fullStagePass,
-  smokeIsClean, stagePlan, validateCostCap,
+  appendSmokeLedger, branchAwareTurns, canStartFull, createCostGuard, fixturePass, fullStagePass,
+  persistRunArtifact, redactDiagnostic, runLiveEndpointTurn, smokeIsClean, stagePlan, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
 
 test('U3 stage denominators are frozen and targeted always appends smoke', async () => {
@@ -45,3 +48,18 @@ test('full stage requires two clean smokes on the current commit and branches ar
   ]);
 });
 
+test('live adapter consumes NDJSON and persisted artifacts redact canary secrets', async () => {
+  const response = { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"text_delta","text":"done"}\n{"type":"turn_completed","text":"done"}\n' };
+  const result = await runLiveEndpointTurn({ endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'canary-token', payload: {}, fetchImpl: async () => response });
+  assert.equal(result.text, 'done');
+  assert.equal(redactDiagnostic({ token: 'canary-token', email: 'person@example.com', uid: 'fixture-owner' }).includes('canary-token'), false);
+  const directory = await mkdtemp(join(tmpdir(), 'ruphus-u3-artifact-'));
+  try {
+    const target = await persistRunArtifact(directory, { transcript: [{ text: 'canary-token' }], ref: 'fixture-secret' }, 'run-1');
+    const contents = await readFile(join(target, 'report.json'), 'utf8');
+    assert.equal(contents.includes('canary-token'), false);
+    assert.equal(contents.includes('fixture-secret'), false);
+    const ledger = await appendSmokeLedger(join(directory, 'smoke-ledger.json'), { commit: 'abc', clean: true });
+    assert.deepEqual(ledger.map((entry) => entry.commit), ['abc']);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
