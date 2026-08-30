@@ -14,6 +14,14 @@ function launchCoffeeRef(launchContext, snapshot) {
   if (snapshot.refs?.[reference]) return reference;
   return Object.entries(snapshot.refs || {}).find(([, id]) => id === reference)?.[0] || null;
 }
+function addOwnerLaunchRef(reference, coffees, snapshot) {
+  if (!reference || !Array.isArray(coffees)) return null;
+  const match = coffees.find((coffee) => coffee?.id === reference || coffee?.refKey === reference);
+  if (!match?.id) return null;
+  const refKey = `c${canonicalHash({ id: match.id, launch: true }).slice(0, 8)}`;
+  snapshot.refs[refKey] = match.id;
+  return refKey;
+}
 
 const displayMethod = (value) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[value] || value || null);
 function publicSnapshot(snapshot) {
@@ -55,7 +63,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   if (!Number.isInteger(evidenceByteCap) || evidenceByteCap < 1) throw Object.assign(new Error('evidence byte cap must be configured'), { code: 'evidence_config_required' });
   const currentLedger = boundLedger(ledger || contextRef.ledger || {}, { maxBytes: Math.min(evidenceByteCap, MAX_LEDGER_BYTES) });
   const dynamic = safeDynamic({ userText, launchContext: publicLaunchContext(contextRef), conversation: Array.isArray(conversation) ? conversation.map((item) => ({ role: item?.role, content: item?.content || item?.text })).filter((item) => item.role === 'user' || item.role === 'assistant') : [], ledger: currentLedger }, evidenceByteCap);
-  const launchCoffee = launchCoffeeRef(contextRef, snapshot);
+  const launchCoffee = launchCoffeeRef(contextRef, snapshot) || addOwnerLaunchRef(contextRef?.coffeeRef, coffees, snapshot);
   if (contextRef?.coffeeRef && !launchCoffee) throw Object.assign(new Error('launch coffee is outside the owner-scoped context'), { code: 'cross_owner_or_context' });
   const normalizedInternalLaunch = { ...clone(contextRef), ...(launchCoffee && launchCoffee !== contextRef.coffeeRef ? { coffeeRef: launchCoffee } : {}) };
   const normalizedLaunch = publicLaunchContext(normalizedInternalLaunch);
