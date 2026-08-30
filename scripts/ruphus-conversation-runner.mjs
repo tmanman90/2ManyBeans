@@ -421,6 +421,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   const schedule = stagePlan(stage, { fixtures: cases.cases, fixtureIds });
   const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew' };
   const guard = createCostGuard(cap);
+  const stageRunId = `u3-${Date.now()}`;
   if (stage !== 'smoke') {
     const references = { gold: [], knownBad: [] }; const goldIds = new Set();
     for (const fixture of cases.cases.filter((item) => item.critical)) {
@@ -452,7 +453,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
       candidate.pairwise = pairwisePass(pairwiseResult?.result || pairwiseResult, packet);
     }
     results.push({ ...candidate, stage, kind: run.kind, commit, repeat: run.repeat, critical: fixture.critical });
-    if (artifactDirectory) await persistRunArtifact(artifactDirectory, { ...candidate, stage, kind: run.kind, commit, repeat: run.repeat, critical: fixture.critical }, `${stage}-${run.kind}-${String(commit).replace(/[^A-Za-z0-9_-]/g, '_')}-${fixture.id}-${run.repeat}`);
+    if (artifactDirectory) await persistRunArtifact(artifactDirectory, { ...candidate, stage, kind: run.kind, commit, repeat: run.repeat, critical: fixture.critical }, `${stageRunId}-${stage}-${run.kind}-${String(commit).replace(/[^A-Za-z0-9_-]/g, '_')}-${fixture.id}-${run.repeat}`);
   }
   const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, results, costUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results) };
   if (artifactDirectory) await persistRunArtifact(artifactDirectory, report);
@@ -470,6 +471,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (options.mode === 'live') {
     try {
       const fixtureIds = options.fixtures ? String(options.fixtures).split(',') : [];
+      configuredCallMaximum();
       const { createFirestoreSessionReset, verifySeededFixture } = await import('./seed-ruphus-dev-fixture.mjs');
       const projectId = process.env.RUPHUS_DEV_PROJECT_ID; const fixtureUid = process.env.RUPHUS_DEV_FIXTURE_UID;
       await verifySeededFixture({ projectId, fixtureUid });
