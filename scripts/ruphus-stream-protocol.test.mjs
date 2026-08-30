@@ -27,3 +27,16 @@ test('authority-shaped text stays text and does not create an artifact', () => {
   assert.equal(frames.some((item) => item.type === 'artifact_ready'), false);
   assert.equal(frames[1].text.includes('apply_proposal'), true);
 });
+
+test('parallel tool frames accept starts and out-of-order results', () => {
+  const frames = [
+    frame('turn_accepted'), frame('context_loading'),
+    frame('tool_started', { name: 'read_coffee_evidence', callId: 'a' }),
+    frame('tool_started', { name: 'read_recipe', callId: 'b' }),
+    frame('tool_result', { name: 'read_recipe', callId: 'b', result: { ok: true } }),
+    frame('artifact_ready', { artifact: { id: 'recipe-1', type: 'current_recipe', status: 'ready' } }),
+    frame('tool_result', { name: 'read_coffee_evidence', callId: 'a', result: { ok: true } }),
+    frame('text_delta', { text: 'done' }), frame('turn_completed', { text: 'done' }),
+  ];
+  assert.equal(parseAgentFrames(frames.join('\n')).at(-1).type, 'turn_completed');
+});

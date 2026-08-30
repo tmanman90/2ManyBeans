@@ -41,7 +41,9 @@ const JSON_SHAPE = /(?:[{[]\s*["']?[A-Za-z_][\w-]*["']?\s*:|["'][A-Za-z_][\w-]*[
 const MARKUP = /```|<\/?[A-Za-z][^>]*>|(^|\s)[*_]{1,3}\S|(^|\s)[-•]\s/m;
 const PROPOSAL_SHAPE = /(?:\b(?:proposal|update)\s*[:{]|\b(?:from|to|delta)\s*[:=])/i;
 const AUTHORITY = /\b(?:I(?:'ve| have)\s+(?:saved|made|applied|sent|changed)|saved (?:that|it)|change applied|brew once|receipt)\b/i;
-const SECRET = /\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b|\bAIza[A-Za-z0-9_-]{20,}\b|\bBearer\s+[A-Za-z0-9._~-]{16,}\b/i;
+// Credential-shaped values remain unsafe even when a fixture uses a short
+// stand-in rather than a production-length key.
+const SECRET = /\b(?:sk|pk)-[A-Za-z0-9_-]{4,}\b|\bAIza[A-Za-z0-9_-]{12,}\b|\bBearer\s+[A-Za-z0-9._~-]{8,}\b/i;
 
 function violation(code, category, message, details = {}) {
   return { code, category, message, ...details };
@@ -227,7 +229,7 @@ export function gradeReply(input = {}) {
 export function runtimeTriggers(input = {}) {
   return gradeReply(input).violations.filter((item) => item.runtime === true && [
     'RT2_LENGTH', 'RT2_MARKUP', 'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE',
-    'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'RT2_FALSE_AUTHORITY',
+    'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'RT2_FALSE_AUTHORITY',
   ].includes(item.code));
 }
 export const getRuntimeTriggers = runtimeTriggers;

@@ -30,13 +30,19 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
   const sdk = client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
   const inputSequences = new Map();
   return Object.freeze({
-    async runTurn({ turnId = 'default', context, userText, conversation = [], tools, previous, toolResult }) {
+    async runTurn({ turnId = 'default', context, userText, conversation = [], tools, previous, toolResult, correctiveInstruction, regeneration = false }) {
       const results = (toolResult?.results || (toolResult ? [toolResult] : [])).map((item) => ({ type: 'function_call_output', call_id: item.callId || item.name, output: JSON.stringify(item.result) }));
       const launchContext = context?.launchContext || context?.context || {};
       const evidenceBlock = buildDynamicEvidenceBlock(context || {});
       const recentConversation = (Array.isArray(conversation) ? conversation : [])
         .filter((message) => ['user', 'assistant'].includes(message?.role) && typeof message?.content === 'string');
-      const input = previous && toolResult
+      const correction = correctiveInstruction ? [{ role: 'developer', content: correctiveInstruction }] : [];
+      const priorInput = inputSequences.get(turnId) || [];
+      const knownToolCalls = new Set(priorInput.filter((item) => item?.type === 'function_call_output').map((item) => item.call_id));
+      const missingEvidence = results.filter((item) => !knownToolCalls.has(item.call_id));
+      const input = (regeneration || correctiveInstruction)
+        ? [...priorInput, ...(previous?.outputItems || []), ...missingEvidence, ...correction]
+        : previous && toolResult
         ? [...(inputSequences.get(turnId) || []), ...(previous.outputItems || []), ...results]
         : [
             { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },

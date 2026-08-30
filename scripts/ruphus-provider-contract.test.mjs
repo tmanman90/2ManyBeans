@@ -40,3 +40,19 @@ test('stateless continuation accumulates the complete multi-round input sequence
     { type: 'function_call_output', call_id: 'call-2', output: '{"ok":true,"data":"recipe"}' },
   ]);
 });
+
+test('regeneration replays every prior tool result and includes corrective instruction', async () => {
+  const requests = [];
+  const responses = [
+    { id: 'r-1', model: RUPHUS_OPENAI_MODEL, output: [{ type: 'function_call', call_id: 'call-1', name: 'read_coffee', arguments: '{}' }] },
+    { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output_text: 'bad {"dose":16}', output: [] },
+    { id: 'r-3', model: RUPHUS_OPENAI_MODEL, output_text: 'fresh coffee reply', output: [] },
+  ];
+  const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return responses.shift(); } } } });
+  const first = await provider.runTurn({ turnId: 'regen-1', context: {}, userText: 'diagnose', tools: [] });
+  const second = await provider.runTurn({ turnId: 'regen-1', context: {}, userText: 'diagnose', tools: [], previous: first, toolResult: { results: [{ callId: 'call-1', result: { coffee: 'El Vergel', dose: 15 } }] } });
+  await provider.runTurn({ turnId: 'regen-1', context: {}, userText: 'diagnose', tools: [], previous: second, correctiveInstruction: 'Return a fresh complete reply with no JSON.', priorToolEvidence: [{ callId: 'call-1', result: { coffee: 'El Vergel', dose: 15 } }], toolResult: { results: [{ callId: 'call-1', result: { coffee: 'El Vergel', dose: 15 } }] }, regeneration: true });
+  const regenInput = requests[2].input;
+  assert.equal(regenInput.filter((item) => item.type === 'function_call_output').length, 1);
+  assert.match(regenInput.at(-1).content, /fresh complete reply/);
+});

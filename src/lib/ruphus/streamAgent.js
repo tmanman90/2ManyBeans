@@ -20,13 +20,36 @@ export function resolveAgentStreamResult({ terminalType, usageSeen = true, trans
 
 export function createAgentFrameParser({ onFrame } = {}) {
   let pending = ''; let previous = 'start'; let turnId = null; let sawFrame = false;
+  const pendingTools = [];
+  const rememberToolStart = (frame) => pendingTools.push({ callId: frame.callId || null, name: frame.name || null });
+  const consumeToolResult = (frame) => {
+    const index = pendingTools.findIndex((tool) => (frame.callId && tool.callId === frame.callId) || (frame.name && tool.name === frame.name) || (!frame.callId && !frame.name));
+    if (index < 0) throw frameError('out_of_order', `tool_result ${frame.callId || frame.name || 'unknown'} has no matching tool_started frame`);
+    pendingTools.splice(index, 1);
+  };
   const accept = (frame) => {
     const validation = validateLifecycleFrame(frame);
     if (!validation.valid) throw frameError('invalid_frame', validation.errors.join('; '));
     if (turnId && frame.turnId !== turnId) throw frameError('turn_mismatch', 'Agent frame turn identity changed');
     if (!turnId) turnId = frame.turnId;
-    if (previous !== 'start' && !TRANSITIONS[previous]?.has(frame.type)) throw frameError('out_of_order', `out of order: ${frame.type} cannot follow ${previous}`);
     if (sawFrame && TERMINAL.has(previous)) throw frameError('out_of_order', 'terminal Agent turn emitted another frame');
+    const hasPendingTools = pendingTools.length > 0;
+    const normalTransition = previous === 'start' || TRANSITIONS[previous]?.has(frame.type);
+    // Promise.all starts every request synchronously, so starts may precede
+    // either result and results may complete in any order. The parser tracks
+    // outstanding tool identities instead of imposing completion order.
+    const parallelTransition = hasPendingTools && (
+      frame.type === 'tool_started'
+      || (frame.type === 'tool_result' && ['tool_started', 'tool_result', 'artifact_ready'].includes(previous))
+    );
+    if (!normalTransition && !parallelTransition) throw frameError('out_of_order', `out of order: ${frame.type} cannot follow ${previous}`);
+    if (hasPendingTools && TERMINAL.has(frame.type)) throw frameError('out_of_order', 'terminal Agent turn emitted before all tools completed');
+    if (hasPendingTools && !['tool_started', 'tool_result', 'artifact_ready'].includes(frame.type)) throw frameError('out_of_order', `out of order: ${frame.type} cannot follow pending tools`);
+    if (frame.type === 'tool_started') rememberToolStart(frame);
+    if (frame.type === 'tool_result') {
+      if (!hasPendingTools) throw frameError('out_of_order', 'tool_result has no pending tool');
+      consumeToolResult(frame);
+    }
     previous = frame.type; sawFrame = true; onFrame?.(frame); return frame;
   };
   const parseLine = (line) => { if (!line.trim()) return null; let frame; try { frame = JSON.parse(line); } catch { throw frameError('malformed_stream', 'The Agent stream returned malformed JSON.'); } return accept(frame); };
