@@ -69,6 +69,30 @@ test('legacy resolver upgrades an exact Aiden slot profile that predates identit
   assert.equal(resolved.validation.valid, true);
 });
 
+test('mapped slots remain authoritative when legacy identity fields are deleted', () => {
+  const mapped = generateV60Recipe({}, { dose: 15 });
+  delete mapped.method;
+  delete mapped.device;
+  delete mapped.mode;
+  const resolved = resolveLegacyRecipe({ handBrewRecipes: { v60: mapped } }, 'v60_hot');
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.source, 'handBrewRecipes.v60');
+  assert.equal(resolved.recipe.method, 'v60');
+  assert.equal(resolved.recipe.device, 'v60');
+  assert.equal(resolved.recipe.mode, 'hot');
+});
+
+test('deleting a mapped slot permits only an exact flat fallback', () => {
+  const classic = generateV60Recipe({}, { dose: 15 });
+  const bean = { handBrewRecipes: { v60: classic }, handBrewRecipe: { ...classic } };
+  delete bean.handBrewRecipes.v60;
+  assert.equal(resolveLegacyRecipe(bean, 'v60_hot').source, 'handBrewRecipe');
+
+  const wrongFlat = { ...classic, device: 'kalita' };
+  const noMatch = { handBrewRecipes: {}, handBrewRecipe: wrongFlat };
+  assert.equal(resolveLegacyRecipe(noMatch, 'v60_hot').code, 'recipe_missing');
+});
+
 test('canonical identity excludes user dose and Aiden grind projection state', () => {
   const recipe = generateV60Recipe({}, { dose: 15 });
   const one = canonicalRecipeSnapshot({ ...recipe, userCoffeeGrams: 15 }, 'v60_hot');

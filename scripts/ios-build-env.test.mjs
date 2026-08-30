@@ -103,6 +103,9 @@ for (const path of ['src/tabs/ChatTab.jsx', 'src/lib/recipeCommands.js', 'src/li
   const source = readFileSync(path, 'utf8');
   assert.doesNotMatch(source, /RUPHUS_API_BASE/, `${path} must not retain the deleted direct-base route`);
 }
+const aidenSource = readFileSync('src/lib/aiden.js', 'utf8');
+assert.equal((aidenSource.match(/ruphusApiUrl\('\/api\/aiden'\)/g) || []).length, 2, 'both legacy and attempt Aiden preparation must use preview-aware routing');
+assert.match(aidenSource, /const PROXY_URL = `\$\{API_BASE\}\/api\/openai`/, 'Aiden generation must retain the existing OpenAI route');
 
 // Evaluate only the small URL module with its two build-time dependencies
 // replaced. This keeps the routing contract test offline and exercises the

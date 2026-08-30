@@ -2,7 +2,7 @@
 // Phase 1: GPT-5.4 generates recipe JSON from bean details
 // Phase 2: Push profile to Fellow via /api/aiden proxy
 
-import { API_BASE, RUPHUS_API_BASE } from './apiBase';
+import { API_BASE, ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { classifyFamilyFallback } from './beanFields';
@@ -626,7 +626,7 @@ export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) 
   assertValidAidenProfile(profile);
 
   const result = await fetchWithRetry({
-    url: `${API_BASE}/api/aiden`,
+    url: ruphusApiUrl('/api/aiden'),
     body: profile,
     retries: 1,
     serviceName: 'Fellow',
@@ -639,6 +639,6 @@ export async function prepareAidenAttempt(attemptId, { recovery = null } = {}) {
   // The server owns retry/reconciliation for attempt preparation. Retrying
   // this request client-side could duplicate a provider create after response
   // loss; relaunching the same attempt is the recovery action.
-  const result = await fetchWithRetry({ url: `${RUPHUS_API_BASE}/api/aiden`, body: { attemptId, ...(recovery ? { recovery, actionId: `new_profile_${attemptId}` } : {}) }, retries: 0, serviceName: 'Fellow' });
+  const result = await fetchWithRetry({ url: ruphusApiUrl('/api/aiden'), body: { attemptId, ...(recovery ? { recovery, actionId: `new_profile_${attemptId}` } : {}) }, retries: 0, serviceName: 'Fellow' });
   return result;
 }

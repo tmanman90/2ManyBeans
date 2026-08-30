@@ -1,5 +1,5 @@
 import { canonicalHash, clone, SLOT_KEYS, validateRecipeSnapshot } from './contracts.js';
-import { validateAidenProfile } from '../aidenProfileValidation.js';
+import { buildAidenTitle, validateAidenProfile } from '../aidenProfileValidation.js';
 import { validateV60Candidate } from '../v60Adapter.js';
 import { validateV60SwitchCandidate } from '../v60SwitchAdapter.js';
 import { validateV60IcedCandidate } from '../v60IcedAdapter.js';
@@ -16,6 +16,17 @@ export const SLOT_DEFINITIONS = Object.freeze({
 const atPath = (bean, path) => path.reduce((value, key) => (value == null ? undefined : value[key]), bean);
 const identity = (recipe) => ({ device: String(recipe?.device || '').toLowerCase(), mode: recipe?.mode || (recipe?.isIced ? 'iced' : 'hot'), variant: String(recipe?.variant || recipe?.v60Variant || 'classic').toLowerCase(), size: String(recipe?.kalitaSize || recipe?.size || '') });
 const matches = (recipe, slotKey) => { const def = SLOT_DEFINITIONS[slotKey]; const item = identity(recipe); return Boolean(def && item && item.device === def.device && item.mode === def.mode && !(slotKey === 'v60_iced' && item.variant === 'switch')); };
+const matchesMappedSlot = (recipe, slotKey) => {
+  const def = SLOT_DEFINITIONS[slotKey];
+  if (!def || !recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return false;
+  const methodIdentity = String(recipe.method || '').toLowerCase();
+  const declaredDevice = String(recipe.device || (['aiden', 'v60', 'kalita'].includes(methodIdentity) ? methodIdentity : '')).toLowerCase();
+  const declaredMode = String(recipe.mode || (recipe.isIced === true ? 'iced' : recipe.isIced === false ? 'hot' : '')).toLowerCase();
+  const variant = String(recipe.variant || recipe.v60Variant || 'classic').toLowerCase();
+  return (!declaredDevice || declaredDevice === def.device)
+    && (!declaredMode || declaredMode === def.mode)
+    && !(slotKey === 'v60_iced' && variant === 'switch');
+};
 const normalize = (recipe, slotKey) => ({ ...clone(recipe), method: SLOT_DEFINITIONS[slotKey].method, device: SLOT_DEFINITIONS[slotKey].device, mode: SLOT_DEFINITIONS[slotKey].mode });
 const validator = (recipe, slotKey) => slotKey === 'aiden' ? validateAidenProfile(recipe) : slotKey === 'v60_hot' ? (identity(recipe).variant === 'switch' ? validateV60SwitchCandidate(recipe) : validateV60Candidate(recipe)) : slotKey === 'v60_iced' ? validateV60IcedCandidate(recipe) : slotKey === 'kalita_hot' ? validateKalitaCandidate(recipe) : validateKalitaIcedCandidate(recipe);
 
@@ -24,7 +35,10 @@ export function validateExecutableRecipe(recipe, slotKey) { const generic = vali
 export function resolveLegacyRecipe(bean, slotKey) {
   if (!SLOT_KEYS.includes(slotKey)) return { ok: false, code: 'unsupported_slot', slotKey };
   const def = SLOT_DEFINITIONS[slotKey]; const mapped = atPath(bean, def.path);
-  if (mapped && matches(mapped, slotKey)) { const recipe = canonicalRecipeSnapshot(mapped, slotKey); return { ok: true, source: def.path.join('.'), slotKey, recipe, hash: recipe.recipeHash, validation: validator(recipe, slotKey) }; }
+  const mappedCandidate = slotKey === 'aiden' && mapped && !mapped.title
+    ? { ...mapped, title: buildAidenTitle(bean) }
+    : mapped;
+  if (mappedCandidate && matchesMappedSlot(mappedCandidate, slotKey)) { const recipe = canonicalRecipeSnapshot(mappedCandidate, slotKey); return { ok: true, source: def.path.join('.'), slotKey, recipe, hash: recipe.recipeHash, validation: validator(recipe, slotKey) }; }
   const legacy = bean?.handBrewRecipe;
   if (!mapped && legacy && matches(legacy, slotKey)) { const recipe = canonicalRecipeSnapshot(legacy, slotKey); return { ok: true, source: 'handBrewRecipe', slotKey, recipe, hash: recipe.recipeHash, validation: validator(recipe, slotKey) }; }
   if (mapped) return { ok: false, code: 'legacy_recipe_ambiguous', source: def.path.join('.'), slotKey, recipe: canonicalRecipeSnapshot(mapped, slotKey), validation: validator(mapped, slotKey) };

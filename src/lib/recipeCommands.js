@@ -1,5 +1,5 @@
 import { getAuth } from 'firebase/auth';
-import { RUPHUS_API_BASE } from './apiBase.js';
+import { ruphusApiUrl } from './apiBase.js';
 import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from './ruphus/census.js';
 
 const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
@@ -27,7 +27,7 @@ export async function executeRecipeCommand(command) {
   const user = getAuth().currentUser;
   if (!user?.uid) throw new Error('Sign in to save recipe changes.');
   const token = await user.getIdToken();
-  const response = await fetch(`${RUPHUS_API_BASE}/api/recipe-command`, {
+  const response = await fetch(ruphusApiUrl('/api/recipe-command'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ ...command, clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES }),
