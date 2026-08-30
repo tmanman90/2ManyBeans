@@ -150,11 +150,11 @@ export function gradeC7Tone({ reply = '' } = {}) {
   const result = [];
   if ((value.match(/!/g) || []).length > 1) result.push(violation('C7_EXCLAMATIONS', CATEGORIES.ORDINARY, 'reply uses more than one exclamation'));
   if ((value.match(/\b(?:sorry|apologies)\b/gi) || []).length > 1) result.push(violation('C7_APOLOGY', CATEGORIES.ORDINARY, 'reply apologizes more than once'));
-  if (/great question|excellent question|as an ai|language model|i cannot provide|i\'m just an ai/i.test(value)) result.push(violation('C7_DISCLAIMER', CATEGORIES.ORDINARY, 'reply uses praise or disclaimer language'));
+  if (/great question|excellent question|as an ai|language model|i cannot provide|i'm just an ai/i.test(value)) result.push(violation('C7_DISCLAIMER', CATEGORIES.ORDINARY, 'reply uses praise or disclaimer language'));
   return result;
 }
 
-export function gradeC8Correction({ reply = '', userTurn = '', priorReplies = [] } = {}) {
+export function gradeC8Correction({ reply = '', userTurn = '', _priorReplies = [] } = {}) {
   const user = textOf(userTurn);
   if (!/(?:actually|no[, ]|correction|instead|not\s+the|i\s+(?:meant|brewed|used)|it\s+was)/i.test(user)) return [];
   const value = textOf(reply);

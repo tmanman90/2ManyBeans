@@ -2,7 +2,6 @@ import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
 
 export const DEFAULT_HISTORY_DAYS = 14;
 export const MAX_SNAPSHOT_LINES = 12;
-export const MAX_SNAPSHOT_CHARS = 600;
 export const MAX_LEDGER_ENTRIES = 8;
 export const MAX_LEDGER_BYTES = 4096;
 export const MAX_READS_PER_TURN = 6;
@@ -27,8 +26,7 @@ export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
   });
   const setupLine = `Setup: ${slotDisplay[setup.defaultMethod] || text(setup.defaultMethod || 'default method not set')}, ${text(setup.grinder || 'grinder not set')}, ${text(setup.units || 'metric')}.`;
   const lines = [setupLine, ...visible.map((coffee, index) => `Jar ${coffee.jarSlot ?? index + 1}: ${coffee.name || 'unnamed coffee'}${coffee.roaster ? `, ${coffee.roaster}` : ''}${coffee.origin ? `, ${coffee.origin}` : ''}; ${coffee.recipes.join(', ') || 'no saved recipe'}.`), `Rotation: ${visible.length} active jars.`];
-  let boundedLines = lines.slice(0, MAX_SNAPSHOT_LINES);
-  while (boundedLines.join('\n').length > MAX_SNAPSHOT_CHARS && boundedLines.length > 1) boundedLines = boundedLines.slice(0, -1);
+  const boundedLines = lines.slice(0, MAX_SNAPSHOT_LINES);
   return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric' }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
 }
 
