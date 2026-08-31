@@ -163,7 +163,11 @@ export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_A
     } else payload = await response.json();
     result ||= (payload.content || []).find((block) => block?.type === 'tool_use' && block?.name === 'submit_result')?.input || null;
     if (!result) result = parseTextResult((payload.content || []).filter((block) => block?.type === 'text').map((block) => block.text || '').join(''));
-    if (object(result)) result = { ...result, schemaVersion: JUDGE_SCHEMA_VERSION };
+    if (object(result)) result = {
+      ...result,
+      schemaVersion: JUDGE_SCHEMA_VERSION,
+      rationale: typeof result.rationale === 'string' ? result.rationale.trim().slice(0, 500) : result.rationale,
+    };
     if (object(result?.scores) && JUDGE_DIMENSIONS.every((dimension) => Number.isFinite(result.scores[dimension]))) {
       result = { ...result, mean: JUDGE_DIMENSIONS.reduce((sum, dimension) => sum + result.scores[dimension], 0) / JUDGE_DIMENSIONS.length };
     }
