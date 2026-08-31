@@ -121,6 +121,9 @@ test('a premature proposal becomes normal advice without dispatch or interruptio
     runs += 1;
     if (runs === 1) return { toolCalls: [{ callId: 'too-soon', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: 4 } } }] };
     assert.equal(input.toolResult.results[0].result.code, 'proposal_timing');
+    assert.equal(input.regeneration, true);
+    assert.deepEqual(input.tools, []);
+    assert.match(input.correctiveInstruction, /not authorized yet/i);
     return { text: 'For this V60, try one small grind step finer first.' };
   } };
   const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: false, proposalIssued: false } };
@@ -182,6 +185,24 @@ test('short credential-shaped secrets trigger RT2 and replace a severe second fa
   assert.equal(result.trace.regenerations[0].delivered, 'replacement');
 });
 
+test('unavailable evidence cannot be turned into an absence claim', async () => {
+  const frames = []; let runs = 0;
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs === 1) return { toolCalls: [{ callId: 'read-1', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } }] };
+    if (runs === 2) return { text: "I don't have a tasting note from that cup." };
+    assert.equal(input.regeneration, true);
+    assert.match(input.correctiveInstruction, /source was unavailable/i);
+    return { text: "I couldn't check the tasting notes just now. The brew log still gives us enough to start with one small grind step finer." };
+  } };
+  const tools = { names: ['read_coffee_evidence'], definitions: [], call: async () => ({ coffeeRef: 'c1', tastings: { status: 'unavailable', summary: "I couldn't check tastings right now." }, unavailable: ['tastings'] }) };
+  const result = await runRuphusTurn({ turnId: 'unavailable-truth', context: base, userText: 'What went wrong?', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.match(result.text, /couldn't check the tasting notes/i);
+  assert.deepEqual(result.trace.regenerations[0].triggers, ['EVIDENCE_SCOPE']);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+
 test('proposal eligibility is exact-target scoped and one proposal per round is atomic', async () => {
   const unrelated = { ...base, proposalState: { target: { coffeeRef: 'c2', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } };
   assert.equal(proposalEligibleForTarget(unrelated, { coffeeRef: 'c1', slot: 'v60_hot' }), false);
@@ -218,4 +239,22 @@ test('parallel tool calls start before either Promise settles and preserve compl
   assert.equal(result.ok, true); assert.equal(continuation.length, 2);
   const resultFrames = frames.filter((frame) => frame.type === 'tool_result');
   assert.deepEqual(resultFrames.map((frame) => frame.result.coffeeRef), ['b', 'a']);
+});
+
+test('a redundant read beyond the tool-round budget recovers to prose without dispatch', async () => {
+  const frames = []; let runs = 0; const dispatched = [];
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs <= 3) return { toolCalls: [{ callId: `read-${runs}`, name: runs === 1 ? 'resolve_coffee' : runs === 2 ? 'read_coffee_evidence' : 'read_recipe', args: runs === 1 ? { reference: 'El Vergel' } : runs === 2 ? { coffeeRef: 'c1', windowDays: 14 } : { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+    assert.equal(input.regeneration, true);
+    assert.deepEqual(input.tools, []);
+    assert.equal(input.toolResult.results[0].result.code, 'read_budget_complete');
+    return { text: 'Try one small grind step finer and keep everything else the same.' };
+  } };
+  const tools = { names: ['resolve_coffee', 'read_coffee_evidence', 'read_recipe'], definitions: [], call: async (name) => { dispatched.push(name); return { ok: true, coffeeRef: 'c1' }; } };
+  const result = await runRuphusTurn({ turnId: 'read-round-recovery', context: base, userText: 'What should I change?', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.equal(result.text, 'Try one small grind step finer and keep everything else the same.');
+  assert.deepEqual(dispatched, ['resolve_coffee', 'read_coffee_evidence']);
+  assert.equal(frames.some((frame) => frame.type === 'turn_interrupted'), false);
 });

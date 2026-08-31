@@ -11,6 +11,20 @@ const SEVERE_SECOND_FAILURES = new Set([
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
 ]);
 
+function runtimeEvidence(toolEvidence = []) {
+  const combined = {};
+  for (const item of toolEvidence) {
+    const result = item?.result;
+    if (!result || typeof result !== 'object') continue;
+    for (const kind of ['coffee', 'recipe', 'brews', 'tastings']) {
+      if (result[kind] && typeof result[kind] === 'object') combined[kind] = result[kind];
+      else if (result.unavailable?.includes(kind)) combined[kind] = { status: 'unavailable' };
+    }
+  }
+  combined.unavailable = Object.entries(combined).filter(([, entry]) => entry?.status === 'unavailable').map(([kind]) => kind);
+  return combined;
+}
+
 export function ambiguityClarification(candidates = []) {
   const labels = candidates.slice(0, 2).map((candidate) => {
     const name = String(candidate?.name || '').trim();
@@ -68,6 +82,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   send('turn_accepted', { protocolVersion: RUPHUS_CONTRACT_VERSION });
   send('context_loading', { evidenceHash: context?.evidenceHash || null });
   let response; let toolCalls = 0; let readCalls = 0; let toolRounds = 0; let text = '';
+  let roundLimitRecovered = false;
   const toolNames = []; const proposalIds = []; const toolEvidence = []; const usageSamples = []; const providerRetrySamples = [];
   let proposalClaimed = false;
   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
@@ -79,7 +94,19 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
       if (!calls.length) break;
-      toolRounds += 1; if (toolRounds > maxToolRounds) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
+      toolRounds += 1;
+      if (toolRounds > maxToolRounds) {
+        if (roundLimitRecovered || !calls.every((request) => READS.has(request.name))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
+        roundLimitRecovered = true;
+        const results = calls.map((request) => ({ callId: request.callId, name: request.name, result: { ok: false, code: 'read_budget_complete', message: 'Use the coffee evidence already provided and answer without another read.' } }));
+        response = await provider.runTurn({
+          turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
+          toolResult: { results }, regeneration: true,
+          correctiveInstruction: 'The useful coffee and recipe evidence is already in this turn. Answer naturally from that evidence, make at most one concrete suggestion, and do not call another tool.',
+        });
+        rememberUsage(response);
+        continue;
+      }
       if (toolCalls + calls.length > maxToolCalls) throw Object.assign(new Error('model requested too many actions'), { code: 'forbidden_tool' });
       const proposalRequests = calls.filter((request) => request.name === 'propose_recipe_change');
       const blockedProposalCalls = new Set();
@@ -113,16 +140,27 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const proposed = results.some((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
       if (proposed) { text += 'I’ve prepared one recipe change for you to review.'; break; }
+      const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
+      if (prematureProposal) {
+        response = await provider.runTurn({
+          turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
+          toolResult: { results }, regeneration: true,
+          correctiveInstruction: 'The recipe change is not authorized yet. Reply with useful coffee advice only, make at most one concrete suggestion, and do not call another tool or claim a change was prepared.',
+        });
+        rememberUsage(response);
+        continue;
+      }
       response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results } }); rememberUsage(response);
     }
     let checked = text.trim();
-    let triggers = runtimeTriggers({ reply: checked, userTurn: userText, trace });
+    const checkedEvidence = runtimeEvidence(toolEvidence);
+    let triggers = runtimeTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence });
     if (triggers.length) {
       trace.regenerations.push({ triggers: triggers.map((trigger) => trigger.code), at: new Date().toISOString() });
-      const correctiveInstruction = 'The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, credential-shaped values, or claims of saved changes. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.';
+      const correctiveInstruction = 'The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.';
       const regenerated = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true });
       rememberUsage(regenerated); const regeneratedText = String(regenerated?.text || '').trim();
-      const second = runtimeTriggers({ reply: regeneratedText, userTurn: userText, trace });
+      const second = runtimeTriggers({ reply: regeneratedText, userTurn: userText, trace, evidence: checkedEvidence });
       if (!second.length) { checked = regeneratedText; triggers = []; } else if (second.some((trigger) => SEVERE_SECOND_FAILURES.has(trigger.code))) { checked = REPLACEMENT; }
       else checked = regeneratedText;
       trace.regenerations.at(-1).secondFailure = second.map((trigger) => trigger.code);

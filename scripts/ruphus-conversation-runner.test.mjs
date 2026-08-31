@@ -10,7 +10,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
   appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
-  persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
+  nextBranchTurn, persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
 
 test('live CLI reaches fail-closed preflight without circular-import deadlock', () => {
@@ -87,6 +87,13 @@ test('full stage requires two clean smokes on the current commit and branches ar
   assert.deepEqual(branchAwareTurns({ turns: ['one', 'two'], replies: [{ question: 'Which?' }, { text: 'done' }] }), [
     { text: 'one', branch: 'model-question', unexpectedBranch: true, question: 'Which?' }, { text: 'two', branch: 'scripted', unexpectedBranch: false, question: null },
   ]);
+  const proposalFixture = { turns: ['diagnose', 'agree'], branches: [{ when: 'want me to propose|prepare that', answer: 'Go ahead.' }] };
+  for (const question of ['Shall I prepare that adjustment?', 'Should I propose it?', 'Want me to set up that grind change?', 'Would you like to try one small recipe change?', 'Want me to put that one-step finer change forward?']) {
+    assert.deepEqual(nextBranchTurn(proposalFixture, 0, { text: question }), { text: 'Go ahead.', unexpectedBranch: false, question });
+  }
+  const correctionFixture = { turns: ['correct', 'done'], branches: [{ when: 'want me to propose|propose that', answer: 'Not yet.' }] };
+  const correctionQuestion = 'Got it—the washed Colombian is El Vergel; want me to propose that change?';
+  assert.deepEqual(nextBranchTurn(correctionFixture, 0, { text: correctionQuestion }), { text: 'Not yet.', unexpectedBranch: false, question: correctionQuestion });
 });
 
 test('each injected fixture is reset before execution, including stale session metadata', async () => {
@@ -121,6 +128,10 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(advice.fabricatedEvidence, false);
   const sameSentenceAdvice = deriveFixtureTrace({ fixture, reply: 'Your V60 recipe was 15 g to 250 g at 94°C, Ode 4.2, finishing around 2:45; for a flat cup, I’d test one small step finer to 4.0.', factSheet: 'V60 recipe 15 g to 250 g at 94°C, Ode 4.2, finishing around 2:45.', frames: [] });
   assert.equal(sameSentenceAdvice.fabricatedEvidence, false);
+  const sinceGrounded = deriveFixtureTrace({ fixture, reply: 'Since El Vergel tasted thin and sour, try one small step finer.', factSheet: 'El Vergel tasted thin and sour.', frames: [] });
+  assert.equal(sinceGrounded.fabricatedEvidence, false);
+  const withGrounded = deriveFixtureTrace({ fixture, reply: 'With El Vergel, the brew log shows one recent hot V60 at 15 g.', factSheet: 'El Vergel has one recent hot V60 at 15 g.', frames: [] });
+  assert.equal(withGrounded.fabricatedEvidence, false);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
@@ -168,6 +179,57 @@ test('live playback follows a declared model-question branch and rejects unmeter
     if (previousInput === undefined) delete process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS; else process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS = previousInput;
     if (previousOutput === undefined) delete process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS = previousOutput;
   }
+});
+
+test('live playback accepts history grounded by an earlier turn in the active conversation', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Check my recent brews.', 'What did the previous brew show?'], branches: [] };
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    const frames = calls === 1
+      ? [
+          { type: 'tool_result', name: 'read_coffee_evidence', result: { brews: { status: 'available', records: [{ summary: 'balanced' }] } } },
+          { type: 'turn_completed', text: 'I checked your recent brews.' },
+        ]
+      : [{ type: 'turn_completed', text: 'The previous brew was balanced.' }];
+    frames.push({ type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } });
+    return { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${frames.map((frame) => JSON.stringify(frame)).join('\n')}\n` };
+  };
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(result.results[0].evidenceBeforeHistory, true);
+  assert.equal(result.results[1].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
+});
+
+test('coffee resolution alone does not count as history evidence', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Use El Vergel.', 'What did the previous brew show?'], branches: [] };
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    const frames = calls === 1
+      ? [
+          { type: 'tool_result', name: 'resolve_coffee', result: { ok: true, coffeeRef: 'c1' } },
+          { type: 'turn_completed', text: 'Got it, El Vergel.' },
+        ]
+      : [{ type: 'turn_completed', text: 'The previous brew was balanced.' }];
+    frames.push({ type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } });
+    return { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${frames.map((frame) => JSON.stringify(frame)).join('\n')}\n` };
+  };
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(result.results[0].evidenceBeforeHistory, false);
+  assert.equal(result.results[1].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), true);
+});
+
+test('a seeded authoritative session ledger counts as history evidence on explicit continuation', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Continue with the earlier coffee.'], branches: [], session: { ledger: { version: 1, entries: [{ kind: 'tasting', status: 'complete', summary: 'Balanced cup.' }], namedCoffees: ['El Vergel'] } } };
+  const fetchImpl = async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${JSON.stringify({ type: 'turn_completed', text: 'The last cup was balanced.' })}\n${JSON.stringify({ type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } })}\n` });
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(result.results[0].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
 });
 
 test('live adapter consumes NDJSON and persisted artifacts redact canary secrets', async () => {

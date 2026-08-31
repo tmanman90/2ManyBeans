@@ -44,6 +44,20 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'Go one step finer than Ode 4.2.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try one small step finer than Ode 4.2.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Go finer, from Ode 4.2 to 4.1.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Try one small finer grind step from Ode 4.2.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'The more recent brew had more sweetness and body.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'The recent brew tasted finer than the earlier one.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'A half step finer should help.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Two clicks finer should help.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Try one notch finer.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Try one small finer adjustment.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Try one small grind adjustment finer.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Propose one small dose increase.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'I’d lean toward a little more extraction, one change at a time.', userUnits: {} }).length, 0);
+  assert.ok(gradeC5Numbers({ reply: 'Use more extraction.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'Use more bloom time.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'Use more contact time.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'The water should be hotter.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.equal(gradeC5Numbers({ reply: 'It is set up for hot V60.', userUnits: {} }).length, 0);
 });
 
@@ -51,6 +65,12 @@ test('machine tokens are catastrophic while natural collocations stay allowed', 
   const leak = gradeC6aMachineTokens({ reply: 'The coffeeId is fixture-el-vergel.' });
   assert.ok(leak.some((item) => item.code === 'CF5_MACHINE_TOKEN' && item.category === 'catastrophic'));
   assert.ok(gradeC6aMachineTokens({ reply: 'Proposal: {"coffeeGrams":16}.' }).some((item) => item.code === 'CF6_JSON_PROSE'));
+  assert.ok(gradeC6aMachineTokens({ reply: 'Use coffee-123abc for this brew.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
+  assert.ok(gradeC6aMachineTokens({ reply: 'Use brew_private for this cup.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
+  assert.ok(gradeC6aMachineTokens({ reply: 'Use 1234567890abcdefghij for this cup.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
+  assert.equal(gradeC6aMachineTokens({ reply: 'This is a coffee-specific adjustment.' }).length, 0);
+  assert.equal(gradeC6aMachineTokens({ reply: 'Compare it brew-by-brew before changing the recipe.' }).length, 0);
+  assert.equal(gradeC6aMachineTokens({ reply: 'Counterintuitively, a slightly finer grind may taste sweeter.' }).length, 0);
   assert.equal(gradeC6bPhrases({ reply: 'Your recorded brew was fast.' }).length, 0);
   assert.ok(gradeC6bPhrases({ reply: 'The ledger has a data gap.' }).length >= 1);
   assert.ok(gradeC6bPhrases({ reply: 'I don’t have access to that query.' }).length >= 1);
@@ -65,6 +85,15 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: 'Nothing in the last two weeks.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'old' }] } }).length, 0);
   assert.ok(gradeEvidenceScope({ reply: 'There are no tastings.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'old' }] } }).length);
   assert.equal(gradeEvidenceScope({ reply: 'There is no tasting attached to that brew.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'old' }] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: 'The V60 was more recent and had no tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'kalita-only' }] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: 'The V60 ran yesterday with no tasting note attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'kalita-only' }] } }).length, 0);
+  assert.ok(gradeEvidenceScope({ reply: "I don't have a tasting note from that cup.", evidence: { tastings: { status: 'unavailable' }, unavailable: ['tastings'] } }).some((item) => item.code === 'EVIDENCE_SCOPE' && item.runtime === true));
+  assert.ok(gradeEvidenceScope({ reply: 'There is no tasting attached to that brew.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));
+  assert.ok(gradeEvidenceScope({ reply: 'The V60 had no tasting note.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));
+  assert.ok(gradeEvidenceScope({ reply: 'The V60 ran yesterday with no tasting note.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));
+  assert.ok(gradeEvidenceScope({ reply: 'There is no recipe for that brew.', evidence: { unavailable: ['recipe'] } }).some((item) => item.runtime === true));
+  assert.equal(gradeEvidenceScope({ reply: "Nothing in the brew log alone flags a problem, though I couldn't check tasting notes.", readWindow: { days: 14 }, evidence: { records: [{}] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: "Nothing obviously alarming from the brew log alone. I couldn't check tasting notes.", readWindow: { days: 14 }, evidence: { records: [{}], unavailable: ['tastings'] } }).length, 0);
 });
 
 test('runtime predicate is only the RT2 subset', () => {
@@ -73,6 +102,7 @@ test('runtime predicate is only the RT2 subset', () => {
   assert.equal(runtimeTriggers({ reply: 'The ledger needs work.' }).length, 0);
   assert.equal(runtimeTriggers({ reply: 'Which? Why?' }).length, 0);
   assert.equal(runtimeTriggers({ reply: 'Tell me about the other coffee.' }).length, 0);
+  assert.ok(runtimeTriggers({ reply: "I don't have a tasting note.", evidence: { unavailable: ['tastings'] } }).some((item) => item.code === 'EVIDENCE_SCOPE'));
 });
 
 test('launch context schema rejects cage fields and accepts an unmethodized tasting', () => {

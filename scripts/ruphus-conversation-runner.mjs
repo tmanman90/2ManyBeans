@@ -366,7 +366,11 @@ export function nextBranchTurn(fixture, index, reply) {
   const planned = fixture.turns?.[index + 1];
   const question = reply?.question || (/\?\s*$/.test(String(reply?.text || '')) ? String(reply.text).trim() : null);
   if (!question) return { text: planned, unexpectedBranch: false, question: null };
-  const branch = (fixture.branches || []).find((candidate) => new RegExp(candidate.when, 'i').test(question));
+  const branches = fixture.branches || [];
+  const direct = branches.find((candidate) => new RegExp(candidate.when, 'i').test(question));
+  const proposalPermission = /\b(?:want me to|would you like me to|shall i|should i|want to|would you like to)\b[^?]*(?:propos|prepar|make|set up|recipe change|grind change|try|put[^?]{0,40}forward)/i.test(question);
+  const semantic = proposalPermission ? branches.find((candidate) => /propos|prepar|change|want to try|would you like to try|next test|bounded/i.test(candidate.when)) : null;
+  const branch = direct || semantic;
   return { text: branch?.answer || planned, unexpectedBranch: !branch, question };
 }
 
@@ -392,7 +396,7 @@ function hasUnsupportedFactualClaim(reply, knownText) {
     if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
     const properNames = evidenceClause.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
     return properNames.some((name) => {
-      const candidate = name.replace(/^(?:For|Your|The|That|This|Got|Next|Keep|Thin|Taste|Notes)\s+/i, '');
+      const candidate = name.replace(/^(?:For|Since|With|Your|The|That|This|Got|Next|Keep|Thin|Taste|Notes)\s+/i, '');
       return candidate.includes(' ') && !knownText.includes(candidate.toLowerCase());
     });
   });
@@ -515,7 +519,10 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account), coffees: account.coffees });
     const toolEvidenceText = JSON.stringify((result.frames || []).filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {})).toLowerCase();
     const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: { days: 14 }, evidence: { records: (result.frames || []).filter((frame) => frame?.type === 'tool_result') }, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
-    if (/\b(?:history|earlier|previous|recorded|last tasting|last brew)\b/i.test(result.text) && !(result.frames || []).some((frame) => frame?.type === 'tool_result')) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence' });
+    const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
+    const priorEvidenceBeforeHistory = results.some((item) => item.evidenceBeforeHistory === true);
+    const seededSessionEvidence = index === 0 && Array.isArray(fixture.session?.ledger?.entries) && fixture.session.ledger.entries.length > 0;
+    if (/\b(?:history|earlier|previous|recorded|last tasting|last brew|last cup)\b/i.test(result.text) && !currentEvidenceBeforeHistory && !priorEvidenceBeforeHistory && !seededSessionEvidence) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence in the active conversation' });
     const expectedMethod = fixture.expected?.method;
     if (expectedMethod && !new RegExp(String(expectedMethod).replace('_', '|'), 'i').test(`${result.text} ${toolEvidenceText}`)) grader.ordinary.push({ code: 'U3_METHOD_SLOT_MISSING', category: 'ordinary', message: 'declared method slot was not evidenced' });
     const branch = nextBranchTurn(fixture, index, result);
@@ -523,7 +530,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const regenerationCount = result.timing?.regenerationCount ?? (result.frames || []).filter((frame) => /regenerat|replac/i.test(String(frame?.type || ''))).length;
     if (regenerationCount > 0) grader.ordinary.push({ code: 'U3_REGENERATION_OR_REPLACEMENT', category: 'ordinary', message: 'a regeneration or replacement was required' });
     if (latencyMs > 25000) grader.ordinary.push({ code: 'U3_TURN_OVER_25S', category: 'ordinary', message: 'turn exceeded the authoritative 25 second limit' });
-    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), frames: structuredClone(result.frames || []), grader, latencyMs, firstFrameMs: result.timing?.firstFrameMs ?? null, readRoundMs: result.timing?.readRoundMs ?? result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: regenerationCount, evidenceBeforeHistory: (result.frames || []).some((frame) => frame?.type === 'tool_result'), costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
+    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), frames: structuredClone(result.frames || []), grader, latencyMs, firstFrameMs: result.timing?.firstFrameMs ?? null, readRoundMs: result.timing?.readRoundMs ?? result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: regenerationCount, evidenceBeforeHistory: currentEvidenceBeforeHistory, costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
     if (branch.unexpectedBranch) {
       turnResult.grader.ordinary.push({ code: 'U3_UNEXPECTED_BRANCH', category: 'ordinary', message: 'model asked an undeclared question branch; fixture stopped' });
       results.push(turnResult);

@@ -34,9 +34,12 @@ export const C6B_ALLOWLIST = Object.freeze([
   /\bbrewing session\b/i, /\byour grinder and kettle\b/i,
 ]);
 
-const INTERNAL_REFERENCE = /(?:^|[\s([{])(?:ref|coffee|bean|brew|tasting|attempt|recipe|session|turn|call)[_-][a-z0-9][a-z0-9_-]{2,}(?=$|[\s)\]}.,!?])/i;
+// Underscore-delimited values are always machine-shaped. A hyphenated value
+// needs an identifier signal (a digit or another delimiter) so ordinary coffee
+// language such as "coffee-specific" or "brew-by-brew" is not rewritten.
+const INTERNAL_REFERENCE = /(?:^|[\s([{])(?:ref|coffee|bean|brew|tasting|attempt|recipe|session|turn|call)(?:_[a-z0-9][a-z0-9_-]{2,}|-(?=[a-z0-9_-]*(?:\d|_))[a-z0-9][a-z0-9_-]{2,})(?=$|[\s)\]}.,!?])/i;
 const HASH = /\b[a-f0-9]{16,}\b/i;
-const LONG_ID = /\b[a-z0-9_-]{20,}\b/i;
+const LONG_ID = /\b(?=[a-z0-9_-]{20,}\b)(?=[a-z0-9_-]*(?:\d|_|-))[a-z0-9_-]+\b/i;
 const JSON_SHAPE = /(?:[{[]\s*["']?[A-Za-z_][\w-]*["']?\s*:|["'][A-Za-z_][\w-]*["']\s*:)/;
 const MARKUP = /```|<\/?[A-Za-z][^>]*>|(^|\s)[*_]{1,3}\S|(^|\s)[-•]\s/m;
 const PROPOSAL_SHAPE = /(?:\b(?:proposal|update)\s*[:{]|\b(?:from|to|delta)\s*[:=])/i;
@@ -110,9 +113,10 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const result = [];
   if (/\b\d+\.\d{2,}\b/.test(value) && !/\b(?:grinder|ode)\s*\d+\.\d{2}\b/i.test(value)) result.push(violation('C5_PRECISION', CATEGORIES.ORDINARY, 'number precision is too fine'));
   if (/\b(?:microns?|µm)\b/i.test(value) && !userUnits.microns) result.push(violation('C5_UNITS', CATEGORIES.ORDINARY, 'microns were introduced without the user using microns'));
-  const directional = /\b(?:increase|decrease|more|less|finer|coarser)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
-  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|a|another)\s+(?:small\s+)?(?:step|gram|click|degree)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
-  if (directional.test(value) && !sized.test(value)) {
+  const directional = /\b(?:increase|decrease|finer|coarser|hotter|cooler)\b|\b(?:more|less)\s+(?:(?:bloom|contact|brew)\s+)?(?:coffee|dose|water|heat|temperature|time|agitation|extraction)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
+  const recommendation = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|grind)\b|\bshould\s+be\s+(?:hotter|cooler)\b|\b(?:a\s+half|half|one|two)\s+(?:small\s+)?(?:grind\s+)?(?:step|click|notch)(?:s)?\s+(?:finer|coarser)\b/i;
+  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|a|another|half)\s+(?:small\s+)?(?:half\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease)s?\b|\b(?:a\s+little|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
+  if (directional.test(value) && recommendation.test(value) && !sized.test(value)) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
   return result;
@@ -187,8 +191,19 @@ export function gradeC10FocusAcknowledgment({ reply = '', focusChanged = false, 
 
 export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {} } = {}) {
   const value = textOf(reply);
-  if (!/\b(?:no|none|nothing)\b[^.?!]*(?:tasting|brew|recipe)s?\b/i.test(value)) return [];
-  if (/\bno\s+(?:tasting|brew|recipe)\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b/i.test(value)) return [];
+  const absence = value.match(/\b(?:no|none|nothing)\b[^.?!]*(?:tasting|brew|recipe)s?\b|\b(?:don[’']?t|do not)\s+have\b[^.?!]*(?:tasting|brew|recipe)s?\b/i);
+  if (!absence) return [];
+  const unavailable = new Set([
+    ...(Array.isArray(evidence?.unavailable) ? evidence.unavailable : []),
+    ...Object.entries(evidence || {}).filter(([, entry]) => entry?.status === 'unavailable').map(([kind]) => kind),
+  ].map((kind) => textOf(kind).toLowerCase()));
+  const claimedSubject = absence[0].match(/\b(?:tasting|brew|recipe)s?\b/i)?.[0]?.toLowerCase() || 'recipe';
+  const claimedKind = claimedSubject.startsWith('tasting') ? 'tastings' : claimedSubject.startsWith('brew') ? 'brews' : 'recipe';
+  if (unavailable.has(claimedKind) || unavailable.has(claimedKind.replace(/s$/, ''))) {
+    return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, `reply claims ${claimedKind} are absent even though that source was unavailable`, { runtime: true })];
+  }
+  if (/\bnothing\b[^.?!]*(?:(?:brew log|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|notes))/i.test(value)) return [];
+  if (/\bno\s+(?:tasting|brew|recipe)\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^.?!]{0,48}\b(?:had|with)\s+no\s+tasting\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
   const hasEvidence = Object.values(evidence || {}).some((entry) => Array.isArray(entry) && entry.length > 0);
   if (windowed && hasEvidence && !/(?:last|past|previous)\s+(?:two|14|fourteen)\s+weeks?|since|between/i.test(value)) return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, 'absence claim is not qualified by the read window')];
@@ -233,6 +248,7 @@ export function runtimeTriggers(input = {}) {
   return gradeReply(input).violations.filter((item) => item.runtime === true && [
     'RT2_LENGTH', 'RT2_MARKUP', 'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE',
     'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'RT2_FALSE_AUTHORITY',
+    'EVIDENCE_SCOPE',
   ].includes(item.code));
 }
 export const getRuntimeTriggers = runtimeTriggers;
