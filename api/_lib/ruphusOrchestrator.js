@@ -82,13 +82,14 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       toolRounds += 1; if (toolRounds > maxToolRounds) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
       if (toolCalls + calls.length > maxToolCalls) throw Object.assign(new Error('model requested too many actions'), { code: 'forbidden_tool' });
       const proposalRequests = calls.filter((request) => request.name === 'propose_recipe_change');
+      const blockedProposalCalls = new Set();
       // Validate the whole round before dispatching any tool. This keeps the
       // one-proposal rule atomic while independent reads remain concurrent.
       if (proposalRequests.length > 1 || (proposalClaimed && proposalRequests.length > 0)) throw Object.assign(new Error('at most one proposal is allowed per turn'), { code: 'proposal_timing' });
       for (const request of calls) {
         if (!tools.names?.includes(request.name) || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
         if (READS.has(request.name) && readCalls + 1 > MAX_READS_PER_TURN) throw Object.assign(new Error('maximum evidence reads exceeded'), { code: 'read_budget_exceeded' });
-        if (request.name === 'propose_recipe_change' && !proposalEligibleForTarget(context, request.args || {})) throw Object.assign(new Error('proposal is not yet earned for this coffee and recipe'), { code: 'proposal_timing' });
+        if (request.name === 'propose_recipe_change' && !proposalEligibleForTarget(context, request.args || {})) blockedProposalCalls.add(request.callId || request);
         if (READS.has(request.name)) readCalls += 1;
       }
       if (proposalRequests.length) proposalClaimed = true;
@@ -96,7 +97,9 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const readRoundStartedAt = performance.now();
       const results = await Promise.all(calls.map(async (request) => {
         send('tool_started', { name: request.name, ...(request.callId ? { callId: request.callId } : {}) }); toolNames.push(request.name);
-        const result = await tools.call(request.name, request.args || {});
+        const result = blockedProposalCalls.has(request.callId || request)
+          ? { ok: false, code: 'proposal_timing', message: 'Give the recipe advice first and wait for explicit agreement before preparing a proposal.' }
+          : await tools.call(request.name, request.args || {});
         toolEvidence.push({ callId: request.callId, name: request.name, result });
         if (READS.has(request.name)) trace.reads.push({ name: request.name, at: new Date().toISOString() });
         if (result?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== result.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: result.coffeeRef });

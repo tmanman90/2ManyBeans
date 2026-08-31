@@ -115,6 +115,22 @@ test('orchestrator buffers text, rejects premature proposal, and regenerates one
   const result = await runRuphusTurn({ turnId: 't1', context: base, userText: 'Go ahead and make that change.', provider, tools, emit: (frame) => frames.push(frame) });
   assert.equal(result.ok, true); assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 1); assert.equal(frames.find((frame) => frame.type === 'text_delta').text, 'Try one step finer than Ode 4.2.'); assert.equal(result.trace.regenerations.length, 1);
 });
+test('a premature proposal becomes normal advice without dispatch or interruption', async () => {
+  const frames = []; let runs = 0; let dispatched = 0;
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs === 1) return { toolCalls: [{ callId: 'too-soon', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: 4 } } }] };
+    assert.equal(input.toolResult.results[0].result.code, 'proposal_timing');
+    return { text: 'For this V60, try one small grind step finer first.' };
+  } };
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: false, proposalIssued: false } };
+  const result = await runRuphusTurn({ turnId: 'premature-proposal', context: current, userText: 'the V60', provider, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => { dispatched += 1; } }, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.equal(result.text, 'For this V60, try one small grind step finer first.');
+  assert.equal(dispatched, 0);
+  assert.equal(frames.some((frame) => frame.type === 'artifact_ready'), false);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
 test('method correction permanently drops the launch hint before evidence resolution', async () => {
   const current = { ...base, launchCoffeeId: 'c1', launchContext: { surface: 'recipe_aiden', launchItem: { kind: 'recipe', ref: 'recipe-1', method: 'aiden' } }, userText: 'Actually, I used v60', __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'recipe-1', method: 'aiden' } }, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map() };
   const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readCoffee: async () => ({ name: 'El Vergel' }), readRecipe: async () => [{ slotKey: 'v60_hot', dose: 15 }], readBrews: async () => [], readTastings: async () => [] } });
