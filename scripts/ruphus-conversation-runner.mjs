@@ -11,7 +11,7 @@ import { RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
 import {
   gradeReply, fixtureManifestShape, validateLaunchContext, CONTRACT_VERSION,
 } from '../src/lib/ruphus/conversationContract.js';
-import { assessCalibration, createAnthropicJudgeAdapter, createBlindJudgePacket, createBlindPairwisePacket, createCalibrationPackets, judgeTranscript, pairwisePass } from './ruphus-conversation-judge.mjs';
+import { assessCalibration, createAnthropicJudgeAdapter, createBlindJudgePacket, createBlindPairwisePacket, createCalibrationPackets, judgeTranscript, pairwisePass, validateJudgeResult, validatePairwiseResult } from './ruphus-conversation-judge.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const FIXTURE_ROOT = join(HERE, 'fixtures', 'ruphus-conversation');
@@ -289,6 +289,17 @@ async function dispatchMetered(adapter, packet, guard) {
     await guard.persistState?.();
     return response;
   } catch (error) { guard.reconcile(reservation, maximum); await guard.persistState?.(); throw error; }
+}
+
+export async function dispatchValidatedJudge(adapter, packet, guard, { dispatch = dispatchMetered, maxAttempts = 2 } = {}) {
+  let response = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    response = await dispatch(adapter, packet, guard);
+    const result = response?.result || response;
+    const validation = packet?.left ? validatePairwiseResult(result) : validateJudgeResult(result);
+    if (validation.valid) return response;
+  }
+  return response;
 }
 
 export function smokeIsClean(results) {
@@ -573,7 +584,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     const goldPacketIds = new Set(references.gold.map((item) => createBlindJudgePacket({ ...item, id: `${item.id}:gold`, seed: `${commit}:calibration` }).packetId));
     const calibrationResults = [];
     for (const packet of goldPackets) {
-      const result = await dispatchMetered(judge, packet, guard);
+      const result = await dispatchValidatedJudge(judge, packet, guard);
       const kind = goldPacketIds.has(packet.packetId) ? 'gold' : 'knownBad';
       calibrationResults.push({ kind, result });
       calibrationRecords.push({ kind, packetId: packet.packetId, mean: result?.result?.mean ?? result?.mean ?? null, scores: result?.result?.scores || result?.scores || null, rationale: result?.result?.rationale || result?.rationale || null, provider: result?.provider || judge.provider || null, model: result?.model || judge.model || null, usage: result?.usage || null });
@@ -597,7 +608,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     const transcript = candidate.transcript;
     if (judge && stage !== 'smoke') {
       const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
-      const judged = await judgeTranscript({ judge: async (input) => dispatchMetered(judge, input, guard), packet });
+      const judged = await judgeTranscript({ judge: async (input) => dispatchValidatedJudge(judge, input, guard), packet });
       candidate.judge = judged.sufficient ? judged.result : null;
       candidate.judgeMeta = judged.sufficient ? { provider: judged.provider, model: judged.model, usage: judged.usage } : { sufficient: false };
       judgeRecords.push({ fixtureId: fixture.id, repeat: run.repeat, provider: judged.provider, model: judged.model, usage: judged.usage, sufficient: judged.sufficient });
@@ -605,7 +616,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     if (pairwise && fixture.critical && (stage === 'full' || stage === 'targeted')) {
       const reference = await loadTranscript(join(root, 'known-bad', `${names[fixture.id]}.md`));
       const packet = createBlindPairwisePacket({ candidate: transcript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
-      const pairwiseResult = await dispatchMetered(pairwise, packet, guard);
+      const pairwiseResult = await dispatchValidatedJudge(pairwise, packet, guard);
       candidate.pairwise = pairwisePass(pairwiseResult?.result || pairwiseResult, packet);
       candidate.pairwiseProvenance = { provider: pairwiseResult?.provider || pairwise.provider || null, model: pairwiseResult?.model || pairwise.model || null, usage: pairwiseResult?.usage || null, packetId: packet.packetId, orderToken: packet.orderToken };
       candidate.pairwiseRationale = pairwiseResult?.result?.rationale || pairwiseResult?.rationale || null;

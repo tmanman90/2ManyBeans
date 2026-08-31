@@ -9,9 +9,30 @@ import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
-  appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
+  appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, dispatchValidatedJudge, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
   nextBranchTurn, persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
+import { JUDGE_SCHEMA_VERSION } from './ruphus-conversation-judge.mjs';
+
+const validJudgment = () => ({
+  schemaVersion: JUDGE_SCHEMA_VERSION,
+  scores: {
+    friendNotForm: 5, knowsMyCoffee: 5, earnsQuestions: 5, movesBrewForward: 5,
+    listens: 5, phoneSized: 5, confidentNotBossy: 5, proposalFeelsEarned: 5,
+  },
+  mean: 5,
+  rationale: 'Good conversation.',
+});
+
+test('judge dispatch retries one malformed structured result without weakening validation', async () => {
+  const responses = [{ result: { schemaVersion: JUDGE_SCHEMA_VERSION } }, { result: validJudgment() }];
+  let calls = 0;
+  const response = await dispatchValidatedJudge(null, { transcript: [] }, null, {
+    dispatch: async () => { calls += 1; return responses.shift(); },
+  });
+  assert.equal(calls, 2);
+  assert.equal(response.result.mean, 5);
+});
 
 test('live CLI reaches fail-closed preflight without circular-import deadlock', () => {
   const result = spawnSync(process.execPath, [
