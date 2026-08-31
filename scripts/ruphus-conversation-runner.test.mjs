@@ -172,6 +172,19 @@ test('live adapter consumes NDJSON and persisted artifacts redact canary secrets
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test('live adapter surfaces only a bounded endpoint error code', async () => {
+  await assert.rejects(() => runLiveEndpointTurn({
+    endpoint: 'https://dev.example.test/api/ruphus-agent',
+    token: 'canary-token',
+    payload: {},
+    fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ error: 'launch_item_not_found', message: 'fixture-secret should not escape' }) }),
+  }), (error) => {
+    assert.match(error.message, /HTTP 400 \(launch_item_not_found\)/);
+    assert.doesNotMatch(error.message, /fixture-secret/);
+    return true;
+  });
+});
+
 test('orchestrator emits safe timing on the completed frame without exposing evidence', async () => {
   const frames = [];
   const result = await runRuphusTurn({

@@ -410,7 +410,16 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl 
   const response = await fetchImpl(endpoint, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error(`U3 endpoint returned HTTP ${response.status}`);
+  if (!response.ok) {
+    let errorCode = 'unknown_error';
+    try {
+      const errorBody = await response.json();
+      if (/^[a-z0-9_-]{1,64}$/i.test(String(errorBody?.error || ''))) errorCode = errorBody.error;
+    } catch {
+      // Keep endpoint diagnostics bounded to a machine-safe code.
+    }
+    throw new Error(`U3 endpoint returned HTTP ${response.status} (${errorCode})`);
+  }
   let body;
   const contentType = response.headers?.get?.('content-type') || '';
   if (contentType.includes('ndjson') && typeof response.text === 'function') {
