@@ -17,6 +17,12 @@ test('relative fixture dates are rewritten from one run clock and seed plan is i
   assert.equal(plan.some((operation) => operation.path.endsWith('/recipeRevisions/c1:v60')), true);
   assert.equal(plan.some((operation) => operation.path.endsWith('/beans/c1')), true);
   assert.equal(plan.some((operation) => operation.path.endsWith('/brewAttempts/b1')), true);
+  assert.deepEqual(plan[0].data.subscription, {
+    status: 'active',
+    plan: 'pro-dev-fixture',
+    expiresAt: '2026-09-06T12:00:00.000Z',
+    source: 'ruphus-dev-fixture',
+  });
   assert.equal(plan.every((operation) => !JSON.stringify(operation).includes('token')), true);
 });
 
@@ -37,4 +43,5 @@ test('seed plan feeds the production reader collection names and revision shape'
   assert.equal(rows.get('users/fixture-account/brewAttempts/b1').coffeeId, 'c1');
   assert.equal(rows.get('users/fixture-account').defaultMethod, 'v60_hot');
   assert.deepEqual(rows.get('users/fixture-account').preferences, { brewMethod: 'v60_hot', grinder: 'Ode', units: 'metric' });
+  assert.equal(rows.get('users/fixture-account').subscription.plan, 'pro-dev-fixture');
 });
