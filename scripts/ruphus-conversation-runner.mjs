@@ -72,8 +72,9 @@ export function fixtureFactSheet(account) {
       return [recipe.displayName || slot, recipe.dose != null ? `${recipe.dose}g coffee` : null, recipe.water != null ? `${recipe.water}g water` : null, recipe.grind || null, recipe.temperature != null ? `${recipe.temperature}C` : null].filter(Boolean).join(', ');
     }).join(' | ') || 'none';
     const tastings = (account.tastings || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.notes || item.note || ''}`).join(' | ') || 'none';
-    const brews = (account.brews || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.slot}, ${item.dose}g coffee, ${item.water}g water, ${item.grind}, ${item.drawdown}`).join(' | ') || 'none';
-    return `Jar ${coffee.jarSlot ?? 'off rotation'}: ${coffee.name} — ${coffee.roaster}, ${coffee.origin}, ${coffee.process}; roasted ${coffee.roastDate || 'unknown'}, opened ${coffee.openDate || 'unknown'}; recipes ${recipes}; brews ${brews}; tastings ${tastings}.`;
+    const brews = (account.brews || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.slot}, ${item.dose}g coffee, ${item.water}g water, ${item.grind}, ${item.drawdown}${item.notes || item.note ? `, note: ${item.notes || item.note}` : ''}`).join(' | ') || 'none';
+    const attempts = (account.attempts || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.slot}, ${item.dose}g coffee, ${item.water}g water, ${item.grind}, ${item.drawdown}${item.notes || item.note ? `, attempt note: ${item.notes || item.note}` : ''}`).join(' | ') || 'none';
+    return `Jar ${coffee.jarSlot ?? 'off rotation'}: ${coffee.name} — ${coffee.roaster}, ${coffee.origin}, ${coffee.process}; roasted ${coffee.roastDate || 'unknown'}, opened ${coffee.openDate || 'unknown'}; recipes ${recipes}; brews ${brews}; attempts ${attempts}; tastings ${tastings}.`;
   }).join('\n');
 }
 export const factSheet = fixtureFactSheet;
@@ -86,6 +87,34 @@ export function parseTranscript(markdown) {
     transcript.push({ role: /^user$/i.test(match[1]) ? 'user' : 'assistant', text: match[2] });
   }
   return transcript;
+}
+
+function proposalCardSummary(artifact) {
+  if (artifact?.type !== 'recipe_proposal') return null;
+  const before = artifact.before || {}; const after = artifact.after || {};
+  const beforeGrind = before.grindSize?.setting ?? before.grind ?? null;
+  const afterGrind = after.grindSize?.setting ?? after.grind ?? null;
+  const changes = [];
+  if (beforeGrind != null && afterGrind != null && String(beforeGrind) !== String(afterGrind)) changes.push(`grind ${beforeGrind} to ${afterGrind}`);
+  if (before.coffeeGrams != null && after.coffeeGrams != null && before.coffeeGrams !== after.coffeeGrams) changes.push(`dose ${before.coffeeGrams} g to ${after.coffeeGrams} g`);
+  if (before.waterGrams != null && after.waterGrams != null && before.waterGrams !== after.waterGrams) changes.push(`water ${before.waterGrams} g to ${after.waterGrams} g`);
+  if (before.temperature != null && after.temperature != null && before.temperature !== after.temperature) changes.push(`temperature ${before.temperature}°C to ${after.temperature}°C`);
+  return `Visible recipe proposal card: ${after.title || before.title || 'recipe change'}; ${changes.join(', ') || 'one bounded recipe change'}; ready to review, not applied.`;
+}
+
+export function judgeVisibleTranscript(candidate = {}) {
+  const transcript = Array.isArray(candidate.transcript) ? candidate.transcript : [];
+  const turnResults = Array.isArray(candidate.results) ? candidate.results : [];
+  const visible = [];
+  let assistantIndex = 0;
+  for (const turn of transcript) {
+    visible.push(turn);
+    if (turn?.role !== 'assistant') continue;
+    const summaries = (turnResults[assistantIndex]?.frames || []).filter((frame) => frame?.type === 'artifact_ready').map((frame) => proposalCardSummary(frame.artifact)).filter(Boolean);
+    for (const summary of summaries) visible.push({ role: 'assistant', text: summary });
+    assistantIndex += 1;
+  }
+  return visible;
 }
 
 export async function loadTranscript(file) {
@@ -629,8 +658,9 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     await resetSession({ fixture, repetition: run.repeat, stage, session: fixture.session || null });
     const candidate = await runLiveCase(account, fixture, { endpoint, token, costGuard: guard, fetchImpl, stageRunId, repetition: run.repeat });
     const transcript = candidate.transcript;
+    const visibleTranscript = judgeVisibleTranscript(candidate);
     if (judge && stage !== 'smoke') {
-      const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript: visibleTranscript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       const judged = await judgeTranscript({ judge: async (input) => dispatchValidatedJudge(judge, input, guard), packet });
       candidate.judge = judged.sufficient ? judged.result : null;
       candidate.judgeMeta = judged.sufficient ? { provider: judged.provider, model: judged.model, usage: judged.usage } : { sufficient: false };
@@ -638,7 +668,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     }
     if (pairwise && fixture.critical && (stage === 'full' || stage === 'targeted')) {
       const reference = await loadTranscript(join(root, 'known-bad', `${names[fixture.id]}.md`));
-      const packet = createBlindPairwisePacket({ candidate: transcript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      const packet = createBlindPairwisePacket({ candidate: visibleTranscript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       const pairwiseResult = await dispatchValidatedJudge(pairwise, packet, guard);
       candidate.pairwise = pairwisePass(pairwiseResult?.result || pairwiseResult, packet);
       candidate.pairwiseProvenance = { provider: pairwiseResult?.provider || pairwise.provider || null, model: pairwiseResult?.model || pairwise.model || null, usage: pairwiseResult?.usage || null, packetId: packet.packetId, orderToken: packet.orderToken };

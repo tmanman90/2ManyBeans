@@ -119,8 +119,19 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!result.ok) return { ok: false, reason: result.reason, candidates: (result.candidates || []).map((item) => cleanInventory(item.coffee)) };
       const resolvedRef = Object.entries(refs).find(([, id]) => id === result.coffee?.id)?.[0] || result.ref;
       if (result.coffee?.id && !refs[resolvedRef]) refs[resolvedRef] = result.coffee.id;
+      // A successful resolver call is authoritative focus evidence even when
+      // the model answers without reading the composite evidence tool. Keep
+      // only owner-inventory fields in the replay ledger so the next turn's
+      // pronouns follow the latest confirmed coffee without persisting refs.
+      const resolvedCoffee = cleanInventory({ ...result.coffee, refKey: resolvedRef });
+      context.ledger = appendLedger(context.ledger, {
+        kind: 'coffee_focus',
+        status: 'available',
+        namedCoffees: resolvedCoffee.name ? [resolvedCoffee.name] : [],
+        ...(resolvedCoffee.name ? { coffee: resolvedCoffee } : {}),
+      }, { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
       if (context.launchCoffeeId && resolvedRef !== context.launchCoffeeId) context.__ruphusLaunchHintConsumed = true;
-      return { ok: true, coffeeRef: resolvedRef, coffee: cleanInventory({ ...result.coffee, refKey: resolvedRef }), match: result.source };
+      return { ok: true, coffeeRef: resolvedRef, coffee: resolvedCoffee, match: result.source };
     }
     requireRef(args);
     const coffeeId = resolveId(args.coffeeRef);

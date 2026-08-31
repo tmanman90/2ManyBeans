@@ -23,3 +23,9 @@ test('null window widens history and still returns scoped evidence', async () =>
   const evidence = await readCoffeeEvidence({ uid: 'u', coffeeId: 'a', windowDays: null, now: Date.parse('2026-08-30T00:00:00Z'), readers: { readRecipe: async () => [], readBrews: async () => [], readTastings: async () => [{ id: 'old', createdAt: '2026-07-01T00:00:00Z', notes: 'berry' }] } });
   assert.equal(evidence.windowDays, null); assert.equal(evidence.tastings.status, 'available'); assert.match(evidence.tastings.summary, /berry/);
 });
+test('brew and tasting summaries preserve distinct provenance for the model', async () => {
+  const evidence = await readCoffeeEvidence({ uid: 'u', coffeeId: 'a', windowDays: null, now: Date.parse('2026-08-30T00:00:00Z'), readers: { readRecipe: async () => [], readBrews: async () => [{ createdAt: '2026-08-27T00:00:00Z', slotKey: 'v60_hot', drawdown: '2:50' }], readTastings: async () => [{ createdAt: '2026-08-09T00:00:00Z', notes: 'thin and sour' }] } });
+  assert.match(evidence.brews.summary, /^BREW — hot V60 — 3 days ago/);
+  assert.match(evidence.tastings.summary, /^TASTING — 21 days ago — not linked to a specific brew/);
+  assert.doesNotMatch(evidence.brews.summary, /thin and sour/);
+});

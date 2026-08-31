@@ -57,9 +57,13 @@ export function resolveCoffeeReference({ reference, coffees = [], ledger = {}, n
     if (matches.length > 1) return { ok: false, reason: 'ambiguous', candidates: matches.map(({ coffee, index }) => candidate(coffee, index, 'jar', 0.9)) };
   }
 
-  const queryTokens = tokens(query);
+  // Articles and pronoun fillers do not identify a coffee. Removing them
+  // keeps attribute references such as “the washed one” comparable to the
+  // owner's process field while preserving genuine ambiguity (for example,
+  // “the Colombian one” still matches both Colombian coffees).
+  const queryTokens = new Set([...tokens(query)].filter((token) => !['a', 'an', 'the', 'one'].includes(token)));
   const scored = pool.map((coffee, index) => {
-    const fields = [entryName(coffee), coffee?.roaster, coffee?.origin, coffee?.region, coffee?.farm].filter(Boolean);
+    const fields = [entryName(coffee), coffee?.roaster, coffee?.origin, coffee?.process, coffee?.region, coffee?.farm].filter(Boolean);
     const fieldTokens = new Set(fields.flatMap((value) => [...tokens(value)]));
     if (coffee?.origin) {
       const origin = normalize(coffee.origin);

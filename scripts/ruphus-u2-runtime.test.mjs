@@ -12,6 +12,12 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /“The other” means the matching coffee other than the current one/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /never leave it at vague “more extraction/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Keep brew attempts and tasting notes separate unless the evidence explicitly links them/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /a photo or visual symptom alone does not identify the bean/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /stay with the most recently named coffee/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Give specific recipe advice before agreement/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /thin but sweet or clean points to strength/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);
 });
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
   const calls = [];
@@ -46,6 +52,18 @@ test('this coffee resolves the current named coffee, then the verified launch co
   assert.equal((await createRuphusTools({ uid: 'u1', context: launchContext, readers }).call('resolve_coffee', { reference: 'this coffee' })).coffeeRef, 'c2');
   const namedContext = { ...launchContext, ledger: { entries: [], namedCoffees: ['El Vergel'] } };
   assert.equal((await createRuphusTools({ uid: 'u1', context: namedContext, readers }).call('resolve_coffee', { reference: 'current coffee' })).coffeeRef, 'c1');
+});
+test('successful focus resolution is replayed so the next pronoun follows the latest coffee', async () => {
+  const context = { ...base, __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' }, ledger: { entries: [], namedCoffees: [] } };
+  const readers = { listCoffees: async () => [
+    { id: 'coffee-1', name: 'El Vergel', origin: 'Colombia', process: 'washed' },
+    { id: 'coffee-2', name: 'Colombia La Esperanza', origin: 'Colombia', process: 'natural' },
+  ] };
+  const tools = createRuphusTools({ uid: 'u1', context, readers });
+  assert.equal((await tools.call('resolve_coffee', { reference: 'El Vergel' })).coffeeRef, 'c1');
+  assert.equal((await tools.call('resolve_coffee', { reference: 'the other Colombia' })).coffeeRef, 'c2');
+  assert.equal((await tools.call('resolve_coffee', { reference: 'that one' })).coffeeRef, 'c2');
+  assert.deepEqual(context.ledger.namedCoffees, ['El Vergel', 'Colombia La Esperanza']);
 });
 test('ambiguous coffee resolution asks once instead of guessing through another tool round', async () => {
   let providerCalls = 0; const frames = [];

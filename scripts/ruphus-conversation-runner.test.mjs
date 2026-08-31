@@ -10,7 +10,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
   appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, dispatchValidatedJudge, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
-  nextBranchTurn, persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
+  fixtureFactSheet, judgeVisibleTranscript, nextBranchTurn, persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
 import { JUDGE_SCHEMA_VERSION } from './ruphus-conversation-judge.mjs';
 
@@ -22,6 +22,13 @@ const validJudgment = () => ({
   },
   mean: 5,
   rationale: 'Good conversation.',
+});
+
+test('blind fact sheet includes attempt notes visible to the candidate', async () => {
+  const { account } = await loadFixtureManifest();
+  const factSheet = fixtureFactSheet(account);
+  assert.match(factSheet, /attempt note: watery/);
+  assert.match(factSheet, /Colombia La Esperanza/);
 });
 
 test('judge dispatch retries one malformed structured result without weakening validation', async () => {
@@ -78,6 +85,15 @@ test('U3 stage denominators are frozen and targeted always appends smoke', async
   assert.throws(() => stagePlan('targeted', { fixtures: cases.cases }), /named fixture/);
 });
 
+test('judge transcript includes the visible proposal card without internal identifiers', () => {
+  const visible = judgeVisibleTranscript({
+    transcript: [{ role: 'user', text: 'Make it.' }, { role: 'assistant', text: 'Prepared for review.' }],
+    results: [{ frames: [{ type: 'artifact_ready', artifact: { type: 'recipe_proposal', id: 'private-id', before: { title: 'Kalita recipe', grindSize: { setting: '4.2' } }, after: { title: 'Kalita recipe', grindSize: { setting: '4.0' } } } }] }],
+  });
+  assert.match(visible.at(-1).text, /Visible recipe proposal card: Kalita recipe; grind 4\.2 to 4\.0; ready to review, not applied/);
+  assert.doesNotMatch(JSON.stringify(visible), /private-id/);
+});
+
 test('U3 cost cap is explicit and hard-stops before overspend', () => {
   assert.throws(() => validateCostCap(), /explicit positive cost cap/);
   const guard = createCostGuard(2);
@@ -128,6 +144,21 @@ test('full stage requires two clean smokes on the current commit and branches ar
   const correctionFixture = { turns: ['correct', 'done'], branches: [{ when: 'want me to propose|propose that', answer: 'Not yet.' }] };
   const correctionQuestion = 'Got it—the washed Colombian is El Vergel; want me to propose that change?';
   assert.deepEqual(nextBranchTurn(correctionFixture, 0, { text: correctionQuestion }), { text: 'Not yet.', unexpectedBranch: false, question: correctionQuestion });
+});
+
+test('natural model questions observed in the latest full report are declared by their fixtures', async () => {
+  const { cases } = await loadFixtureManifest();
+  const byId = new Map(cases.cases.map((fixture) => [fixture.id, fixture]));
+  const observed = [
+    ['AE05', 0, 'The Kalita was watery; want me to suggest the exact adjustment?', 'Would more dose beat a finer grind?'],
+    ['AE05', 0, 'The Kalita was watery; want me to suggest the exact change?', 'Would more dose beat a finer grind?'],
+    ['AE13', 0, 'The pale brew is ambiguous; would you like one bounded recipe change?', 'No, just describe the photo for now.'],
+    ['AE14', 1, 'Got it—the V60 is the one you brewed; would you like me to suggest one small V60 adjustment?', 'Not yet.'],
+  ];
+  for (const [id, index, question, expectedText] of observed) {
+    const branch = nextBranchTurn(byId.get(id), index, { question });
+    assert.deepEqual(branch, { text: expectedText, unexpectedBranch: false, question }, `${id}: ${question}`);
+  }
 });
 
 test('each injected fixture is reset before execution, including stale session metadata', async () => {

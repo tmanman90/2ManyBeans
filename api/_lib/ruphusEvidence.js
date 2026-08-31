@@ -106,6 +106,8 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
     const date = daysAgo(record.date || record.createdAt || record.updatedAt, now);
     const age = date == null ? '' : `${date} days ago`;
     const numbers = [record.dose != null ? `${record.dose}g` : null, record.water != null ? `${record.water}g` : null, record.grind || null, record.temperature != null ? `${record.temperature}°` : null, record.drawdown || null, record.notes || record.note || null].filter(Boolean).join(', ');
+    if (kind === 'brews') return ['BREW', method, age, numbers].filter(Boolean).join(' — ');
+    if (kind === 'tastings') return ['TASTING', age, 'not linked to a specific brew', numbers].filter(Boolean).join(' — ');
     return [method, numbers, age].filter(Boolean).join(': ');
   }).join(' | ');
   return { kind, status: 'available', summary, windowDays, count: values.length, records: clone(values.slice(0, 4)) };
