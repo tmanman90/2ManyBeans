@@ -472,7 +472,12 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     } }); } catch (error) { if (reservation) costGuard.reconcile(reservation, 0); await costGuard?.persistState?.(); throw error; }
     const model = result.model || RUPHUS_OPENAI_MODEL;
     const priced = priceUsage({ model, provider: 'openai', usage: result.usage });
-    if (!priced) throw new Error('U3 provider returned incomplete or unpriceable usage; refusing unmetered evidence');
+    if (!priced) {
+      if (reservation) costGuard.reconcile(reservation, maximum);
+      else if (maximum) costGuard?.charge(maximum);
+      await costGuard?.persistState?.();
+      throw new Error('U3 provider returned incomplete or unpriceable usage; maximum reservation charged and evidence refused');
+    }
     if (reservation) costGuard.reconcile(reservation, priced.cost); else costGuard?.charge(priced.cost);
     await costGuard?.persistState?.();
     transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });

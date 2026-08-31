@@ -149,7 +149,19 @@ test('live playback follows a declared model-question branch and rejects unmeter
   await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost, stageRunId: 'stage-2', repetition: 2 });
   assert.notEqual(payloads[0].turnId, payloads[2].turnId);
   assert.ok(cost.spentUsd > 0);
-  await assert.rejects(() => runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl: async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"turn_completed","text":"x"}\n' }), costGuard: { assertCanCall() {}, charge() {} } }), /unpriceable usage/);
+  const previousInput = process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS;
+  const previousOutput = process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS;
+  process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS = '100';
+  process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS = '100';
+  const unpricedGuard = createCostGuard(1);
+  try {
+    await assert.rejects(() => runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl: async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"turn_completed","text":"x"}\n' }), costGuard: unpricedGuard }), /maximum reservation charged/);
+    assert.ok(unpricedGuard.spentUsd > 0);
+    assert.equal(unpricedGuard.reservedUsd, 0);
+  } finally {
+    if (previousInput === undefined) delete process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS; else process.env.RUPHUS_AGENT_MAX_INPUT_TOKENS = previousInput;
+    if (previousOutput === undefined) delete process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS = previousOutput;
+  }
 });
 
 test('live adapter consumes NDJSON and persisted artifacts redact canary secrets', async () => {
