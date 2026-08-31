@@ -113,10 +113,11 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const result = [];
   if (/\b\d+\.\d{2,}\b/.test(value) && !/\b(?:grinder|ode)\s*\d+\.\d{2}\b/i.test(value)) result.push(violation('C5_PRECISION', CATEGORIES.ORDINARY, 'number precision is too fine'));
   if (/\b(?:microns?|µm)\b/i.test(value) && !userUnits.microns) result.push(violation('C5_UNITS', CATEGORIES.ORDINARY, 'microns were introduced without the user using microns'));
-  const directional = /\b(?:increase|decrease|finer|coarser|hotter|cooler)\b|\b(?:more|less)\s+(?:(?:bloom|contact|brew)\s+)?(?:coffee|dose|water|heat|temperature|time|agitation|extraction)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
-  const recommendation = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|grind)\b|\bshould\s+be\s+(?:hotter|cooler)\b|\b(?:a\s+half|half|one|two)\s+(?:small\s+)?(?:grind\s+)?(?:step|click|notch)(?:s)?\s+(?:finer|coarser)\b/i;
-  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|a|another|half)\s+(?:small\s+)?(?:half\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease)s?\b|\b(?:a\s+little|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
-  if (directional.test(value) && recommendation.test(value) && !sized.test(value)) {
+  const directional = /\b(?:increase|decrease|finer|coarser|hotter|cooler)\b|\b(?:more|less|higher|lower)\s+(?:(?:bloom|contact|brew)\s+)?(?:coffee|dose|water|heat|temperature|time|agitation|extraction|bloom|contact|steep(?:ing)?|drawdown|flow|pour(?:s|ing)?)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
+  const recommendation = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|could|would)\b|\bgrind\s+(?:the\s+)?(?:coffee\s+)?(?:finer|coarser)\b/i;
+  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|degrees?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease)s?(?:\s+(?:finer|coarser))?\b|\b(?:a\s+)?half\s+(?:a\s+)?(?:step|click|notch|degree)s?\b|\b(?:a\s+little|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
+  const sentences = value.split(/(?<=[.!?])\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
+  if (sentences.some((sentence) => directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence))) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
   return result;

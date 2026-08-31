@@ -1,10 +1,10 @@
 # AE02 — El Virgil
 
 User: El Virgil.
-Ruphus: You mean El Vergel, the washed Colombian in jar 1. I’ve got it.
+Ruphus: Do you mean El Vergel? I also have Colombia La Esperanza, so I want to make sure.
 
 User: The Colombian one.
-Ruphus: I have two Colombian coffees here: El Vergel or Colombia La Esperanza. Which one do you mean?
+Ruphus: They’re both Colombian: El Vergel is the washed coffee in jar 1, and La Esperanza is the natural in jar 2. Which one?
 
 User: The washed one.
-Ruphus: That’s El Vergel. I’d brew its hot V60 one step finer than Ode 4.2 for a sweeter cup.
+Ruphus: El Vergel. Its recent V60 was 15g to 250g at Ode 4.2, and your older tasting described it as thin and a little sour. What are you hoping to improve in the next cup?

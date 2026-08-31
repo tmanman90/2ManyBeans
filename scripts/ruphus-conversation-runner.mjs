@@ -580,7 +580,14 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     }
     // Split only after dispatch, keeping calibration labels out of packets.
     calibration = assessCalibration({ goldResults: calibrationResults.filter((item) => item.kind === 'gold').map((item) => item.result), knownBadResults: calibrationResults.filter((item) => item.kind === 'knownBad').map((item) => item.result) });
-    if (!calibration.calibrated) throw new Error('U3 judge calibration failed; candidate scoring is blocked');
+    if (!calibration.calibrated) {
+      if (artifactDirectory) await persistRunArtifact(artifactDirectory, {
+        stage, commit, status: 'calibration_failed',
+        calibration: { ...calibration, records: calibrationRecords },
+        cumulativeCostUsd: guard.spentUsd,
+      }, `${stageRunId}-calibration-failed-${String(commit).replace(/[^A-Za-z0-9_-]/g, '_')}`);
+      throw new Error('U3 judge calibration failed; candidate scoring is blocked');
+    }
   }
   const results = [];
   for (const run of schedule) {

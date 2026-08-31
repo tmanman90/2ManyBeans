@@ -1,7 +1,7 @@
 # AE04 — Method choice
 
 User: What should I change for this coffee?
-Ruphus: I can tune either the hot Kalita or the hot V60, and the right move depends on which cup you mean. Which one?
+Ruphus: Colombia La Esperanza has both a hot Kalita and a hot V60, and they finished at 3:10 and 2:45. Which cup are you trying to improve?
 
 User: The Kalita.
-Ruphus: For the hot Kalita, I’d go one step finer than Ode 4.2 to build more sweetness and structure.
+Ruphus: Got it—the Kalita was 15g to 250g at Ode 4.2 and finished in 3:10. That timing alone doesn’t tell me what to change; did it taste thin, dry, muted, or something else?
