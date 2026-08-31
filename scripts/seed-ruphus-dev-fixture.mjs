@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIXTURE_ROOT, loadFixtureManifest } from './ruphus-conversation-runner.mjs';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
+import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 
 export function assertDevTarget({ projectId, fixtureUid, authorized = false } = {}) {
   if (!authorized) throw new Error('fixture seeding requires explicit Dev authorization');
@@ -20,6 +22,37 @@ export function rewriteRelativeDates(value, now = new Date()) {
   if (!match) return value;
   const date = new Date(now.getTime() - Number(match[1]) * 24 * 60 * 60 * 1000);
   return date.toISOString();
+}
+
+function withoutUndefined(value) {
+  if (Array.isArray(value)) return value.map(withoutUndefined);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).map(([key, item]) => [key, withoutUndefined(item)]));
+  return value;
+}
+
+export function executableFixtureRecipe(recipe = {}, slotKey = recipe.slot) {
+  if (!['kalita_hot', 'v60_hot'].includes(slotKey)) return recipe;
+  const dose = Number(recipe.dose ?? recipe.coffeeGrams);
+  const water = Number(recipe.water ?? recipe.waterGrams);
+  const temperature = Number(recipe.temperature ?? recipe.temperatureC ?? recipe.waterTemp?.celsius);
+  const ratio = Number.isFinite(dose) && Number.isFinite(water) && dose > 0 ? water / dose : 16;
+  const grinder = 'fellow-ode-gen2';
+  const generated = slotKey === 'kalita_hot'
+    ? generateKalitaRecipe({ targetRatio: ratio, targetTemperatureC: temperature }, { dose, size: dose <= 18 ? '155' : '185', grinder })
+    : generateV60Recipe({ targetRatio: ratio, targetTemperatureC: temperature }, { dose, grinder });
+  const steps = generated.steps.map((step, index) => index === generated.steps.length - 1 ? { ...step, waterTotal: water } : step);
+  const grindSetting = String(recipe.grind || '').match(/\d+(?:\.\d+)?/)?.[0] || generated.grindSize?.setting;
+  return {
+    ...generated,
+    slot: slotKey,
+    displayName: recipe.displayName,
+    coffeeGrams: dose,
+    waterGrams: water,
+    ratio: recipe.ratio || `1:${Math.round(ratio * 10) / 10}`,
+    waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) },
+    grindSize: { ...generated.grindSize, setting: grindSetting },
+    steps,
+  };
 }
 
 export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
@@ -47,7 +80,8 @@ export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
   }
   for (const [ref, recipe] of Object.entries(seeded.recipes || {})) {
     const [coffeeId, slotKey] = ref.split(':');
-    operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { coffeeId, slotKey: recipe.slot || slotKey, snapshot: recipe, snapshotHash: canonicalHash(recipe) } });
+    const snapshot = withoutUndefined(executableFixtureRecipe(recipe, recipe.slot || slotKey));
+    operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { coffeeId, slotKey: recipe.slot || slotKey, snapshot, snapshotHash: canonicalHash(snapshot) } });
   }
   for (const tasting of seeded.tastings || []) operations.push({ path: `users/${fixtureUid}/tastings/${tasting.id}`, data: { ...tasting, beanId: tasting.beanId || tasting.coffeeId } });
   for (const attempt of [...(seeded.brews || []), ...(seeded.attempts || [])]) operations.push({ path: `users/${fixtureUid}/brewAttempts/${attempt.id}`, data: attempt });

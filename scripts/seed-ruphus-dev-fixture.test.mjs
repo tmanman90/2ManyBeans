@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildSeedPlan, assertDevTarget, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
+import { buildSeedPlan, assertDevTarget, executableFixtureRecipe, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
+import { validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
 test('fixture seeding fails closed outside an explicitly authorized Dev target', () => {
   assert.throws(() => assertDevTarget({ projectId: 'coffee-prod', fixtureUid: 'fixture', authorized: true }), /non-Dev/);
@@ -45,4 +46,16 @@ test('seed plan feeds the production reader collection names and revision shape'
   assert.equal(rows.get('users/fixture-account').defaultMethod, 'v60_hot');
   assert.deepEqual(rows.get('users/fixture-account').preferences, { brewMethod: 'v60_hot', grinder: 'Ode', units: 'metric' });
   assert.equal(rows.get('users/fixture-account').subscription.plan, 'pro-dev-fixture');
+});
+
+test('Dev hand-brew fixtures become complete executable revision snapshots', () => {
+  const sparse = { slot: 'kalita_hot', dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94, ratio: '1:16.7' };
+  const recipe = executableFixtureRecipe(sparse, 'kalita_hot');
+  assert.equal(recipe.coffeeGrams, 15);
+  assert.equal(recipe.waterGrams, 250);
+  assert.equal(recipe.grindSize.setting, '4.2');
+  assert.equal(recipe.steps.at(-1).waterTotal, 250);
+  assert.equal(validateExecutableRecipe(recipe, 'kalita_hot').valid, true);
+  const plan = buildSeedPlan({ setup: {}, coffees: [{ id: 'c1' }], recipes: { 'c1:v60_hot': { slot: 'v60_hot', dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94, ratio: '1:16.7' } } }, { fixtureUid: 'fixture-account' });
+  assert.equal(JSON.stringify(plan).includes('undefined'), false);
 });
