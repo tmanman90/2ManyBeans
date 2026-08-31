@@ -92,6 +92,20 @@ test('proposal tool maps one explicit control into a complete executable recipe'
   assert.equal(saved[0].after.grindSize.setting, '4.0');
   assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
 });
+test('the same recipe advice is idempotent within one session but distinct across chats', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const propose = async (sessionId) => {
+    const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId };
+    const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
+    await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+    return tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: '4.0' } });
+  };
+  const first = await propose('chat-1');
+  const replay = await propose('chat-1');
+  const anotherChat = await propose('chat-2');
+  assert.equal(first.artifact.id, replay.artifact.id);
+  assert.notEqual(first.artifact.id, anotherChat.artifact.id);
+});
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;
   const provider = { async runTurn() { runs += 1; return runs === 1 ? { text: 'Proposal: {"dose":16}' } : { text: 'Try one step finer than Ode 4.2.' }; } };

@@ -185,7 +185,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const validationRecipe = recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
-    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after }).slice(0, 16)}`, status: 'proposed', coffeeId, slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
+    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
     if (context.proposalState) context.proposalState.proposalIssued = true;
     return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}) }) };
