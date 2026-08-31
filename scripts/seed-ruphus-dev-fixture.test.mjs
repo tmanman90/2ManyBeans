@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildSeedPlan, assertDevTarget, executableFixtureRecipe, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
+import { buildSeedPlan, assertDevTarget, createFirestoreSessionReset, executableFixtureRecipe, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
 import { validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { buildProposal } from '../api/_lib/ruphusRepository.js';
 
@@ -60,4 +60,13 @@ test('Dev hand-brew fixtures become complete executable revision snapshots', () 
   assert.doesNotThrow(() => buildProposal({ proposalId: 'p1', uid: 'u1', coffeeId: 'c1', slotKey: 'kalita_hot', sessionId: 's1', before: recipe, after: recipe, sourceRevisionHash: 'hash', createdAt: new Date().toISOString() }));
   const plan = buildSeedPlan({ setup: {}, coffees: [{ id: 'c1' }], recipes: { 'c1:v60_hot': { slot: 'v60_hot', dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94, ratio: '1:16.7' } } }, { fixtureUid: 'fixture-account' });
   assert.equal(JSON.stringify(plan).includes('undefined'), false);
+});
+
+test('each Dev fixture session reset also clears only the fake owner rate-limit counter', async () => {
+  const writes = [];
+  const db = { collection: (name) => ({ doc: (id) => ({ collection: (child) => ({ doc: (childId) => ({ set: async (data) => writes.push({ path: `${name}/${id}/${child}/${childId}`, data }) }) }) }) }) };
+  const reset = await createFirestoreSessionReset({ projectId: 'coffee-dev', fixtureUid: 'fixture-account', db });
+  await reset({ fixture: { launchContext: { surface: 'direct' } }, repetition: 1, stage: 'smoke' });
+  assert.deepEqual(writes.map((item) => item.path).sort(), ['users/fixture-account/chatSessions/active', 'users/fixture-account/rateLimits/claude']);
+  assert.equal(writes.find((item) => item.path.endsWith('/rateLimits/claude')).data.count, 0);
 });
