@@ -293,12 +293,20 @@ async function dispatchMetered(adapter, packet, guard) {
 
 export async function dispatchValidatedJudge(adapter, packet, guard, { dispatch = dispatchMetered, maxAttempts = 2 } = {}) {
   let response = null;
+  let lastError = null;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    response = await dispatch(adapter, packet, guard);
+    try {
+      response = await dispatch(adapter, packet, guard);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 >= maxAttempts) throw error;
+      continue;
+    }
     const result = response?.result || response;
     const validation = packet?.left ? validatePairwiseResult(result) : validateJudgeResult(result);
     if (validation.valid) return response;
   }
+  if (!response && lastError) throw lastError;
   return response;
 }
 

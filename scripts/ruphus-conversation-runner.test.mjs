@@ -34,6 +34,19 @@ test('judge dispatch retries one malformed structured result without weakening v
   assert.equal(response.result.mean, 5);
 });
 
+test('judge dispatch retries one bounded transport failure', async () => {
+  let calls = 0;
+  const response = await dispatchValidatedJudge(null, { transcript: [] }, null, {
+    dispatch: async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('timed out');
+      return { result: validJudgment() };
+    },
+  });
+  assert.equal(calls, 2);
+  assert.equal(response.result.mean, 5);
+});
+
 test('live CLI reaches fail-closed preflight without circular-import deadlock', () => {
   const result = spawnSync(process.execPath, [
     'scripts/ruphus-conversation-runner.mjs',

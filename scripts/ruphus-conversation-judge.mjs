@@ -4,6 +4,7 @@ import { ANTHROPIC_ENDPOINT, buildAnthropicRequest } from './ruphus-eval/provide
 
 export const JUDGE_SCHEMA_VERSION = 'ruphus-conversation-judge-v1';
 export const JUDGE_PROMPT_VERSION = 'ruphus-conversation-judge-prompt-v2';
+export const JUDGE_REQUEST_TIMEOUT_MS = 45_000;
 export const JUDGE_INSTRUCTIONS = Object.freeze(`You are a blind coffee-conversation judge. Score only the visible transcript against the stated intent and fact sheet. Treat a launch surface stated in the intent as visible user context. Do not infer hidden traces, gold text, known-bad text, IDs, or implementation details. G1 friendNotForm: knowledgeable friend, not a report. G2 knowsMyCoffee: uses the actual coffees, recipes, and history correctly. G3 earnsQuestions: asks only what the evidence cannot answer; asking no question deserves a high score when the evidence already supports the answer. G4 movesBrewForward: leaves something actionable or clearer. G5 listens: engages with specifics, corrections, topic switches, and pronouns. G6 phoneSized: short readable paragraphs. G7 confidentNotBossy: has opinions, explains briefly, accepts pushback. G8 proposalFeelsEarned: a proposal, when appropriate, is a natural conclusion and never a demand; if no proposal is needed or attempted, score this dimension 5 unless the assistant improperly avoids an explicitly requested proposal. Return strict JSON with schemaVersion, scores for friendNotForm, knowsMyCoffee, earnsQuestions, movesBrewForward, listens, phoneSized, confidentNotBossy, proposalFeelsEarned, mean, and one short rationale. Each score is an integer from 1 to 5 and mean is their arithmetic mean.`);
 export const PAIRWISE_INSTRUCTIONS = Object.freeze(`You are a blind coffee-conversation pairwise judge. Compare the left and right visible transcripts against the stated intent and fact sheet. Treat a launch surface stated in the intent as visible user context. Do not infer hidden traces, gold text, known-bad text, IDs, or implementation details. Return strict JSON with schemaVersion, winner (left, right, or tie), and one short rationale. Choose the better coffee-friend conversation; a tie is not a win.`);
 export const JUDGE_DIMENSIONS = Object.freeze([
@@ -150,7 +151,17 @@ export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_A
   if (!token) throw new Error('U3 judge auth must be injected non-printingly');
   const adapter = async (packet) => {
     const request = buildAnthropicRequest({ model, system: packet.left ? PAIRWISE_INSTRUCTIONS : JUDGE_INSTRUCTIONS, messages: [{ role: 'user', content: JSON.stringify(packet) }], tools: [submitResultTool(Boolean(packet.left))], toolChoice: { name: 'submit_result' }, maxOutputTokens: Number(process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) });
-    const response = await fetchImpl(ANTHROPIC_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': token, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(request) });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), JUDGE_REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetchImpl(ANTHROPIC_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': token, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(request), signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error('U3 Anthropic judge request timed out');
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!response.ok) throw new Error(`U3 Anthropic judge returned HTTP ${response.status}`);
     let payload; let result = null;
     if ((response.headers?.get?.('content-type') || '').includes('event-stream') && typeof response.text === 'function') {
