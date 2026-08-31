@@ -62,6 +62,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.ok(gradeC10FocusAcknowledgment({ reply: 'The other coffee looks good.', focusChanged: true, coffeeName: 'El Vergel' }).length);
   assert.equal(gradeEvidenceScope({ reply: 'Nothing in the last two weeks.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'old' }] } }).length, 0);
   assert.ok(gradeEvidenceScope({ reply: 'There are no tastings.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'old' }] } }).length);
+  assert.equal(gradeEvidenceScope({ reply: 'There is no tasting attached to that brew.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'old' }] } }).length, 0);
 });
 
 test('runtime predicate is only the RT2 subset', () => {

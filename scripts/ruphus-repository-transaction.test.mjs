@@ -11,4 +11,6 @@ test('proposal transaction completes all reads before revision and bean writes',
   assert.ok(reads < writes, 'Firestore transaction reads must precede writes');
   assert.match(source, /tx\.get\(pairQuery\)/);
   assert.match(source, /tx\.get\(sessionQuery\)/);
+  assert.match(source, /tx\.get\(revisions\.doc\(activeRevisionId\)\)/);
+  assert.ok(source.indexOf('tx.get(revisions.doc(activeRevisionId))') < writes, 'active recipe revision must be read before writes');
 });

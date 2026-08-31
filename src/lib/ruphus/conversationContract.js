@@ -188,6 +188,7 @@ export function gradeC10FocusAcknowledgment({ reply = '', focusChanged = false, 
 export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {} } = {}) {
   const value = textOf(reply);
   if (!/\b(?:no|none|nothing)\b[^.?!]*(?:tasting|brew|recipe)s?\b/i.test(value)) return [];
+  if (/\bno\s+(?:tasting|brew|recipe)\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
   const hasEvidence = Object.values(evidence || {}).some((entry) => Array.isArray(entry) && entry.length > 0);
   if (windowed && hasEvidence && !/(?:last|past|previous)\s+(?:two|14|fourteen)\s+weeks?|since|between/i.test(value)) return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, 'absence claim is not qualified by the read window')];

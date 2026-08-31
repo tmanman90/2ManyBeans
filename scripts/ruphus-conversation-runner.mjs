@@ -385,11 +385,16 @@ function factualEvidenceText(fixture, frames, factSheet = '', turnIndex = 0) {
 
 function hasUnsupportedFactualClaim(reply, knownText) {
   const value = String(reply || '');
-  if (!/\b(?:history|earlier|previous|recorded|brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)\b/i.test(value)) return false;
-  const numbers = value.match(/\b\d+(?:\.\d+)?\b/g) || [];
-  if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
-  const properNames = value.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
-  return properNames.some((name) => !/^(?:Good|Hot|Cold|The|That|This|Your|My|Our)\b/.test(name) && !knownText.includes(name.toLowerCase()));
+  const evidenceSentences = value.split(/(?<=[.!?])\s+|\n+/).filter((sentence) => /\b(?:history|earlier|previous|recorded|last|notes? (?:show|say|mention)|brew log|tasted|was brewed|used|finished|recipe (?:is|was))\b/i.test(sentence));
+  return evidenceSentences.some((sentence) => {
+    const numbers = sentence.match(/\b\d+(?:\.\d+)?\b/g) || [];
+    if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
+    const properNames = sentence.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
+    return properNames.some((name) => {
+      const candidate = name.replace(/^(?:For|Your|The|That|This|Got|Next|Keep|Thin|Taste|Notes)\s+/i, '');
+      return candidate.includes(' ') && !knownText.includes(candidate.toLowerCase());
+    });
+  });
 }
 
 export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [] } = {}) {
@@ -405,12 +410,12 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   return { expectedCoffeeId: expected || fallback, actualCoffeeId: actual || fallback, focusCoffeeId: actual || fallback, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
 
-export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl = globalThis.fetch }) {
+export async function runLiveEndpointTurn({ endpoint, token, payload, devReadFault = null, fetchImpl = globalThis.fetch }) {
   if (!endpoint || !/^https:\/\//i.test(endpoint)) throw new Error('U3 live endpoint must be HTTPS');
   if (!token) throw new Error('U3 live auth must be injected non-printingly');
   if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for live U3 mode');
   const response = await fetchImpl(endpoint, {
-    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(devReadFault ? { 'x-ruphus-dev-read-fault': devReadFault } : {}) }, body: JSON.stringify(payload),
   });
   if (!response.ok) {
     let errorCode = 'unknown_error';
@@ -479,7 +484,9 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const reservation = maximum ? costGuard.reserveMaximum(maximum) : null;
     await costGuard?.persistState?.();
     let result;
-    try { result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
+    const injectedRead = index === 0 ? fixture.injectedReads?.first : fixture.injectedReads?.next;
+    const devReadFault = injectedRead?.tastings === 'timeout' ? 'tastings_timeout' : null;
+    try { result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, devReadFault, payload: {
       turnId: `${stageRunId}-${fixture.id}-r${repetition}-t${index + 1}`, contextRef: context.launchContext, userText,
       conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: Boolean(index === 0 && fixture.session && /^continue\b/i.test(userText)),
     } }); } catch (error) {

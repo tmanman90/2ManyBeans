@@ -37,6 +37,7 @@ test('seed plan feeds the production reader collection names and revision shape'
   const account = { setup: { defaultMethod: 'v60_hot', grinder: 'Ode', units: 'metric' }, coffees: [{ id: 'c1' }], recipes: { 'c1:v60_hot': { slot: 'v60_hot', dose: 15 } }, tastings: [{ id: 't1', coffeeId: 'c1' }], brews: [{ id: 'b1', coffeeId: 'c1' }], attempts: [] };
   const rows = new Map(buildSeedPlan(account, { fixtureUid: 'fixture-account' }).map((item) => [item.path, item.data]));
   assert.equal(rows.get('users/fixture-account/beans/c1').id, 'c1');
+  assert.deepEqual(rows.get('users/fixture-account/beans/c1').activeRevisionIds, { v60_hot: 'c1:v60_hot' });
   assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').coffeeId, 'c1');
   assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').slotKey, 'v60_hot');
   assert.equal(rows.get('users/fixture-account/tastings/t1').beanId, 'c1');

@@ -32,11 +32,20 @@ export function resolveCoffeeReference({ reference, coffees = [], ledger = {}, n
   const inventory = Array.isArray(coffees) ? coffees : [];
   const named = Array.isArray(namedCoffees) ? namedCoffees : Array.isArray(ledger?.namedCoffees) ? ledger.namedCoffees : [];
   const pool = inventory.length ? inventory : named;
+  if (/\b(?:earlier|previous)\s+(?:coffee|one)\b/i.test(query) && named.length) {
+    const coffee = namedInventoryEntry(named.at(-1), inventory); return { ok: true, ...candidate(coffee, named.length - 1, 'pronoun', 1) };
+  }
   if (/^(?:that one|the last one|that coffee)$/i.test(query) && named.length) {
     const coffee = namedInventoryEntry(named.at(-1), inventory); return { ok: true, ...candidate(coffee, named.length - 1, 'pronoun', 1) };
   }
-  if (/^(?:the first one|the first coffee|first one)$/i.test(query) && named.length) {
+  if (/\b(?:back\s+to\s+)?(?:the\s+)?first\s+(?:one|coffee)\b/i.test(query) && named.length) {
     const coffee = namedInventoryEntry(named[0], inventory); return { ok: true, ...candidate(coffee, 0, 'pronoun', 1) };
+  }
+  if (/\bother\b/i.test(query) && named.length && inventory.length) {
+    const current = namedInventoryEntry(named.at(-1), inventory);
+    const remaining = inventory.filter((coffee) => coffee?.id !== current?.id && normalize(entryName(coffee)) !== normalize(entryName(current)));
+    const narrowedReference = query.replace(/\b(?:now|the|other)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (narrowedReference && remaining.length) return resolveCoffeeReference({ reference: narrowedReference, coffees: remaining, ledger: { namedCoffees: named } });
   }
   const byExact = pool.map((coffee, index) => ({ coffee, index })).filter(({ coffee }) => [coffee?.id, coffee?.refKey, coffee?.coffeeRef, coffee?.name].some((value) => normalize(value) === normalize(query)));
   if (byExact.length === 1) return { ok: true, ...candidate(byExact[0].coffee, byExact[0].index, 'exact', 1) };

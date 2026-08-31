@@ -72,6 +72,13 @@ export function deriveProposalReadiness({ conversation = [], ledger = null, user
   const userAgreed = /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
   return { diagnosisReady, userAgreed };
 }
+export function devReadFaultForRequest({ uid, header, env = process.env } = {}) {
+  if (header !== 'tastings_timeout' || env.VERCEL_ENV !== 'preview' || env.TMB_APP_VARIANT !== 'dev' || uid !== env.RUPHUS_DEV_FIXTURE_UID) return null;
+  try {
+    const projectId = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT || '{}').project_id;
+    return /\b(?:dev|development|staging|test)\b/i.test(String(projectId || '')) && !/prod|production|live/i.test(String(projectId || '')) ? header : null;
+  } catch { return null; }
+}
 function firestoreReaders(db) {
   const readCoffee = async ({ uid, coffeeId }) => {
     const snap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get();
@@ -87,11 +94,12 @@ function firestoreReaders(db) {
     async readRecipe({ uid, coffeeId, slotKey, slot, launchItem }) {
       const bean = await readCoffee({ uid, coffeeId }); if (!bean) return null;
       const requested = slotKey || slot;
-      if (launchItem?.kind === 'recipe') {
-        const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(launchItem.ref).get();
-        if (!revision?.exists || revision.data()?.coffeeId !== coffeeId || revision.data()?.slotKey !== requested) return { code: 'launch_item_not_found' };
+      const revisionId = launchItem?.kind === 'recipe' ? launchItem.ref : bean.activeRevisionIds?.[requested] || null;
+      if (revisionId) {
+        const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(revisionId).get();
+        if (!revision?.exists || revision.data()?.coffeeId !== coffeeId || revision.data()?.slotKey !== requested) return { code: launchItem ? 'launch_item_not_found' : 'active_revision_not_found' };
         const data = revision.data() || {};
-        return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${launchItem.ref}`, selectedHash: data.snapshotHash || null, slotKey: requested };
+        return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${revisionId}`, selectedHash: data.snapshotHash || null, slotKey: requested };
       }
       if (requested) { const result = resolveLegacyRecipe(bean, requested); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested } : { code: result.code }; }
       return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);
@@ -137,7 +145,10 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
   let db; let context; let activeSession; let effectiveContextRef = contextRef;
   try {
     db = getDb();
-    const readers = firestoreReaders(db);
+    let readers = firestoreReaders(db);
+    if (devReadFaultForRequest({ uid, header: req.headers?.['x-ruphus-dev-read-fault'] })) {
+      readers = { ...readers, readTastings: async () => { throw Object.assign(new Error('Dev fixture tasting timeout'), { code: 'read_timeout' }); } };
+    }
     activeSession = prepareSession(await readActiveSession(db, uid), { now: startedAt });
     const replay = sessionReplayInputs({ session: activeSession, conversation, ledger, continuePrevious, now: startedAt });
     const suppliedConversation = replay.conversation;

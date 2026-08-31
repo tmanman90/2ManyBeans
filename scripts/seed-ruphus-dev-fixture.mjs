@@ -41,7 +41,10 @@ export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
     account: seeded.account || 'ruphus-dev-fixture',
   };
   const operations = [{ path: `users/${fixtureUid}`, data: profile }];
-  for (const coffee of seeded.coffees || []) operations.push({ path: `users/${fixtureUid}/beans/${coffee.id}`, data: coffee });
+  for (const coffee of seeded.coffees || []) {
+    const activeRevisionIds = Object.fromEntries(Object.keys(seeded.recipes || {}).filter((ref) => ref.startsWith(`${coffee.id}:`)).map((ref) => [ref.slice(coffee.id.length + 1), ref]));
+    operations.push({ path: `users/${fixtureUid}/beans/${coffee.id}`, data: { ...coffee, ...(Object.keys(activeRevisionIds).length ? { activeRevisionIds } : {}) } });
+  }
   for (const [ref, recipe] of Object.entries(seeded.recipes || {})) {
     const [coffeeId, slotKey] = ref.split(':');
     operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { coffeeId, slotKey: recipe.slot || slotKey, snapshot: recipe, snapshotHash: canonicalHash(recipe) } });

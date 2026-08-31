@@ -117,6 +117,8 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(grounded.fabricatedEvidence, false);
   const userSupplied = deriveFixtureTrace({ fixture: { ...fixture, turns: ['I used the Kalita 155 with 250 grams of water.'] }, turnIndex: 0, reply: 'Your Kalita 155 brew used 250 grams of water.', frames: [] });
   assert.equal(userSupplied.fabricatedEvidence, false);
+  const advice = deriveFixtureTrace({ fixture, reply: 'The last brew used Ode 4.2. Next time, try Ode 4.0 and aim for 3:00.', factSheet: 'The last brew used Ode 4.2.', frames: [] });
+  assert.equal(advice.fabricatedEvidence, false);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
@@ -168,9 +170,12 @@ test('live playback follows a declared model-question branch and rejects unmeter
 
 test('live adapter consumes NDJSON and persisted artifacts redact canary secrets', async () => {
   const response = { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => '{"type":"text_delta","text":"done"}\n{"type":"turn_completed","text":"done","timing":{"firstFrameMs":12,"checkedReplyMs":30,"readRoundMs":4,"regenerationCount":0}}\n' };
-  const result = await runLiveEndpointTurn({ endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'canary-token', payload: {}, fetchImpl: async () => response });
+  let request;
+  const result = await runLiveEndpointTurn({ endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'canary-token', payload: { userText: 'hello' }, devReadFault: 'tastings_timeout', fetchImpl: async (_endpoint, value) => { request = value; return response; } });
   assert.equal(result.text, 'done');
   assert.equal(result.timing.checkedReplyMs, 30);
+  assert.equal(request.headers['x-ruphus-dev-read-fault'], 'tastings_timeout');
+  assert.equal(JSON.parse(request.body).devReadFault, undefined);
   assert.equal(redactDiagnostic({ token: 'canary-token', email: 'person@example.com', uid: 'fixture-owner' }).includes('canary-token'), false);
   const directory = await mkdtemp(join(tmpdir(), 'ruphus-u3-artifact-'));
   try {

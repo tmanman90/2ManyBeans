@@ -4,7 +4,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, deriveProposalReadiness, firestoreReaders, hasUnavailableEvidence, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
+import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, firestoreReaders, hasUnavailableEvidence, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
@@ -43,6 +43,13 @@ test('provider receives the bounded conversation and launch clue', async () => {
 test('server allowlist is exact and empty by default', () => {
   const previous = process.env.RUPHUS_AGENT_V3_UIDS; delete process.env.RUPHUS_AGENT_V3_UIDS; assert.equal(allowedAgentUids().size, 0); process.env.RUPHUS_AGENT_V3_UIDS = 'u-1, u-2'; assert.equal(allowedAgentUids().has('u-1'), true); assert.equal(allowedAgentUids().has('u-3'), false); if (previous == null) delete process.env.RUPHUS_AGENT_V3_UIDS; else process.env.RUPHUS_AGENT_V3_UIDS = previous;
 });
+test('reader fault injection is restricted to the isolated preview fixture identity', () => {
+  const env = { VERCEL_ENV: 'preview', TMB_APP_VARIANT: 'dev', RUPHUS_DEV_FIXTURE_UID: 'fixture-owner', FIREBASE_SERVICE_ACCOUNT: JSON.stringify({ project_id: 'coffee-ruphus-dev' }) };
+  assert.equal(devReadFaultForRequest({ uid: 'fixture-owner', header: 'tastings_timeout', env }), 'tastings_timeout');
+  assert.equal(devReadFaultForRequest({ uid: 'other', header: 'tastings_timeout', env }), null);
+  assert.equal(devReadFaultForRequest({ uid: 'fixture-owner', header: 'tastings_timeout', env: { ...env, VERCEL_ENV: 'production' } }), null);
+  assert.equal(devReadFaultForRequest({ uid: 'fixture-owner', header: 'tastings_timeout', env: { ...env, FIREBASE_SERVICE_ACCOUNT: JSON.stringify({ project_id: 'coffee-prod' }) } }), null);
+});
 test('unavailable active evidence is retried before a prose-only continuation', async () => {
   const calls = [];
   const session = { ledger: { entries: [{ status: 'partial', evidence: [{ kind: 'tastings', status: 'unavailable' }] }] } };
@@ -77,9 +84,9 @@ test('active server history is authoritative and proposal readiness requires gro
   assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: session.ledger, userText: 'Yes, make that change.' }), { diagnosisReady: true, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: { entries: [] }, userText: 'Yes, make that change.' }), { diagnosisReady: false, userAgreed: true });
 });
-test('typed recipe launch reads the owner-scoped immutable revision and rejects substitutes', async () => {
+test('typed recipe launch and active slot read the owner-scoped immutable revision and reject substitutes', async () => {
   const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };
-  const db = { collection: (name) => ({ doc: (id) => ({ collection: (child) => ({ doc: (childId) => ({ get: async () => ({ exists: child === 'beans' || name === 'users' && child === 'recipeRevisions' && childId === 'rev-1', data: () => child === 'beans' ? { name: 'El Vergel' } : revision }) }) }) }) }) };
+  const db = { collection: (name) => ({ doc: (id) => ({ collection: (child) => ({ doc: (childId) => ({ get: async () => ({ exists: child === 'beans' || name === 'users' && child === 'recipeRevisions' && childId === 'rev-1', data: () => child === 'beans' ? { name: 'El Vergel', activeRevisionIds: { v60_hot: 'rev-1' } } : revision }) }) }) }) }) };
   const readers = firestoreReaders(db);
   assert.equal((await readers.readLaunchItem({ uid: 'u', item: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' }, coffeeRef: 'bean-1', coffees: [{ id: 'bean-1' }] })).ok, true);
   assert.equal((await readers.readLaunchItem({ uid: 'u', item: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' }, coffeeRef: 'bean-2', coffees: [{ id: 'bean-2' }] })).ok, false);
@@ -87,4 +94,5 @@ test('typed recipe launch reads the owner-scoped immutable revision and rejects 
   assert.equal(resolved.selectedHash, 'hash-1'); assert.equal(resolved.dose, 15);
   const detachedReadRecipe = readers.readRecipe;
   assert.equal((await detachedReadRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot', launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } })).dose, 15);
+  assert.equal((await detachedReadRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot' })).selectedPath, 'recipeRevisions/rev-1');
 });

@@ -3,8 +3,13 @@ import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { proposalEligibleForTarget, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
+import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 
 const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
+test('prompt uses held brew details and deterministic focus before asking', () => {
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Never ask for dose, water, grind, temperature, or brew time when a tool result already supplies it/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /“The other” means the matching coffee other than the current one/);
+});
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
   const calls = [];
   const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });

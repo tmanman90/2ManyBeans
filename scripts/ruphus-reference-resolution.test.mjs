@@ -18,3 +18,9 @@ test('pronouns use only named ledger coffees and do not guess without one', () =
   assert.equal(resolveCoffeeReference({ reference: 'the first one', coffees: [], ledger }).ok, true);
   assert.equal(resolveCoffeeReference({ reference: 'that one', coffees: [] }).ok, false);
 });
+test('earlier, other, and back-to-first follow the named conversation order', () => {
+  const ledger = { namedCoffees: ['El Vergel'] };
+  assert.equal(resolveCoffeeReference({ reference: 'Continue with the earlier coffee.', coffees, ledger }).coffee.id, 'a');
+  assert.equal(resolveCoffeeReference({ reference: 'Now the other Colombia.', coffees, ledger }).coffee.id, 'b');
+  assert.equal(resolveCoffeeReference({ reference: 'back to the first one', coffees, ledger: { namedCoffees: ['El Vergel', 'Colombia La Esperanza'] } }).coffee.id, 'a');
+});

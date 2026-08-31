@@ -102,16 +102,20 @@ export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, a
     const beanSnap = await tx.get(beanRef);
     if (!beanSnap.exists) throw Object.assign(new Error('coffee not found'), { code: 'not_found' });
     const bean = beanSnap.data();
-    const resolved = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
-    if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
-    const candidate = canonicalCandidate(after, slotKey);
-    const validation = validateExecutableRecipe(candidate, slotKey);
-    if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
     let activeRevisionId = bean.activeRevisionIds?.[slotKey] || null;
     if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
     const pairQuery = proposals.where('sessionId', '==', sessionId).where('coffeeId', '==', coffeeId).where('slotKey', '==', slotKey).where('status', '==', 'proposed');
     const sessionQuery = proposals.where('sessionId', '==', sessionId).where('status', '==', 'proposed');
     const [pairSnap, sessionSnap] = await Promise.all([tx.get(pairQuery), tx.get(sessionQuery)]);
+    const activeRevisionSnap = activeRevisionId ? await tx.get(revisions.doc(activeRevisionId)) : null;
+    if (activeRevisionId && (!activeRevisionSnap?.exists || activeRevisionSnap.data()?.coffeeId !== coffeeId || activeRevisionSnap.data()?.slotKey !== slotKey)) throw Object.assign(new Error('active revision is unavailable'), { code: 'active_revision_not_found' });
+    const resolved = activeRevisionSnap?.exists
+      ? { ok: true, recipe: clone(activeRevisionSnap.data()?.snapshot || {}) }
+      : resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
+    if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
+    const candidate = canonicalCandidate(after, slotKey);
+    const validation = validateExecutableRecipe(candidate, slotKey);
+    if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
     if (!activeRevisionId) {
       activeRevisionId = id('revision');
       tx.set(revisions.doc(activeRevisionId), { id: activeRevisionId, ownerId: uid, coffeeId, slotKey, snapshot: clone(resolved.recipe), snapshotHash: recipeIdentityHash(resolved.recipe, slotKey), ...(slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind ?? null) } : {}), status: 'active', parentId: null, createdAt });
