@@ -115,6 +115,8 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: wrongFocus, expectedCoffeeId: wrongFocus.expectedCoffeeId, actualCoffeeId: wrongFocus.actualCoffeeId }).catastrophic.some((item) => item.code === 'CF1_WRONG_COFFEE'), true);
   const grounded = deriveFixtureTrace({ fixture, reply: 'The tasting was thin and sour.', factSheet: 'The tasting was thin and sour.', frames: [] });
   assert.equal(grounded.fabricatedEvidence, false);
+  const userSupplied = deriveFixtureTrace({ fixture: { ...fixture, turns: ['I used the Kalita 155 with 250 grams of water.'] }, turnIndex: 0, reply: 'Your Kalita 155 brew used 250 grams of water.', frames: [] });
+  assert.equal(userSupplied.fabricatedEvidence, false);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {

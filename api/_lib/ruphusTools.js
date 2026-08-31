@@ -51,9 +51,15 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const coffees = typeof readers.listCoffees === 'function' ? await readers.listCoffees({ uid }) : snapshot.coffees || [];
     return Array.isArray(coffees) ? coffees : [];
   };
-  const readRecipe = async (coffeeId, slotKey) => {
+  const readRecipe = async (coffeeId, slotKey, coffeeRef) => {
     if (!SLOT_KEYS.includes(slotKey)) return null;
-    if (typeof readers.readRecipe === 'function') return readers.readRecipe({ uid, coffeeId, slotKey });
+    const item = context.__ruphusLaunchContext?.launchItem;
+    const launchItem = context.launchCoffeeId === coffeeRef
+      && item?.kind === 'recipe'
+      && item.method === slotKey
+      ? item
+      : null;
+    if (typeof readers.readRecipe === 'function') return readers.readRecipe({ uid, coffeeId, slotKey, launchItem });
     return null;
   };
   const call = async (name, args = {}) => {
@@ -73,9 +79,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const coffeeId = resolveId(args.coffeeRef);
     if (!coffeeId) throw Object.assign(new Error('coffee reference is outside the current owner-scoped context'), { code: 'cross_owner_or_context' });
     if (name === 'read_coffee_evidence') {
-      const launchItem = context.launchCoffeeId === args.coffeeRef && !context.__ruphusLaunchHintConsumed ? context.__ruphusLaunchContext?.launchItem || null : null;
+      const verifiedLaunchItem = context.launchCoffeeId === args.coffeeRef ? context.__ruphusLaunchContext?.launchItem || null : null;
+      const launchItem = context.__ruphusLaunchHintConsumed ? null : verifiedLaunchItem;
       const trustedWiden = context.historyWidened === true || context.__ruphusHistoryWidened === true;
-      const evidence = await readCoffeeEvidence({ uid, coffeeId, launchItem, readers, windowDays: trustedWiden ? null : args.windowDays, now: args.now, timeoutMs: args.timeoutMs });
+      const evidence = await readCoffeeEvidence({ uid, coffeeId, launchItem: verifiedLaunchItem, readers, windowDays: trustedWiden ? null : args.windowDays, now: args.now, timeoutMs: args.timeoutMs });
       const snapshotCoffee = snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef);
       const methodCorrected = /\b(?:actually|no[, ]|correction|instead|i (?:meant|brewed|used)|it was)\b[\s\S]*\b(?:aiden|v60|kalita|hot|iced)\b/i.test(context.userText || '');
       if (methodCorrected) context.__ruphusLaunchHintConsumed = true;
@@ -109,9 +116,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const slotKey = args.slot || args.slotKey;
     if (name === 'read_recipe') {
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
-      const recipe = await readRecipe(coffeeId, slotKey);
+      const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
       if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
       if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipe.selectedHash || canonicalHash(recipeValue(recipe)) });
+      if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: modelRecipe(recipe) };
     }
     if (!canPropose) throw Object.assign(new Error('proposal is not yet earned'), { code: 'proposal_timing' });
@@ -120,7 +128,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const target = context.__ruphusResolvedTargets instanceof Map ? context.__ruphusResolvedTargets.get(`${args.coffeeRef}:${slotKey}`) : null;
     if (!target || target.coffeeId !== coffeeId || target.coffeeRef !== args.coffeeRef) return { ok: false, code: 'proposal_target_required', message: 'Read the exact coffee and recipe before suggesting a change.' };
     if (context.proposalState?.target && (context.proposalState.target.coffeeRef !== args.coffeeRef || context.proposalState.target.slot !== slotKey)) return { ok: false, code: 'proposal_target_mismatch', message: 'That suggestion is bound to a different coffee and recipe.' };
-    const recipe = await readRecipe(coffeeId, slotKey);
+    const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
     if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
     const before = clone(target.before); const after = recipeValue(args.afterRecipe); const paths = changedPaths(before, after).filter(Boolean);
     if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
@@ -134,9 +142,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}) }) };
   };
   const definitions = RUPHUS_READ_TOOL_NAMES.map((name) => {
-    if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
+    if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
-    if (name === 'read_recipe') return { type: 'function', name, description: 'Read one resolved recipe slot using coffee language.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
+    if (name === 'read_recipe') return { type: 'function', name, description: 'Read one exact recipe slot for a recipe question or immediately before a proposal. General coffee evidence already includes recipe information.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
     return { type: 'function', name, description: 'Propose one bounded recipe-control change after the user agrees.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, afterRecipe: { type: 'object', properties: STRICT_RECIPE_PROPERTIES, required: Object.keys(STRICT_RECIPE_PROPERTIES), additionalProperties: false } }, required: ['coffeeRef', 'slot', 'afterRecipe'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });

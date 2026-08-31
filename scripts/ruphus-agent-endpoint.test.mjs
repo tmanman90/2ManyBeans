@@ -85,4 +85,6 @@ test('typed recipe launch reads the owner-scoped immutable revision and rejects 
   assert.equal((await readers.readLaunchItem({ uid: 'u', item: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' }, coffeeRef: 'bean-2', coffees: [{ id: 'bean-2' }] })).ok, false);
   const resolved = await readers.readRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot', launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } });
   assert.equal(resolved.selectedHash, 'hash-1'); assert.equal(resolved.dose, 15);
+  const detachedReadRecipe = readers.readRecipe;
+  assert.equal((await detachedReadRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot', launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } })).dose, 15);
 });

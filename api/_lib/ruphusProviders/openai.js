@@ -36,6 +36,10 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
       const evidenceBlock = buildDynamicEvidenceBlock(context || {});
       const recentConversation = (Array.isArray(conversation) ? conversation : [])
         .filter((message) => ['user', 'assistant'].includes(message?.role) && typeof message?.content === 'string');
+      const latest = recentConversation.at(-1);
+      const currentUserTurn = latest?.role === 'user' && latest.content === userText
+        ? []
+        : [{ role: 'user', content: userText }];
       const correction = correctiveInstruction ? [{ role: 'developer', content: correctiveInstruction }] : [];
       const priorInput = inputSequences.get(turnId) || [];
       const knownToolCalls = new Set(priorInput.filter((item) => item?.type === 'function_call_output').map((item) => item.call_id));
@@ -46,7 +50,8 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
         ? [...(inputSequences.get(turnId) || []), ...(previous.outputItems || []), ...results]
         : [
             { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },
-            ...(recentConversation.length ? recentConversation : [{ role: 'user', content: userText }]),
+            ...recentConversation,
+            ...currentUserTurn,
           ];
       inputSequences.set(turnId, input);
       const response = await sdk.responses.create(buildOpenAIRequest({ instructions, input, tools, maxOutputTokens }));

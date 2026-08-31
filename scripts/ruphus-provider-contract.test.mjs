@@ -13,6 +13,20 @@ test('provider output rejects malformed tool arguments and preserves attribution
   assert.throws(() => outputParts({ output: [{ type: 'function_call', name: 'read_coffee', arguments: '{' }] }), /malformed/);
 });
 
+test('provider appends the newest user turn after authoritative history', async () => {
+  const requests = [];
+  const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return { id: 'r-history', model: RUPHUS_OPENAI_MODEL, output_text: 'done', output: [] }; } } } });
+  await provider.runTurn({ turnId: 'history-turn', context: {}, userText: 'Now tell me about El Vergel.', conversation: [
+    { role: 'user', content: 'It tasted watery.' },
+    { role: 'assistant', content: 'Try one step finer.' },
+  ], tools: [] });
+  assert.deepEqual(requests[0].input.slice(-3), [
+    { role: 'user', content: 'It tasted watery.' },
+    { role: 'assistant', content: 'Try one step finer.' },
+    { role: 'user', content: 'Now tell me about El Vergel.' },
+  ]);
+});
+
 test('OpenAI continuation replays prior response items alongside every tool result', async () => {
   const requests = [];
   const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output_text: '', output: [] }; } } } });

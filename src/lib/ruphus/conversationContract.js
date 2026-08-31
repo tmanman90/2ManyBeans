@@ -110,7 +110,9 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const result = [];
   if (/\b\d+\.\d{2,}\b/.test(value) && !/\b(?:grinder|ode)\s*\d+\.\d{2}\b/i.test(value)) result.push(violation('C5_PRECISION', CATEGORIES.ORDINARY, 'number precision is too fine'));
   if (/\b(?:microns?|µm)\b/i.test(value) && !userUnits.microns) result.push(violation('C5_UNITS', CATEGORIES.ORDINARY, 'microns were introduced without the user using microns'));
-  if (/\b(?:increase|decrease|more|less|finer|coarser|up|down)\b/i.test(value) && !/\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|a|another)\s+(?:step|gram|click|degree)\b/i.test(value)) {
+  const directional = /\b(?:increase|decrease|more|less|finer|coarser)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
+  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|a|another)\s+(?:small\s+)?(?:step|gram|click|degree)\b/i;
+  if (directional.test(value) && !sized.test(value)) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
   return result;

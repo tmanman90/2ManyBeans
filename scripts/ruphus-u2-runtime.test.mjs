@@ -44,6 +44,16 @@ test('method correction permanently drops the launch hint before evidence resolu
   assert.equal(result.method.slot, 'v60_hot'); assert.equal(current.__ruphusLaunchHintConsumed, true);
 });
 
+test('direct recipe read carries the verified matching launch revision', async () => {
+  const seen = [];
+  const current = { ...base, launchCoffeeId: 'c1', __ruphusLaunchHintConsumed: false, __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } }, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async (input) => { seen.push(input); return { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 }; } } });
+  const result = await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(result.recipe.dose, 15);
+  assert.deepEqual(seen[0].launchItem, { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' });
+  assert.deepEqual(current.proposalState.target, { coffeeRef: 'c1', slot: 'v60_hot' });
+});
+
 test('RT3 delivers regenerated length/markup text and carries corrective instruction plus all tool evidence', async () => {
   const frames = []; let runs = 0; const seen = [];
   const evidence = { name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 }, coffee: 'El Vergel', records: [{ id: 'brew-1', dose: 15 }] };

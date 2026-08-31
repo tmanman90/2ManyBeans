@@ -66,8 +66,13 @@ export async function loadFixtureManifest(root = FIXTURE_ROOT) {
 
 export function fixtureFactSheet(account) {
   return account.coffees.map((coffee) => {
-    const recipes = (coffee.recipes || []).map((slot) => account.recipes[`${coffee.id}:${slot}`]?.displayName || slot).join(', ') || 'none';
-    return `Jar ${coffee.jarSlot ?? 'off rotation'}: ${coffee.name} — ${coffee.roaster}, ${coffee.origin}, ${coffee.process}; ${recipes}; last brew ${coffee.lastBrewDate || 'none'}.`;
+    const recipes = (coffee.recipes || []).map((slot) => {
+      const recipe = account.recipes[`${coffee.id}:${slot}`] || {};
+      return [recipe.displayName || slot, recipe.dose != null ? `${recipe.dose}g coffee` : null, recipe.water != null ? `${recipe.water}g water` : null, recipe.grind || null, recipe.temperature != null ? `${recipe.temperature}C` : null].filter(Boolean).join(', ');
+    }).join(' | ') || 'none';
+    const tastings = (account.tastings || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.notes || item.note || ''}`).join(' | ') || 'none';
+    const brews = (account.brews || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.slot}, ${item.dose}g coffee, ${item.water}g water, ${item.grind}, ${item.drawdown}`).join(' | ') || 'none';
+    return `Jar ${coffee.jarSlot ?? 'off rotation'}: ${coffee.name} — ${coffee.roaster}, ${coffee.origin}, ${coffee.process}; roasted ${coffee.roastDate || 'unknown'}, opened ${coffee.openDate || 'unknown'}; recipes ${recipes}; brews ${brews}; tastings ${tastings}.`;
   }).join('\n');
 }
 export const factSheet = fixtureFactSheet;
@@ -371,10 +376,11 @@ function resolveFixtureRef(value, refMap) {
   return value;
 }
 
-function factualEvidenceText(fixture, frames, factSheet = '') {
-  const fixtureFacts = fixture?.factSheet || fixture?.facts || fixture?.expected || {};
+function factualEvidenceText(fixture, frames, factSheet = '', turnIndex = 0) {
+  const fixtureFacts = fixture?.factSheet || fixture?.facts || { expected: fixture?.expected || {}, session: fixture?.session || null };
   const toolFacts = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {});
-  return JSON.stringify({ factSheet, fixtureFacts, toolFacts }).toLowerCase();
+  const userTurn = fixture?.turns?.[turnIndex] || '';
+  return JSON.stringify({ factSheet, fixtureFacts, toolFacts, userTurn }).toLowerCase();
 }
 
 function hasUnsupportedFactualClaim(reply, knownText) {
@@ -383,7 +389,7 @@ function hasUnsupportedFactualClaim(reply, knownText) {
   const numbers = value.match(/\b\d+(?:\.\d+)?\b/g) || [];
   if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
   const properNames = value.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
-  return properNames.some((name) => !/^(?:Good|Hot|Cold|The|That|This)\b/.test(name) && !knownText.includes(name.toLowerCase()));
+  return properNames.some((name) => !/^(?:Good|Hot|Cold|The|That|This|Your|My|Our)\b/.test(name) && !knownText.includes(name.toLowerCase()));
 }
 
 export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [] } = {}) {
@@ -395,7 +401,7 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   const expected = resolveFixtureRef(expectedRaw, refMap);
   const replyCoffee = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.name && new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(reply)).map((coffee) => coffee.id);
   const fallback = replyCoffee.length === 1 ? replyCoffee[0] : resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
-  const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet));
+  const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet, turnIndex));
   return { expectedCoffeeId: expected || fallback, actualCoffeeId: actual || fallback, focusCoffeeId: actual || fallback, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
 

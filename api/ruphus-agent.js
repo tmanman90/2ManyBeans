@@ -73,11 +73,19 @@ export function deriveProposalReadiness({ conversation = [], ledger = null, user
   return { diagnosisReady, userAgreed };
 }
 function firestoreReaders(db) {
+  const readCoffee = async ({ uid, coffeeId }) => {
+    const snap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get();
+    return snap.exists ? { id: coffeeId, ...snap.data() } : null;
+  };
+  const readAttempts = async ({ uid, coffeeId }) => {
+    const snap = await db.collection('users').doc(uid).collection('brewAttempts').where('coffeeId', '==', coffeeId).get();
+    return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+  };
   return {
     async listCoffees({ uid }) { const snap = await db.collection('users').doc(uid).collection('beans').get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
-    async readCoffee({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get(); return snap.exists ? { id: coffeeId, ...snap.data() } : null; },
+    readCoffee,
     async readRecipe({ uid, coffeeId, slotKey, slot, launchItem }) {
-      const bean = await this.readCoffee({ uid, coffeeId }); if (!bean) return null;
+      const bean = await readCoffee({ uid, coffeeId }); if (!bean) return null;
       const requested = slotKey || slot;
       if (launchItem?.kind === 'recipe') {
         const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(launchItem.ref).get();
@@ -89,8 +97,8 @@ function firestoreReaders(db) {
       return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);
     },
     async readTastings({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('tastings').where('beanId', '==', coffeeId).get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
-    async readAttempts({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('brewAttempts').where('coffeeId', '==', coffeeId).get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
-    async readBrews(args) { return this.readAttempts(args); },
+    readAttempts,
+    readBrews: readAttempts,
     async readSetup({ uid }) {
       const snap = await db.collection('users').doc(uid).get();
       const profile = snap?.exists ? snap.data() || {} : {};
