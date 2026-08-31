@@ -302,6 +302,16 @@ test('live adapter surfaces only a bounded endpoint error code', async () => {
   });
 });
 
+test('live endpoint aborts a stalled response and marks provider dispatch uncertain', async () => {
+  const fetchImpl = async (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+  });
+  await assert.rejects(
+    runLiveEndpointTurn({ endpoint: 'https://dev.example/api/ruphus-agent', token: 'dev-token', payload: {}, fetchImpl, timeoutMs: 5 }),
+    (error) => error.message === 'U3 endpoint request timed out' && error.providerDispatched === true,
+  );
+});
+
 test('live adapter rejects interrupted terminal frames while preserving priceable usage', async () => {
   const response = { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => [
     JSON.stringify({ type: 'tool_result', name: 'propose_recipe_change', result: { ok: false, code: 'one_change_required', message: 'private detail' } }),

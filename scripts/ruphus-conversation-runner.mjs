@@ -23,6 +23,7 @@ export const U3_STAGE_RULES = Object.freeze({
 export const CRITICAL_FIXTURE_IDS = Object.freeze(['AE01', 'AE02', 'AE03', 'AE04', 'AE05', 'AE06', 'AE07', 'AE08', 'AE09', 'AE10', 'AE14']);
 export const SUPPORTING_FIXTURE_IDS = Object.freeze(['AE11', 'AE12', 'AE13']);
 export const U3_TOTAL_LIVE_COST_CAP_USD = 30;
+export const U3_ENDPOINT_TIMEOUT_MS = 45_000;
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const cloneWithout = (value, keys) => Object.fromEntries(Object.entries(value || {}).filter(([key]) => !keys.includes(key)));
 
@@ -434,12 +435,15 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   return { expectedCoffeeId: expected || fallback, actualCoffeeId: actual || fallback, focusCoffeeId: actual || fallback, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
 
-export async function runLiveEndpointTurn({ endpoint, token, payload, devReadFault = null, fetchImpl = globalThis.fetch }) {
+export async function runLiveEndpointTurn({ endpoint, token, payload, devReadFault = null, fetchImpl = globalThis.fetch, timeoutMs = U3_ENDPOINT_TIMEOUT_MS }) {
   if (!endpoint || !/^https:\/\//i.test(endpoint)) throw new Error('U3 live endpoint must be HTTPS');
   if (!token) throw new Error('U3 live auth must be injected non-printingly');
   if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for live U3 mode');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
   const response = await fetchImpl(endpoint, {
-    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(devReadFault ? { 'x-ruphus-dev-read-fault': devReadFault } : {}) }, body: JSON.stringify(payload),
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(devReadFault ? { 'x-ruphus-dev-read-fault': devReadFault } : {}) }, body: JSON.stringify(payload), signal: controller.signal,
   });
   if (!response.ok) {
     let errorCode = 'unknown_error';
@@ -482,6 +486,17 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, devReadFau
   else throw new Error('U3 endpoint returned an unreadable response');
   if (!body || typeof body.text !== 'string') throw new Error('U3 endpoint returned no visible reply');
   return body;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error('U3 endpoint request timed out');
+      timeoutError.providerDispatched = true;
+      timeoutError.model = RUPHUS_OPENAI_MODEL;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function createLiveJudgeAdapter({ endpoint = process.env.RUPHUS_JUDGE_ENDPOINT, token = process.env.RUPHUS_JUDGE_AUTH_TOKEN, modelFamily = process.env.RUPHUS_JUDGE_MODEL_FAMILY, providerFamily = process.env.RUPHUS_PROVIDER_MODEL_FAMILY || 'openai', fetchImpl = globalThis.fetch } = {}) {
