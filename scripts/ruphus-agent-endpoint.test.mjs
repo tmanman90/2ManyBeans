@@ -95,4 +95,6 @@ test('typed recipe launch and active slot read the owner-scoped immutable revisi
   const detachedReadRecipe = readers.readRecipe;
   assert.equal((await detachedReadRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot', launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } })).dose, 15);
   assert.equal((await detachedReadRecipe({ uid: 'u', coffeeId: 'bean-1', slotKey: 'v60_hot' })).selectedPath, 'recipeRevisions/rev-1');
+  const activeRecipes = await detachedReadRecipe({ uid: 'u', coffeeId: 'bean-1' });
+  assert.equal(activeRecipes.length, 1); assert.equal(activeRecipes[0].slotKey, 'v60_hot'); assert.equal(activeRecipes[0].dose, 15);
 });

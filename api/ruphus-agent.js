@@ -101,6 +101,15 @@ function firestoreReaders(db) {
         const data = revision.data() || {};
         return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${revisionId}`, selectedHash: data.snapshotHash || null, slotKey: requested };
       }
+      if (!requested) {
+        const active = await Promise.all(Object.entries(bean.activeRevisionIds || {}).filter(([candidate, id]) => SLOT_KEYS.includes(candidate) && typeof id === 'string' && id).map(async ([candidate, id]) => {
+          const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(id).get();
+          const data = revision?.exists ? revision.data() || {} : null;
+          if (!data || data.coffeeId !== coffeeId || data.slotKey !== candidate) return null;
+          return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${id}`, selectedHash: data.snapshotHash || null, slotKey: candidate };
+        }));
+        if (active.some(Boolean)) return active.filter(Boolean);
+      }
       if (requested) { const result = resolveLegacyRecipe(bean, requested); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested } : { code: result.code }; }
       return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);
     },
