@@ -10,6 +10,8 @@ const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees
 test('prompt uses held brew details and deterministic focus before asking', () => {
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never ask for dose, water, grind, temperature, or brew time when a tool result already supplies it/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /“The other” means the matching coffee other than the current one/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /never leave it at vague “more extraction/);
 });
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
   const calls = [];
