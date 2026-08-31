@@ -4,7 +4,7 @@
 const textOf = (value) => typeof value === 'string' ? value : String(value ?? '');
 const words = (value) => textOf(value).trim().split(/\s+/).filter(Boolean);
 const paragraphs = (value) => textOf(value).trim() ? textOf(value).trim().split(/\n\s*\n/) : [];
-const sentenceCount = (value) => textOf(value).replace(/(\d)\.(\d)/g, '$1\u0000$2').split(/[.!?]+/).map((part) => part.trim()).filter(Boolean).length;
+const sentenceCount = (value) => textOf(value).replace(/(\d)\.(\d)/g, '$1\u0000$2').split(/[.!?]+/).map((part) => part.trim()).filter((part) => Boolean(part.replace(/^[”’"')\]}]+|[“‘"'([{]+$/g, '').trim())).length;
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 export const CONTRACT_VERSION = 'conversation-contract-v1';
@@ -115,7 +115,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   if (/\b(?:microns?|µm)\b/i.test(value) && !userUnits.microns) result.push(violation('C5_UNITS', CATEGORIES.ORDINARY, 'microns were introduced without the user using microns'));
   const directional = /\b(?:increase|decrease|finer|coarser|hotter|cooler)\b|\b(?:more|less|higher|lower)\s+(?:(?:bloom|contact|brew)\s+)?(?:coffee|dose|water|heat|temperature|time|agitation|extraction|bloom|contact|steep(?:ing)?|drawdown|flow|pour(?:s|ing)?)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
   const recommendation = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|could|would)\b|\bgrind\s+(?:the\s+)?(?:coffee\s+)?(?:finer|coarser)\b/i;
-  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|degrees?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease|change)s?(?:\s+(?:finer|coarser))?\b|\b(?:a\s+)?half\s+(?:a\s+)?(?:step|click|notch|degree)s?\b|\b(?:a\s+(?:little|touch|bit)|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee|dose)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
+  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|degrees?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+|ode\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease|change)s?(?:\s+(?:finer|coarser))?\b|\b(?:a\s+)?half\s+(?:a\s+)?(?:step|click|notch|degree)s?\b|\b(?:a\s+(?:little|touch|bit)|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee|dose)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
   const sentences = value.split(/(?<=[.!?])\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
   const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beat|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
@@ -206,7 +206,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
     return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, `reply claims ${claimedKind} are absent even though that source was unavailable`, { runtime: true })];
   }
   if (/\bnothing\b[^.?!]*(?:(?:brew log|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|notes))/i.test(value)) return [];
-  if (/\bno\s+(?:tasting|brew|recipe)\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^.?!]{0,48}\b(?:had|with)\s+no\s+tasting\b/i.test(value)) return [];
+  if (/\bno\s+(?:linked\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^.?!]{0,64}\b(?:had|has|with)\s+no\s+(?:linked\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
   const hasEvidence = Object.values(evidence || {}).some((entry) => Array.isArray(entry) && entry.length > 0);
   if (windowed && hasEvidence && !/(?:last|past|previous)\s+(?:two|14|fourteen)\s+weeks?|since|between/i.test(value)) return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, 'absence claim is not qualified by the read window')];
