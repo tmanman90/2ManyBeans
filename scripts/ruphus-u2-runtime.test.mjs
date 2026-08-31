@@ -50,6 +50,13 @@ test('ambiguous coffee resolution asks once instead of guessing through another 
   assert.equal(frames.at(-1).type, 'turn_completed'); assert.equal(result.toolCalls, 1);
   assert.equal(ambiguityClarification([{ name: 'coffeeId-secret' }, { name: 'Safe' }]), 'Which coffee do you mean?');
 });
+test('a successful recipe proposal ends with one truthful review handoff', async () => {
+  let providerCalls = 0; const frames = [];
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const result = await runRuphusTurn({ turnId: 'proposal-complete', context: current, userText: 'Yes, make that change.', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, proposal: { id: 'p1' }, artifact: { type: 'recipe_proposal', id: 'p1' } }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'I’ve prepared one recipe change for you to review.');
+  assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
+});
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;
   const provider = { async runTurn() { runs += 1; return runs === 1 ? { text: 'Proposal: {"dose":16}' } : { text: 'Try one step finer than Ode 4.2.' }; } };

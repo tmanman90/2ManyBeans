@@ -108,6 +108,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
+      const proposed = results.some((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
+      if (proposed) { text += 'I’ve prepared one recipe change for you to review.'; break; }
       response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results } }); rememberUsage(response);
     }
     let checked = text.trim();
