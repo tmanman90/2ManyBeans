@@ -16,6 +16,8 @@ test('tools expose only resolver, composite evidence, recipe, and proposal', asy
   const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });
   assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
   const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
+  assert.deepEqual(proposalSchema.properties.change.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
+  assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);
   assert.deepEqual(tools.definitions.find((definition) => definition.name === 'read_recipe').parameters.properties.slot.enum, ['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
   const assertStrictSchema = (schema) => {
     if (schema?.type === 'array') {
@@ -79,6 +81,16 @@ test('proposal candidates allow mirrored fields for one user-facing control but 
   await secondTools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
   const multipleControls = await secondTools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { dose: 16, grindSize: { setting: 4 } } });
   assert.equal(multipleControls.code, 'one_change_required');
+});
+test('proposal tool maps one explicit control into a complete executable recipe', async () => {
+  const before = generateV60Recipe({}, { dose: 15 }); const saved = [];
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's3' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => { saved.push(input); return { id: 'p1', ...input }; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: 'Ode 4.0' } });
+  assert.equal(result.ok, true);
+  assert.equal(saved[0].after.grindSize.setting, '4.0');
+  assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
 });
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;
