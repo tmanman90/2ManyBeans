@@ -288,7 +288,7 @@ async function dispatchMetered(adapter, packet, guard) {
     guard.reconcile(reservation, priced.cost);
     await guard.persistState?.();
     return response;
-  } catch (error) { guard.reconcile(reservation, 0); await guard.persistState?.(); throw error; }
+  } catch (error) { guard.reconcile(reservation, maximum); await guard.persistState?.(); throw error; }
 }
 
 export function smokeIsClean(results) {

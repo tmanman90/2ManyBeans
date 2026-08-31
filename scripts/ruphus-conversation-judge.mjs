@@ -99,22 +99,70 @@ export async function judgeTranscript({ judge, packet }) {
   return { sufficient: true, validation, result, usage: response?.usage || null, model: response?.model || judge.model || null, provider: response?.provider || judge.provider || null };
 }
 
+function submitResultTool(pairwise) {
+  const properties = pairwise
+    ? {
+        schemaVersion: { type: 'string', const: JUDGE_SCHEMA_VERSION },
+        winner: { type: 'string', enum: ['left', 'right', 'tie'] },
+        rationale: { type: 'string', minLength: 1, maxLength: 500 },
+      }
+    : {
+        schemaVersion: { type: 'string', const: JUDGE_SCHEMA_VERSION },
+        scores: {
+          type: 'object',
+          properties: Object.fromEntries(JUDGE_DIMENSIONS.map((dimension) => [dimension, { type: 'integer', minimum: 1, maximum: 5 }])),
+          required: [...JUDGE_DIMENSIONS],
+          additionalProperties: false,
+        },
+        mean: { type: 'number', minimum: 1, maximum: 5 },
+        rationale: { type: 'string', minLength: 1, maxLength: 500 },
+      };
+  return {
+    name: 'submit_result',
+    description: 'Submit the blind conversation judgment in the required schema.',
+    strict: true,
+    input_schema: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
+  };
+}
+
+function parseTextResult(value) {
+  const text = String(value || '').trim().replace(/^```json\s*|\s*```$/g, '');
+  try { return JSON.parse(text); } catch {
+    const start = text.indexOf('{'); const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) { try { return JSON.parse(text.slice(start, end + 1)); } catch { /* handled below */ } }
+  }
+  throw new Error('U3 Anthropic judge returned non-JSON output');
+}
+
+function streamedToolResult(events) {
+  let active = false; let partial = '';
+  for (const event of events) {
+    if (event.type === 'content_block_start') {
+      active = event.content_block?.type === 'tool_use' && event.content_block?.name === 'submit_result';
+      if (active && object(event.content_block?.input) && Object.keys(event.content_block.input).length) return event.content_block.input;
+    } else if (active && event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') partial += event.delta.partial_json || '';
+    else if (active && event.type === 'content_block_stop') active = false;
+  }
+  return partial ? parseTextResult(partial) : null;
+}
+
 export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_AUTH_TOKEN, model = process.env.RUPHUS_JUDGE_MODEL || 'claude-sonnet-5', fetchImpl = globalThis.fetch } = {}) {
   if (!token) throw new Error('U3 judge auth must be injected non-printingly');
   const adapter = async (packet) => {
-    const request = buildAnthropicRequest({ model, system: packet.left ? PAIRWISE_INSTRUCTIONS : JUDGE_INSTRUCTIONS, messages: [{ role: 'user', content: JSON.stringify(packet) }], maxOutputTokens: Number(process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) });
+    const request = buildAnthropicRequest({ model, system: packet.left ? PAIRWISE_INSTRUCTIONS : JUDGE_INSTRUCTIONS, messages: [{ role: 'user', content: JSON.stringify(packet) }], tools: [submitResultTool(Boolean(packet.left))], toolChoice: { name: 'submit_result' }, maxOutputTokens: Number(process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) });
     const response = await fetchImpl(ANTHROPIC_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': token, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(request) });
     if (!response.ok) throw new Error(`U3 Anthropic judge returned HTTP ${response.status}`);
-    let payload;
+    let payload; let result = null;
     if ((response.headers?.get?.('content-type') || '').includes('event-stream') && typeof response.text === 'function') {
       const events = (await response.text()).split(/\r?\n/).filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).filter((line) => line !== '[DONE]').map((line) => JSON.parse(line));
       const message = events.find((event) => event.type === 'message_start')?.message || {};
       const text = events.filter((event) => event.type === 'content_block_delta' && event.delta?.type === 'text_delta').map((event) => event.delta.text || '').join('');
       const usage = { ...(message.usage || {}), ...(events.find((event) => event.type === 'message_delta')?.usage || {}) };
       payload = { content: [{ type: 'text', text }], usage, model: message.model || model };
+      result = streamedToolResult(events);
     } else payload = await response.json();
-    const text = (payload.content || []).filter((block) => block?.type === 'text').map((block) => block.text || '').join('').trim().replace(/^```json\s*|\s*```$/g, '');
-    let result; try { result = JSON.parse(text); } catch { throw new Error('U3 Anthropic judge returned non-JSON output'); }
+    result ||= (payload.content || []).find((block) => block?.type === 'tool_use' && block?.name === 'submit_result')?.input || null;
+    if (!result) result = parseTextResult((payload.content || []).filter((block) => block?.type === 'text').map((block) => block.text || '').join(''));
     return { result, usage: payload.usage, model: payload.model || model, provider: 'anthropic' };
   };
   Object.defineProperties(adapter, { modelFamily: { value: 'anthropic' }, model: { value: model }, provider: { value: 'anthropic' } });

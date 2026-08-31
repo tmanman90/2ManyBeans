@@ -43,10 +43,21 @@ test('Anthropic judge adapter uses frozen instructions and parses streamed usage
   try {
     const result = judged(4);
     const response = { ok: true, headers: { get: () => 'text/event-stream' }, text: async () => `data: ${JSON.stringify({ type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 10 } }})}\n\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(result) }})}\n\ndata: ${JSON.stringify({ type: 'message_delta', usage: { output_tokens: 10 }})}\n\n` };
-    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); assert.match(JSON.parse(request.body).system, /friendNotForm/); return response; } });
+    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); const body = JSON.parse(request.body); assert.match(body.system, /friendNotForm/); assert.equal(body.tool_choice.name, 'submit_result'); assert.equal(body.tools[0].input_schema.additionalProperties, false); return response; } });
     const envelope = await adapter({ promptVersion: 'v1' });
     assert.equal(envelope.provider, 'anthropic');
     assert.equal(envelope.usage.input_tokens, 10);
+    assert.equal(validateJudgeResult(envelope.result).valid, true);
+  } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
+});
+
+test('Anthropic judge accepts a forced structured tool result', async () => {
+  const prior = process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = '100';
+  try {
+    const result = judged(5);
+    const response = { ok: true, headers: { get: () => 'application/json' }, json: async () => ({ model: 'claude-sonnet-5', usage: { input_tokens: 10, output_tokens: 10 }, content: [{ type: 'tool_use', name: 'submit_result', input: result }] }) };
+    const envelope = await createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async () => response })({ promptVersion: 'v1' });
+    assert.deepEqual(envelope.result, result);
     assert.equal(validateJudgeResult(envelope.result).valid, true);
   } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
 });
