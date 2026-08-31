@@ -60,7 +60,17 @@ export function sessionConversationForProvider(session, { now = Date.now(), incl
 export function sessionReplayInputs({ session, conversation, ledger, continuePrevious = false, now = Date.now() } = {}) {
   const stale = Boolean(session && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale');
   if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? sessionConversationForProvider(session, { now, includeStale: true }) : [], ledger: null };
-  return { stale: false, resumed: false, conversation: Array.isArray(conversation) && conversation.length ? conversation : sessionConversationForProvider(session, { now }), ledger: ledger || session?.ledger || null };
+  const storedConversation = sessionConversationForProvider(session, { now });
+  return { stale: false, resumed: false, conversation: storedConversation.length ? storedConversation : Array.isArray(conversation) ? conversation : [], ledger: ledger || session?.ledger || null };
+}
+
+export function deriveProposalReadiness({ conversation = [], ledger = null, userText = '' } = {}) {
+  const previousAssistant = [...conversation].reverse().find((message) => message?.role === 'assistant')?.content || '';
+  const diagnosisReady = previousAssistant.trim().split(/\s+/).filter(Boolean).length >= 8
+    && /\b(?:watery|thin|sour|sharp|bitter|harsh|muted|flat|weak|strong|extraction|grind|dose|temperature|ratio|contact time|drawdown)\b/i.test(previousAssistant)
+    && Array.isArray(ledger?.entries) && ledger.entries.length > 0;
+  const userAgreed = /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
+  return { diagnosisReady, userAgreed };
 }
 function firestoreReaders(db) {
   return {
@@ -129,6 +139,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const olderReference = activeSession?.historyWidened === true || /\b(?:older|last month|three weeks?|weeks? ago|before that|historical|earlier)\b/i.test(priorText);
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
     context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
+    Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
     context.sessionId = turnId;
     context.sessionState.lastActivityAt = activeSession?.lastActivityAt || null;
     context.sessionState.boundaryIndex = activeSession?.boundaryIndex || 0;
@@ -138,7 +149,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });
     const turnResult = await runRuphusTurn({ turnId, context, userText: context.userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), emit: (frame) => { if (!firstFrameAt) firstFrameAt = Date.now(); writeFrame(res, frame); } });
     const priorMessages = activeSession?.messages || [];
-    const suppliedMessages = (replay.resumed ? [] : suppliedConversation).filter((message) => message?.role === 'user' || message?.role === 'assistant').map((message) => ({ id: message.id || `replay-${priorMessages.length}`, role: message.role, text: String(message.content || message.text || ''), createdAt: Number(message.createdAt) || startedAt })).filter((message) => message.text);
+    const suppliedMessages = (replay.resumed || priorMessages.length ? [] : suppliedConversation).filter((message) => message?.role === 'user' || message?.role === 'assistant').map((message) => ({ id: message.id || `replay-${priorMessages.length}`, role: message.role, text: String(message.content || message.text || ''), createdAt: Number(message.createdAt) || startedAt })).filter((message) => message.text);
     const nextMessages = [...priorMessages, ...suppliedMessages, { id: `${turnId}-user`, role: 'user', text: context.userText, createdAt: startedAt, turnId }, ...(turnResult.text ? [{ id: `${turnId}-assistant`, role: 'assistant', text: turnResult.text, createdAt: Date.now(), turnId }] : [])];
     const ledgerBytes = Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES);
     await writeActiveSession(db, uid, { protocolVersion: 1, messages: nextMessages, turns: [...(activeSession?.turns || []), { id: turnId, status: turnResult.ok ? 'completed' : 'interrupted' }], contextRef: effectiveContextRef, launchContext: context.launchContext, ledger: boundLedger(context.ledger, { maxBytes: ledgerBytes }), boundaryIndex: activeSession?.boundaryIndex || 0, lastActivityAt: Date.now(), launchHintConsumed: context.__ruphusLaunchHintConsumed === true, historyWidened: context.historyWidened === true, updatedAt: Date.now() }, { maxBytes: ledgerBytes });

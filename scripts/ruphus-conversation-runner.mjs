@@ -382,12 +382,8 @@ function hasUnsupportedFactualClaim(reply, knownText) {
   if (!/\b(?:history|earlier|previous|recorded|brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)\b/i.test(value)) return false;
   const numbers = value.match(/\b\d+(?:\.\d+)?\b/g) || [];
   if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
-  const factualPhrases = value.match(/\b(?:brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)\b[^.!?]{0,80}/gi) || [];
-  return factualPhrases.some((phrase) => {
-    const words = phrase.toLowerCase().split(/\s+/).map((word) => word.replace(/[^a-z0-9.]/g, '')).filter((word) => word.length > 3 && !/^(?:your|the|was|is|and|with|for|this|that|a|an|on|of|to|had|like|called|about)$/.test(word));
-    const distinctive = words.filter((word) => !/^(?:brew|brewed|tasting|tasted|recipe|drawdown|dose|grind|water|temperature|ratio)$/.test(word));
-    return distinctive.length > 0 && distinctive.some((word) => !knownText.includes(word));
-  });
+  const properNames = value.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
+  return properNames.some((name) => !/^(?:Good|Hot|Cold|The|That|This)\b/.test(name) && !knownText.includes(name.toLowerCase()));
 }
 
 export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [] } = {}) {
@@ -432,7 +428,18 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, fetchImpl 
     const frames = text.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
     const completed = frames.find((frame) => frame.type === 'turn_completed');
     const delta = frames.filter((frame) => frame.type === 'text_delta').map((frame) => frame.text || '').join('');
-    body = { ...(completed || {}), text: completed?.text || delta, frames, usage: frames.find((frame) => frame.type === 'usage')?.usage || null, timing: completed?.timing || frames.find((frame) => frame.type === 'timing')?.timing || null };
+    const usage = frames.find((frame) => frame.type === 'usage')?.usage || null;
+    const failed = frames.find((frame) => frame.type === 'turn_failed' || frame.type === 'turn_interrupted');
+    if (failed) {
+      const code = /^[a-z0-9_-]{1,64}$/i.test(String(failed.code || '')) ? failed.code : 'turn_failed';
+      const error = new Error(`U3 endpoint ended with ${failed.type} (${code})`);
+      error.providerDispatched = true;
+      error.usage = usage;
+      error.model = RUPHUS_OPENAI_MODEL;
+      throw error;
+    }
+    if (!completed) throw new Error('U3 endpoint stream ended without a completed terminal frame');
+    body = { ...completed, text: completed.text || delta, frames, usage, timing: completed.timing || frames.find((frame) => frame.type === 'timing')?.timing || null };
   } else if (typeof response.json === 'function') body = await response.json();
   else throw new Error('U3 endpoint returned an unreadable response');
   if (!body || typeof body.text !== 'string') throw new Error('U3 endpoint returned no visible reply');
@@ -468,8 +475,15 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     let result;
     try { result = await runLiveEndpointTurn({ endpoint, token, fetchImpl, payload: {
       turnId: `${stageRunId}-${fixture.id}-r${repetition}-t${index + 1}`, contextRef: context.launchContext, userText,
-      conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: false,
-    } }); } catch (error) { if (reservation) costGuard.reconcile(reservation, 0); await costGuard?.persistState?.(); throw error; }
+      conversation: transcript.map((turn) => ({ role: turn.role, content: turn.text })), ledger: null, continuePrevious: Boolean(index === 0 && fixture.session && /^continue\b/i.test(userText)),
+    } }); } catch (error) {
+      if (reservation) {
+        const failedPrice = error?.providerDispatched ? priceUsage({ model: error.model || RUPHUS_OPENAI_MODEL, provider: 'openai', usage: error.usage }) : null;
+        costGuard.reconcile(reservation, error?.providerDispatched ? failedPrice?.cost ?? maximum : 0);
+      }
+      await costGuard?.persistState?.();
+      throw error;
+    }
     const model = result.model || RUPHUS_OPENAI_MODEL;
     const priced = priceUsage({ model, provider: 'openai', usage: result.usage });
     if (!priced) {
@@ -492,7 +506,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const regenerationCount = result.timing?.regenerationCount ?? (result.frames || []).filter((frame) => /regenerat|replac/i.test(String(frame?.type || ''))).length;
     if (regenerationCount > 0) grader.ordinary.push({ code: 'U3_REGENERATION_OR_REPLACEMENT', category: 'ordinary', message: 'a regeneration or replacement was required' });
     if (latencyMs > 25000) grader.ordinary.push({ code: 'U3_TURN_OVER_25S', category: 'ordinary', message: 'turn exceeded the authoritative 25 second limit' });
-    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), grader, latencyMs, firstFrameMs: result.timing?.firstFrameMs ?? null, readRoundMs: result.timing?.readRoundMs ?? result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: regenerationCount, evidenceBeforeHistory: (result.frames || []).some((frame) => frame?.type === 'tool_result'), costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
+    const turnResult = { fixtureId: fixture.id, turn: index + 1, transcript: structuredClone(transcript), frames: structuredClone(result.frames || []), grader, latencyMs, firstFrameMs: result.timing?.firstFrameMs ?? null, readRoundMs: result.timing?.readRoundMs ?? result.readRoundMs ?? null, methodTier: fixture.expected?.methodTier || null, methodSlot: fixture.expected?.method || null, regenerationFrames: regenerationCount, evidenceBeforeHistory: (result.frames || []).some((frame) => frame?.type === 'tool_result'), costUsd: priced.cost, model, unexpectedBranch: branch.unexpectedBranch, question: branch.question };
     if (branch.unexpectedBranch) {
       turnResult.grader.ordinary.push({ code: 'U3_UNEXPECTED_BRANCH', category: 'ordinary', message: 'model asked an undeclared question branch; fixture stopped' });
       results.push(turnResult);

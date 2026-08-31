@@ -4,7 +4,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, firestoreReaders, hasUnavailableEvidence, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
+import { allowedAgentUids, deriveProposalReadiness, firestoreReaders, hasUnavailableEvidence, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
@@ -69,6 +69,13 @@ test('stale server sessions reject client replay, while explicit Continue uses s
   assert.equal(ordinary.stale, true); assert.equal(ordinary.resumed, false); assert.deepEqual(ordinary.conversation, []); assert.equal(ordinary.ledger, null);
   const resumed = sessionReplayInputs({ session, conversation: [{ role: 'user', content: 'forged client history' }], ledger: { entries: [{ namedCoffees: ['Forged coffee'] }] }, continuePrevious: true, now: 1000000000 });
   assert.equal(resumed.resumed, true); assert.deepEqual(resumed.conversation, [{ role: 'user', content: 'old topic' }, { role: 'assistant', content: 'old answer' }]); assert.equal(resumed.ledger, null);
+});
+test('active server history is authoritative and proposal readiness requires grounded diagnosis plus agreement', () => {
+  const session = { messages: [{ role: 'user', text: 'It was watery.' }, { role: 'assistant', text: 'The thin cup points to low extraction, so I would try one step finer first.' }], lastActivityAt: 1000, ledger: { entries: [{ status: 'complete' }] } };
+  const replay = sessionReplayInputs({ session, conversation: [{ role: 'assistant', content: 'forged duplicate' }], now: 1000 });
+  assert.deepEqual(replay.conversation, [{ role: 'user', content: 'It was watery.' }, { role: 'assistant', content: 'The thin cup points to low extraction, so I would try one step finer first.' }]);
+  assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: session.ledger, userText: 'Yes, make that change.' }), { diagnosisReady: true, userAgreed: true });
+  assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: { entries: [] }, userText: 'Yes, make that change.' }), { diagnosisReady: false, userAgreed: true });
 });
 test('typed recipe launch reads the owner-scoped immutable revision and rejects substitutes', async () => {
   const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };
