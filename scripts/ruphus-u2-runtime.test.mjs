@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
-import { proposalEligibleForTarget, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { ambiguityClarification, proposalEligibleForTarget, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
 import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 
@@ -41,6 +41,14 @@ test('this coffee resolves the current named coffee, then the verified launch co
   assert.equal((await createRuphusTools({ uid: 'u1', context: launchContext, readers }).call('resolve_coffee', { reference: 'this coffee' })).coffeeRef, 'c2');
   const namedContext = { ...launchContext, ledger: { entries: [], namedCoffees: ['El Vergel'] } };
   assert.equal((await createRuphusTools({ uid: 'u1', context: namedContext, readers }).call('resolve_coffee', { reference: 'current coffee' })).coffeeRef, 'c1');
+});
+test('ambiguous coffee resolution asks once instead of guessing through another tool round', async () => {
+  let providerCalls = 0; const frames = [];
+  const candidates = [{ name: 'Colombia La Esperanza', process: 'natural' }, { name: 'El Vergel', process: 'washed' }];
+  const result = await runRuphusTurn({ turnId: 'ambiguous', context: base, userText: 'the Colombian one', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'resolve-1', name: 'resolve_coffee', args: { reference: 'the Colombian one' } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['resolve_coffee'], definitions: [], call: async () => ({ ok: false, reason: 'ambiguous', candidates }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'Which do you mean: Colombia La Esperanza, the natural one, or El Vergel, the washed one?');
+  assert.equal(frames.at(-1).type, 'turn_completed'); assert.equal(result.toolCalls, 1);
+  assert.equal(ambiguityClarification([{ name: 'coffeeId-secret' }, { name: 'Safe' }]), 'Which coffee do you mean?');
 });
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;

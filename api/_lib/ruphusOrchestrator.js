@@ -11,6 +11,16 @@ const SEVERE_SECOND_FAILURES = new Set([
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
 ]);
 
+export function ambiguityClarification(candidates = []) {
+  const labels = candidates.slice(0, 2).map((candidate) => {
+    const name = String(candidate?.name || '').trim();
+    const process = String(candidate?.process || '').trim();
+    return name ? `${name}${process ? `, the ${process} one` : ''}` : '';
+  }).filter(Boolean);
+  const reply = labels.length > 1 ? `Which do you mean: ${labels[0]}, or ${labels[1]}?` : 'Which coffee do you mean?';
+  return runtimeTriggers({ reply }).length ? 'Which coffee do you mean?' : reply;
+}
+
 function proposalTarget(state) {
   const target = state?.target || {};
   return {
@@ -96,6 +106,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         return { callId: request.callId, name: request.name, result };
       }));
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
+      const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
+      if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results } }); rememberUsage(response);
     }
     let checked = text.trim();
