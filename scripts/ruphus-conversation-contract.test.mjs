@@ -43,6 +43,7 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.ok(gradeC5Numbers({ reply: 'Go finer.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.equal(gradeC5Numbers({ reply: 'Go one step finer than Ode 4.2.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try one small step finer than Ode 4.2.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Go finer, from Ode 4.2 to 4.1.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'It is set up for hot V60.', userUnits: {} }).length, 0);
 });
 

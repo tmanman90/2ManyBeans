@@ -67,6 +67,19 @@ test('proposal candidates treat null schema fields as unchanged recipe values', 
   assert.equal(result.ok, true); assert.equal(saved.length, 1); assert.equal(saved[0].after.dose, before.dose); assert.equal(saved[0].after.grindSize.setting, 4);
   assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
 });
+test('proposal candidates allow mirrored fields for one user-facing control but reject two controls', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's1' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => ({ id: 'p1', ...input }) });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const mirroredGrind = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { grind: 'Ode 4.0', grindSize: { setting: 4 } } });
+  assert.equal(mirroredGrind.ok, true);
+  const secondContext = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's2' };
+  const secondTools = createRuphusTools({ uid: 'u1', context: secondContext, readers: { readRecipe: async () => before } });
+  await secondTools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const multipleControls = await secondTools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { dose: 16, grindSize: { setting: 4 } } });
+  assert.equal(multipleControls.code, 'one_change_required');
+});
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;
   const provider = { async runTurn() { runs += 1; return runs === 1 ? { text: 'Proposal: {"dose":16}' } : { text: 'Try one step finer than Ode 4.2.' }; } };

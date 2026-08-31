@@ -29,6 +29,14 @@ function changedPaths(before, after, prefix = '') {
   const present = new Set(Object.keys(after));
   return [...new Set([...Object.keys(before), ...Object.keys(after)])].flatMap((key) => present.has(key) ? changedPaths(before[key], after[key], prefix ? `${prefix}.${key}` : key) : []);
 }
+function recipeControl(path = '') {
+  const root = String(path).split('.')[0];
+  if (['coffeeGrams', 'userCoffeeGrams', 'dose'].includes(root)) return 'dose';
+  if (['waterGrams', 'water'].includes(root)) return 'water';
+  if (['grind', 'grindSize'].includes(root)) return 'grind';
+  if (['temperature', 'temperatureC', 'waterTemp'].includes(root)) return 'temperature';
+  return root;
+}
 function recipeValue(recipe) {
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return recipe;
   const value = clone(recipe); for (const key of ['selectedPath', 'selectedHash', 'sourceLineage']) delete value[key];
@@ -150,8 +158,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
     if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
     const before = clone(target.before); const after = mergeRecipePatch(before, args.afterRecipe); const paths = changedPaths(before, after).filter(Boolean);
+    const controls = [...new Set(paths.map(recipeControl))];
     if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
-    if (paths.length !== 1 || paths[0].startsWith('method') || paths[0].startsWith('device') || paths[0].startsWith('mode')) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
+    if (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0])) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
     const validationRecipe = recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
@@ -164,7 +173,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
     if (name === 'read_recipe') return { type: 'function', name, description: 'Read one exact recipe slot for a recipe question or immediately before a proposal. General coffee evidence already includes recipe information.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
-    return { type: 'function', name, description: 'Propose one bounded recipe-control change after the user agrees.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, afterRecipe: { type: 'object', properties: STRICT_RECIPE_PROPERTIES, required: Object.keys(STRICT_RECIPE_PROPERTIES), additionalProperties: false } }, required: ['coffeeRef', 'slot', 'afterRecipe'], additionalProperties: false } };
+    return { type: 'function', name, description: 'Propose one bounded recipe-control change after the user agrees. In afterRecipe, set only that one control to a non-null value and set every other required field to null.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, afterRecipe: { type: 'object', properties: STRICT_RECIPE_PROPERTIES, required: Object.keys(STRICT_RECIPE_PROPERTIES), additionalProperties: false } }, required: ['coffeeRef', 'slot', 'afterRecipe'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
 }
