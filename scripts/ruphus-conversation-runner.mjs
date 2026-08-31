@@ -574,7 +574,7 @@ function parseArgs(argv) {
   return { mode: values.mode || 'injected', stage: values.stage || 'smoke', root: values.root || FIXTURE_ROOT, costCapUsd: values['cost-cap-usd'], fixtures: values.fixtures };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+async function runCli() {
   const options = parseArgs(process.argv.slice(2));
   if (options.mode === 'live') {
     try {
@@ -606,4 +606,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error('U3 mode must be injected or live.');
     process.exitCode = 2;
   }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  void runCli();
 }

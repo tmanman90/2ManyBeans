@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +12,28 @@ import {
   appendSmokeLedger, branchAwareTurns, canStartFull, configuredCallMaximum, createCostGuard, deriveFixtureTrace, endpointCallMultiplier, fixturePass, fullStagePass, loadCumulativeCostLedger, persistCumulativeCostLedger,
   persistRunArtifact, redactDiagnostic, runInjectedCorpus, runLiveCase, runLiveEndpointTurn, smokeIsClean, stagePlan, targetedStagePass, validateCostCap,
 } from './ruphus-conversation-runner.mjs';
+
+test('live CLI reaches fail-closed preflight without circular-import deadlock', () => {
+  const result = spawnSync(process.execPath, [
+    'scripts/ruphus-conversation-runner.mjs',
+    '--mode=live',
+    '--stage=smoke',
+    '--cost-cap-usd=30',
+  ], {
+    cwd: join(import.meta.dirname, '..'),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      RUPHUS_AGENT_MAX_INPUT_TOKENS: '1000000',
+      RUPHUS_AGENT_MAX_OUTPUT_TOKENS: '1000',
+      RUPHUS_DEV_PROJECT_ID: '',
+      RUPHUS_DEV_FIXTURE_UID: '',
+    },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /fixture seeding requires a Dev project/);
+  assert.doesNotMatch(result.stderr, /unsettled top-level await/);
+});
 
 test('U3 stage denominators are frozen and targeted always appends smoke', async () => {
   const { cases } = await loadFixtureManifest();
