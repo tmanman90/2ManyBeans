@@ -35,6 +35,20 @@ function recipeValue(recipe) {
   const stack = [value]; while (stack.length) { const current = stack.pop(); if (!current || typeof current !== 'object') continue; for (const key of Object.keys(current)) { if (current[key] === null) delete current[key]; else if (typeof current[key] === 'object') stack.push(current[key]); } }
   return value;
 }
+function mergeRecipePatch(before, patch) {
+  const result = clone(before);
+  const merge = (target, source) => {
+    for (const [key, value] of Object.entries(source || {})) {
+      if (value == null) continue;
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        if (!target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) target[key] = {};
+        merge(target[key], value);
+      } else target[key] = clone(value);
+    }
+  };
+  merge(result, patch);
+  return result;
+}
 function modelRecipe(recipe) {
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
   const result = {};
@@ -135,7 +149,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (context.proposalState?.target && (context.proposalState.target.coffeeRef !== args.coffeeRef || context.proposalState.target.slot !== slotKey)) return { ok: false, code: 'proposal_target_mismatch', message: 'That suggestion is bound to a different coffee and recipe.' };
     const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
     if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
-    const before = clone(target.before); const after = recipeValue(args.afterRecipe); const paths = changedPaths(before, after).filter(Boolean);
+    const before = clone(target.before); const after = mergeRecipePatch(before, args.afterRecipe); const paths = changedPaths(before, after).filter(Boolean);
     if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (paths.length !== 1 || paths[0].startsWith('method') || paths[0].startsWith('device') || paths[0].startsWith('mode')) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
     const validationRecipe = recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;

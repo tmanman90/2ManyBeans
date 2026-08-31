@@ -4,6 +4,7 @@ import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { ambiguityClarification, proposalEligibleForTarget, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
 import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 
 const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
 test('prompt uses held brew details and deterministic focus before asking', () => {
@@ -56,6 +57,15 @@ test('a successful recipe proposal ends with one truthful review handoff', async
   const result = await runRuphusTurn({ turnId: 'proposal-complete', context: current, userText: 'Yes, make that change.', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, proposal: { id: 'p1' }, artifact: { type: 'recipe_proposal', id: 'p1' } }) }, emit: (frame) => frames.push(frame) });
   assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'I’ve prepared one recipe change for you to review.');
   assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
+});
+test('proposal candidates treat null schema fields as unchanged recipe values', async () => {
+  const before = generateV60Recipe({}, { dose: 15 }); const saved = [];
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's1' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => { saved.push(input); return { id: 'p1', ...input }; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { method: null, device: null, mode: null, dose: null, water: null, grindSize: { setting: 4, microns: null, description: null, grinderSpecific: null, sourceExact: null } } });
+  assert.equal(result.ok, true); assert.equal(saved.length, 1); assert.equal(saved[0].after.dose, before.dose); assert.equal(saved[0].after.grindSize.setting, 4);
+  assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
 });
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;
