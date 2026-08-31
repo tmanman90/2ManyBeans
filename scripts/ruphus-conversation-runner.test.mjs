@@ -119,6 +119,8 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(userSupplied.fabricatedEvidence, false);
   const advice = deriveFixtureTrace({ fixture, reply: 'The last brew used Ode 4.2. Next time, try Ode 4.0 and aim for 3:00.', factSheet: 'The last brew used Ode 4.2.', frames: [] });
   assert.equal(advice.fabricatedEvidence, false);
+  const sameSentenceAdvice = deriveFixtureTrace({ fixture, reply: 'Your V60 recipe was 15 g to 250 g at 94°C, Ode 4.2, finishing around 2:45; for a flat cup, I’d test one small step finer to 4.0.', factSheet: 'V60 recipe 15 g to 250 g at 94°C, Ode 4.2, finishing around 2:45.', frames: [] });
+  assert.equal(sameSentenceAdvice.fabricatedEvidence, false);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {

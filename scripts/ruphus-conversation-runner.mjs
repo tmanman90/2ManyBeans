@@ -387,9 +387,10 @@ function hasUnsupportedFactualClaim(reply, knownText) {
   const value = String(reply || '');
   const evidenceSentences = value.split(/(?<=[.!?])\s+|\n+/).filter((sentence) => /\b(?:history|earlier|previous|recorded|last|notes? (?:show|say|mention)|brew log|tasted|was brewed|used|finished|recipe (?:is|was))\b/i.test(sentence));
   return evidenceSentences.some((sentence) => {
-    const numbers = sentence.match(/\b\d+(?:\.\d+)?\b/g) || [];
+    const evidenceClause = sentence.split(/\b(?:so|therefore|for\s+(?:a|the)\s+[^,;.!?]*cup|i[’']d|i would|try|test|recommend|adjust|next time)\b/i)[0];
+    const numbers = evidenceClause.match(/\b\d+(?:\.\d+)?\b/g) || [];
     if (numbers.some((number) => !knownText.includes(number.toLowerCase()))) return true;
-    const properNames = sentence.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
+    const properNames = evidenceClause.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
     return properNames.some((name) => {
       const candidate = name.replace(/^(?:For|Your|The|That|This|Got|Next|Keep|Thin|Taste|Notes)\s+/i, '');
       return candidate.includes(' ') && !knownText.includes(candidate.toLowerCase());
