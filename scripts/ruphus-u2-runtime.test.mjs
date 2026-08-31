@@ -35,6 +35,13 @@ test('tools expose only resolver, composite evidence, recipe, and proposal', asy
   const evidence = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 }); calls.push(evidence); assert.equal(evidence.coffee.status, 'available');
   await assert.rejects(() => tools.call('read_coffee_evidence', { coffeeRef: 'c1', uid: 'evil', windowDays: 14 }), /server-bound/);
 });
+test('this coffee resolves the current named coffee, then the verified launch coffee', async () => {
+  const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel' }, { id: 'coffee-2', name: 'Colombia La Esperanza' }] };
+  const launchContext = { ...base, launchCoffeeId: 'c2', __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' }, ledger: { entries: [], namedCoffees: [] } };
+  assert.equal((await createRuphusTools({ uid: 'u1', context: launchContext, readers }).call('resolve_coffee', { reference: 'this coffee' })).coffeeRef, 'c2');
+  const namedContext = { ...launchContext, ledger: { entries: [], namedCoffees: ['El Vergel'] } };
+  assert.equal((await createRuphusTools({ uid: 'u1', context: namedContext, readers }).call('resolve_coffee', { reference: 'current coffee' })).coffeeRef, 'c1');
+});
 test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
   const frames = []; let runs = 0;
   const provider = { async runTurn() { runs += 1; return runs === 1 ? { text: 'Proposal: {"dose":16}' } : { text: 'Try one step finer than Ode 4.2.' }; } };

@@ -4,7 +4,7 @@
 const textOf = (value) => typeof value === 'string' ? value : String(value ?? '');
 const words = (value) => textOf(value).trim().split(/\s+/).filter(Boolean);
 const paragraphs = (value) => textOf(value).trim() ? textOf(value).trim().split(/\n\s*\n/) : [];
-const sentenceCount = (value) => textOf(value).split(/[.!?]+/).map((part) => part.trim()).filter(Boolean).length;
+const sentenceCount = (value) => textOf(value).replace(/(\d)\.(\d)/g, '$1\u0000$2').split(/[.!?]+/).map((part) => part.trim()).filter(Boolean).length;
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 export const CONTRACT_VERSION = 'conversation-contract-v1';

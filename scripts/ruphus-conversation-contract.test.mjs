@@ -31,6 +31,7 @@ test('length and shape graders distinguish ordinary caps from runtime hard cap',
   assert.equal(gradeC1Length({ reply: `${'coffee '.repeat(161)}brew.` }).some((item) => item.code === 'RT2_LENGTH'), true);
   assert.ok(gradeC2Shape({ reply: '**heading**\n\n- one\n- two' }).some((item) => item.code === 'RT2_MARKUP'));
   assert.ok(gradeC2Shape({ reply: 'one\n\ntwo\n\nthree\n\nfour' }).some((item) => item.code === 'C2_PARAGRAPHS'));
+  assert.equal(gradeC2Shape({ reply: 'Move the Ode from 4.2 to 4.0 and keep 15 g to 250 g unchanged. That should add sweetness and body.' }).some((item) => item.code === 'C2_SENTENCES'), false);
 });
 
 test('question, value, number, and tone graders enforce conversational constraints', () => {
