@@ -119,7 +119,8 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const sentences = value.split(/(?<=[.!?])\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
   const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beat|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
-  if (sentences.some((sentence) => directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence) && !(hasSizedRecommendation && comparison.test(sentence)))) {
+  const conditionalAlternative = /\bif\b/i;
+  if (sentences.some((sentence) => directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence) && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence))))) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
   return result;
@@ -205,7 +206,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
   if (unavailable.has(claimedKind) || unavailable.has(claimedKind.replace(/s$/, ''))) {
     return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, `reply claims ${claimedKind} are absent even though that source was unavailable`, { runtime: true })];
   }
-  if (/\bnothing\b[^.?!]*(?:(?:brew log|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|notes))/i.test(value)) return [];
+  if (/\bnothing\b[^.?!]*(?:(?:brew log|brew details|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|brew details|notes))/i.test(value)) return [];
   if (/\bno\s+(?:linked\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^.?!]{0,64}\b(?:had|has|with)\s+no\s+(?:linked\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
   const hasEvidence = Object.values(evidence || {}).some((entry) => Array.isArray(entry) && entry.length > 0);

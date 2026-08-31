@@ -9,7 +9,8 @@ import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
 test('prompt uses held brew details and deterministic focus before asking', () => {
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never ask for dose, water, grind, temperature, or brew time when a tool result already supplies it/);
-  assert.match(RUPHUS_SYSTEM_PROMPT, /keep ordinary replies under 90 words/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /never exceed 90 words in an ordinary reply/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /asks you to tell them about it, answer with one useful recipe or history detail/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /“The other” means the matching coffee other than the current one/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /never leave it at vague “more extraction/);

@@ -58,8 +58,10 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'A bit more extraction should help.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'A finer grind would beat more dose; try one small step finer.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'I’d try more dose before a finer grind. Go from 15 g to 16 g coffee.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Try 16 g instead of 15 g. A finer grind is better if the cup was sour.', userUnits: {} }).length, 0);
   assert.ok(gradeC5Numbers({ reply: 'A finer grind would beat more dose.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.ok(gradeC5Numbers({ reply: 'I’d try more dose before a finer grind.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'A finer grind is the better move if the cup was sour.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.equal(gradeC5Numbers({ reply: 'Propose one small dose increase.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'I’d lean toward a little more extraction, one change at a time.', userUnits: {} }).length, 0);
   assert.ok(gradeC5Numbers({ reply: 'Use more extraction.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
@@ -103,6 +105,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.ok(gradeEvidenceScope({ reply: 'The V60 ran yesterday with no tasting note.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));
   assert.ok(gradeEvidenceScope({ reply: 'There is no recipe for that brew.', evidence: { unavailable: ['recipe'] } }).some((item) => item.runtime === true));
   assert.equal(gradeEvidenceScope({ reply: "Nothing in the brew log alone flags a problem, though I couldn't check tasting notes.", readWindow: { days: 14 }, evidence: { records: [{}] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: "Nothing obviously alarming from the brew details alone. I couldn't check tastings.", readWindow: { days: 14 }, evidence: { records: [{}], unavailable: ['tastings'] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: "Nothing obviously alarming from the brew log alone. I couldn't check tasting notes.", readWindow: { days: 14 }, evidence: { records: [{}], unavailable: ['tastings'] } }).length, 0);
 });
 
