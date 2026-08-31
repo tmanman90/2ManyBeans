@@ -9,6 +9,20 @@ test('tools expose only resolver, composite evidence, recipe, and proposal', asy
   const calls = [];
   const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });
   assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
+  const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
+  const assertStrictSchema = (schema) => {
+    if (schema?.type === 'array') {
+      assert.ok(schema.items, 'every provider array schema must declare items');
+      assertStrictSchema(schema.items);
+    }
+    if (schema?.type === 'object') {
+      assert.equal(schema.additionalProperties, false);
+      assert.deepEqual(schema.required, Object.keys(schema.properties));
+      Object.values(schema.properties).forEach(assertStrictSchema);
+    }
+    if (Array.isArray(schema?.anyOf)) schema.anyOf.forEach(assertStrictSchema);
+  };
+  assertStrictSchema(proposalSchema);
   assert.equal((await tools.call('resolve_coffee', { reference: 'jar 1' })).coffeeRef, 'c1');
   const offRotation = await tools.call('resolve_coffee', { reference: 'Rwanda' });
   assert.equal((await tools.call('read_coffee_evidence', { coffeeRef: offRotation.coffeeRef, windowDays: 14 })).coffee.status, 'available');
