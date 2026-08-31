@@ -54,9 +54,10 @@ test('Anthropic judge adapter uses frozen instructions and parses streamed usage
 test('Anthropic judge accepts a forced structured tool result', async () => {
   const prior = process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = '100';
   try {
-    const result = { ...judged(5), mean: 1 };
+    const result = { ...judged(5), schemaVersion: 'model-invented-version', mean: 1 };
     const response = { ok: true, headers: { get: () => 'application/json' }, json: async () => ({ model: 'claude-sonnet-5', usage: { input_tokens: 10, output_tokens: 10 }, content: [{ type: 'tool_use', name: 'submit_result', input: result }] }) };
     const envelope = await createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async () => response })({ promptVersion: 'v1' });
+    assert.equal(envelope.result.schemaVersion, JUDGE_SCHEMA_VERSION);
     assert.equal(envelope.result.mean, 5);
     assert.equal(validateJudgeResult(envelope.result).valid, true);
   } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }

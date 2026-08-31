@@ -3,9 +3,9 @@ import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { ANTHROPIC_ENDPOINT, buildAnthropicRequest } from './ruphus-eval/provider-anthropic.mjs';
 
 export const JUDGE_SCHEMA_VERSION = 'ruphus-conversation-judge-v1';
-export const JUDGE_PROMPT_VERSION = 'ruphus-conversation-judge-prompt-v1';
+export const JUDGE_PROMPT_VERSION = 'ruphus-conversation-judge-prompt-v2';
 export const JUDGE_INSTRUCTIONS = Object.freeze(`You are a blind coffee-conversation judge. Score only the visible transcript against the stated intent and fact sheet. Treat a launch surface stated in the intent as visible user context. Do not infer hidden traces, gold text, known-bad text, IDs, or implementation details. G1 friendNotForm: knowledgeable friend, not a report. G2 knowsMyCoffee: uses the actual coffees, recipes, and history correctly. G3 earnsQuestions: asks only what the evidence cannot answer; asking no question deserves a high score when the evidence already supports the answer. G4 movesBrewForward: leaves something actionable or clearer. G5 listens: engages with specifics, corrections, topic switches, and pronouns. G6 phoneSized: short readable paragraphs. G7 confidentNotBossy: has opinions, explains briefly, accepts pushback. G8 proposalFeelsEarned: a proposal, when appropriate, is a natural conclusion and never a demand; if no proposal is needed or attempted, score this dimension 5 unless the assistant improperly avoids an explicitly requested proposal. Return strict JSON with schemaVersion, scores for friendNotForm, knowsMyCoffee, earnsQuestions, movesBrewForward, listens, phoneSized, confidentNotBossy, proposalFeelsEarned, mean, and one short rationale. Each score is an integer from 1 to 5 and mean is their arithmetic mean.`);
-export const PAIRWISE_INSTRUCTIONS = Object.freeze(`You are a blind coffee-conversation pairwise judge. Compare the left and right visible transcripts against the stated intent and fact sheet. Do not infer hidden traces, gold text, known-bad text, IDs, or implementation details. Return strict JSON with schemaVersion, winner (left, right, or tie), and one short rationale. Choose the better coffee-friend conversation; a tie is not a win.`);
+export const PAIRWISE_INSTRUCTIONS = Object.freeze(`You are a blind coffee-conversation pairwise judge. Compare the left and right visible transcripts against the stated intent and fact sheet. Treat a launch surface stated in the intent as visible user context. Do not infer hidden traces, gold text, known-bad text, IDs, or implementation details. Return strict JSON with schemaVersion, winner (left, right, or tie), and one short rationale. Choose the better coffee-friend conversation; a tie is not a win.`);
 export const JUDGE_DIMENSIONS = Object.freeze([
   'friendNotForm', 'knowsMyCoffee', 'earnsQuestions', 'movesBrewForward',
   'listens', 'phoneSized', 'confidentNotBossy', 'proposalFeelsEarned',
@@ -163,6 +163,7 @@ export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_A
     } else payload = await response.json();
     result ||= (payload.content || []).find((block) => block?.type === 'tool_use' && block?.name === 'submit_result')?.input || null;
     if (!result) result = parseTextResult((payload.content || []).filter((block) => block?.type === 'text').map((block) => block.text || '').join(''));
+    if (object(result)) result = { ...result, schemaVersion: JUDGE_SCHEMA_VERSION };
     if (object(result?.scores) && JUDGE_DIMENSIONS.every((dimension) => Number.isFinite(result.scores[dimension]))) {
       result = { ...result, mean: JUDGE_DIMENSIONS.reduce((sum, dimension) => sum + result.scores[dimension], 0) / JUDGE_DIMENSIONS.length };
     }
