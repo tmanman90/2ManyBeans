@@ -154,6 +154,7 @@ test('natural model questions observed in the latest full report are declared by
     ['AE05', 0, 'The Kalita was watery; want me to suggest the exact change?', 'Would more dose beat a finer grind?'],
     ['AE13', 0, 'The pale brew is ambiguous; would you like one bounded recipe change?', 'No, just describe the photo for now.'],
     ['AE14', 1, 'Got it—the V60 is the one you brewed; would you like me to suggest one small V60 adjustment?', 'Not yet.'],
+    ['AE07', 0, 'Was it thin but sweet and clean, or sharp/sour and muted?', 'Sharp and under-ripe. What should I adjust now?'],
   ];
   for (const [id, index, question, expectedText] of observed) {
     const branch = nextBranchTurn(byId.get(id), index, { question });

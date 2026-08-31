@@ -55,7 +55,9 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'I’d target a touch more extraction, then one small step finer.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'A bit more extraction should help.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'A finer grind would beat more dose; try one small step finer.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'I’d try more dose before a finer grind. Go from 15 g to 16 g coffee.', userUnits: {} }).length, 0);
   assert.ok(gradeC5Numbers({ reply: 'A finer grind would beat more dose.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'I’d try more dose before a finer grind.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.equal(gradeC5Numbers({ reply: 'Propose one small dose increase.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'I’d lean toward a little more extraction, one change at a time.', userUnits: {} }).length, 0);
   assert.ok(gradeC5Numbers({ reply: 'Use more extraction.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
