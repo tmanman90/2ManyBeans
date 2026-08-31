@@ -206,11 +206,13 @@ test('live adapter surfaces only a bounded endpoint error code', async () => {
 
 test('live adapter rejects interrupted terminal frames while preserving priceable usage', async () => {
   const response = { ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => [
+    JSON.stringify({ type: 'tool_result', name: 'propose_recipe_change', result: { ok: false, code: 'one_change_required', message: 'private detail' } }),
     JSON.stringify({ type: 'turn_interrupted', code: 'slot_required', message: 'internal detail' }),
     JSON.stringify({ type: 'usage', usage: { input_tokens: 12, output_tokens: 3 } }),
   ].join('\n') };
   await assert.rejects(() => runLiveEndpointTurn({ endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'canary-token', payload: {}, fetchImpl: async () => response }), (error) => {
-    assert.match(error.message, /turn_interrupted \(slot_required\)/);
+    assert.match(error.message, /turn_interrupted \(slot_required\); last_tool_failure=one_change_required/);
+    assert.equal(error.toolFailureCode, 'one_change_required');
     assert.deepEqual(error.usage, { input_tokens: 12, output_tokens: 3 });
     assert.equal(error.providerDispatched, true);
     return true;

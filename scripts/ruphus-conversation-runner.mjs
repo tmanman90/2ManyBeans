@@ -443,10 +443,13 @@ export async function runLiveEndpointTurn({ endpoint, token, payload, devReadFau
     const failed = frames.find((frame) => frame.type === 'turn_failed' || frame.type === 'turn_interrupted');
     if (failed) {
       const code = /^[a-z0-9_-]{1,64}$/i.test(String(failed.code || '')) ? failed.code : 'turn_failed';
-      const error = new Error(`U3 endpoint ended with ${failed.type} (${code})`);
+      const lastToolFailure = frames.slice().reverse().find((frame) => frame.type === 'tool_result' && frame.result?.ok === false);
+      const toolFailureCode = /^[a-z0-9_-]{1,64}$/i.test(String(lastToolFailure?.result?.code || lastToolFailure?.result?.reason || '')) ? String(lastToolFailure.result.code || lastToolFailure.result.reason) : null;
+      const error = new Error(`U3 endpoint ended with ${failed.type} (${code})${toolFailureCode ? `; last_tool_failure=${toolFailureCode}` : ''}`);
       error.providerDispatched = true;
       error.usage = usage;
       error.model = RUPHUS_OPENAI_MODEL;
+      if (toolFailureCode) error.toolFailureCode = toolFailureCode;
       throw error;
     }
     if (!completed) throw new Error('U3 endpoint stream ended without a completed terminal frame');
