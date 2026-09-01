@@ -10,7 +10,7 @@ origin: docs/brainstorms/2026-08-30-ruphus-conversation-first-reset-requirements
 
 ## Summary
 
-Make Professor Ruphus a warm, experienced coffee friend in a natural multi-turn mobile conversation, and prove it with staged real-provider conversations, a blind calibrated judge, and unscripted owner conversations on a physical Dev device before touching heavier session or rollout architecture. Build the smallest vertical slice on the existing session model: remove the launch cage, give the model a compact rotation and setup snapshot and barista-language evidence with a bounded ledger, infer method by priority order, enforce a deliberately narrow runtime contract, and delete the user-visible failure seams. The first full gate is a backend conversation checkpoint, not a product claim. Product PASS (Dev-dogfood-ready) requires the Chat surface work, a final full gate on the final code, proven environment identity, and the product owner's unscripted device conversations logged with zero bad verdicts and every fixture they produce passed at full cadence on the final code. Durable multi-session storage is deferrable until after that and never blocks proving or dogfooding. Everything stays behind the existing Dev-only gates; production is out of scope.
+Make Professor Ruphus a warm, experienced coffee friend in a natural multi-turn mobile conversation, and prove it with staged real-provider conversations, a blind calibrated judge, and unscripted owner conversations on a physical Dev device before touching heavier session or rollout architecture. Build the smallest vertical slice on the existing session model: remove the launch cage, deterministically bind high-confidence coffee references before model reasoning, give the model a compact rotation and setup snapshot and barista-language evidence with a bounded ledger, infer method by priority order, enforce a deliberately narrow runtime contract, and delete the user-visible failure seams. The first full gate is a backend conversation checkpoint, not a product claim. Product PASS (Dev-dogfood-ready) requires the Chat surface work, the explicit native proposal/action loop for the authorized Dev owner, a final full gate on the final code, proven environment identity, and the product owner's unscripted device conversations logged with zero bad verdicts and every fixture they produce passed at full cadence on the final code. Durable multi-session storage is deferrable until after that and never blocks proving or dogfooding. Everything stays behind the existing Dev-only gates; production is out of scope.
 
 ---
 
@@ -25,9 +25,9 @@ The current Agent path can stream typed artifacts and protect recipe mutations, 
 This plan carries all requirements from the origin document (R1-R29), the Conversation Contract C1-C10 (with C6 split into C6a hard tokens and C6b context-sensitive phrases), runtime enforcement RT1-RT5, method priority M1-M6 including M1b, evidence model E1-E6, session behavior S1-S4, feel rubric G1-G8, catastrophic failures CF1-CF6, and acceptance fixtures AE1-AE14. Groupings preserve origin IDs.
 
 - R1-R4. One coherent conversation with a launch clue of `{ coffeeRef?, surface, launchItem? }` (coffee-only for direct Chat, bean cards, and the unsaved tasting-wizard reveal; one temporary typed item hint for recipe, brew, and tasting-card surfaces, with a method required for a recipe and optional for a brew or tasting and never derived for a tasting from the coffee's recipes or profile), invisible mutable focus, age-based session boundaries (S1-S3), a new-chat boundary that clears the ledger and never deletes messages (S4), and resumable history.
-- R5-R8. Automatic, parallel, owner-scoped retrieval (E1-E5) over a default 14-day history window that widens on request, older references, or corrections, with scoped absence and no unqualified absence claim over a bounded read; model-called `resolve_coffee` reference resolution (E6); one named clarification for genuine ambiguity; correction repair (C8).
+- R5-R8. Automatic, parallel, owner-scoped retrieval (E1-E5) over a default 14-day history window that widens on request, older references, or corrections, with scoped absence and no unqualified absence claim over a bounded read; a trusted pre-model turn binder for high-confidence exact, ordinal, pronoun, and sole-alternative coffee references, with model-called `resolve_coffee` retained for fuzzy or unresolved language (E6); one named clarification only for genuine ambiguity; correction repair (C8).
 - R9-R12. Method by priority order (M1, M1b, M2-M6) over recipe-slot identities (Aiden, V60 hot, V60 iced, Kalita hot, Kalita iced) with the mode rule (explicit user mode wins; M2-M5 may infer iced from the recent or only saved evidence; hot is only the final fallback and never overrides a sole or recent iced recipe); recorded evidence before questions with question limits (C3-C4); real back-and-forth; the coffee-friend voice (C1, C2, C5-C7).
-- R13-R15. Earned, optional, card-only proposals (C9) with no recipe dump; unchanged exact-target and approval authority; unchanged safety, provenance, receipt, undo, and account-deletion boundaries.
+- R13-R15. Earned, optional, card-only proposals (C9) with no recipe dump; explicit native Apply, Brew once, and Keep controls only when their existing command preconditions and authorized Dev mutation gate pass; unchanged exact-target and approval authority; unchanged safety, provenance, receipt, undo, and account-deletion boundaries.
 - R16-R18. Staged real-provider evaluation gate with catastrophic and ordinary failure classes; exactly fourteen fixtures, eleven critical (AE1-AE10, AE14) and three supporting (AE11-AE13); polished text (C2, C6).
 - R19-R21. Narrow runtime enforcement (RT1-RT5) with everything else graded in evaluation; outage degradation (E5); bounded ledger (E3).
 - R22. Seven failure seams removed or replaced, including the proposal card's JSON dump.
@@ -73,6 +73,10 @@ This plan carries all requirements from the origin document (R1-R29), the Conver
 
 ## Context & Research
 
+### 2026-08-31 Research Amendment
+
+The first live smoke on commit `bec0506` exposed a contract-level gap that prompt tuning cannot close: after Ruphus had focused El Vergel, the user said "Now the other Colombia," the deterministic resolver could identify the sole alternative, but the model skipped the resolver and asked which Colombian coffee was meant. Current consumer-agent patterns reinforce the same correction: trusted app context is resolved before model reasoning, consequential actions remain explicit native confirmations, and clarifications are reserved for genuinely ambiguous choices. This amendment therefore replaces the model-only reference decision with a narrow trusted turn binder and completes the existing native proposal/action loop. It does not authorize a general text parser, autonomous mutation, new hardware behavior, production rollout, or broader operating-system agency.
+
 ### Relevant Code and Patterns
 
 - `api/ruphus-agent.js` is the authenticated, allowlisted streaming boundary. It already injects the authenticated UID and constructs owner-scoped readers.
@@ -117,12 +121,12 @@ This plan carries all requirements from the origin document (R1-R29), the Conver
 - **Compact rotation and setup snapshot instead of preloaded records:** Every turn carries the E1 snapshot (one setup line with default method, grinder, and units, then jars 1-3 with their saved recipe slots in display language, and counts) with opaque per-coffee reference keys mapped server-side to IDs. There is no separate profile-setup tool. The model never needs to speak an ID; a C6a token grader catches any that leak.
 - **Domain-language tool results and a bounded ledger:** Tool results render as E2 barista summaries (structured fields retained for deterministic code); the E3 ledger is a field on the session document, replayed into later turns, cleared on new chat, rebuilt on stale resumption, and its named coffees are the pronoun universe.
 - **Parallel reads with a budget:** One composite read fans out recipe, recent brews, and tastings concurrently over a default 14-day history window (the same window as M2) that widens when the user asks for or refers to older history or a correction implies it; the first turn's read includes a launch item by its ref regardless of the window; at most 6 reads and 2 tool rounds per turn; per-round timeout feeds E5 degradation. Empty or windowed results state their scope in domain language, and an unqualified absence claim over a bounded read is an ordinary evidence-scope failure.
-- **Resolution is a model-called tool, not a parser:** `resolve_coffee({ reference })` is called by the model with the reference language it extracted from the user's turn. Inside the tool, `referenceResolver` deterministically handles exact references, unique jar ordinals, normalized name, roaster, and origin tokens, bounded close spelling, and pronouns against the ledger's named coffees, reusing the existing inventory listing when the snapshot is insufficient. There is no regex pre-parser over raw user turns and no second overlapping search tool. `methodResolver` implements M1-M6 from the launch hint, ledger evidence, recipes, brews, and the setup line over recipe-slot identities (Aiden, V60 hot, V60 iced, Kalita hot, Kalita iced), returning `{ slot, displayName, tier }` or `{ ask: [candidates with display names] }`; an explicit user mode wins, M2-M5 may infer iced from the recent or only saved evidence, hot is only the final fallback when mode remains unspecified and the evidence does not distinguish it and never overrides a sole or recent iced recipe, and prose says "iced V60", never an internal slot key.
+- **Trusted turn binding before model reasoning:** Before each provider call, a narrow deterministic binder runs the existing owner-scoped `referenceResolver` against the complete allowed coffee inventory, bounded ledger, launch clue, and current user turn. It binds only high-confidence exact names, unique jar ordinals, established pronouns, sequence references, and a sole valid "other" alternative. A unique result becomes locked turn context with an opaque `coffeeRef`, is appended to the sanitized focus ledger, retires an incompatible launch hint, and must not be re-clarified by the model. A genuinely ambiguous result supplies bounded named candidates for one clarification. No confident result leaves the turn unbound and preserves model-called `resolve_coffee({ reference })` as the fuzzy/unknown fallback. The binder never infers a recipe mutation, never sees another owner's data, never rewrites model prose, and never performs broad intent classification. `methodResolver` implements M1-M6 from the locked coffee, launch hint, ledger evidence, recipes, brews, and setup line over recipe-slot identities (Aiden, V60 hot, V60 iced, Kalita hot, Kalita iced), returning `{ slot, displayName, tier }` or `{ ask: [candidates with display names] }`; an explicit user mode wins, M2-M5 may infer iced from the recent or only saved evidence, hot is only the final fallback when mode remains unspecified and the evidence does not distinguish it and never overrides a sole or recent iced recipe, and prose says "iced V60", never an internal slot key.
 - **One shared contract module, two enforcement layers:** `src/lib/ruphus/conversationContract.js` holds the C1-C10 graders as pure functions used by tests, the conversation runner, and the runtime post-check. The runtime post-check applies only the RT2 triggers; everything else is evaluation. No in-stream prose mutation anywhere.
 - **Buffer, then deliver:** The orchestrator buffers provider text until the post-check passes and emits `text_delta` frames only for checked text; the lifecycle caption covers the wait (visible within 1 second). One regeneration on an RT2 trigger; on a second failure, length or markup is delivered as is, and leak, JSON, or false-authority replies are replaced by one short in-character line. Every regeneration is written to the server-side trace and counts as an ordinary run failure.
 - **Persona prompt, not a checklist:** `ruphusPrompt.js` is a persona, three short exemplar exchanges, and the essential hard rules (one question at most, do not ask for what the app knows, acknowledge a correction in one sentence, name the coffee when you switch, propose only after agreement, no markup, no machine words) plus the snapshot, ledger, and resolver blocks. It never contains graders, templates, from/to/delta phrasing rules, or token-echo instructions.
 - **Invisible focus machinery:** Focus is derived server-side from successful reads and recorded in the server-side turn trace only. No streamed focus frame, no focus card, no persistent context header (`RuphusContextHeader` is retired), no client-derived focus from artifacts.
-- **Proposals are earned and card-only:** The proposal tool is callable only after the orchestrator has seen a substantive diagnosis reply and a user turn that asks for or agrees to a change; proposal-shaped prose is an RT2 trigger and CF6 in evaluation. The card shows only from → to rows in the user's units; the "All controls" JSON block is deleted. In Dev dogfood the card shows the suggested change with no action buttons.
+- **Proposals are earned, card-only, and explicitly actionable:** The proposal tool is callable only after the orchestrator has seen a substantive diagnosis reply and a user turn that asks for or agrees to a change; proposal-shaped prose is an RT2 trigger and CF6 in evaluation. The card shows only from → to rows in the user's units; the "All controls" JSON block is deleted. For the authorized Dev owner, the card exposes the existing app-owned Apply, Brew once, and Keep commands only when their exact proposal, slot, freshness, entitlement, and mutation-rollout preconditions pass. The model cannot invoke those commands, every action requires a user tap, stale or uncertain states disable duplicate action, and canonical receipts/recovery remain the truth.
 - **Truthful direct opening:** `dataLoaded` flows from `useAppData` through `main.jsx` and `App` to `ChatTab`; `opening.js` returns the neutral greeting until it is true, then a rotation-aware line whose template is chosen by meaningful state, and never a rotation claim before data is loaded. The opening is recomputed per fresh open or new chat and is not persisted until the user sends.
 - **In-character recovery:** Signed-in Agent failures show "Professor Ruphus lost the thread. Try again." Only demo mode uses the legacy route. No mode language anywhere.
 - **New chat is a boundary, never a deletion:** U4 marks a boundary index on the existing active document; messages before it stay stored and reachable behind the one Continue affordance; the ledger clears. U5 later gives each conversation its own durable document behind the same affordance.
@@ -209,7 +213,8 @@ Runtime behavior (RT1-RT5): provider text is buffered and never emitted as `text
 ```mermaid
 flowchart TB
     U1[U1 Contract graders, fixtures,<br/>gold and known-bad transcripts] --> U2[U2 Vertical slice on existing session]
-    U2 --> U3[U3 Backend conversation checkpoint<br/>smoke, calibration, full gate]
+    U2 --> U2B[U2b Trusted turn binding remediation]
+    U2B --> U3[U3 Backend conversation checkpoint<br/>smoke, calibration, full gate]
     U3 --> U4[U4 Chat surface seams and launch handoffs]
     U4 --> R4[Targeted rerun + smoke<br/>post-surface checkpoint]
     R4 --> U6[U6 Final full gate, rollout, isolation,<br/>device, owner conversations<br/>= Product PASS / Dev-dogfood-ready]
@@ -292,8 +297,8 @@ flowchart TB
 **Approach:**
 - Contract: `validateContextRef` (`contracts.js:96-101`) becomes the `launchContext` validator for `{ coffeeRef?, surface, launchItem? }`: `surface` is required from a fixed set (direct, bean_card, recipe_kalita_v60, recipe_aiden, tasting_card, tasting_wizard); `launchItem` is optional and must be `{ kind: 'recipe' | 'brew' | 'tasting', ref, method? }` with `method` (a recipe-slot identity) required for kind recipe and optional for brew and tasting; `slotKey`, a bare `method`, and any recipe identity outside a typed `launchItem` are rejected. Add `ledger`, `rotationSnapshot`, and boundary shapes with byte caps. Retire `coffee_context` and `data_gap` artifact types (reject on emit, tolerate on read of old history). Legacy caged launches are rejected from this unit on; the in-app producers are converted in U4, and contextual in-app launches are not exercised between the two.
 - Evidence (`ruphusEvidence.js`): build the E1 snapshot from the owner's coffees with opaque ref keys, each coffee's saved recipe slots in display language, and the setup line (default method, grinder, units from the existing allowlist, which excludes contact, subscription, consent, token, and integration fields); render E2 summaries for recipe, brews, and tastings in the user's units and grinder terms, with empty or windowed results stating their scope ("no tastings in the last two weeks"); implement the E3 ledger with eviction, the window each read covered, the "unavailable" entry kind, and the named-coffee list for pronouns; provide a composite parallel read with per-read timeouts and the E4 budget over a default 14-day window that widens when the user asks for or refers to older history or a correction implies it, and that includes a launch item by its ref on the first turn regardless of the window.
-- Tools: `resolve_coffee({ reference })` (model-called; deterministic matching inside; reuses the existing inventory listing when the snapshot is insufficient), `read_coffee_evidence` (composite, parallel), `read_recipe` (explicit recipe slot from the resolver only), and the existing `propose_recipe_change`. No `search_coffees` and no `read_profile_setup`. The existing `read_coffee` is replaced by `read_coffee_evidence`, and no read returns an artifact; a missing recipe returns a domain-language "has no Kalita recipe; has an iced V60 and Aiden" result, never a card. Tool descriptions use coffee language.
-- Resolvers: `referenceResolver` handles exact refs, unique jar ordinals, normalized name/roaster/origin tokens, bounded close spelling, and pronouns from the ledger's named coffees; it returns one high-confidence match or a bounded named candidate set and is invoked only by the `resolve_coffee` tool, never by a regex pass over the user turn. `methodResolver` implements M1, M1b, M2-M6 over the launch hint, ledger, recipes, brews, and setup line using recipe-slot identities and the mode rule (explicit user mode wins; M2-M5 may infer iced from the recent or only saved evidence; hot is only the final fallback and never overrides a sole or recent iced recipe), returning the slot plus its display name; the M1b hint applies only when the launch item carries a method, is bound to the launch `coffeeRef`, stated once, dropped on any coffee change or method correction, and never carried to another coffee; a tasting item without a recorded method yields no M1b method and inference continues at M2, never deriving a method from the coffee's recipes or profile.
+- Tools: `resolve_coffee({ reference })` (model-called fallback after trusted turn binding; deterministic matching inside; reuses the existing inventory listing when the snapshot is insufficient), `read_coffee_evidence` (composite, parallel), `read_recipe` (explicit recipe slot from the resolver only), and the existing `propose_recipe_change`. No `search_coffees` and no `read_profile_setup`. The existing `read_coffee` is replaced by `read_coffee_evidence`, and no read returns an artifact; a missing recipe returns a domain-language "has no Kalita recipe; has an iced V60 and Aiden" result, never a card. Tool descriptions use coffee language.
+- Resolvers: `referenceResolver` handles exact refs, unique jar ordinals, normalized name/roaster/origin tokens, bounded close spelling, and pronouns from the ledger's named coffees; it returns one high-confidence match or a bounded named candidate set. U2b invokes it through the narrow trusted turn binder before the provider for supported high-confidence discourse forms, while the `resolve_coffee` tool remains the fallback for fuzzy or unresolved language. `methodResolver` implements M1, M1b, M2-M6 over the launch hint, ledger, recipes, brews, and setup line using recipe-slot identities and the mode rule (explicit user mode wins; M2-M5 may infer iced from the recent or only saved evidence; hot is only the final fallback and never overrides a sole or recent iced recipe), returning the slot plus its display name; the M1b hint applies only when the launch item carries a method, is bound to the launch `coffeeRef`, stated once, dropped on any coffee change or method correction, and never carried to another coffee; a tasting item without a recorded method yields no M1b method and inference continues at M2, never deriving a method from the coffee's recipes or profile.
 - Prompt: persona, three short exemplar exchanges, the essential hard rules, and the snapshot, ledger, and resolver results as separate blocks. Remove "canonical" and "selected coffee" language. No graders, checklists, templates, from/to/delta rules, or token-echo instructions.
 - Orchestrator: remove the authority-claim prose filter; buffer provider text and emit `text_delta` only after the RT2 post-check passes; one regeneration on a trigger, RT3 second-failure handling, RT5 trace recording; gate the proposal tool on C9 state; handle parallel tool calls in one round; keep unknown/forbidden-tool fail-closed behavior, usage attribution, and truthful interrupted accounting; record focus changes in the server-side turn trace only, with no streamed frame.
 - Provider: support multiple tool calls per round and continuation; keep storage disabled and retries explicit.
@@ -332,13 +337,50 @@ flowchart TB
 - All U1 cases pass through the real orchestrator and tool contracts with the injected provider (plumbing proof, labeled as such).
 - Tool traces show parallel reads within budget and retrieval preceding every claim about history.
 
+- U2b. **Bind high-confidence coffee references before provider reasoning**
+
+**Goal:** Close the live `AE10` failure without adding a broad natural-language framework: when Coffee can uniquely resolve the user's coffee reference, the provider receives that target as locked context before it chooses tools or prose.
+
+**Requirements:** R5-R8, R11, R19; E3, E6; C3, C8, C10; AE1, AE2, AE10, AE14
+
+**Dependencies:** U2
+
+**Files:**
+- Create: `api/_lib/ruphusTurnBinder.js`
+- Modify: `api/_lib/ruphusContext.js`
+- Modify: `api/_lib/ruphusPrompt.js`
+- Modify: `api/_lib/ruphusTools.js`
+- Modify: `api/ruphus-agent.js`
+- Modify/Test: `scripts/ruphus-reference-resolution.test.mjs`
+- Modify/Test: `scripts/ruphus-u2-runtime.test.mjs`
+- Modify/Test: `scripts/ruphus-agent-endpoint.test.mjs`
+- Modify/Test: `scripts/ruphus-conversation-contract.test.mjs`
+
+**Approach:**
+- Build one pure binder over `{ userText, coffees, ledger, launchContext }`. It recognizes only exact coffee names, unique jar ordinals, established `this`/`that`/`first`/`back` references, and a sole valid `other` alternative after excluding the current focus. It delegates candidate selection to the existing `referenceResolver`; it does not diagnose coffee, infer arbitrary intent, or fuzzy-match unsupported prose.
+- Run it after owner-scoped context assembly and before the first provider dispatch. A unique result adds a safe enumerable `turnBinding: { status: 'locked', coffeeRef, coffeeName }`, non-enumerable server identity, sanitized `coffee_focus` ledger entry, and trace metadata. The prompt states that the locked coffee is authoritative for this turn and may not be re-clarified; reads use its opaque ref. A changed coffee retires the launch hint.
+- A genuinely ambiguous result adds `turnBinding: { status: 'ambiguous', candidates: [{ coffeeRef, coffeeName }] }` and permits exactly one named clarification. No match omits the block and leaves `resolve_coffee` available to the model for fuzzy language such as a misspelled name.
+- If the model still calls `resolve_coffee` for the locked reference, the tool returns the same target and cannot contradict it. Persist the resulting focus with the existing bounded ledger/session path.
+
+**Test scenarios:**
+- After El Vergel is the latest focus, `Now the other Colombia` locks the sole other Colombian coffee before the first provider call and the reply does not ask which Colombian coffee was meant.
+- The next `that one` stays on the newly locked coffee; `back to the first one` returns to El Vergel.
+- `the Colombian one` with two valid candidates and no established focus remains ambiguous and produces one named clarification.
+- `El Virgil` remains an unbound fuzzy case for model-called `resolve_coffee` and still resolves through that tool.
+- Cross-owner refs never enter the binder; provider-visible context contains opaque refs and allowed names only; the focus ledger remains within its existing authoritative byte/entry bounds.
+- A coffee switch drops an incompatible launch hint and cannot change an already-issued proposal target.
+
+**Verification:**
+- The endpoint test captures the first provider request and proves the locked target is present before any tool call.
+- The live AE10 transcript is rerun in the next authorized smoke and cannot pass by weakening the clarification or wrong-target graders.
+
 - U3. **Run the staged real-provider gate to a backend conversation checkpoint**
 
 **Goal:** Prove the conversation with the real model and real Dev reads before the Chat surface changes. The result is a backend conversation checkpoint, not Product PASS.
 
 **Requirements:** R16-R19, R26-R28; AE1-AE14; G1-G8; CF1-CF6
 
-**Dependencies:** U2
+**Dependencies:** U2b
 
 **Files:**
 - Create: `scripts/seed-ruphus-dev-fixture.mjs`
@@ -374,13 +416,13 @@ flowchart TB
 **Verification:**
 - The decision record reports per-fixture clean-run rates, catastrophic count, judge scores, pairwise results, latency percentiles, cost, stage, and commit, and marks the backend conversation checkpoint PASS or FAIL. U4 may proceed on FAIL only for work that does not touch conversation behavior, and nothing downstream may be declared accepted until the checkpoint passes.
 
-- U4. **Remove the user-visible seams from Chat and convert the launch handoffs**
+- U4. **Remove the user-visible seams, convert the launch handoffs, and complete native proposal actions**
 
-**Goal:** Make the Chat surface match the contract: truthful direct opening under hydration, in-character captions and retry, stale and new-chat boundaries on the existing session, card-only proposals with no placeholder actions and no JSON dump, invisible focus, photo handling, and the five launch surfaces sending `{ coffeeRef?, surface, launchItem? }`.
+**Goal:** Make the Chat surface match the contract: truthful direct opening under hydration, in-character captions and retry, stale and new-chat boundaries on the existing session, card-only proposals with no placeholder actions or JSON dump, explicit Apply/Brew once/Keep controls backed by the existing app-owned command boundary, invisible focus, photo handling, and the five launch surfaces sending `{ coffeeRef?, surface, launchItem? }`.
 
 **Requirements:** R2-R4, R13, R18, R22-R25; S1-S4; F1, F4-F5; AE1 (launch path), AE7 and AE12 (rendered-harness assertions), AE9, AE13, AE14
 
-**Dependencies:** U2; U3 backend checkpoint must pass before U4 is accepted
+**Dependencies:** U2b; U3 backend checkpoint must pass before U4 is accepted
 
 **Files:**
 - Modify: `src/main.jsx` (forward `dataLoaded` to `App`)
@@ -395,6 +437,9 @@ flowchart TB
 - Modify: `src/components/chat/RuphusMessage.jsx`
 - Modify: `src/components/chat/ArtifactRenderer.jsx`
 - Modify: `src/components/chat/artifacts/RecipeProposalCard.jsx` (delete the "All controls" `<pre>` JSON block and the "Available soon" labels)
+- Modify: `src/components/chat/artifacts/ActionReceiptCard.jsx`
+- Modify: `src/hooks/useRuphusAction.js`
+- Modify: `src/lib/recipeCommands.js`
 - Modify: `src/components/chat/RuphusLifecycleCaption.jsx`
 - Delete or retire: `src/components/chat/RuphusContextHeader.jsx`, `src/components/chat/artifacts/CoffeeContextCard.jsx`, `src/components/chat/artifacts/DataGapCard.jsx`
 - Create: `src/components/chat/RuphusOpening.jsx`
@@ -417,7 +462,7 @@ flowchart TB
 - Captions: fixed map by read category in `captions.js`, consumed by `RuphusLifecycleCaption.jsx`, visible within 1 second of send, rotation ≥ 2s, validated by the C6 graders; interrupted turn shows "Professor Ruphus got cut off" with one Try again.
 - Recovery: replace "Continue in standard chat" (`ChatTab.jsx:1321-1322`) with "Professor Ruphus lost the thread. Try again." No route switch for signed-in users.
 - Boundaries: `session.js` computes S1-S3 from the injected clock and last activity; S3 renders the opening with one Continue affordance showing date and first line; continuing rebuilds the ledger. New chat (S4) advances the boundary index on the existing active document and clears the ledger; messages before the boundary are never deleted and remain behind the same Continue affordance. This is complete in U4; U5 changes storage, not behavior.
-- Cards: `RecipeProposalCard.jsx` shows only the changed values as from → to rows in the user's units; the "All controls" `<details>`/`<pre>` JSON block is deleted; the "Available soon" labels and their disabled buttons are deleted; in Dev dogfood no action buttons render; no card renders for reads, gaps, or focus; remove the `coffee_context` focus derivation at `ChatTab.jsx:870-873`.
+- Cards: `RecipeProposalCard.jsx` shows only the changed values as from → to rows in the user's units; the "All controls" `<details>`/`<pre>` JSON block is deleted; the "Available soon" labels and disabled placeholders are deleted. When the authorized Dev mutation gate and exact proposal preconditions pass, the card exposes one primary control plus the relevant secondary choices from Apply, Brew once, and Keep; when they do not pass, the card remains informative without implying an unavailable action. Each tap dispatches the existing idempotent app-owned command, disables duplicate submission, preserves the proposal target across later focus changes, handles stale/uncertain results truthfully, and replaces the proposal state with a canonical receipt/recovery state. The model never dispatches a command. No card renders for reads, gaps, or focus; remove the `coffee_context` focus derivation at `ChatTab.jsx:870-873`.
 - Photos: reuse the existing description path; append the description to the turn as user evidence; never send image bytes to the agent provider.
 - Keep user bubbles, unbubbled Ruphus prose, keyboard behavior, and native artifact rendering consistent with the existing design; keep defensive Markdown stripping as a fallback only.
 - Keep pure session, opening, and caption logic outside render callbacks.
@@ -434,17 +479,17 @@ flowchart TB
 - Covers AE12 branch A (rendered-harness assertions). With `dataLoaded` true, the opening names the rotation, arrives without a network call, and falls back to the invitation on an empty rotation.
 - Covers AE12 branch B (rendered-harness assertions). With `dataLoaded` false at mount, the neutral greeting renders and the DOM never contains an empty-rotation statement; when `dataLoaded` flips, the rotation-aware line replaces it; nothing is persisted until the user sends; new chat recomputes.
 - Covers AE7 (rendered-harness assertions). 14-day return shows the opening and Continue affordance; continuing shows the prior thread and a rebuilt ledger; 2-hour return resumes silently; 3-day return resumes visibly; new chat leaves every prior message stored and reachable behind Continue.
-- Covers AE9. A proposal card stays bound to its original coffee after a focus change; no action buttons render in Dev dogfood.
+- Covers AE9. A proposal card stays bound to its original coffee after a focus change; the authorized Dev owner can Apply, Brew once, or Keep only through the exact app-owned action callbacks; an unauthorized, stale, or already-settled proposal cannot dispatch.
 - Covers AE13. A photo produces a description in the turn and no image bytes in the agent request.
 - Covers AE14 launch path. The Kalita/V60 modal launch reaches the endpoint with a recipe `launchItem` whose method is the displayed recipe's slot identity and no `slotKey` field.
-- DOM: the rendered proposal card contains no `<pre>` element and none of the internal key names `coffeeGrams`, `waterTemp`, `celsius`, `grindSize`, `setting`, or a bare `ratio` key; no "Available soon" text exists anywhere; no `coffee_context`, `data_gap`, or focus frame renders anything; no context header exists; the DOM never contains "standard chat."
+- DOM: the rendered proposal card contains no `<pre>` element and none of the internal key names `coffeeGrams`, `waterTemp`, `celsius`, `grindSize`, `setting`, or a bare `ratio` key; no "Available soon" text exists anywhere; enabled action labels match their actual command; settled receipts expose only valid next actions; no `coffee_context`, `data_gap`, or focus frame renders anything; no context header exists; the DOM never contains "standard chat."
 - Interrupted turn shows the in-character retry once, does not duplicate bubbles, and does not label partial output complete.
 - Captions never contain C6a tokens or unallowed C6b phrases; the first caption appears within 1 second; rotation cadence is honored.
 - Runtime interaction: exercise New chat, Continue previous, Try again, and focus-change callbacks so deferred closure errors cannot hide behind a build.
 - Mobile and desktop layouts, keyboard open/closed, long and short Ruphus text remain usable with accessible names and native-sized targets.
 
 **Verification:**
-- The rendered harness proves context-free entry, truthful opening under delayed hydration, natural focus switching in prose only, stale and new-chat boundaries without deletion, card-only proposals with no placeholder actions and no JSON, in-character recovery, and zero writes.
+- The rendered harness proves context-free entry, truthful opening under delayed hydration, natural focus switching in prose only, stale and new-chat boundaries without deletion, card-only proposals with no placeholder actions or JSON, correct enabled/disabled action states with injected command callbacks, in-character recovery, and no real writes. Focused command integration tests separately prove the Dev action dispatch and receipt transitions.
 - Post-surface checkpoint: a targeted rerun (AE1, AE7, AE9, AE12, AE13, AE14, and any fixture whose surface changed, at full cadence) plus one smoke passes after U4 lands, and the AE7 and AE12 rendered-harness assertions (opening, hydration, boundary, Continue) pass in the harness; these assertions count here and toward Product PASS, never toward the U3 backend checkpoint.
 
 - U5. **Add the durable per-conversation repository (deferrable)**
@@ -513,14 +558,14 @@ flowchart TB
 - Append: `scripts/fixtures/ruphus-conversation/cases.json` (AE15 onward from owner-conversation failures, with manifest version bump)
 
 **Approach:**
-- Keep Agent access restricted to the approved Dev UID and mutation access disabled.
+- Keep Agent access and recipe-action mutation access restricted to the approved Dev UID, with both server-side access and mutation allowlists required for Apply, Brew once, and Keep. Lifecycle closure remains available only through its existing exact attempt identity; no other mutation mode is added.
 - Integrate the current preview-routing work so every native Dev Agent, proposal, tasting-provenance, and Aiden preparation request uses the isolated preview backend without dropping deployment-protection query parameters.
 - Fail a native Dev build before Vite when required Firebase configuration is absent; never let the blank-screen failure masquerade as an Agent defect.
 - Require the installed Dev bundle to prove the Dev bundle ID and name, preview backend, and disabled Capgo auto-update before device evidence counts.
 - Run exactly one final full gate (64 runs) with the U3 runner on the final commit; any later code change restarts the cycle at a smoke.
 - Run the simulator and physical-device pass on the critical fixtures as a scripted click-through against the seeded fixture account; record pass, fail, or insufficient evidence per category.
-- Owner conversations (R29): the product owner holds at least five unscripted conversations in the installed Dev app on a physical device across at least three of the six surfaces (direct Chat, bean card, Kalita/V60 recipe, Aiden recipe, tasting card, tasting wizard reveal), including at least one tasting surface, against Dev data only, read and proposal only. Each conversation is logged with surface, date, every failure observed, and the owner's verdict (good, acceptable, or bad); every failure is written as a new fixture (AE15 onward) with a manifest version bump and run at its set's full cadence on the final code. A bad verdict or any appended fixture not yet passed at full cadence on the final code returns the work to a smoke and blocks Dev-dogfood-ready regardless of catastrophic classification. This category is never inferred from the scripted click-through.
-- Keep dogfood read/proposal-only: no recipe commands, Fellow, physical-brew claims, Firebase rules deployment, production Vercel, or production Capgo.
+- Owner conversations (R29): the product owner holds at least five unscripted conversations in the installed Dev app on a physical device across at least three of the six surfaces (direct Chat, bean card, Kalita/V60 recipe, Aiden recipe, tasting card, tasting wizard reveal), including at least one tasting surface, against Dev data only. Each conversation is logged with surface, date, every failure observed, and the owner's verdict (good, acceptable, or bad); at least one earned proposal exercises an available native action or records why no action was appropriate; every failure is written as a new fixture (AE15 onward) with a manifest version bump and run at its set's full cadence on the final code. A bad verdict or any appended fixture not yet passed at full cadence on the final code returns the work to a smoke and blocks Dev-dogfood-ready regardless of catastrophic classification. This category is never inferred from the scripted click-through.
+- Keep dogfood action scope narrow: only the existing Apply, Brew once, and Keep recipe commands for the approved Dev UID; no autonomous command, Fellow success claim, physical-brew claim, Firebase rules deployment, production Vercel, or production Capgo.
 - Authenticate through the signed-in Dev app or non-printing injection; never persist a token in fixtures, output, screenshots, or the decision record.
 - Diagnostic traces stay at 30 days redacted; user-visible conversation history is product data and is never expired by the telemetry TTL.
 
@@ -530,7 +575,7 @@ flowchart TB
 - Dev bundle and updater separation in `capacitor.config.ts` and the Capgo lesson document.
 
 **Test scenarios:**
-- Rollout: an unlisted UID receives no Agent access; the approved UID receives it; mutation modes remain unavailable.
+- Rollout: an unlisted UID receives no Agent or recipe-action access; the approved UID receives Agent access and only the enumerated Apply, Brew once, and Keep mutation modes; all other mutation modes remain unavailable.
 - Environment: preflight rejects every missing Firebase variable and prints no secret values.
 - Routing: every Ruphus-related native Dev API client preserves the preview host and protection query; production and web behavior unchanged.
 - Bundle isolation: Dev configuration names `com.talmeltzer.coffeehub.dev`, displays `2manybeans Dev`, and disables Capgo auto-update for the verified build.
@@ -549,11 +594,11 @@ flowchart TB
 | Goal | Requirements | Acceptance evidence | Units |
 |------|--------------|---------------------|-------|
 | Warm coffee-friend voice, phone-sized, not enforced into a form | R12, R18, R19 (C1-C7, RT1-RT5) | Deterministic graders on every run; regeneration counted as failure; G1, G6, G7 | U1, U2, U3 |
-| Uses account data without being asked | R5, R21, E1-E5 | AE1, AE5, AE6, AE10; evidence-before-claim and evidence-scope graders; G2 against the fact sheet | U2, U3 |
-| Infers the obvious, asks the genuine | R6, R7, R9, R10, M1-M6, E6 | AE2, AE3, AE4, AE5, AE11; C3 graders with the M6 exemption; G3 | U1, U2, U3 |
+| Uses account data without being asked | R5, R21, E1-E5 | AE1, AE5, AE6, AE10; evidence-before-claim and evidence-scope graders; G2 against the fact sheet | U2, U2b, U3 |
+| Infers the obvious, asks the genuine | R6, R7, R9, R10, M1-M6, E6 | AE2, AE3, AE4, AE5, AE10, AE11; locked-turn and unnecessary-clarification assertions; C3 graders with the M6 exemption; G3 | U1, U2, U2b, U3 |
 | Launch hint helps once, then disappears | R2, M1b | AE1, AE14; launch-shape tests; contract rejection of `slotKey` and bare method | U1, U2, U4 |
-| Accepts corrections and topic switches | R2, R8, R11, C8, C10 | AE1, AE2, AE6, AE9, AE10, AE14; G5 | U2, U3, U4 |
-| Proposal only when earned, optional, no recipe dump | R13, R14, C9 | AE5, AE9; orchestrator gate; card DOM assertions; G8 | U2, U3, U4 |
+| Accepts corrections and topic switches | R2, R8, R11, C8, C10 | AE1, AE2, AE6, AE9, AE10, AE14; locked-turn trace; G5 | U2, U2b, U3, U4 |
+| Proposal only when earned, optional, actionable, no recipe dump | R13, R14, C9 | AE5, AE9; orchestrator gate; card DOM and action-integration assertions; canonical receipts; G8 | U2, U3, U4 |
 | Honest under outages | R20, E5 | AE8 | U2, U3 |
 | Sessions feel resumable, never deleted | R3, R4, S1-S4 | AE7 conversational turns (runner, U3); AE7 opening, boundary, and Continue assertions (rendered harness, U4); boundary tests | U2, U3, U4, U5 |
 | Direct opening is truthful under hydration | R23 | AE12 starter-prompt turn (runner, U3); AE12 branches A and B opening and hydration assertions (rendered harness, U4); harness toggle | U3, U4 |
@@ -572,7 +617,8 @@ flowchart TB
     Surfaces[Direct Chat and five launch surfaces] --> Chat[Chat surface]
     Chat --> Stream[Authenticated Agent stream]
     Stream --> Context[Snapshot, ledger, launch hint, resolvers]
-    Context --> Reads[Parallel owner-scoped reads]
+    Context --> Binder[Trusted turn binder]
+    Binder --> Reads[Parallel owner-scoped reads]
     Reads --> Provider[Provider tool loop]
     Provider --> Buffer[Buffered prose]
     Buffer --> Check[Narrow post-check]
@@ -584,12 +630,12 @@ flowchart TB
     Frames --> Artifacts
 ```
 
-- **Interaction graph:** Direct Chat and the five launch surfaces feed one Agent conversation with a coffee-only or item-hinted clue; the endpoint assembles the snapshot, ledger, hint, and resolver results; tools read in parallel and return domain language; the provider emits prose and, when earned, a proposal; prose is buffered, checked once, then streamed; the session document records the turn, ledger, and boundary; focus and regeneration go to the server-side trace. Existing action commands consume proposal identity independently.
+- **Interaction graph:** Direct Chat and the five launch surfaces feed one Agent conversation with a coffee-only or item-hinted clue; the endpoint assembles the snapshot, ledger, hint, and owner-scoped resolver inputs; the trusted turn binder locks a unique coffee or exposes genuine ambiguity before provider reasoning; tools read in parallel and return domain language; the provider emits prose and, when earned, a proposal; prose is buffered, checked once, then streamed; the session document records the turn, ledger, and boundary; focus and regeneration go to the server-side trace. Existing action commands consume proposal identity only after an explicit native tap.
 - **Error propagation:** Reference ambiguity becomes one named question; a read timeout becomes a plain-language "couldn't check" and an unavailable ledger entry; an RT2 failure becomes one regeneration, then delivery or a truthful line; provider or stream failures retain interrupted state with an in-character retry; session persistence failure leaves local display recoverable and is never labeled complete.
 - **State lifecycle risks:** Launch hint, focus, ledger, session age, boundary, partial turn, proposal target, `dataLoaded`, local cache, and remote session can drift independently. Coffee-only or hinted clues bound to one coffee, read-derived focus, bounded ledgers, boundary indexes that never delete, stable IDs, late-hydration guards, and an opening that waits for `dataLoaded` prevent silent rebinding, false claims, or loss.
 - **API surface parity:** Web and native Dev clients use the same contracts; native Dev alone selects the protected preview base; legacy chat and production routing remain unchanged.
 - **Integration coverage:** Unit tests cannot prove the provider, real reads, native identity, Capgo behavior, or how the owner actually talks; U3 proves the backend conversation, U4's rerun proves it through the surface, U6 proves the environment and the owner's experience, each reported separately.
-- **Unchanged invariants:** Authenticated UID remains server-derived; tools remain read/proposal-only; recipe validators and exact slot resolution remain the source of truth; cards do not authorize writes; command, receipt, provenance, undo, account deletion, Fellow, and physical-success boundaries do not expand.
+- **Unchanged invariants:** Authenticated UID remains server-derived; model tools remain read/proposal-only; recipe validators and exact slot resolution remain the source of truth; cards display command availability but do not themselves authorize writes; command, receipt, provenance, undo, account deletion, Fellow, and physical-success boundaries do not expand.
 
 ---
 
@@ -597,7 +643,7 @@ flowchart TB
 
 | Risk | Mitigation |
 |------|------------|
-| Fuzzy matching selects the wrong coffee | `resolve_coffee` returns only high-confidence unique matches; bounded named candidates force one question; a wrong coffee after an unambiguous reference is catastrophic (CF1). |
+| Turn binding selects the wrong coffee | The binder admits only high-confidence forms through the owner-scoped resolver, records a locked target before provider dispatch, leaves fuzzy language to the model-called fallback, and exposes bounded named candidates for genuine ambiguity; a wrong coffee after an unambiguous reference is catastrophic (CF1). |
 | Launch hint becomes a new cage | Hint is typed, bound to the launch coffee, spoken once, discarded on any coffee change or method correction, never write authority; AE1 and AE14 gate it. |
 | Snapshot or reads bloat context or leak fields | Snapshot capped at 12 lines including the setup line; E4 read budget; allowlist; byte caps; no whole-account dump; no separate profile tool. |
 | Model echoes ref keys or internal words | C6a token grader includes ref-key and hash patterns; runtime post-check regenerates once; a delivered leak is catastrophic (CF5). |
@@ -625,6 +671,7 @@ flowchart TB
 
 - U1 makes the contract executable, freezes fixtures with gold and known-bad transcripts for the eleven critical cases, and characterizes the current implementation as failing.
 - U2 lands the smallest vertical slice on the existing session model with buffered delivery and the narrow post-check.
+- U2b binds high-confidence coffee references before provider reasoning and proves the live AE10 failure shape at the endpoint boundary.
 
 ### Phase 2: Backend conversation checkpoint
 
@@ -650,7 +697,8 @@ flowchart TB
 - **Prompt as a checklist of the contract:** Rejected; it produces template speech that satisfies graders and fails the friend test. Persona, three exemplars, and essential hard rules only.
 - **Send the full account snapshot on every turn:** Rejected; the compact rotation and setup snapshot plus on-demand parallel reads gives the model orientation without privacy, token, or anchoring cost.
 - **A separate profile-setup tool:** Rejected; the setup line in the snapshot carries the default method, grinder, and units without another read.
-- **A regex pre-parser for coffee references, or the model fuzzy-matching from an inventory list as the only resolver:** Rejected; the model extracts the reference and calls `resolve_coffee`; deterministic matching inside the tool owns jar ordinals, close spellings, pronouns, and ambiguity thresholds.
+- **Model-called resolution as the only resolver:** Rejected after live AE10 evidence; the model can skip the tool and re-clarify a uniquely resolvable reference. High-confidence discourse forms are bound before provider reasoning, while fuzzy and unknown language remains model-called.
+- **A generalized regex intent parser:** Rejected; the trusted binder recognizes only the enumerated coffee-reference forms, delegates selection to the existing deterministic resolver, and never diagnoses, chooses a method, or authorizes an action.
 - **Keep mutating prose in-stream to strip authority claims:** Rejected; it produces mangled sentences and hides the failure. Buffered delivery with a narrow post-check and one counted regeneration is honest and testable.
 - **Stream unchecked text and correct afterward:** Rejected; a visible retraction is worse than a one-second caption.
 - **Show the gold transcript to the judge:** Rejected; it invites prose matching and leniency. The judge is blind and calibrated against gold and known-bad instead.
