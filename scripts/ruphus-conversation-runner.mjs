@@ -460,7 +460,9 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   const expected = resolveFixtureRef(expectedRaw, refMap);
   const replyCoffee = (Array.isArray(coffees) ? coffees : []).flatMap((coffee) => {
     if (!coffee?.name) return [];
-    const match = new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').exec(reply);
+    const words = String(coffee.name).trim().split(/\s+/).filter(Boolean);
+    const names = [String(coffee.name), ...(words.length >= 3 ? [words.slice(-2).join(' ')] : [])];
+    const match = names.map((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').exec(reply)).filter(Boolean).sort((left, right) => left.index - right.index)[0];
     return match ? [{ id: coffee.id, index: match.index }] : [];
   }).sort((left, right) => left.index - right.index);
   const namedReplyFocus = replyCoffee[0]?.id || null;

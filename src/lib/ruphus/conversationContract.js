@@ -235,7 +235,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
     return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, `reply claims ${claimedKind} are absent even though that source was unavailable`, { runtime: true })];
   }
   if (/\bnothing\b[^.?!]*(?:(?:brew log|brew details|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|brew details|notes))/i.test(value)) return [];
-  if (/\bno\s+(?:(?:linked|separate|recorded)\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^?!]{0,128}\b(?:had|has|with)\b[^?!]{0,64}\bno\s+(?:(?:linked|recorded)\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
+  if (/\bno\s+(?:(?:linked|separate|recorded)\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^?!]{0,128}\b(?:had|has|with)\b[^?!]{0,64}\bno\s+(?:(?:linked|recorded|attached)\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
   const hasEvidence = Object.values(evidence || {}).some((entry) => Array.isArray(entry) && entry.length > 0);
   if (windowed && hasEvidence && !/(?:last|past|previous)\s+(?:two|14|fourteen)\s+weeks?|since|between/i.test(value)) return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, 'absence claim is not qualified by the read window')];
