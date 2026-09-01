@@ -59,6 +59,7 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'A finer grind would beat more dose; try one small step finer.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Finer grind would beat more dose here: thin plus sour points to under-extraction. I’d make one small finer step on the Ode, keeping 15 g and 250 g unchanged; more dose would strengthen the cup but may leave that sourness intact.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Finer grind would beat more dose here. Move the Ode from 4.2 to 4.0, keeping 15 g and 250 g unchanged. More dose would make the cup stronger, but could leave that sourness intact.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Finer grind would beat more dose here. I’d move the Kalita grind one small step finer, from Ode 4.2 to 4.1; keep dose and water unchanged. More dose would mainly strengthen the cup without extracting the coffee better.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'I’d try more dose before a finer grind. Go from 15 g to 16 g coffee.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try 16 g instead of 15 g. A finer grind is better if the cup was sour.', userUnits: {} }).length, 0);
   assert.ok(gradeC5Numbers({ reply: 'A finer grind would beat more dose.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
@@ -127,6 +128,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: 'The recent brew itself has no tasting attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent V60 has no linked tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The more recent hot V60 brew, three days ago, has recipe and timing notes but no linked tasting.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: 'Your more recent hot V60, three days ago, has brew details logged but no separate tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'Your latest hot V60 was 3 days ago at 15g coffee, 250g water, Ode 4.2, and 2:50, with no linked tasting note yet.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: "There's no separate tasting note attached to it.", readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The most recent brew was a hot V60 three days ago, using 15 g coffee to 250 g water at Ode 4.2 and 94°C, but there’s no recorded tasting attached to it.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);

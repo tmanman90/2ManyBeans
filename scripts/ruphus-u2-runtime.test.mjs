@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { ambiguityClarification, proposalEligibleForTarget, proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
-import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
+import { buildDynamicEvidenceBlock, RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 
@@ -26,10 +26,23 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /older coffee-level tasting that is not linked to the current brew does not diagnose today's cup/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /never send two consecutive question-only replies/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /do not add that there is no separate tasting unless the checked evidence explicitly establishes that absence/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /locked binding says Colombia La Esperanza for “the other Colombia,” answer about Colombia La Esperanza/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /do not ask for agreement, advertise a proposal, or say you will prepare one/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Use fresh, fresher, and freshest only for literal roast age/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
+});
+test('locked turn binding is the final explicit developer target', () => {
+  const block = buildDynamicEvidenceBlock({
+    rotationSnapshot: { coffees: [{ refKey: 'c2', name: 'Colombia La Esperanza' }] },
+    ledger: { namedCoffees: ['El Vergel', 'Colombia La Esperanza'] },
+    launchContext: { surface: 'direct' },
+    turnBinding: { status: 'locked', coffeeRef: 'c2', coffeeName: 'Colombia La Esperanza' },
+  });
+  assert.match(block, /<AUTHORITATIVE_TURN_TARGET>/);
+  assert.match(block, /current message resolves to Colombia La Esperanza/);
+  assert.match(block, /Do not answer from the prior coffee focus/);
+  assert.ok(block.lastIndexOf('<AUTHORITATIVE_TURN_TARGET>') > block.lastIndexOf('<TRUSTED_TURN_BINDING>'));
 });
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
   const calls = [];
