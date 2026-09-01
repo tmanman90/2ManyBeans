@@ -114,6 +114,36 @@ test('proposal tool maps one explicit control into a complete executable recipe'
   assert.equal(saved[0].after.grindSize.setting, '4.0');
   assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
 });
+test('dose proposal regenerates every executable alias and timed instruction from the new dose', async () => {
+  const source = generateV60Recipe({}, { dose: 15 });
+  const before = { ...source, dose: 15, userCoffeeGrams: 15, water: source.waterGrams, prepSteps: source.prepSteps.map((step) => ({ ...step })) };
+  const saved = [];
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 'dose-canonical' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => { saved.push(input); return { id: 'p-dose', ...input }; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'dose', value: 16 } });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.artifact.changedPaths, ['dose']);
+  assert.equal(saved[0].after.coffeeGrams, 16);
+  assert.equal(saved[0].after.userCoffeeGrams, 16);
+  assert.equal(saved[0].after.dose, 16);
+  assert.equal(saved[0].after.water, saved[0].after.waterGrams);
+  assert.equal(saved[0].after.steps.at(-1).waterTotal, saved[0].after.waterGrams);
+  assert.match(saved[0].after.prepSteps[1].action, /Add 16g coffee/);
+  assert.doesNotMatch(JSON.stringify(saved[0].after), /15g/);
+  assert.equal(saved[0].after.steps.some((step) => /15g/.test(step.action)), false);
+});
+test('conditional sensory diagnosis cannot mint proposal authority', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: {
+    target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false,
+    diagnosis: { conditional: true, pendingClarification: { kind: 'sensory', question: 'Was the cup sour or bitter?' } },
+  } };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'dose', value: 16 } }), (error) => error.code === 'proposal_timing');
+  assert.equal(current.proposalState.proposalIssued, false);
+});
 test('the same recipe advice is idempotent within one session but distinct across chats', async () => {
   const before = generateV60Recipe({}, { dose: 15 });
   const propose = async (sessionId) => {

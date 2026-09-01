@@ -3,6 +3,11 @@ import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
 import { resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
+import { generateV60Recipe } from '../../src/lib/v60Adapter.js';
+import { generateV60SwitchRecipe } from '../../src/lib/v60SwitchAdapter.js';
+import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
+import { generateKalitaRecipe } from '../../src/lib/kalitaAdapter.js';
+import { generateKalitaIcedRecipe } from '../../src/lib/kalitaIcedAdapter.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 
 export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
@@ -76,6 +81,69 @@ function patchForChange(before, change) {
     return before.waterTemp ? { waterTemp: { celsius, fahrenheit: Math.round(celsius * 9 / 5 + 32) } } : { temperature: celsius };
   }
   return { ratio: value };
+}
+function ratioNumber(value) {
+  if (Number.isFinite(Number(value))) return Number(value);
+  const match = String(value || '').match(/(?:1\s*[:/]\s*)?([0-9]+(?:\.[0-9]+)?)/);
+  return match ? Number(match[1]) : null;
+}
+function doseRecipeIntent(before) {
+  return {
+    ...(ratioNumber(before.ratio) != null ? { targetRatio: ratioNumber(before.ratio) } : {}),
+    ...(Number.isFinite(before.waterTemp?.celsius) ? { targetTemperatureC: before.waterTemp.celsius } : {}),
+  };
+}
+function generatedDoseRecipe(before, slotKey, dose) {
+  const intent = doseRecipeIntent(before);
+  const configuration = {
+    dose,
+    size: before.kalitaSize || before.size,
+    kalitaSize: before.kalitaSize || before.size,
+    roast: before.roast || 'medium',
+    process: before.process || '',
+    chillingMethod: before.chillingMethod || before.selectedChillingMethod,
+  };
+  let generated;
+  try {
+    generated = slotKey === 'v60_hot'
+      ? (String(before.variant || before.v60Variant || '').toLowerCase() === 'switch' ? generateV60SwitchRecipe(intent, configuration) : generateV60Recipe(intent, configuration))
+      : slotKey === 'v60_iced' ? generateV60IcedRecipe(intent, configuration)
+        : slotKey === 'kalita_hot' ? generateKalitaRecipe(intent, configuration)
+          : slotKey === 'kalita_iced' ? generateKalitaIcedRecipe(intent, configuration)
+            : null;
+  } catch {
+    return null;
+  }
+  if (!generated) return null;
+  const result = { ...clone(before), ...clone(generated) };
+  // Dose is the only user-facing control. Preserve the existing grinder and
+  // temperature choices while replacing every dose/water alias and generated
+  // timed instruction from the canonical adapter output.
+  for (const key of ['grind', 'grindSize', 'temperature', 'temperatureC', 'waterTemp', 'waterTemp2']) {
+    if (Object.hasOwn(before, key)) result[key] = clone(before[key]);
+  }
+  for (const key of ['coffeeGrams', 'userCoffeeGrams', 'dose']) if (Object.hasOwn(before, key)) result[key] = dose;
+  const waterAliases = {
+    waterGrams: generated.waterGrams,
+    water: generated.waterGrams,
+    hotWaterGrams: generated.hotWaterGrams,
+    recipeIceGrams: generated.recipeIceGrams,
+    iceGrams: generated.iceGrams,
+    initialBrewIceGrams: generated.initialBrewIceGrams,
+    postBrewIceGrams: generated.postBrewIceGrams,
+    finalBeverageWaterTargetGrams: generated.finalBeverageWaterTargetGrams,
+  };
+  for (const [key, value] of Object.entries(waterAliases)) if (Object.hasOwn(before, key) && value != null) result[key] = value;
+  return result;
+}
+function conditionalSensoryClarification(state) {
+  const diagnosis = state?.diagnosis || {};
+  const condition = [state?.conditionalOn, state?.diagnosisConditionalOn, diagnosis.conditionalOn, diagnosis.condition].filter(Boolean).join(' ');
+  const pending = [state?.pendingSensoryClarification, diagnosis.pendingSensoryClarification, state?.pendingClarification, diagnosis.pendingClarification, state?.pendingQuestion, diagnosis.pendingQuestion].filter(Boolean);
+  const pendingText = pending.map((value) => typeof value === 'string' ? value : JSON.stringify(value)).join(' ');
+  const sensory = state?.sensoryClarificationPending === true || diagnosis.sensoryClarificationPending === true || /sensory|taste|tasting|flavo[u]?r|cup/i.test(`${condition} ${pendingText}`);
+  const conditional = state?.diagnosisConditional === true || diagnosis.conditional === true || diagnosis.status === 'conditional' || /conditional|pending|until|if/i.test(condition);
+  return conditional && sensory && pending.length > 0;
 }
 function modelRecipe(recipe) {
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
@@ -188,7 +256,11 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: modelRecipe(recipe) };
     }
-    if (!canPropose) throw Object.assign(new Error('proposal is not yet earned'), { code: 'proposal_timing' });
+    if (!canPropose
+      || (context.proposalState && (context.proposalState.diagnosisReady !== true || context.proposalState.userAgreed !== true))
+      || conditionalSensoryClarification(context.proposalState)) {
+      throw Object.assign(new Error('proposal is not yet earned'), { code: 'proposal_timing' });
+    }
     if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
     const target = context.__ruphusResolvedTargets instanceof Map ? context.__ruphusResolvedTargets.get(`${args.coffeeRef}:${slotKey}`) : null;
     if (!target || target.coffeeId !== coffeeId || target.coffeeRef !== args.coffeeRef) return { ok: false, code: 'proposal_target_required', message: 'Read the exact coffee and recipe before suggesting a change.' };
@@ -197,11 +269,14 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (context.proposalState?.target && (context.proposalState.target.coffeeRef !== args.coffeeRef || context.proposalState.target.slot !== slotKey)) return { ok: false, code: 'proposal_target_mismatch', message: 'That suggestion is bound to a different coffee and recipe.' };
     const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
     if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
-    const before = clone(target.before); const after = mergeRecipePatch(before, requestedPatch); const paths = changedPaths(before, after).filter(Boolean);
+    const before = clone(target.before);
+    let after = mergeRecipePatch(before, requestedPatch);
+    if (args.change?.control === 'dose') after = generatedDoseRecipe(before, slotKey, Number(args.change.value)) || after;
+    const paths = args.change?.control === 'dose' ? ['dose'] : changedPaths(before, after).filter(Boolean);
     const controls = args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
     if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0])) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
-    const validationRecipe = recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
+    const validationRecipe = after.sourceLineage ? after : recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
     const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
