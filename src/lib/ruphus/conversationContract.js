@@ -120,7 +120,8 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beat|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
   const conditionalAlternative = /\bif\b/i;
-  if (sentences.some((sentence) => directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence) && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence))))) {
+  const explanationAfterSizedRecommendation = /\b(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\b/i;
+  if (sentences.some((sentence) => directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence) && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence))))) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
   return result;

@@ -17,6 +17,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /Keep brew attempts and tasting notes separate unless the evidence explicitly links them/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /a photo or visual symptom alone does not identify the bean/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /stay with the most recently named coffee/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /only reaffirms the already focused coffee, acknowledge it in one short phrase/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Give specific recipe advice before agreement/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /thin but sweet or clean points to strength/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);

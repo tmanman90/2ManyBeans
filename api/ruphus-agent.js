@@ -59,19 +59,32 @@ export function sessionConversationForProvider(session, { now = Date.now(), incl
 }
 export function sessionReplayInputs({ session, conversation, ledger, continuePrevious = false, now = Date.now() } = {}) {
   const stale = Boolean(session && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale');
-  if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? sessionConversationForProvider(session, { now, includeStale: true }) : [], ledger: null };
+  if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? sessionConversationForProvider(session, { now, includeStale: true }) : [], ledger: null, referenceLedger: continuePrevious === true ? replayFocusLedger(session?.ledger) : null };
   const storedConversation = sessionConversationForProvider(session, { now });
-  return { stale: false, resumed: false, conversation: storedConversation.length ? storedConversation : Array.isArray(conversation) ? conversation : [], ledger: ledger || session?.ledger || null };
+  return { stale: false, resumed: false, conversation: storedConversation.length ? storedConversation : Array.isArray(conversation) ? conversation : [], ledger: ledger || session?.ledger || null, referenceLedger: null };
+}
+
+export function replayFocusLedger(ledger) {
+  const rawNames = [
+    ...(Array.isArray(ledger?.namedCoffees) ? ledger.namedCoffees : []),
+    ...(Array.isArray(ledger?.entries) ? ledger.entries.flatMap((entry) => Array.isArray(entry?.namedCoffees) ? entry.namedCoffees : []) : []),
+  ];
+  const namedCoffees = [...new Set(rawNames.map((value) => String(value || '').split('').filter((character) => {
+    const code = character.charCodeAt(0);
+    return code >= 32 && code !== 127;
+  }).join('').trim().slice(0, 120)).filter(Boolean))].slice(-3);
+  return namedCoffees.length ? { version: 1, entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees }] } : null;
 }
 
 export function deriveProposalReadiness({ conversation = [], ledger = null, userText = '' } = {}) {
   const previousAssistant = [...conversation].reverse().find((message) => message?.role === 'assistant')?.content || '';
   const unresolvedSensoryQuestion = /\?/u.test(previousAssistant)
     && /\b(?:was|is|does|did|which|mean)\b[^?]{0,220}\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/iu.test(previousAssistant);
+  const answeredSensoryQuestion = /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow|full[- ]?bodied)\b/iu.test(userText);
   const diagnosisReady = previousAssistant.trim().split(/\s+/).filter(Boolean).length >= 8
     && /\b(?:watery|thin|sour|sharp|bitter|harsh|muted|flat|weak|strong|extraction|grind|dose|temperature|ratio|contact time|drawdown)\b/i.test(previousAssistant)
     && Array.isArray(ledger?.entries) && ledger.entries.length > 0
-    && !unresolvedSensoryQuestion;
+    && (!unresolvedSensoryQuestion || answeredSensoryQuestion);
   const userAgreed = /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
   return { diagnosisReady, userAgreed };
 }
@@ -169,7 +182,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const priorText = suppliedConversation.map((message) => message?.content || message?.text || '').join(' ');
     const olderReference = activeSession?.historyWidened === true || /\b(?:older|last month|three weeks?|weeks? ago|before that|historical|earlier)\b/i.test(priorText);
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
-    context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
+    context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
     Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
     context.sessionId = turnId;
     context.sessionState.lastActivityAt = activeSession?.lastActivityAt || null;

@@ -4,7 +4,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, firestoreReaders, hasUnavailableEvidence, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
+import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs } from '../api/ruphus-agent.js';
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
@@ -130,6 +130,26 @@ test('stale server sessions reject client replay, while explicit Continue uses s
   assert.equal(ordinary.stale, true); assert.equal(ordinary.resumed, false); assert.deepEqual(ordinary.conversation, []); assert.equal(ordinary.ledger, null);
   const resumed = sessionReplayInputs({ session, conversation: [{ role: 'user', content: 'forged client history' }], ledger: { entries: [{ namedCoffees: ['Forged coffee'] }] }, continuePrevious: true, now: 1000000000 });
   assert.equal(resumed.resumed, true); assert.deepEqual(resumed.conversation, [{ role: 'user', content: 'old topic' }, { role: 'assistant', content: 'old answer' }]); assert.equal(resumed.ledger, null);
+  assert.deepEqual(resumed.referenceLedger, { version: 1, entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['Old coffee'] }] });
+  assert.equal(JSON.stringify(resumed.referenceLedger).includes('summary'), false);
+});
+test('stale continuation carries only a bounded coffee focus into turn binding', async () => {
+  const sessionLedger = { version: 1, entries: [{ kind: 'tasting', summary: 'Old untrusted diagnosis', namedCoffees: ['El Vergel'] }], namedCoffees: ['El Vergel', 'El Vergel'] };
+  assert.deepEqual(replayFocusLedger(sessionLedger), { version: 1, entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['El Vergel'] }] });
+  const built = await buildRuphusContext({
+    uid: 'user-1', contextRef: { surface: 'direct' }, userText: 'Continue with the earlier coffee.',
+    ledger: replayFocusLedger(sessionLedger), evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [
+        { id: 'bean-1', name: 'El Vergel', origin: 'Colombia', status: 'ACTIVE' },
+        { id: 'bean-2', name: 'Colombia La Esperanza', origin: 'Colombia', status: 'ACTIVE' },
+        { id: 'bean-3', name: 'Kenya Gachatha', origin: 'Kenya', status: 'ACTIVE' },
+      ],
+      readSetup: async () => ({ defaultMethod: 'v60_hot' }),
+    },
+  });
+  assert.deepEqual({ status: built.turnBinding.status, coffeeName: built.turnBinding.coffeeName }, { status: 'locked', coffeeName: 'El Vergel' });
+  assert.equal(JSON.stringify(built.ledger).includes('Old untrusted diagnosis'), false);
 });
 test('active server history is authoritative and proposal readiness requires grounded diagnosis plus agreement', () => {
   const session = { messages: [{ role: 'user', text: 'It was watery.' }, { role: 'assistant', text: 'The thin cup points to low extraction, so I would try one step finer first.' }], lastActivityAt: 1000, ledger: { entries: [{ status: 'complete' }] } };
@@ -138,6 +158,7 @@ test('active server history is authoritative and proposal readiness requires gro
   assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: session.ledger, userText: 'Yes, make that change.' }), { diagnosisReady: true, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: { entries: [] }, userText: 'Yes, make that change.' }), { diagnosisReady: false, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does watery mean thin but clean, or sour and muted? If it is thin, I would test 16g.' }], ledger: session.ledger, userText: 'Go ahead and change it.' }), { diagnosisReady: false, userAgreed: true });
+  assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does watery mean thin but clean, or sour and muted? I would test one small grind step after your answer.' }], ledger: session.ledger, userText: 'Sour and muted. Go ahead with one finer step.' }), { diagnosisReady: true, userAgreed: true });
 });
 test('typed recipe launch and active slot read the owner-scoped immutable revision and reject substitutes', async () => {
   const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };
