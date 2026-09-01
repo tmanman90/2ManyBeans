@@ -120,8 +120,22 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beat|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
   const conditionalAlternative = /\bif\b/i;
-  const explanationAfterSizedRecommendation = /\b(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\b/i;
-  if (sentences.some((sentence) => directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence) && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence))))) {
+  const explanationAfterSizedRecommendation = /^(?:so\s+)?(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\s+(?:is|would be|should be)\s+(?:the\s+)?(?:cleanest|best|safest|simplest)\s+(?:next\s+)?(?:test|move|change|step)[.!]?$/i;
+  const additionalRecommendation = /\b(?:raise|lower)\b/i;
+  if (sentences.some((sentence) => {
+    const explicitDirectionalControl = sentence.match(/\b(?:try|use|make|move|adjust|change|increase|decrease|raise|lower|turn|set)\b[^.!?]{0,32}\b(?:more|less|higher|lower)\s+(coffee|dose|water|temperature|heat|agitation|time|bloom|contact|extraction)\b/i)?.[1]?.toLowerCase() || null;
+    const controlHasSize = explicitDirectionalControl === 'coffee' || explicitDirectionalControl === 'dose'
+      ? /(?:\b\d+(?:\.\d+)?\s*(?:g|grams?)\b[^.!?]{0,24}\b(?:coffee|dose)\b|\b(?:coffee|dose)\b[^.!?]{0,24}\b\d+(?:\.\d+)?\s*(?:g|grams?)\b)/i.test(value)
+      : explicitDirectionalControl === 'water'
+        ? /(?:\b\d+(?:\.\d+)?\s*(?:g|ml)\b[^.!?]{0,24}\bwater\b|\bwater\b[^.!?]{0,24}\b\d+(?:\.\d+)?\s*(?:g|ml)\b)/i.test(value)
+        : explicitDirectionalControl === 'temperature' || explicitDirectionalControl === 'heat'
+          ? /\b\d+(?:\.\d+)?\s*°?\s*[CF]\b/i.test(value)
+          : explicitDirectionalControl ? sized.test(sentence) : false;
+    const unsizedAdditionalControl = sentence.split(/;|,\s*(?:and|also)\s+|\s+\b(?:and|also)\b\s+/i).slice(1)
+      .some((clause) => directional.test(clause) && (recommendation.test(clause) || additionalRecommendation.test(clause)) && !sized.test(clause));
+    return explicitDirectionalControl && !controlHasSize || unsizedAdditionalControl || directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence)
+      && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence)));
+  })) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
   return result;

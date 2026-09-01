@@ -162,6 +162,17 @@ test('natural model questions observed in the latest full report are declared by
   }
 });
 
+test('AE09 cannot skip the sensory answer by asking for proposal permission on turn one', async () => {
+  const { cases } = await loadFixtureManifest();
+  const fixture = cases.cases.find((item) => item.id === 'AE09');
+  const premature = nextBranchTurn(fixture, 0, { text: 'I would go one small step finer. Want me to propose that change?' });
+  assert.equal(premature.unexpectedBranch, true);
+  const sensory = nextBranchTurn(fixture, 0, { text: 'Was it thin but sweet and clean, or sour, sharp, or muted?' });
+  assert.deepEqual({ text: sensory.text, unexpectedBranch: sensory.unexpectedBranch }, { text: 'It is sour and muted.', unexpectedBranch: false });
+  const permission = nextBranchTurn(fixture, 1, { text: 'Try one small step finer. Want me to propose that change?' });
+  assert.deepEqual({ text: permission.text, unexpectedBranch: permission.unexpectedBranch }, { text: 'Go ahead and change it.', unexpectedBranch: false });
+});
+
 test('each injected fixture is reset before execution, including stale session metadata', async () => {
   const resets = [];
   const report = await runInjectedCorpus(undefined, { resetSession: async (input) => resets.push(input) });

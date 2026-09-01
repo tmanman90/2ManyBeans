@@ -59,28 +59,30 @@ export function sessionConversationForProvider(session, { now = Date.now(), incl
 }
 export function sessionReplayInputs({ session, conversation, ledger, continuePrevious = false, now = Date.now() } = {}) {
   const stale = Boolean(session && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale');
-  if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? sessionConversationForProvider(session, { now, includeStale: true }) : [], ledger: null, referenceLedger: continuePrevious === true ? replayFocusLedger(session?.ledger) : null };
+  if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? staleReplayConversation(session, { now }) : [], ledger: null, referenceLedger: continuePrevious === true ? replayFocusLedger(session?.ledger) : null };
   const storedConversation = sessionConversationForProvider(session, { now });
   return { stale: false, resumed: false, conversation: storedConversation.length ? storedConversation : Array.isArray(conversation) ? conversation : [], ledger: ledger || session?.ledger || null, referenceLedger: null };
 }
 
+export function staleReplayConversation(session, { now = Date.now() } = {}) {
+  return sessionConversationForProvider(session, { now, includeStale: true }).filter((message) => message.role === 'user');
+}
+
 export function replayFocusLedger(ledger) {
-  const rawNames = [
-    ...(Array.isArray(ledger?.namedCoffees) ? ledger.namedCoffees : []),
-    ...(Array.isArray(ledger?.entries) ? ledger.entries.flatMap((entry) => Array.isArray(entry?.namedCoffees) ? entry.namedCoffees : []) : []),
-  ];
-  const namedCoffees = [...new Set(rawNames.map((value) => String(value || '').split('').filter((character) => {
+  const entryNames = Array.isArray(ledger?.entries) ? ledger.entries.flatMap((entry) => Array.isArray(entry?.namedCoffees) ? entry.namedCoffees : []) : [];
+  const rawNames = entryNames.length ? entryNames : Array.isArray(ledger?.namedCoffees) ? ledger.namedCoffees : [];
+  const latestCoffee = rawNames.map((value) => String(value || '').split('').filter((character) => {
     const code = character.charCodeAt(0);
     return code >= 32 && code !== 127;
-  }).join('').trim().slice(0, 120)).filter(Boolean))].slice(-3);
-  return namedCoffees.length ? { version: 1, entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees }] } : null;
+  }).join('').trim().slice(0, 120)).filter(Boolean).at(-1);
+  return latestCoffee ? { version: 1, entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: [latestCoffee] }] } : null;
 }
 
 export function deriveProposalReadiness({ conversation = [], ledger = null, userText = '' } = {}) {
   const previousAssistant = [...conversation].reverse().find((message) => message?.role === 'assistant')?.content || '';
   const unresolvedSensoryQuestion = /\?/u.test(previousAssistant)
     && /\b(?:was|is|does|did|which|mean)\b[^?]{0,220}\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/iu.test(previousAssistant);
-  const answeredSensoryQuestion = /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow|full[- ]?bodied)\b/iu.test(userText);
+  const answeredSensoryQuestion = /\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|full[- ]?bodied)\b/iu.test(userText);
   const diagnosisReady = previousAssistant.trim().split(/\s+/).filter(Boolean).length >= 8
     && /\b(?:watery|thin|sour|sharp|bitter|harsh|muted|flat|weak|strong|extraction|grind|dose|temperature|ratio|contact time|drawdown)\b/i.test(previousAssistant)
     && Array.isArray(ledger?.entries) && ledger.entries.length > 0

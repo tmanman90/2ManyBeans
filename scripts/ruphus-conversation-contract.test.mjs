@@ -65,6 +65,11 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'Propose one small dose increase.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'I’d lean toward a little more extraction, one change at a time.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'For El Vergel, I’d make the Ode 4.2 one small step finer. A modest extraction increase is the cleanest next test.', userUnits: {} }).length, 0);
+  assert.ok(gradeC5Numbers({ reply: 'I would try one small grind step finer. A small increase is best; also use more water.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'I would try one small grind step finer. This increase is best; lower the temperature.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'Try one small grind step finer. A small strength increase is best, and use more water.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'Try one small grind step finer. If you want, use more water.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'Try one small grind step finer. Use more water instead of more coffee.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.ok(gradeC5Numbers({ reply: 'Use more extraction.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.ok(gradeC5Numbers({ reply: 'Use more bloom time.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
   assert.ok(gradeC5Numbers({ reply: 'Use more contact time.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
