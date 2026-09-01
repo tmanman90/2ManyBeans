@@ -49,6 +49,16 @@ test('trusted binding exposes genuine bounded ambiguity without guessing', () =>
   ]);
 });
 
+test('trusted binding carries one active descriptor constraint into the next clarification', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const ambiguous = bindRuphusTurn({ userText: 'the Colombian one', coffees, refs });
+  assert.equal(ambiguous.status, 'ambiguous');
+  assert.equal(ambiguous.ledger.entries.at(-1).kind, 'coffee_reference_constraint');
+  const resolved = bindRuphusTurn({ userText: 'the washed one', coffees, refs, ledger: ambiguous.ledger });
+  assert.deepEqual({ status: resolved.status, coffeeRef: resolved.coffeeRef, coffeeName: resolved.coffeeName }, { status: 'locked', coffeeRef: 'c-a', coffeeName: 'El Vergel' });
+  assert.equal(resolved.ledger.entries.some((entry) => entry.kind === 'coffee_reference_constraint'), false);
+});
+
 test('trusted turn binding seeds a valid launch coffee for current references before evidence exists', () => {
   const result = bindRuphusTurn({
     userText: 'Tell me about this coffee.',

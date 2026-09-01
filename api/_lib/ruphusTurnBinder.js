@@ -9,6 +9,7 @@ const ORDINAL = /\b(?:jar|shelf|bean)\s*#?\s*\d+\b/i;
 const OTHER = /\bother\b/i;
 const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
 const FOCUS_ENTRY = 'coffee_focus';
+const REFERENCE_CONSTRAINT_ENTRY = 'coffee_reference_constraint';
 
 function candidateCoffee(coffee, coffeeRef) {
   const coffeeName = text(coffee?.name || coffee?.coffeeName);
@@ -75,6 +76,22 @@ function publicResult(result, refs) {
   return { status: 'none' };
 }
 
+function activeReferenceConstraint(ledger) {
+  return (Array.isArray(ledger?.entries) ? ledger.entries : []).slice().reverse()
+    .find((entry) => entry?.kind === REFERENCE_CONSTRAINT_ENTRY && entry?.status === 'ambiguous' && text(entry.summary))?.summary || null;
+}
+
+function appendReferenceConstraint(ledger, reference, evidenceByteCap) {
+  return appendLedger(ledger, { kind: REFERENCE_CONSTRAINT_ENTRY, status: 'ambiguous', summary: text(reference) }, {
+    maxBytes: Math.min(Number(evidenceByteCap) || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES),
+  });
+}
+
+function retireReferenceConstraints(ledger) {
+  if (!Array.isArray(ledger?.entries)) return ledger;
+  return { ...ledger, entries: ledger.entries.filter((entry) => entry?.kind !== REFERENCE_CONSTRAINT_ENTRY) };
+}
+
 export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launchContext = {}, refs = {}, evidenceByteCap = MAX_LEDGER_BYTES } = {}) {
   const inventory = Array.isArray(coffees) ? coffees : [];
   const supported = isSupportedReference(userText, inventory, ledger, launchContext, refs);
@@ -88,10 +105,19 @@ export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launc
   const reference = supported.current && /^(?:this|current|that|earlier|previous)\b/i.test(supported.reference)
     ? supported.current
     : supported.reference;
-  const result = resolveCoffeeReference({ reference, coffees: inventory, ledger: resolverLedger });
+  const priorConstraint = activeReferenceConstraint(resolverLedger);
+  const constrainedReference = priorConstraint && DESCRIPTOR.test(supported.reference)
+    ? `${priorConstraint} ${supported.reference}`
+    : reference;
+  const result = resolveCoffeeReference({ reference: constrainedReference, coffees: inventory, ledger: resolverLedger });
   const binding = publicResult(result, refs);
   if (binding.status === 'none') return { status: 'none', ledger, refs: {}, launchHintConsumed: false };
-  if (binding.status === 'ambiguous') return { ...binding, ledger, refs: {}, launchHintConsumed: false };
+  if (binding.status === 'ambiguous') {
+    const nextLedger = DESCRIPTOR.test(supported.reference)
+      ? appendReferenceConstraint(retireReferenceConstraints(ledger), constrainedReference, evidenceByteCap)
+      : ledger;
+    return { ...binding, ledger: nextLedger, refs: {}, launchHintConsumed: false };
+  }
 
   const focusEntry = {
     kind: FOCUS_ENTRY,
@@ -104,7 +130,7 @@ export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launc
       ...(text(binding.coffee?.process) ? { process: text(binding.coffee.process) } : {}),
     },
   };
-  const nextLedger = appendLedger(ledger, focusEntry, { maxBytes: Math.min(Number(evidenceByteCap) || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
+  const nextLedger = appendLedger(retireReferenceConstraints(ledger), focusEntry, { maxBytes: Math.min(Number(evidenceByteCap) || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
   const launchHintConsumed = Boolean(launchContext?.launchItem && launchContext?.coffeeRef && launchContext.coffeeRef !== binding.coffeeRef);
   return { ...binding, ledger: nextLedger, refs: binding.refs, launchHintConsumed };
 }

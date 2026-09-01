@@ -74,6 +74,26 @@ test('endpoint context binds the sole other coffee before provider dispatch', as
   assert.equal(contradictory.match, 'turn_binding');
 });
 
+test('endpoint carries AE02 descriptor clarification into the first provider request', async () => {
+  const readers = {
+    listCoffees: async () => [
+      { id: 'bean-1', name: 'El Vergel', origin: 'Colombia', process: 'washed', jarSlot: 1, status: 'ACTIVE' },
+      { id: 'bean-2', name: 'Colombia La Esperanza', origin: 'Colombia', process: 'natural', jarSlot: 2, status: 'ACTIVE' },
+      { id: 'bean-3', name: 'Kenya Kiamabara', origin: 'Kenya', process: 'washed', jarSlot: 3, status: 'ACTIVE' },
+    ],
+    readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'Ode 4.2', units: 'metric' }),
+  };
+  const first = await buildRuphusContext({ uid: 'user-1', contextRef: { surface: 'direct' }, userText: 'the Colombian one', evidenceByteCap: 10000, readers });
+  assert.equal(first.turnBinding.status, 'ambiguous');
+  const second = await buildRuphusContext({ uid: 'user-1', contextRef: { surface: 'direct' }, userText: 'the washed one', ledger: first.ledger, evidenceByteCap: 10000, readers });
+  assert.deepEqual({ status: second.turnBinding.status, coffeeName: second.turnBinding.coffeeName }, { status: 'locked', coffeeName: 'El Vergel' });
+  const rawTools = createRuphusTools({ uid: 'user-1', context: second, readers: { listCoffees: async () => [] } });
+  let calls = 0;
+  const tools = { ...rawTools, call: async (...args) => { calls += 1; return rawTools.call(...args); } };
+  const result = await runRuphusTurn({ turnId: 'ae02-bound-turn', context: second, userText: 'the washed one', provider: { async runTurn(input) { assert.equal(calls, 0); assert.equal(input.context.turnBinding.coffeeName, 'El Vergel'); return { text: 'The washed coffee is El Vergel.' }; } }, tools, emit: () => {} });
+  assert.equal(result.ok, true);
+});
+
 test('server allowlist is exact and empty by default', () => {
   const previous = process.env.RUPHUS_AGENT_V3_UIDS; delete process.env.RUPHUS_AGENT_V3_UIDS; assert.equal(allowedAgentUids().size, 0); process.env.RUPHUS_AGENT_V3_UIDS = 'u-1, u-2'; assert.equal(allowedAgentUids().has('u-1'), true); assert.equal(allowedAgentUids().has('u-3'), false); if (previous == null) delete process.env.RUPHUS_AGENT_V3_UIDS; else process.env.RUPHUS_AGENT_V3_UIDS = previous;
 });
