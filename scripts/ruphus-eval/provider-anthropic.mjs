@@ -13,7 +13,7 @@ function assertTools(tools = []) {
   if (tools.some((tool) => { const schema = tool.input_schema || tool.parameters || tool.inputSchema; return schema && (schema.type !== 'object' || !exactObject(schema.properties) || schema.additionalProperties !== false); })) throw new Error('Anthropic evaluation tools require strict object schemas');
 }
 
-export function buildAnthropicRequest({ model, system, instructions, messages = [], input = null, tools = [], toolChoice = null, maxOutputTokens = 1800, temperature, thinking = 'disabled', effort, signal } = {}) {
+export function buildAnthropicRequest({ model, system, instructions, messages = [], input = null, tools = [], toolChoice = null, maxOutputTokens = 1800, thinking = 'disabled', effort, signal } = {}) {
   if (typeof model !== 'string' || !model.trim()) throw new Error('Anthropic model is required');
   const providerMessages = messages.length > 0 ? messages : input == null ? [] : Array.isArray(input) ? input : [input];
   if (!Array.isArray(providerMessages)) throw new Error('Anthropic messages must be an array');
@@ -30,10 +30,6 @@ export function buildAnthropicRequest({ model, system, instructions, messages = 
     })),
     stream: true,
   };
-  if (temperature != null) {
-    if (!Number.isFinite(temperature) || temperature < 0 || temperature > 1) throw new Error('Anthropic temperature must be between 0 and 1');
-    request.temperature = temperature;
-  }
   if (system != null || instructions != null) request.system = system ?? instructions;
   if (toolChoice != null) {
     if (!exactObject(toolChoice) || typeof toolChoice.name !== 'string' || toolChoice.name !== 'submit_result') throw new Error('Anthropic evaluation only permits the frozen submit_result tool choice');

@@ -41,6 +41,7 @@ test('calibration packets are exactly 11 plus 11 and carry no calibration label'
   assert.match(JUDGE_INSTRUCTIONS, /coffee-level tasting that is old or unlinked cannot diagnose today's specific brew/);
   assert.match(JUDGE_INSTRUCTIONS, /actual intent, not an assumption that every conversation must end in brew advice/);
   assert.match(JUDGE_INSTRUCTIONS, /method correction does not answer an unresolved sensory question/i);
+  assert.match(JUDGE_INSTRUCTIONS, /transcript ends without visibly giving that answer/i);
 });
 
 test('Anthropic judge adapter uses frozen instructions and parses streamed usage without printing auth', async () => {
@@ -48,7 +49,7 @@ test('Anthropic judge adapter uses frozen instructions and parses streamed usage
   try {
     const result = judged(4);
     const response = { ok: true, headers: { get: () => 'text/event-stream' }, text: async () => `data: ${JSON.stringify({ type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 10 } }})}\n\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(result) }})}\n\ndata: ${JSON.stringify({ type: 'message_delta', usage: { output_tokens: 10 }})}\n\n` };
-    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); const body = JSON.parse(request.body); assert.match(body.system, /friendNotForm/); assert.match(body.system, /never lower proposalFeelsEarned.*numeric suggestion has no proposal card/i); assert.equal(body.temperature, 0); assert.equal(body.tool_choice.name, 'submit_result'); assert.equal(body.tools[0].input_schema.additionalProperties, false); return response; } });
+    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); const body = JSON.parse(request.body); assert.match(body.system, /friendNotForm/); assert.match(body.system, /never lower proposalFeelsEarned.*numeric suggestion has no proposal card/i); assert.equal(body.temperature, undefined); assert.equal(body.tool_choice.name, 'submit_result'); assert.equal(body.tools[0].input_schema.additionalProperties, false); return response; } });
     const envelope = await adapter({ promptVersion: 'v1' });
     assert.equal(envelope.provider, 'anthropic');
     assert.equal(envelope.usage.input_tokens, 10);
