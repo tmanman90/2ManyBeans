@@ -286,6 +286,24 @@ test('live playback accepts history grounded by an earlier turn in the active co
   assert.equal(result.results[1].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
 });
 
+test('live playback reports a required native proposal that never materializes', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Yes, make that change.'], branches: [], expected: { proposal: true } };
+  const response = (frames) => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${frames.map((frame) => JSON.stringify(frame)).join('\n')}\n` });
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const missing = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', costGuard: cost, fetchImpl: async () => response([
+    { type: 'turn_completed', text: 'The recipe has not been changed.' },
+    { type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } },
+  ]) });
+  assert.equal(missing.grader.ordinary.some((item) => item.code === 'U3_PROPOSAL_MISSING'), true);
+  const present = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', costGuard: cost, fetchImpl: async () => response([
+    { type: 'artifact_ready', artifact: { type: 'recipe_proposal' } },
+    { type: 'turn_completed', text: 'Prepared for review.' },
+    { type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } },
+  ]) });
+  assert.equal(present.grader.ordinary.some((item) => item.code === 'U3_PROPOSAL_MISSING'), false);
+});
+
 test('coffee resolution alone does not count as history evidence', async () => {
   const { account, cases } = await loadFixtureManifest();
   const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Use El Vergel.', 'What did the previous brew show?'], branches: [] };

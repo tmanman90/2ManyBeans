@@ -608,6 +608,11 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     onTurn?.(turnResult);
     if (branch.question && index + 1 < turns.length) turns[index + 1] = branch.text;
   }
+  const expectsProposal = fixture?.expected?.proposal === true || fixture?.expected?.proposalAfterAgreement === true;
+  const hasProposal = results.some((item) => (item.frames || []).some((frame) => frame?.type === 'artifact_ready' && frame?.artifact?.type === 'recipe_proposal'));
+  if (expectsProposal && !hasProposal && results.length) {
+    results.at(-1).grader.ordinary.push({ code: 'U3_PROPOSAL_MISSING', category: 'ordinary', message: 'fixture required a native recipe proposal after explicit agreement' });
+  }
   return { fixtureId: fixture.id, transcript, results, grader: { catastrophic: results.flatMap((result) => result.grader.catastrophic), ordinary: results.flatMap((result) => result.grader.ordinary) } };
 }
 

@@ -129,7 +129,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const counterfactualAlternative = /^\s*(?:more|less|higher|lower)\s+(?:coffee|dose|water|heat|temperature|time|agitation|extraction)\b[^.!?]*\bwould\b[^.!?]*\bbut\b/i;
   const actionableAdditional = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|raise|lower)\b/i;
   const explanationAfterSizedRecommendation = /^(?:so\s+)?(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\s+(?:is|would be|should be)\s+(?:the\s+)?(?:cleanest|best|safest|simplest)\s+(?:next\s+)?(?:test|move|change|step)[.!]?$/i;
-  const predictedOutcome = /^\s*(?:the\s+(?:finer|coarser)\s+grind|the\s+change|this\s+change|that\s+change)\s+(?:should|would|could)\s+(?:increase|decrease|improve|reduce|preserve|keep|add)\b/i;
+  const predictedOutcome = /^\s*(?:the\s+(?:finer|coarser)\s+grind|the\s+change|this(?:\s+change)?|that(?:\s+change)?)\s+(?:should|would|could)\s+(?:increase|decrease|improve|reduce|preserve|keep|add)\b/i;
   const additionalRecommendation = /\b(?:raise|lower)\b/i;
   if (!result.some((item) => item.code === 'C5_DIRECTION_SIZE') && sentences.some((sentence) => {
     const explicitDirectionalControl = sentence.match(/\b(?:try|use|make|move|adjust|change|increase|decrease|raise|lower|turn|set)\b[^.!?]{0,32}\b(?:more|less|higher|lower)\s+(coffee|dose|water|temperature|heat|agitation|time|bloom|contact|extraction)\b/i)?.[1]?.toLowerCase() || null;
