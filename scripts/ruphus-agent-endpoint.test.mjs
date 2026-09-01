@@ -137,6 +137,7 @@ test('active server history is authoritative and proposal readiness requires gro
   assert.deepEqual(replay.conversation, [{ role: 'user', content: 'It was watery.' }, { role: 'assistant', content: 'The thin cup points to low extraction, so I would try one step finer first.' }]);
   assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: session.ledger, userText: 'Yes, make that change.' }), { diagnosisReady: true, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: replay.conversation, ledger: { entries: [] }, userText: 'Yes, make that change.' }), { diagnosisReady: false, userAgreed: true });
+  assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does watery mean thin but clean, or sour and muted? If it is thin, I would test 16g.' }], ledger: session.ledger, userText: 'Go ahead and change it.' }), { diagnosisReady: false, userAgreed: true });
 });
 test('typed recipe launch and active slot read the owner-scoped immutable revision and reject substitutes', async () => {
   const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };

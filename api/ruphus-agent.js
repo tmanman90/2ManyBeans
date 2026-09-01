@@ -66,9 +66,12 @@ export function sessionReplayInputs({ session, conversation, ledger, continuePre
 
 export function deriveProposalReadiness({ conversation = [], ledger = null, userText = '' } = {}) {
   const previousAssistant = [...conversation].reverse().find((message) => message?.role === 'assistant')?.content || '';
+  const unresolvedSensoryQuestion = /\?/u.test(previousAssistant)
+    && /\b(?:was|is|does|did|which|mean)\b[^?]{0,220}\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/iu.test(previousAssistant);
   const diagnosisReady = previousAssistant.trim().split(/\s+/).filter(Boolean).length >= 8
     && /\b(?:watery|thin|sour|sharp|bitter|harsh|muted|flat|weak|strong|extraction|grind|dose|temperature|ratio|contact time|drawdown)\b/i.test(previousAssistant)
-    && Array.isArray(ledger?.entries) && ledger.entries.length > 0;
+    && Array.isArray(ledger?.entries) && ledger.entries.length > 0
+    && !unresolvedSensoryQuestion;
   const userAgreed = /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
   return { diagnosisReady, userAgreed };
 }

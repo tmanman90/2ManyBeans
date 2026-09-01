@@ -43,6 +43,40 @@ function proposalTarget(state) {
   };
 }
 
+function proposalValue(recipe = {}, control) {
+  if (control === 'dose') return recipe.coffeeGrams ?? recipe.userCoffeeGrams ?? recipe.dose ?? null;
+  if (control === 'water') return recipe.waterGrams ?? recipe.water ?? null;
+  if (control === 'grind') return recipe.grindSize?.setting ?? recipe.grind ?? null;
+  if (control === 'temperature') return recipe.waterTemp?.celsius ?? recipe.temperatureC ?? recipe.temperature ?? null;
+  if (control === 'ratio') return recipe.ratio ?? null;
+  return null;
+}
+
+function proposalUnit(control) {
+  if (control === 'dose' || control === 'water') return 'g';
+  if (control === 'temperature') return '°C';
+  return '';
+}
+
+export function proposalHandoff(artifact = {}) {
+  const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
+  const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
+    : rawControl === 'waterGrams' ? 'water'
+      : rawControl === 'grindSize' ? 'grind'
+        : rawControl === 'waterTemp' || rawControl === 'temperatureC' ? 'temperature'
+          : ['dose', 'water', 'grind', 'temperature', 'ratio'].includes(rawControl) ? rawControl : null;
+  const before = control ? proposalValue(artifact.before, control) : null;
+  const after = control ? proposalValue(artifact.after, control) : null;
+  if (!control || before == null || after == null) return 'I’ve prepared one recipe change for you to review. It has not been applied.';
+  const unit = proposalUnit(control);
+  const unchanged = ['dose', 'water', 'grind', 'temperature']
+    .filter((item) => item !== control && proposalValue(artifact.before, item) != null && proposalValue(artifact.before, item) === proposalValue(artifact.after, item))
+    .slice(0, 3);
+  const unchangedList = unchanged.length > 2 ? `${unchanged.slice(0, -1).join(', ')}, and ${unchanged.at(-1)}` : unchanged.join(' and ');
+  const unchangedText = unchanged.length ? ` ${unchangedList[0].toUpperCase()}${unchangedList.slice(1)} stay${unchanged.length === 1 ? 's' : ''} the same.` : '';
+  return `Prepared: change the ${control} from ${before}${unit} to ${after}${unit}.${unchangedText} Review it before applying.`;
+}
+
 /**
  * Proposal eligibility is a trusted, target-bound context input. The
  * conversation transcript is deliberately not consulted: an old diagnosis
@@ -138,8 +172,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
-      const proposed = results.some((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
-      if (proposed) { text += 'I’ve prepared one recipe change for you to review.'; break; }
+      const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
+      if (proposed) { text += proposalHandoff(proposed.result.artifact); break; }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
         response = await provider.runTurn({

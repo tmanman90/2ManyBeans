@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
-import { ambiguityClarification, proposalEligibleForTarget, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { ambiguityClarification, proposalEligibleForTarget, proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
 import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
@@ -78,8 +78,8 @@ test('ambiguous coffee resolution asks once instead of guessing through another 
 test('a successful recipe proposal ends with one truthful review handoff', async () => {
   let providerCalls = 0; const frames = [];
   const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
-  const result = await runRuphusTurn({ turnId: 'proposal-complete', context: current, userText: 'Yes, make that change.', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, proposal: { id: 'p1' }, artifact: { type: 'recipe_proposal', id: 'p1' } }) }, emit: (frame) => frames.push(frame) });
-  assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'I’ve prepared one recipe change for you to review.');
+  const result = await runRuphusTurn({ turnId: 'proposal-complete', context: current, userText: 'Yes, make that change.', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, proposal: { id: 'p1' }, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0', temperature: 94 } } }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'Prepared: change the grind from 4.2 to 4.0. Dose, water, and temperature stay the same. Review it before applying.');
   assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
 });
 test('proposal candidates treat null schema fields as unchanged recipe values', async () => {
@@ -143,6 +143,9 @@ test('conditional sensory diagnosis cannot mint proposal authority', async () =>
   await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
   await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'dose', value: 16 } }), (error) => error.code === 'proposal_timing');
   assert.equal(current.proposalState.proposalIssued, false);
+});
+test('proposal handoff names the exact change and makes review authority explicit', () => {
+  assert.equal(proposalHandoff({ changedPaths: ['dose'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 16, waterGrams: 250, grind: '4.2', temperature: 94 } }), 'Prepared: change the dose from 15g to 16g. Water, grind, and temperature stay the same. Review it before applying.');
 });
 test('the same recipe advice is idempotent within one session but distinct across chats', async () => {
   const before = generateV60Recipe({}, { dose: 15 });
