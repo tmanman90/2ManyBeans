@@ -12,8 +12,10 @@ preflight stops the run; it never falls back to production.
   `2manybeans Dev`. Never install over or upload to `com.talmeltzer.coffeehub`.
 - Keep Capgo auto-update disabled for installed-build evidence. Do not publish
   a production Capgo bundle or move the production channel.
-- Keep Agent behavior read/proposal-only. Mutation rollout stays disabled; do
-  not run recipe commands, Fellow preparation, or claim a physical brew.
+- Keep model behavior read/proposal-only. For the approved Dev owner only,
+  native Apply, Brew once, and Keep taps may use the existing app-owned recipe
+  command boundary when both access and mutation allowlists pass. Do not add
+  autonomous commands, prepare Fellow, or claim a physical brew.
 - Do not deploy Firebase rules and do not read or mutate cloud coffee data
   outside the dedicated Dev fixture account.
 - Never print, persist, screenshot, or commit authentication tokens or provider
@@ -34,11 +36,11 @@ Record identifiers, never secrets, in the decision document:
 | --- | --- |
 | Source | Exact clean commit under test |
 | Firebase | Separate Dev project ID; explicitly not `manybeans-7893c` |
-| Account | Dedicated Dev fixture UID allowlisted for Agent access only |
+| Account | Dedicated Dev fixture UID allowlisted for Agent access and the three approved native proposal actions |
 | Backend | Unique Vercel preview origin selected by the Dev native build |
 | App | `com.talmeltzer.coffeehub.dev` and display name `2manybeans Dev` |
 | Updater | `CapacitorUpdater.autoUpdate` is `false` in the verified Dev bundle |
-| Mutation | Mutation allowlist empty/disabled for the dogfood account |
+| Mutation | Client and server allowlists contain only the approved Dev UID; rollout tests prove only Apply, Brew once, and Keep are exposed from a proposal |
 | Budget | One cumulative ledger with authorized cap `$30`, starting spend, and remaining amount |
 
 Stop immediately if any identity is missing, if the preview redirects to an
@@ -50,9 +52,10 @@ Dev request reaches a production backend.
 1. Confirm the working tree and preserve unrelated owner changes.
 2. Confirm a separate Firebase Dev project has been explicitly authorized and
    selected. Do not infer safety from the Firebase CLI's current project.
-3. Inject the six `VITE_FIREBASE_*` client values, `VITE_RUPHUS_API_BASE`, the
-   Dev fixture UID/auth input, and provider/judge credentials without printing
-   their values.
+3. Inject the six `VITE_FIREBASE_*` client values, `VITE_RUPHUS_API_BASE`,
+   `VITE_RUPHUS_AGENT_V3_MUTATION_UIDS`, the matching server-side access and
+   mutation allowlists, the Dev fixture UID/auth input, and provider/judge
+   credentials without printing their values.
 4. Run `node --test scripts/ios-build-env.test.mjs`.
 5. Run the native Dev build only through `npm run build:ios:dev`; its preflight
    must execute before Vite and fail on every missing required variable without
@@ -95,7 +98,9 @@ against the seeded fixture account. Record `pass`, `fail`, or
 - Jar-number switch and coffee-name switch without stale launch anchoring.
 - Watery Kalita diagnosis and a natural follow-up exchange.
 - Recipe launch hint followed by an explicit V60 correction.
-- Topic change after a proposal without applying or authorizing a mutation.
+- Topic change after a proposal without changing its target, followed by one
+  explicit native Apply, Brew once, or Keep tap against disposable Dev fixture
+  data; verify the canonical receipt and that a repeat tap cannot duplicate it.
 - No C6a machine token, JSON/markup dump, mode-switch language, or placeholder
   action appears on screen.
 
@@ -107,7 +112,9 @@ physical-device scripted proof, and owner conversation proof remain separate.
 
 The product owner must personally complete at least five unscripted
 conversations on the physical Dev device across at least three surfaces,
-including at least one tasting surface. Use this table in the decision record:
+including at least one tasting surface. At least one earned proposal must use
+an available native action or record why no action was appropriate. Use this
+table in the decision record:
 
 | # | Date | Surface | What the owner naturally asked | Failures observed | Verdict | Derived fixture |
 | --- | --- | --- | --- | --- | --- | --- |
