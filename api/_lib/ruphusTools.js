@@ -110,6 +110,14 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     forbidOwner(args);
     if (name === 'resolve_coffee') {
       if (typeof args.reference !== 'string' || !args.reference.trim()) throw Object.assign(new Error('reference is required'), { code: 'invalid_tool_input' });
+      const binding = context.__ruphusTurnBinding;
+      if (binding?.status === 'locked' && binding.coffeeRef && binding.coffee?.id && refs[binding.coffeeRef] === binding.coffee.id) {
+        const coffee = cleanInventory({ ...binding.coffee, refKey: binding.coffeeRef });
+        return { ok: true, coffeeRef: binding.coffeeRef, coffee, match: 'turn_binding' };
+      }
+      if (binding?.status === 'ambiguous') {
+        return { ok: false, reason: 'ambiguous', candidates: (binding.candidates || []).map((item) => ({ name: item.coffeeName, refKey: item.coffeeRef })) };
+      }
       const inventory = await list();
       const lastNamedCoffee = Array.isArray(context.ledger?.namedCoffees) ? context.ledger.namedCoffees.at(-1) : null;
       const contextualReference = isCurrentCoffeeReference(args.reference)

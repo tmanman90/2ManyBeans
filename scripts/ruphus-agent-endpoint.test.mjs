@@ -40,6 +40,40 @@ test('provider receives the bounded conversation and launch clue', async () => {
   assert.equal(result.ok, true); assert.deepEqual(seen[0].conversation, current.conversation);
 });
 
+test('endpoint context binds the sole other coffee before provider dispatch', async () => {
+  const built = await buildRuphusContext({
+    uid: 'user-1',
+    contextRef: { surface: 'direct' },
+    userText: 'Now the other Colombia.',
+    ledger: { entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['El Vergel'] }], namedCoffees: ['El Vergel'] },
+    evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [
+        { id: 'bean-1', name: 'El Vergel', origin: 'Colombia', process: 'washed', jarSlot: 1, status: 'ACTIVE' },
+        { id: 'bean-2', name: 'Colombia La Esperanza', origin: 'Colombia', process: 'natural', jarSlot: 2, status: 'ACTIVE' },
+      ],
+      readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'Ode 4.2', units: 'metric' }),
+    },
+  });
+  assert.equal(built.turnBinding.status, 'locked');
+  assert.equal(built.turnBinding.coffeeName, 'Colombia La Esperanza');
+  assert.equal(built.__ruphusRefs[built.turnBinding.coffeeRef], 'bean-2');
+  const priorRef = Object.entries(built.__ruphusRefs).find(([, id]) => id === 'bean-1')?.[0];
+  assert.ok(priorRef);
+  assert.deepEqual(built.trace.focusChanges, [{ from: priorRef, to: built.turnBinding.coffeeRef, source: 'turn_binding' }]);
+  assert.doesNotMatch(JSON.stringify(built), /bean-2/);
+  const rawTools = createRuphusTools({ uid: 'user-1', context: built, readers: { listCoffees: async () => [] } });
+  const toolCalls = [];
+  const tools = { ...rawTools, call: async (...args) => { toolCalls.push(args); return rawTools.call(...args); } };
+  const seen = [];
+  const result = await runRuphusTurn({ turnId: 'bound-turn', context: built, userText: 'Now the other Colombia.', provider: { async runTurn(input) { assert.equal(toolCalls.length, 0); assert.deepEqual(input.context.trace.focusChanges, [{ from: priorRef, to: built.turnBinding.coffeeRef, source: 'turn_binding' }]); assert.equal(input.context.turnBinding.coffeeName, 'Colombia La Esperanza'); seen.push(input); return { text: 'I’m with Colombia La Esperanza.' }; } }, tools, emit: () => {} });
+  assert.equal(result.ok, true);
+  assert.equal(seen[0].context.turnBinding.coffeeName, 'Colombia La Esperanza');
+  const contradictory = await tools.call('resolve_coffee', { reference: 'El Vergel' });
+  assert.equal(contradictory.coffeeRef, built.turnBinding.coffeeRef);
+  assert.equal(contradictory.match, 'turn_binding');
+});
+
 test('server allowlist is exact and empty by default', () => {
   const previous = process.env.RUPHUS_AGENT_V3_UIDS; delete process.env.RUPHUS_AGENT_V3_UIDS; assert.equal(allowedAgentUids().size, 0); process.env.RUPHUS_AGENT_V3_UIDS = 'u-1, u-2'; assert.equal(allowedAgentUids().has('u-1'), true); assert.equal(allowedAgentUids().has('u-3'), false); if (previous == null) delete process.env.RUPHUS_AGENT_V3_UIDS; else process.env.RUPHUS_AGENT_V3_UIDS = previous;
 });
