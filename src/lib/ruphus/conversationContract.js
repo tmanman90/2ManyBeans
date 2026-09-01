@@ -132,7 +132,8 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const actionableAdditional = /\b(?:try|test|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|raise|lower)\b/i;
   const explanationAfterSizedRecommendation = /^(?:so\s+)?(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\s+(?:is|would be|should be)\s+(?:the\s+)?(?:cleanest|best|safest|simplest)\s+(?:next\s+)?(?:test|move|change|step)[.!]?$/i;
   const explanatoryTest = /(?:^|;\s*)\s*(?:this|that)(?:\s+(?:is|would be)|[’']s)\s+(?:the\s+)?(?:cleanest|best|safest|simplest)\s+(?:first|next)?\s*(?:test|move|change|step)\s+for\s+(?:a\s+little\s+)?more\s+extraction\b/i;
-  const predictedOutcome = /(?:^|;\s*)\s*(?:[^;.!?]{0,80}\bso\s+)?(?:the\s+(?:finer|coarser)\s+grind|finer|coarser|the\s+change|this(?:\s+change)?|that(?:\s+change)?)\s+(?:should|would|could)\s+(?:address|help|increase|decrease|improve|reduce|preserve|keep|add|give)\b/i;
+  const predictedOutcome = /(?:^|;\s*)\s*(?:[^;.!?]{0,80}\bso\s+)?(?:the\s+(?:finer|coarser)\s+grind|finer|coarser|the\s+change|this(?:\s+change)?|that(?:\s+change)?|(?:the\s+)?(?:(?:muted|dry|flat|sour|thin)\s+)?(?:finish|cup|brew|flavou?r))\s+(?:should|would|could)\s+(?:address|help|increase|decrease|improve|reduce|preserve|keep|add|give|benefit\s+from)\b/i;
+  const evidenceSupportsSizedChange = /\b(?:supports?|backs?|justifies?)\s+(?:that|this|the)\s+(?:(?:modest|small|slight|gentle)\s+){0,2}(?:extraction|strength|temperature|agitation)\s+(?:increase|decrease)\b/i;
   const additionalRecommendation = /\b(?:raise|lower)\b/i;
   const sizedDose = /(?:\b(?:dose|coffee)\b[^.!?]{0,32}\b\d+(?:\.\d+)?\s*(?:g|grams?)\b|\b\d+(?:\.\d+)?\s*(?:g|grams?)\b[^.!?]{0,32}\b(?:dose|coffee)\b)/i.test(value);
   const sizedGrind = /(?:\b(?:ode|grinder)\s+\d+(?:\.\d+)?\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half|gentle|modest)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|ode\s+)?(?:step|click|notch|adjustment)s?\b)/i.test(value);
@@ -157,7 +158,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
     );
     const boundedOutcome = hasSizedRecommendation && /\baim\s+for\s+(?:a\s+)?(?:little|touch|bit)\s+more\s+(?:contact|sweetness|clarity|body|extraction)\b/i.test(sentence);
     return explicitDirectionalControl && !controlHasSize || unsizedAdditionalControl || directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence)
-      && !(linkedSizedControl || boundedOutcome || hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || counterfactualAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence) || explanatoryTest.test(sentence) || predictedOutcome.test(sentence)));
+      && !(linkedSizedControl || boundedOutcome || hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || counterfactualAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence) || explanatoryTest.test(sentence) || predictedOutcome.test(sentence) || evidenceSupportsSizedChange.test(sentence)));
   })) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
