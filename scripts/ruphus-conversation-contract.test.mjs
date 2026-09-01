@@ -93,6 +93,8 @@ test('machine tokens are catastrophic while natural collocations stay allowed', 
   assert.ok(gradeC6aMachineTokens({ reply: 'Use brew_private for this cup.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
   assert.ok(gradeC6aMachineTokens({ reply: 'Use 1234567890abcdefghij for this cup.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
   assert.ok(gradeC6aMachineTokens({ reply: 'Snapshot says Ode 4.2; current recipe unknown, so do not assume. Need no generic question. final.' }).some((item) => item.code === 'CF5_DRAFT_LEAK'));
+  assert.ok(runtimeTriggers({ reply: 'I will set aside the Rwanda Aiden context.' }).some((item) => item.code === 'CF5_INTERNAL_PRODUCT_LANGUAGE'));
+  assert.ok(runtimeTriggers({ reply: 'This is the clean, straightforward coffee slot.' }).some((item) => item.code === 'CF5_INTERNAL_PRODUCT_LANGUAGE'));
   assert.equal(gradeC6aMachineTokens({ reply: 'This is a coffee-specific adjustment.' }).length, 0);
   assert.equal(gradeC6aMachineTokens({ reply: 'Compare it brew-by-brew before changing the recipe.' }).length, 0);
   assert.equal(gradeC6aMachineTokens({ reply: 'Counterintuitively, a slightly finer grind may taste sweeter.' }).length, 0);
