@@ -159,6 +159,7 @@ test('natural model questions are declared while photo-first proposal permission
     ['AE14', 1, 'Got it—the V60 is the one you brewed; would you like me to suggest one small V60 adjustment?', 'Not yet.'],
     ['AE14', 1, 'Got it—the V60 was clean but hollow, or was it dull and drying?', 'It was mainly bland with little sweetness.'],
     ['AE14', 1, 'Was the flatness mainly low body, or did it have body but little aroma and flavor?', 'It was mainly bland with little sweetness.'],
+    ['AE14', 1, 'Did the flatness come with a dry/astringent finish, or was it simply dull with low flavor?', 'It was mainly bland with little sweetness.'],
     ['AE11', 1, 'Which coffee do you mean?', 'It is a SEY coffee from Burundi.'],
     ['AE13', 1, 'Did it taste thin but sweet and clean, or sour, sharp, or muted?', 'It tasted sour and muted.'],
     ['AE07', 0, 'Was it thin but sweet and clean, or sharp/sour and muted?', 'Sharp and under-ripe. What should I adjust now?'],

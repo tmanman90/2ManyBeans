@@ -98,6 +98,8 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'It is set up for hot V60.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Go one small step finer: change the Ode from 4.2 to 4.1. The muted finish should benefit from a little more contact.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Go one small step finer: Ode 4.2 to 4.1. Your recent 3:10 Kalita brew supports that modest extraction increase.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Move the Ode from 4.2 to 4.1. That’s the cleanest small test for more extraction.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Go one small step finer: Ode 4.2 to 4.1. The finer grind should bring more sweetness and clarity.', userUnits: {} }).length, 0);
 });
 
 test('machine tokens are catastrophic while natural collocations stay allowed', () => {
