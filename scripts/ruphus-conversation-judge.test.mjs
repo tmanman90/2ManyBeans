@@ -71,6 +71,17 @@ test('Anthropic judge accepts a forced structured tool result', async () => {
   } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
 });
 
+test('Anthropic judge preserves valid structured scores when the provider omits its rationale', async () => {
+  const prior = process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = '100';
+  try {
+    const response = { ok: true, headers: { get: () => 'application/json' }, json: async () => ({ model: 'claude-sonnet-5', usage: { input_tokens: 10, output_tokens: 10 }, content: [{ type: 'tool_use', name: 'submit_result', input: { ...judged(4), rationale: null } }] }) };
+    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async () => response });
+    const envelope = await adapter({ transcript: [{ role: 'assistant', text: 'Try one small step finer.' }] });
+    assert.equal(validateJudgeResult(envelope.result).valid, true);
+    assert.match(envelope.result.rationale, /omitted a textual rationale/i);
+  } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
+});
+
 test('judge deterministically preserves the no-proposal default without hiding a missed request', async () => {
   const prior = process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = '100';
   try {
