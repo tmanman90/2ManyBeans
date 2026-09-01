@@ -3,7 +3,7 @@ import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { ANTHROPIC_ENDPOINT, buildAnthropicRequest } from './ruphus-eval/provider-anthropic.mjs';
 
 export const JUDGE_SCHEMA_VERSION = 'ruphus-conversation-judge-v1';
-export const JUDGE_PROMPT_VERSION = 'ruphus-conversation-judge-prompt-v8';
+export const JUDGE_PROMPT_VERSION = 'ruphus-conversation-judge-prompt-v10';
 export const JUDGE_REQUEST_TIMEOUT_MS = 45_000;
 export const JUDGE_INSTRUCTIONS = Object.freeze(`You are a blind coffee-conversation judge. Score only the visible transcript against the stated intent and fact sheet. Treat a launch surface stated in the intent as visible user context. Judge progress against the user's actual intent, not an assumption that every conversation must end in brew advice: correctly identifying or switching coffees and faithfully tracking “that one” or “the first one” can fully move an informational conversation forward. When a user answers a brewer question but still has not described the cup, one discriminating sensory question is earned and useful progress even if the transcript ends before the user answers it. A method correction does not answer an unresolved sensory question, so it may be asked again in a corrected-method-specific way; exact repetition with no new grounding is weaker. Relative fixture dates are literal offsets, so “-18d” means 18 days ago and is consistent with that natural-language age. The fact sheet is your correctness key, not proof that every fact was available in the assistant's current bounded read: honor an intent or transcript that explicitly limits a read window and allows widening after a correction. A coffee-level tasting that is old or unlinked cannot diagnose today's specific brew, so one current sensory question is earned when its answer changes advice. If the user supplies a correction needed to answer the request but the transcript ends without visibly giving that answer, treat it as a severe listening and progress failure: listens and movesBrewForward must be 1, and earnsQuestions may be no higher than 2. An internal or meta statement that the correction was processed does not count as answering the user. A transcript line beginning “Visible recipe proposal card:” describes a native card the user actually saw; use that card when judging proposal specificity and whether the change was applied. Do not infer hidden traces, gold text, known-bad text, IDs, or implementation details. G1 friendNotForm: knowledgeable friend, not a report. G2 knowsMyCoffee: uses the actual coffees, recipes, and history correctly. G3 earnsQuestions: asks only what the evidence cannot answer; asking no question deserves a high score when the evidence already supports the answer. G4 movesBrewForward: leaves something actionable or clearer, including resolving the user's requested identity, reference, or necessary next distinction. G5 listens: engages with specifics, corrections, topic switches, and pronouns. G6 phoneSized: short readable paragraphs. G7 confidentNotBossy: has opinions, explains briefly, accepts pushback. G8 proposalFeelsEarned: a proposal, when appropriate, is a natural conclusion and never a demand. Ordinary coffee advice such as “try one step finer” is a suggestion, not a proposal. Count a proposal only when the assistant says it prepared a change or a visible recipe proposal card appears. If no proposal is needed or attempted, score this dimension 5 unless the assistant improperly avoids an explicitly requested proposal. Return strict JSON with schemaVersion, scores for friendNotForm, knowsMyCoffee, earnsQuestions, movesBrewForward, listens, phoneSized, confidentNotBossy, proposalFeelsEarned, mean, and one short rationale. Each score is an integer from 1 to 5 and mean is their arithmetic mean.`);
 export const JUDGE_SCORING_INSTRUCTIONS = Object.freeze(`${JUDGE_INSTRUCTIONS} Numeric ordinary advice is still ordinary advice: never lower proposalFeelsEarned merely because a specific grind setting or other numeric suggestion has no proposal card.`);
@@ -148,6 +148,17 @@ function streamedToolResult(events) {
   return partial ? parseTextResult(partial) : null;
 }
 
+function enforceVisibleProposalRule(result, packet) {
+  if (!object(result?.scores) || packet?.left) return result;
+  const turns = Array.isArray(packet?.transcript) ? packet.transcript : [];
+  const assistantText = turns.filter((turn) => turn?.role === 'assistant').map((turn) => String(turn.text || '')).join('\n');
+  const userText = turns.filter((turn) => turn?.role === 'user').map((turn) => String(turn.text || '')).join('\n');
+  const hasProposal = /visible recipe proposal card:|\b(?:prepared|saved|made|applied)\b[^.!?]{0,48}\b(?:change|proposal|recipe)\b|\b(?:change|proposal|recipe)\b[^.!?]{0,48}\b(?:prepared|saved|made|applied)\b/i.test(assistantText);
+  const proposalRequested = /\b(?:go ahead|do it|apply it|apply that|make that change|change it|prepare it|save it)\b/i.test(userText);
+  if (hasProposal || proposalRequested) return result;
+  return { ...result, scores: { ...result.scores, proposalFeelsEarned: 5 } };
+}
+
 export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_AUTH_TOKEN, model = process.env.RUPHUS_JUDGE_MODEL || 'claude-sonnet-5', fetchImpl = globalThis.fetch } = {}) {
   if (!token) throw new Error('U3 judge auth must be injected non-printingly');
   const adapter = async (packet) => {
@@ -180,6 +191,7 @@ export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_A
       schemaVersion: JUDGE_SCHEMA_VERSION,
       rationale: typeof result.rationale === 'string' ? result.rationale.trim().slice(0, 500) : result.rationale,
     };
+    result = enforceVisibleProposalRule(result, packet);
     if (object(result?.scores) && JUDGE_DIMENSIONS.every((dimension) => Number.isFinite(result.scores[dimension]))) {
       result = { ...result, mean: JUDGE_DIMENSIONS.reduce((sum, dimension) => sum + result.scores[dimension], 0) / JUDGE_DIMENSIONS.length };
     }

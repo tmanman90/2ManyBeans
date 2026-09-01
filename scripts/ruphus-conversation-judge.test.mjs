@@ -70,3 +70,18 @@ test('Anthropic judge accepts a forced structured tool result', async () => {
     assert.equal(validateJudgeResult(envelope.result).valid, true);
   } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
 });
+
+test('judge deterministically preserves the no-proposal default without hiding a missed request', async () => {
+  const prior = process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = '100';
+  try {
+    const lowProposal = { ...judged(4), scores: { ...scores(4), proposalFeelsEarned: 3 }, mean: 3.875 };
+    const response = () => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ model: 'claude-sonnet-5', usage: { input_tokens: 10, output_tokens: 10 }, content: [{ type: 'tool_use', name: 'submit_result', input: lowProposal }] }) });
+    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async () => response() });
+    const ordinary = await adapter({ transcript: [{ role: 'assistant', text: 'Try one small step finer.' }] });
+    assert.equal(ordinary.result.scores.proposalFeelsEarned, 5);
+    assert.equal(ordinary.result.mean, 4.125);
+    const missed = await adapter({ transcript: [{ role: 'user', text: 'Go ahead and change it.' }, { role: 'assistant', text: 'Try one small step finer.' }] });
+    assert.equal(missed.result.scores.proposalFeelsEarned, 3);
+    assert.equal(missed.result.mean, 3.875);
+  } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
+});
