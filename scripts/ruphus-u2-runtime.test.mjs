@@ -22,6 +22,8 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /thin but sweet or clean points to strength/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /launchItem method in LAUNCH_CLUE is verified app context/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /older coffee-level tasting that is not linked to the current brew does not diagnose today's cup/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /never send two consecutive question-only replies/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /do not add that there is no separate tasting unless the checked evidence explicitly establishes that absence/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);
 });
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
