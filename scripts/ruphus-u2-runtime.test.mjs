@@ -27,6 +27,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /never send two consecutive question-only replies/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /do not add that there is no separate tasting unless the checked evidence explicitly establishes that absence/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
 });
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
   const calls = [];
