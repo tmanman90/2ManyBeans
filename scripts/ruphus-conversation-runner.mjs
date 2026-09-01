@@ -434,11 +434,22 @@ function resolveFixtureRef(value, refMap) {
   return value;
 }
 
-function factualEvidenceText(fixture, frames, factSheet = '', turnIndex = 0) {
+function relativeDateAliases(value, now = new Date()) {
+  const instant = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(instant.getTime())) return String(value || '');
+  return String(value || '').replace(/-(\d+)d\b/g, (offset, days) => {
+    const date = new Date(instant.getTime() - Number(days) * 24 * 60 * 60 * 1000);
+    const iso = date.toISOString().slice(0, 10);
+    const spoken = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' }).format(date);
+    return `${offset} (${iso}; ${spoken})`;
+  });
+}
+
+function factualEvidenceText(fixture, frames, factSheet = '', turnIndex = 0, now = new Date()) {
   const fixtureFacts = fixture?.factSheet || fixture?.facts || { expected: fixture?.expected || {}, session: fixture?.session || null };
   const toolFacts = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {});
   const userTurn = fixture?.turns?.[turnIndex] || '';
-  return JSON.stringify({ factSheet, fixtureFacts, toolFacts, userTurn }).toLowerCase();
+  return relativeDateAliases(JSON.stringify({ factSheet, fixtureFacts, toolFacts, userTurn }), now).toLowerCase();
 }
 
 function hasUnsupportedFactualClaim(reply, knownText) {
@@ -456,7 +467,7 @@ function hasUnsupportedFactualClaim(reply, knownText) {
   });
 }
 
-export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [], priorCoffeeId = null } = {}) {
+export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [], priorCoffeeId = null, now = new Date() } = {}) {
   const toolResults = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {}).filter(object);
   const rawActual = [...toolResults].reverse().map((result) => result.coffeeRef || result.actualCoffeeId || result.focusCoffeeId || result.focus?.coffeeRef || result.focus?.coffeeId || result.evidence?.coffeeRef || result.coffee?.id).find(Boolean) || null;
   const actual = resolveFixtureRef(rawActual, refMap);
@@ -472,7 +483,7 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   }).sort((left, right) => left.index - right.index);
   const namedReplyFocus = replyCoffee[0]?.id || null;
   const fallback = namedReplyFocus || resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
-  const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet, turnIndex));
+  const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet, turnIndex, now));
   const carriedFocus = actual || namedReplyFocus || priorCoffeeId || fallback;
   return { expectedCoffeeId: expected || fallback, actualCoffeeId: carriedFocus, focusCoffeeId: carriedFocus, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
@@ -595,8 +606,12 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });
     const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account), coffees: account.coffees, priorCoffeeId: activeCoffeeId });
     activeCoffeeId = trace.actualCoffeeId || activeCoffeeId;
-    const toolEvidenceText = JSON.stringify((result.frames || []).filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {})).toLowerCase();
-    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: { days: 14 }, evidence: { records: (result.frames || []).filter((frame) => frame?.type === 'tool_result') }, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
+    const toolFrames = (result.frames || []).filter((frame) => frame?.type === 'tool_result');
+    const toolEvidenceText = JSON.stringify(toolFrames.map((frame) => frame.result || {})).toLowerCase();
+    const compositeEvidence = [...toolFrames].reverse().find((frame) => frame?.name === 'read_coffee_evidence')?.result || null;
+    const gradedEvidence = compositeEvidence ? { ...compositeEvidence, records: toolFrames } : { records: toolFrames };
+    const gradedWindow = compositeEvidence ? (compositeEvidence.windowDays == null ? null : { days: compositeEvidence.windowDays }) : { days: 14 };
+    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: gradedWindow, evidence: gradedEvidence, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
     const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
     const priorEvidenceBeforeHistory = results.some((item) => item.evidenceBeforeHistory === true);
     const seededSessionEvidence = index === 0 && Array.isArray(fixture.session?.ledger?.entries) && fixture.session.ledger.entries.length > 0;

@@ -150,13 +150,12 @@ test('full stage requires two clean smokes on the current commit and branches ar
   assert.deepEqual(nextBranchTurn(correctionFixture, 0, { text: correctionQuestion }), { text: 'Not yet.', unexpectedBranch: false, question: correctionQuestion });
 });
 
-test('natural model questions observed in the latest full report are declared by their fixtures', async () => {
+test('natural model questions are declared while photo-first proposal permission stays a failure', async () => {
   const { cases } = await loadFixtureManifest();
   const byId = new Map(cases.cases.map((fixture) => [fixture.id, fixture]));
   const observed = [
     ['AE05', 0, 'The Kalita was watery; want me to suggest the exact adjustment?', 'Would more dose beat a finer grind?'],
     ['AE05', 0, 'The Kalita was watery; want me to suggest the exact change?', 'Would more dose beat a finer grind?'],
-    ['AE13', 0, 'The pale brew is ambiguous; would you like one bounded recipe change?', 'No, just describe the photo for now.'],
     ['AE14', 1, 'Got it—the V60 is the one you brewed; would you like me to suggest one small V60 adjustment?', 'Not yet.'],
     ['AE07', 0, 'Was it thin but sweet and clean, or sharp/sour and muted?', 'Sharp and under-ripe. What should I adjust now?'],
   ];
@@ -164,6 +163,8 @@ test('natural model questions observed in the latest full report are declared by
     const branch = nextBranchTurn(byId.get(id), index, { question });
     assert.deepEqual(branch, { text: expectedText, unexpectedBranch: false, question }, `${id}: ${question}`);
   }
+  const prematurePhotoProposal = nextBranchTurn(byId.get('AE13'), 0, { question: 'The pale brew is ambiguous; would you like one bounded recipe change?' });
+  assert.equal(prematurePhotoProposal.unexpectedBranch, true);
 });
 
 test('AE09 cannot skip the sensory answer by asking for proposal permission on turn one', async () => {
@@ -224,6 +225,10 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(sinceGrounded.fabricatedEvidence, false);
   const withGrounded = deriveFixtureTrace({ fixture, reply: 'With El Vergel, the brew log shows one recent hot V60 at 15 g.', factSheet: 'El Vergel has one recent hot V60 at 15 g.', frames: [] });
   assert.equal(withGrounded.fabricatedEvidence, false);
+  const relativeDate = deriveFixtureTrace({ fixture, reply: 'The last brew was August 29.', factSheet: 'The last brew was -3d.', now: new Date('2026-09-01T12:00:00Z'), frames: [] });
+  assert.equal(relativeDate.fabricatedEvidence, false);
+  const wrongRelativeDate = deriveFixtureTrace({ fixture, reply: 'The last brew was August 28.', factSheet: 'The last brew was -3d.', now: new Date('2026-09-01T12:00:00Z'), frames: [] });
+  assert.equal(wrongRelativeDate.fabricatedEvidence, true);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
@@ -292,6 +297,20 @@ test('live playback accepts history grounded by an earlier turn in the active co
   const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
   assert.equal(result.results[0].evidenceBeforeHistory, true);
   assert.equal(result.results[1].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
+});
+
+test('live playback grades evidence against the source window actually read', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE06'), turns: ['How did this coffee taste?'], branches: [] };
+  const frames = [
+    { type: 'tool_result', name: 'read_coffee_evidence', result: { windowDays: null, unavailable: [], tastings: { status: 'available', summary: 'TASTING — 21 days ago — not linked to a specific brew — thin and a little sour', count: 1 } } },
+    { type: 'turn_completed', text: 'The latest hot V60 brew was three days ago, but there’s no linked tasting describing that cup.' },
+    { type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } },
+  ];
+  const fetchImpl = async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${frames.map((frame) => JSON.stringify(frame)).join('\n')}\n` });
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(result.grader.ordinary.some((item) => item.code === 'EVIDENCE_SCOPE'), false);
 });
 
 test('live playback reports a required native proposal that never materializes', async () => {
