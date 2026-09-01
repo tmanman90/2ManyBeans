@@ -108,6 +108,7 @@ test('machine tokens are catastrophic while natural collocations stay allowed', 
   assert.ok(gradeC6aMachineTokens({ reply: 'Snapshot says Ode 4.2; current recipe unknown, so do not assume. Need no generic question. final.' }).some((item) => item.code === 'CF5_DRAFT_LEAK'));
   assert.ok(runtimeTriggers({ reply: 'I will set aside the Rwanda Aiden context.' }).some((item) => item.code === 'CF5_INTERNAL_PRODUCT_LANGUAGE'));
   assert.ok(runtimeTriggers({ reply: 'This is the clean, straightforward coffee slot.' }).some((item) => item.code === 'CF5_INTERNAL_PRODUCT_LANGUAGE'));
+  assert.ok(runtimeTriggers({ reply: 'The label would fill those gaps.\u{F0000}' }).some((item) => item.code === 'CF5_PRIVATE_USE'));
   assert.equal(gradeC6aMachineTokens({ reply: 'This is a coffee-specific adjustment.' }).length, 0);
   assert.equal(gradeC6aMachineTokens({ reply: 'Compare it brew-by-brew before changing the recipe.' }).length, 0);
   assert.equal(gradeC6aMachineTokens({ reply: 'Counterintuitively, a slightly finer grind may taste sweeter.' }).length, 0);
@@ -131,6 +132,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: 'The recent hot V60 brew itself has no recorded tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'coffee-level-only' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The more recent hot V60 has recipe notes, but no attached tasting.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'coffee-level-only' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: "I don't have a saved coffee called Moon Base, so I can't reliably tell you its recipe.", readWindow: { days: 14 }, evidence: {} }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: "I still can't match that name to a saved coffee, so I don't have reliable notes on its tasting profile.", readWindow: { days: 14 }, evidence: {} }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent brew itself has no tasting attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent V60 has no linked tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The latest hot V60 brew was three days ago, but there’s no linked tasting describing that cup.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);

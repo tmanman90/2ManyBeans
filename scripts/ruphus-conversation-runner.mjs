@@ -448,8 +448,17 @@ function relativeDateAliases(value, now = new Date()) {
 function factualEvidenceText(fixture, frames, factSheet = '', turnIndex = 0, now = new Date()) {
   const fixtureFacts = fixture?.factSheet || fixture?.facts || { expected: fixture?.expected || {}, session: fixture?.session || null };
   const toolFacts = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {});
-  const userTurn = fixture?.turns?.[turnIndex] || '';
-  return relativeDateAliases(JSON.stringify({ factSheet, fixtureFacts, toolFacts, userTurn }), now).toLowerCase();
+  const userTurns = Array.isArray(fixture?.turns) ? fixture.turns.slice(0, turnIndex + 1) : [];
+  return relativeDateAliases(JSON.stringify({ factSheet, fixtureFacts, toolFacts, userTurns }), now).toLowerCase();
+}
+
+function makesHistoryClaim(reply) {
+  const sentences = String(reply || '').split(/(?<=[.!?])\s+|\n+/);
+  return sentences.some((sentence) => {
+    const history = /\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i;
+    if (!history.test(sentence)) return false;
+    return !/\b(?:no|not|isn[’']?t|aren[’']?t|can[’']?t|cannot|couldn[’']?t|don[’']?t|do not|without)\b[^.!?]{0,96}\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i.test(sentence);
+  });
 }
 
 function hasUnsupportedFactualClaim(reply, knownText) {
@@ -615,7 +624,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
     const priorEvidenceBeforeHistory = results.some((item) => item.evidenceBeforeHistory === true);
     const seededSessionEvidence = index === 0 && Array.isArray(fixture.session?.ledger?.entries) && fixture.session.ledger.entries.length > 0;
-    if (/\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i.test(result.text) && !currentEvidenceBeforeHistory && !priorEvidenceBeforeHistory && !seededSessionEvidence) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence in the active conversation' });
+    if (makesHistoryClaim(result.text) && !currentEvidenceBeforeHistory && !priorEvidenceBeforeHistory && !seededSessionEvidence) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence in the active conversation' });
     const expectedMethod = fixture.expected?.method;
     if (expectedMethod && !new RegExp(String(expectedMethod).replace('_', '|'), 'i').test(`${result.text} ${toolEvidenceText}`)) grader.ordinary.push({ code: 'U3_METHOD_SLOT_MISSING', category: 'ordinary', message: 'declared method slot was not evidenced' });
     const branch = nextBranchTurn(fixture, index, result);

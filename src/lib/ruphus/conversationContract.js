@@ -6,6 +6,7 @@ const words = (value) => textOf(value).trim().split(/\s+/).filter(Boolean);
 const paragraphs = (value) => textOf(value).trim() ? textOf(value).trim().split(/\n\s*\n/) : [];
 const sentenceCount = (value) => textOf(value).replace(/(\d)\.(\d)/g, '$1\u0000$2').split(/[.!?]+/).map((part) => part.trim()).filter((part) => Boolean(part.replace(/^[”’"')\]}]+|[“‘"'([{]+$/g, '').trim())).length;
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const PRIVATE_USE = /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u;
 
 export const CONTRACT_VERSION = 'conversation-contract-v1';
 export const CATEGORIES = Object.freeze({ CATASTROPHIC: 'catastrophic', ORDINARY: 'ordinary' });
@@ -175,6 +176,7 @@ export function gradeC6aMachineTokens({ reply = '' } = {}) {
   if (SECRET.test(value)) result.push(violation('CF5_SECRET', CATEGORIES.CATASTROPHIC, 'reply leaks a credential-like value', { runtime: true }));
   if (DRAFT_LEAK.test(value)) result.push(violation('CF5_DRAFT_LEAK', CATEGORIES.CATASTROPHIC, 'reply leaks internal drafting instructions', { runtime: true }));
   if (INTERNAL_PRODUCT_PHRASE.test(value)) result.push(violation('CF5_INTERNAL_PRODUCT_LANGUAGE', CATEGORIES.CATASTROPHIC, 'reply leaks internal product language', { runtime: true }));
+  if (PRIVATE_USE.test(value)) result.push(violation('CF5_PRIVATE_USE', CATEGORIES.CATASTROPHIC, 'reply contains a private-use character', { runtime: true }));
   return result;
 }
 
@@ -238,6 +240,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
   // “I don't have a saved coffee called X ... or its recipe” as an exhaustive
   // assertion that recipe history is absent.
   if (/\b(?:don[’']?t|do not)\s+have\b[^.?!]{0,80}\b(?:a\s+)?saved\s+coffee\b/i.test(value)) return [];
+  if (/\b(?:can[’']?t|cannot)\s+match\b[^.?!]{0,80}\b(?:a\s+)?saved\s+coffee\b|\bisn[’']?t\b[^.?!]{0,80}\b(?:among|in)\b[^.?!]{0,40}\bsaved\s+coffees?\b/i.test(value)) return [];
   const absence = value.match(/\b(?:no|none|nothing)\b[^.?!]*(?:tasting|brew|recipe)s?\b|\b(?:don[’']?t|do not)\s+have\b[^.?!]*(?:tasting|brew|recipe)s?\b/i);
   if (!absence) return [];
   const unavailable = new Set([
@@ -294,7 +297,7 @@ export function gradeReply(input = {}) {
 export function runtimeTriggers(input = {}) {
   return gradeReply(input).violations.filter((item) => item.runtime === true && [
     'RT2_LENGTH', 'RT2_MARKUP', 'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE',
-    'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK', 'CF5_INTERNAL_PRODUCT_LANGUAGE', 'RT2_FALSE_AUTHORITY',
+    'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK', 'CF5_INTERNAL_PRODUCT_LANGUAGE', 'CF5_PRIVATE_USE', 'RT2_FALSE_AUTHORITY',
     'EVIDENCE_SCOPE',
   ].includes(item.code));
 }

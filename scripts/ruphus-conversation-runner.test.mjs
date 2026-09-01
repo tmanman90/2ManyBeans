@@ -233,6 +233,8 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(relativeDate.fabricatedEvidence, false);
   const wrongRelativeDate = deriveFixtureTrace({ fixture, reply: 'The last brew was August 28.', factSheet: 'The last brew was -3d.', now: new Date('2026-09-01T12:00:00Z'), frames: [] });
   assert.equal(wrongRelativeDate.fabricatedEvidence, true);
+  const userNamedUnknown = deriveFixtureTrace({ fixture: { ...fixture, turns: ['Tell me about Moon Base.', 'It is a SEY coffee from Burundi.'] }, turnIndex: 1, reply: "Got it—Moon Base is a SEY coffee from Burundi, but it isn't among the saved coffees, so I can't verify its producer, process, or history." });
+  assert.equal(userNamedUnknown.fabricatedEvidence, false);
 });
 
 test('candidate dispatch reserves configured priced maximums and targeted pass partitions its appended smoke', () => {
@@ -301,6 +303,19 @@ test('live playback accepts history grounded by an earlier turn in the active co
   const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
   assert.equal(result.results[0].evidenceBeforeHistory, true);
   assert.equal(result.results[1].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
+});
+
+test('live playback does not treat an explicit lack of saved history as a history claim', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Tell me about Moon Base.'], branches: [] };
+  const frames = [
+    { type: 'turn_completed', text: "Moon Base isn't among the saved coffees, so I can't verify its producer, process, or history." },
+    { type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } },
+  ];
+  const fetchImpl = async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${frames.map((frame) => JSON.stringify(frame)).join('\n')}\n` });
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(result.results[0].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
 });
 
 test('live playback grades evidence against the source window actually read', async () => {
