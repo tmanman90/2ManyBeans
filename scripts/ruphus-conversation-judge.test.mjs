@@ -48,7 +48,7 @@ test('Anthropic judge adapter uses frozen instructions and parses streamed usage
   try {
     const result = judged(4);
     const response = { ok: true, headers: { get: () => 'text/event-stream' }, text: async () => `data: ${JSON.stringify({ type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 10 } }})}\n\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(result) }})}\n\ndata: ${JSON.stringify({ type: 'message_delta', usage: { output_tokens: 10 }})}\n\n` };
-    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); const body = JSON.parse(request.body); assert.match(body.system, /friendNotForm/); assert.equal(body.tool_choice.name, 'submit_result'); assert.equal(body.tools[0].input_schema.additionalProperties, false); return response; } });
+    const adapter = createAnthropicJudgeAdapter({ token: 'canary-token', fetchImpl: async (_url, request) => { assert.equal(request.headers['x-api-key'], 'canary-token'); const body = JSON.parse(request.body); assert.match(body.system, /friendNotForm/); assert.match(body.system, /never lower proposalFeelsEarned.*numeric suggestion has no proposal card/i); assert.equal(body.tool_choice.name, 'submit_result'); assert.equal(body.tools[0].input_schema.additionalProperties, false); return response; } });
     const envelope = await adapter({ promptVersion: 'v1' });
     assert.equal(envelope.provider, 'anthropic');
     assert.equal(envelope.usage.input_tokens, 10);
