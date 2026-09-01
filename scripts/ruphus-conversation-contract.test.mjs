@@ -57,6 +57,7 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'I’d target a touch more extraction, then one small step finer.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'A bit more extraction should help.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'A finer grind would beat more dose; try one small step finer.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Finer grind would beat more dose here: thin plus sour points to under-extraction. I’d make one small finer step on the Ode, keeping 15 g and 250 g unchanged; more dose would strengthen the cup but may leave that sourness intact.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'I’d try more dose before a finer grind. Go from 15 g to 16 g coffee.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try 16 g instead of 15 g. A finer grind is better if the cup was sour.', userUnits: {} }).length, 0);
   assert.ok(gradeC5Numbers({ reply: 'A finer grind would beat more dose.', userUnits: {} }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
@@ -106,6 +107,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: 'The V60 ran yesterday with no tasting note attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'kalita-only' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent brew itself has no tasting attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent V60 has no linked tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: 'The more recent hot V60 brew, three days ago, has recipe and timing notes but no linked tasting.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: "There's no separate tasting note attached to it.", readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.ok(gradeEvidenceScope({ reply: "I don't have a tasting note from that cup.", evidence: { tastings: { status: 'unavailable' }, unavailable: ['tastings'] } }).some((item) => item.code === 'EVIDENCE_SCOPE' && item.runtime === true));
   assert.ok(gradeEvidenceScope({ reply: 'There is no tasting attached to that brew.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));

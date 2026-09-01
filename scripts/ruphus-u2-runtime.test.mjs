@@ -12,6 +12,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never ask for dose, water, grind, temperature, or brew time when a tool result already supplies it/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /never exceed 90 words in an ordinary reply/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /asks you to tell them about it, answer with one useful recipe or history detail/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice or a generic invitation/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /“The other” means the matching coffee other than the current one/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /never leave it at vague “more extraction/);
