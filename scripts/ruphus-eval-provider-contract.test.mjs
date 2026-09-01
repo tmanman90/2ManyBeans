@@ -73,6 +73,7 @@ test('Anthropic Messages adapter preserves thinking/tool blocks and usage', asyn
 test('Anthropic request rejects non-function tool types', () => {
   assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', tools: [{ type: 'computer' }] }), /custom function/);
   assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', tools: [{ name: 'readCoffee', strict: false }] }), /must be strict/);
+  assert.throws(() => buildAnthropicRequest({ model: 'claude-sonnet-5', temperature: 2 }), /temperature/);
 });
 
 test('provider-neutral scored requests preserve instructions and evidence across adapters', () => {

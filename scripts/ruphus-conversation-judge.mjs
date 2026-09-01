@@ -151,7 +151,7 @@ function streamedToolResult(events) {
 export function createAnthropicJudgeAdapter({ token = process.env.RUPHUS_JUDGE_AUTH_TOKEN, model = process.env.RUPHUS_JUDGE_MODEL || 'claude-sonnet-5', fetchImpl = globalThis.fetch } = {}) {
   if (!token) throw new Error('U3 judge auth must be injected non-printingly');
   const adapter = async (packet) => {
-    const request = buildAnthropicRequest({ model, system: packet.left ? PAIRWISE_INSTRUCTIONS : JUDGE_SCORING_INSTRUCTIONS, messages: [{ role: 'user', content: JSON.stringify(packet) }], tools: [submitResultTool(Boolean(packet.left))], toolChoice: { name: 'submit_result' }, maxOutputTokens: Number(process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) });
+    const request = buildAnthropicRequest({ model, system: packet.left ? PAIRWISE_INSTRUCTIONS : JUDGE_SCORING_INSTRUCTIONS, messages: [{ role: 'user', content: JSON.stringify(packet) }], tools: [submitResultTool(Boolean(packet.left))], toolChoice: { name: 'submit_result' }, maxOutputTokens: Number(process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS || process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS), temperature: 0 });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), JUDGE_REQUEST_TIMEOUT_MS);
     let response;
