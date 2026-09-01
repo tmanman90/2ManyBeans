@@ -41,7 +41,8 @@ test('calibration packets are exactly 11 plus 11 and carry no calibration label'
   assert.match(JUDGE_INSTRUCTIONS, /coffee-level tasting that is old or unlinked cannot diagnose today's specific brew/);
   assert.match(JUDGE_INSTRUCTIONS, /actual intent, not an assumption that every conversation must end in brew advice/);
   assert.match(JUDGE_INSTRUCTIONS, /method correction does not answer an unresolved sensory question/i);
-  assert.match(JUDGE_INSTRUCTIONS, /transcript ends without visibly giving that answer/i);
+  assert.match(JUDGE_INSTRUCTIONS, /visibly switches to the corrected method/i);
+  assert.match(JUDGE_INSTRUCTIONS, /corrected-method-specific earned follow-up/i);
 });
 
 test('Anthropic judge adapter uses frozen instructions and parses streamed usage without printing auth', async () => {

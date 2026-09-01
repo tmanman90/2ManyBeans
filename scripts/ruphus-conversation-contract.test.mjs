@@ -100,6 +100,8 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'Go one small step finer: Ode 4.2 to 4.1. Your recent 3:10 Kalita brew supports that modest extraction increase.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Move the Ode from 4.2 to 4.1. That’s the cleanest small test for more extraction.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Go one small step finer: Ode 4.2 to 4.1. The finer grind should bring more sweetness and clarity.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'For El Vergel’s sour, muted cup, I’d grind one small step finer: Ode 4.2 → 4.1. Keep the 15g dose, 250g water, and 94°C unchanged; the recent V60 was 2:50, so this should gently increase extraction without changing strength.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'Yes—finer grind is the better first move. Thin and sour points to under-extraction, so keep the Kalita 155 at 15 g coffee and 250 g water, and move the Ode from 4.2 to 4.1; changing dose would mainly alter strength rather than address the sourness.', userUnits: {} }).length, 0);
 });
 
 test('machine tokens are catastrophic while natural collocations stay allowed', () => {
