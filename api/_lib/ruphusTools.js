@@ -169,6 +169,23 @@ function modelRecipe(recipe) {
   for (const key of Object.keys(RECIPE_PROPERTIES)) if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
   return result;
 }
+function withoutMethodFocus(ledger) {
+  if (!Array.isArray(ledger?.entries)) return ledger;
+  return { ...ledger, entries: ledger.entries.filter((entry) => entry?.kind !== 'method_focus') };
+}
+function methodFocusForCoffee(ledger, snapshot, coffeeRef) {
+  const coffee = snapshot?.coffees?.find((item) => item.refKey === coffeeRef);
+  const name = String(coffee?.name || '').trim().toLocaleLowerCase();
+  if (!name) return null;
+  const entry = (Array.isArray(ledger?.entries) ? ledger.entries : []).slice().reverse().find((item) => item?.kind === 'method_focus' && item?.status === 'available' && Array.isArray(item.namedCoffees) && item.namedCoffees.some((value) => String(value).trim().toLocaleLowerCase() === name));
+  return entry?.methodFocus?.displayName ? { displayName: entry.methodFocus.displayName } : null;
+}
+function recipeSlotKey(recipe) {
+  const raw = recipe?.slotKey || recipe?.slot || recipe?.method;
+  if (SLOT_KEYS.includes(raw)) return raw;
+  if (raw === 'v60' || raw === 'kalita') return `${raw}_${recipe?.mode === 'iced' ? 'iced' : 'hot'}`;
+  return null;
+}
 
 export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true } = {}) {
   if (!uid || !context) throw new Error('tools require owner and context');
@@ -238,6 +255,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const snapshotCoffee = snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef);
       const methodCorrected = /\b(?:actually|no[, ]|correction|instead|i (?:meant|brewed|used)|it was)\b[\s\S]*\b(?:aiden|v60|kalita|hot|iced)\b/i.test(context.userText || '');
       if (methodCorrected) context.__ruphusLaunchHintConsumed = true;
+      const methodFocus = methodFocusForCoffee(context.ledger, snapshot, args.coffeeRef);
       const method = resolveMethod({
         userText: context.userText || '',
         launchItem,
@@ -253,13 +271,23 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         launchHintConsumed: methodCorrected || context.__ruphusLaunchHintConsumed === true,
         methodCorrected,
         focusChanged: Boolean(context.launchCoffeeId && context.launchCoffeeId !== args.coffeeRef),
+        methodFocus,
+        methodFocusCoffeeRef: methodFocus ? args.coffeeRef : null,
       });
       if (launchItem) context.__ruphusLaunchHintConsumed = true;
-      context.ledger = appendLedger(context.ledger, ledgerEntryFromEvidence(evidence, { coffee: evidence.coffee?.coffee }), { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
-      const target = evidence.recipe?.records?.find((item) => item?.slotKey || item?.slot || item?.method);
+      const ledgerBytes = Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES);
+      context.ledger = appendLedger(withoutMethodFocus(context.ledger), ledgerEntryFromEvidence(evidence, { coffee: evidence.coffee?.coffee }), { maxBytes: ledgerBytes });
+      if (method?.slot && method?.displayName) {
+        context.ledger = appendLedger(context.ledger, {
+          kind: 'method_focus',
+          status: 'available',
+          namedCoffees: evidence.coffee?.coffee?.name ? [evidence.coffee.coffee.name] : snapshotCoffee?.name ? [snapshotCoffee.name] : [],
+          methodFocus: { displayName: method.displayName },
+        }, { maxBytes: ledgerBytes });
+      }
+      const target = method?.slot ? evidence.recipe?.records?.find((item) => recipeSlotKey(item) === method.slot) : null;
       if (target && context.__ruphusResolvedTargets instanceof Map) {
-        const rawSlot = target.slotKey || target.slot || target.method;
-        const slotKey = SLOT_KEYS.includes(rawSlot) ? rawSlot : ['v60', 'kalita'].includes(rawSlot) ? `${rawSlot}_${target.mode === 'iced' ? 'iced' : 'hot'}` : rawSlot;
+        const slotKey = recipeSlotKey(target);
         context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(target), sourceHash: target.selectedHash || canonicalHash(recipeValue(target)) });
         if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       }

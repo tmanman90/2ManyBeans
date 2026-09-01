@@ -15,8 +15,9 @@ const text = (value) => String(value ?? '').trim();
 const asDate = (value) => value instanceof Date ? value : new Date(value);
 const daysAgo = (value, now = Date.now()) => { const date = asDate(value); return Number.isFinite(date.getTime()) ? Math.max(0, Math.round((now - date.getTime()) / 86400000)) : null; };
 const slotDisplay = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' });
-const LEDGER_FIELDS = Object.freeze(['kind', 'status', 'summary', 'windowDays', 'count', 'at', 'namedCoffees', 'coffee', 'evidence']);
+const LEDGER_FIELDS = Object.freeze(['kind', 'status', 'summary', 'windowDays', 'count', 'at', 'namedCoffees', 'coffee', 'evidence', 'methodFocus']);
 const COFFEE_FIELDS = Object.freeze(['name', 'roaster', 'origin', 'process']);
+const METHOD_FOCUS_NAMES = new Set(['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita']);
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 
 function safeLedgerValue(value) {
@@ -39,6 +40,11 @@ export function sanitizeLedgerEntry(entry = {}) {
     if (key === 'evidence') {
       if (!Array.isArray(entry.evidence)) continue;
       result.evidence = entry.evidence.map((item) => sanitizeLedgerEntry(item)).map((item) => Object.fromEntries(['kind', 'status', 'summary', 'windowDays', 'count'].filter((field) => Object.hasOwn(item, field)).map((field) => [field, item[field]])));
+      continue;
+    }
+    if (key === 'methodFocus') {
+      const displayName = text(entry.methodFocus?.displayName);
+      if (METHOD_FOCUS_NAMES.has(displayName)) result.methodFocus = { displayName };
       continue;
     }
     const clean = safeLedgerValue(entry[key]);

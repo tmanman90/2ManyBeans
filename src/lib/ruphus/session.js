@@ -3,12 +3,15 @@ const MAX_LEDGER_ENTRIES = 8;
 const MAX_LEDGER_BYTES = 4096;
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 const textValue = (value) => String(value || '').trim();
+const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 const safeLedgerEntry = (entry = {}) => {
   const value = {};
   for (const key of ['kind', 'status', 'summary', 'windowDays', 'count', 'at']) if (typeof entry[key] === 'string' || typeof entry[key] === 'number') value[key] = entry[key];
   if (Array.isArray(entry.namedCoffees)) value.namedCoffees = entry.namedCoffees.filter((item) => typeof item === 'string').map(textValue);
   if (entry.coffee && typeof entry.coffee === 'object') value.coffee = Object.fromEntries(['name', 'roaster', 'origin', 'process'].filter((key) => typeof entry.coffee[key] === 'string').map((key) => [key, textValue(entry.coffee[key])]));
+  const methodFocus = methodFocusName(entry.methodFocus?.displayName);
+  if (methodFocus) value.methodFocus = { displayName: methodFocus };
   return value;
 };
 const boundedLedger = (ledger, { maxBytes = MAX_LEDGER_BYTES, maxEntries = MAX_LEDGER_ENTRIES } = {}) => {

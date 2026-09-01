@@ -48,6 +48,9 @@ export function resolveMethod(input = {}) {
   const focus = input.coffeeRef || input.focusCoffeeRef;
   if (launch && !input.launchHintConsumed && mode && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(applyMode(slot(launch), mode), 'M1');
   if (launch && !input.launchHintConsumed && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(slot(launch), 'M1b');
+  const methodFocus = slot(input.methodFocus?.displayName || input.methodFocus?.slot || input.methodFocus);
+  const sameFocusedCoffee = !input.methodFocusCoffeeRef || !input.coffeeRef || input.methodFocusCoffeeRef === input.coffeeRef;
+  if (methodFocus && sameFocusedCoffee && !input.methodCorrected && !input.focusChanged) return methodResult(applyMode(methodFocus, mode), 'M2');
 
   const now = input.now == null ? Date.now() : (input.now instanceof Date ? input.now.getTime() : Number(input.now));
   const days = Number(input.historyDays || 14);

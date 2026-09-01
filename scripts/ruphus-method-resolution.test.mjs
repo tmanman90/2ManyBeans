@@ -34,3 +34,12 @@ test('launch hint is one-shot and stays dropped on later return', () => {
   const result = resolveMethod({ launchItem: { method: 'kalita_hot' }, launchCoffeeRef: 'a', coffeeRef: 'a', launchHintConsumed: true, recipes: ['v60_iced'] });
   assert.equal(result.slot, 'v60_iced'); assert.notEqual(result.tier, 'M1b');
 });
+test('trusted method focus carries same-coffee continuity but yields to correction or switch', () => {
+  const carried = resolveMethod({ methodFocus: { displayName: 'hot Kalita' }, methodFocusCoffeeRef: 'a', coffeeRef: 'a', launchHintConsumed: true, recipes: ['v60_hot'], brews: [{ slot: 'v60_hot' }] });
+  assert.equal(carried.slot, 'kalita_hot'); assert.equal(carried.tier, 'M2');
+  assert.equal(resolveMethod({ methodFocus: { displayName: 'hot Kalita' }, methodFocusCoffeeRef: 'a', coffeeRef: 'a', userText: 'make it iced', launchHintConsumed: true }).slot, 'kalita_iced');
+  const corrected = resolveMethod({ methodFocus: { displayName: 'hot Kalita' }, methodFocusCoffeeRef: 'a', coffeeRef: 'a', userText: 'Actually, I used the V60.', methodCorrected: true, launchHintConsumed: true, recipes: ['v60_hot'] });
+  assert.notEqual(corrected.slot, 'kalita_hot');
+  const switched = resolveMethod({ methodFocus: { displayName: 'hot Kalita' }, methodFocusCoffeeRef: 'a', coffeeRef: 'b', launchHintConsumed: true, recipes: ['v60_hot'] });
+  assert.notEqual(switched.slot, 'kalita_hot');
+});

@@ -29,3 +29,9 @@ test('session metadata is validated and stale replay preserves the ledger and la
   const stale = prepareSession({ ...session, lastActivityAt: 1 }, { now: 1000000000 });
   assert.equal(stale.ledger.namedCoffees[0], 'El Vergel'); assert.equal(stale.messages.length, 1);
 });
+test('session replay preserves sanitized method focus without slot or reference authority', () => {
+  const session = normalizeAgentSession({ ledger: { entries: [{ kind: 'method_focus', status: 'available', namedCoffees: ['El Vergel'], methodFocus: { displayName: 'hot Kalita', slot: 'kalita_hot', coffeeRef: 'secret' } }] } });
+  assert.deepEqual(session.ledger.entries[0].methodFocus, { displayName: 'hot Kalita' });
+  assert.equal(session.ledger.entries[0].methodFocus.slot, undefined);
+  assert.equal(session.ledger.entries[0].methodFocus.coffeeRef, undefined);
+});

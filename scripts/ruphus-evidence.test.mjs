@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { appendLedger, buildRotationSnapshot, ledgerEntryFromEvidence, readCoffeeEvidence } from '../api/_lib/ruphusEvidence.js';
+import { appendLedger, buildRotationSnapshot, ledgerEntryFromEvidence, readCoffeeEvidence, sanitizeLedgerEntry } from '../api/_lib/ruphusEvidence.js';
 
 test('snapshot is compact, ref-keyed, and carries setup plus jars', () => {
   const snapshot = buildRotationSnapshot({ setup: { defaultMethod: 'v60_hot', grinder: 'Ode 4.2', units: 'metric' }, coffees: [{ id: 'a', name: 'El Vergel', jarSlot: 1, status: 'ACTIVE', recipes: ['v60_hot'] }, { id: 'b', name: 'Other', jarSlot: 2, status: 'ACTIVE' }] });
@@ -28,4 +28,8 @@ test('brew and tasting summaries preserve distinct provenance for the model', as
   assert.match(evidence.brews.summary, /^BREW — hot V60 — 3 days ago/);
   assert.match(evidence.tastings.summary, /^TASTING — 21 days ago — not linked to a specific brew/);
   assert.doesNotMatch(evidence.brews.summary, /thin and sour/);
+});
+test('method focus replay keeps only an allowlisted display name', () => {
+  assert.deepEqual(sanitizeLedgerEntry({ kind: 'method_focus', methodFocus: { displayName: 'hot Kalita', slot: 'kalita_hot', coffeeRef: 'secret' } }).methodFocus, { displayName: 'hot Kalita' });
+  assert.equal(Object.hasOwn(sanitizeLedgerEntry({ kind: 'method_focus', methodFocus: { displayName: 'secret method' } }), 'methodFocus'), false);
 });

@@ -5,6 +5,7 @@ import { ambiguityClarification, proposalEligibleForTarget, proposalHandoff, run
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
 import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 
 const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
 test('prompt uses held brew details and deterministic focus before asking', () => {
@@ -199,6 +200,51 @@ test('method correction permanently drops the launch hint before evidence resolu
   const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readCoffee: async () => ({ name: 'El Vergel' }), readRecipe: async () => [{ slotKey: 'v60_hot', dose: 15 }], readBrews: async () => [], readTastings: async () => [] } });
   const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
   assert.equal(result.method.slot, 'v60_hot'); assert.equal(current.__ruphusLaunchHintConsumed, true);
+});
+
+test('same-coffee evidence carries the verified method focus until correction or switch', async () => {
+  const current = {
+    ...base,
+    launchCoffeeId: 'c1',
+    launchContext: { surface: 'recipe_kalita', launchItem: { kind: 'recipe', ref: 'recipe-kalita', method: 'kalita_hot' } },
+    __ruphusLaunchHintConsumed: false,
+    __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'recipe-kalita', method: 'kalita_hot' } },
+    __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' },
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }, { refKey: 'c2', name: 'Colombia La Esperanza', jarSlot: 2 }], refs: { c1: 'coffee-1', c2: 'coffee-2' } },
+    __ruphusEvidenceByteCap: 4096,
+    __ruphusResolvedTargets: new Map(),
+    proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false },
+  };
+  const readers = {
+    readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Colombia La Esperanza' : 'El Vergel' }),
+    readRecipe: async ({ coffeeId, slotKey, windowDays }) => {
+      const slot = slotKey || (coffeeId === 'coffee-2' ? 'v60_hot' : 'v60_hot');
+      const recipe = slot === 'kalita_hot' ? generateKalitaRecipe({}, { dose: 15 }) : generateV60Recipe({}, { dose: 15 });
+      if (windowDays === undefined) return { ...recipe, slotKey: slot };
+      return [{ ...generateV60Recipe({}, { dose: 15 }), slotKey: 'v60_hot' }, { ...generateKalitaRecipe({}, { dose: 15 }), slotKey: 'kalita_hot' }];
+    },
+    readBrews: async () => [{ slotKey: 'v60_hot', updatedAt: '2026-08-30T00:00:00Z' }],
+    readTastings: async () => [],
+  };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers });
+  current.userText = 'Tell me about this coffee.';
+  const first = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(first.method.slot, 'kalita_hot'); assert.equal(first.method.tier, 'M1b');
+  assert.deepEqual(current.ledger.entries.at(-1).methodFocus, { displayName: 'hot Kalita' });
+  current.userText = 'What should I change?';
+  const continued = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(continued.method.slot, 'kalita_hot'); assert.equal(continued.method.tier, 'M2');
+  current.proposalState.target = { coffeeRef: 'c1', slot: 'kalita_hot' };
+  const proposal = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 4 } });
+  assert.equal(proposal.ok, true);
+  current.userText = 'Actually, I used the V60 this morning.';
+  const corrected = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(corrected.method.slot, 'v60_hot');
+  assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.methodFocus?.displayName === 'hot Kalita'), false);
+  current.userText = 'Now the other coffee.';
+  const switched = await tools.call('read_coffee_evidence', { coffeeRef: 'c2', windowDays: 14 });
+  assert.notEqual(switched.method.slot, 'kalita_hot');
+  assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.namedCoffees?.includes('El Vergel')), false);
 });
 
 test('direct recipe read carries the verified matching launch revision', async () => {
