@@ -458,8 +458,12 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   const expectation = fixture?.expected?.turns?.[turnIndex] || fixture?.expected?.perTurn?.[turnIndex] || {};
   const expectedRaw = expectation.focus || (fixture?.expected?.focus?.length === 1 ? fixture.expected.focus[0] : null) || fixture?.launchContext?.coffeeRef;
   const expected = resolveFixtureRef(expectedRaw, refMap);
-  const replyCoffee = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.name && new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(reply)).map((coffee) => coffee.id);
-  const namedReplyFocus = replyCoffee.length === 1 ? replyCoffee[0] : null;
+  const replyCoffee = (Array.isArray(coffees) ? coffees : []).flatMap((coffee) => {
+    if (!coffee?.name) return [];
+    const match = new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').exec(reply);
+    return match ? [{ id: coffee.id, index: match.index }] : [];
+  }).sort((left, right) => left.index - right.index);
+  const namedReplyFocus = replyCoffee[0]?.id || null;
   const fallback = namedReplyFocus || resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
   const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet, turnIndex));
   const carriedFocus = actual || namedReplyFocus || priorCoffeeId || fallback;

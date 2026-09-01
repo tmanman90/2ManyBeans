@@ -202,6 +202,8 @@ test('fixture expectations and tool-result traces enforce wrong-coffee and fabri
   assert.equal(currentWrongOverridesCarry.actualCoffeeId, 'fixture-wrong');
   const namedSwitchOverridesCarry = deriveFixtureTrace({ fixture: { expected: { focus: ['fixture-colombia-other'] } }, priorCoffeeId: 'fixture-el-vergel', coffees: [{ id: 'fixture-el-vergel', name: 'El Vergel' }, { id: 'fixture-colombia-other', name: 'Colombia La Esperanza' }], reply: 'Got it—the other Colombian is Colombia La Esperanza.' });
   assert.equal(namedSwitchOverridesCarry.actualCoffeeId, 'fixture-colombia-other');
+  const firstNamedCoffeeOverridesCarry = deriveFixtureTrace({ fixture: { expected: { focus: ['fixture-el-vergel'] } }, priorCoffeeId: 'fixture-colombia-other', coffees: [{ id: 'fixture-el-vergel', name: 'El Vergel' }, { id: 'fixture-colombia-other', name: 'Colombia La Esperanza' }], reply: 'El Vergel is the washed Colombian. It is cleaner than Colombia La Esperanza.' });
+  assert.equal(firstNamedCoffeeOverridesCarry.actualCoffeeId, 'fixture-el-vergel');
   const wrongFocus = deriveFixtureTrace({ fixture: { expected: { focus: ['fixture-right'] } }, refMap: snapshot.refs, frames: [{ type: 'tool_result', result: { coffeeRef: 'fixture-wrong' } }] });
   assert.equal(gradeReply({ reply: 'The coffee is ready.', trace: wrongFocus, expectedCoffeeId: wrongFocus.expectedCoffeeId, actualCoffeeId: wrongFocus.actualCoffeeId }).catastrophic.some((item) => item.code === 'CF1_WRONG_COFFEE'), true);
   const grounded = deriveFixtureTrace({ fixture, reply: 'The tasting was thin and sour.', factSheet: 'The tasting was thin and sour.', frames: [] });
