@@ -86,6 +86,7 @@ test('machine tokens are catastrophic while natural collocations stay allowed', 
   assert.ok(gradeC6aMachineTokens({ reply: 'Use coffee-123abc for this brew.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
   assert.ok(gradeC6aMachineTokens({ reply: 'Use brew_private for this cup.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
   assert.ok(gradeC6aMachineTokens({ reply: 'Use 1234567890abcdefghij for this cup.' }).some((item) => item.code === 'CF5_OPAQUE_REFERENCE'));
+  assert.ok(gradeC6aMachineTokens({ reply: 'Snapshot says Ode 4.2; current recipe unknown, so do not assume. Need no generic question. final.' }).some((item) => item.code === 'CF5_DRAFT_LEAK'));
   assert.equal(gradeC6aMachineTokens({ reply: 'This is a coffee-specific adjustment.' }).length, 0);
   assert.equal(gradeC6aMachineTokens({ reply: 'Compare it brew-by-brew before changing the recipe.' }).length, 0);
   assert.equal(gradeC6aMachineTokens({ reply: 'Counterintuitively, a slightly finer grind may taste sweeter.' }).length, 0);
@@ -124,6 +125,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
 test('runtime predicate is only the RT2 subset', () => {
   assert.ok(runtimeTriggers({ reply: `${'coffee '.repeat(161)}brew.` }).some((item) => item.code === 'RT2_LENGTH'));
   assert.ok(runtimeTriggers({ reply: 'Proposal: {"dose":16}.' }).length > 0);
+  assert.ok(runtimeTriggers({ reply: 'Need no generic question. No tool until agreement. final.' }).some((item) => item.code === 'CF5_DRAFT_LEAK'));
   assert.equal(runtimeTriggers({ reply: 'The ledger needs work.' }).length, 0);
   assert.equal(runtimeTriggers({ reply: 'Which? Why?' }).length, 0);
   assert.equal(runtimeTriggers({ reply: 'Tell me about the other coffee.' }).length, 0);

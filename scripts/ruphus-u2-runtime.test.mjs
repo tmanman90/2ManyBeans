@@ -292,6 +292,15 @@ test('short credential-shaped secrets trigger RT2 and replace a severe second fa
   assert.equal(result.trace.regenerations[0].delivered, 'replacement');
 });
 
+test('internal drafting notes trigger RT2 and replace a severe second failure', async () => {
+  assert.ok(runtimeTriggers({ reply: 'Snapshot says the current recipe is unknown. Need no generic question. final.' }).some((item) => item.code === 'CF5_DRAFT_LEAK'));
+  const context = { ...base, trace: { focusChanges: [], reads: [], regenerations: [] }, proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const provider = { runTurn: async ({ regeneration }) => ({ text: regeneration ? 'No tool until agreement. final.' : 'Snapshot says Ode 4.2. Need no generic question. final.', toolCalls: [], usage: { input_tokens: 10, output_tokens: 10 } }) };
+  const result = await runRuphusTurn({ turnId: 'draft-leak', context, userText: 'What should I change?', provider, tools: { definitions: [], call: async () => ({}) }, send: () => {} });
+  assert.equal(result.text, 'I lost my train of thought there. Ask me that again and I’ll keep it short.');
+  assert.deepEqual(result.trace.regenerations[0].secondFailure, ['CF5_DRAFT_LEAK']);
+});
+
 test('unavailable evidence cannot be turned into an absence claim', async () => {
   const frames = []; let runs = 0;
   const provider = { async runTurn(input) {

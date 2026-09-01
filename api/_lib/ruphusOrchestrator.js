@@ -7,7 +7,7 @@ import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 const REPLACEMENT = 'I lost my train of thought there. Ask me that again and I’ll keep it short.';
 const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
-  'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET',
+  'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
 ]);
 
@@ -191,7 +191,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     let triggers = runtimeTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence });
     if (triggers.length) {
       trace.regenerations.push({ triggers: triggers.map((trigger) => trigger.code), at: new Date().toISOString() });
-      const correctiveInstruction = 'The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.';
+      const correctiveInstruction = 'The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.';
       const regenerated = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true });
       rememberUsage(regenerated); const regeneratedText = String(regenerated?.text || '').trim();
       const second = runtimeTriggers({ reply: regeneratedText, userTurn: userText, trace, evidence: checkedEvidence });
