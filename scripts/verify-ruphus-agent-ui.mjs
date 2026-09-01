@@ -69,11 +69,14 @@ assert.equal(await page.locator('[data-ruphus-continue="true"]').count(), 0);
 await page.locator('[data-ruphus-new-chat]').click();
 assert.equal(await page.locator('[data-ruphus-stored-messages]').getAttribute('data-ruphus-stored-messages'), '1');
 assert.equal(await page.locator('[data-ruphus-boundary-state]').getAttribute('data-ruphus-boundary-index'), '1');
-assert.equal(await page.locator('[data-command-write]').isDisabled(), true);
 await page.locator('[data-ruphus-stream]').click();
 await page.waitForSelector('[data-ruphus-lifecycle-caption]', { state: 'visible' });
 await page.waitForSelector('[data-ruphus-message="agent-v3"]', { state: 'visible' });
 await page.waitForSelector('[data-artifact="recipe_proposal"]', { state: 'visible' });
+assert.equal(await page.locator('[data-proposal-actions="true"] button').count(), 3);
+await page.getByRole('button', { name: 'Apply', exact: true }).click();
+assert.equal(await page.locator('[data-ruphus-harness]').getAttribute('data-write-count'), '1');
+assert.equal(await page.locator('[data-ruphus-harness]').getAttribute('data-last-action'), 'apply_proposal');
 await page.locator('[data-keyboard-input]').focus();
 assert.equal(await page.locator('[data-keyboard-visible="true"]').count(), 1);
   await page.screenshot({ path: '/tmp/ruphus-agent-v3-mobile.png', fullPage: false });
@@ -86,7 +89,7 @@ assert.equal(await legacy.locator('[data-legacy-route="true"]').count(), 1);
 await legacy.screenshot({ path: '/tmp/ruphus-agent-v3-legacy.png', fullPage: false });
 assert.deepEqual(requests, []);
   assert.deepEqual(errors, []);
-  console.log('Ruphus rendered browser harness passed: launch entries, context-free opening, hydration toggle, disabled command, Agent frames/artifact, legacy route, keyboard padding, no writes, mobile+desktop.');
+  console.log('Ruphus rendered browser harness passed: launch entries, context-free opening, hydration toggle, injected proposal actions, Agent frames/artifact, legacy route, keyboard padding, no network writes, mobile+desktop.');
 } finally {
   await browser.close();
   if (server && !server.killed) {

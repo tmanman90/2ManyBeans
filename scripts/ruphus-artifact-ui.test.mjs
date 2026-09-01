@@ -6,10 +6,15 @@ import { buildRecipeLaunchContext, resolveTastingLaunchMethod } from '../src/lib
 import { validateLaunchContext } from '../src/lib/ruphus/conversationContract.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-test('U4 native artifact UI is proposal-only and contains no machine controls', () => {
+test('U4 proposal UI exposes only registered native actions and no machine controls', () => {
   const proposal = read('src/components/chat/artifacts/RecipeProposalCard.jsx');
   const renderer = read('src/components/chat/ArtifactRenderer.jsx');
-  assert.doesNotMatch(proposal, /Available soon|All controls|<pre|ArtifactAction|onAction/);
+  assert.doesNotMatch(proposal, /Available soon|All controls|<pre/);
+  assert.match(proposal, /apply_proposal/);
+  assert.match(proposal, /brew_once/);
+  assert.match(proposal, /keep_current/);
+  assert.match(proposal, /proposal\.actions/);
+  assert.match(renderer, /actionPending/);
   assert.doesNotMatch(renderer, /CoffeeContextCard|DataGapCard/); assert.match(renderer, /RecipeProposalCard/);
 });
 test('U4 opening and lifecycle surfaces use warm copy and accessible targets', () => {

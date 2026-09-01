@@ -124,7 +124,7 @@ export function validateProposal(value) {
     const result = validateRecipeSnapshot(value[key]);
     if (!result.valid) errors.push(`${key}: ${result.errors.join(', ')}`);
   }
-  if (!['proposed', 'applied', 'kept', 'stale', 'superseded', 'archived', 'unavailable'].includes(value.status)) errors.push('invalid proposal status');
+  if (!['proposed', 'applied', 'kept', 'attempt_created', 'stale', 'superseded', 'archived', 'unavailable'].includes(value.status)) errors.push('invalid proposal status');
   if (Object.keys(value).some((key) => key.startsWith('action') || key === 'receipt')) errors.push('proposal cannot contain authority fields');
   return { valid: errors.length === 0, errors };
 }

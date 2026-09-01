@@ -403,11 +403,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const { hydratedMessages, hydratedContext, hydratedArtifacts, hydratedSession, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
   const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
   const mutationEnabled = isRuphusMutationEnabled({ uid, isDemo });
-  const { run: runRuphusAction } = useRuphusAction({ uid, onReceipt: (result) => {
+  const { pending: ruphusActionPending, run: runRuphusAction } = useRuphusAction({ uid, onReceipt: (result) => {
     if (!result?.receipt) return;
     const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
+    const settledProposalId = result.receipt.proposalId || result.proposal?.id;
+    const settledProposalStatus = result.proposal?.status || (result.receipt.mode === 'apply_proposal' ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
+    const settleProposal = (item) => item?.type === 'recipe_proposal' && item.id === settledProposalId && settledProposalStatus ? { ...item, status: settledProposalStatus } : item;
     if (result.attempt) onRuphusAttempt?.(result.attempt);
-    setAgentArtifacts((previous) => [...previous.filter((item) => item.id !== artifact.id), artifact]);
+    setMessages((previous) => previous.map((message) => Array.isArray(message.artifacts) ? { ...message, artifacts: message.artifacts.map(settleProposal) } : message));
+    setAgentArtifacts((previous) => [...previous.map(settleProposal).filter((item) => item.id !== artifact.id), artifact]);
   } });
   const [agentContext, setAgentContext] = useState(null);
   const [agentFrame, setAgentFrame] = useState(null);
@@ -432,7 +436,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [toast, setToast] = useState(null);
   const handleRuphusAction = useCallback(async (request) => {
     if (!mutationEnabled) return null;
-    try { return await runRuphusAction(request); } catch (error) { setToast(error.message || 'Action unavailable'); return null; }
+    try { return await runRuphusAction(request); } catch (error) {
+      if (error?.code === 'stale' && request?.artifact?.id) {
+        const markStale = (item) => item?.type === 'recipe_proposal' && item.id === request.artifact.id ? { ...item, status: 'stale' } : item;
+        setMessages((previous) => previous.map((message) => Array.isArray(message.artifacts) ? { ...message, artifacts: message.artifacts.map(markStale) } : message));
+        setAgentArtifacts((previous) => previous.map(markStale));
+      }
+      setToast(error.message || 'Action unavailable');
+      return null;
+    }
   }, [mutationEnabled, runRuphusAction]);
   // Disable keyboard hook when tab is hidden to prevent double-counting
   // keyboard events and corrupting the shared tab bar hide counter.
@@ -1345,7 +1357,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (isIntroState && i === 0) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} />)}</div></RuphusMessage> : <ChatMessage
+                {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
@@ -1373,7 +1385,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           />
         )}
         {agentEnabled && loading && agentText && <RuphusMessage text={agentText} />}
-        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} />)}</div>}
+        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div>}
       </div>
 
       {showJumpLatest && streamingSlot && (
