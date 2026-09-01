@@ -87,14 +87,19 @@ function ratioNumber(value) {
   const match = String(value || '').match(/(?:1\s*[:/]\s*)?([0-9]+(?:\.[0-9]+)?)/);
   return match ? Number(match[1]) : null;
 }
-function doseRecipeIntent(before) {
+function doseRecipeIntent(before, dose) {
+  const water = Number(before.waterGrams ?? before.water ?? before.finalBeverageWaterTargetGrams);
+  const fixedWaterRatio = Number.isFinite(water) && water > 0 && Number.isFinite(dose) && dose > 0 ? water / dose : null;
   return {
-    ...(ratioNumber(before.ratio) != null ? { targetRatio: ratioNumber(before.ratio) } : {}),
+    ...((fixedWaterRatio ?? ratioNumber(before.ratio)) != null ? { targetRatio: fixedWaterRatio ?? ratioNumber(before.ratio) } : {}),
     ...(Number.isFinite(before.waterTemp?.celsius) ? { targetTemperatureC: before.waterTemp.celsius } : {}),
   };
 }
+function scaleBrewWaterCopy(value, scale) {
+  return String(value || '').replace(/\b(\d+(?:\.\d+)?)\s*g\b/gi, (_match, amount) => `${Math.round(Number(amount) * scale)}g`);
+}
 function generatedDoseRecipe(before, slotKey, dose) {
-  const intent = doseRecipeIntent(before);
+  const intent = doseRecipeIntent(before, dose);
   const configuration = {
     dose,
     size: before.kalitaSize || before.size,
@@ -134,6 +139,19 @@ function generatedDoseRecipe(before, slotKey, dose) {
     finalBeverageWaterTargetGrams: generated.finalBeverageWaterTargetGrams,
   };
   for (const [key, value] of Object.entries(waterAliases)) if (Object.hasOwn(before, key) && value != null) result[key] = value;
+  const fixedWater = Number(before.waterGrams ?? before.water);
+  const generatedWater = Number(generated.waterGrams);
+  if (Number.isFinite(fixedWater) && fixedWater > 0 && Number.isFinite(generatedWater) && generatedWater > 0 && !slotKey.endsWith('_iced')) {
+    const waterScale = fixedWater / generatedWater;
+    result.waterGrams = fixedWater;
+    if (Object.hasOwn(before, 'water')) result.water = fixedWater;
+    result.ratio = `1:${Math.round((fixedWater / dose) * 10) / 10}`;
+    result.steps = (generated.steps || []).map((step, index, steps) => ({
+      ...step,
+      ...(Number.isFinite(step.waterTotal) ? { waterTotal: index === steps.length - 1 ? fixedWater : Math.round(step.waterTotal * waterScale) } : {}),
+      ...(typeof step.action === 'string' ? { action: scaleBrewWaterCopy(step.action, waterScale) } : {}),
+    }));
+  }
   return result;
 }
 function conditionalSensoryClarification(state) {

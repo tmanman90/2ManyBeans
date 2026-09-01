@@ -127,7 +127,9 @@ test('dose proposal regenerates every executable alias and timed instruction fro
   assert.equal(saved[0].after.coffeeGrams, 16);
   assert.equal(saved[0].after.userCoffeeGrams, 16);
   assert.equal(saved[0].after.dose, 16);
+  assert.equal(saved[0].after.waterGrams, before.waterGrams);
   assert.equal(saved[0].after.water, saved[0].after.waterGrams);
+  assert.notEqual(saved[0].after.ratio, before.ratio);
   assert.equal(saved[0].after.steps.at(-1).waterTotal, saved[0].after.waterGrams);
   assert.match(saved[0].after.prepSteps[1].action, /Add 16g coffee/);
   assert.doesNotMatch(JSON.stringify(saved[0].after), /15g/);
