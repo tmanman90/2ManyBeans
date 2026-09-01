@@ -120,6 +120,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beat|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
   const conditionalAlternative = /\bif\b/i;
+  const counterfactualAlternative = /^\s*(?:more|less|higher|lower)\s+(?:coffee|dose|water|heat|temperature|time|agitation|extraction)\b[^.!?]*\bwould\b[^.!?]*\bbut\b/i;
   const actionableAdditional = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|raise|lower)\b/i;
   const explanationAfterSizedRecommendation = /^(?:so\s+)?(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\s+(?:is|would be|should be)\s+(?:the\s+)?(?:cleanest|best|safest|simplest)\s+(?:next\s+)?(?:test|move|change|step)[.!]?$/i;
   const additionalRecommendation = /\b(?:raise|lower)\b/i;
@@ -135,7 +136,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
     const unsizedAdditionalControl = sentence.split(/;|,\s*(?:and|also)\s+|\s+\b(?:and|also)\b\s+/i).slice(1)
       .some((clause) => directional.test(clause) && (actionableAdditional.test(clause) || additionalRecommendation.test(clause)) && !sized.test(clause));
     return explicitDirectionalControl && !controlHasSize || unsizedAdditionalControl || directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence)
-      && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence)));
+      && !(hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || counterfactualAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence)));
   })) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
   }
@@ -223,7 +224,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
     return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, `reply claims ${claimedKind} are absent even though that source was unavailable`, { runtime: true })];
   }
   if (/\bnothing\b[^.?!]*(?:(?:brew log|brew details|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|brew details|notes))/i.test(value)) return [];
-  if (/\bno\s+(?:(?:linked|separate)\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^.?!]{0,96}\b(?:had|has|with)\b[^.?!]{0,64}\bno\s+(?:linked\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
+  if (/\bno\s+(?:(?:linked|separate)\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked)\s+to\b|\bno\s+(?:tasting|brew|recipe)\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^?!]{0,128}\b(?:had|has|with)\b[^?!]{0,64}\bno\s+(?:linked\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
   const hasEvidence = Object.values(evidence || {}).some((entry) => Array.isArray(entry) && entry.length > 0);
   if (windowed && hasEvidence && !/(?:last|past|previous)\s+(?:two|14|fourteen)\s+weeks?|since|between/i.test(value)) return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, 'absence claim is not qualified by the read window')];
