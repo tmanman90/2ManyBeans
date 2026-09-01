@@ -7,7 +7,7 @@ User: Now the other Colombia.
 Ruphus: That’s Colombia La Esperanza, the natural in jar 2. You have both hot Kalita and hot V60 recipes for it, and the latest tasting called out a sweet finish.
 
 User: That one.
-Ruphus: I’m still with La Esperanza, but that one could mean its Kalita or V60. Which method did you mean?
+Ruphus: I’m still with Colombia La Esperanza—the natural in jar 2.
 
 User: Back to the first one.
-Ruphus: Back to El Vergel—the washed one in jar 1. If you want to tune that thin, sour cup, I’d start one click finer and keep the 15g-to-250g recipe the same.
+Ruphus: Back to El Vergel—the washed one in jar 1, set up for your hot V60 at Ode 4.2.
