@@ -234,6 +234,10 @@ export function gradeC10FocusAcknowledgment({ reply = '', focusChanged = false, 
 
 export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {} } = {}) {
   const value = textOf(reply);
+  // Saved-coffee inventory is not a time-windowed history claim. Do not read
+  // “I don't have a saved coffee called X ... or its recipe” as an exhaustive
+  // assertion that recipe history is absent.
+  if (/\b(?:don[’']?t|do not)\s+have\b[^.?!]{0,80}\b(?:a\s+)?saved\s+coffee\b/i.test(value)) return [];
   const absence = value.match(/\b(?:no|none|nothing)\b[^.?!]*(?:tasting|brew|recipe)s?\b|\b(?:don[’']?t|do not)\s+have\b[^.?!]*(?:tasting|brew|recipe)s?\b/i);
   if (!absence) return [];
   const unavailable = new Set([

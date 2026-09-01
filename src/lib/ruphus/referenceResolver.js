@@ -77,6 +77,10 @@ export function resolveCoffeeReference({ reference, coffees = [], ledger = {}, n
     const score = Math.max(overlap / Math.max(queryTokens.size, 1), originMatch ? 0.8 : 0) + (closeEnough ? 0.55 : 0);
     return { coffee, index, score, closeEnough };
   }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
+  // One weak attribute overlap is not a plausible identity match. For
+  // example, “a SEY coffee from Burundi” must not become a choice between
+  // the saved SEY coffee from Kenya and an unrelated Colombian coffee.
+  if (scored.length && scored[0].score < 0.5 && !scored[0].closeEnough) return { ok: false, reason: 'not_found', candidates: [] };
   if (scored.length > 1 && scored[0].score === scored[1].score) return { ok: false, reason: 'ambiguous', candidates: scored.slice(0, 3).map((item) => candidate(item.coffee, item.index, 'candidate', item.score)) };
   if (scored.length && (scored[0].score >= 0.75 || (scored[0].closeEnough && scored[0].score > (scored[1]?.score || 0) + 0.15))) {
     return { ok: true, ...candidate(scored[0].coffee, scored[0].index, scored[0].closeEnough ? 'close_name' : 'token', scored[0].score) };

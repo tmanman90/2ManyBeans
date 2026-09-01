@@ -14,6 +14,17 @@ test('resolver handles unique jar, close spelling, and ambiguity', () => {
   assert.equal(ambiguous.ok, false); assert.equal(ambiguous.reason, 'ambiguous'); assert.equal(ambiguous.candidates.length, 2);
   assert.equal(resolveCoffeeReference({ reference: 'the washed one', coffees }).coffee.id, 'a');
 });
+test('resolver rejects a weak partial match when supplied identity details conflict', () => {
+  const inventory = [
+    ...coffees,
+    { id: 'c', refKey: 'c-c', name: 'Kenya Gachatha', roaster: 'SEY', origin: 'Kenya', process: 'washed', jarSlot: 3 },
+  ];
+  assert.deepEqual(resolveCoffeeReference({ reference: 'It is a SEY coffee from Burundi.', coffees: inventory }), {
+    ok: false,
+    reason: 'not_found',
+    candidates: [],
+  });
+});
 test('pronouns use only named ledger coffees and do not guess without one', () => {
   const ledger = { namedCoffees: [{ id: 'a', refKey: 'c-a', name: 'El Vergel' }, { id: 'b', refKey: 'c-b', name: 'La Esperanza' }] };
   assert.equal(resolveCoffeeReference({ reference: 'that one', coffees: [], ledger }).coffee.id, 'b');
