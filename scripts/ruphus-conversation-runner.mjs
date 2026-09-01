@@ -451,7 +451,7 @@ function hasUnsupportedFactualClaim(reply, knownText) {
   });
 }
 
-export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [] } = {}) {
+export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = '', turnIndex = 0, factSheet = '', coffees = [], priorCoffeeId = null } = {}) {
   const toolResults = frames.filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {}).filter(object);
   const rawActual = [...toolResults].reverse().map((result) => result.coffeeRef || result.actualCoffeeId || result.focusCoffeeId || result.focus?.coffeeRef || result.focus?.coffeeId || result.evidence?.coffeeRef || result.coffee?.id).find(Boolean) || null;
   const actual = resolveFixtureRef(rawActual, refMap);
@@ -461,7 +461,8 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   const replyCoffee = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.name && new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(reply)).map((coffee) => coffee.id);
   const fallback = replyCoffee.length === 1 ? replyCoffee[0] : resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
   const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet, turnIndex));
-  return { expectedCoffeeId: expected || fallback, actualCoffeeId: actual || fallback, focusCoffeeId: actual || fallback, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
+  const carriedFocus = actual || priorCoffeeId || fallback;
+  return { expectedCoffeeId: expected || fallback, actualCoffeeId: carriedFocus, focusCoffeeId: carriedFocus, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
 
 export async function runLiveEndpointTurn({ endpoint, token, payload, devReadFault = null, fetchImpl = globalThis.fetch, timeoutMs = U3_ENDPOINT_TIMEOUT_MS }) {
@@ -547,6 +548,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
   const transcript = [];
   const results = [];
   const turns = [...fixture.turns];
+  let activeCoffeeId = null;
   for (let index = 0; index < turns.length; index += 1) {
     const userText = turns[index];
     const started = performance.now();
@@ -579,7 +581,8 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     if (reservation) costGuard.reconcile(reservation, priced.cost); else costGuard?.charge(priced.cost);
     await costGuard?.persistState?.();
     transcript.push({ role: 'user', text: userText }, { role: 'assistant', text: result.text });
-    const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account), coffees: account.coffees });
+    const trace = deriveFixtureTrace({ fixture, frames: result.frames || [], refMap: context.rotationSnapshot?.refs || {}, reply: result.text, turnIndex: index, factSheet: fixtureFactSheet(account), coffees: account.coffees, priorCoffeeId: activeCoffeeId });
+    activeCoffeeId = trace.actualCoffeeId || activeCoffeeId;
     const toolEvidenceText = JSON.stringify((result.frames || []).filter((frame) => frame?.type === 'tool_result').map((frame) => frame.result || {})).toLowerCase();
     const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: { days: 14 }, evidence: { records: (result.frames || []).filter((frame) => frame?.type === 'tool_result') }, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
     const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
