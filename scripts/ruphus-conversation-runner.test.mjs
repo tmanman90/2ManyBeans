@@ -300,6 +300,15 @@ test('coffee resolution alone does not count as history evidence', async () => {
   assert.equal(result.results[1].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), true);
 });
 
+test('trusted rotation recipe language does not masquerade as a history claim', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Use jar one.'], branches: [] };
+  const fetchImpl = async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${JSON.stringify({ type: 'turn_completed', text: 'Its recorded recipe is hot V60.' })}\n${JSON.stringify({ type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } })}\n` });
+  const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+  const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+  assert.equal(result.results[0].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
+});
+
 test('a seeded authoritative session ledger counts as history evidence on explicit continuation', async () => {
   const { account, cases } = await loadFixtureManifest();
   const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['Continue with the earlier coffee.'], branches: [], session: { ledger: { version: 1, entries: [{ kind: 'tasting', status: 'complete', summary: 'Balanced cup.' }], namedCoffees: ['El Vergel'] } } };

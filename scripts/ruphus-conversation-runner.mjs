@@ -585,7 +585,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
     const priorEvidenceBeforeHistory = results.some((item) => item.evidenceBeforeHistory === true);
     const seededSessionEvidence = index === 0 && Array.isArray(fixture.session?.ledger?.entries) && fixture.session.ledger.entries.length > 0;
-    if (/\b(?:history|earlier|previous|recorded|last tasting|last brew|last cup)\b/i.test(result.text) && !currentEvidenceBeforeHistory && !priorEvidenceBeforeHistory && !seededSessionEvidence) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence in the active conversation' });
+    if (/\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i.test(result.text) && !currentEvidenceBeforeHistory && !priorEvidenceBeforeHistory && !seededSessionEvidence) grader.ordinary.push({ code: 'U3_EVIDENCE_BEFORE_HISTORY', category: 'ordinary', message: 'history claim was made without preceding evidence in the active conversation' });
     const expectedMethod = fixture.expected?.method;
     if (expectedMethod && !new RegExp(String(expectedMethod).replace('_', '|'), 'i').test(`${result.text} ${toolEvidenceText}`)) grader.ordinary.push({ code: 'U3_METHOD_SLOT_MISSING', category: 'ordinary', message: 'declared method slot was not evidenced' });
     const branch = nextBranchTurn(fixture, index, result);

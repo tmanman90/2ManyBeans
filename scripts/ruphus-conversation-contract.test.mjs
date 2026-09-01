@@ -105,6 +105,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: 'The V60 ran yesterday with no tasting note attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'kalita-only' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent brew itself has no tasting attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent V60 has no linked tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: "There's no separate tasting note attached to it.", readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.ok(gradeEvidenceScope({ reply: "I don't have a tasting note from that cup.", evidence: { tastings: { status: 'unavailable' }, unavailable: ['tastings'] } }).some((item) => item.code === 'EVIDENCE_SCOPE' && item.runtime === true));
   assert.ok(gradeEvidenceScope({ reply: 'There is no tasting attached to that brew.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));
   assert.ok(gradeEvidenceScope({ reply: 'The V60 had no tasting note.', evidence: { unavailable: ['tastings'] } }).some((item) => item.runtime === true));
