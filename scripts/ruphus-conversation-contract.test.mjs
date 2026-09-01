@@ -95,6 +95,7 @@ test('machine tokens are catastrophic while natural collocations stay allowed', 
 test('correction, proposal, focus, and evidence-scope graders classify failures', () => {
   assert.ok(gradeC8Correction({ userTurn: 'Actually I used the V60.', reply: 'The Kalita is still right.' }).some((item) => item.code === 'CF3_SILENT_CORRECTION'));
   assert.equal(gradeC8Correction({ userTurn: 'Actually I used the V60.', reply: 'You’re right—that changes the diagnosis.' }).length, 0);
+  assert.equal(gradeC8Correction({ userTurn: 'It was sour and muted.', reply: 'That points to extraction, not strength.' }).length, 0);
   const proposal = [{ type: 'artifact_ready', artifact: { type: 'recipe_proposal' } }];
   assert.ok(gradeC9ProposalTiming({ reply: 'I suggest a change.', frames: proposal, priorReplies: [], userTurn: 'Go ahead.' }).some((item) => item.code === 'C9_PREMATURE_PROPOSAL'));
   assert.ok(gradeC10FocusAcknowledgment({ reply: 'The other coffee looks good.', focusChanged: true, coffeeName: 'El Vergel' }).length);

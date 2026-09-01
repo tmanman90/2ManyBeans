@@ -183,7 +183,7 @@ export function gradeC7Tone({ reply = '' } = {}) {
 
 export function gradeC8Correction({ reply = '', userTurn = '', _priorReplies = [] } = {}) {
   const user = textOf(userTurn);
-  if (!/(?:actually|no[, ]|correction|instead|not\s+the|i\s+(?:meant|brewed|used)|it\s+was)/i.test(user)) return [];
+  if (!/(?:actually|no[, ]|correction|instead|not\s+the|i\s+(?:meant|brewed|used))/i.test(user)) return [];
   const value = textOf(reply);
   if (!/(?:got it|thanks|you[’']re right|okay|understood|i had that wrong|that changes|you[’']re correct)/i.test(value)) return [violation('CF3_SILENT_CORRECTION', CATEGORIES.CATASTROPHIC, 'reply uses corrected state without acknowledging the correction')];
   if ((value.match(/\b(?:sorry|apologies)\b/gi) || []).length > 1) return [violation('C8_REARGUED', CATEGORIES.ORDINARY, 'correction contains more than one apology')];
