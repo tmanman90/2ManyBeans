@@ -34,10 +34,14 @@ test('blind fact sheet includes attempt notes visible to the candidate', async (
 test('judge dispatch retries one malformed structured result without weakening validation', async () => {
   const responses = [{ result: { schemaVersion: JUDGE_SCHEMA_VERSION } }, { result: validJudgment() }];
   let calls = 0;
+  const packets = [];
   const response = await dispatchValidatedJudge(null, { transcript: [] }, null, {
-    dispatch: async () => { calls += 1; return responses.shift(); },
+    dispatch: async (_adapter, packet) => { calls += 1; packets.push(packet); return responses.shift(); },
   });
   assert.equal(calls, 2);
+  assert.equal(Object.hasOwn(packets[0], 'validationCorrection'), false);
+  assert.match(packets[1].validationCorrection, /scores must contain every dimension/);
+  assert.doesNotMatch(packets[1].validationCorrection, /gold|known-bad/);
   assert.equal(response.result.mean, 5);
 });
 

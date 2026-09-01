@@ -324,9 +324,10 @@ async function dispatchMetered(adapter, packet, guard) {
 export async function dispatchValidatedJudge(adapter, packet, guard, { dispatch = dispatchMetered, maxAttempts = 2 } = {}) {
   let response = null;
   let lastError = null;
+  let requestPacket = packet;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      response = await dispatch(adapter, packet, guard);
+      response = await dispatch(adapter, requestPacket, guard);
     } catch (error) {
       lastError = error;
       if (attempt + 1 >= maxAttempts) throw error;
@@ -335,6 +336,10 @@ export async function dispatchValidatedJudge(adapter, packet, guard, { dispatch 
     const result = response?.result || response;
     const validation = packet?.left ? validatePairwiseResult(result) : validateJudgeResult(result);
     if (validation.valid) return response;
+    requestPacket = {
+      ...packet,
+      validationCorrection: `Your previous structured result was invalid: ${validation.errors.join('; ')}. Return every required field in the exact schema, including one short rationale.`,
+    };
   }
   if (!response && lastError) throw lastError;
   return response;

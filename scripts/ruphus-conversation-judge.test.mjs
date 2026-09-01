@@ -36,6 +36,7 @@ test('calibration packets are exactly 11 plus 11 and carry no calibration label'
   assert.equal(packets.length, 22);
   assert.equal(packets.every((packet) => !JSON.stringify(packet).includes('known-bad') && !JSON.stringify(packet).includes('gold')), true);
   assert.equal(Object.isFrozen(JUDGE_INSTRUCTIONS), true);
+  assert.match(JUDGE_INSTRUCTIONS, /Ordinary coffee advice.*is a suggestion, not a proposal/);
 });
 
 test('Anthropic judge adapter uses frozen instructions and parses streamed usage without printing auth', async () => {
