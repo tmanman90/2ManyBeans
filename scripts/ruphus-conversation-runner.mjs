@@ -459,9 +459,10 @@ export function deriveFixtureTrace({ fixture, frames = [], refMap = {}, reply = 
   const expectedRaw = expectation.focus || (fixture?.expected?.focus?.length === 1 ? fixture.expected.focus[0] : null) || fixture?.launchContext?.coffeeRef;
   const expected = resolveFixtureRef(expectedRaw, refMap);
   const replyCoffee = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.name && new RegExp(`\\b${String(coffee.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(reply)).map((coffee) => coffee.id);
-  const fallback = replyCoffee.length === 1 ? replyCoffee[0] : resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
+  const namedReplyFocus = replyCoffee.length === 1 ? replyCoffee[0] : null;
+  const fallback = namedReplyFocus || resolveFixtureRef(fixture?.launchContext?.coffeeRef, refMap);
   const fabricated = toolResults.some((result) => result.fabricatedEvidence === true || result.evidenceStatus === 'fabricated' || result.evidence?.fabricated === true || (Array.isArray(result.fabricatedFacts) && result.fabricatedFacts.length > 0)) || hasUnsupportedFactualClaim(reply, factualEvidenceText(fixture, frames, factSheet, turnIndex));
-  const carriedFocus = actual || priorCoffeeId || fallback;
+  const carriedFocus = actual || namedReplyFocus || priorCoffeeId || fallback;
   return { expectedCoffeeId: expected || fallback, actualCoffeeId: carriedFocus, focusCoffeeId: carriedFocus, fabricatedEvidence: fabricated, expectedFocus: expected || fallback, ambiguity: expectation.ambiguity === true };
 }
 

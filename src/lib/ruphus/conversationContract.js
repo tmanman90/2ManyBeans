@@ -118,6 +118,11 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const recommendation = /\b(?:try|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|could|would)\b|\bgrind\s+(?:the\s+)?(?:coffee\s+)?(?:finer|coarser)\b/i;
   const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|degrees?|seconds?|min(?:ute)?s?)\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+|ode\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease|change)s?(?:\s+(?:finer|coarser))?\b|\b(?:a\s+)?half\s+(?:a\s+)?(?:step|click|notch|degree)s?\b|\b(?:a\s+(?:little|touch|bit)|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee|dose)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
   const sentences = value.split(/(?<=[.!?])\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
+  const odeSmallStep = value.match(/\b(?:one|a)\s+(?:small\s+)?step\b[^.!?]*?\b(?:ode\s*)?(\d+(?:\.\d+)?)\s*(?:to|→)\s*(?:about\s+)?(\d+(?:\.\d+)?)/i)
+    || value.match(/\b(?:ode\s*)?(\d+(?:\.\d+)?)\s*(?:to|→)\s*(?:about\s+)?(\d+(?:\.\d+)?)[^.!?]*?\b(?:one|a)\s+(?:small\s+)?step\b/i);
+  if (odeSmallStep && Math.abs(Number(odeSmallStep[1]) - Number(odeSmallStep[2])) >= 1) {
+    result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'claimed small grinder step conflicts with the numeric change'));
+  }
   const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beat|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
   const conditionalAlternative = /\bif\b/i;
@@ -126,7 +131,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const explanationAfterSizedRecommendation = /^(?:so\s+)?(?:a|an|the|this)\s+(?:(?:modest|small|slight|gentle|clean)\s+){0,2}(?:extraction|strength|temperature|agitation)?\s*(?:increase|decrease)\s+(?:is|would be|should be)\s+(?:the\s+)?(?:cleanest|best|safest|simplest)\s+(?:next\s+)?(?:test|move|change|step)[.!]?$/i;
   const predictedOutcome = /^\s*(?:the\s+(?:finer|coarser)\s+grind|the\s+change|this\s+change|that\s+change)\s+(?:should|would|could)\s+(?:increase|decrease|improve|reduce|preserve|keep|add)\b/i;
   const additionalRecommendation = /\b(?:raise|lower)\b/i;
-  if (sentences.some((sentence) => {
+  if (!result.some((item) => item.code === 'C5_DIRECTION_SIZE') && sentences.some((sentence) => {
     const explicitDirectionalControl = sentence.match(/\b(?:try|use|make|move|adjust|change|increase|decrease|raise|lower|turn|set)\b[^.!?]{0,32}\b(?:more|less|higher|lower)\s+(coffee|dose|water|temperature|heat|agitation|time|bloom|contact|extraction)\b/i)?.[1]?.toLowerCase() || null;
     const controlHasSize = explicitDirectionalControl === 'coffee' || explicitDirectionalControl === 'dose'
       ? /(?:\b\d+(?:\.\d+)?\s*(?:g|grams?)\b[^.!?]{0,24}\b(?:coffee|dose)\b|\b(?:coffee|dose)\b[^.!?]{0,24}\b\d+(?:\.\d+)?\s*(?:g|grams?)\b)/i.test(value)
