@@ -93,6 +93,37 @@ assert.match(capacitorConfig, /2manybeans Dev/);
 assert.match(capacitorConfig, /autoUpdate: !disableCapgoUpdates/);
 assert.match(capacitorConfig, /TMB_DISABLE_CAPGO_UPDATES/);
 
+const sceneManifestResult = spawnSync('plutil', [
+  '-extract',
+  'UIApplicationSceneManifest',
+  'json',
+  '-o',
+  '-',
+  'ios/App/App/Info.plist',
+], { encoding: 'utf8' });
+assert.equal(sceneManifestResult.status, 0, 'iOS 27 requires an application scene manifest');
+const sceneManifest = JSON.parse(sceneManifestResult.stdout);
+assert.equal(sceneManifest.UIApplicationSupportsMultipleScenes, false);
+const applicationScenes = sceneManifest.UISceneConfigurations?.UIWindowSceneSessionRoleApplication;
+assert.equal(applicationScenes?.length, 1, 'the app must declare exactly one main scene configuration');
+assert.equal(applicationScenes[0].UISceneConfigurationName, 'Default Configuration');
+assert.equal(applicationScenes[0].UISceneDelegateClassName, '$(PRODUCT_MODULE_NAME).SceneDelegate');
+assert.equal(applicationScenes[0].UISceneStoryboardFile, 'Main');
+
+const appDelegateSource = readFileSync('ios/App/App/AppDelegate.swift', 'utf8');
+assert.match(appDelegateSource, /configurationForConnecting connectingSceneSession/);
+const sceneDelegateSource = readFileSync('ios/App/App/SceneDelegate.swift', 'utf8');
+assert.match(sceneDelegateSource, /class SceneDelegate: UIResponder, UIWindowSceneDelegate/);
+assert.match(sceneDelegateSource, /ApplicationDelegateProxy\.shared\.application\(UIApplication\.shared, open:/);
+assert.match(sceneDelegateSource, /continue: userActivity/);
+
+const iosVariantConfigurator = readFileSync('scripts/configure-ios-variant.mjs', 'utf8');
+assert.match(iosVariantConfigurator, /const ensureSceneLifecycle = \(\) =>/);
+assert.match(iosVariantConfigurator, /writeFileSync\(sceneDelegatePath, sceneDelegateSource\)/);
+assert.match(iosVariantConfigurator, /<key>UIApplicationSceneManifest<\/key>/);
+assert.match(iosVariantConfigurator, /configurationForConnecting connectingSceneSession/);
+assert.match(iosVariantConfigurator, /SceneDelegate\.swift in Sources/);
+
 const apiBaseSource = readFileSync('src/lib/apiBase.js', 'utf8');
 assert.match(apiBaseSource, /VITE_RUPHUS_API_BASE/);
 assert.match(apiBaseSource, /base\.searchParams/);
