@@ -5,7 +5,7 @@ import { cacheRead, cacheWrite, chatKey } from '../lib/offlineCache';
 import { resolveTerminal } from '../lib/streamChat';
 import { parseBeanScan, parseRecipeCard } from '../lib/chatParse';
 import { recipeSummary } from '../components/chat/RecipeCard';
-import { normalizeAgentSession, inflateAgentSession, startNewChat } from '../lib/ruphus/session.js';
+import { normalizeAgentSession, inflateAgentSession, startNewChat, clientSessionWrite } from '../lib/ruphus/session.js';
 
 const MAX_MESSAGES = 50;
 const MAX_TEXT = 2000;
@@ -66,8 +66,9 @@ function createDefaultAdapter(uid) {
       const snap = await getDoc(ref);
       return snap.exists() ? snap.data() : null;
     },
-    saveRemote(session) {
-      return setDoc(ref, session);
+    saveRemote(session, options) {
+      const write = clientSessionWrite(session, options);
+      return setDoc(ref, write.data, { merge: write.merge });
     },
     async loadRemoteArtifacts(session) {
       const sessionId = session?.contextRef?.sessionId;
@@ -166,7 +167,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     };
   }, [adapter, isDemo, uid]);
 
-  const persist = useCallback((messages, metadata = {}) => {
+  const persist = useCallback((messages, metadata = {}, options = {}) => {
     if (isDemo || !uid || !adapterRef.current) return;
     const session = metadata.protocolVersion === AGENT_PROTOCOL_VERSION
       ? normalizeAgentSession({ ...metadata, messages })
@@ -177,17 +178,17 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     Promise.resolve(adapterRef.current.saveLocal?.(session))
       .catch(err => console.warn('[ChatSession] Local persist failed:', err));
     if (!hydratedRef.current) return;
-    Promise.resolve(adapterRef.current.saveRemote?.(session))
+    Promise.resolve(adapterRef.current.saveRemote?.(session, options))
       .catch(err => console.warn('[ChatSession] Remote persist failed:', err));
   }, [isDemo, uid]);
 
-  const clear = useCallback(() => {
+  const clear = useCallback((currentMessages = hydratedMessages, currentContext = hydratedContext) => {
     if (isDemo || !uid || !adapterRef.current) return;
     const now = Date.now();
     const next = startNewChat({
       protocolVersion: AGENT_PROTOCOL_VERSION,
-      messages: hydratedMessages,
-      contextRef: hydratedContext,
+      messages: currentMessages,
+      contextRef: currentContext,
       lastActivityAt: now,
       updatedAt: now,
     }, { now });
@@ -200,7 +201,7 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     setHydrationState('hydrated');
     Promise.resolve(adapterRef.current.saveLocal?.(next))
       .catch(err => console.warn('[ChatSession] Local boundary persist failed:', err));
-    Promise.resolve(adapterRef.current.saveRemote?.(next))
+    Promise.resolve(adapterRef.current.saveRemote?.(next, { resetContext: true }))
       .catch(err => console.warn('[ChatSession] Remote boundary persist failed:', err));
   }, [hydratedContext, hydratedMessages, isDemo, uid]);
 

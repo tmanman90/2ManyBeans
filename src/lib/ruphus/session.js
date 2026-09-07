@@ -19,6 +19,14 @@ export function restoreChatMessage(message) {
 }
 const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
+
+// UI transcript saves must not replace evidence and lifecycle state written by
+// the endpoint after each turn. Explicit New chat/Continue remain reset paths.
+export function clientSessionWrite(session, { resetContext = false } = {}) {
+  if (session.protocolVersion !== AGENT_PROTOCOL_VERSION || resetContext) return { data: session, merge: false };
+  return { data: Object.fromEntries(['protocolVersion', 'messages', 'pendingActionIds', 'updatedAt']
+    .filter(key => key in session).map(key => [key, session[key]])), merge: true };
+}
 const safeLedgerEntry = (entry = {}) => {
   const value = {};
   for (const key of ['kind', 'status', 'summary', 'windowDays', 'count', 'at']) if (typeof entry[key] === 'string' || typeof entry[key] === 'number') value[key] = entry[key];

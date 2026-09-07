@@ -713,14 +713,14 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const commitAssistantMessage = (assistantMsg) => {
     setMessages(prev => {
       const updated = [...prev, assistantMsg];
-      if (updated.length > MAX_DISPLAY_MESSAGES) {
+      if (!agentEnabled && updated.length > MAX_DISPLAY_MESSAGES) {
         const pruned = updated.slice(0, updated.length - MAX_DISPLAY_MESSAGES);
         pruned.forEach(m => m.photos?.forEach(url => safeRevokeBlobUrl(url)));
         const trimmed = updated.slice(-MAX_DISPLAY_MESSAGES);
         persist(threadForPersistence(trimmed));
         return trimmed;
       }
-      persist(threadForPersistence(updated));
+      persist(threadForPersistence(updated), agentEnabled ? { protocolVersion: 1, contextRef: agentContextRef.current } : {});
       return updated;
     });
   };
@@ -811,7 +811,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       userTouchedThreadRef.current = true;
       setMessages(prev => {
         const updated = [...prev, displayMsg];
-        persist(threadForPersistence(updated));
+        persist(threadForPersistence(updated), agentEnabled ? { protocolVersion: 1, contextRef: agentContextRef.current } : {});
         return updated;
       });
     }
@@ -894,7 +894,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       persist(threadForPersistence([...messages, displayMsg, assistant]), {
         protocolVersion: 1, contextRef, turns: [{ id: turnId, status: 'completed' }],
       });
-      setAgentText(''); agentTextRef.current = ''; agentArtifactsRef.current = []; setAgentFrame(null);
+      setAgentText(''); agentTextRef.current = ''; agentArtifactsRef.current = []; setAgentArtifacts([]); setAgentFrame(null);
     };
 
     await new Promise((resolve) => {
@@ -1201,7 +1201,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handleNewChat = () => {
     if (isDemo || messages.length <= 1) return;
     if (!window.confirm('Start a fresh conversation?')) return;
-    clear();
+    clear(threadForPersistence(messages), agentContextRef.current);
     resetIntroThread();
     agentSessionIdRef.current = null;
     setLegacyChatOverride(false);
@@ -1312,7 +1312,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         </div>
       </div>
 
-      {agentEnabled && hydrationState === 'hydrated' && hydratedMessages.length > 0 && isIntroState && sessionPresentation(hydratedSession || hydratedContext).showContinue && <RuphusContinuePrevious session={hydratedSession || hydratedContext} onContinue={() => { const resumed = continuePrevious(hydratedSession || hydratedContext); const resumedContext = resumed?.contextRef || null; setAgentContext(resumedContext); agentContextRef.current = resumedContext; agentSessionIdRef.current = resumedContext?.sessionId || null; persist(hydratedMessages, resumed); hydrateThread(hydratedMessages); }} firstLine={hydratedMessages[0]?.content} />}
+      {agentEnabled && hydrationState === 'hydrated' && hydratedMessages.length > 0 && isIntroState && sessionPresentation(hydratedSession || hydratedContext).showContinue && <RuphusContinuePrevious session={hydratedSession || hydratedContext} onContinue={() => { const resumed = continuePrevious(hydratedSession || hydratedContext); const resumedContext = resumed?.contextRef || null; setAgentContext(resumedContext); agentContextRef.current = resumedContext; agentSessionIdRef.current = resumedContext?.sessionId || null; persist(hydratedMessages, resumed, { resetContext: true }); hydrateThread(hydratedMessages); }} firstLine={hydratedMessages[0]?.content} />}
 
       <div
         ref={scrollRef}
@@ -1348,6 +1348,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => {
             if (isIntroState && i === 0) return null;
+            if (i === 0 && msg.role === 'assistant' && !msg.content?.trim() && !msg.artifacts?.length && !msg.photos?.length) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
                 {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage

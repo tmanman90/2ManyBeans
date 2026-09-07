@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { continuePrevious, inflateAgentSession, normalizeAgentSession, prepareSession, restoreChatMessage, sessionAge, sessionPresentation, startNewChat } from '../src/lib/ruphus/session.js';
+import { clientSessionWrite, continuePrevious, inflateAgentSession, normalizeAgentSession, prepareSession, restoreChatMessage, sessionAge, sessionPresentation, startNewChat } from '../src/lib/ruphus/session.js';
+
+test('ordinary UI saves preserve server evidence while explicit New chat clears it', () => {
+  const remote = normalizeAgentSession({ messages: [{ role: 'assistant', text: 'Try reducing the water by 20g for this thin clean cup.' }], ledger: { entries: [{ kind: 'evidence_read', summary: 'Kalita recipe checked' }] }, launchHintConsumed: true, turns: [{ id: 'turn-1' }] });
+  const ui = normalizeAgentSession({ messages: remote.messages });
+  const write = clientSessionWrite(ui);
+  assert.equal(write.merge, true);
+  for (const key of ['ledger', 'turns', 'boundaryIndex', 'contextRef', 'launchContext', 'launchHintConsumed', 'historyWidened', 'lastActivityAt']) assert.equal(key in write.data, false);
+  const saved = { ...remote, ...write.data };
+  assert.deepEqual(saved.ledger, remote.ledger);
+  assert.equal(saved.launchHintConsumed, true);
+  const cleared = clientSessionWrite(startNewChat(saved), { resetContext: true });
+  assert.equal(cleared.merge, false);
+  assert.deepEqual(cleared.data.ledger.entries, []);
+  assert.equal(cleared.data.boundaryIndex, saved.messages.length);
+});
 
 test('saved Agent conversation retains its native proposal through display restoration', () => {
   const artifact = { id: 'proposal', type: 'recipe_proposal', actions: ['apply_proposal'], status: 'proposed' };

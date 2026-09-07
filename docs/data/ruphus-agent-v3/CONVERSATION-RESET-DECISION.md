@@ -204,6 +204,12 @@ but product acceptance still requires authenticated conversation evidence and
 five qualifying owner-run unscripted conversations on the physical Dev device,
 including a tasting surface.
 
+## September 6 typed-UI remediation
+
+Supplemental real Dev browser report `conversation-eval/u3-action-check-1788761866814/report.json` passes an actually typed three-turn thin/clean Kalita conversation, one proposal card, explicit Update, canonical saved-recipe readback, New chat history retention, and cleanup Undo readback. This supersedes API-plus-restored-transcript proof for that scenario, not the full final gate. Earlier failed typed reports are retained: they exposed UI session overwrites that erased server evidence and a duplicate transient proposal card.
+
+Ordinary Agent UI persistence now merges transcript fields without replacing server evidence or lifecycle state; all generic Chat saves retain Agent protocol. Explicit New chat uses the current conversation, and completed transient artifacts clear after persistence. Empty introductory bubbles are hidden. Final focused tests pass 42/42, scoped source/test ESLint and build pass, and the actual Firestore emulator verifies merge preservation plus negative authority cases. Testing spend after the typed live pass is $28.023517 of the $30 total cap. Browser routing buffers real endpoint frames, so this is not native transport or streaming-latency evidence. Installed-app and owner gates remain outstanding for this revision.
+
 ## Evidence ledger
 
 | Category | Result | Commit |

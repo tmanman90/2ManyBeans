@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 // Real app/providers, standard Firebase SDK login, isolated fixture only.
 // This entry check deliberately forbids model and recipe command dispatches.
-export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false }) {
+export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false, liveConversation = null }) {
   assert.equal(config.VITE_FIREBASE_PROJECT_ID, 'twomanybeans-ruphus-dev');
   const previous = Object.fromEntries(Object.keys(config).map(key => [key, process.env[key]]));
   const previousVariant = process.env.TMB_APP_VARIANT;
@@ -35,6 +35,14 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     });
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
+      if (liveConversation && url.origin === origin && url.pathname === '/api/ruphus-agent' && route.request().method() === 'POST') {
+        try {
+          const result = await liveConversation.dispatch(route.request().postDataJSON());
+          return route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: result.frames.map(frame => JSON.stringify(frame)).join('\n') + '\n' });
+        } catch {
+          return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'dev_acceptance_turn_failed' }) });
+        }
+      }
       if (savedAction && url.origin === origin && url.pathname === '/api/recipe-command' && route.request().method() === 'POST') {
         try {
           const result = await savedAction.command(route.request().postDataJSON());
@@ -90,6 +98,16 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     }
     stage = 'verify_agent_entry';
     await agentEntry.waitFor();
+    if (liveConversation) {
+      stage = 'typed_live_conversation';
+      for (const [index, message] of liveConversation.turns.entries()) {
+        const input = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
+        await input.fill(message);
+        await input.press('Enter');
+        await page.waitForFunction(count => document.querySelectorAll('[data-ruphus-message="agent-v3"]').length >= count,
+          index + 1, { timeout: 60000 });
+      }
+    }
     if (checkSessionBoundary) {
       stage = 'new_chat_boundary';
       page.once('dialog', async dialog => {
@@ -139,6 +157,24 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       await page.locator('[data-artifact="action_receipt"][data-status="succeeded"]').waitFor();
       await savedAction.verify();
       await page.screenshot({ path: '/tmp/ruphus-authenticated-saved.png', fullPage: false });
+      if (liveConversation) {
+        stage = 'new_chat_after_live_turns';
+        page.once('dialog', async dialog => {
+          if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
+          else await dialog.dismiss();
+        });
+        await page.getByRole('button', { name: 'New chat', exact: true }).click();
+        const boundary = await page.evaluate(async ({ firestoreModule, fixtureUid }) => {
+          const { db } = await import('/src/firebase.js');
+          const { doc, getDocFromServer, waitForPendingWrites } = await import(firestoreModule);
+          await waitForPendingWrites(db);
+          const data = (await getDocFromServer(doc(db, 'users', fixtureUid, 'chatSessions', 'active'))).data();
+          return { count: data.messages.length, boundaryIndex: data.boundaryIndex, evidenceCleared: data.ledger.entries.length === 0 };
+        }, { firestoreModule, fixtureUid });
+        assert.ok(boundary.count >= liveConversation.turns.length * 2, 'New chat must retain the conversation just completed, not only the initial hydration');
+        assert.equal(boundary.boundaryIndex, boundary.count);
+        assert.equal(boundary.evidenceCleared, true);
+      }
     }
     const text = await page.locator('body').innerText();
     assert.match(text, /Professor Ruphus|Your rotation, your taste/i);
@@ -147,7 +183,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     assert.equal(blockedApiPaths.length, 0, 'Entry must not dispatch model or command requests');
     const screenshot = '/tmp/ruphus-authenticated-chat.png';
     await page.screenshot({ path: screenshot, fullPage: false });
-    return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', savedAction: Boolean(savedAction), viewport: '390×844', screenshot, modelDispatches: 0, nativeUiTest: false };
+    return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', savedAction: Boolean(savedAction), viewport: '390×844', screenshot, modelDispatches: liveConversation?.turns.length || 0, typedConversation: Boolean(liveConversation), nativeUiTest: false };
   } catch (error) {
     const screenshot = `/tmp/ruphus-authenticated-entry-failure-${Date.now()}.png`;
     const screenshotSaved = page ? await page.screenshot({ path: screenshot, fullPage: false }).then(() => true).catch(() => false) : false;

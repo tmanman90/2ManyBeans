@@ -10,12 +10,16 @@ import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { normalizeAgentSession } from '../src/lib/ruphus/session.js';
+import { configuredCallMaximum, endpointCallMultiplier, runLiveEndpointTurn } from './ruphus-conversation-runner.mjs';
+import { priceUsage } from '../api/_lib/modelPricing.js';
+import { RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
 
 const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
 const mode = process.argv[3] || 'action';
-assert.ok(['action', 'action-thin', 'smoke', 'full', 'ui', 'ui-action', 'ui-session'].includes(mode), 'Expected action, action-thin, smoke, full, ui, ui-action or ui-session');
+const uiMode = ['ui', 'ui-action', 'ui-session', 'ui-conversation'].includes(mode);
+assert.ok(['action', 'action-thin', 'smoke', 'full', 'ui', 'ui-action', 'ui-session', 'ui-conversation'].includes(mode), 'Unknown acceptance mode');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -88,7 +92,7 @@ try {
   const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`;
   const fixtureProfile = decode({ mapValue: await request(base, { token: auth.idToken }) });
   assert.equal(fixtureProfile.account || fixtureProfile.subscription?.source, 'ruphus-dev-fixture', 'Only the explicitly seeded fixture can be mutated');
-  if (mode === 'ui' || mode === 'ui-action' || mode === 'ui-session') {
+  if (uiMode) {
     // Historical seed-only root fields violate the existing profile hasOnly
     // rule. Remove only those named fixture fields, retaining domain setup in
     // preferences and server-owned fixture identity in subscription.source.
@@ -142,7 +146,7 @@ try {
     report.supplementalOwnerJourney = true;
   }
   const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
-  if (mode === 'ui' || mode === 'ui-action' || mode === 'ui-session') {
+  if (uiMode) {
     report.stage = 'authenticated_browser_entry';
     await request(`${base}?updateMask.fieldPaths=onboardingComplete&updateMask.fieldPaths=tourCompleted`, { method: 'PATCH', body: encode({ onboardingComplete: true, tourCompleted: true }).mapValue });
     const keys = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID', 'VITE_RUPHUS_AGENT_V3_MUTATION_UIDS'];
@@ -150,6 +154,55 @@ try {
     let savedAction = null;
     let appliedResult = null;
     let artifact = null;
+    let liveConversation = null;
+    if (mode === 'ui-conversation') {
+      await reset({ fixture: { ...fixture, session: null }, stage: 'typed-browser', repetition: 1 });
+      const prior = await loadCumulativeCostLedger(ledgerPath);
+      const guard = createCostGuard(30, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
+      report.typedTurns = [];
+      liveConversation = {
+        turns: ['My Colombia La Esperanza Kalita 155 recipe tasted watered down.', 'Thin, but sweet and clean. Not sour.', 'Ok can we update the recipe?'],
+        dispatch: async payload => {
+          assert.equal(payload.userText, liveConversation.turns[report.typedTurns.length], 'Only the scripted fixture turns may dispatch');
+          const maximum = configuredCallMaximum() * endpointCallMultiplier.total;
+          const reservation = guard.reserveMaximum(maximum);
+          await guard.persistState();
+          let result;
+          try {
+            result = await runLiveEndpointTurn({ endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, payload });
+          } catch (error) {
+            guard.reconcile(reservation, maximum);
+            await guard.persistState();
+            throw error;
+          }
+          const price = priceUsage({ model: RUPHUS_OPENAI_MODEL, provider: 'openai', usage: result.usage });
+          guard.reconcile(reservation, price?.cost ?? maximum);
+          await guard.persistState();
+          assert.ok(price, 'Live browser usage must be complete');
+          report.cumulativeCostUsd = guard.spentUsd;
+          report.typedTurns.push({ userText: payload.userText, reply: result.text, frames: result.frames });
+          artifact = result.frames.find(frame => frame.type === 'artifact_ready' && frame.artifact?.type === 'recipe_proposal')?.artifact || artifact;
+          return result;
+        },
+      };
+      savedAction = {
+        command: async body => {
+          assert.ok(artifact, 'The live chat must create the proposal');
+          assert.equal(body.mode, 'apply_proposal');
+          assert.equal(body.proposalId, artifact.id);
+          assert.ok(artifact.after.coffeeGrams / artifact.after.waterGrams > artifact.before.coffeeGrams / artifact.before.waterGrams, 'Thin clean cup should receive the discussed strength adjustment');
+          assert.ok(artifact.after.waterGrams === artifact.before.waterGrams || artifact.after.coffeeGrams === artifact.before.coffeeGrams, 'Change one strength control, not both');
+          assert.deepEqual(artifact.after.grindSize, artifact.before.grindSize);
+          appliedResult = await request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body });
+          return appliedResult;
+        },
+        verify: async () => {
+          assert.equal(appliedResult?.receipt?.status, 'succeeded');
+          assert.equal(recipeHash(await savedRecipe()), recipeHash(artifact.after));
+          report.canonicalReadback = true;
+        },
+      };
+    }
     if (mode === 'ui-action') {
       report.stage = 'existing_proposal_lookup';
       const proposals = [];
@@ -187,7 +240,7 @@ try {
     }
     try {
       report.stage = 'authenticated_browser_entry';
-      report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid, savedAction, checkSessionBoundary: mode === 'ui-session' });
+      report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid, savedAction, liveConversation, checkSessionBoundary: mode === 'ui-session' });
     } finally {
       if (appliedResult?.revision?.id) {
         await request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body: { actionId: `${runId}-undo`, mode: 'undo_revision', coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, expectedRevisionId: appliedResult.revision.id } });

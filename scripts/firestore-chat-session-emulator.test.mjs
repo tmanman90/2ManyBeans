@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import test from 'node:test';
-import { normalizeAgentSession, startNewChat } from '../src/lib/ruphus/session.js';
+import { clientSessionWrite, normalizeAgentSession, startNewChat } from '../src/lib/ruphus/session.js';
 
 // Opt-in, local emulator only. A temporary package root avoids changing the
 // application's runtime dependencies for the Firebase rules test utilities.
@@ -26,6 +26,13 @@ test('chat session rules accept actual client shapes and retain authority bounda
     const path = 'users/fixture-owner/chatSessions/active';
     const session = normalizeAgentSession({ messages: [{ id: 'hello', role: 'user', text: 'My Kalita tasted thin', createdAt: 1 }] });
     await assertSucceeds(setDoc(doc(owner, path), session));
+    const serverSession = normalizeAgentSession({ ...session, ledger: { entries: [{ kind: 'evidence_read', summary: 'Kalita checked' }] }, launchHintConsumed: true });
+    await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(), path), serverSession));
+    const uiWrite = clientSessionWrite(session);
+    await assertSucceeds(setDoc(doc(owner, path), uiWrite.data, { merge: uiWrite.merge }));
+    const readback = (await getDoc(doc(owner, path))).data();
+    assert.deepEqual(readback.ledger, serverSession.ledger);
+    assert.equal(readback.launchHintConsumed, true);
     const boundary = startNewChat(session);
     await assertSucceeds(setDoc(doc(owner, path), boundary));
     assert.equal((await getDoc(doc(owner, path))).data().boundaryIndex, 1);
