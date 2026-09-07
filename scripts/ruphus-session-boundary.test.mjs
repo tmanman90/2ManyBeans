@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clientSessionWrite, continuePrevious, inflateAgentSession, normalizeAgentSession, prepareSession, restoreChatMessage, sessionAge, sessionPresentation, startNewChat } from '../src/lib/ruphus/session.js';
+import { clientSessionWrite, continuePrevious, inflateAgentSession, normalizeAgentSession, prepareSession, restoreChatMessage, sessionAge, sessionPresentation, startNewChat, retainActionReceipt } from '../src/lib/ruphus/session.js';
+
+test('Brew once receipt survives return to chat and replay does not duplicate it', () => {
+  const proposal = { id: 'proposal', type: 'recipe_proposal', status: 'proposed' };
+  const receipt = { id: 'action', type: 'action_receipt', mode: 'brew_once', proposalId: 'proposal', attemptId: 'attempt', status: 'succeeded' };
+  const messages = [{ id: 'reply', role: 'assistant', content: 'Review this recipe.', turnId: 'turn', artifacts: [proposal] }];
+  const updated = retainActionReceipt(messages, receipt, 'attempt_created');
+  const restored = inflateAgentSession(normalizeAgentSession({ messages: updated })).messages.map(restoreChatMessage);
+  assert.equal(restored[0].artifacts[0].status, 'attempt_created');
+  assert.deepEqual(restored[0].artifacts[1], receipt);
+  assert.deepEqual(retainActionReceipt(restored, receipt, 'attempt_created'), restored);
+  const orphan = retainActionReceipt([], receipt, 'attempt_created');
+  assert.equal(normalizeAgentSession({ messages: orphan }).messages[0].artifacts[0].attemptId, 'attempt');
+});
 
 test('ordinary UI saves preserve server evidence while explicit New chat clears it', () => {
   const remote = normalizeAgentSession({ messages: [{ role: 'assistant', text: 'Try reducing the water by 20g for this thin clean cup.' }], ledger: { entries: [{ kind: 'evidence_read', summary: 'Kalita recipe checked' }] }, launchHintConsumed: true, turns: [{ id: 'turn-1' }] });

@@ -40,7 +40,7 @@ import { RuphusContinuePrevious } from '../components/chat/RuphusContinuePreviou
 import { ArtifactRenderer } from '../components/chat/ArtifactRenderer';
 import { recoveryForAgentFrame } from '../lib/ruphus/recovery';
 import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from '../lib/ruphus/census';
-import { continuePrevious, restoreChatMessage, sessionPresentation } from '../lib/ruphus/session';
+import { continuePrevious, restoreChatMessage, sessionPresentation, retainActionReceipt } from '../lib/ruphus/session';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
@@ -406,12 +406,14 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const { pending: ruphusActionPending, run: runRuphusAction } = useRuphusAction({ uid, onReceipt: (result) => {
     if (!result?.receipt) return;
     const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
-    const settledProposalId = result.receipt.proposalId || result.proposal?.id;
+    if (!artifact.proposalId && result.proposal?.id) artifact.proposalId = result.proposal.id;
     const settledProposalStatus = result.proposal?.status || (result.receipt.mode === 'apply_proposal' ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
-    const settleProposal = (item) => item?.type === 'recipe_proposal' && item.id === settledProposalId && settledProposalStatus ? { ...item, status: settledProposalStatus } : item;
+    setMessages(previous => {
+      const updated = retainActionReceipt(previous, artifact, settledProposalStatus);
+      persist(threadForPersistence(updated), { protocolVersion: 1 });
+      return updated;
+    });
     if (result.attempt) onRuphusAttempt?.(result.attempt);
-    setMessages((previous) => previous.map((message) => Array.isArray(message.artifacts) ? { ...message, artifacts: message.artifacts.map(settleProposal) } : message));
-    setAgentArtifacts((previous) => [...previous.map(settleProposal).filter((item) => item.id !== artifact.id), artifact]);
   } });
   const [agentContext, setAgentContext] = useState(null);
   const [agentFrame, setAgentFrame] = useState(null);

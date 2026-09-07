@@ -20,6 +20,23 @@ export function restoreChatMessage(message) {
 const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 
+export function retainActionReceipt(messages, receipt, proposalStatus) {
+  let attached = false;
+  const updated = messages.map(message => {
+    if (!Array.isArray(message.artifacts)) return message;
+    const ownsProposal = message.artifacts.some(item => item.type === 'recipe_proposal' && item.id === receipt.proposalId);
+    const ownsReceipt = message.artifacts.some(item => item.id === receipt.id);
+    if (!ownsProposal && !ownsReceipt) return message;
+    const artifacts = message.artifacts.filter(item => item.id !== receipt.id).map(item =>
+      ownsProposal && item.id === receipt.proposalId && proposalStatus ? { ...item, status: proposalStatus } : item);
+    if (!attached) artifacts.push(receipt);
+    attached = true;
+    return { ...message, artifacts };
+  });
+  if (!attached) updated.push({ id: `receipt-${receipt.id}`, role: 'assistant', content: 'Recipe action result', turnId: `action-${receipt.id}`, createdAt: Date.now(), artifacts: [receipt] });
+  return updated;
+}
+
 // UI transcript saves must not replace evidence and lifecycle state written by
 // the endpoint after each turn. Explicit New chat/Continue remain reset paths.
 export function clientSessionWrite(session, { resetContext = false } = {}) {

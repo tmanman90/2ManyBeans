@@ -50,6 +50,16 @@ Acceptance: interrupted reply, failed save, uncertain/replayed action, relaunch,
 
 ## UX5 — Prove and deliver the complete Dev journey
 
+### September 7 owner failure: trial to permanent recipe
+
+The owner obtained a proposal, chose Brew once, returned to Chat, lost the card, and asked to save permanently. Ruphus replied with manual instructions instead of recovering the actionable trial. This is a failed journey, not acceptance of the proposal step. The owner explicitly requires complete internal journey testing before another request to test.
+
+Required behavior: preserve the trial card and action result through navigation/relaunch; recover the exact trial when asked to make it permanent; present one explicit save control; persist exactly that recipe and verify it on its normal recipe surface. Choosing Brew once never automatically replaces the saved recipe. A later explicit save must not manufacture a tasting or require a tasting merely to change the user's mind. Keep brew execution state independent of saved-recipe state so saving does not interrupt an ongoing timer or falsify completion. Reject wrong-owner, wrong-method, and stale-source actions. Retry must not create another revision or brew.
+
+Acceptance scenario: describe thin Kalita cup → proposal → Brew once → leave Chat → return/relaunch → ask to make it permanent → exact trial review/save → canonical recipe readback → ongoing attempt still valid → retry → Undo. Include completed and not-yet-completed attempts, coffee switch before return, and changed saved recipe while away. Source/unit tests are not a substitute for this rendered and live journey. Do not ask the owner to validate another partial patch.
+
+Current narrow remediation persists receipts alongside their proposal instead of transient Agent state; session round-trip and replay tests pass. Permanent-save recovery and its lifecycle-safe command behavior remain outstanding. Not delivered or ready.
+
 Run the complete owner journey: describe cup → clarify if needed → discuss adjustment → request update → inspect card → save → open updated recipe → start supported brew flow → record feedback. Repeat with coffee/method correction and failure recovery.
 
 Report source/deterministic, live provider, rendered UI, simulator, physical device, preview identity, and owner unscripted evidence separately. Verify Dev bundle, preview backend, isolated Firebase, access/entitlement, and disabled automatic Capgo updates before installation. Do not wipe app data speculatively.
