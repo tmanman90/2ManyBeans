@@ -20,3 +20,30 @@ test('launch coffee outside the three-line rotation snapshot gets an owner-scope
   const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'bean_card', coffeeRef: 'coffee-4' }, evidenceByteCap: 10000, readers: { listCoffees: async () => Array.from({ length: 4 }, (_, index) => ({ id: `coffee-${index + 1}`, name: `Coffee ${index + 1}`, jarSlot: index + 1, status: 'ACTIVE' })), readSetup: async () => ({}) } });
   assert.match(context.launchCoffeeId, /^c/); assert.equal(context.__ruphusRefs[context.launchCoffeeId], 'coffee-4'); assert.doesNotMatch(JSON.stringify(context.rotationSnapshot), /coffee-4/);
 });
+test('direct chat locks an explicitly named brewer ahead of the saved default and carries corrections', async () => {
+  const readers = {
+    listCoffees: async () => [{ id: 'coffee-1', name: 'Colombia La Esperanza', jarSlot: 1, status: 'ACTIVE' }],
+    readSetup: async () => ({ defaultMethod: 'aiden', grinder: 'Ode' }),
+  };
+  const first = await buildRuphusContext({
+    uid: 'u1',
+    contextRef: { surface: 'direct' },
+    userText: 'I tried the Colombia in jar 1 with the Kalita 155 recipe and it tasted watery.',
+    evidenceByteCap: 4096,
+    readers,
+  });
+  assert.equal(first.turnBinding.coffeeName, 'Colombia La Esperanza');
+  assert.deepEqual(first.methodBinding, { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' });
+  assert.equal(first.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.methodFocus?.displayName === 'hot Kalita'), true);
+
+  const correction = await buildRuphusContext({
+    uid: 'u1',
+    contextRef: { surface: 'direct' },
+    userText: "Huh no, I didn't brew this on Aiden.",
+    conversation: [{ role: 'user', content: 'I used the Kalita 155 recipe.' }],
+    ledger: first.ledger,
+    evidenceByteCap: 4096,
+    readers,
+  });
+  assert.equal(correction.methodBinding.slot, 'kalita_hot');
+});

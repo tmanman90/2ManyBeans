@@ -1,7 +1,7 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { assetUrl } from "../lib/assetUrl";
-import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
+import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive, MessageCircle } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { GlassButton } from '../components/GlassButton';
 import { C, fonts, type, shadows, radius, glass, journalCard, cardBase } from '../styles/theme';
@@ -406,9 +406,10 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                         compact={false}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${agentV3Enabled ? 4 : 3}, 1fr)`, gap: 8 }}>
                       <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
                       <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label="Learn" onClick={() => (isDemo ? onDemoAction : handleLearn)?.(bean)} />
+                      {agentV3Enabled && <PillButton color={C.accent} bg={C.accentSoft} icon={<MessageCircle size={18} />} label="Ask Ruphus" onClick={() => onOpenRuphus?.({ coffeeRef: bean.id, surface: 'bean_card' })} />}
                       <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
                     </div>
                   </div>
@@ -684,13 +685,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           siblings={jarOrder}
           onNavigate={(b) => openDetail(b, null)}
           onClose={closeDetail}
-          learnLabel={agentV3Enabled ? 'Ask Ruphus' : 'Learn'}
-          onLearn={(b) => {
-            closeDetail();
-            if (agentV3Enabled) {
-              onOpenRuphus?.({ coffeeRef: b.id, surface: 'bean_card' }, 'What should I change for this coffee?');
-            } else (isDemo ? onDemoAction : handleLearn)?.(b);
-          }}
+          onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
+          onAskRuphus={agentV3Enabled ? ((b) => { closeDetail(); onOpenRuphus?.({ coffeeRef: b.id, surface: 'bean_card' }); }) : undefined}
           onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}
           onFreeze={handleFreeze}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}

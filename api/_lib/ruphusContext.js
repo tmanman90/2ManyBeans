@@ -2,6 +2,7 @@ import { canonicalHash, clone, validateLaunchContext } from '../../src/lib/ruphu
 import { sanitizeEvidence } from '../../src/lib/ruphus/sanitizeEvidence.js';
 import { appendLedger, boundLedger, buildRotationSnapshot, MAX_LEDGER_BYTES, shouldWidenHistory } from './ruphusEvidence.js';
 import { bindRuphusTurn } from './ruphusTurnBinder.js';
+import { explicitMethodFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 
 function safeDynamic({ userText, launchContext, conversation, ledger }, maxBytes) {
   const dynamic = sanitizeEvidence({ userText, launchContext, conversation, ledger }, { maxBytes });
@@ -29,6 +30,25 @@ function addOwnerLaunchRef(reference, coffees, snapshot) {
   const refKey = `c${canonicalHash({ id: match.id, launch: true }).slice(0, 8)}`;
   snapshot.refs[refKey] = match.id;
   return refKey;
+}
+
+function methodFocusForCoffee(ledger, coffeeName) {
+  const normalizedName = String(coffeeName || '').trim().toLocaleLowerCase();
+  if (!normalizedName || !Array.isArray(ledger?.entries)) return null;
+  const entry = ledger.entries.slice().reverse().find((item) => item?.kind === 'method_focus'
+    && item?.status === 'available'
+    && Array.isArray(item.namedCoffees)
+    && item.namedCoffees.some((name) => String(name || '').trim().toLocaleLowerCase() === normalizedName));
+  return entry?.methodFocus?.displayName ? { displayName: entry.methodFocus.displayName } : null;
+}
+
+function priorExplicitMethod(conversation = []) {
+  for (const message of conversation.slice().reverse()) {
+    if (message?.role !== 'user') continue;
+    const method = explicitMethodFromText(message?.content || message?.text);
+    if (method) return method;
+  }
+  return null;
 }
 
 const displayMethod = (value) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[value] || value || null);
@@ -80,7 +100,39 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     ? { ...normalizedInternalLaunch, launchItem: null }
     : normalizedInternalLaunch;
   const normalizedLaunch = publicLaunchContext(launchForTurn);
-  const dynamic = safeDynamic({ userText, launchContext: normalizedLaunch, conversation: Array.isArray(conversation) ? conversation.map((item) => ({ role: item?.role, content: item?.content || item?.text })).filter((item) => item.role === 'user' || item.role === 'assistant') : [], ledger: turnBinding.ledger }, evidenceByteCap);
+  const boundCoffeeRef = turnBinding.status === 'locked' ? turnBinding.coffeeRef : launchCoffee || ledgerCoffeeRef(currentLedger, coffees, snapshot);
+  const boundCoffee = (snapshot.coffees || []).find((coffee) => coffee.refKey === boundCoffeeRef);
+  const carriedMethod = methodFocusForCoffee(turnBinding.ledger, boundCoffee?.name);
+  let resolvedMethod = resolveMethod({
+    userText,
+    launchItem: launchForTurn.launchItem,
+    launchCoffeeRef: launchCoffee,
+    coffeeRef: boundCoffeeRef,
+    recipeSlots: boundCoffee?.recipes || [],
+    defaultMethod: snapshot.setup?.defaultMethod,
+    launchHintConsumed,
+    methodFocus: carriedMethod,
+    methodFocusCoffeeRef: carriedMethod ? boundCoffeeRef : null,
+  });
+  let methodBinding = resolvedMethod?.slot && ['M1', 'M1b', 'M2'].includes(resolvedMethod.tier)
+    ? { status: 'locked', slot: resolvedMethod.slot, displayName: resolvedMethod.displayName, source: resolvedMethod.tier }
+    : null;
+  if (!methodBinding && /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not)\b[\s\S]*\b(?:aiden|v\s*60|kalita)\b/i.test(userText)) {
+    const prior = priorExplicitMethod(Array.isArray(conversation) ? conversation : []);
+    if (prior) {
+      resolvedMethod = { slot: prior, displayName: displayMethod(prior), tier: 'M1-correction' };
+      methodBinding = { status: 'locked', slot: prior, displayName: displayMethod(prior), source: 'M1-correction' };
+    }
+  }
+  let turnLedger = turnBinding.ledger;
+  if (methodBinding && boundCoffee?.name) {
+    turnLedger = {
+      ...turnLedger,
+      entries: Array.isArray(turnLedger?.entries) ? turnLedger.entries.filter((entry) => entry?.kind !== 'method_focus') : [],
+    };
+    turnLedger = appendLedger(turnLedger, { kind: 'method_focus', status: 'available', namedCoffees: [boundCoffee.name], methodFocus: { displayName: methodBinding.displayName } }, { maxBytes: Math.min(evidenceByteCap, MAX_LEDGER_BYTES) });
+  }
+  const dynamic = safeDynamic({ userText, launchContext: normalizedLaunch, conversation: Array.isArray(conversation) ? conversation.map((item) => ({ role: item?.role, content: item?.content || item?.text })).filter((item) => item.role === 'user' || item.role === 'assistant') : [], ledger: turnLedger }, evidenceByteCap);
   const widened = shouldWidenHistory({ userText: dynamic.userText || '', correction: sessionState?.correction === true || shouldWidenHistory({ userText: dynamic.userText || '' }), olderReference: sessionState?.olderReference === true });
   const safeSnapshot = publicSnapshot(snapshot);
   const publicBinding = turnBinding.status === 'none'
@@ -90,18 +142,19 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
       : { status: 'ambiguous', candidates: turnBinding.candidates.map(({ coffeeRef, coffeeName }) => ({ coffeeRef, coffeeName })) };
   const trace = { focusChanges: [], reads: [], regenerations: [] };
   if (publicBinding?.status === 'locked') trace.focusChanges.push({ from: launchCoffee || ledgerCoffeeRef(currentLedger, coffees, snapshot) || null, to: publicBinding.coffeeRef, source: 'turn_binding' });
-  const evidence = { launchContext: normalizedLaunch, rotationSnapshot: safeSnapshot, ledger: turnBinding.ledger, turnBinding: publicBinding || null, conversation: dynamic.conversation || [], userText: dynamic.userText || '', historyWidened: widened };
+  const evidence = { launchContext: normalizedLaunch, rotationSnapshot: safeSnapshot, ledger: turnLedger, turnBinding: publicBinding || null, methodBinding, conversation: dynamic.conversation || [], userText: dynamic.userText || '', historyWidened: widened };
   const result = {
     version: 2,
     context: normalizedLaunch,
     launchContext: normalizedLaunch,
     rotationSnapshot: safeSnapshot,
-    ledger: turnBinding.ledger,
+    ledger: turnLedger,
     conversation: dynamic.conversation || [],
     userText: dynamic.userText || '',
     evidenceHash: canonicalHash(evidence),
     historyWidened: widened,
     ...(publicBinding ? { turnBinding: publicBinding } : {}),
+    ...(methodBinding ? { methodBinding } : {}),
     sessionState: { lastActivityAt: Number.isFinite(Number(sessionState?.lastActivityAt)) ? Number(sessionState.lastActivityAt) : null, boundaryIndex: Number.isInteger(sessionState?.boundaryIndex) ? Math.max(0, sessionState.boundaryIndex) : 0, launchHintConsumed },
   };
   installServerField(result, '__ruphusRefs', clone(snapshot.refs));
@@ -112,6 +165,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   installServerField(result, '__ruphusEvidenceByteCap', evidenceByteCap);
   installServerField(result, '__ruphusResolvedTargets', new Map());
   installServerField(result, '__ruphusTurnBinding', turnBinding.status === 'none' ? null : turnBinding);
+  installServerField(result, '__ruphusMethodBinding', methodBinding);
   installServerField(result, 'launchCoffeeId', launchCoffee);
   installServerField(result, 'trace', trace);
   installServerField(result, 'proposalState', { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false });

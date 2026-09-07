@@ -9,7 +9,7 @@
 // pending (real photos render as-is on the white card for now).
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight, Settings2 } from 'lucide-react';
+import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight, Settings2, MessageCircle } from 'lucide-react';
 import { splitTastingNotes } from '../lib/tastingHero';
 import { AnimatePresence, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
 import { m, spring } from '../lib/motion';
@@ -322,7 +322,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, learnLabel = 'Learn', onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null, onUndoRecipe = null }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, learnLabel = 'Learn', onAskRuphus, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null, onUndoRecipe = null }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -757,6 +757,13 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                     <RotateCcw size={16} color={BLUE} />
                     <span style={{ fontFamily: G, fontWeight: 700, fontSize: 13, letterSpacing: '0.14em', color: BLUE }}>BACK TO CARD</span>
                   </button>
+
+                  {onAskRuphus && (
+                    <button onClick={() => onAskRuphus(bean)} style={{ width: '100%', background: '#FFF8F0', border: '1.5px solid #B06A2D', borderRadius: 13, padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer', marginTop: 10 }}>
+                      <MessageCircle size={17} color="#9A5824" />
+                      <span style={{ fontFamily: G, fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', color: '#9A5824' }}>ASK PROFESSOR RUPHUS</span>
+                    </button>
+                  )}
 
                   {/* management actions — only those with a handler (e.g. sealed Inventory
                       beans have no "Return"), grid sized to the count so it stays even */}

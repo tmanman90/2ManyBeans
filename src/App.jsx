@@ -342,6 +342,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               onStartTastingSession={handleStartTastingSession}
               isDemo={isDemo}
               onDemoAction={onDemoAction}
+              onOpenRuphus={openRuphus}
             />
           </Suspense>
         )}

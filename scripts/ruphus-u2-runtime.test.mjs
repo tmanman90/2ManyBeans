@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
-import { ambiguityClarification, proposalEligibleForTarget, proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { ambiguityClarification, methodBindingTriggers, proposalEligibleForTarget, proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
 import { buildDynamicEvidenceBlock, RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
@@ -35,6 +35,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /do not ask for agreement, advertise a proposal, or say you will prepare one/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Use fresh, fresher, and freshest only for literal roast age/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /When TRUSTED_METHOD_BINDING says locked/);
 });
 test('locked turn binding is the final explicit developer target', () => {
   const block = buildDynamicEvidenceBlock({
@@ -47,6 +48,17 @@ test('locked turn binding is the final explicit developer target', () => {
   assert.match(block, /current message resolves to Colombia La Esperanza/);
   assert.match(block, /Do not answer from the prior coffee focus/);
   assert.ok(block.lastIndexOf('<AUTHORITATIVE_TURN_TARGET>') > block.lastIndexOf('<TRUSTED_TURN_BINDING>'));
+});
+test('locked method binding is injected after general setup and rejects another brewer', () => {
+  const block = buildDynamicEvidenceBlock({
+    rotationSnapshot: { setup: { defaultMethod: 'Aiden' } },
+    methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' },
+  });
+  assert.match(block, /<AUTHORITATIVE_METHOD_TARGET>/);
+  assert.match(block, /user used hot Kalita/);
+  assert.ok(block.lastIndexOf('<AUTHORITATIVE_METHOD_TARGET>') > block.lastIndexOf('<TRUSTED_METHOD_BINDING>'));
+  assert.deepEqual(methodBindingTriggers({ reply: 'Use the Aiden recipe instead.', binding: { status: 'locked', slot: 'kalita_hot' } }).map((item) => item.code), ['RT6_METHOD_CONTRADICTION']);
+  assert.deepEqual(methodBindingTriggers({ reply: 'For the Kalita, was it thin but clean or sour?', binding: { status: 'locked', slot: 'kalita_hot' } }), []);
 });
 test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
   const calls = [];
@@ -196,6 +208,20 @@ test('orchestrator buffers text, rejects premature proposal, and regenerates one
   const tools = createRuphusTools({ uid: 'u1', context: base });
   const result = await runRuphusTurn({ turnId: 't1', context: base, userText: 'Go ahead and make that change.', provider, tools, emit: (frame) => frames.push(frame) });
   assert.equal(result.ok, true); assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 1); assert.equal(frames.find((frame) => frame.type === 'text_delta').text, 'Try one step finer than Ode 4.2.'); assert.equal(result.trace.regenerations.length, 1);
+});
+test('orchestrator regenerates a reply that contradicts the user-locked brewer', async () => {
+  let runs = 0;
+  const context = { ...base, methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' }, trace: { focusChanges: [], reads: [], regenerations: [] } };
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs === 1) return { text: 'Use the Aiden recipe instead.' };
+    assert.match(input.correctiveInstruction, /explicitly used hot Kalita/);
+    return { text: 'For that Kalita cup, was it thin but clean, or sour and sharp?' };
+  } };
+  const result = await runRuphusTurn({ turnId: 'locked-method', context, userText: 'I used the Kalita 155 and it tasted watery.', provider, tools: createRuphusTools({ uid: 'u1', context }) });
+  assert.equal(result.text, 'For that Kalita cup, was it thin but clean, or sour and sharp?');
+  assert.equal(runs, 2);
+  assert.deepEqual(result.trace.regenerations[0].triggers, ['RT6_METHOD_CONTRADICTION']);
 });
 test('a premature proposal becomes normal advice without dispatch or interruption', async () => {
   const frames = []; let runs = 0; let dispatched = 0;

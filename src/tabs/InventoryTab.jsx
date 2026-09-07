@@ -1,7 +1,7 @@
 // Inventory tab — ported from prototype lines 438-481
 import { useState, useEffect } from 'react';
 import { assetUrl } from "../lib/assetUrl";
-import { Plus, Search, Coffee, Snowflake } from 'lucide-react';
+import { Plus, Search, Coffee, Snowflake, MessageCircle } from 'lucide-react';
 import { C, fonts, type, shadows, radius, glass, journalCard } from '../styles/theme';
 import { getPeakStatus, today, daysBetween } from '../lib/peakStatus';
 import { ShelfCard } from '../components/ShelfCard';
@@ -26,6 +26,7 @@ import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 import { haptic } from '../lib/haptics';
+import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 
 // Secondary Liquid-Glass pill for the rail card footer (matches the Rotation footer).
 // Spreads ...rest so long-press handlers (Brew) pass through.
@@ -63,10 +64,11 @@ const OpenJarBtn = ({ onClick }) => (
   </GlassButton>
 );
 
-export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, saveHandBrewTiming, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction }) => {
+export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, saveHandBrewTiming, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction, onOpenRuphus }) => {
   const { preferences } = usePreferences();
   const isHandBrew = preferences.brewMethod !== 'aiden';
   const canisterCount = preferences.canisterCount || 3;
+  const agentV3Enabled = isRuphusAgentV3Enabled({ isDemo });
   const sealed = beans.filter(b => b.status === 'SEALED');
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));
@@ -125,18 +127,23 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
     onOpenBean(bean.id, emptySlots[0]);
   };
 
-  // Footer for each rail card: Open into jar (primary) + Brew / Learn / Freeze (secondary).
-  // Matches the Rotation footer — Brew long-presses to the method menu, Learn uses the
-  // Ruphus avatar, Freeze toggles the bean's frozen state. (Finish lives on the card back.)
+  const askRuphus = (bean) => onOpenRuphus?.({ coffeeRef: bean.id, surface: 'bean_card' });
+
+  // Footer for each rail card: Open into jar (primary) plus the coffee actions.
+  // Learn keeps the existing educational profile; Ask Ruphus is a separate,
+  // contextual Agent entry in Dev builds.
   const railActions = (bean) => (
     <div style={{ padding: '12px 16px 14px', display: 'flex', flexDirection: 'column', gap: 9 }}>
       <div style={{ borderTop: `1px solid ${C.hairline}`, marginBottom: 1 }} />
       <OpenJarBtn onClick={() => tryOpenBean(bean)} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${agentV3Enabled ? 4 : 3}, 1fr)`, gap: 8 }}>
         <BrewPill bean={bean} isHandBrew={isHandBrew} isDemo={isDemo} onDemoAction={onDemoAction} aiden={aiden} handBrew={handBrew} />
         <GlassPill color={C.accent} bg={C.accentSoft}
           icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />}
           label="Learn" onClick={() => isDemo ? onDemoAction?.() : handleLearn(bean)} />
+        {agentV3Enabled && <GlassPill color={C.accent} bg={C.accentSoft}
+          icon={<MessageCircle size={18} />} label="Ask Ruphus"
+          onClick={() => askRuphus(bean)} />}
         <GlassPill color={bean.frozenAt ? C.frost : C.accent} bg={bean.frozenAt ? C.frostBg : C.accentSoft}
           icon={<Snowflake size={18} />} label={bean.frozenAt ? 'Frozen' : 'Freeze'}
           onClick={() => handleFreeze(bean)} />
@@ -438,6 +445,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           onOpen={(b) => { closeDetail(); tryOpenBean(b); }}
           onClose={closeDetail}
           onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
+          onAskRuphus={agentV3Enabled ? ((b) => { closeDetail(); askRuphus(b); }) : undefined}
           onFreeze={handleFreeze}
           onFinish={(b) => { closeDetail(); isDemo ? onDemoAction?.() : handleFinishBag(b); }}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
@@ -451,6 +459,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           bean={detailBean}
           z={5000}
           onClose={() => setDetailTasting(null)}
+          onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         />
       )}
       {editBean && (
@@ -508,6 +517,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         icedError={aiden.icedError}
         onPushIced={aiden.onPushIced}
         onRetryIcedPush={aiden.onRetryIcedPush}
+        onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
       />
       <HandBrewModal
         open={handBrew.handBrewModal}
@@ -532,6 +542,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
+        onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
       />
       <FinishBagPrompt
         open={!!finishPrompt}

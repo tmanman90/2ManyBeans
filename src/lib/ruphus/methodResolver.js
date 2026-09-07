@@ -24,6 +24,25 @@ const recordTime = (record) => {
   return Number.isFinite(value) ? value : -Infinity;
 };
 
+const METHOD_MENTION = /\b(?:(hot|iced)\s+)?(aiden|v\s*60|kalita)(?:\s+(?:155|185))?\b/gi;
+const NEGATED_METHOD_PREFIX = /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not|without)\b(?:\s+[a-z0-9']+){0,5}\s*$/i;
+
+export function explicitMethodFromText(value) {
+  const source = String(value || '');
+  const positive = [];
+  for (const match of source.matchAll(METHOD_MENTION)) {
+    const prefix = source.slice(Math.max(0, match.index - 64), match.index);
+    if (NEGATED_METHOD_PREFIX.test(prefix)) continue;
+    const resolved = slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`);
+    if (resolved && !positive.includes(resolved)) positive.push(resolved);
+  }
+  return positive.length === 1 ? positive[0] : null;
+}
+
+export function mentionedMethodSlots(value) {
+  return [...new Set([...String(value || '').matchAll(METHOD_MENTION)].map((match) => slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`)).filter(Boolean))];
+}
+
 function latestRecipeSlot(recipes, records) {
   const candidates = [...new Set((Array.isArray(recipes) ? recipes : []).map((item) => slot(typeof item === 'string' ? item : item?.slotKey || item?.slot || item?.method)).filter(Boolean))];
   if (!candidates.length) return null;
@@ -39,8 +58,7 @@ function latestRecipeSlot(recipes, records) {
 
 export function resolveMethod(input = {}) {
   const requestText = input.userText || input.request || '';
-  const explicitMatch = requestText.match(/(?:on|the|using|with|use)\s+(?:the\s+)?(?:(hot|iced)\s+)?(aiden|v60|kalita)\b/i);
-  const explicit = slot(input.explicitMethod || input.explicitSlot || explicitMatch?.[0]);
+  const explicit = slot(input.explicitMethod || input.explicitSlot) || explicitMethodFromText(requestText);
   if (explicit) return methodResult(explicit, 'M1');
   const mode = explicitMode(requestText);
   const launch = input.launchItem?.method || input.launchMethod;

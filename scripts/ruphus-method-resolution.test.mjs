@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveMethod } from '../src/lib/ruphus/methodResolver.js';
+import { explicitMethodFromText, resolveMethod } from '../src/lib/ruphus/methodResolver.js';
 
 test('method priority prefers explicit and temporary launch hints', () => {
   assert.equal(resolveMethod({ userText: 'use the Kalita', launchItem: { method: 'aiden' }, coffeeRef: 'a', launchCoffeeRef: 'a' }).slot, 'kalita_hot');
@@ -8,6 +8,12 @@ test('method priority prefers explicit and temporary launch hints', () => {
   assert.equal(resolveMethod({ userText: 'the hot one', recipes: ['v60_iced'] }).slot, 'v60_hot');
   assert.equal(resolveMethod({ launchItem: { method: 'kalita_hot' }, coffeeRef: 'a', launchCoffeeRef: 'a' }).tier, 'M1b');
   assert.equal(resolveMethod({ launchItem: { method: 'kalita_hot' }, coffeeRef: 'b', launchCoffeeRef: 'a', recipes: ['aiden'] }).tier, 'M3');
+});
+test('natural brewer mentions bind directly while negated brewers never become the target', () => {
+  assert.equal(explicitMethodFromText('I used the Kalita 155 recipe today.'), 'kalita_hot');
+  assert.equal(explicitMethodFromText('My V60 tasted thin.'), 'v60_hot');
+  assert.equal(explicitMethodFromText("Huh no, I didn't brew this on Aiden."), null);
+  assert.equal(explicitMethodFromText('Not Aiden—I used the Kalita 155.'), 'kalita_hot');
 });
 test('method inference applies recent agreement, iced mode, and M6 ask', () => {
   assert.equal(resolveMethod({ brews: [{ slot: 'v60_iced' }, { slot: 'v60_iced' }], isChangeRequest: true }).slot, 'v60_iced');

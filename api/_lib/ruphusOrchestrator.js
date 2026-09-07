@@ -3,13 +3,25 @@ import { gradeReply, runtimeTriggers } from '../../src/lib/ruphus/conversationCo
 import { RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
+import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
 
 const REPLACEMENT = 'I lost my train of thought there. Ask me that again and I’ll keep it short.';
 const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
   'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
+  'RT6_METHOD_CONTRADICTION',
 ]);
+
+export function methodBindingTriggers({ reply = '', binding = null } = {}) {
+  if (binding?.status !== 'locked' || !binding.slot) return [];
+  const incompatible = mentionedMethodSlots(reply).filter((slot) => slot !== binding.slot);
+  return incompatible.length ? [{ code: 'RT6_METHOD_CONTRADICTION', severity: 'catastrophic', methods: incompatible }] : [];
+}
+
+function checkedTriggers({ reply, userTurn, trace, evidence, methodBinding }) {
+  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding })];
+}
 
 function runtimeEvidence(toolEvidence = []) {
   const combined = {};
@@ -188,13 +200,16 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     }
     let checked = text.trim();
     const checkedEvidence = runtimeEvidence(toolEvidence);
-    let triggers = runtimeTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence });
+    let triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
     if (triggers.length) {
       trace.regenerations.push({ triggers: triggers.map((trigger) => trigger.code), at: new Date().toISOString() });
-      const correctiveInstruction = 'The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.';
+      const methodCorrection = context?.methodBinding?.status === 'locked'
+        ? ` The user explicitly used ${context.methodBinding.displayName}; do not mention, suggest, or ask about another brewer.`
+        : '';
+      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}`;
       const regenerated = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true });
       rememberUsage(regenerated); const regeneratedText = String(regenerated?.text || '').trim();
-      const second = runtimeTriggers({ reply: regeneratedText, userTurn: userText, trace, evidence: checkedEvidence });
+      const second = checkedTriggers({ reply: regeneratedText, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
       if (!second.length) { checked = regeneratedText; triggers = []; } else if (second.some((trigger) => SEVERE_SECOND_FAILURES.has(trigger.code))) { checked = REPLACEMENT; }
       else checked = regeneratedText;
       trace.regenerations.at(-1).secondFailure = second.map((trigger) => trigger.code);

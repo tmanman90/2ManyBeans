@@ -49,11 +49,18 @@ test('app handoff validates contextual launches and main mounts Chat while data 
   assert.doesNotMatch(main, /Gate 6a: Waiting for Firestore data/);
   assert.match(main, /<App[\s\S]*dataLoaded=\{dataLoaded\}/);
 });
-test('M1 Rotation shelf keeps its legacy Learn action and has no Agent shelf entry', () => {
+test('coffee cards keep Learn and expose a separate contextual Agent entry in Dev', () => {
   const rotation = read('src/tabs/RotationTab.jsx');
+  const inventory = read('src/tabs/InventoryTab.jsx');
+  const detail = read('src/components/BeanDetailCard.jsx');
   assert.match(rotation, /label="Learn"/);
-  assert.doesNotMatch(rotation, /label="Professor Ruphus"/);
+  assert.match(rotation, /label="Ask Ruphus"/);
+  assert.match(inventory, /label="Learn"/);
+  assert.match(inventory, /label="Ask Ruphus"/);
+  assert.match(detail, /ASK PROFESSOR RUPHUS/);
+  assert.match(detail, /onAskRuphus/);
   assert.match(rotation, /surface: 'bean_card'/);
+  assert.match(inventory, /surface: 'bean_card'/);
 });
 test('M1 contextual starter routes with its explicit context before React state settles', () => {
   const chat = read('src/tabs/ChatTab.jsx');
