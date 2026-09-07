@@ -2,7 +2,29 @@
 
 ## Current acceptance — September 6 UX follow-up
 
-### Open session-write authority blocker
+### Session-write correction — approved and deployed to isolated Dev
+
+After explicit owner approval, the narrow chatSessions rules correction was
+deployed only to `twomanybeans-ruphus-dev`. The previous live rules were verified
+byte-identical to the local baseline, ruleset
+`f6d7b983-f131-49a3-8b52-ba662cbd6559`, before deployment. The change accepts
+normalized Agent metadata and nullable context, preserves the legacy message
+limit, and retains ownership and server-only recipe/action authority.
+
+The local Firestore emulator executed the actual normalized-session and New chat
+payloads successfully, including server readback. Negative probes rejected other
+users, anonymous access, non-active session writes, malformed fields, and forged
+proposal/revision/attempt/action/receipt writes. Focused source tests: 9/9 passed;
+targeted lint and diff check passed. A temporary ARM Java runtime was used for
+the emulator. This is actual emulator execution, not a source-text-only check.
+
+After deployment, the real authenticated Dev browser pressed New chat, confirmed
+it, and verified its boundary through server readback: `saved:true`, report
+`conversation-eval/u3-action-check-1788760032385/report.json`. This closes the
+session-write rejection below. Production was not changed. No AI spending was
+needed for this rules/session check.
+
+### Historical session-write failure (now closed)
 
 Authenticated New chat persistence is FAIL. After accepting the native browser
 confirmation, server readback did not contain the new boundary. A direct standard
@@ -12,11 +34,11 @@ only a rendering/timing symptom. Final report:
 `conversation-eval/u3-action-check-1788759366448/report.json`.
 The checked-in `chatSessions` allowlist excludes normalized Agent session fields
 including ledger, boundaryIndex, lastActivityAt, launchContext, launchHintConsumed,
-and historyWidened. Rule deployment is explicitly outside current authority; no
-rule change or deployment was attempted. Need approval for a narrowly scoped
+and historyWidened. At the time, rule deployment was outside authority; no
+rule change or deployment was attempted. The missing approval was for a narrowly scoped
 isolated-Dev rules correction, with owner checks and server-only action/proposal
-records preserved. Java is unavailable locally, so Firestore emulator execution
-is also not yet established. Script lint/diff checks passed; no AI call occurred.
+records preserved. Java was unavailable in that check, so Firestore emulator
+execution had not yet been established. Script lint/diff checks passed; no AI call occurred.
 
 ### Latest authenticated saved-proposal result
 

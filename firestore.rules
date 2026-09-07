@@ -117,14 +117,28 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if request.auth != null && request.auth.uid == userId
         && sessionId == 'active'
-        && request.resource.data.keys().hasOnly(['protocolVersion', 'messages', 'turns', 'contextRef', 'pendingActionIds', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['protocolVersion', 'messages', 'turns', 'contextRef', 'launchContext', 'ledger', 'boundaryIndex', 'lastActivityAt', 'launchHintConsumed', 'historyWidened', 'pendingActionIds', 'updatedAt'])
         && request.resource.data.messages is list
-        && request.resource.data.messages.size() <= 50
+        && (('protocolVersion' in request.resource.data && request.resource.data.protocolVersion == 1) || request.resource.data.messages.size() <= 50)
         // Legacy sessions omit the Agent fields; only validate v3 fields when
         // they are present so field access cannot reject a legacy write.
         && (!('protocolVersion' in request.resource.data) || request.resource.data.protocolVersion == 1)
         && (!('turns' in request.resource.data) || request.resource.data.turns is list)
-        && (!('contextRef' in request.resource.data) || request.resource.data.contextRef is map)
+        && (!('contextRef' in request.resource.data) || request.resource.data.contextRef == null || request.resource.data.contextRef is map)
+        && (!('launchContext' in request.resource.data) || request.resource.data.launchContext == null || request.resource.data.launchContext is map)
+        && (!('ledger' in request.resource.data) || (request.resource.data.ledger is map
+          && request.resource.data.ledger.keys().hasOnly(['version', 'entries', 'namedCoffees', 'bytes'])
+          && request.resource.data.ledger.version == 1
+          && request.resource.data.ledger.entries is list
+          && request.resource.data.ledger.entries.size() <= 8
+          && request.resource.data.ledger.namedCoffees is list
+          && request.resource.data.ledger.bytes is int
+          && request.resource.data.ledger.bytes >= 0 && request.resource.data.ledger.bytes <= 4096))
+        && (!('boundaryIndex' in request.resource.data) || (request.resource.data.boundaryIndex is int
+          && request.resource.data.boundaryIndex >= 0 && request.resource.data.boundaryIndex <= request.resource.data.messages.size()))
+        && (!('lastActivityAt' in request.resource.data) || request.resource.data.lastActivityAt is number)
+        && (!('launchHintConsumed' in request.resource.data) || request.resource.data.launchHintConsumed is bool)
+        && (!('historyWidened' in request.resource.data) || request.resource.data.historyWidened is bool)
         && (!('pendingActionIds' in request.resource.data) || request.resource.data.pendingActionIds is list)
         && request.resource.data.updatedAt is number;
       allow delete: if request.auth != null && request.auth.uid == userId;
