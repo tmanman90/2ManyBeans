@@ -82,6 +82,8 @@ Voice, autonomous background changes, new external integrations, broad redesign 
 
 ## Execution sequence
 
+September 7 native follow-up: current assets also build/install/launch in iPhone 17 Pro simulator 7EC6BF90-33B7-4B1A-A651-464B4AC9AA9E (process 9644). Standard CLI AX snapshot still fails the CoreSimulator architecture load; ARM Node with the existing XcodeBuildMCP resource root/socket captures the accessibility snapshot successfully. Screenshot confirms the ordinary Apple/Google sign-in screen. This does not establish fixture authentication or scripted native conversation acceptance.
+
 UX1 → UX2 → UX3 → UX4 → UX5, reusing verified existing behavior instead of reimplementing it. Inspect current coverage at each step; implement only gaps. Keep coherent local commits and perform focused checks per unit, then integrated functional and visual acceptance.
 
 ## September 6 delivery checkpoint — not Product PASS
