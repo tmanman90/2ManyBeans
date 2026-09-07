@@ -28,16 +28,29 @@ evidence, not a native tap-through claim. The latest local U3 suite passed
 
 Native scripted acceptance remains unproven: a fresh XcodeBuildMCP simulator
 snapshot still fails because AXe cannot load CoreSimulator for the current
-architecture. The real-app localhost browser check authenticated the isolated
-fixture through the standard Firebase SDK and completed the visible consent
-screen, but showed a blank viewport after tapping Chat and timed out waiting
-for Agent entry. Cause is unconfirmed; this is not a deployed-native failure
-claim or an authenticated browser PASS. The third attempt is preserved in
-`conversation-eval/u3-action-check-1788753928201/report.json`, with the observed
-viewport at `/tmp/ruphus-authenticated-entry-failure.png`. The check blocked
-model/command routes and made no AI dispatches. This repair loop pauses at the
-requested MSW three-round fuse. The required owner unscripted device
-conversations also remain open.
+architecture. Following owner approval for another no-model repair pass, the
+real-app localhost browser check passed authenticated Agent entry through the
+standard Firebase SDK and visible consent button. Fresh screenshot inspection
+corrects the earlier blank-viewport interpretation: the failed check was on
+the privacy-consent screen, with no JavaScript errors. The test raced profile
+hydration and now handles the consent gate after navigation as well.
+`conversation-eval/u3-action-check-1788757218419/report.json` records the entry
+PASS at 390×844; `/tmp/ruphus-authenticated-chat.png` shows the four-coffee
+opening, starter prompts, and composer. Model/command routes were blocked;
+there were no AI dispatches. This is browser entry only, not a conversation,
+recipe-update, or installed-native acceptance PASS. Prior failed reports are
+preserved. The required owner unscripted device conversations remain open.
+
+The subsequent no-model continuation reproduced a separate local product bug:
+Chat display hydration dropped `turnId` and `artifacts`, turning restored Agent
+replies into text-only messages. The display mapper now retains both, with an
+executable save/inflate/display regression and a ChatTab wiring assertion.
+Focused session/artifact tests passed 21/21; source/test lint and web build
+passed. The mobile/desktop component harness passed using the already installed
+Chrome via `RUPHUS_UI_BROWSER_PATH` (the default Playwright browser binary was
+absent). This proves local restoration data and component behavior, not an
+authenticated saved-update flow, deployment, or phone verification. No AI calls
+were made in this continuation.
 
 Production and the Dev Capgo channel remain untouched. The historical
 checkpoint below applies only to its named older commit, not the current UX

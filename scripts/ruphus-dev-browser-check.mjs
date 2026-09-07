@@ -13,6 +13,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
   let browser;
   let page;
   let stage = 'start_server';
+  const errors = [];
   try {
     server = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'silent' });
     await server.listen();
@@ -21,9 +22,16 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     page = await context.newPage();
-    const errors = [];
     const blockedApiPaths = [];
-    page.on('pageerror', () => errors.push('page_runtime_error'));
+    page.on('pageerror', error => {
+      // Emit only JS identifiers and local source locations, never arbitrary
+      // exception text (which could contain request arguments or credentials).
+      const identifier = error.message.match(/^([A-Za-z_$][\w$]*) is not defined$/)?.[1];
+      const source = error.stack?.match(/\/src\/[A-Za-z0-9_./-]+\.(?:jsx?|tsx?)/)?.[0];
+      const failure = { kind: error.name, ...(identifier ? { identifier } : {}), ...(source ? { source } : {}) };
+      errors.push(failure);
+      console.log(JSON.stringify({ browserRuntimeError: failure }));
+    });
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.hostname === '2manybeans.vercel.app' || url.pathname.startsWith('/api/')) {
@@ -51,8 +59,18 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     if (await consent.isVisible()) await consent.click();
     stage = 'open_chat';
     await page.getByRole('button', { name: 'Chat', exact: true }).click();
+    // Auth/profile hydration can replace the initial navigation with the
+    // consent gate. Wait for that real outcome rather than racing hydration.
+    const agentEntry = page.locator('[data-ruphus-agent-enabled="true"]');
+    await consent.or(agentEntry).first().waitFor();
+    if (await consent.isVisible()) {
+      stage = 'hydrated_fixture_data_consent';
+      await consent.click();
+      await consent.waitFor({ state: 'hidden' });
+      await page.getByRole('button', { name: 'Chat', exact: true }).click();
+    }
     stage = 'verify_agent_entry';
-    await page.locator('[data-ruphus-agent-enabled="true"]').waitFor();
+    await agentEntry.waitFor();
     const text = await page.locator('body').innerText();
     assert.match(text, /Professor Ruphus|Your rotation, your taste/i);
     assert.equal(await page.locator('vite-error-overlay').count(), 0);
@@ -65,7 +83,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     const screenshot = '/tmp/ruphus-authenticated-entry-failure.png';
     if (page) await page.screenshot({ path: screenshot, fullPage: false }).catch(() => {});
     // Do not print Playwright evaluation arguments, auth objects, or error stacks.
-    console.log(JSON.stringify({ browserStage: stage, screenshot, timedOut: error.name === 'TimeoutError' }));
+    console.log(JSON.stringify({ browserStage: stage, screenshot, timedOut: error.name === 'TimeoutError', errors }));
     throw new Error(`Dev browser entry failed at ${stage}`);
   } finally {
     await browser?.close();

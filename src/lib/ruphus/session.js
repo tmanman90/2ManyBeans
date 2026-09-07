@@ -3,6 +3,20 @@ const MAX_LEDGER_ENTRIES = 8;
 const MAX_LEDGER_BYTES = 4096;
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 const textValue = (value) => String(value || '').trim();
+
+// Keep native cards attached when persisted messages enter the Chat display.
+export function restoreChatMessage(message) {
+  return {
+    id: message.id || crypto.randomUUID(),
+    role: message.role,
+    content: String(message.content || ''),
+    createdAt: message.createdAt,
+    sources: Array.isArray(message.sources) ? message.sources : undefined,
+    disclaimer: message.disclaimer,
+    ...(message.turnId ? { turnId: message.turnId } : {}),
+    ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}),
+  };
+}
 const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 const safeLedgerEntry = (entry = {}) => {

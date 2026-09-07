@@ -88,6 +88,7 @@ test('M1 Firestore session rules preserve legacy shape and constrain Agent v3 fi
   assert.match(rules, /match \/users\/\{userId\}\/brewAttempts/);
 });
 test('M1 session hydration reconciles owner-readable proposal records', () => {
+  assert.match(read('src/tabs/ChatTab.jsx'), /thread\.map\(restoreChatMessage\)/);
   const session = read('src/hooks/useChatSession.js');
   assert.match(session, /loadRemoteArtifacts/);
   assert.match(session, /collection\(db, 'users', uid, 'proposals'/);

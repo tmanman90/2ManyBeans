@@ -40,7 +40,7 @@ import { RuphusContinuePrevious } from '../components/chat/RuphusContinuePreviou
 import { ArtifactRenderer } from '../components/chat/ArtifactRenderer';
 import { recoveryForAgentFrame } from '../lib/ruphus/recovery';
 import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from '../lib/ruphus/census';
-import { continuePrevious, sessionPresentation } from '../lib/ruphus/session';
+import { continuePrevious, restoreChatMessage, sessionPresentation } from '../lib/ruphus/session';
 
 const MAX_API_MESSAGES = 20;
 const MAX_DISPLAY_MESSAGES = 50;
@@ -507,14 +507,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   }, []);
 
   const hydrateThread = useCallback((thread) => {
-    const restored = thread.map(msg => ({
-      id: msg.id || crypto.randomUUID(),
-      role: msg.role,
-      content: String(msg.content || ''),
-      createdAt: msg.createdAt,
-      sources: Array.isArray(msg.sources) ? msg.sources : undefined,
-      disclaimer: msg.disclaimer,
-    }));
+    const restored = thread.map(restoreChatMessage);
     const last = restored[restored.length - 1];
     const needsRetry = last?.role === 'user';
     const display = needsRetry

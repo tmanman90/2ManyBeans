@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { continuePrevious, normalizeAgentSession, prepareSession, sessionAge, sessionPresentation, startNewChat } from '../src/lib/ruphus/session.js';
+import { continuePrevious, inflateAgentSession, normalizeAgentSession, prepareSession, restoreChatMessage, sessionAge, sessionPresentation, startNewChat } from '../src/lib/ruphus/session.js';
+
+test('saved Agent conversation retains its native proposal through display restoration', () => {
+  const artifact = { id: 'proposal', type: 'recipe_proposal', actions: ['apply_proposal'], status: 'proposed' };
+  const saved = normalizeAgentSession({ messages: [{ id: 'reply', role: 'assistant', content: 'Review this change.', turnId: 'turn', artifacts: [artifact] }] });
+  const message = inflateAgentSession(saved).messages.map(restoreChatMessage)[0];
+  assert.equal(message.turnId, 'turn');
+  assert.deepEqual(message.artifacts, [artifact]);
+  assert.equal(message.content, 'Review this change.');
+  const legacy = restoreChatMessage({ id: 'old', role: 'assistant', content: 'Hello' });
+  assert.equal('turnId' in legacy, false);
+  assert.equal('artifacts' in legacy, false);
+});
 
 test('age classification uses the approved six-hour and seven-day boundaries', () => {
   const now = 100000000;
