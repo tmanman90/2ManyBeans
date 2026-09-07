@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { trialReceiptsForSession } from '../api/ruphus-agent.js';
+
+test('current conversation selects its exact trial, not another trial or an old chat', async () => {
+  const receipt = { id: 'receipt-new', type: 'action_receipt', mode: 'brew_once', attemptId: 'new', coffeeId: 'coffee', slotKey: 'kalita_hot' };
+  const session = { lastActivityAt: 1000, boundaryIndex: 0, messages: [{ artifacts: [receipt] }] };
+  const context = { rotationSnapshot: { refs: { c1: 'coffee' }, coffees: [] } };
+  Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(session, { now: 1001 }) });
+  assert.equal(JSON.stringify(context).includes('receipt-new'), false);
+  assert.deepEqual(trialReceiptsForSession({ ...session, boundaryIndex: 1 }, { now: 1001 }), []);
+  assert.deepEqual(trialReceiptsForSession(session, { now: 9 * 86400000 }), []);
+  let canonicalReceipt = { ...receipt, ownerId: 'owner' };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: {
+    readAttempts: async () => ['old', 'new'].map(id => ({ id, ownerId: 'owner', coffeeId: 'coffee', slotKey: 'kalita_hot', proposalId: 'proposal', status: 'timer_started', snapshot: { coffeeGrams: 13, waterGrams: 205 } })),
+    readTrialReceipt: async () => canonicalReceipt,
+  } });
+  const recovered = await tools.call('review_trial_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', trialRef: null });
+  assert.equal(recovered.artifact.attemptId, 'new');
+  canonicalReceipt = { ...canonicalReceipt, id: 'different' };
+  assert.equal((await tools.call('review_trial_recipe', { coffeeRef: 'c1', slot: 'kalita_hot' })).ok, false);
+});
 
 test('trial review recovers the stored recipe and confirmation without a model mutation', async () => {
   const trial = { id: 'trial', ownerId: 'owner', coffeeId: 'coffee', slotKey: 'kalita_hot', proposalId: 'proposal', revisionId: 'revision', sourceHash: 'hash', status: 'created', snapshot: { coffeeGrams: 13, waterGrams: 205 } };

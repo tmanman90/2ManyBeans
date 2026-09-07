@@ -318,10 +318,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (typeof readers.readAttempts !== 'function' || typeof readers.readTrialReceipt !== 'function') return { ok: false, message: 'I could not check your trial recipe right now.' };
       const attempts = (await readers.readAttempts({ uid, coffeeId })).filter(item => item.ownerId === uid && item.coffeeId === coffeeId && item.slotKey === slotKey && item.proposalId && !item.promotedRevisionId && ['created', 'timer_started', 'profile_prepared', 'completed', 'tasted'].includes(item.status));
       const trialRef = item => `trial-${canonicalHash({ uid, id: item.id }).slice(0, 16)}`;
-      const selected = args.trialRef ? attempts.filter(item => trialRef(item) === args.trialRef) : attempts;
+      const conversationReceipt = (context.__ruphusTrialReceipts || []).filter(item => item.coffeeId === coffeeId && item.slotKey === slotKey).at(-1);
+      const selected = args.trialRef ? attempts.filter(item => trialRef(item) === args.trialRef)
+        : conversationReceipt ? attempts.filter(item => item.id === conversationReceipt.attemptId) : attempts;
       if (selected.length !== 1) return { ok: false, candidates: attempts.map(item => ({ trialRef: trialRef(item), createdAt: item.createdAt || null, recipe: modelRecipe(item.snapshot) })), message: attempts.length ? 'Ask which of these trial dates or adjustments the user means, then call again with its trialRef. Do not choose for them.' : 'There is no unsaved trial for this coffee and brewer that I can recover.' };
       const attempt = selected[0];
       const savedReceipt = await readers.readTrialReceipt({ uid, attemptId: attempt.id });
+      if (!args.trialRef && conversationReceipt && savedReceipt?.id !== conversationReceipt.id) return { ok: false, message: 'I could not verify the trial from this conversation.' };
       if (!savedReceipt || savedReceipt.ownerId !== uid || savedReceipt.mode !== 'brew_once' || savedReceipt.attemptId !== attempt.id || savedReceipt.coffeeId !== coffeeId || savedReceipt.slotKey !== slotKey) return { ok: false, message: 'I could not recover the confirmation for this trial.' };
       const coffeeName = snapshot.coffees?.find(item => item.refKey === args.coffeeRef)?.name || context.turnBinding?.coffeeName || 'This coffee';
       const artifact = makeArtifact('action_receipt', { id: savedReceipt.id, status: 'ready', mode: 'brew_once', actionId: savedReceipt.actionId, attemptId: attempt.id, proposalId: attempt.proposalId, coffeeId, slotKey, revisionId: attempt.revisionId, sourceHash: attempt.sourceHash, promoteAvailable: proposalActions.includes('apply_proposal'), title: `${coffeeName} · ${displaySlot(slotKey)}`, message: 'Review your trial recipe below. Recovering this card does not change your saved recipe.', recipe: modelRecipe(attempt.snapshot) });

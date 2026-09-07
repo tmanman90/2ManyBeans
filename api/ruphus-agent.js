@@ -57,6 +57,13 @@ export function sessionConversationForProvider(session, { now = Date.now(), incl
   if (!session || (!includeStale && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale')) return [];
   return (session.messages || []).map((message) => ({ role: message.role, content: message.text })).filter((message) => message.role === 'user' || message.role === 'assistant');
 }
+export function trialReceiptsForSession(session, { now = Date.now() } = {}) {
+  if (!session || sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale') return [];
+  return (session.messages || []).slice(session.boundaryIndex || 0)
+    .flatMap(message => message.artifacts || [])
+    .filter(item => item.type === 'action_receipt' && item.mode === 'brew_once' && item.attemptId)
+    .map(item => ({ id: item.id, attemptId: item.attemptId, coffeeId: item.coffeeId, slotKey: item.slotKey }));
+}
 export function sessionReplayInputs({ session, conversation, ledger, continuePrevious = false, now = Date.now() } = {}) {
   const stale = Boolean(session && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale');
   if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? staleReplayConversation(session, { now }) : [], ledger: null, referenceLedger: continuePrevious === true ? replayFocusLedger(session?.ledger) : null };
@@ -199,6 +206,9 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
     context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
     Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
+    // A conversation reference, not write authority; the tool rechecks the
+    // owner-scoped attempt and canonical receipt before displaying anything.
+    Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(activeSession, { now: startedAt }), enumerable: false });
     context.sessionId = turnId;
     context.sessionState.lastActivityAt = activeSession?.lastActivityAt || null;
     context.sessionState.boundaryIndex = activeSession?.boundaryIndex || 0;

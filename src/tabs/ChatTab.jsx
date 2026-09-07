@@ -408,11 +408,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
     if (!artifact.proposalId && result.proposal?.id) artifact.proposalId = result.proposal.id;
     const settledProposalStatus = result.proposal?.status || (['apply_proposal', 'promote_attempt'].includes(result.receipt.mode) ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
-    setMessages(previous => {
-      const updated = retainActionReceipt(previous, artifact, settledProposalStatus);
-      persist(threadForPersistence(updated), { protocolVersion: 1 });
-      return updated;
-    });
+    const updated = retainActionReceipt(messages, artifact, settledProposalStatus);
+    // Persist before navigation can unmount Chat; React updaters must stay pure.
+    persist(threadForPersistence(updated), { protocolVersion: 1 });
+    setMessages(updated);
     if (result.attempt) onRuphusAttempt?.(result.attempt);
   } });
   const [agentContext, setAgentContext] = useState(null);
@@ -1353,7 +1352,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (i === 0 && msg.role === 'assistant' && !msg.content?.trim() && !msg.artifacts?.length && !msg.photos?.length) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {agentEnabled && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
+                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
