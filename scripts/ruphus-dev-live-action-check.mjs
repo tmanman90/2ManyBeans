@@ -1,0 +1,158 @@
+// Operator-only acceptance: existing isolated fixture, standard Firebase sign-in,
+// real endpoint and canonical readback. Never prints or persists credentials.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { loadFixtureManifest, createCostGuard, loadCumulativeCostLedger, persistCumulativeCostLedger, runLiveCase, persistRunArtifact } from './ruphus-conversation-runner.mjs';
+import { createFirestoreSessionReset } from './seed-ruphus-dev-fixture.mjs';
+import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
+import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
+import { canonicalHash } from '../src/lib/ruphus/contracts.js';
+
+const project = 'twomanybeans-ruphus-dev';
+const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
+const endpoint = process.argv[2];
+assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
+const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
+const ledgerPath = `${directory}/live-cost-ledger.json`;
+const runId = `u3-action-check-${Date.now()}`;
+const report = { kind: 'live-action-acceptance', endpoint, passed: false, nativeUiTest: false };
+const oauth = JSON.parse(fs.readFileSync('/Users/talmeltzer/.config/configstore/firebase-tools.json')).tokens.access_token;
+
+async function request(url, { token = oauth, body, method = body ? 'POST' : 'GET' } = {}) {
+  const response = await fetch(url, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const data = await response.json();
+  if (!response.ok) {
+    const code = typeof data.error === 'string' && /^[a-z_]+$/.test(data.error) ? data.error : 'request_failed';
+    throw new Error(`Dev request HTTP ${response.status} ${code}`);
+  }
+  return data;
+}
+function api(path) {
+  const result = spawnSync('npx', ['vercel', 'api', path, '--raw'], { encoding: 'utf8' });
+  if (result.status !== 0) throw new Error('Managed Dev configuration read failed');
+  return JSON.parse(result.stdout);
+}
+function encode(value) {
+  if (value === null) return { nullValue: null };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+  if (typeof value === 'object') return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encode(item)])) } };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  return { stringValue: value };
+}
+function decode(value) {
+  if (value.mapValue) return Object.fromEntries(Object.entries(value.mapValue.fields || {}).map(([key, item]) => [key, decode(item)]));
+  if (value.arrayValue) return (value.arrayValue.values || []).map(decode);
+  if ('integerValue' in value) return Number(value.integerValue);
+  return Object.values(value)[0];
+}
+
+try {
+  report.stage = 'managed_config';
+  const envs = api(`/v10/projects/${vercelProject}/env`).envs.filter(env => env.target.includes('preview') && !env.gitBranch);
+  const config = key => {
+    const matches = envs.filter(env => env.key === key);
+    assert.equal(matches.length, 1, 'Dev configuration must be unambiguous');
+    return api(`/v1/projects/${vercelProject}/env/${matches[0].id}?decrypt=true`).value;
+  };
+  assert.equal(config('VITE_FIREBASE_PROJECT_ID'), project);
+  for (const key of ['RUPHUS_AGENT_MAX_INPUT_TOKENS', 'RUPHUS_AGENT_MAX_OUTPUT_TOKENS']) process.env[key] = config(key);
+  const deployment = api(`/v13/deployments/${new URL(endpoint).hostname}`);
+  assert.equal(deployment.projectId, vercelProject);
+  assert.equal(deployment.readyState, 'READY');
+  assert.notEqual(deployment.target, 'production');
+  report.deploymentId = deployment.id;
+  report.stage = 'fixture_lookup';
+  const users = (await request(`https://identitytoolkit.googleapis.com/v1/projects/${project}/accounts:batchGet?maxResults=100`)).users;
+  const fixtures = users.filter(user => !user.email && !user.providerUserInfo?.length && !user.disabled);
+  assert.equal(fixtures.length, 1, 'Fixture identity must be unique');
+  const uid = fixtures[0].localId;
+  assert.ok(config('RUPHUS_AGENT_V3_UIDS').split(',').map(value => value.trim()).includes(uid));
+  const accounts = (await request(`https://iam.googleapis.com/v1/projects/${project}/serviceAccounts`)).accounts;
+  const signer = accounts.find(account => account.displayName === 'Ruphus Dev Preview' && !account.disabled);
+  assert.ok(signer);
+  const now = Math.floor(Date.now() / 1000);
+  report.stage = 'fixture_token_signing';
+  const signed = await request(`https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(signer.email)}:signJwt`, { body: { payload: JSON.stringify({ iss: signer.email, sub: signer.email, aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit', iat: now, exp: now + 600, uid }) } });
+  report.stage = 'fixture_sign_in';
+  const auth = await request(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${config('VITE_FIREBASE_API_KEY')}`, { token: null, body: { token: signed.signedJwt, returnSecureToken: true } });
+  const claims = JSON.parse(Buffer.from(auth.idToken.split('.')[1], 'base64url'));
+  assert.ok(claims.sub === uid && claims.aud === project, 'Fixture sign-in identity must match');
+  const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`;
+  assert.equal(decode({ mapValue: await request(base, { token: auth.idToken }) }).account, 'ruphus-dev-fixture', 'Only the explicitly seeded fixture can be mutated');
+  const bean = async () => decode({ mapValue: await request(`${base}/beans/fixture-colombia-other`, { token: auth.idToken }) });
+  const savedRecipe = async () => {
+    const coffee = await bean();
+    const revisionId = coffee.activeRevisionIds?.kalita_hot;
+    if (revisionId) return decode({ mapValue: await request(`${base}/recipeRevisions/${encodeURIComponent(revisionId)}`, { token: auth.idToken }) }).snapshot;
+    return resolveLegacyRecipe(coffee, 'kalita_hot').recipe;
+  };
+  const recipeHash = recipe => {
+    const normalized = canonicalRecipeSnapshot(recipe, 'kalita_hot');
+    delete normalized.recipeHash;
+    delete normalized.userCoffeeGrams;
+    delete normalized.aidenGrind;
+    return canonicalHash(normalized);
+  };
+  report.stage = 'canonical_recipe_read';
+  const before = await savedRecipe();
+  assert.ok(before, 'Seeded Kalita recipe must exist');
+  const seedRevision = (await bean()).activeRevisionIds?.kalita_hot;
+  if (seedRevision === 'fixture-colombia-other:kalita_hot') {
+    // Repair only the named original seed's metadata; never rewrite a real action revision.
+    const revision = decode({ mapValue: await request(`${base}/recipeRevisions/${encodeURIComponent(seedRevision)}`) });
+    if (revision.id !== seedRevision || revision.snapshotHash !== recipeHash(before)) {
+      await request(`${base}/recipeRevisions/${encodeURIComponent(seedRevision)}?updateMask.fieldPaths=id&updateMask.fieldPaths=snapshotHash`, { method: 'PATCH', body: encode({ id: seedRevision, snapshotHash: recipeHash(before) }).mapValue });
+    }
+  }
+  if (!resolveLegacyRecipe(await bean(), 'kalita_hot').recipe) {
+    report.stage = 'repair_missing_fixture_projection';
+    await request(`${base}/beans/fixture-colombia-other?updateMask.fieldPaths=handBrewRecipes.kalita`, { method: 'PATCH', body: encode({ handBrewRecipes: { kalita: before } }).mapValue });
+  }
+  const db = { collection: collection => ({ doc: owner => ({ collection: child => ({ doc: id => ({ set: async value => {
+    assert.ok(collection === 'users' && owner === uid && ((child === 'chatSessions' && id === 'active') || (child === 'rateLimits' && id === 'claude')));
+    return request(`${base}/${child}/${id}`, { method: 'PATCH', body: encode(value).mapValue });
+  } }) }) }) }) };
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = cases.cases.find(item => item.id === 'AE05');
+  const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
+  report.stage = 'fixture_session_reset';
+  await reset({ fixture, stage: 'action-acceptance', repetition: 1 });
+  const prior = await loadCumulativeCostLedger(ledgerPath);
+  const guard = createCostGuard(30, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
+  report.stage = 'live_conversation';
+  report.conversation = await runLiveCase(account, fixture, { endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costGuard: guard, stageRunId: runId });
+  report.cumulativeCostUsd = guard.spentUsd;
+  const artifact = report.conversation.results.flatMap(turn => turn.frames || []).find(frame => frame.type === 'artifact_ready' && frame.artifact?.type === 'recipe_proposal')?.artifact;
+  assert.ok(artifact, 'Live conversation must produce a native proposal');
+  assert.ok(artifact.actions?.includes('apply_proposal'), 'Live proposal must enable Apply');
+  assert.equal(recipeHash(await savedRecipe()), recipeHash(before), 'Proposal must not change the saved recipe');
+  const command = body => request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body });
+  const { request: apply } = resolveRuphusActionRequest({ uid, mode: 'apply_proposal', artifact });
+  let applied;
+  try {
+    report.stage = 'apply';
+    applied = await command(apply);
+    report.applied = applied.receipt?.status === 'succeeded';
+    assert.equal(recipeHash(await savedRecipe()), recipeHash(artifact.after), 'Canonical readback must match proposal');
+    report.canonicalReadback = true;
+    assert.equal((await command(apply)).revision.id, applied.revision.id, 'Replay must preserve revision identity');
+    report.idempotentReplay = true;
+  } finally {
+    if (applied?.revision?.id) {
+      report.stage = 'undo';
+      await command({ actionId: `${runId}-undo`, mode: 'undo_revision', coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, expectedRevisionId: applied.revision.id });
+      report.undoReadback = recipeHash(await savedRecipe()) === recipeHash(before);
+    }
+  }
+  assert.ok(report.applied && report.undoReadback);
+  report.passed = true;
+} catch (error) {
+  // Assertion actual/expected and request objects can contain private identifiers.
+  report.failure = error.code === 'ERR_ASSERTION' ? String(error.message).split('\n')[0] : /^(?:Dev request HTTP|U3 |Managed Dev)/.test(error.message) ? error.message : 'Acceptance check failed; inspect the named stage without credentials';
+  process.exitCode = 1;
+} finally {
+  const path = await persistRunArtifact(directory, report, runId);
+  console.log(JSON.stringify({ passed: report.passed, stage: report.stage, failure: report.failure, applied: report.applied, canonicalReadback: report.canonicalReadback, idempotentReplay: report.idempotentReplay, undoReadback: report.undoReadback, cumulativeCostUsd: report.cumulativeCostUsd, report: path, nativeUiTest: false }));
+}

@@ -5,6 +5,7 @@ import { FIXTURE_ROOT, loadFixtureManifest } from './ruphus-conversation-runner.
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { SLOT_DEFINITIONS } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
 export function assertDevTarget({ projectId, fixtureUid, authorized = false } = {}) {
   if (!authorized) throw new Error('fixture seeding requires explicit Dev authorization');
@@ -79,12 +80,20 @@ export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
   const operations = [{ path: `users/${fixtureUid}`, data: profile }];
   for (const coffee of seeded.coffees || []) {
     const activeRevisionIds = Object.fromEntries(Object.keys(seeded.recipes || {}).filter((ref) => ref.startsWith(`${coffee.id}:`)).map((ref) => [ref.slice(coffee.id.length + 1), ref]));
-    operations.push({ path: `users/${fixtureUid}/beans/${coffee.id}`, data: { ...coffee, ...(Object.keys(activeRevisionIds).length ? { activeRevisionIds } : {}) } });
+    const data = { ...coffee, ...(Object.keys(activeRevisionIds).length ? { activeRevisionIds } : {}) };
+    for (const [slotKey, ref] of Object.entries(activeRevisionIds)) {
+      const path = SLOT_DEFINITIONS[slotKey]?.path;
+      if (!path) continue;
+      const snapshot = withoutUndefined(executableFixtureRecipe(seeded.recipes[ref], slotKey));
+      if (path.length === 1) data[path[0]] = snapshot;
+      else data[path[0]] = { ...(data[path[0]] || {}), [path[1]]: snapshot };
+    }
+    operations.push({ path: `users/${fixtureUid}/beans/${coffee.id}`, data });
   }
   for (const [ref, recipe] of Object.entries(seeded.recipes || {})) {
     const [coffeeId, slotKey] = ref.split(':');
     const snapshot = withoutUndefined(executableFixtureRecipe(recipe, recipe.slot || slotKey));
-    operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { coffeeId, slotKey: recipe.slot || slotKey, snapshot, snapshotHash: canonicalHash(snapshot) } });
+    operations.push({ path: `users/${fixtureUid}/recipeRevisions/${ref}`, data: { id: ref, coffeeId, slotKey: recipe.slot || slotKey, snapshot, snapshotHash: canonicalHash(snapshot) } });
   }
   for (const tasting of seeded.tastings || []) operations.push({ path: `users/${fixtureUid}/tastings/${tasting.id}`, data: { ...tasting, beanId: tasting.beanId || tasting.coffeeId } });
   for (const attempt of [...(seeded.brews || []), ...(seeded.attempts || [])]) operations.push({ path: `users/${fixtureUid}/brewAttempts/${attempt.id}`, data: attempt });

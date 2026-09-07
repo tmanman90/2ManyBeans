@@ -41,7 +41,9 @@ test('seed plan feeds the production reader collection names and revision shape'
   assert.equal(rows.get('users/fixture-account/beans/c1').id, 'c1');
   assert.deepEqual(rows.get('users/fixture-account/beans/c1').activeRevisionIds, { v60_hot: 'c1:v60_hot' });
   assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').coffeeId, 'c1');
+  assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').id, 'c1:v60_hot');
   assert.equal(rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').slotKey, 'v60_hot');
+  assert.deepEqual(rows.get('users/fixture-account/beans/c1').handBrewRecipes.v60, rows.get('users/fixture-account/recipeRevisions/c1:v60_hot').snapshot, 'Command drift checks require the same saved projection and revision');
   assert.equal(rows.get('users/fixture-account/tastings/t1').beanId, 'c1');
   assert.equal(rows.get('users/fixture-account/brewAttempts/b1').coffeeId, 'c1');
   assert.equal(rows.get('users/fixture-account').defaultMethod, 'v60_hot');
