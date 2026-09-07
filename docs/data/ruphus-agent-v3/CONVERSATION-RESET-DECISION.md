@@ -1,5 +1,17 @@
 # Conversation reset decision
 
+## September 7 current gate status — not Product PASS
+
+Owner authorized $35 cumulative testing, preserving prior spend. Current backend is Dev preview `twomanybeans-ruphus-auqzqpgbz-tmanman90s-projects.vercel.app`, source `ca78bb67a15190d8497d7c701574af021e3dcbef`. No production change.
+
+The initial September 7 smoke (`u3-action-check-1788794154246`) was invalidated after discovering 12 earlier UI-test trials in the dedicated fixture account. They influenced method selection. The exact fixture-only cleanup preserves frozen history, refuses non-fixture profiles/foreign paths, and leaves diagnostics intact. Clean-fixture rerun `u3-action-check-1788794467920` passed 11/11 with no failures.
+
+Manifest v3 (`f92486c57c9c0766`) appends critical AE15 for the owner's trial-return failure: recover this chat's 240 g-water trial rather than an older 235 g alternative, with a usable native save confirmation and no model write. Full cadence is now 69 conversations; the baseline classifications and thresholds remain intact. Two expanded smokes passed: `u3-action-check-1788795146440` (12/12, no failures) and `u3-action-check-1788795866318` (one ordinary AE14 regeneration, zero catastrophic). Both recovered the correct actionable trial card. A smoke from the older manifest cannot unlock this full gate.
+
+The scored run stopped at judge calibration in `u3-action-check-1788796150945`; no candidate full-gate result is claimed. The new gold trial's visible card and trial facts were missing from judge inputs, and a no-proposal score override incorrectly inflated the premature-proposal reference. Local commit `1c4257a` fixes those evaluation inputs, versions the judge as v13, and passes 53 focused checks. Thresholds and reference wording were not weakened. Recalibration/full execution is in progress; recorded cost was $28.584878 with a $2.009 maximum outstanding reservation at this checkpoint.
+
+Existing live typed-browser trial → reload → recovery → save → canonical readback → Undo evidence remains separately valid. Authenticated native scripted acceptance and owner unscripted acceptance remain insufficient evidence. The historical sections below are not current delivery claims.
+
 ## Current acceptance — September 6 UX follow-up
 
 ### Latest narrow end-to-end journey
