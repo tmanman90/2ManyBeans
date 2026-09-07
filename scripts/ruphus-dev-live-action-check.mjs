@@ -270,7 +270,7 @@ try {
     }
     report.passed = report.ui.passed;
   } else if (mode === 'smoke' || mode === 'full') {
-    const judge = mode === 'full' ? createAnthropicJudgeAdapter({ token: config('ANTHROPIC_API_KEY') }) : null;
+    const judge = mode === 'full' ? createAnthropicJudgeAdapter({ token: process.env.RUPHUS_JUDGE_AUTH_TOKEN || config('ANTHROPIC_API_KEY') }) : null;
     report.stage = `seed_live_${mode}`;
     const documents = [];
     let pageToken;
