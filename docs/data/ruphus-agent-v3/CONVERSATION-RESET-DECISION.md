@@ -212,6 +212,8 @@ Ordinary Agent UI persistence now merges transcript fields without replacing ser
 
 Native delivery for `175acce`: XcodeBuildMCP compiled and installed the signed Dev app on exact device `A34D2908-AC86-59E1-8172-A69FBE33FCFC`. Launch was denied by iOS with `FBSOpenApplicationErrorDomain` code 7, `Locked`; this is not a successful native launch or a crash observation. The built artifact verifies `com.talmeltzer.coffeehub.dev`, `2manybeans Dev`, build 41, isolated Firebase, current preview `https://twomanybeans-ruphus-3fbme3ftj-tmanman90s-projects.vercel.app`, Ask label, session-reset fix, autoUpdate false, and channel dev. Capgo remains unchanged. Final rendered harness passes mobile and desktop after the empty-intro cleanup.
 
+Follow-up native check: current `175acce` assets compile/install/launch successfully in the iPhone 17 Pro simulator (process 50218). Screenshot inspection confirms the normal Apple/Google sign-in screen, not authenticated fixture acceptance. A second exact-device launch remains denied as Locked. No extra provider spend; ledger is $28.023517 spent, $0 reserved. Final full-gate and owner requirements remain unchanged.
+
 ## Evidence ledger
 
 | Category | Result | Commit |
