@@ -210,6 +210,8 @@ Supplemental real Dev browser report `conversation-eval/u3-action-check-17887618
 
 Ordinary Agent UI persistence now merges transcript fields without replacing server evidence or lifecycle state; all generic Chat saves retain Agent protocol. Explicit New chat uses the current conversation, and completed transient artifacts clear after persistence. Empty introductory bubbles are hidden. Final focused tests pass 42/42, scoped source/test ESLint and build pass, and the actual Firestore emulator verifies merge preservation plus negative authority cases. Testing spend after the typed live pass is $28.023517 of the $30 total cap. Browser routing buffers real endpoint frames, so this is not native transport or streaming-latency evidence. Installed-app and owner gates remain outstanding for this revision.
 
+Native delivery for `175acce`: XcodeBuildMCP compiled and installed the signed Dev app on exact device `A34D2908-AC86-59E1-8172-A69FBE33FCFC`. Launch was denied by iOS with `FBSOpenApplicationErrorDomain` code 7, `Locked`; this is not a successful native launch or a crash observation. The built artifact verifies `com.talmeltzer.coffeehub.dev`, `2manybeans Dev`, build 41, isolated Firebase, current preview `https://twomanybeans-ruphus-3fbme3ftj-tmanman90s-projects.vercel.app`, Ask label, session-reset fix, autoUpdate false, and channel dev. Capgo remains unchanged. Final rendered harness passes mobile and desktop after the empty-intro cleanup.
+
 ## Evidence ledger
 
 | Category | Result | Commit |
