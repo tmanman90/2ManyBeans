@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 // Real app/providers, standard Firebase SDK login, isolated fixture only.
 // This entry check deliberately forbids model and recipe command dispatches.
-export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false, liveConversation = null, freshConversation = false }) {
+export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false, liveConversation = null, freshConversation = false, checkOpeningRecovery = false }) {
   assert.equal(config.VITE_FIREBASE_PROJECT_ID, 'twomanybeans-ruphus-dev');
   const previous = Object.fromEntries(Object.keys(config).map(key => [key, process.env[key]]));
   const previousVariant = process.env.TMB_APP_VARIANT;
@@ -112,7 +112,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     stage = 'verify_agent_entry';
     await agentEntry.waitFor();
     await page.locator('[data-ruphus-agent-enabled="true"][data-chat-hydration="hydrated"]').waitFor();
-    if (freshConversation) {
+    if (freshConversation || checkOpeningRecovery) {
       stage = 'fresh_owner_conversation';
       const newChat = page.getByRole('button', { name: 'New chat', exact: true });
       if (await newChat.isVisible()) {
@@ -123,6 +123,20 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
         await newChat.click();
       }
       await page.getByRole('button', { name: 'What should I brew today?', exact: true }).waitFor();
+    }
+    if (checkOpeningRecovery) {
+      stage = 'opening_scroll_and_continue';
+      const resume = page.locator('[data-ruphus-continue="true"] button');
+      await resume.waitFor();
+      const geometry = await page.locator('[role="log"]').evaluate(async node => {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        return { scrollTop: node.scrollTop, openingTop: node.querySelector('[data-ruphus-opening]').getBoundingClientRect().top, logTop: node.getBoundingClientRect().top };
+      });
+      await page.screenshot({ path: '/tmp/ruphus-opening-recovery.png' });
+      await resume.click();
+      await page.locator('[data-ruphus-continue="true"]').waitFor({ state: 'hidden' });
+      assert.equal(geometry.scrollTop, 0, 'Opening must remain at the top when Continue loads');
+      assert.ok(geometry.openingTop >= geometry.logTop - 1, 'Greeting must not be clipped');
     }
     if (liveConversation) {
       stage = 'typed_live_conversation';

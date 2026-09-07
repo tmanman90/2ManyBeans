@@ -396,6 +396,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const { openPaywall } = usePaywall();
   const firstName = profile?.displayName?.trim().split(/\s+/)[0] || '';
   const [messages, setMessages] = useState([introMessage()]);
+  const isIntroState = messages.length === 1 && messages[0].role === 'assistant';
   // apiMessages stores the raw messages sent to the API (with base64 images)
   const apiMessages = useRef([
     { role: 'assistant', content: messages[0].content },
@@ -561,10 +562,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (keyboardHeight > 0 && scrollRef.current) {
       setTimeout(() => {
         const el = scrollRef.current;
-        if (el) el.scrollTop = el.scrollHeight;
+        if (el) el.scrollTop = isIntroState ? 0 : el.scrollHeight;
       }, 50);
     }
-  }, [keyboardHeight]);
+  }, [keyboardHeight, isIntroState]);
 
   // No-op updateBean wrapper for ephemeral beans (no id to persist to)
   const ephemeralUpdateBean = async (beanId, updates) => {
@@ -576,8 +577,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
 
   useEffect(() => {
-    if (!streamingSlot && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, streamingSlot]);
+    if (!streamingSlot && scrollRef.current) scrollRef.current.scrollTop = isIntroState ? 0 : scrollRef.current.scrollHeight;
+  }, [messages, streamingSlot, isIntroState]);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
@@ -631,12 +632,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (isActive && scrollRef.current) {
       const raf = requestAnimationFrame(() => {
         if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          scrollRef.current.scrollTop = isIntroState ? 0 : scrollRef.current.scrollHeight;
         }
       });
       return () => cancelAnimationFrame(raf);
     }
-  }, [isActive]);
+  }, [isActive, isIntroState]);
 
   // Cleanup all tracked blob URLs on unmount
   useEffect(() => {
@@ -1280,7 +1281,6 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   };
 
   // Is this the intro/empty state (only the first assistant message, no user turns)?
-  const isIntroState = messages.length === 1 && messages[0].role === 'assistant';
   const starterPrompts = getStarterPrompts(beans, isDemo);
 
   return (
