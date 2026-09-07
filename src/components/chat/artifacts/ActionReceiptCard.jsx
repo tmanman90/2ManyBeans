@@ -22,6 +22,6 @@ export function ActionReceiptCard({ artifact = {}, onAction, actionPending = fal
       {canStart && <ArtifactAction action="start_attempt" label={artifact.slotKey === 'aiden' ? 'Prepare in Fellow' : 'Start brew'} status={status} onClick={() => onAction?.({ mode: 'start_attempt', artifact })} />}
       {canPromote && <ArtifactAction action="promote_attempt" label="Make this my recipe" status={actionPending ? 'applying' : status} disabled={actionPending} onClick={() => onAction?.({ mode: 'promote_attempt', artifact })} />}
     </div>
-    {artifact.recipe && <details style={{ marginTop: 8 }}><summary style={{ minHeight: 44, padding: '12px 0', cursor: 'pointer', color: C.textMuted }}>Review trial recipe</summary><CurrentRecipeCard recipe={artifact.recipe} title="Trial recipe" /></details>}
+    {artifact.recipe && <details key={`${artifact.id}:${artifact.promoteAvailable === true}`} style={{ marginTop: 8 }}><summary style={{ minHeight: 44, padding: '12px 0', cursor: 'pointer', color: C.textMuted }}>Review trial recipe</summary><CurrentRecipeCard recipe={artifact.recipe} title="Trial recipe" /></details>}
   </div>;
 }

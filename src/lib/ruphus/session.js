@@ -23,7 +23,9 @@ const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0
 export function retainActionReceipt(messages, receipt, proposalStatus) {
   receipt = Object.fromEntries(Object.entries(receipt).filter(([, value]) => value !== undefined));
   let attached = false;
-  const updated = messages.map(message => {
+  const latestTrialMessage = receipt.mode === 'promote_attempt' && receipt.status === 'succeeded'
+    ? messages.findLastIndex(message => message.artifacts?.some(item => item.attemptId === receipt.attemptId)) : -1;
+  const updated = messages.map((message, index) => {
     if (!Array.isArray(message.artifacts)) return message;
     const ownsProposal = message.artifacts.some(item => item.type === 'recipe_proposal' && item.id === receipt.proposalId);
     const ownsReceipt = message.artifacts.some(item => item.id === receipt.id);
@@ -35,8 +37,10 @@ export function retainActionReceipt(messages, receipt, proposalStatus) {
       if (receipt.mode === 'promote_attempt' && receipt.status === 'succeeded' && item.attemptId === receipt.attemptId) return { ...item, promoteAvailable: false };
       return item;
     });
-    if (!attached) artifacts.push(receipt);
-    attached = true;
+    if (!attached && (latestTrialMessage < 0 || index === latestTrialMessage)) {
+      artifacts.push(receipt);
+      attached = true;
+    }
     return { ...message, artifacts };
   });
   if (!attached) updated.push({ id: `receipt-${receipt.id}`, role: 'assistant', content: 'Recipe action result', turnId: `action-${receipt.id}`, createdAt: Date.now(), artifacts: [receipt] });

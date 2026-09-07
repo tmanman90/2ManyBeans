@@ -114,12 +114,14 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     await page.locator('[data-ruphus-agent-enabled="true"][data-chat-hydration="hydrated"]').waitFor();
     if (freshConversation) {
       stage = 'fresh_owner_conversation';
-      page.once('dialog', async dialog => {
-        if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
-        else await dialog.dismiss();
-      });
       const newChat = page.getByRole('button', { name: 'New chat', exact: true });
-      if (await newChat.isVisible()) await newChat.click();
+      if (await newChat.isVisible()) {
+        page.once('dialog', async dialog => {
+          if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
+          else await dialog.dismiss();
+        });
+        await newChat.click();
+      }
       await page.getByRole('button', { name: 'What should I brew today?', exact: true }).waitFor();
     }
     if (liveConversation) {
@@ -142,6 +144,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     }
     if (checkSessionBoundary) {
       stage = 'new_chat_boundary';
+      page.removeAllListeners('dialog');
       page.once('dialog', async dialog => {
         if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
         else await dialog.dismiss();
@@ -225,12 +228,21 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
         await recovered.screenshot({ path: '/tmp/ruphus-live-trial-review.png' });
         await recovered.getByRole('button', { name: 'Make this my recipe', exact: true }).click();
         await page.getByText('This trial is now your saved recipe.', { exact: true }).waitFor();
+        assert.equal(await recovered.locator('details').evaluate(node => node.open), false, 'Successful save closes the expanded review so confirmation stays visible');
+        await page.waitForFunction(() => {
+          const confirmation = [...document.querySelectorAll('div')].find(node => node.textContent === 'This trial is now your saved recipe.');
+          const composer = document.querySelector('[placeholder="Ask Professor Ruphus..."]');
+          if (!confirmation || !composer) return false;
+          const rect = confirmation.getBoundingClientRect();
+          return rect.top >= 0 && rect.bottom < composer.getBoundingClientRect().top;
+        });
       } else await proposal.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
       if (!liveConversation?.trialJourney) await page.locator('[data-artifact="action_receipt"][data-status="succeeded"]').waitFor();
       await savedAction.verify();
       await page.screenshot({ path: '/tmp/ruphus-authenticated-saved.png', fullPage: false });
       if (liveConversation) {
         stage = 'new_chat_after_live_turns';
+        page.removeAllListeners('dialog');
         page.once('dialog', async dialog => {
           if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
           else await dialog.dismiss();

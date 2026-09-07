@@ -20,6 +20,7 @@ test('Brew once receipt survives return to chat and replay does not duplicate it
   const saved = retainActionReceipt(recovered, { id: 'saved', type: 'action_receipt', mode: 'promote_attempt', status: 'succeeded', attemptId: 'attempt', proposalId: 'proposal' }, 'applied');
   assert.equal(saved.at(-1).artifacts[0].promoteAvailable, false);
   assert.equal(saved.flatMap(item => item.artifacts).filter(item => item.id === 'saved').length, 1);
+  assert.equal(saved.at(-1).artifacts.some(item => item.id === 'saved'), true, 'Save confirmation belongs next to the latest recovered trial, not the older proposal');
 });
 
 test('ordinary UI saves preserve server evidence while explicit New chat clears it', () => {
