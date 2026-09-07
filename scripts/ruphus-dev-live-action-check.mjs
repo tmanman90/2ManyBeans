@@ -355,6 +355,10 @@ try {
 } catch (error) {
   // Assertion actual/expected and request objects can contain private identifiers.
   report.failure = error.code === 'ERR_ASSERTION' ? String(error.message).split('\n')[0] : /^(?:Dev request HTTP|U3 |Managed Dev)/.test(error.message) ? error.message : 'Acceptance check failed; inspect the named stage without credentials';
+  report.failureType = ['TypeError', 'SyntaxError', 'AssertionError', 'Error'].includes(error.name) ? error.name : 'unknown';
+  const transportCode = error.cause?.code || error.code;
+  report.transportFailure = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET'].includes(transportCode) ? transportCode : null;
+  report.fetchFailed = error.message === 'fetch failed';
   process.exitCode = 1;
 } finally {
   const path = await persistRunArtifact(directory, report, runId);
