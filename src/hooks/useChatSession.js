@@ -67,7 +67,7 @@ function createDefaultAdapter(uid) {
       return snap.exists() ? snap.data() : null;
     },
     saveRemote(session, options) {
-      if (session.protocolVersion === AGENT_PROTOCOL_VERSION && !options?.resetContext) {
+      if (session.protocolVersion === AGENT_PROTOCOL_VERSION) {
         return runTransaction(db, async transaction => {
           const snapshot = await transaction.get(ref);
           const write = clientSessionWrite(session, { ...options, remoteSession: snapshot.exists() ? snapshot.data() : null });
@@ -182,14 +182,17 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       messages: normalizeMessages(messages),
       updatedAt: Date.now(),
       };
-    Promise.resolve(adapterRef.current.saveLocal?.(session))
+    const localSession = session.protocolVersion === AGENT_PROTOCOL_VERSION
+      ? { ...session, ...clientSessionWrite(session, { ...options, remoteSession: hydratedSession }).data, boundaryIndex: options.resetContext ? session.boundaryIndex : hydratedSession?.boundaryIndex || 0 }
+      : session;
+    Promise.resolve(adapterRef.current.saveLocal?.(localSession))
       .catch(err => console.warn('[ChatSession] Local persist failed:', err));
     if (!hydratedRef.current) return;
     Promise.resolve(adapterRef.current.saveRemote?.(session, options))
       .catch(err => console.warn('[ChatSession] Remote persist failed:', err));
-  }, [isDemo, uid]);
+  }, [hydratedSession, isDemo, uid]);
 
-  const clear = useCallback((currentMessages = hydratedMessages, currentContext = hydratedContext) => {
+  const clear = useCallback((currentMessages = hydratedMessages.slice(hydratedSession?.boundaryIndex || 0), currentContext = hydratedContext) => {
     if (isDemo || !uid || !adapterRef.current) return;
     const now = Date.now();
     const next = startNewChat({
@@ -200,17 +203,18 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
       updatedAt: now,
     }, { now });
     hydratedRef.current = true;
-    const inflated = inflateAgentSession(next);
+    const localNext = clientSessionWrite(next, { resetContext: true, archiveActive: true, remoteSession: hydratedSession }).data;
+    const inflated = inflateAgentSession(localNext);
     setHydratedSession(inflated);
     setHydratedMessages(inflated.messages);
     setHydratedContext(next.contextRef || null);
     setHydratedArtifacts([]);
     setHydrationState('hydrated');
-    Promise.resolve(adapterRef.current.saveLocal?.(next))
+    Promise.resolve(adapterRef.current.saveLocal?.(localNext))
       .catch(err => console.warn('[ChatSession] Local boundary persist failed:', err));
-    Promise.resolve(adapterRef.current.saveRemote?.(next, { resetContext: true }))
+    Promise.resolve(adapterRef.current.saveRemote?.(next, { resetContext: true, archiveActive: true }))
       .catch(err => console.warn('[ChatSession] Remote boundary persist failed:', err));
-  }, [hydratedContext, hydratedMessages, isDemo, uid]);
+  }, [hydratedContext, hydratedMessages, hydratedSession, isDemo, uid]);
 
   return { hydratedMessages, hydratedContext, hydratedArtifacts, hydratedSession, hydrationState, persist, clear };
 }

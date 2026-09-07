@@ -63,6 +63,29 @@ test('saved Agent conversation retains its native proposal through display resto
   assert.equal('artifacts' in legacy, false);
 });
 
+test('a second New chat preserves the first archived conversation and is replay-safe', () => {
+  const first = normalizeAgentSession({ messages: [{ id: 'first', role: 'user', text: 'First conversation' }] });
+  const remote = startNewChat(first);
+  const active = normalizeAgentSession({ messages: [{ id: 'second', role: 'user', text: 'Second conversation' }] });
+  const reset = startNewChat(active);
+  const write = clientSessionWrite(reset, { resetContext: true, archiveActive: true, remoteSession: remote });
+  assert.equal(write.merge, false);
+  assert.deepEqual(write.data.messages.map(message => message.id), ['first', 'second']);
+  assert.equal(write.data.boundaryIndex, 2);
+  assert.deepEqual(write.data.ledger.entries, []);
+  const replay = clientSessionWrite(reset, { resetContext: true, archiveActive: true, remoteSession: write.data });
+  assert.deepEqual(replay.data.messages, write.data.messages);
+  assert.equal(replay.data.boundaryIndex, 2);
+});
+
+test('Continue previous does not archive the resumed active conversation', () => {
+  const remote = normalizeAgentSession({ messages: [{ id: 'old', role: 'user', text: 'Archived' }, { id: 'active', role: 'user', text: 'Resume this' }], boundaryIndex: 1, lastActivityAt: 1 });
+  const resumed = continuePrevious(remote, { now: 1000000000 });
+  const write = clientSessionWrite(resumed, { resetContext: true, remoteSession: remote });
+  assert.equal(write.data.boundaryIndex, 1);
+  assert.deepEqual(write.data.messages.map(message => message.id), ['old', 'active']);
+});
+
 test('age classification uses the approved six-hour and seven-day boundaries', () => {
   const now = 100000000;
   assert.equal(sessionAge({ lastActivityAt: now - 2 * 3600000, now }).state, 'fresh');

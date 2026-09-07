@@ -13,7 +13,7 @@ test('chat session rules accept actual client shapes and retain authority bounda
   const require = createRequire(process.env.RUPHUS_RULES_TEST_PACKAGE_ROOT
     ? `${process.env.RUPHUS_RULES_TEST_PACKAGE_ROOT}/package.json` : import.meta.url);
   const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-  const { doc, setDoc, getDoc } = require('firebase/firestore');
+  const { doc, setDoc, getDoc, runTransaction } = require('firebase/firestore');
   const [host, port] = process.env.FIRESTORE_EMULATOR_HOST.split(':');
   const env = await initializeTestEnvironment({
     projectId: 'demo-ruphus-session-rules',
@@ -36,6 +36,20 @@ test('chat session rules accept actual client shapes and retain authority bounda
     const boundary = startNewChat(session);
     await assertSucceeds(setDoc(doc(owner, path), boundary));
     assert.equal((await getDoc(doc(owner, path))).data().boundaryIndex, 1);
+    const second = normalizeAgentSession({ messages: [{ id: 'second', role: 'user', text: 'Another conversation', createdAt: 2 }] });
+    const saveActive = async (value, options = {}) => runTransaction(owner, async transaction => {
+      const ref = doc(owner, path);
+      const remote = (await transaction.get(ref)).data();
+      const write = clientSessionWrite(value, { ...options, remoteSession: remote });
+      transaction.set(ref, write.data, { merge: write.merge });
+    });
+    await assertSucceeds(saveActive(second));
+    await assertSucceeds(saveActive(startNewChat(second), { resetContext: true, archiveActive: true }));
+    const secondBoundary = (await getDoc(doc(owner, path))).data();
+    assert.deepEqual(secondBoundary.messages.map(message => message.id), ['hello', 'second']);
+    assert.equal(secondBoundary.boundaryIndex, 2);
+    await assertSucceeds(saveActive(startNewChat(second), { resetContext: true, archiveActive: true }));
+    assert.equal((await getDoc(doc(owner, path))).data().messages.length, 2);
     await assertSucceeds(setDoc(doc(owner, path), { messages: [], updatedAt: 1 }));
     const longSession = normalizeAgentSession({ messages: Array.from({ length: 51 }, (_, i) => ({ role: 'user', text: `Turn ${i}`, id: `${i}` })) });
     await assertSucceeds(setDoc(doc(owner, path), longSession));
