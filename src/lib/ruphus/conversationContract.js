@@ -125,7 +125,11 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   if (odeSmallStep && Math.abs(Number(odeSmallStep[1]) - Number(odeSmallStep[2])) >= 1) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'claimed small grinder step conflicts with the numeric change'));
   }
-  const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence));
+  // A recommendation may be followed by its explicit adjustment. A historical
+  // setting alone is not an adjustment and must not satisfy this link.
+  const explicitAdjustment = /\bfrom\s+(?:ode\s+|grinder\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
+  const hasSizedRecommendation = sentences.some((sentence) => recommendation.test(sentence) && sized.test(sentence))
+    || sentences.some((sentence) => recommendation.test(sentence)) && sentences.some((sentence) => directional.test(sentence) && explicitAdjustment.test(sentence));
   const comparison = /\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b[^.!?]*(?:\b(?:beats?|before|rather than|instead of|over)\b)[^.!?]*\b(?:finer|coarser|dose|grind|water|coffee|extraction)\b/i;
   const conditionalAlternative = /\bif\b/i;
   const counterfactualAlternative = /(?:^|;\s*)\s*(?:more|less|higher|lower|extra)\s+(?:coffee|dose|water|heat|temperature|time|agitation|extraction)\b[^;.!?]*\b(?:could|would|may|might)\b/i;
@@ -151,7 +155,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
         : explicitDirectionalControl === 'temperature' || explicitDirectionalControl === 'heat'
           ? /\b\d+(?:\.\d+)?\s*°?\s*[CF]\b/i.test(value)
           : explicitDirectionalControl ? sized.test(sentence) : false;
-    const unsizedAdditionalControl = sentence.split(/;|,\s*(?:and|also)\s+|\s+\b(?:and|also)\b\s+(?=(?:try|test|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|raise|lower)\b)/i).slice(1)
+    const unsizedAdditionalControl = sentence.replace(/\b(finer|coarser)\s+grinding\b/gi, '$1 grounds').split(/;|,\s*(?:and|also)\s+|\s+\b(?:and|also)\b\s+(?=(?:try|test|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|raise|lower)\b)/i).slice(1)
       .some((clause) => directional.test(clause) && (actionableAdditional.test(clause) || additionalRecommendation.test(clause)) && !sized.test(clause) && !counterfactualAlternative.test(clause) && !predictedOutcome.test(clause) && !explanatoryTest.test(clause) && !/\baim\s+for\s+(?:a\s+)?(?:little|touch|bit)\s+more\s+(?:contact|sweetness|clarity|body|extraction)\b/i.test(clause));
     const linkedSizedControl = hasSizedRecommendation && (
       (/\b(?:more|less|higher|lower)\s+(?:dose|coffee)\b/i.test(sentence) && sizedDose)

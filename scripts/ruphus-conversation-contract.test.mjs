@@ -54,6 +54,18 @@ test('sized live recommendations can explain effects without becoming unsized in
   ]) assert.ok(gradeC5Numbers({ reply }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
 });
 
+test('full-run sized grind advice survives explanatory wording and following-sentence sizing', () => {
+  for (const reply of [
+    'For El Vergel’s hot V60, go one small step finer: change the Ode from 4.2 to 4.1. The last brew was 15 g, 250 g, and 2:50; finer grinding should target the sour, muted character without changing the rest of the recipe.',
+    'Yes—finer grind would be the better first test. Thin plus sour points to both low strength and insufficient extraction, but one small finer step on the Kalita recipe—from Ode 4.2 to 4.1—targets the sourness without changing dose or water.',
+  ]) assert.deepEqual(gradeC5Numbers({ reply }), []);
+  for (const reply of [
+    'Finer grinding should target sourness.',
+    'Finer grind would be the better first test. The last brew used Ode 4.2.',
+    'Go one small step finer. Also use more water.',
+  ]) assert.ok(gradeC5Numbers({ reply }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+});
+
 test('question, value, number, and tone graders enforce conversational constraints', () => {
   assert.ok(gradeC3Questions({ reply: 'Which? Why?', ledger: {} }).some((item) => item.code === 'C3_QUESTION_COUNT'));
   assert.ok(gradeC3Questions({ reply: 'What dose did you use?', ledger: { dose: 15 } }).some((item) => item.code === 'C3_HELD_DATA_QUESTION'));
