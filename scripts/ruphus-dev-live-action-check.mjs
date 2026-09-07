@@ -90,6 +90,10 @@ try {
   const claims = JSON.parse(Buffer.from(auth.idToken.split('.')[1], 'base64url'));
   assert.ok(claims.sub === uid && claims.aud === project, 'Fixture sign-in identity must match');
   const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`;
+  if (mode === 'ui') {
+    const session = decode({ mapValue: await request(`${base}/chatSessions/active`, { token: auth.idToken }) });
+    console.log(JSON.stringify({ sessionSchema: { keys: Object.keys(session), ledgerKeys: Object.keys(session.ledger || {}), ledgerBytes: session.ledger?.bytes, ledgerEntries: session.ledger?.entries?.length, boundaryIndex: session.boundaryIndex, messageCount: session.messages?.length } }));
+  }
   const fixtureProfile = decode({ mapValue: await request(base, { token: auth.idToken }) });
   assert.equal(fixtureProfile.account || fixtureProfile.subscription?.source, 'ruphus-dev-fixture', 'Only the explicitly seeded fixture can be mutated');
   if (uiMode) {

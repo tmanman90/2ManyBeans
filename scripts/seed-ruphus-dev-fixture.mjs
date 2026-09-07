@@ -115,7 +115,7 @@ export async function createFirestoreSessionReset({ projectId, fixtureUid, db: p
     const app = getApps().find((candidate) => candidate.options.projectId === projectId) || initializeApp({ projectId }, `ruphus-u3-${fixtureUid}`);
     db = getFirestore(app);
   }
-  return async ({ fixture, repetition, stage, session = null } = {}) => {
+  return async ({ fixture, session = null } = {}) => {
     const now = Date.now();
     const ageDays = Number(session?.lastActivityOffsetDays) || 0;
     const storedMessages = Array.isArray(session?.messages) ? session.messages : [];
@@ -124,7 +124,7 @@ export async function createFirestoreSessionReset({ projectId, fixtureUid, db: p
     await Promise.all([db.collection('users').doc(fixtureUid).collection('chatSessions').doc('active').set({
       protocolVersion: 1, messages: storedMessages, turns: Array.isArray(session?.turns) ? session.turns : [], contextRef: fixture?.launchContext || null, launchContext: fixture?.launchContext || null,
       ledger: session?.ledger || { version: 1, entries: [], namedCoffees: [], bytes: 0 }, boundaryIndex, lastActivityAt: Number.isFinite(Number(session?.lastActivityAt)) ? Number(session.lastActivityAt) : now - ageDays * 24 * 60 * 60 * 1000,
-      launchHintConsumed: false, historyWidened: false, updatedAt: now, u3Stage: stage || 'injected', u3Repetition: repetition || 1,
+      launchHintConsumed: false, historyWidened: false, updatedAt: now,
     }), db.collection('users').doc(fixtureUid).collection('rateLimits').doc('claude').set({ count: 0, windowStart: resetAt, updatedAt: resetAt })]);
   };
 }

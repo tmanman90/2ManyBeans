@@ -22,6 +22,11 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     page = await context.newPage();
+    page.on('console', async message => {
+      if (!message.text().startsWith('[ChatSession]')) return;
+      const code = await message.args().at(-1)?.evaluate(value => typeof value?.code === 'string' && /^[a-z/-]+$/.test(value.code) ? value.code : null).catch(() => null);
+      if (code) console.log(JSON.stringify({ sessionPersistenceError: code }));
+    });
     await page.exposeFunction('reportFixtureProfile', value => console.log(JSON.stringify({ fixtureProfile: value })));
     const blockedApiPaths = [];
     page.on('pageerror', error => {
@@ -159,6 +164,13 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
         // Brew once hands off to the timer, rather than leaving Chat visible.
         await page.getByRole('button', { name: 'Close brew timer', exact: true }).waitFor();
         await page.evaluate(async firestoreModule => { const { db } = await import('/src/firebase.js'); const { waitForPendingWrites } = await import(firestoreModule); await waitForPendingWrites(db); }, firestoreModule);
+        const savedTranscript = await page.evaluate(async ({ firestoreModule, fixtureUid }) => {
+          const { db } = await import('/src/firebase.js');
+          const { doc, getDocFromServer } = await import(firestoreModule);
+          const saved = (await getDocFromServer(doc(db, 'users', fixtureUid, 'chatSessions', 'active'))).data();
+          return { messages: saved?.messages?.length || 0, artifacts: (saved?.messages || []).flatMap(item => item.artifacts || []).map(item => item.type) };
+        }, { firestoreModule, fixtureUid });
+        console.log(JSON.stringify({ savedTranscript }));
         stage = 'return_after_trial';
         await page.reload({ waitUntil: 'domcontentloaded' });
         // This operator check deliberately uses memory-only auth, so restore
@@ -175,6 +187,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
         await page.getByText('Hand Brew Recipe', { exact: true }).locator('..').getByRole('button', { name: 'Close', exact: true }).click();
         await page.getByText('Your first bean!', { exact: true }).waitFor({ state: 'hidden' });
         await page.getByRole('button', { name: 'Chat', exact: true }).click();
+        await page.locator('[data-artifact="action_receipt"]').waitFor();
         const input = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
         await input.fill(liveConversation.turns[3]);
         await input.press('Enter');

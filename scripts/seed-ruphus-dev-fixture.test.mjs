@@ -74,4 +74,7 @@ test('each Dev fixture session reset also clears only the fake owner rate-limit 
   await reset({ fixture: { launchContext: { surface: 'direct' } }, repetition: 1, stage: 'smoke' });
   assert.deepEqual(writes.map((item) => item.path).sort(), ['users/fixture-account/chatSessions/active', 'users/fixture-account/rateLimits/claude']);
   assert.equal(writes.find((item) => item.path.endsWith('/rateLimits/claude')).data.count, 0);
+  const session = writes.find(item => item.path.endsWith('/chatSessions/active')).data;
+  assert.equal('u3Stage' in session, false, 'diagnostic metadata makes owner session writes fail rules');
+  assert.equal('u3Repetition' in session, false);
 });
