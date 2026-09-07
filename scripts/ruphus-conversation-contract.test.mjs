@@ -70,6 +70,10 @@ test('question, value, number, and tone graders enforce conversational constrain
   assert.equal(gradeC5Numbers({ reply: 'A half step finer should help.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Two clicks finer should help.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try one notch finer.', userUnits: {} }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'For El Vergel on the hot V60, go one small step finer: Ode 4.2 to 4.1. Sour and muted points toward needing more extraction; keep the dose, water, and temperature unchanged for this test.' }).length, 0);
+  assert.equal(gradeC5Numbers({ reply: 'For Colombia La Esperanza’s hot Kalita, I’d go one small Ode grind step finer: 4.2 to 4.1. The sour, muted cup points toward more extraction; keep the 15 g, 250 g, and 3:10 recipe unchanged for this test.' }).length, 0);
+  assert.ok(gradeC5Numbers({ reply: 'For this test, use more water.' }).some(item => item.code === 'C5_DIRECTION_SIZE'));
+  assert.ok(gradeC5Numbers({ reply: 'Try more extraction for this test.' }).some(item => item.code === 'C5_DIRECTION_SIZE'));
   assert.equal(gradeC5Numbers({ reply: 'Adjust the grind finer by one small Ode step.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try one small finer adjustment.', userUnits: {} }).length, 0);
   assert.equal(gradeC5Numbers({ reply: 'Try one small grind adjustment finer.', userUnits: {} }).length, 0);

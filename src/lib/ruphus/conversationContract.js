@@ -118,7 +118,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   if (/\b(?:microns?|µm)\b/i.test(value) && !userUnits.microns) result.push(violation('C5_UNITS', CATEGORIES.ORDINARY, 'microns were introduced without the user using microns'));
   const directional = /\b(?:increase|decrease|finer|coarser|hotter|cooler)\b|\b(?:more|less|higher|lower)\s+(?:(?:bloom|contact|brew)\s+)?(?:coffee|dose|water|heat|temperature|time|agitation|extraction|bloom|contact|steep(?:ing)?|drawdown|flow|pour(?:s|ing)?)\b|\b(?:turn|move|adjust|go)\s+(?:up|down)\b/i;
   const recommendation = /\b(?:try|test|use|make|move|go|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|could|would)\b|\bgrind\s+(?:the\s+)?(?:coffee\s+)?(?:(?:one|two|three|a|an)\s+(?:small\s+)?(?:step|click|notch)s?\s+)?(?:finer|coarser)\b/i;
-  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|degrees?|seconds?|min(?:ute)?s?)\b|\b(?:ode|grinder)\s+\d+(?:\.\d+)?\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half|gentle|modest)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+|ode\s+)?(?:step|gram|click|notch|degree|adjustment|increase|decrease|change)s?(?:\s+(?:finer|coarser))?\b|\b(?:a|an)\s+(?:gentle|modest|small|slight)\s+(?:extraction|strength|temperature|agitation)\s+(?:increase|decrease)\b|\b(?:a\s+)?half\s+(?:a\s+)?(?:step|click|notch|degree)s?\b|\b(?:a\s+(?:little|touch|bit)|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee|dose)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
+  const sized = /\b\d+(?:\.\d+)?\s*(?:g|grams?|ml|°?[CF]|steps?|clicks?|notches?|degrees?|seconds?|min(?:ute)?s?)\b|\b(?:ode|grinder)\s+\d+(?:\.\d+)?\b|\b(?:one|two|three|a|an|another)\s+(?:(?:small|tiny|half|gentle|modest)\s+)?(?:(?:finer|coarser)\s+)?(?:grind\s+|dose\s+|ode\s+(?:grind\s+)?)?(?:step|gram|click|notch|degree|adjustment|increase|decrease|change)s?(?:\s+(?:finer|coarser))?\b|\b(?:a|an)\s+(?:gentle|modest|small|slight)\s+(?:extraction|strength|temperature|agitation)\s+(?:increase|decrease)\b|\b(?:a\s+)?half\s+(?:a\s+)?(?:step|click|notch|degree)s?\b|\b(?:a\s+(?:little|touch|bit)|slightly)\s+(?:more|less)\s+(?:extraction|agitation|time|heat|water|coffee|dose)\b|\bfrom\s+(?:[A-Za-z]+\s+)?\d+(?:\.\d+)?\s+(?:to|→)\s+\d+(?:\.\d+)?\b/i;
   const sentences = value.split(/(?<=[.!?])\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean);
   const odeSmallStep = value.match(/\b(?:one|a)\s+(?:small\s+)?step\b[^.!?]*?\b(?:ode\s*)?(\d+(?:\.\d+)?)\s*(?:to|→)\s*(?:about\s+)?(\d+(?:\.\d+)?)/i)
     || value.match(/\b(?:ode\s*)?(\d+(?:\.\d+)?)\s*(?:to|→)\s*(?:about\s+)?(\d+(?:\.\d+)?)[^.!?]*?\b(?:one|a)\s+(?:small\s+)?step\b/i);
@@ -140,6 +140,9 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
   const sizedWater = /(?:\bwater\b[^.!?]{0,32}\b\d+(?:\.\d+)?\s*(?:g|ml)\b|\b\d+(?:\.\d+)?\s*(?:g|ml)\b[^.!?]{0,32}\bwater\b)/i.test(value);
   const sizedTemperature = /\b\d+(?:\.\d+)?\s*°?\s*[CF]\b/i.test(value);
   if (!result.some((item) => item.code === 'C5_DIRECTION_SIZE') && sentences.some((sentence) => {
+    // "For this test" names the experiment; it is not the imperative "test".
+    // Keep the surrounding prose so genuine extra controls still get graded.
+    const recommendationProse = sentence.replace(/\bfor\s+(?:this|that|the)\s+test\b/gi, '');
     const explicitDirectionalControl = sentence.match(/\b(?:try|use|make|move|adjust|change|increase|decrease|raise|lower|turn|set)\b[^.!?]{0,32}\b(?:more|less|higher|lower)\s+(coffee|dose|water|temperature|heat|agitation|time|bloom|contact|extraction)\b/i)?.[1]?.toLowerCase() || null;
     const controlHasSize = explicitDirectionalControl === 'coffee' || explicitDirectionalControl === 'dose'
       ? /(?:\b\d+(?:\.\d+)?\s*(?:g|grams?)\b[^.!?]{0,24}\b(?:coffee|dose)\b|\b(?:coffee|dose)\b[^.!?]{0,24}\b\d+(?:\.\d+)?\s*(?:g|grams?)\b)/i.test(value)
@@ -157,7 +160,7 @@ export function gradeC5Numbers({ reply = '', userUnits = {} } = {}) {
       || (/\b(?:hotter|cooler|temperature|heat)\b/i.test(sentence) && sizedTemperature)
     );
     const boundedOutcome = hasSizedRecommendation && /\baim\s+for\s+(?:a\s+)?(?:little|touch|bit)\s+more\s+(?:contact|sweetness|clarity|body|extraction)\b/i.test(sentence);
-    return explicitDirectionalControl && !controlHasSize || unsizedAdditionalControl || directional.test(sentence) && recommendation.test(sentence) && !sized.test(sentence)
+    return explicitDirectionalControl && !controlHasSize || unsizedAdditionalControl || directional.test(sentence) && recommendation.test(recommendationProse) && !sized.test(sentence)
       && !(linkedSizedControl || boundedOutcome || hasSizedRecommendation && (comparison.test(sentence) || conditionalAlternative.test(sentence) || counterfactualAlternative.test(sentence) || explanationAfterSizedRecommendation.test(sentence) || explanatoryTest.test(sentence) || predictedOutcome.test(sentence) || evidenceSupportsSizedChange.test(sentence)));
   })) {
     result.push(violation('C5_DIRECTION_SIZE', CATEGORIES.ORDINARY, 'recommended direction has no clear size'));
