@@ -35,6 +35,18 @@ test('length and shape graders distinguish ordinary caps from runtime hard cap',
   assert.equal(gradeC2Shape({ reply: 'One. Two. If you want it, say “yes.”' }).some((item) => item.code === 'C2_SENTENCES'), false);
 });
 
+test('sized live recommendations can explain effects without becoming unsized instructions', () => {
+  for (const reply of [
+    'For thin and sour, I’d choose a finer grind before adding dose: move the Ode from 4.2 to 4.1 for the Kalita 155. That should target the sourness and may add body; more dose would mainly strengthen the cup without directly addressing likely under-extraction. Keep the water and dose unchanged for this test.',
+    'For the hot Kalita, I’d grind one small step finer on the Ode: 4.2 to 4.1. That should increase extraction and target the sour, muted character without changing the dose, water, or temperature.',
+  ]) assert.deepEqual(gradeC5Numbers({ reply }), []);
+  for (const reply of [
+    'Grind one small step finer. Also use more water.',
+    'That should increase extraction.',
+    'Grind finer. That should target the sourness.',
+  ]) assert.ok(gradeC5Numbers({ reply }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
+});
+
 test('question, value, number, and tone graders enforce conversational constraints', () => {
   assert.ok(gradeC3Questions({ reply: 'Which? Why?', ledger: {} }).some((item) => item.code === 'C3_QUESTION_COUNT'));
   assert.ok(gradeC3Questions({ reply: 'What dose did you use?', ledger: { dose: 15 } }).some((item) => item.code === 'C3_HELD_DATA_QUESTION'));

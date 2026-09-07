@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { loadFixtureManifest, createCostGuard, loadCumulativeCostLedger, persistCumulativeCostLedger, runLiveCase, persistRunArtifact } from './ruphus-conversation-runner.mjs';
-import { createFirestoreSessionReset } from './seed-ruphus-dev-fixture.mjs';
+import { loadFixtureManifest, createCostGuard, loadCumulativeCostLedger, persistCumulativeCostLedger, runLiveCase, runLiveStage, persistRunArtifact } from './ruphus-conversation-runner.mjs';
+import { createFirestoreSessionReset, seedFixture } from './seed-ruphus-dev-fixture.mjs';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
@@ -12,6 +12,8 @@ import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
+const mode = process.argv[3] || 'action';
+assert.ok(['action', 'smoke'].includes(mode), 'Expected action or smoke');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -63,6 +65,8 @@ try {
   assert.equal(deployment.readyState, 'READY');
   assert.notEqual(deployment.target, 'production');
   report.deploymentId = deployment.id;
+  report.commit = deployment.meta?.gitCommitSha;
+  assert.match(report.commit || '', /^[a-f0-9]{40}$/);
   report.stage = 'fixture_lookup';
   const users = (await request(`https://identitytoolkit.googleapis.com/v1/projects/${project}/accounts:batchGet?maxResults=100`)).users;
   const fixtures = users.filter(user => !user.email && !user.providerUserInfo?.length && !user.disabled);
@@ -117,6 +121,19 @@ try {
   const { account, cases } = await loadFixtureManifest();
   const fixture = cases.cases.find(item => item.id === 'AE05');
   const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
+  if (mode === 'smoke') {
+    report.stage = 'seed_live_smoke';
+    await seedFixture({ projectId: project, fixtureUid: uid, authorized: true, write: async (path, data) => {
+      assert.ok(path === `users/${uid}` || path.startsWith(`users/${uid}/`));
+      await request(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}`, { method: 'PATCH', body: encode(data).mapValue });
+    } });
+    report.stage = 'live_smoke';
+    const smoke = await runLiveStage({ stage: 'smoke', endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costCapUsd: 30, commit: report.commit, resetSession: reset });
+    report.smoke = smoke;
+    report.cumulativeCostUsd = smoke.cumulativeCostUsd;
+    report.passed = smoke.passed;
+    if (!smoke.passed) process.exitCode = 1;
+  } else {
   report.stage = 'fixture_session_reset';
   await reset({ fixture, stage: 'action-acceptance', repetition: 1 });
   const prior = await loadCumulativeCostLedger(ledgerPath);
@@ -148,6 +165,7 @@ try {
   }
   assert.ok(report.applied && report.undoReadback);
   report.passed = true;
+  }
 } catch (error) {
   // Assertion actual/expected and request objects can contain private identifiers.
   report.failure = error.code === 'ERR_ASSERTION' ? String(error.message).split('\n')[0] : /^(?:Dev request HTTP|U3 |Managed Dev)/.test(error.message) ? error.message : 'Acceptance check failed; inspect the named stage without credentials';
