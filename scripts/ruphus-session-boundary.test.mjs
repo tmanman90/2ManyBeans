@@ -2,6 +2,31 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { clientSessionWrite, continuePrevious, inflateAgentSession, normalizeAgentSession, prepareSession, restoreChatMessage, sessionAge, sessionPresentation, startNewChat, retainActionReceipt } from '../src/lib/ruphus/session.js';
 
+test('Undo retires only the exact saved-revision controls, including after hydration', () => {
+  const saved = { id: 'save', type: 'action_receipt', mode: 'promote_attempt', status: 'succeeded', revisionId: 'revision', coffeeId: 'coffee', slotKey: 'kalita_hot', undoAvailable: true, executionAvailable: true };
+  const other = { ...saved, id: 'other', revisionId: 'other-revision' };
+  const messages = [{ id: 'one', role: 'assistant', content: 'Saved', artifacts: [saved, other] }];
+  const undo = { id: 'undo', type: 'undo_receipt', mode: 'undo_revision', status: 'succeeded', undoneRevisionId: 'revision', coffeeId: 'coffee', slotKey: 'kalita_hot' };
+  const result = retainActionReceipt(messages, undo);
+  assert.equal(result[0].artifacts[0].status, 'undone');
+  assert.equal(result[0].artifacts[0].undoAvailable, false);
+  assert.equal(result[0].artifacts[0].executionAvailable, false);
+  assert.deepEqual(result[0].artifacts[1], other);
+  assert.equal(saved.status, 'succeeded', 'do not mutate the supplied transcript');
+  assert.deepEqual(retainActionReceipt(result, undo), result);
+  const hydrated = normalizeAgentSession({ messages: [...messages, { id: 'two', role: 'assistant', content: 'Undone', artifacts: [undo] }] });
+  assert.equal(hydrated.messages[0].artifacts[0].status, 'undone');
+  const restored = inflateAgentSession({ protocolVersion: 1, messages: [...messages, { id: 'two', role: 'assistant', text: 'Undone', artifacts: [undo] }] });
+  assert.equal(restored.messages[0].artifacts[0].status, 'undone');
+  const { coffeeId: _coffee, slotKey: _slot, ...legacyUndo } = undo;
+  const legacy = inflateAgentSession({ protocolVersion: 1, messages: [...messages, { id: 'two', role: 'assistant', text: 'Undone', artifacts: [legacyUndo] }] });
+  assert.equal(legacy.messages[0].artifacts[0].status, 'undone', 'older Firestore receipts identify only the exact revision');
+  const wrongCoffee = retainActionReceipt(messages, { ...undo, coffeeId: 'different-coffee' });
+  assert.equal(wrongCoffee[0].artifacts[0].status, 'succeeded');
+  const failed = retainActionReceipt(messages, { ...undo, status: 'failed' });
+  assert.equal(failed[0].artifacts[0].status, 'succeeded');
+});
+
 test('Brew once receipt survives return to chat and replay does not duplicate it', () => {
   const proposal = { id: 'proposal', type: 'recipe_proposal', status: 'proposed' };
   const receipt = { id: 'action', type: 'action_receipt', mode: 'brew_once', proposalId: 'proposal', attemptId: 'attempt', status: 'succeeded' };

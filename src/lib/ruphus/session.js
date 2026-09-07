@@ -20,6 +20,20 @@ export function restoreChatMessage(message) {
 const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 
+function settleUndoneReceipts(messages) {
+  const undos = messages.flatMap(message => message.artifacts || []).filter(item => item.mode === 'undo_revision' && item.status === 'succeeded' && item.undoneRevisionId);
+  return messages.map(message => !Array.isArray(message.artifacts) ? message : {
+    ...message,
+    artifacts: message.artifacts.map(item => {
+      const undone = ['apply_proposal', 'promote_attempt'].includes(item.mode) && undos.some(undo =>
+        undo.undoneRevisionId === item.revisionId
+        && (!undo.coffeeId || undo.coffeeId === item.coffeeId)
+        && (!undo.slotKey || undo.slotKey === item.slotKey));
+      return undone ? { ...item, status: 'undone', undoAvailable: false, executionAvailable: false, promoteAvailable: false } : item;
+    }),
+  });
+}
+
 export function retainActionReceipt(messages, receipt, proposalStatus) {
   receipt = Object.fromEntries(Object.entries(receipt).filter(([, value]) => value !== undefined));
   let attached = false;
@@ -44,7 +58,7 @@ export function retainActionReceipt(messages, receipt, proposalStatus) {
     return { ...message, artifacts };
   });
   if (!attached) updated.push({ id: `receipt-${receipt.id}`, role: 'assistant', content: 'Recipe action result', turnId: `action-${receipt.id}`, createdAt: Date.now(), artifacts: [receipt] });
-  return updated;
+  return settleUndoneReceipts(updated);
 }
 
 // UI transcript saves must not replace evidence and lifecycle state written by
@@ -82,6 +96,7 @@ const boundedLedger = (ledger, { maxBytes = MAX_LEDGER_BYTES, maxEntries = MAX_L
 
 export function normalizeAgentSession(session, options = {}) {
   if (!session || typeof session !== 'object') return null;
+  session = { ...session, messages: settleUndoneReceipts((Array.isArray(session.messages) ? session.messages : []).filter(Boolean)) };
   const messages = (Array.isArray(session.messages) ? session.messages : []).filter(Boolean).map((message) => ({ id: textValue(message.id), role: message.role, text: textValue(message.text || message.content), createdAt: Number.isFinite(Number(message.createdAt)) ? Number(message.createdAt) : Date.now(), ...(message.turnId ? { turnId: textValue(message.turnId) } : {}), ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}) })).filter((message) => (message.role === 'user' || message.role === 'assistant') && message.text);
   const timestamp = Number(session.lastActivityAt || session.updatedAt);
   const lastActivityAt = Number.isFinite(timestamp) && timestamp >= 0 ? Math.min(timestamp, Date.now()) : Date.now();
@@ -92,6 +107,7 @@ export function normalizeAgentSession(session, options = {}) {
 }
 export function inflateAgentSession(session, options = {}) {
   if (!session || session.protocolVersion !== AGENT_PROTOCOL_VERSION) return null;
+  session = { ...session, messages: settleUndoneReceipts(session.messages) };
   return { ...session, messages: session.messages.map((message) => ({ id: textValue(message.id), role: message.role, content: textValue(message.text), createdAt: Number(message.createdAt) || Date.now(), ...(message.turnId ? { turnId: textValue(message.turnId) } : {}), ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}) })), ledger: boundedLedger(session.ledger, options), boundaryIndex: Math.max(0, Math.min(session.messages.length, Number.isInteger(session.boundaryIndex) ? session.boundaryIndex : 0)), lastActivityAt: Number(session.lastActivityAt || session.updatedAt) || Date.now(), launchHintConsumed: session.launchHintConsumed === true, historyWidened: session.historyWidened === true };
 }
 
