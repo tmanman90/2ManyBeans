@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 // Real app/providers, standard Firebase SDK login, isolated fixture only.
 // This entry check deliberately forbids model and recipe command dispatches.
-export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null }) {
+export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false }) {
   assert.equal(config.VITE_FIREBASE_PROJECT_ID, 'twomanybeans-ruphus-dev');
   const previous = Object.fromEntries(Object.keys(config).map(key => [key, process.env[key]]));
   const previousVariant = process.env.TMB_APP_VARIANT;
@@ -90,6 +90,34 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     }
     stage = 'verify_agent_entry';
     await agentEntry.waitFor();
+    if (checkSessionBoundary) {
+      stage = 'new_chat_boundary';
+      page.once('dialog', async dialog => {
+        if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
+        else await dialog.dismiss();
+      });
+      await page.getByRole('button', { name: 'New chat', exact: true }).click();
+      const boundary = await page.evaluate(async ({ firestoreModule, fixtureUid }) => {
+        const { db } = await import('/src/firebase.js');
+        const { doc, getDocFromServer, waitForPendingWrites, setDoc } = await import(firestoreModule);
+        await waitForPendingWrites(db);
+        const snapshot = await getDocFromServer(doc(db, 'users', fixtureUid, 'chatSessions', 'active'));
+        const data = snapshot.data();
+        const saved = data?.messages?.length > 0 && data.boundaryIndex === data.messages.length;
+        if (!saved) {
+          const { startNewChat } = await import('/src/lib/ruphus/session.js');
+          try {
+            await setDoc(doc(db, 'users', fixtureUid, 'chatSessions', 'active'), startNewChat(data));
+            return { saved: false, directPayloadAccepted: true };
+          } catch (error) {
+            return { saved: false, directPayloadAccepted: false, permissionDenied: error.code === 'permission-denied' };
+          }
+        }
+        return { saved };
+      }, { firestoreModule, fixtureUid });
+      console.log(JSON.stringify({ newChatBoundary: boundary }));
+      assert.equal(boundary.saved, true, 'New chat must persist its boundary on the server');
+    }
     if (savedAction) {
       stage = 'restored_proposal_card';
       const proposal = page.locator('[data-artifact="recipe_proposal"]');

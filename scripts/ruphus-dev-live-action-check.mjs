@@ -15,7 +15,7 @@ const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
 const mode = process.argv[3] || 'action';
-assert.ok(['action', 'smoke', 'full', 'ui', 'ui-action'].includes(mode), 'Expected action, smoke, full, ui or ui-action');
+assert.ok(['action', 'smoke', 'full', 'ui', 'ui-action', 'ui-session'].includes(mode), 'Expected action, smoke, full, ui, ui-action or ui-session');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -88,7 +88,7 @@ try {
   const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`;
   const fixtureProfile = decode({ mapValue: await request(base, { token: auth.idToken }) });
   assert.equal(fixtureProfile.account || fixtureProfile.subscription?.source, 'ruphus-dev-fixture', 'Only the explicitly seeded fixture can be mutated');
-  if (mode === 'ui' || mode === 'ui-action') {
+  if (mode === 'ui' || mode === 'ui-action' || mode === 'ui-session') {
     // Historical seed-only root fields violate the existing profile hasOnly
     // rule. Remove only those named fixture fields, retaining domain setup in
     // preferences and server-owned fixture identity in subscription.source.
@@ -135,7 +135,7 @@ try {
   const { account, cases } = await loadFixtureManifest();
   const fixture = cases.cases.find(item => item.id === 'AE05');
   const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
-  if (mode === 'ui' || mode === 'ui-action') {
+  if (mode === 'ui' || mode === 'ui-action' || mode === 'ui-session') {
     report.stage = 'authenticated_browser_entry';
     await request(`${base}?updateMask.fieldPaths=onboardingComplete&updateMask.fieldPaths=tourCompleted`, { method: 'PATCH', body: encode({ onboardingComplete: true, tourCompleted: true }).mapValue });
     const keys = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID', 'VITE_RUPHUS_AGENT_V3_MUTATION_UIDS'];
@@ -180,7 +180,7 @@ try {
     }
     try {
       report.stage = 'authenticated_browser_entry';
-      report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid, savedAction });
+      report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid, savedAction, checkSessionBoundary: mode === 'ui-session' });
     } finally {
       if (appliedResult?.revision?.id) {
         await request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body: { actionId: `${runId}-undo`, mode: 'undo_revision', coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, expectedRevisionId: appliedResult.revision.id } });

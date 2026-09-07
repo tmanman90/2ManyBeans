@@ -2,6 +2,22 @@
 
 ## Current acceptance — September 6 UX follow-up
 
+### Open session-write authority blocker
+
+Authenticated New chat persistence is FAIL. After accepting the native browser
+confirmation, server readback did not contain the new boundary. A direct standard
+Firebase SDK write of the app's `startNewChat` payload also returned
+`permission-denied`, independently confirming the rejected payload rather than
+only a rendering/timing symptom. Final report:
+`conversation-eval/u3-action-check-1788759366448/report.json`.
+The checked-in `chatSessions` allowlist excludes normalized Agent session fields
+including ledger, boundaryIndex, lastActivityAt, launchContext, launchHintConsumed,
+and historyWidened. Rule deployment is explicitly outside current authority; no
+rule change or deployment was attempted. Need approval for a narrowly scoped
+isolated-Dev rules correction, with owner checks and server-only action/proposal
+records preserved. Java is unavailable locally, so Firestore emulator execution
+is also not yet established. Script lint/diff checks passed; no AI call occurred.
+
 ### Latest authenticated saved-proposal result
 
 Latest native follow-up: source `51e38e4` was copied through `cap:copy:dev`
