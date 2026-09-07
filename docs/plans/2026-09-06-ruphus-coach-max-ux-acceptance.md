@@ -63,3 +63,12 @@ Voice, autonomous background changes, new external integrations, broad redesign 
 ## Execution sequence
 
 UX1 → UX2 → UX3 → UX4 → UX5, reusing verified existing behavior instead of reimplementing it. Inspect current coverage at each step; implement only gaps. Keep coherent local commits and perform focused checks per unit, then integrated functional and visual acceptance.
+
+## September 6 delivery checkpoint — not Product PASS
+
+- Source commits `5a2ebc4` and `2c0047e` repair explicit update-request readiness, server-authorized proposal actions, hot-water recipe consistency, and the review card. The final focused endpoint/runtime/action/artifact suite passed 81 tests; lint and build passed. The rendered browser harness passed mobile and desktop, including pending/stale states. The full proposal → Apply → canonical readback → Undo regression uses injected provider/readers and an in-memory repository, not live Firebase.
+- Preview `https://twomanybeans-ruphus-4mwknxyj6-tmanman90s-projects.vercel.app` reached READY. Its project is the isolated `twomanybeans-ruphus-dev` Vercel project. Preview action access now includes the two authorized accounts (owner and original fixture); no production environment was modified.
+- Managed client configuration was read into process memory, not an environment file. Native assets verified Dev bundle/display name, isolated Firebase, this preview URL, Ask Professor Ruphus, Update saved recipe, updater disabled, and dev channel. XcodeBuildMCP built, installed, and launched `com.talmeltzer.coffeehub.dev` on the exact authorized iPhone, reporting SUCCEEDED and process 11911. Existing Capacitor keyboard warnings only. This is delivery/launch evidence, not authenticated scripted acceptance.
+- Capgo channels were not changed. Diagnostic ledgers and report directories remain unstaged and preserved.
+- Authenticated live fixture acceptance remains blocked: the existing fixture has no linked sign-in provider, and existing Dev service accounts expose neither signJwt nor signBlob permission to the current operator. Standard token-signing preflight returned 403. No IAM permissions, auth backdoors, or user passwords were changed. No provider calls were made in this checkpoint; cumulative recorded test spend remains $27.082879 of the authorized $30.
+- UX3/UX4 complete-transcript and recovery acceptance, authenticated live Apply/readback, scripted native journey, and owner unscripted evidence remain unproven. Do not describe this checkpoint as the finished Coach Max experience.
