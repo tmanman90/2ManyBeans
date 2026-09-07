@@ -16,6 +16,10 @@ test('Brew once receipt survives return to chat and replay does not duplicate it
   const optional = retainActionReceipt(messages, { ...receipt, state: undefined, title: undefined }, 'attempt_created');
   assert.equal(Object.hasOwn(optional[0].artifacts[1], 'state'), false, 'Firestore rejects undefined receipt fields');
   assert.equal(Object.hasOwn(optional[0].artifacts[1], 'title'), false);
+  const recovered = [...updated, { id: 'recovered', role: 'assistant', content: 'Here is that trial.', artifacts: [{ ...receipt, status: 'ready', promoteAvailable: true }] }];
+  const saved = retainActionReceipt(recovered, { id: 'saved', type: 'action_receipt', mode: 'promote_attempt', status: 'succeeded', attemptId: 'attempt', proposalId: 'proposal' }, 'applied');
+  assert.equal(saved.at(-1).artifacts[0].promoteAvailable, false);
+  assert.equal(saved.flatMap(item => item.artifacts).filter(item => item.id === 'saved').length, 1);
 });
 
 test('ordinary UI saves preserve server evidence while explicit New chat clears it', () => {

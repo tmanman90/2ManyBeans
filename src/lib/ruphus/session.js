@@ -27,7 +27,9 @@ export function retainActionReceipt(messages, receipt, proposalStatus) {
     if (!Array.isArray(message.artifacts)) return message;
     const ownsProposal = message.artifacts.some(item => item.type === 'recipe_proposal' && item.id === receipt.proposalId);
     const ownsReceipt = message.artifacts.some(item => item.id === receipt.id);
-    if (!ownsProposal && !ownsReceipt) return message;
+    const ownsSavedTrial = receipt.mode === 'promote_attempt' && receipt.status === 'succeeded'
+      && message.artifacts.some(item => item.attemptId === receipt.attemptId);
+    if (!ownsProposal && !ownsReceipt && !ownsSavedTrial) return message;
     const artifacts = message.artifacts.filter(item => item.id !== receipt.id).map(item => {
       if (ownsProposal && item.id === receipt.proposalId && proposalStatus) return { ...item, status: proposalStatus };
       if (receipt.mode === 'promote_attempt' && receipt.status === 'succeeded' && item.attemptId === receipt.attemptId) return { ...item, promoteAvailable: false };
