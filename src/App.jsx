@@ -84,16 +84,16 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
   });
 
-  // First-bean celebration: fires once when user goes from 0 beans to >= 1
+  // First-bean celebration: loading existing inventory is not an addition.
   const [firstBeanCelebrating, setFirstBeanCelebrating] = useState(false);
-  const prevBeanCountRef = useRef(beans.length);
+  const prevBeanCountRef = useRef(null);
   useEffect(() => {
     const prev = prevBeanCountRef.current;
-    prevBeanCountRef.current = beans.length;
-    if (prev === 0 && beans.length > 0) {
+    prevBeanCountRef.current = dataLoaded ? { uid, count: beans.length } : null;
+    if (dataLoaded && prev && prev.uid === uid && prev.count === 0 && beans.length > 0) {
       setFirstBeanCelebrating(true);
     }
-  }, [beans.length]);
+  }, [beans.length, dataLoaded, uid]);
 
   const handleStartTastingSession = (beanId, attemptId = null) => {
     if (!beanId) return;
