@@ -2,6 +2,34 @@
 
 ## Current acceptance — September 6 UX follow-up
 
+### Latest narrow end-to-end journey
+
+`conversation-eval/u3-action-check-1788760560189/report.json` passed the
+supplemental owner-reported thin/clean Kalita journey: live replies, immediate
+proposal after "Ok can we update the recipe?", real authenticated browser card,
+Update button, canonical recipe readback, idempotent replay, and cleanup Undo.
+All three deterministic turn grades passed. The browser restored the actual
+live transcript/proposal after API-driven conversation; it did not type those
+three turns or prove native-phone interaction. The changed water was 250g to
+225g with dose/grind preserved. This is a supplemental journey, not a replacement
+for the frozen full U3 gate. C9 now recognizes an explicit recipe-update request
+as agreement after substantive advice, with positive/negative regressions.
+
+The rendered receipt exposed confusing completion copy; it now says "Recipe
+updated" and "Your saved recipe is ready for your next brew." Applied proposals
+say "Saved to your recipe." The component harness passed mobile/desktop with
+the new receipt assertion. Focused conversation/session/artifact/action tests
+passed 53/53; targeted lint, build, and diff check passed. AI spend is
+$28.009070 total, reserved zero; the $30 ceiling remains unchanged.
+
+Simulator automation architecture was diagnosed: the installed Homebrew CLI
+embeds an x86_64 Node runtime. Invoking its CLI with the installed ARM Node and
+an isolated daemon socket restored semantic home-screen snapshots. Build/run of
+the current Dev native assets succeeded on the iPhone 17 Pro simulator, process
+41601, and screenshot confirmed the normal sign-in screen. The app's WebView
+still exposes no actionable semantic targets in that snapshot, and no supported
+fixture login was completed there. Do not claim native authenticated acceptance.
+
 ### Session-write correction — approved and deployed to isolated Dev
 
 After explicit owner approval, the narrow chatSessions rules correction was
@@ -10,6 +38,8 @@ byte-identical to the local baseline, ruleset
 `f6d7b983-f131-49a3-8b52-ba662cbd6559`, before deployment. The change accepts
 normalized Agent metadata and nullable context, preserves the legacy message
 limit, and retains ownership and server-only recipe/action authority.
+Deployed ruleset `820f23bc-c375-4a93-a48c-f03198fa6542` was independently read
+back and matched the emulator-tested source exactly.
 
 The local Firestore emulator executed the actual normalized-session and New chat
 payloads successfully, including server readback. Negative probes rejected other

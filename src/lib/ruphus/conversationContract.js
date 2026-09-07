@@ -224,7 +224,7 @@ export function gradeC9ProposalTiming({ reply = '', frames = [], priorReplies = 
   if (PROPOSAL_SHAPE.test(value) || JSON_SHAPE.test(value)) result.push(violation('CF6_PROPOSAL_PROSE', CATEGORIES.CATASTROPHIC, 'proposal is rendered in prose', { runtime: true }));
   if (!hasProposal) return result;
   const substantive = Array.isArray(priorReplies) && priorReplies.some((item) => words(item?.reply ?? item?.text ?? item).length >= 8);
-  const agreement = /\b(?:change|do it|yes|agree|try that|make that|go ahead)\b/i.test(textOf(userTurn));
+  const agreement = /\b(?:change|do it|yes|agree|try that|make that|go ahead|update (?:the |my |this |our )?recipe)\b/i.test(textOf(userTurn));
   if (!substantive || !agreement) result.push(violation('C9_PREMATURE_PROPOSAL', CATEGORIES.ORDINARY, 'proposal appeared before diagnosis and agreement'));
   return result;
 }

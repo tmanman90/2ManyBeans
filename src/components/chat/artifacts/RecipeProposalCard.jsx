@@ -26,6 +26,7 @@ export function RecipeProposalCard({ proposal = {}, onAction, actionPending = fa
   const allowedActions = new Set(Array.isArray(proposal.actions) ? proposal.actions : []);
   const showActions = proposal.status === 'proposed' && Boolean(onAction) && allowedActions.size > 0;
   const steps = [...(after.prepSteps || []), ...(after.steps || []), ...(after.postBrewSteps || [])];
+  const completedMessage = { applied: 'Saved to your recipe.', kept: 'Your saved recipe is unchanged.', attempt_created: 'Ready for one brew. Your saved recipe is unchanged.' }[status];
   return <section aria-label={`${proposal.coffeeName || 'Coffee'} recipe change`} data-artifact="recipe_proposal" data-status={status} style={{ width: '100%', boxSizing: 'border-box', padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={{ color: C.textMuted, marginBottom: 6 }}>{[proposal.coffeeName, brewerName(proposal.slotKey, after)].filter(Boolean).join(' · ')}</div>
     <div style={typeScale.h3}>Your next recipe</div>
@@ -35,6 +36,6 @@ export function RecipeProposalCard({ proposal = {}, onAction, actionPending = fa
     {showActions && <div data-proposal-actions="true" style={{ display: 'grid', gap: 8, marginTop: 12 }}>
       {ACTIONS.filter(({ mode }) => allowedActions.has(mode)).map(({ mode, label }) => <ArtifactAction key={mode} action={mode} label={label} status={status} disabled={actionPending} onClick={() => onAction({ mode, artifact: proposal })} />)}
     </div>}
-    <p aria-live="polite" style={{ color: C.textMuted, margin: '12px 0 0', lineHeight: 1.5 }}>{actionPending ? 'Working on your choice…' : status === 'proposed' ? showActions ? 'Your saved recipe is unchanged until you choose.' : 'This suggestion can’t be saved from this chat right now. Your recipe is unchanged.' : status === 'stale' || status === 'superseded' ? 'This suggestion is out of date. Ask Ruphus for a fresh one.' : 'This suggestion is no longer open.'}</p>
+    <p aria-live="polite" style={{ color: C.textMuted, margin: '12px 0 0', lineHeight: 1.5 }}>{actionPending ? 'Working on your choice…' : status === 'proposed' ? showActions ? 'Your saved recipe is unchanged until you choose.' : 'This suggestion can’t be saved from this chat right now. Your recipe is unchanged.' : completedMessage || (status === 'stale' || status === 'superseded' ? 'This suggestion is out of date. Ask Ruphus for a fresh one.' : 'This suggestion is no longer open.')}</p>
   </section>;
 }

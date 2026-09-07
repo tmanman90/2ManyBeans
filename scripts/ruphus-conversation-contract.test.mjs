@@ -173,6 +173,14 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: "Nothing obviously alarming from the brew log alone. I couldn't check tasting notes.", readWindow: { days: 14 }, evidence: { records: [{}], unavailable: ['tastings'] } }).length, 0);
 });
 
+test('recipe update request accepts an earned card without requiring another yes', () => {
+  const frames = [{ type: 'artifact_ready', artifact: { type: 'recipe_proposal' } }];
+  const priorReplies = [{ reply: 'For the thin but clean Kalita, reduce water by 20g and keep dose and grind unchanged.' }];
+  assert.deepEqual(gradeC9ProposalTiming({ reply: 'Prepared for review.', frames, priorReplies, userTurn: 'Ok can we update the recipe?' }), []);
+  assert.ok(gradeC9ProposalTiming({ frames, priorReplies: [], userTurn: 'Ok can we update the recipe?' }).some(item => item.code === 'C9_PREMATURE_PROPOSAL'));
+  assert.ok(gradeC9ProposalTiming({ frames, priorReplies, userTurn: 'What do you think?' }).some(item => item.code === 'C9_PREMATURE_PROPOSAL'));
+});
+
 test('runtime predicate is only the RT2 subset', () => {
   assert.ok(runtimeTriggers({ reply: `${'coffee '.repeat(161)}brew.` }).some((item) => item.code === 'RT2_LENGTH'));
   assert.ok(runtimeTriggers({ reply: 'Proposal: {"dose":16}.' }).length > 0);

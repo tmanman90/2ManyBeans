@@ -15,7 +15,7 @@ const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
 const mode = process.argv[3] || 'action';
-assert.ok(['action', 'smoke', 'full', 'ui', 'ui-action', 'ui-session'].includes(mode), 'Expected action, smoke, full, ui, ui-action or ui-session');
+assert.ok(['action', 'action-thin', 'smoke', 'full', 'ui', 'ui-action', 'ui-session'].includes(mode), 'Expected action, action-thin, smoke, full, ui, ui-action or ui-session');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -133,7 +133,14 @@ try {
     return request(`${base}/${child}/${id}`, { method: 'PATCH', body: encode(value).mapValue });
   } }) }) }) }) };
   const { account, cases } = await loadFixtureManifest();
-  const fixture = cases.cases.find(item => item.id === 'AE05');
+  const fixture = structuredClone(cases.cases.find(item => item.id === 'AE05'));
+  if (mode === 'action-thin') {
+    // Supplemental owner-reported journey, not a change to the frozen U3 golds.
+    fixture.id = 'UX-thin-kalita';
+    fixture.turns = ['I did the Kalita 155 recipe but it felt watered down.', 'Thin, but sweet and clean. Not sour.', 'Ok can we update the recipe?'];
+    fixture.branches = [{ when: 'thin|sour|sharp|muted|sweet', answer: fixture.turns[1] }];
+    report.supplementalOwnerJourney = true;
+  }
   const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
   if (mode === 'ui' || mode === 'ui-action' || mode === 'ui-session') {
     report.stage = 'authenticated_browser_entry';
@@ -213,17 +220,44 @@ try {
   const artifact = report.conversation.results.flatMap(turn => turn.frames || []).find(frame => frame.type === 'artifact_ready' && frame.artifact?.type === 'recipe_proposal')?.artifact;
   assert.ok(artifact, 'Live conversation must produce a native proposal');
   assert.ok(artifact.actions?.includes('apply_proposal'), 'Live proposal must enable Apply');
+  if (mode === 'action-thin') {
+    assert.ok(artifact.after.waterGrams < artifact.before.waterGrams, 'Thin clean cup must receive the discussed lower-water proposal');
+    assert.equal(artifact.after.coffeeGrams, artifact.before.coffeeGrams);
+    assert.deepEqual(artifact.after.grindSize, artifact.before.grindSize);
+    assert.equal(report.conversation.results.length, 3, 'Update request must produce the card without another yes loop');
+  }
   assert.equal(recipeHash(await savedRecipe()), recipeHash(before), 'Proposal must not change the saved recipe');
   const command = body => request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body });
   const { request: apply } = resolveRuphusActionRequest({ uid, mode: 'apply_proposal', artifact });
+  let acceptedApply = apply;
   let applied;
   try {
     report.stage = 'apply';
-    applied = await command(apply);
+    if (mode === 'action-thin') {
+      report.stage = 'live_proposal_browser';
+      const transcript = report.conversation.results.at(-1).transcript;
+      await request(`${base}/chatSessions/active`, { method: 'PATCH', body: encode(normalizeAgentSession({
+        messages: transcript.map((message, index) => ({ ...message, id: `${runId}-message-${index}`, createdAt: Date.now(),
+          ...(index === transcript.length - 1 ? { turnId: `${runId}-proposal`, artifacts: [artifact] } : {}) })),
+      })).mapValue });
+      const { checkAuthenticatedDevEntry } = await import('./ruphus-dev-browser-check.mjs');
+      const keys = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID', 'VITE_RUPHUS_AGENT_V3_MUTATION_UIDS'];
+      report.ui = await checkAuthenticatedDevEntry({
+        config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid,
+        savedAction: { command: async body => {
+          assert.equal(body.mode, 'apply_proposal');
+          assert.equal(body.proposalId, artifact.id);
+          acceptedApply = body;
+          applied = await command(body);
+          return applied;
+        }, verify: async () => assert.equal(recipeHash(await savedRecipe()), recipeHash(artifact.after)) },
+      });
+      assert.ok(report.ui.passed, 'Fresh live proposal must render and apply through the actual browser UI');
+    } else applied = await command(apply);
     report.applied = applied.receipt?.status === 'succeeded';
     assert.equal(recipeHash(await savedRecipe()), recipeHash(artifact.after), 'Canonical readback must match proposal');
     report.canonicalReadback = true;
-    assert.equal((await command(apply)).revision.id, applied.revision.id, 'Replay must preserve revision identity');
+    assert.equal((await command(acceptedApply)).revision.id, applied.revision.id, 'Replay must preserve revision identity');
     report.idempotentReplay = true;
   } finally {
     if (applied?.revision?.id) {
