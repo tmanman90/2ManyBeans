@@ -10,7 +10,7 @@ import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { normalizeAgentSession } from '../src/lib/ruphus/session.js';
-import { configuredCallMaximum, endpointCallMultiplier, runLiveEndpointTurn } from './ruphus-conversation-runner.mjs';
+import { configuredCallMaximum, endpointCallMultiplier, runLiveEndpointTurn, U3_TOTAL_LIVE_COST_CAP_USD } from './ruphus-conversation-runner.mjs';
 import { priceUsage } from '../api/_lib/modelPricing.js';
 import { RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
 
@@ -162,7 +162,7 @@ try {
     if (mode === 'ui-conversation' || mode === 'ui-trial') {
       await reset({ fixture: { ...fixture, session: null }, stage: 'typed-browser', repetition: 1 });
       const prior = await loadCumulativeCostLedger(ledgerPath);
-      const guard = createCostGuard(30, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
+      const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
       report.typedTurns = [];
       liveConversation = {
         trialJourney: mode === 'ui-trial',
@@ -274,7 +274,7 @@ try {
       await request(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}`, { method: 'PATCH', body: encode(data).mapValue });
     } });
     report.stage = `live_${mode}`;
-    const smoke = await runLiveStage({ stage: mode, endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costCapUsd: 30, commit: report.commit, resetSession: reset, judge, pairwise: judge, ledger: await loadSmokeLedger(`${directory}/smoke-ledger.json`) });
+    const smoke = await runLiveStage({ stage: mode, endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costCapUsd: U3_TOTAL_LIVE_COST_CAP_USD, commit: report.commit, resetSession: reset, judge, pairwise: judge, ledger: await loadSmokeLedger(`${directory}/smoke-ledger.json`) });
     report[mode] = smoke;
     report.cumulativeCostUsd = smoke.cumulativeCostUsd;
     report.passed = smoke.passed;
@@ -283,7 +283,7 @@ try {
   report.stage = 'fixture_session_reset';
   await reset({ fixture, stage: 'action-acceptance', repetition: 1 });
   const prior = await loadCumulativeCostLedger(ledgerPath);
-  const guard = createCostGuard(30, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
+  const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
   report.stage = 'live_conversation';
   report.conversation = await runLiveCase(account, fixture, { endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costGuard: guard, stageRunId: runId });
   report.cumulativeCostUsd = guard.spentUsd;

@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
+import { loadFixtureManifest, U3_TOTAL_LIVE_COST_CAP_USD } from './ruphus-conversation-runner.mjs';
 import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
@@ -96,6 +96,15 @@ test('judge transcript includes the visible proposal card without internal ident
   });
   assert.match(visible.at(-1).text, /Visible recipe proposal card: Kalita recipe; grind 4\.2 to 4\.0; ready to review, not applied/);
   assert.doesNotMatch(JSON.stringify(visible), /private-id/);
+});
+
+test('authorized $35 total retains prior spend and refuses overspend', () => {
+  assert.equal(U3_TOTAL_LIVE_COST_CAP_USD, 35);
+  const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: 28.066506 });
+  assert.ok(Math.abs(guard.remainingUsd - 6.933494) < 1e-9);
+  guard.reserveMaximum(2.009);
+  assert.throws(() => guard.reserveMaximum(5), /cost cap/);
+  assert.equal(guard.spentUsd, 28.066506);
 });
 
 test('U3 cost cap is explicit and hard-stops before overspend', () => {
