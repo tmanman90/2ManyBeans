@@ -213,8 +213,8 @@ test('opening and lifecycle captions stay truthful and machine-free', () => {
 test('fixture account and exact fourteen-case manifest are hashed and classified', async () => {
   const { account, cases } = await loadFixtureManifest();
   assertFixtureIntegrity(account, cases);
-  assert.equal(cases.cases.length, 14);
-  assert.equal(cases.cases.filter((item) => item.critical).length, 11);
+  assert.equal(cases.cases.length, 15);
+  assert.equal(cases.cases.filter((item) => item.critical).length, 12);
   assert.match(fixtureFactSheet(account), /El Vergel/);
   const tampered = structuredClone(account); tampered.coffees[0].name = 'Tampered';
   assert.throws(() => assertFixtureIntegrity(tampered, cases), /hash mismatch/);
@@ -225,7 +225,7 @@ test('gold transcripts pass and known-bad transcripts reproduce named old dogfoo
   const names = {
     AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask',
     AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage',
-    AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew',
+    AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew', AE15: 'AE15-trial-return',
   };
   const focus = { AE01: ['El Vergel'], AE10: ['El Vergel'], AE14: [] };
   for (const fixture of cases.cases.filter((item) => item.critical)) {
@@ -244,7 +244,10 @@ test('gold transcripts pass and known-bad transcripts reproduce named old dogfoo
     const bad = await loadTranscript(join(FIXTURE_ROOT, 'known-bad', `${names[fixture.id]}.md`));
     const badText = bad.filter((item) => item.role === 'assistant').map((item) => item.text).join(' ');
     const badResult = gradeReply({ reply: badText, userTurn: fixture.turns.at(-1), ledger: { dose: 15, grind: 'Ode 4.2', method: 'hot V60', tasting: 'thin' }, readWindow: { days: 14 }, evidence: { tastings: [{ id: 'older' }] }, focusChanged: Boolean(focus[fixture.id]?.length), coffeeName: focus[fixture.id]?.[0] });
-    assert.ok(badResult.violations.length > 0, `${fixture.id} known-bad must fail`);
+    if (fixture.id === 'AE15') {
+      const { gradeTrialRecovery } = await import('./ruphus-conversation-runner.mjs');
+      assert.equal(gradeTrialRecovery(fixture, [])[0].code, 'U3_TRIAL_CARD_MISSING');
+    } else assert.ok(badResult.violations.length > 0, `${fixture.id} known-bad must fail`);
   }
 });
 
@@ -263,7 +266,7 @@ test('injected runner is explicitly plumbing-only and executes all fourteen fixt
   const report = await runInjectedCorpus();
   assert.equal(report.mode, 'injected');
   assert.equal(report.label, 'plumbing only');
-  assert.equal(report.results.length, 14);
+  assert.equal(report.results.length, 15);
   assert.equal(report.passed, true);
 });
 

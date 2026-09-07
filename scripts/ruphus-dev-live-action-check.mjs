@@ -137,8 +137,11 @@ try {
     await request(`${base}/beans/fixture-colombia-other?updateMask.fieldPaths=handBrewRecipes.kalita`, { method: 'PATCH', body: encode({ handBrewRecipes: { kalita: before } }).mapValue });
   }
   const db = { collection: collection => ({ doc: owner => ({ collection: child => ({ doc: id => ({ set: async value => {
-    assert.ok(collection === 'users' && owner === uid && ((child === 'chatSessions' && id === 'active') || (child === 'rateLimits' && id === 'claude')));
+    assert.ok(collection === 'users' && owner === uid && ((child === 'chatSessions' && id === 'active') || (child === 'rateLimits' && id === 'claude') || (['brewAttempts', 'receipts'].includes(child) && /^fixture-trial-return(?:-older)?(?:-receipt)?$/.test(id))));
     return request(`${base}/${child}/${id}`, { method: 'PATCH', body: encode(value).mapValue });
+  }, delete: async () => {
+    assert.ok(collection === 'users' && owner === uid && child === 'brewAttempts' && /^fixture-trial-return(?:-older)?$/.test(id));
+    return request(`${base}/${child}/${id}`, { method: 'DELETE' });
   } }) }) }) }) };
   const { account, cases } = await loadFixtureManifest();
   const fixture = structuredClone(cases.cases.find(item => item.id === 'AE05'));

@@ -57,7 +57,7 @@ export function createBlindJudgePacket({ id, intent, factSheet, transcript, seed
 }
 
 export function createCalibrationPackets({ gold, knownBad, factSheet, seed = 'calibration' }) {
-  if (!Array.isArray(gold) || gold.length !== 11 || !Array.isArray(knownBad) || knownBad.length !== 11) throw new Error('calibration requires eleven gold and eleven known-bad packets');
+  if (!Array.isArray(gold) || gold.length < 11 || !Array.isArray(knownBad) || knownBad.length !== gold.length || new Set(gold.map(item => item.id)).size !== gold.length || !gold.every(item => knownBad.some(other => other.id === item.id))) throw new Error('calibration requires matched gold and known-bad packets for every critical fixture, including the eleven baseline cases');
   const source = [...(gold || []).map((item) => ({ ...item, calibration: 'gold' })), ...(knownBad || []).map((item) => ({ ...item, calibration: 'known-bad' }))];
   return deterministicOrder(source, seed).map((item) => createBlindJudgePacket({ ...item, id: `${item.id}:${item.calibration}`, seed }));
 }
@@ -67,7 +67,7 @@ export function assessCalibration({ goldResults, knownBadResults }) {
   const goldValues = (goldResults || []).map(unwrap); const knownBadValues = (knownBadResults || []).map(unwrap);
   const gold = goldValues.map((result) => validateJudgeResult(result));
   const knownBad = knownBadValues.map((result) => validateJudgeResult(result));
-  const valid = gold.length === 11 && knownBad.length === 11 && gold.every((result) => result.valid) && knownBad.every((result) => result.valid);
+  const valid = gold.length >= 11 && knownBad.length === gold.length && gold.every((result) => result.valid) && knownBad.every((result) => result.valid);
   const goldPass = valid && goldValues.every((result) => result.mean >= 4.5);
   const knownBadPass = valid && knownBadValues.every((result) => result.mean <= 2.5);
   return { calibrated: goldPass && knownBadPass, goldPass, knownBadPass, valid, errors: [...gold, ...knownBad].flatMap((result) => result.errors) };

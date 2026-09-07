@@ -32,7 +32,7 @@ export function fixtureHash(account) {
 }
 
 export function validateFixtureCase(fixture, ids = new Set()) {
-  if (!object(fixture) || typeof fixture.id !== 'string' || !/^AE(?:0[1-9]|1[0-4])$/.test(fixture.id)) throw new Error('fixture id must be AE01 through AE14');
+  if (!object(fixture) || typeof fixture.id !== 'string' || !/^AE(?:0[1-9]|[1-9]\d+)$/.test(fixture.id)) throw new Error('fixture id must be AE01 or a later numbered case');
   if (ids.has(fixture.id)) throw new Error(`duplicate fixture ${fixture.id}`);
   ids.add(fixture.id);
   if (typeof fixture.intent !== 'string' || !Array.isArray(fixture.turns) || fixture.turns.length === 0) throw new Error(`fixture ${fixture.id} requires intent and turns`);
@@ -50,9 +50,8 @@ export function assertFixtureIntegrity(account, cases) {
   if (cases.manifestHash !== expected) throw new Error('fixture cases manifest hash mismatch; bump manifest version and regenerate hash');
   const ids = new Set();
   for (const fixture of cases.cases) validateFixtureCase(fixture, ids);
-  if (ids.size !== 14 || !['AE01','AE02','AE03','AE04','AE05','AE06','AE07','AE08','AE09','AE10','AE11','AE12','AE13','AE14'].every((id) => ids.has(id))) throw new Error('fixture ids must be exactly AE01 through AE14');
-  const critical = cases.cases.filter((fixture) => fixture.critical);
-  if (critical.length !== 11 || cases.cases.filter((fixture) => !fixture.critical).length !== 3) throw new Error('fixture set must contain eleven critical and three supporting cases');
+  if (!Array.from({ length: ids.size }, (_, index) => `AE${String(index + 1).padStart(2, '0')}`).every(id => ids.has(id))) throw new Error('fixture ids must preserve the baseline and append consecutively');
+  if (cases.cases.some(fixture => (CRITICAL_FIXTURE_IDS.includes(fixture.id) && !fixture.critical) || (SUPPORTING_FIXTURE_IDS.includes(fixture.id) && fixture.critical))) throw new Error('baseline fixture classifications are frozen');
   return true;
 }
 
@@ -90,6 +89,7 @@ export function parseTranscript(markdown) {
 }
 
 function proposalCardSummary(artifact) {
+  if (artifact?.type === 'action_receipt' && artifact.mode === 'brew_once' && artifact.status === 'ready') return `Visible trial recipe card: ${artifact.title || 'trial recipe'}; ${artifact.recipe?.coffeeGrams} g coffee, ${artifact.recipe?.waterGrams} g water; Make this my recipe confirmation available; not saved.`;
   if (artifact?.type !== 'recipe_proposal') return null;
   const before = artifact.before || {}; const after = artifact.after || {};
   const beforeGrind = before.grindSize?.setting ?? before.grind ?? null;
@@ -201,13 +201,12 @@ export function stagePlan(stage, { fixtures, fixtureIds = [] } = {}) {
   if (!Object.hasOwn(U3_STAGE_RULES, stage) && stage !== 'targeted') throw new Error(`unknown U3 stage: ${stage}`);
   const source = Array.isArray(fixtures) ? fixtures : [];
   const byId = new Map(source.map((fixture) => [fixture.id, fixture]));
-  const critical = (ids) => ids.map((id) => byId.get(id)).filter(Boolean);
   const schedule = [];
   const add = (fixture, repeat, kind = stage) => { for (let index = 1; index <= repeat; index += 1) schedule.push({ fixtureId: fixture.id, critical: fixture.critical, repeat: index, kind }); };
-  if (stage === 'smoke') critical(CRITICAL_FIXTURE_IDS).forEach((fixture) => add(fixture, 1));
+  if (stage === 'smoke') source.filter(fixture => fixture.critical).forEach((fixture) => add(fixture, 1));
   if (stage === 'calibration' || stage === 'full') {
-    critical(CRITICAL_FIXTURE_IDS).forEach((fixture) => add(fixture, U3_STAGE_RULES[stage].criticalRuns));
-    critical(SUPPORTING_FIXTURE_IDS).forEach((fixture) => add(fixture, U3_STAGE_RULES[stage].supportingRuns));
+    source.filter(fixture => fixture.critical).forEach((fixture) => add(fixture, U3_STAGE_RULES[stage].criticalRuns));
+    source.filter(fixture => !fixture.critical).forEach((fixture) => add(fixture, U3_STAGE_RULES[stage].supportingRuns));
   }
   if (stage === 'targeted') {
     if (!fixtureIds.length) throw new Error('targeted stage requires named fixture IDs');
@@ -359,12 +358,26 @@ export function fixturePass(results, { critical = true } = {}) {
   return clean >= 4 && judgePasses >= 4 && pairwiseWins === results.length;
 }
 
-export function fullStagePass(results) {
+export function fullStagePass(results, { fixtures = null } = {}) {
   const clean = results.filter((result) => !result.grader?.catastrophic?.length && !result.grader?.ordinary?.length).length;
   const byFixture = new Map();
   for (const result of results) byFixture.set(result.fixtureId, [...(byFixture.get(result.fixtureId) || []), result]);
   const fixtureResultsPass = [...byFixture.values()].every((runs) => fixturePass(runs, { critical: runs[0]?.critical !== false }));
-  return results.every((result) => !(result.grader?.catastrophic?.length)) && clean >= 58 && fixtureResultsPass;
+  const baselinePresent = [...CRITICAL_FIXTURE_IDS, ...SUPPORTING_FIXTURE_IDS].every(id => byFixture.has(id));
+  const allExpectedPresent = !fixtures || (byFixture.size === fixtures.length && fixtures.every(fixture => byFixture.has(fixture.id) && byFixture.get(fixture.id).every(run => run.critical === fixture.critical)));
+  const completeCadence = [...byFixture.values()].every(runs => runs.length === (runs[0]?.critical !== false ? 5 : 3));
+  // Preserve the original 58/64 allowance as the suite grows under R29.
+  return baselinePresent && allExpectedPresent && completeCadence && results.every((result) => !(result.grader?.catastrophic?.length)) && clean >= results.length - (64 - 58) && fixtureResultsPass;
+}
+
+export function gradeTrialRecovery(fixture, frames = []) {
+  if (!fixture.trialRecovery) return [];
+  const { coffeeId, slotKey, attemptId, waterGrams } = fixture.trialRecovery;
+  const cards = frames.filter(frame => frame.type === 'artifact_ready').map(frame => frame.artifact);
+  const card = cards.find(item => item?.type === 'action_receipt' && item.mode === 'brew_once');
+  if (!card) return [{ code: 'U3_TRIAL_CARD_MISSING', category: 'ordinary', message: 'permanent-save request did not recover a trial confirmation card' }];
+  if (card.coffeeId !== coffeeId || card.slotKey !== slotKey || card.attemptId !== attemptId || card.recipe?.waterGrams !== waterGrams) return [{ code: 'U3_WRONG_TRIAL', category: 'catastrophic', message: 'recovered card is not the exact trial requested' }];
+  return card.status === 'ready' && card.promoteAvailable === true ? [] : [{ code: 'U3_TRIAL_SAVE_UNAVAILABLE', category: 'ordinary', message: 'recovered trial has no usable save confirmation' }];
 }
 
 export function targetedStagePass(results, fixtureIds) {
@@ -373,8 +386,8 @@ export function targetedStagePass(results, fixtureIds) {
   return smokeIsClean(smoke) && [...named.values()].every((runs) => runs.length > 0 && fixturePass(runs, { critical: runs[0].critical !== false }));
 }
 
-export function canStartFull(ledger, commit) {
-  const smokes = (Array.isArray(ledger) ? ledger : []).filter((entry) => entry.stage === 'smoke' && entry.commit === commit);
+export function canStartFull(ledger, commit, manifestHash = null) {
+  const smokes = (Array.isArray(ledger) ? ledger : []).filter((entry) => entry.stage === 'smoke' && entry.commit === commit && (!manifestHash || entry.manifestHash === manifestHash));
   const lastTwo = smokes.slice(-2);
   return lastTwo.length === 2 && lastTwo.every((entry) => entry.clean === true);
 }
@@ -391,7 +404,7 @@ export async function appendSmokeLedger(path, entry) {
   let entries = [];
   try { entries = JSON.parse(await readFile(path, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (!Array.isArray(entries)) throw new Error('smoke ledger must be a JSON array');
-  entries.push({ stage: 'smoke', commit: String(entry.commit || ''), clean: entry.clean === true, recordedAt: entry.recordedAt || new Date().toISOString() });
+  entries.push({ stage: 'smoke', commit: String(entry.commit || ''), manifestHash: entry.manifestHash || null, clean: entry.clean === true, recordedAt: entry.recordedAt || new Date().toISOString() });
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
   return entries;
@@ -621,6 +634,7 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const gradedEvidence = compositeEvidence ? { ...compositeEvidence, records: toolFrames } : { records: toolFrames };
     const gradedWindow = compositeEvidence ? (compositeEvidence.windowDays == null ? null : { days: compositeEvidence.windowDays }) : { days: 14 };
     const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: gradedWindow, evidence: gradedEvidence, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
+    for (const violation of gradeTrialRecovery(fixture, result.frames)) grader[violation.category].push(violation);
     const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
     const priorEvidenceBeforeHistory = results.some((item) => item.evidenceBeforeHistory === true);
     const seededSessionEvidence = index === 0 && Array.isArray(fixture.session?.ledger?.entries) && fixture.session.ledger.entries.length > 0;
@@ -655,12 +669,12 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   const cap = validateCostCap(costCapUsd);
   if (cap > U3_TOTAL_LIVE_COST_CAP_USD) throw new Error(`U3 live cost cap cannot exceed the authorized cumulative $${U3_TOTAL_LIVE_COST_CAP_USD} ceiling`);
   if (typeof resetSession !== 'function') throw new Error('live U3 stage requires a Dev session reset adapter');
-  if (stage === 'full' && !canStartFull(ledger, commit)) throw new Error('full U3 stage requires two consecutive clean smokes on the same commit');
   if (stage !== 'smoke' && (typeof judge !== 'function' || judge.modelFamily === 'openai')) throw new Error(`${stage} U3 stage requires the calibrated different-model-family judge`);
   if ((stage === 'full' || stage === 'targeted') && typeof pairwise !== 'function') throw new Error(`${stage} U3 stage requires a blind pairwise judge`);
   const { account, cases } = await loadFixtureManifest(root);
+  if (stage === 'full' && !canStartFull(ledger, commit, account.manifestHash)) throw new Error('full U3 stage requires two consecutive clean smokes on the same commit and fixture manifest');
   const schedule = stagePlan(stage, { fixtures: cases.cases, fixtureIds });
-  const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew' };
+  const names = { AE01: 'AE01-aiden-jar1', AE02: 'AE02-el-virgil', AE03: 'AE03-method-infer', AE04: 'AE04-method-ask', AE05: 'AE05-watery-kalita', AE06: 'AE06-false-no-tastings', AE07: 'AE07-stale-session', AE08: 'AE08-reader-outage', AE09: 'AE09-proposal-timing', AE10: 'AE10-pronouns', AE14: 'AE14-launch-hint-vs-brew', AE15: 'AE15-trial-return' };
   const priorCost = await loadCumulativeCostLedger(costLedgerPath);
   const persistCost = (value) => persistCumulativeCostLedger(costLedgerPath, value);
   const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: priorCost.spentUsd, initialReservedUsd: priorCost.reservedUsd, persist: persistCost });
@@ -729,10 +743,10 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   const readRoundMs = { p50: percentile(readValues, 0.5), p90: percentile(readValues, 0.9) };
   const latency = { checkedReplyMs, readRoundMs, budget: { checkedReplyP50: checkedReplyMs.p50 == null || checkedReplyMs.p50 <= 8000, checkedReplyP90: checkedReplyMs.p90 == null || checkedReplyMs.p90 <= 15000, readRoundP90: readRoundMs.p90 == null || readRoundMs.p90 <= 1500 } };
   latency.passed = Object.values(latency.budget).every(Boolean);
-  const stageResult = stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results);
+  const stageResult = stage === 'calibration' ? false : stage === 'full' ? fullStagePass(results, { fixtures: cases.cases }) : stage === 'targeted' ? targetedStagePass(results, fixtureIds) : smokeIsClean(results);
   const report = { stage, commit, manifestVersion: account.manifestVersion, manifestHash: account.manifestHash, calibration: stage === 'smoke' ? null : { ...calibration, records: calibrationRecords }, judge: { records: judgeRecords }, pairwise: { records: pairwiseRecords }, latency, ordinaryFailures: latency.passed ? [] : ['U3_LATENCY_BUDGET'], results, costUsd: guard.spentUsd - startingSpentUsd, cumulativeCostUsd: guard.spentUsd, clean: smokeIsClean(results), passed: stageResult && latency.passed };
   if (artifactDirectory) await persistRunArtifact(artifactDirectory, report);
-  if (stage === 'smoke' && smokeLedgerPath) await appendSmokeLedger(smokeLedgerPath, { commit, clean: report.clean });
+  if (stage === 'smoke' && smokeLedgerPath) await appendSmokeLedger(smokeLedgerPath, { commit, manifestHash: account.manifestHash, clean: report.clean });
   return report;
 }
 

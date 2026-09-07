@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadFixtureManifest, U3_TOTAL_LIVE_COST_CAP_USD } from './ruphus-conversation-runner.mjs';
+import { gradeTrialRecovery, loadFixtureManifest, U3_TOTAL_LIVE_COST_CAP_USD } from './ruphus-conversation-runner.mjs';
 import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
@@ -22,6 +22,20 @@ const validJudgment = () => ({
   },
   mean: 5,
   rationale: 'Good conversation.',
+});
+
+test('owner trial regression requires its exact actionable card, not reassuring prose', async () => {
+  const { cases } = await loadFixtureManifest();
+  const fixture = cases.cases.find(item => item.id === 'AE15');
+  const artifact = { type: 'action_receipt', mode: 'brew_once', status: 'ready', promoteAvailable: true, ...fixture.trialRecovery, recipe: { coffeeGrams: 15, waterGrams: 240 } };
+  const frames = [{ type: 'artifact_ready', artifact }];
+  assert.deepEqual(gradeTrialRecovery(fixture, frames), []);
+  assert.equal(gradeTrialRecovery(fixture, [])[0].code, 'U3_TRIAL_CARD_MISSING');
+  assert.equal(gradeTrialRecovery(fixture, [{ type: 'artifact_ready', artifact: { ...artifact, attemptId: 'older' } }])[0].category, 'catastrophic');
+  assert.equal(gradeTrialRecovery(fixture, [{ type: 'artifact_ready', artifact: { ...artifact, promoteAvailable: false } }])[0].code, 'U3_TRIAL_SAVE_UNAVAILABLE');
+  const old = [{ stage: 'smoke', commit: 'same', clean: true, manifestHash: 'old' }, { stage: 'smoke', commit: 'same', clean: true, manifestHash: 'old' }];
+  assert.equal(canStartFull(old, 'same', 'new'), false);
+  assert.match(judgeVisibleTranscript({ transcript: [{ role: 'assistant', text: 'Ready to review.' }], results: [{ frames }] }).at(-1).text, /240 g water.*Make this my recipe/);
 });
 
 test('blind fact sheet includes attempt notes visible to the candidate', async () => {
@@ -82,10 +96,10 @@ test('live CLI reaches fail-closed preflight without circular-import deadlock', 
 
 test('U3 stage denominators are frozen and targeted always appends smoke', async () => {
   const { cases } = await loadFixtureManifest();
-  assert.equal(stagePlan('smoke', { fixtures: cases.cases }).length, 11);
-  assert.equal(stagePlan('calibration', { fixtures: cases.cases }).length, 36);
-  assert.equal(stagePlan('full', { fixtures: cases.cases }).length, 64);
-  assert.equal(stagePlan('targeted', { fixtures: cases.cases, fixtureIds: ['AE05'] }).length, 16);
+  assert.equal(stagePlan('smoke', { fixtures: cases.cases }).length, 12);
+  assert.equal(stagePlan('calibration', { fixtures: cases.cases }).length, 39);
+  assert.equal(stagePlan('full', { fixtures: cases.cases }).length, 69);
+  assert.equal(stagePlan('targeted', { fixtures: cases.cases, fixtureIds: ['AE05'] }).length, 17);
   assert.throws(() => stagePlan('targeted', { fixtures: cases.cases }), /named fixture/);
 });
 
@@ -195,8 +209,8 @@ test('AE09 cannot skip the sensory answer by asking for proposal permission on t
 test('each injected fixture is reset before execution, including stale session metadata', async () => {
   const resets = [];
   const report = await runInjectedCorpus(undefined, { resetSession: async (input) => resets.push(input) });
-  assert.equal(report.results.length, 14);
-  assert.equal(resets.length, 14);
+  assert.equal(report.results.length, 15);
+  assert.equal(resets.length, 15);
   assert.equal(resets.find((entry) => entry.fixture.id === 'AE07').session.lastActivityOffsetDays, 14);
 });
 

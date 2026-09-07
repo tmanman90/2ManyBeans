@@ -361,7 +361,7 @@ export function fixtureManifestShape(account, cases) {
   const errors = [];
   if (!Number.isInteger(account.manifestVersion) || account.manifestVersion < 1) errors.push('account manifestVersion is required');
   if (cases.manifestVersion !== account.manifestVersion) errors.push('manifest versions differ');
-  if (!Array.isArray(cases.cases) || cases.cases.length !== 14) errors.push('exactly fourteen cases are required');
+  if (!Array.isArray(cases.cases) || cases.cases.length < 14) errors.push('the fourteen baseline cases are required');
   return { valid: errors.length === 0, errors };
 }
 

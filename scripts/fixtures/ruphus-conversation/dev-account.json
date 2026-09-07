@@ -1,6 +1,6 @@
 {
-  "manifestVersion": 2,
-  "manifestHash": "19ed5658dd50cadf",
+  "manifestVersion": 3,
+  "manifestHash": "f92486c57c9c0766",
   "account": "ruphus-dev-fixture",
   "setup": {"defaultMethod": "v60_hot", "grinder": "Ode 4.2", "units": "metric"},
   "sealedCounts": {"active": 4, "finished": 1, "sealed": 0},

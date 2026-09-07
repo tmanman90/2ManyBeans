@@ -3,6 +3,7 @@ import test from 'node:test';
 import { buildSeedPlan, assertDevTarget, createFirestoreSessionReset, executableFixtureRecipe, fixtureAttemptCleanup, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
 import { validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { buildProposal } from '../api/_lib/ruphusRepository.js';
+import { loadFixtureManifest } from './ruphus-conversation-runner.mjs';
 
 test('fixture seeding fails closed outside an explicitly authorized Dev target', () => {
   assert.throws(() => assertDevTarget({ projectId: 'coffee-prod', fixtureUid: 'fixture', authorized: true }), /non-Dev/);
@@ -87,4 +88,23 @@ test('each Dev fixture session reset also clears only the fake owner rate-limit 
   const session = writes.find(item => item.path.endsWith('/chatSessions/active')).data;
   assert.equal('u3Stage' in session, false, 'diagnostic metadata makes owner session writes fail rules');
   assert.equal('u3Repetition' in session, false);
+});
+
+test('trial-return reset binds current chat to its exact trial despite an older alternative', async () => {
+  const writes = [];
+  const removed = [];
+  const db = { collection: name => ({ doc: id => ({ collection: child => ({ doc: childId => ({ set: async data => writes.push({ path: `${name}/${id}/${child}/${childId}`, data }), delete: async () => removed.push(`${child}/${childId}`) }) }) }) }) };
+  const { cases } = await loadFixtureManifest();
+  const reset = await createFirestoreSessionReset({ projectId: 'coffee-dev', fixtureUid: 'fixture-account', db });
+  await reset({ fixture: cases.cases.find(item => item.id === 'AE15') });
+  const attempts = writes.filter(item => item.path.includes('/brewAttempts/'));
+  assert.deepEqual(attempts.map(item => item.data.snapshot.waterGrams), [235, 240]);
+  assert.ok(attempts.every(item => item.data.ownerId === 'fixture-account' && item.data.status === 'timer_started'));
+  const session = writes.find(item => item.path.endsWith('/chatSessions/active')).data;
+  const receipt = session.messages[0].artifacts[0];
+  assert.equal(receipt.attemptId, 'fixture-trial-return');
+  assert.equal(writes.find(item => item.path.endsWith(`/receipts/${receipt.id}`)).data.ownerId, 'fixture-account');
+  assert.ok(writes.every(item => !item.path.includes('/beans/') && !item.path.includes('/recipeRevisions/')));
+  await reset({ fixture: cases.cases[0] });
+  assert.deepEqual(removed, ['brewAttempts/fixture-trial-return-older', 'brewAttempts/fixture-trial-return']);
 });

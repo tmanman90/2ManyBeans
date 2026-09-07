@@ -129,8 +129,27 @@ export async function createFirestoreSessionReset({ projectId, fixtureUid, db: p
     const app = getApps().find((candidate) => candidate.options.projectId === projectId) || initializeApp({ projectId }, `ruphus-u3-${fixtureUid}`);
     db = getFirestore(app);
   }
+  let priorTrialIds = [];
   return async ({ fixture, session = null } = {}) => {
     const now = Date.now();
+    for (const id of priorTrialIds) await db.collection('users').doc(fixtureUid).collection('brewAttempts').doc(id).delete();
+    priorTrialIds = [];
+    if (fixture?.trialRecovery) {
+      const { account } = await loadFixtureManifest();
+      const { coffeeId, slotKey, attemptId, waterGrams } = fixture.trialRecovery;
+      const original = account.recipes[`${coffeeId}:${slotKey}`];
+      if (!original) throw new Error('trial fixture must reference a frozen recipe');
+      const receiptId = `${attemptId}-receipt`;
+      const receipt = { id: receiptId, type: 'action_receipt', version: 1, status: 'succeeded', mode: 'brew_once', actionId: `${attemptId}-action`, attemptId, coffeeId, slotKey };
+      for (const [id, water] of [[`${attemptId}-older`, waterGrams - 5], [attemptId, waterGrams]]) {
+        const snapshot = executableFixtureRecipe({ ...original, water, ratio: `1:${water / original.dose}` }, slotKey);
+        await db.collection('users').doc(fixtureUid).collection('brewAttempts').doc(id).set({ id, ownerId: fixtureUid, coffeeId, slotKey, status: 'timer_started', proposalId: `${id}-proposal`, revisionId: `${coffeeId}:${slotKey}`, sourceHash: canonicalHash(executableFixtureRecipe(original, slotKey)), snapshot, createdAt: new Date(now).toISOString() });
+        await db.collection('users').doc(fixtureUid).collection('receipts').doc(`${id}-receipt`).set({ ...receipt, id: `${id}-receipt`, attemptId: id, actionId: `${id}-action`, ownerId: fixtureUid });
+        priorTrialIds.push(id);
+      }
+      session = { messages: [{ id: `${attemptId}-message`, role: 'assistant', text: 'Your one-brew Kalita trial is ready. Your saved recipe is unchanged.', createdAt: now - 1000, artifacts: [receipt] }], boundaryIndex: 0,
+        ledger: { version: 1, entries: [{ kind: 'coffee_focus', status: 'available', summary: 'Colombia La Esperanza is the current coffee.', namedCoffees: ['Colombia La Esperanza'] }], namedCoffees: ['Colombia La Esperanza'], bytes: 0 } };
+    }
     const ageDays = Number(session?.lastActivityOffsetDays) || 0;
     const storedMessages = Array.isArray(session?.messages) ? session.messages : [];
     const boundaryIndex = Number.isInteger(session?.boundaryIndex) ? session.boundaryIndex : 0;
