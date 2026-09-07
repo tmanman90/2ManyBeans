@@ -95,5 +95,7 @@ test('judge deterministically preserves the no-proposal default without hiding a
     const missed = await adapter({ transcript: [{ role: 'user', text: 'Go ahead and change it.' }, { role: 'assistant', text: 'Try one small step finer.' }] });
     assert.equal(missed.result.scores.proposalFeelsEarned, 3);
     assert.equal(missed.result.mean, 3.875);
+    const trial = await adapter({ transcript: [{ role: 'user', text: 'Can you make that trial recipe permanent?' }, { role: 'assistant', text: 'Reduce the water yourself.' }] });
+    assert.equal(trial.result.scores.proposalFeelsEarned, 3, 'a missing trial-save card must not get an automatic perfect score');
   } finally { if (prior === undefined) delete process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS; else process.env.RUPHUS_JUDGE_MAX_OUTPUT_TOKENS = prior; }
 });
