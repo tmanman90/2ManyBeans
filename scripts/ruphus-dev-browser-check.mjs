@@ -199,7 +199,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
         await recovered.getByRole('button', { name: 'Make this my recipe', exact: true }).click();
         await page.getByText('This trial is now your saved recipe.', { exact: true }).waitFor();
       } else await proposal.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
-      await page.locator('[data-artifact="action_receipt"][data-status="succeeded"]').waitFor();
+      if (!liveConversation?.trialJourney) await page.locator('[data-artifact="action_receipt"][data-status="succeeded"]').waitFor();
       await savedAction.verify();
       await page.screenshot({ path: '/tmp/ruphus-authenticated-saved.png', fullPage: false });
       if (liveConversation) {

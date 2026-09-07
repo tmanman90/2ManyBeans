@@ -68,6 +68,14 @@ No “ready” claim from compilation, injected model replies, or isolated compo
 
 ## Deferred
 
+### September 7 trial-return checkpoint — not Product PASS
+
+Authenticated typed browser acceptance at `u3-action-check-1788792835279/report.json` passes conversation → proposal → Brew once → timer → reload and fixture reauthentication → return → conversational trial recovery → permanent save → canonical readback → New chat boundary → Undo/readback. Backend preview is `https://twomanybeans-ruphus-auqzqpgbz-tmanman90s-projects.vercel.app` (Dev, READY, source ca78bb6); local rendered client also includes 0bcaf22. Test spend is $28.066506 cumulative of $30. This uses actual Firebase/provider/commands through an operator-guarded browser transport, not a scripted native-device pass.
+
+Root causes found: fixture seeding added u3Stage/u3Repetition fields disallowed by session rules, so client transcripts/cards were never saved; restored user turns used the assistant renderer; trial recovery lacked the active conversation's receipt reference. Seeder metadata removed without changing rules; receipt identity is server-revalidated, bounded to current chat, and never model write authority. Focused action/recovery/session/artifact matrix: 46/46. Rendered mobile/desktop harness and build pass. Reports/ledgers preserved unstaged.
+
+Remaining: polish long recovered-card layout (the expanded screenshot overlaps the composer), native verification/delivery of these changes, broader plan final gate and owner unscripted evidence. Do not ask the owner to retest this partial checkpoint or mark the goal complete.
+
 Voice, autonomous background changes, new external integrations, broad redesign of non-chat screens, and expanded hardware capabilities. Improve the supported experience before adding scope.
 
 ## Execution sequence
