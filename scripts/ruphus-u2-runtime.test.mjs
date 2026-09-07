@@ -60,10 +60,10 @@ test('locked method binding is injected after general setup and rejects another 
   assert.deepEqual(methodBindingTriggers({ reply: 'Use the Aiden recipe instead.', binding: { status: 'locked', slot: 'kalita_hot' } }).map((item) => item.code), ['RT6_METHOD_CONTRADICTION']);
   assert.deepEqual(methodBindingTriggers({ reply: 'For the Kalita, was it thin but clean or sour?', binding: { status: 'locked', slot: 'kalita_hot' } }), []);
 });
-test('tools expose only resolver, composite evidence, recipe, and proposal', async () => {
+test('tools expose reads, trial review, and proposal but no mutation', async () => {
   const calls = [];
   const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });
-  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
+  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'review_trial_recipe', 'propose_recipe_change']);
   const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
   assert.deepEqual(proposalSchema.properties.change.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
   assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);

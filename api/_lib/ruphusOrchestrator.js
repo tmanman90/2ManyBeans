@@ -6,7 +6,7 @@ import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
 
 const REPLACEMENT = 'I lost my train of thought there. Ask me that again and I’ll keep it short.';
-const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe']);
+const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'review_trial_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
   'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
@@ -186,6 +186,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
       if (proposed) { text += proposalHandoff(proposed.result.artifact); break; }
+      const recoveredTrial = results.find(item => item.name === 'review_trial_recipe' && item.result?.ok === true && item.result?.artifact);
+      if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
         response = await provider.runTurn({

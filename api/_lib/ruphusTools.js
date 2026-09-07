@@ -10,7 +10,7 @@ import { generateKalitaRecipe } from '../../src/lib/kalitaAdapter.js';
 import { generateKalitaIcedRecipe } from '../../src/lib/kalitaIcedAdapter.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 
-export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
+export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'review_trial_recipe', 'propose_recipe_change']);
 export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
 const nullable = (schema) => ({ anyOf: [schema, { type: 'null' }] });
 const strictObject = (properties) => ({ type: 'object', properties: Object.fromEntries(Object.entries(properties).map(([key, schema]) => [key, nullable(schema)])), required: Object.keys(properties), additionalProperties: false });
@@ -313,6 +313,18 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       return { ...publicEvidence(evidence), method, coffeeRef: args.coffeeRef };
     }
     const slotKey = args.slot || args.slotKey;
+    if (name === 'review_trial_recipe') {
+      if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
+      if (typeof readers.readAttempts !== 'function' || typeof readers.readTrialReceipt !== 'function') return { ok: false, message: 'I could not check your trial recipe right now.' };
+      const attempts = (await readers.readAttempts({ uid, coffeeId })).filter(item => item.ownerId === uid && item.coffeeId === coffeeId && item.slotKey === slotKey && item.proposalId && !item.promotedRevisionId && ['created', 'timer_started', 'profile_prepared', 'completed', 'tasted'].includes(item.status));
+      if (attempts.length !== 1) return { ok: false, message: attempts.length ? 'There is more than one trial for this recipe. Ask which brew date the user means; do not choose for them.' : 'There is no unsaved trial for this coffee and brewer that I can recover.' };
+      const attempt = attempts[0];
+      const savedReceipt = await readers.readTrialReceipt({ uid, attemptId: attempt.id });
+      if (!savedReceipt || savedReceipt.ownerId !== uid || savedReceipt.mode !== 'brew_once' || savedReceipt.attemptId !== attempt.id || savedReceipt.coffeeId !== coffeeId || savedReceipt.slotKey !== slotKey) return { ok: false, message: 'I could not recover the confirmation for this trial.' };
+      const coffeeName = snapshot.coffees?.find(item => item.refKey === args.coffeeRef)?.name || context.turnBinding?.coffeeName || 'This coffee';
+      const artifact = makeArtifact('action_receipt', { id: savedReceipt.id, status: 'ready', mode: 'brew_once', actionId: savedReceipt.actionId, attemptId: attempt.id, proposalId: attempt.proposalId, coffeeId, slotKey, revisionId: attempt.revisionId, sourceHash: attempt.sourceHash, promoteAvailable: proposalActions.includes('apply_proposal'), title: `${coffeeName} · ${displaySlot(slotKey)}`, message: 'Review your trial recipe below. Recovering this card does not change your saved recipe.', recipe: modelRecipe(attempt.snapshot) });
+      return { ok: true, summary: 'Recovered the existing trial. The save button requires the user’s tap; no recipe was changed.', artifact };
+    }
     if (name === 'read_recipe') {
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
@@ -355,6 +367,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, actions, ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}) }) };
   };
   const definitions = RUPHUS_READ_TOOL_NAMES.map((name) => {
+    if (name === 'review_trial_recipe') return { type: 'function', name, description: 'Recover an existing Brew once trial when the user asks to keep it, make it permanent, or save that trial. This reads the actual trial and displays its save control; it never saves or requires tasting. Use instead of generating a new recipe from conversation prose.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
     if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
     if (name === 'read_recipe') return { type: 'function', name, description: 'After explicit user agreement, read one exact recipe slot once immediately before a proposal. Do not use this during diagnosis because read_coffee_evidence already includes the recipe.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };

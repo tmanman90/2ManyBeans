@@ -141,6 +141,11 @@ function firestoreReaders(db) {
     },
     async readTastings({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('tastings').where('beanId', '==', coffeeId).get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
     readAttempts,
+    async readTrialReceipt({ uid, attemptId }) {
+      const results = await db.collection('users').doc(uid).collection('receipts').where('attemptId', '==', attemptId).get();
+      const receipts = results.docs.map(item => ({ id: item.id, ...item.data() })).filter(item => item.mode === 'brew_once');
+      return receipts.length === 1 ? receipts[0] : null;
+    },
     readBrews: readAttempts,
     async readSetup({ uid }) {
       const snap = await db.collection('users').doc(uid).get();
