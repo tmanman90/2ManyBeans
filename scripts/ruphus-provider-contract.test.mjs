@@ -1,6 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildOpenAIRequest, createOpenAIProvider, outputParts, RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
+import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
+
+test('provider instructions preserve partial sensory answers and evidence-backed brewer choices', async () => {
+  const requests = [];
+  const provider = createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: 1, client: { responses: { create: async (request) => {
+    requests.push(request);
+    return { id: 'sensory-guidance', model: RUPHUS_OPENAI_MODEL, output_text: '', output: [] };
+  } } } });
+  await provider.runTurn({ context: {}, userText: 'Thin', conversation: [
+    { role: 'user', content: 'I used the Kalita recipe and it felt watered down.' },
+    { role: 'assistant', content: 'Was it thin but sweet and clean, or sour and sharp?' },
+  ], tools: [] });
+  const instructions = requests[0].instructions;
+  assert.doesNotMatch(instructions, /ask whether they used Aiden, V60, or Kalita/i);
+  assert.match(instructions, /"thin" alone does not establish/i);
+  assert.match(instructions, /Treat a partial answer as partial/i);
+  assert.match(instructions, /do not promise that extraction will stay unchanged/i);
+  assert.equal(requests[0].input.at(-1).content, 'Thin');
+});
 
 test('OpenAI adapter is pinned, stateless, and provider-neutral', () => {
   const request = buildOpenAIRequest({ instructions: 'coach', input: [{ role: 'user', content: 'coffee' }], tools: [], maxOutputTokens: 1 });
