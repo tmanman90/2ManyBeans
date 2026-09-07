@@ -4,6 +4,18 @@
 
 ### Latest authenticated saved-proposal result
 
+Latest native follow-up: source `51e38e4` was copied through `cap:copy:dev`
+with managed isolated Firebase values and the verified `3fbme3ftj` preview.
+XcodeBuildMCP device build-and-run succeeded on the exact authorized phone
+`A34D2908-AC86-59E1-8172-A69FBE33FCFC`, launching process 13580. The built app
+was independently checked as `com.talmeltzer.coffeehub.dev`, `2manybeans Dev`,
+build 41, containing the isolated web Firebase project, preview URL, Ruphus and
+Update labels, updater autoUpdate=false and channel=dev. The native
+GoogleService-Info.plist is not present in the built bundle; the checked Firebase
+identity is the embedded web configuration. This is compile/install/launch and
+bundle proof only, not physical-device conversation acceptance. No Capgo
+upload or production operation was performed. Live spend remained $28.000296.
+
 After explicit owner approval to continue, the saved-proposal browser check
 passed: `conversation-eval/u3-action-check-1788758703256/report.json`.
 The real authenticated app restored an existing proposal, rendered its Update
