@@ -18,8 +18,8 @@ const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
 const mode = process.argv[3] || 'action';
-const uiMode = ['ui', 'ui-action', 'ui-session', 'ui-conversation'].includes(mode);
-assert.ok(['action', 'action-thin', 'smoke', 'full', 'ui', 'ui-action', 'ui-session', 'ui-conversation'].includes(mode), 'Unknown acceptance mode');
+const uiMode = ['ui', 'ui-action', 'ui-session', 'ui-conversation', 'ui-trial'].includes(mode);
+assert.ok(['action', 'action-thin', 'smoke', 'full', 'ui', 'ui-action', 'ui-session', 'ui-conversation', 'ui-trial'].includes(mode), 'Unknown acceptance mode');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -155,12 +155,13 @@ try {
     let appliedResult = null;
     let artifact = null;
     let liveConversation = null;
-    if (mode === 'ui-conversation') {
+    if (mode === 'ui-conversation' || mode === 'ui-trial') {
       await reset({ fixture: { ...fixture, session: null }, stage: 'typed-browser', repetition: 1 });
       const prior = await loadCumulativeCostLedger(ledgerPath);
       const guard = createCostGuard(30, { initialSpentUsd: prior.spentUsd, initialReservedUsd: prior.reservedUsd, persist: state => persistCumulativeCostLedger(ledgerPath, state) });
       report.typedTurns = [];
       liveConversation = {
+        trialJourney: mode === 'ui-trial',
         turns: ['My Colombia La Esperanza Kalita 155 recipe tasted watered down.', 'Thin, but sweet and clean. Not sour.', 'Ok can we update the recipe?'],
         dispatch: async payload => {
           assert.equal(payload.userText, liveConversation.turns[report.typedTurns.length], 'Only the scripted fixture turns may dispatch');
@@ -185,9 +186,21 @@ try {
           return result;
         },
       };
+      if (mode === 'ui-trial') liveConversation.turns.push('Can you make that trial recipe permanent?');
+      let trialResult = null;
       savedAction = {
         command: async body => {
           assert.ok(artifact, 'The live chat must create the proposal');
+          if (mode === 'ui-trial') {
+            assert.equal(body.coffeeId, artifact.coffeeId);
+            assert.equal(body.slotKey, artifact.slotKey);
+            assert.ok(['brew_once', 'timer_started', 'promote_attempt'].includes(body.mode));
+            if (body.mode !== 'brew_once') assert.equal(body.attemptId, trialResult?.attempt?.id);
+            const result = await request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body });
+            if (body.mode === 'brew_once') { trialResult = result; assert.equal(recipeHash(await savedRecipe()), recipeHash(before)); report.trialLeftSavedRecipeUnchanged = true; }
+            if (body.mode === 'promote_attempt') appliedResult = result;
+            return result;
+          }
           assert.equal(body.mode, 'apply_proposal');
           assert.equal(body.proposalId, artifact.id);
           assert.ok(artifact.after.coffeeGrams / artifact.after.waterGrams > artifact.before.coffeeGrams / artifact.before.waterGrams, 'Thin clean cup should receive the discussed strength adjustment');

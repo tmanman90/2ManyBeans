@@ -100,7 +100,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     await agentEntry.waitFor();
     if (liveConversation) {
       stage = 'typed_live_conversation';
-      for (const [index, message] of liveConversation.turns.entries()) {
+      for (const [index, message] of liveConversation.turns.slice(0, liveConversation.trialJourney ? 3 : undefined).entries()) {
         const input = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
         await input.fill(message);
         await input.press('Enter');
@@ -153,7 +153,25 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       stage = 'proposal_screenshot';
       await proposal.screenshot({ path: '/tmp/ruphus-authenticated-proposal.png' });
       stage = 'update_saved_recipe';
-      await proposal.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
+      if (liveConversation?.trialJourney) {
+        stage = 'try_once';
+        await proposal.getByRole('button', { name: 'Try for one brew', exact: true }).click();
+        await page.waitForFunction(() => document.body.innerText.includes('Ready for one brew') || document.body.innerText.includes('Brew once ready'));
+        await page.evaluate(async firestoreModule => { const { db } = await import('/src/firebase.js'); const { waitForPendingWrites } = await import(firestoreModule); await waitForPendingWrites(db); }, firestoreModule);
+        stage = 'return_after_trial';
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: 'Chat', exact: true }).click();
+        const input = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
+        await input.fill(liveConversation.turns[3]);
+        await input.press('Enter');
+        const recovered = page.locator('[data-artifact="action_receipt"][data-status="ready"]');
+        await recovered.waitFor({ timeout: 60000 });
+        await recovered.locator('summary').click();
+        assert.match(await recovered.innerText(), /Trial recipe/);
+        await recovered.screenshot({ path: '/tmp/ruphus-live-trial-review.png' });
+        await recovered.getByRole('button', { name: 'Make this my recipe', exact: true }).click();
+        await page.getByText('This trial is now your saved recipe.', { exact: true }).waitFor();
+      } else await proposal.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
       await page.locator('[data-artifact="action_receipt"][data-status="succeeded"]').waitFor();
       await savedAction.verify();
       await page.screenshot({ path: '/tmp/ruphus-authenticated-saved.png', fullPage: false });
