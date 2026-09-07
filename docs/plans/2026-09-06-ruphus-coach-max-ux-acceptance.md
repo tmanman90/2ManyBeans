@@ -76,6 +76,8 @@ Root causes found: fixture seeding added u3Stage/u3Repetition fields disallowed 
 
 Remaining: polish long recovered-card layout (the expanded screenshot overlaps the composer), native verification/delivery of these changes, broader plan final gate and owner unscripted evidence. Do not ask the owner to retest this partial checkpoint or mark the goal complete.
 
+Follow-up source 87d432f moves the trial-save action above expanded details, adds a 44px disclosure target and readable step spacing; mobile/desktop rendered harness passes with action-position assertions and inspected `/tmp/ruphus-trial-review-mobile.png`. Managed native assets verified Dev bundle, preview auqzqpgbz, Firebase twomanybeans-ruphus-dev, Ask label, trial-save label, autoUpdate false, defaultChannel dev. XcodeBuildMCP device build-and-run succeeded on exact authorized iPhone A34D2908-AC86-59E1-8172-A69FBE33FCFC; installed and launched com.talmeltzer.coffeehub.dev, display name 2manybeans Dev, process 16219. No uninstall or Capgo change. This is native delivery/launch evidence, not authenticated scripted native acceptance. Broader final gate and owner-only evidence remain outstanding.
+
 Voice, autonomous background changes, new external integrations, broad redesign of non-chat screens, and expanded hardware capabilities. Improve the supported experience before adding scope.
 
 ## Execution sequence
