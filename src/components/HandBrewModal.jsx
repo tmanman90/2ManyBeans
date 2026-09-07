@@ -424,7 +424,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 
 export const HandBrewModal = ({
   open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, icedUnsupported = false, onRetryIced, loading, error, phase, onRetry, onRegenerate,
-  extraFooter, bean, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onStartTasting, onOpenRuphus = null,
+  extraFooter, bean, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onStartTasting, onOpenRuphus = null, onDismissAttempt = null,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
 }) => {
@@ -1130,7 +1130,7 @@ export const HandBrewModal = ({
       attemptId={attemptId}
       revisionId={revisionId}
       onSaveTimingEvent={onSaveTimingEvent}
-      onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
+      onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); onDismissAttempt?.(attemptId); }}
       onStartTasting={(beanId) => {
         setTimerOpen(false);
         setTimerRecipeOverride(null);

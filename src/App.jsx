@@ -66,8 +66,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
   const [pendingTastingAttemptId, setPendingTastingAttemptId] = useState(null);
   const [ruphusLaunch, setRuphusLaunch] = useState(null);
-  const { attempt: ruphusAttemptRecord, put: putRuphusAttempt, update: updateRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
-  const ruphusAttempt = ruphusAttemptRecord?.stage === 'tasting' ? null : ruphusAttemptRecord;
+  const { attempt: ruphusAttemptRecord, put: putRuphusAttempt, update: updateRuphusAttempt, dismiss: dismissRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
+  const ruphusAttempt = ruphusAttemptRecord?.stage === 'tasting' || ruphusAttemptRecord?.stage === 'dismissed' ? null : ruphusAttemptRecord;
   // In-session tasting wizard draft. Kept above TastingTab so tab navigation
   // cannot discard an unfinished guided tasting; never persisted to Firebase.
   const [tastingWizardDraft, setTastingWizardDraft] = useState(() => ruphusAttemptRecord?.stage === 'tasting' ? ruphusAttemptRecord.draft || null : null);
@@ -320,6 +320,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
             onDemoAction={onDemoAction}
             onOpenRuphus={(contextRef, starterIntent) => openRuphus(contextRef, starterIntent)}
             ruphusAttempt={ruphusAttempt}
+            onDismissRuphusAttempt={dismissRuphusAttempt}
           />
         )}
         {tab === 'inventory' && (

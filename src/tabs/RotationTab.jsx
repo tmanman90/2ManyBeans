@@ -69,7 +69,7 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
   </m.button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -582,6 +582,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onStartTasting={onStartTastingSession}
       />
       <HandBrewModal
+        onDismissAttempt={onDismissRuphusAttempt}
         open={handBrew.handBrewModal}
         onClose={handBrew.closeHandBrewModal}
         recipe={handBrew.handBrewRecipe}
