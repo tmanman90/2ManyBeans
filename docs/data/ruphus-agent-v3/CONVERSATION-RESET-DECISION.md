@@ -4,6 +4,14 @@
 
 ### Latest narrow end-to-end journey
 
+Final phone installation: source `0be3e4e`, guarded Dev assets copied with the
+verified `3fbme3ftj` backend and isolated Firebase configuration, then
+XcodeBuildMCP build/install/launch succeeded on Tal's exact authorized iPhone,
+process 13892. The final bundle independently verifies `2manybeans Dev`,
+`com.talmeltzer.coffeehub.dev`, build 41, updated receipt labels, dev channel,
+and autoUpdate=false. No Capgo or production changes. This is installation and
+bundle evidence, not an authenticated on-phone conversation test.
+
 `conversation-eval/u3-action-check-1788760560189/report.json` passed the
 supplemental owner-reported thin/clean Kalita journey: live replies, immediate
 proposal after "Ok can we update the recipe?", real authenticated browser card,
