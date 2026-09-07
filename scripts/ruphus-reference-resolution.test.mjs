@@ -7,6 +7,15 @@ const coffees = [
   { id: 'a', refKey: 'c-a', name: 'El Vergel', roaster: 'Good Medicine', origin: 'Colombia', process: 'washed', jarSlot: 1 },
   { id: 'b', refKey: 'c-b', name: 'Colombia La Esperanza', roaster: 'Good Medicine', origin: 'Colombia', process: 'natural', jarSlot: 2 },
 ];
+test('trial recipe references retain the current coffee without inventing one', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const ledger = { namedCoffees: ['Colombia La Esperanza'] };
+  for (const userText of ['Can you make that Kalita trial recipe permanent?', 'Save this trial.', 'Keep that recipe.']) {
+    assert.equal(bindRuphusTurn({ userText, coffees, refs, ledger }).coffeeRef, 'c-b');
+    assert.notEqual(bindRuphusTurn({ userText, coffees, refs }).status, 'locked');
+  }
+  assert.equal(bindRuphusTurn({ userText: 'Use El Vergel instead of that trial.', coffees, refs, ledger }).coffeeRef, 'c-a');
+});
 test('resolver handles unique jar, close spelling, and ambiguity', () => {
   assert.equal(resolveCoffeeReference({ reference: 'jar #1', coffees }).coffee.id, 'a');
   assert.equal(resolveCoffeeReference({ reference: 'El Virgil', coffees }).coffee.id, 'a');

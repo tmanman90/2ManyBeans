@@ -2,6 +2,10 @@
 
 ## September 7 current gate status — not Product PASS
 
+The completed 69-conversation run `conversation-eval/u3-action-check-1788796415608/report.json` is **FAIL**, at $29.896213 cumulative spend. Judge v13 calibration passed. Original reports and ledgers remain unchanged by remediation. AE15 repetition 1 failed to recover the chat's trial card and asked an unnecessary coffee-identification question; later repetitions recovered it. Source tracing showed the trusted binder recognizes "that coffee" but not "that Kalita trial recipe", leaving the latter to probabilistic resolution. A local reference-binding correction now passes 30 reference/endpoint/trial tests, including first-provider-request identity and no-current-coffee/explicit-other-coffee controls. It is not yet deployed or live-proven.
+
+Other open gate findings: two AE09 C5 sizing flags on explanatory contact-time prose after explicit 4.2→4.1 recommendations; AE14 initial launch-method evidence missing, one regeneration, and an undeclared sensory-question wording. These remain recorded failures, not silently reclassified passes. Current native simulator recheck shows the normal Apple/Google sign-in screen; exact owner iPhone remains connected. No authenticated native acceptance is claimed.
+
 Owner authorized $35 cumulative testing, preserving prior spend. Current backend is Dev preview `twomanybeans-ruphus-auqzqpgbz-tmanman90s-projects.vercel.app`, source `ca78bb67a15190d8497d7c701574af021e3dcbef`. No production change.
 
 The initial September 7 smoke (`u3-action-check-1788794154246`) was invalidated after discovering 12 earlier UI-test trials in the dedicated fixture account. They influenced method selection. The exact fixture-only cleanup preserves frozen history, refuses non-fixture profiles/foreign paths, and leaves diagnostics intact. Clean-fixture rerun `u3-action-check-1788794467920` passed 11/11 with no failures.

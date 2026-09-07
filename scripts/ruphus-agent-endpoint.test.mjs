@@ -94,6 +94,28 @@ test('endpoint carries AE02 descriptor clarification into the first provider req
   assert.equal(result.ok, true);
 });
 
+test('trial reference is bound before the provider and cannot resolve to a different coffee', async () => {
+  const userText = 'Can you make that Kalita trial recipe permanent?';
+  const context = await buildRuphusContext({ uid: 'owner', contextRef: { surface: 'direct' }, userText, evidenceByteCap: 4096,
+    ledger: { namedCoffees: ['Colombia La Esperanza'], entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['Colombia La Esperanza'] }] }, readers: {
+      listCoffees: async () => [
+        { id: 'private-bean-first', name: 'El Vergel', status: 'ACTIVE' },
+        { id: 'private-bean-current', name: 'Colombia La Esperanza', status: 'ACTIVE' },
+      ], readSetup: async () => ({}),
+    } });
+  const tools = createRuphusTools({ uid: 'owner', context, readers: {} });
+  const result = await runRuphusTurn({ turnId: 'trial-binding', context, userText, tools,
+    provider: { runTurn: async ({ context: input }) => {
+      assert.equal(input.turnBinding.coffeeName, 'Colombia La Esperanza');
+      assert.doesNotMatch(JSON.stringify(input), /private-bean-current/);
+      return { text: 'I can check that trial.' };
+    } }, emit: () => {} });
+  assert.equal(result.ok, true);
+  const resolved = await tools.call('resolve_coffee', { reference: 'that Kalita trial recipe' });
+  assert.equal(resolved.coffeeRef, context.turnBinding.coffeeRef);
+  assert.equal(resolved.match, 'turn_binding');
+});
+
 test('server allowlist is exact and empty by default', () => {
   const previous = process.env.RUPHUS_AGENT_V3_UIDS; delete process.env.RUPHUS_AGENT_V3_UIDS; assert.equal(allowedAgentUids().size, 0); process.env.RUPHUS_AGENT_V3_UIDS = 'u-1, u-2'; assert.equal(allowedAgentUids().has('u-1'), true); assert.equal(allowedAgentUids().has('u-3'), false); if (previous == null) delete process.env.RUPHUS_AGENT_V3_UIDS; else process.env.RUPHUS_AGENT_V3_UIDS = previous;
 });
