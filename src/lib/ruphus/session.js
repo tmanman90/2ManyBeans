@@ -21,6 +21,7 @@ const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita'
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 
 export function retainActionReceipt(messages, receipt, proposalStatus) {
+  receipt = Object.fromEntries(Object.entries(receipt).filter(([, value]) => value !== undefined));
   let attached = false;
   const updated = messages.map(message => {
     if (!Array.isArray(message.artifacts)) return message;
