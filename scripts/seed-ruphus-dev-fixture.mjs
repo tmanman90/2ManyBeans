@@ -65,7 +65,8 @@ export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
   // Mirror the production readers exactly: beans, recipeRevisions, tastings,
   // and brewAttempts. The fixture account remains a source manifest only.
   const profile = {
-    ...seeded.setup,
+    displayName: 'Ruphus Dev Fixture',
+    username: null,
     preferences: { brewMethod: seeded.setup?.defaultMethod || null, grinder: seeded.setup?.grinder || null, units: seeded.setup?.units || 'metric' },
     subscription: {
       status: 'active',
@@ -73,9 +74,6 @@ export function buildSeedPlan(account, { fixtureUid, now = new Date() } = {}) {
       expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       source: 'ruphus-dev-fixture',
     },
-    manifestVersion: seeded.manifestVersion,
-    manifestHash: seeded.manifestHash,
-    account: seeded.account || 'ruphus-dev-fixture',
   };
   const operations = [{ path: `users/${fixtureUid}`, data: profile }];
   for (const coffee of seeded.coffees || []) {

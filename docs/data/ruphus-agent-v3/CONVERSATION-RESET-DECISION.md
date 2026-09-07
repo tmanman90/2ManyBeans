@@ -2,6 +2,33 @@
 
 ## Current acceptance — September 6 UX follow-up
 
+### Latest authenticated saved-proposal result
+
+After explicit owner approval to continue, the saved-proposal browser check
+passed: `conversation-eval/u3-action-check-1788758703256/report.json`.
+The real authenticated app restored an existing proposal, rendered its Update
+control, dispatched the real Dev recipe command, displayed the success receipt,
+and matched canonical saved-recipe readback. Cleanup Undo restored the original
+recipe and readback matched. This replays an existing proposal's presentation
+and a scripted user/reply pair; it is **not** a new live-model conversation or
+native-phone proof. No model requests were made.
+
+Root cause of the earlier consent loop was proven by Firestore snapshots:
+consent became true with pending writes, then rolled back to false. Historical
+fixture-only root fields violated the existing profile keys allowlist. The
+seeder now keeps setup in preferences, uses the existing server-owned
+subscription.source fixture marker, and emits valid displayName/username fields.
+Only the guarded fake Dev profile was repaired; no rules were changed/deployed.
+The successful run observed consent true with pending=false. Earlier timeout
+attribution to timing alone was incomplete. Unique failure screenshot paths now
+prevent accidental reuse of an older capture. Seeder regressions passed 6/6;
+script lint and diff checks passed. Prior failure reports remain preserved.
+
+Screenshots: `/tmp/ruphus-authenticated-proposal.png` and
+`/tmp/ruphus-authenticated-saved.png`. The replayed example changes Kalita grind
+4.2 to 4.1, not the owner's original thin-cup water adjustment. That entire live
+conversation and the latest installed-device journey remain unproven.
+
 **Product PASS remains false. The final-code full gate is incomplete.**
 
 Runtime commit `78f2e6d` is deployed to the isolated Dev preview

@@ -86,7 +86,19 @@ try {
   const claims = JSON.parse(Buffer.from(auth.idToken.split('.')[1], 'base64url'));
   assert.ok(claims.sub === uid && claims.aud === project, 'Fixture sign-in identity must match');
   const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`;
-  assert.equal(decode({ mapValue: await request(base, { token: auth.idToken }) }).account, 'ruphus-dev-fixture', 'Only the explicitly seeded fixture can be mutated');
+  const fixtureProfile = decode({ mapValue: await request(base, { token: auth.idToken }) });
+  assert.equal(fixtureProfile.account || fixtureProfile.subscription?.source, 'ruphus-dev-fixture', 'Only the explicitly seeded fixture can be mutated');
+  if (mode === 'ui' || mode === 'ui-action') {
+    // Historical seed-only root fields violate the existing profile hasOnly
+    // rule. Remove only those named fixture fields, retaining domain setup in
+    // preferences and server-owned fixture identity in subscription.source.
+    assert.equal(fixtureProfile.subscription?.source, 'ruphus-dev-fixture');
+    const obsolete = ['account', 'manifestVersion', 'manifestHash', 'defaultMethod', 'grinder', 'units'].filter(key => key in fixtureProfile);
+    const patch = { displayName: fixtureProfile.displayName || 'Ruphus Dev Fixture', username: fixtureProfile.username ?? null };
+    const mask = [...obsolete, ...Object.keys(patch)].map(key => `updateMask.fieldPaths=${key}`).join('&');
+    await request(`${base}?${mask}`, { method: 'PATCH', body: encode(patch).mapValue });
+    report.fixtureProfileSchemaRepaired = true;
+  }
   const bean = async () => decode({ mapValue: await request(`${base}/beans/fixture-colombia-other`, { token: auth.idToken }) });
   const savedRecipe = async () => {
     const coffee = await bean();
@@ -147,7 +159,10 @@ try {
       artifact = record ? { ...record, type: 'recipe_proposal', actions: ['apply_proposal', 'brew_once', 'keep_current'] } : null;
       report.replayedProposalPresentation = true;
       assert.ok(artifact, 'No existing compatible live proposal; no model call was made');
-      const session = normalizeAgentSession({ contextRef: { surface: 'direct', sessionId: artifact.sessionId || runId }, messages: [{ id: `${runId}-reply`, role: 'assistant', content: 'Review this saved recipe proposal.', turnId: artifact.turnId || runId, artifacts: [artifact] }], lastActivityAt: Date.now() });
+      const session = normalizeAgentSession({ contextRef: { surface: 'direct', sessionId: artifact.sessionId || runId }, messages: [
+        { id: `${runId}-question`, role: 'user', content: 'Can we update this recipe?' },
+        { id: `${runId}-reply`, role: 'assistant', content: 'Review this saved recipe proposal.', turnId: artifact.turnId || runId, artifacts: [artifact] },
+      ], lastActivityAt: Date.now() });
       await db.collection('users').doc(uid).collection('chatSessions').doc('active').set(session);
       savedAction = {
         command: async body => {

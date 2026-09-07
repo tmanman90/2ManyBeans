@@ -22,6 +22,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     page = await context.newPage();
+    await page.exposeFunction('reportFixtureProfile', value => console.log(JSON.stringify({ fixtureProfile: value })));
     const blockedApiPaths = [];
     page.on('pageerror', error => {
       // Emit only JS identifiers and local source locations, never arbitrary
@@ -61,6 +62,16 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       const result = await signInWithCustomToken(auth, customToken);
       if (result.user.uid !== fixtureUid) throw new Error('Wrong fixture identity');
     }, { authModule, customToken, fixtureUid });
+    const firestoreModule = firebaseModule.code.match(/from\s+["']([^"']*firebase_firestore[^"']*)["']/)?.[1];
+    assert.ok(firestoreModule);
+    await page.evaluate(async ({ firestoreModule, fixtureUid }) => {
+      const { db } = await import('/src/firebase.js');
+      const { doc, onSnapshot } = await import(firestoreModule);
+      onSnapshot(doc(db, 'users', fixtureUid), snapshot => {
+        const data = snapshot.data();
+        window.reportFixtureProfile({ exists: snapshot.exists(), consent: data?.aiDataConsent === true, pending: snapshot.metadata.hasPendingWrites, cache: snapshot.metadata.fromCache });
+      }, () => window.reportFixtureProfile({ readError: true }));
+    }, { firestoreModule, fixtureUid });
     stage = 'fixture_data_consent';
     const consent = page.getByRole('button', { name: 'I Understand and Agree', exact: true });
     await page.getByRole('button', { name: /^(I Understand and Agree|Chat)$/ }).first().waitFor();
@@ -84,11 +95,16 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       const proposal = page.locator('[data-artifact="recipe_proposal"]');
       await proposal.or(consent).first().waitFor();
       if (await consent.isVisible()) {
+        stage = 'proposal_consent_click';
         await consent.click();
+        stage = 'proposal_consent_saved';
         await consent.waitFor({ state: 'hidden' });
+        stage = 'proposal_chat_navigation';
         await page.getByRole('button', { name: 'Chat', exact: true }).click();
       }
+      stage = 'proposal_visible';
       await proposal.waitFor();
+      stage = 'proposal_screenshot';
       await proposal.screenshot({ path: '/tmp/ruphus-authenticated-proposal.png' });
       stage = 'update_saved_recipe';
       await proposal.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
@@ -105,10 +121,17 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     await page.screenshot({ path: screenshot, fullPage: false });
     return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', savedAction: Boolean(savedAction), viewport: '390×844', screenshot, modelDispatches: 0, nativeUiTest: false };
   } catch (error) {
-    const screenshot = '/tmp/ruphus-authenticated-entry-failure.png';
-    if (page) await page.screenshot({ path: screenshot, fullPage: false }).catch(() => {});
+    const screenshot = `/tmp/ruphus-authenticated-entry-failure-${Date.now()}.png`;
+    const screenshotSaved = page ? await page.screenshot({ path: screenshot, fullPage: false }).then(() => true).catch(() => false) : false;
+    const visible = page ? await page.evaluate(() => ({
+      consent: [...document.querySelectorAll('button')].some(button => button.textContent === 'I Understand and Agree'),
+      agent: Boolean(document.querySelector('[data-ruphus-agent-enabled="true"]')),
+      proposals: document.querySelectorAll('[data-artifact="recipe_proposal"]').length,
+      restoredReply: document.body.innerText.includes('Review this saved recipe proposal.'),
+      continuePrevious: document.body.innerText.includes('Continue previous'),
+    })).catch(() => null) : null;
     // Do not print Playwright evaluation arguments, auth objects, or error stacks.
-    console.log(JSON.stringify({ browserStage: stage, screenshot, timedOut: error.name === 'TimeoutError', errors }));
+    console.log(JSON.stringify({ browserStage: stage, screenshot: screenshotSaved ? screenshot : null, screenshotSaved, visible, timedOut: error.name === 'TimeoutError', strictLocator: error.message.includes('strict mode violation'), targetClosed: /Target.*closed/.test(error.message), errors }));
     throw new Error(`Dev browser entry failed at ${stage}`);
   } finally {
     await browser?.close();
