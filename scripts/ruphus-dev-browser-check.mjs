@@ -137,6 +137,21 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       await page.locator('[data-ruphus-continue="true"]').waitFor({ state: 'hidden' });
       assert.equal(geometry.scrollTop, 0, 'Opening must remain at the top when Continue loads');
       assert.ok(geometry.openingTop >= geometry.logTop - 1, 'Greeting must not be clipped');
+      stage = 'composer_after_recovery';
+      const composer = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
+      const draft = await composer.inputValue();
+      try {
+        await composer.fill('');
+        await composer.pressSequentially('Typing after Continue');
+        assert.equal(await composer.inputValue(), 'Typing after Continue');
+        await page.getByRole('button', { name: 'Rotation', exact: true }).click();
+        await page.getByRole('button', { name: 'Chat', exact: true }).click();
+        await composer.fill('');
+        await composer.pressSequentially('Typing after returning');
+        assert.equal(await composer.inputValue(), 'Typing after returning');
+      } finally {
+        await composer.fill(draft);
+      }
     }
     if (liveConversation) {
       stage = 'typed_live_conversation';
