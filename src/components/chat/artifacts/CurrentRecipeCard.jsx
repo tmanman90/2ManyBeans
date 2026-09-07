@@ -5,6 +5,6 @@ export function CurrentRecipeCard({ recipe = {}, title = 'Current recipe' }) {
   return <div data-artifact="current_recipe" style={{ padding: 14, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={typeScale.h3}>{title}</div>
     {rows.filter(([, value]) => value != null).map(([label, value]) => <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, paddingTop: 7, fontVariantNumeric: 'tabular-nums' }}><span style={{ color: C.textMuted }}>{label}</span><span>{String(value)}</span></div>)}
-    {Array.isArray(recipe.steps) && recipe.steps.length > 0 && <ol>{recipe.steps.map((step, index) => <li key={index}>{[step.time, step.action].filter(Boolean).join(' · ')}</li>)}</ol>}
+    {Array.isArray(recipe.steps) && recipe.steps.length > 0 && <ol style={{ margin: '16px 0 0', paddingLeft: 20, lineHeight: 1.5 }}>{recipe.steps.map((step, index) => <li key={index} style={{ paddingLeft: 4, marginBottom: 12 }}>{[step.time, step.action].filter(Boolean).join(' · ')}</li>)}</ol>}
   </div>;
 }

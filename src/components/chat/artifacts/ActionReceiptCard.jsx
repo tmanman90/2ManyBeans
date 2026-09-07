@@ -17,11 +17,11 @@ export function ActionReceiptCard({ artifact = {}, onAction, actionPending = fal
   return <div data-artifact="action_receipt" data-status={status} style={{ width: '100%', padding: 14, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={typeScale.h3}>{artifact.title || completedCopy?.[0] || 'Recipe change'}</div>
     <div style={{ color: C.textMuted, marginTop: 6 }}>{artifact.message || completedCopy?.[1] || 'Check the result before continuing.'}</div>
-    {artifact.recipe && <details style={{ marginTop: 12 }}><summary>Review trial recipe</summary><CurrentRecipeCard recipe={artifact.recipe} title="Trial recipe" /></details>}
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
       {canUndo && <ArtifactAction action="undo_revision" label="Undo" status={status} onClick={() => onAction?.({ mode: 'undo_revision', artifact })} />}
       {canStart && <ArtifactAction action="start_attempt" label={artifact.slotKey === 'aiden' ? 'Prepare in Fellow' : 'Start brew'} status={status} onClick={() => onAction?.({ mode: 'start_attempt', artifact })} />}
       {canPromote && <ArtifactAction action="promote_attempt" label="Make this my recipe" status={actionPending ? 'applying' : status} disabled={actionPending} onClick={() => onAction?.({ mode: 'promote_attempt', artifact })} />}
     </div>
+    {artifact.recipe && <details style={{ marginTop: 8 }}><summary style={{ minHeight: 44, padding: '12px 0', cursor: 'pointer', color: C.textMuted }}>Review trial recipe</summary><CurrentRecipeCard recipe={artifact.recipe} title="Trial recipe" /></details>}
   </div>;
 }
