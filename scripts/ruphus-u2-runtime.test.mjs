@@ -49,6 +49,12 @@ test('locked turn binding is the final explicit developer target', () => {
   assert.match(block, /Do not answer from the prior coffee focus/);
   assert.ok(block.lastIndexOf('<AUTHORITATIVE_TURN_TARGET>') > block.lastIndexOf('<TRUSTED_TURN_BINDING>'));
 });
+test('launch method is an opened recipe clue, not a claim about the actual brew', () => {
+  const block = buildDynamicEvidenceBlock({ methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1b' } });
+  assert.match(block, /opened the hot Kalita recipe/);
+  assert.match(block, /Name hot Kalita once/);
+  assert.doesNotMatch(block, /user used hot Kalita/);
+});
 test('locked method binding is injected after general setup and rejects another brewer', () => {
   const block = buildDynamicEvidenceBlock({
     rotationSnapshot: { setup: { defaultMethod: 'Aiden' } },

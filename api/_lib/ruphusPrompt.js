@@ -37,7 +37,9 @@ export function buildDynamicEvidenceBlock(evidence = {}) {
     ? `\n<AUTHORITATIVE_TURN_TARGET>\nThe user's current message resolves to ${turnBinding.coffeeName}. Answer about ${turnBinding.coffeeName} only, and use ${turnBinding.coffeeRef} for any read. Do not answer from the prior coffee focus.\n</AUTHORITATIVE_TURN_TARGET>`
     : '';
   const lockedMethod = methodBinding?.status === 'locked'
-    ? `\n<AUTHORITATIVE_METHOD_TARGET>\nThe user used ${methodBinding.displayName}. Do not substitute, suggest, or ask about another brewer.\n</AUTHORITATIVE_METHOD_TARGET>`
+    ? `\n<AUTHORITATIVE_METHOD_TARGET>\n${methodBinding.source === 'M1b'
+      ? `The user opened the ${methodBinding.displayName} recipe. Name ${methodBinding.displayName} once in this opening reply so the clue is visible and easy to correct; it is not independent proof of what they brewed.`
+      : `The user used ${methodBinding.displayName}.`} Do not substitute, suggest, or ask about another brewer.\n</AUTHORITATIVE_METHOD_TARGET>`
     : '';
   return `\n<COFFEE_ROTATION_SNAPSHOT>\n${JSON.stringify(snapshot)}\n</COFFEE_ROTATION_SNAPSHOT>\n<EVIDENCE_LEDGER>\n${JSON.stringify(ledger)}\n</EVIDENCE_LEDGER>\n<LAUNCH_CLUE>\n${JSON.stringify(launch)}\n</LAUNCH_CLUE>\n<TRUSTED_TURN_BINDING>\n${JSON.stringify(turnBinding)}\n</TRUSTED_TURN_BINDING>\n<TRUSTED_METHOD_BINDING>\n${JSON.stringify(methodBinding)}\n</TRUSTED_METHOD_BINDING>${lockedTarget}${lockedMethod}${proposalReadiness}`;
 }
