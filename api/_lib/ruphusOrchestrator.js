@@ -129,7 +129,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   send('context_loading', { evidenceHash: context?.evidenceHash || null });
   let response; let toolCalls = 0; let readCalls = 0; let toolRounds = 0; let text = '';
   let roundLimitRecovered = false;
-  const toolNames = []; const proposalIds = []; const toolEvidence = []; const usageSamples = []; const providerRetrySamples = [];
+  const toolNames = []; const proposalIds = []; const artifacts = []; const toolEvidence = []; const usageSamples = []; const providerRetrySamples = [];
   let proposalClaimed = false;
   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
   const rememberUsage = (value) => { usageSamples.push(value?.usage ?? null); const retryCount = value?.retryCount ?? value?.retry_count; if (typeof retryCount === 'number' && Number.isFinite(retryCount) && retryCount >= 0) providerRetrySamples.push({ retryCount }); };
@@ -178,7 +178,10 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         if (result?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== result.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: result.coffeeRef });
         if (result?.proposal?.id) proposalIds.push(result.proposal.id);
         send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result });
-        if (result?.artifact) send('artifact_ready', { artifact: result.artifact });
+        if (result?.artifact) {
+          artifacts.push(JSON.parse(JSON.stringify(result.artifact)));
+          send('artifact_ready', { artifact: result.artifact });
+        }
         return { callId: request.callId, name: request.name, result };
       }));
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
@@ -220,7 +223,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     if (checked) send('text_delta', { text: checked });
     const timing = { firstFrameMs: firstFrameAt == null ? null : firstFrameAt - turnStartedAt, checkedReplyMs: performance.now() - turnStartedAt, readRoundMs: readRoundMs || null, regenerationCount: trace.regenerations.length };
     send('turn_completed', { text: checked, timing });
-    return { ok: true, turnId, text: checked, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace }) };
+    return { ok: true, turnId, text: checked, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace }) };
   } catch (error) {
     send(error.code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code: error.code || 'turn_failed', message: error.message });
     return { ok: false, turnId, code: error.code || 'turn_failed', text: '', toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };

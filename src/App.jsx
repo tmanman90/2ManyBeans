@@ -242,7 +242,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   }, [profile, updateProfile, tourActive, addBean]);
 
   return (
-    <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', ...(tab === 'chat' ? { height: '100dvh', overflow: 'hidden' } : {}), display: 'flex', flexDirection: 'column' }}>
       {/* html background set via useEffect covers WKWebView canvas gap */}
       {/* Header */}
       {isRotation ? (
@@ -297,7 +297,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: (tab === 'inventory' || tab === 'rotation') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : tab === 'archive' ? `12px 0 calc(100px + env(safe-area-inset-bottom, 0px))` : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: (tab === 'inventory' || tab === 'rotation' || tab === 'chat') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : tab === 'archive' ? `12px 0 calc(100px + env(safe-area-inset-bottom, 0px))` : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             uid={uid}

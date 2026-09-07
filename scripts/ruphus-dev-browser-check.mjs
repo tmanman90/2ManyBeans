@@ -271,6 +271,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       assert.equal(restored.userText, liveConversation.turns.at(-1), 'Latest typed turn must survive server restoration');
       assert.equal(restored.hasReply, true, 'Latest reply must survive server restoration');
     }
+    console.log(JSON.stringify({ chatGeometry: await page.locator('[role="log"]').evaluate(node => ({ scrollTop: node.scrollTop, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, top: node.getBoundingClientRect().top, bottom: node.getBoundingClientRect().bottom, cards: node.querySelectorAll('[data-artifact="recipe_proposal"]').length })) }));
     await page.screenshot({ path: screenshot, fullPage: false });
     return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', savedAction: Boolean(savedAction), viewport: '390×844', screenshot, modelDispatches: liveConversation?.turns.length || 0, typedConversation: Boolean(liveConversation), nativeUiTest: false };
   } catch (error) {

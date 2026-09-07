@@ -149,6 +149,7 @@ test('a successful recipe proposal ends with one truthful review handoff', async
   const result = await runRuphusTurn({ turnId: 'proposal-complete', context: current, userText: 'Yes, make that change.', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, proposal: { id: 'p1' }, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0', temperature: 94 } } }) }, emit: (frame) => frames.push(frame) });
   assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'Prepared: change the grind from 4.2 to 4.0. Dose, water, and temperature stay the same. Review it before applying.');
   assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
+  assert.deepEqual(result.artifacts, frames.filter(frame => frame.type === 'artifact_ready').map(frame => frame.artifact), 'Server persistence receives the exact card delivered to the client');
 });
 test('proposal candidates treat null schema fields as unchanged recipe values', async () => {
   const before = generateV60Recipe({}, { dose: 15 }); const saved = [];
