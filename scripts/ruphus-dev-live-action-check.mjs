@@ -9,12 +9,13 @@ import { createFirestoreSessionReset, seedFixture } from './seed-ruphus-dev-fixt
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
+import { normalizeAgentSession } from '../src/lib/ruphus/session.js';
 
 const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
 const mode = process.argv[3] || 'action';
-assert.ok(['action', 'smoke', 'full', 'ui'].includes(mode), 'Expected action, smoke, full or ui');
+assert.ok(['action', 'smoke', 'full', 'ui', 'ui-action'].includes(mode), 'Expected action, smoke, full, ui or ui-action');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -122,12 +123,56 @@ try {
   const { account, cases } = await loadFixtureManifest();
   const fixture = cases.cases.find(item => item.id === 'AE05');
   const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
-  if (mode === 'ui') {
+  if (mode === 'ui' || mode === 'ui-action') {
     report.stage = 'authenticated_browser_entry';
     await request(`${base}?updateMask.fieldPaths=onboardingComplete&updateMask.fieldPaths=tourCompleted`, { method: 'PATCH', body: encode({ onboardingComplete: true, tourCompleted: true }).mapValue });
     const keys = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID', 'VITE_RUPHUS_AGENT_V3_MUTATION_UIDS'];
     const { checkAuthenticatedDevEntry } = await import('./ruphus-dev-browser-check.mjs');
-    report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid });
+    let savedAction = null;
+    let appliedResult = null;
+    let artifact = null;
+    if (mode === 'ui-action') {
+      report.stage = 'existing_proposal_lookup';
+      const proposals = [];
+      let pageToken = '';
+      do {
+        const page = await request(`${base}/proposals${pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : ''}`, { token: auth.idToken });
+        proposals.push(...(page.documents || []).map(document => ({ id: document.name.split('/').at(-1), ...decode({ mapValue: document }) })));
+        pageToken = page.nextPageToken || '';
+      } while (pageToken);
+      const currentRevision = (await bean()).activeRevisionIds?.kalita_hot || null;
+      const record = proposals.find(proposal => proposal.status === 'proposed' && proposal.coffeeId === 'fixture-colombia-other' && proposal.slotKey === 'kalita_hot' && (proposal.sourceRevisionId || null) === currentRevision && proposal.before && recipeHash(proposal.before) === recipeHash(before));
+      // Repository documents contain domain data, not the streamed UI envelope.
+      // Reconstruct that presentation only; the real command retains all gates.
+      artifact = record ? { ...record, type: 'recipe_proposal', actions: ['apply_proposal', 'brew_once', 'keep_current'] } : null;
+      report.replayedProposalPresentation = true;
+      assert.ok(artifact, 'No existing compatible live proposal; no model call was made');
+      const session = normalizeAgentSession({ contextRef: { surface: 'direct', sessionId: artifact.sessionId || runId }, messages: [{ id: `${runId}-reply`, role: 'assistant', content: 'Review this saved recipe proposal.', turnId: artifact.turnId || runId, artifacts: [artifact] }], lastActivityAt: Date.now() });
+      await db.collection('users').doc(uid).collection('chatSessions').doc('active').set(session);
+      savedAction = {
+        command: async body => {
+          assert.equal(body.mode, 'apply_proposal');
+          assert.equal(body.proposalId, artifact.id);
+          appliedResult = await request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body });
+          return appliedResult;
+        },
+        verify: async () => {
+          assert.equal(appliedResult?.receipt?.status, 'succeeded');
+          assert.equal(recipeHash(await savedRecipe()), recipeHash(artifact.after));
+          report.canonicalReadback = true;
+        },
+      };
+    }
+    try {
+      report.stage = 'authenticated_browser_entry';
+      report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid, savedAction });
+    } finally {
+      if (appliedResult?.revision?.id) {
+        await request(`${endpoint}/api/recipe-command`, { token: auth.idToken, body: { actionId: `${runId}-undo`, mode: 'undo_revision', coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, expectedRevisionId: appliedResult.revision.id } });
+        report.undoReadback = recipeHash(await savedRecipe()) === recipeHash(before);
+        assert.ok(report.undoReadback);
+      }
+    }
     report.passed = report.ui.passed;
   } else if (mode === 'smoke' || mode === 'full') {
     const judge = mode === 'full' ? createAnthropicJudgeAdapter({}) : null;

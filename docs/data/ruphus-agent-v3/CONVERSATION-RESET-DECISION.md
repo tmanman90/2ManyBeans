@@ -52,6 +52,17 @@ absent). This proves local restoration data and component behavior, not an
 authenticated saved-update flow, deployment, or phone verification. No AI calls
 were made in this continuation.
 
+The no-model saved-proposal browser check remains FAIL. It selects an existing
+compatible owner-scoped proposal, reconstructs only its presentation envelope,
+and prepares a fixture session; only the real Dev command endpoint may Apply.
+The first lookup used UI fields absent from repository records and was corrected.
+The next two attempts timed out at `restored_proposal_card`, with the privacy
+consent screen in the failure capture and no page errors. No Apply or Undo was
+reached. Final report: `conversation-eval/u3-action-check-1788758015806/report.json`.
+The three-attempt repair pass stops under the MSW fuse; authenticated card/action
+acceptance remains open. Focused action/session/artifact tests passed 38/38 and
+script lint/diff checks passed, but are not substitutes for this failed UI check.
+
 Production and the Dev Capgo channel remain untouched. The historical
 checkpoint below applies only to its named older commit, not the current UX
 follow-up.

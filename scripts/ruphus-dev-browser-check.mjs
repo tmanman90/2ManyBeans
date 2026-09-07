@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 // Real app/providers, standard Firebase SDK login, isolated fixture only.
 // This entry check deliberately forbids model and recipe command dispatches.
-export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid }) {
+export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null }) {
   assert.equal(config.VITE_FIREBASE_PROJECT_ID, 'twomanybeans-ruphus-dev');
   const previous = Object.fromEntries(Object.keys(config).map(key => [key, process.env[key]]));
   const previousVariant = process.env.TMB_APP_VARIANT;
@@ -34,6 +34,14 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     });
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
+      if (savedAction && url.origin === origin && url.pathname === '/api/recipe-command' && route.request().method() === 'POST') {
+        try {
+          const result = await savedAction.command(route.request().postDataJSON());
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
+        } catch {
+          return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'dev_acceptance_command_failed' }) });
+        }
+      }
       if (url.hostname === '2manybeans.vercel.app' || url.pathname.startsWith('/api/')) {
         blockedApiPaths.push(url.pathname);
         return route.abort();
@@ -71,6 +79,23 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     }
     stage = 'verify_agent_entry';
     await agentEntry.waitFor();
+    if (savedAction) {
+      stage = 'restored_proposal_card';
+      const proposal = page.locator('[data-artifact="recipe_proposal"]');
+      await proposal.or(consent).first().waitFor();
+      if (await consent.isVisible()) {
+        await consent.click();
+        await consent.waitFor({ state: 'hidden' });
+        await page.getByRole('button', { name: 'Chat', exact: true }).click();
+      }
+      await proposal.waitFor();
+      await proposal.screenshot({ path: '/tmp/ruphus-authenticated-proposal.png' });
+      stage = 'update_saved_recipe';
+      await proposal.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
+      await page.locator('[data-artifact="action_receipt"][data-status="succeeded"]').waitFor();
+      await savedAction.verify();
+      await page.screenshot({ path: '/tmp/ruphus-authenticated-saved.png', fullPage: false });
+    }
     const text = await page.locator('body').innerText();
     assert.match(text, /Professor Ruphus|Your rotation, your taste/i);
     assert.equal(await page.locator('vite-error-overlay').count(), 0);
@@ -78,7 +103,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     assert.equal(blockedApiPaths.length, 0, 'Entry must not dispatch model or command requests');
     const screenshot = '/tmp/ruphus-authenticated-chat.png';
     await page.screenshot({ path: screenshot, fullPage: false });
-    return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', viewport: '390×844', screenshot, modelDispatches: 0, nativeUiTest: false };
+    return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', savedAction: Boolean(savedAction), viewport: '390×844', screenshot, modelDispatches: 0, nativeUiTest: false };
   } catch (error) {
     const screenshot = '/tmp/ruphus-authenticated-entry-failure.png';
     if (page) await page.screenshot({ path: screenshot, fullPage: false }).catch(() => {});
