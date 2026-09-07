@@ -1,7 +1,7 @@
 import { C, radius, shadows, type as typeScale } from '../../../styles/theme';
 import { ArtifactAction } from './ArtifactAction';
 
-export function ActionReceiptCard({ artifact = {}, onAction }) {
+export function ActionReceiptCard({ artifact = {}, onAction, actionPending = false }) {
   const status = artifact.status || 'succeeded';
   const canUndo = status === 'succeeded' && artifact.undoAvailable === true;
   const canPromote = ['succeeded', 'attempt_tasted'].includes(status) && artifact.promoteAvailable === true && Boolean(onAction);
@@ -19,7 +19,7 @@ export function ActionReceiptCard({ artifact = {}, onAction }) {
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
       {canUndo && <ArtifactAction action="undo_revision" label="Undo" status={status} onClick={() => onAction?.({ mode: 'undo_revision', artifact })} />}
       {canStart && <ArtifactAction action="start_attempt" label={artifact.slotKey === 'aiden' ? 'Prepare in Fellow' : 'Start brew'} status={status} onClick={() => onAction?.({ mode: 'start_attempt', artifact })} />}
-      {canPromote && <ArtifactAction action="promote_attempt" label="Make this my recipe" status={status} onClick={() => onAction?.({ mode: 'promote_attempt', artifact })} />}
+      {canPromote && <ArtifactAction action="promote_attempt" label="Make this my recipe" status={actionPending ? 'applying' : status} disabled={actionPending} onClick={() => onAction?.({ mode: 'promote_attempt', artifact })} />}
     </div>
   </div>;
 }

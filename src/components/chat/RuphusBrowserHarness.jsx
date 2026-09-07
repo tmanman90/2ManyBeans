@@ -52,6 +52,8 @@ export function RuphusBrowserHarness({ legacy = false }) {
       {frames.some(frame => frame.type === 'text_delta') && <RuphusMessage text="I’m reading this cup in context." />}
       {frames.some(frame => frame.type === 'artifact_ready') && <ArtifactRenderer artifact={{ ...artifact, ...(proposalStale ? { status: 'stale' } : {}) }} onAction={handleAction} actionPending={proposalPending} />}
       {lastAction === 'apply_proposal' && <ArtifactRenderer artifact={{ type: 'action_receipt', status: 'succeeded', mode: 'apply_proposal', undoAvailable: true, executionAvailable: true, slotKey: 'kalita_hot' }} onAction={handleAction} />}
+      {lastAction === 'brew_once' && <ArtifactRenderer artifact={{ id: 'trial-receipt', type: 'action_receipt', status: 'succeeded', mode: 'brew_once', promoteAvailable: true, attemptId: 'trial', coffeeId: 'bean-1', slotKey: 'kalita_hot' }} onAction={handleAction} actionPending={proposalPending} />}
+      {lastAction === 'promote_attempt' && <ArtifactRenderer artifact={{ type: 'action_receipt', status: 'succeeded', mode: 'promote_attempt', undoAvailable: true }} onAction={handleAction} />}
       <button type="button" data-proposal-pending-toggle onClick={() => setProposalPending(value => !value)}>Toggle pending action</button>
       <button type="button" data-proposal-stale-toggle onClick={() => setProposalStale(value => !value)}>Toggle stale proposal</button>
       <input aria-label="Harness composer" data-keyboard-input="true" onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
