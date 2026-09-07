@@ -37,6 +37,19 @@ test('ordinary UI saves preserve server evidence while explicit New chat clears 
   assert.equal(cleared.data.boundaryIndex, saved.messages.length);
 });
 
+test('active UI suffix retains the archived prefix across transactional saves', () => {
+  const archived = [{ id: 'old', role: 'user', text: 'Use Aiden' }, { id: 'old-reply', role: 'assistant', text: 'Old Aiden advice' }];
+  const remote = startNewChat(normalizeAgentSession({ messages: archived }));
+  const ui = normalizeAgentSession({ messages: [{ id: 'new', role: 'user', text: 'Use Kalita' }] });
+  const write = clientSessionWrite(ui, { remoteSession: remote });
+  const saved = { ...remote, ...write.data };
+  assert.equal(saved.boundaryIndex, 2);
+  assert.equal(saved.messages.length, 3);
+  assert.deepEqual(saved.messages.slice(saved.boundaryIndex).map(message => message.text), ['Use Kalita']);
+  const replay = clientSessionWrite(ui, { remoteSession: saved });
+  assert.deepEqual(replay.data.messages, saved.messages, 'repeated saves do not duplicate the archive');
+});
+
 test('saved Agent conversation retains its native proposal through display restoration', () => {
   const artifact = { id: 'proposal', type: 'recipe_proposal', actions: ['apply_proposal'], status: 'proposed' };
   const saved = normalizeAgentSession({ messages: [{ id: 'reply', role: 'assistant', content: 'Review this change.', turnId: 'turn', artifacts: [artifact] }] });

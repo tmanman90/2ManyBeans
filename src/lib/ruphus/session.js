@@ -45,10 +45,17 @@ export function retainActionReceipt(messages, receipt, proposalStatus) {
 
 // UI transcript saves must not replace evidence and lifecycle state written by
 // the endpoint after each turn. Explicit New chat/Continue remain reset paths.
-export function clientSessionWrite(session, { resetContext = false } = {}) {
+export function clientSessionWrite(session, { resetContext = false, remoteSession = null } = {}) {
   if (session.protocolVersion !== AGENT_PROTOCOL_VERSION || resetContext) return { data: session, merge: false };
-  return { data: Object.fromEntries(['protocolVersion', 'messages', 'pendingActionIds', 'updatedAt']
-    .filter(key => key in session).map(key => [key, session[key]])), merge: true };
+  const data = Object.fromEntries(['protocolVersion', 'messages', 'pendingActionIds', 'updatedAt']
+    .filter(key => key in session).map(key => [key, session[key]]));
+  // Chat renders only the active suffix. Keep the archived prefix that the
+  // server's boundary indexes; otherwise even a valid first message is denied.
+  if (remoteSession?.protocolVersion === AGENT_PROTOCOL_VERSION && Array.isArray(data.messages)) {
+    const remote = normalizeAgentSession(remoteSession);
+    data.messages = [...remote.messages.slice(0, remote.boundaryIndex), ...data.messages];
+  }
+  return { data, merge: true };
 }
 const safeLedgerEntry = (entry = {}) => {
   const value = {};

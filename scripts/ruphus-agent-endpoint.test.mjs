@@ -6,6 +6,14 @@ import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation } from '../api/ruphus-agent.js';
 
+test('New chat excludes archived Aiden conversation from provider replay', () => {
+  const session = { lastActivityAt: 1000, boundaryIndex: 2, messages: [
+    { role: 'user', text: 'Use Aiden' }, { role: 'assistant', text: 'Aiden recipe advice' },
+    { role: 'user', text: 'My Kalita tasted thin' },
+  ] };
+  assert.deepEqual(sessionConversationForProvider(session, { now: 1000 }), [{ role: 'user', content: 'My Kalita tasted thin' }]);
+});
+
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
 

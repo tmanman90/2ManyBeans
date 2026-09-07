@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 // Real app/providers, standard Firebase SDK login, isolated fixture only.
 // This entry check deliberately forbids model and recipe command dispatches.
-export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false, liveConversation = null }) {
+export async function checkAuthenticatedDevEntry({ config, customToken, fixtureUid, savedAction = null, checkSessionBoundary = false, liveConversation = null, freshConversation = false }) {
   assert.equal(config.VITE_FIREBASE_PROJECT_ID, 'twomanybeans-ruphus-dev');
   const previous = Object.fromEntries(Object.keys(config).map(key => [key, process.env[key]]));
   const previousVariant = process.env.TMB_APP_VARIANT;
@@ -14,6 +14,8 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
   let page;
   let stage = 'start_server';
   const errors = [];
+  const persistenceErrors = [];
+  let completeDispatch;
   try {
     server = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'silent' });
     await server.listen();
@@ -25,7 +27,10 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     page.on('console', async message => {
       if (!message.text().startsWith('[ChatSession]')) return;
       const code = await message.args().at(-1)?.evaluate(value => typeof value?.code === 'string' && /^[a-z/-]+$/.test(value.code) ? value.code : null).catch(() => null);
-      if (code) console.log(JSON.stringify({ sessionPersistenceError: code }));
+      if (code) {
+        persistenceErrors.push(code);
+        console.log(JSON.stringify({ sessionPersistenceError: code }));
+      }
     });
     await page.exposeFunction('reportFixtureProfile', value => console.log(JSON.stringify({ fixtureProfile: value })));
     const blockedApiPaths = [];
@@ -43,8 +48,11 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       if (liveConversation && url.origin === origin && url.pathname === '/api/ruphus-agent' && route.request().method() === 'POST') {
         try {
           const result = await liveConversation.dispatch(route.request().postDataJSON());
-          return route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: result.frames.map(frame => JSON.stringify(frame)).join('\n') + '\n' });
+          await route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: result.frames.map(frame => JSON.stringify(frame)).join('\n') + '\n' });
+          completeDispatch?.(result);
+          return;
         } catch {
+          completeDispatch?.({ text: null });
           return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'dev_acceptance_turn_failed' }) });
         }
       }
@@ -103,14 +111,31 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     }
     stage = 'verify_agent_entry';
     await agentEntry.waitFor();
+    if (freshConversation) {
+      stage = 'fresh_owner_conversation';
+      page.once('dialog', async dialog => {
+        if (dialog.type() === 'confirm' && dialog.message() === 'Start a fresh conversation?') await dialog.accept();
+        else await dialog.dismiss();
+      });
+      const newChat = page.getByRole('button', { name: 'New chat', exact: true });
+      if (await newChat.isVisible()) await newChat.click();
+      await page.getByRole('button', { name: 'What should I brew today?', exact: true }).waitFor();
+    }
     if (liveConversation) {
       stage = 'typed_live_conversation';
-      for (const [index, message] of liveConversation.turns.slice(0, liveConversation.trialJourney ? 3 : undefined).entries()) {
+      for (const message of liveConversation.turns.slice(0, liveConversation.trialJourney ? 3 : undefined)) {
         const input = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
+        let timeout;
+        const dispatched = new Promise(resolve => {
+          completeDispatch = resolve;
+          timeout = setTimeout(() => resolve({ text: null }), 60000);
+        });
         await input.fill(message);
         await input.press('Enter');
-        await page.waitForFunction(count => document.querySelectorAll('[data-ruphus-message="agent-v3"]').length >= count,
-          index + 1, { timeout: 60000 });
+        const result = await dispatched;
+        clearTimeout(timeout);
+        assert.ok(result.text, 'Live dispatch must return a reply');
+        await page.locator('[data-ruphus-message="agent-v3"]').filter({ hasText: result.text }).last().waitFor({ timeout: 60000 });
       }
     }
     if (checkSessionBoundary) {
@@ -227,6 +252,23 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     assert.deepEqual(errors, []);
     assert.equal(blockedApiPaths.length, 0, 'Entry must not dispatch model or command requests');
     const screenshot = '/tmp/ruphus-authenticated-chat.png';
+    await page.evaluate(async firestoreModule => {
+      const { db } = await import('/src/firebase.js');
+      const { waitForPendingWrites } = await import(firestoreModule);
+      await waitForPendingWrites(db);
+    }, firestoreModule);
+    assert.equal(persistenceErrors.length, 0, 'Chat persistence errors invalidate browser acceptance');
+    if (liveConversation && !liveConversation.trialJourney) {
+      const restored = await page.evaluate(async ({ firestoreModule, fixtureUid }) => {
+        const { db } = await import('/src/firebase.js');
+        const { doc, getDocFromServer } = await import(firestoreModule);
+        const data = (await getDocFromServer(doc(db, 'users', fixtureUid, 'chatSessions', 'active'))).data();
+        const active = (data?.messages || []).slice(data?.boundaryIndex || 0);
+        return { userText: active.filter(message => message.role === 'user').at(-1)?.text, hasReply: active.at(-1)?.role === 'assistant' };
+      }, { firestoreModule, fixtureUid });
+      assert.equal(restored.userText, liveConversation.turns.at(-1), 'Latest typed turn must survive server restoration');
+      assert.equal(restored.hasReply, true, 'Latest reply must survive server restoration');
+    }
     await page.screenshot({ path: screenshot, fullPage: false });
     return { passed: true, authenticated: true, agentEnabled: true, entry: 'Rotation → Chat', savedAction: Boolean(savedAction), viewport: '390×844', screenshot, modelDispatches: liveConversation?.turns.length || 0, typedConversation: Boolean(liveConversation), nativeUiTest: false };
   } catch (error) {

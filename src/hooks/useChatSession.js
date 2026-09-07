@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, runTransaction, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { cacheRead, cacheWrite, chatKey } from '../lib/offlineCache';
 import { resolveTerminal } from '../lib/streamChat';
@@ -67,6 +67,13 @@ function createDefaultAdapter(uid) {
       return snap.exists() ? snap.data() : null;
     },
     saveRemote(session, options) {
+      if (session.protocolVersion === AGENT_PROTOCOL_VERSION && !options?.resetContext) {
+        return runTransaction(db, async transaction => {
+          const snapshot = await transaction.get(ref);
+          const write = clientSessionWrite(session, { ...options, remoteSession: snapshot.exists() ? snapshot.data() : null });
+          transaction.set(ref, write.data, { merge: write.merge });
+        });
+      }
       const write = clientSessionWrite(session, options);
       return setDoc(ref, write.data, { merge: write.merge });
     },
