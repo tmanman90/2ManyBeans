@@ -111,6 +111,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
     }
     stage = 'verify_agent_entry';
     await agentEntry.waitFor();
+    await page.locator('[data-ruphus-agent-enabled="true"][data-chat-hydration="hydrated"]').waitFor();
     if (freshConversation) {
       stage = 'fresh_owner_conversation';
       page.once('dialog', async dialog => {
@@ -136,6 +137,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
         clearTimeout(timeout);
         assert.ok(result.text, 'Live dispatch must return a reply');
         await page.locator('[data-ruphus-message="agent-v3"]').filter({ hasText: result.text }).last().waitFor({ timeout: 60000 });
+        await page.locator('[data-ruphus-agent-enabled="true"][aria-busy="false"]').waitFor({ timeout: 60000 });
       }
     }
     if (checkSessionBoundary) {

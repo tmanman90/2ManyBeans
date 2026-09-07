@@ -544,7 +544,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     }
     const boundaryIndex = Number.isInteger(hydratedSession?.boundaryIndex) ? hydratedSession.boundaryIndex : 0;
     const activeMessages = hydratedMessages.slice(boundaryIndex);
-    if (activeMessages.length > 0) {
+    if (activeMessages.length > 0 && !userTouchedThreadRef.current) {
       hydrateThread(activeMessages);
       userTouchedThreadRef.current = false;
       return;
@@ -1284,7 +1284,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const starterPrompts = getStarterPrompts(beans, isDemo);
 
   return (
-    <div data-ruphus-agent-enabled={agentEnabled ? 'true' : 'false'} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
+    <div data-ruphus-agent-enabled={agentEnabled ? 'true' : 'false'} data-chat-hydration={hydrationState} aria-busy={loading} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
       {/* Masthead — calm editorial: Fraunces title + subtitle (no eyebrow, no gradient rule). */}
       <div data-masthead style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
