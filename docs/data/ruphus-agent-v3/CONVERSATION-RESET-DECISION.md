@@ -1,6 +1,49 @@
 # Conversation reset decision
 
-## Backend conversation checkpoint
+## Current acceptance — September 6 UX follow-up
+
+**Product PASS remains false. The final-code full gate is incomplete.**
+
+Runtime commit `78f2e6d` is deployed to the isolated Dev preview
+`https://twomanybeans-ruphus-3fbme3ftj-tmanman90s-projects.vercel.app`.
+Two consecutive eleven-conversation smokes passed on that exact deployed
+commit, with no recorded ordinary or catastrophic failures:
+`conversation-eval/u3-action-check-1788752703926/report.json` and
+`conversation-eval/u3-action-check-1788752855414/report.json`.
+
+The different-family judge calibrated successfully before the full stage.
+That stage stopped at the cumulative cost guard after 28 completed run
+artifacts; it is not a full-gate PASS. One completed run recorded an unexpected
+clarification branch. The stop is preserved in
+`conversation-eval/u3-action-check-1788753013356/report.json`.
+Actual cumulative spend is $28.000296 of the authorized $30. The next judge
+dispatch required a $2.009 maximum reservation, so it was refused before
+dispatch. No ceiling was raised or reservation discarded.
+
+Live proposal creation, explicit Apply, canonical saved-recipe readback,
+idempotent replay, and Undo/readback passed on the earlier `2f93a8c` preview:
+`conversation-eval/u3-action-check-1788751177982/report.json`. This is backend
+evidence, not a native tap-through claim. The latest local U3 suite passed
+56 tests. Earlier failed smoke artifacts remain unchanged.
+
+Native scripted acceptance remains unproven: a fresh XcodeBuildMCP simulator
+snapshot still fails because AXe cannot load CoreSimulator for the current
+architecture. The real-app localhost browser check authenticated the isolated
+fixture through the standard Firebase SDK and completed the visible consent
+screen, but showed a blank viewport after tapping Chat and timed out waiting
+for Agent entry. Cause is unconfirmed; this is not a deployed-native failure
+claim or an authenticated browser PASS. The third attempt is preserved in
+`conversation-eval/u3-action-check-1788753928201/report.json`, with the observed
+viewport at `/tmp/ruphus-authenticated-entry-failure.png`. The check blocked
+model/command routes and made no AI dispatches. This repair loop pauses at the
+requested MSW three-round fuse. The required owner unscripted device
+conversations also remain open.
+
+Production and the Dev Capgo channel remain untouched. The historical
+checkpoint below applies only to its named older commit, not the current UX
+follow-up.
+
+## Historical backend conversation checkpoint
 
 **Status: PASS — the final live U3 gate passed on `efe58d9`.**
 

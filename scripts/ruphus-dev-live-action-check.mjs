@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { loadFixtureManifest, createCostGuard, loadCumulativeCostLedger, persistCumulativeCostLedger, runLiveCase, runLiveStage, persistRunArtifact } from './ruphus-conversation-runner.mjs';
+import { loadFixtureManifest, createCostGuard, loadCumulativeCostLedger, loadSmokeLedger, persistCumulativeCostLedger, runLiveCase, runLiveStage, persistRunArtifact } from './ruphus-conversation-runner.mjs';
+import { createAnthropicJudgeAdapter } from './ruphus-conversation-judge.mjs';
 import { createFirestoreSessionReset, seedFixture } from './seed-ruphus-dev-fixture.mjs';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
@@ -13,7 +14,7 @@ const project = 'twomanybeans-ruphus-dev';
 const vercelProject = 'prj_puSGDxI5uv7x98v0NRLz0Yk8KNus';
 const endpoint = process.argv[2];
 const mode = process.argv[3] || 'action';
-assert.ok(['action', 'smoke'].includes(mode), 'Expected action or smoke');
+assert.ok(['action', 'smoke', 'full', 'ui'].includes(mode), 'Expected action, smoke, full or ui');
 assert.match(endpoint || '', /^https:\/\/twomanybeans-ruphus-[a-z0-9]+-tmanman90s-projects\.vercel\.app$/);
 const directory = 'docs/data/ruphus-agent-v3/conversation-eval';
 const ledgerPath = `${directory}/live-cost-ledger.json`;
@@ -121,15 +122,23 @@ try {
   const { account, cases } = await loadFixtureManifest();
   const fixture = cases.cases.find(item => item.id === 'AE05');
   const reset = await createFirestoreSessionReset({ projectId: project, fixtureUid: uid, db });
-  if (mode === 'smoke') {
-    report.stage = 'seed_live_smoke';
+  if (mode === 'ui') {
+    report.stage = 'authenticated_browser_entry';
+    await request(`${base}?updateMask.fieldPaths=onboardingComplete&updateMask.fieldPaths=tourCompleted`, { method: 'PATCH', body: encode({ onboardingComplete: true, tourCompleted: true }).mapValue });
+    const keys = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID', 'VITE_RUPHUS_AGENT_V3_MUTATION_UIDS'];
+    const { checkAuthenticatedDevEntry } = await import('./ruphus-dev-browser-check.mjs');
+    report.ui = await checkAuthenticatedDevEntry({ config: Object.fromEntries(keys.map(key => [key, config(key)])), customToken: signed.signedJwt, fixtureUid: uid });
+    report.passed = report.ui.passed;
+  } else if (mode === 'smoke' || mode === 'full') {
+    const judge = mode === 'full' ? createAnthropicJudgeAdapter({}) : null;
+    report.stage = `seed_live_${mode}`;
     await seedFixture({ projectId: project, fixtureUid: uid, authorized: true, write: async (path, data) => {
       assert.ok(path === `users/${uid}` || path.startsWith(`users/${uid}/`));
       await request(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}`, { method: 'PATCH', body: encode(data).mapValue });
     } });
-    report.stage = 'live_smoke';
-    const smoke = await runLiveStage({ stage: 'smoke', endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costCapUsd: 30, commit: report.commit, resetSession: reset });
-    report.smoke = smoke;
+    report.stage = `live_${mode}`;
+    const smoke = await runLiveStage({ stage: mode, endpoint: `${endpoint}/api/ruphus-agent`, token: auth.idToken, costCapUsd: 30, commit: report.commit, resetSession: reset, judge, pairwise: judge, ledger: await loadSmokeLedger(`${directory}/smoke-ledger.json`) });
+    report[mode] = smoke;
     report.cumulativeCostUsd = smoke.cumulativeCostUsd;
     report.passed = smoke.passed;
     if (!smoke.passed) process.exitCode = 1;
