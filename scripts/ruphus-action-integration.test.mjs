@@ -259,14 +259,34 @@ test('recipe provenance is slot-scoped and clears only the selected active revis
   assert.equal(store.getBean('multi-slot').recipeProvenance.kalita_hot, undefined);
 });
 
-test('A tasted Brew-once attempt can be promoted only after provenance transition', () => {
+test('A tasted Brew-once attempt can be saved without changing tasting provenance', () => {
   const { store, recipe } = setup();
   const current = store.execute({ actionId: 'promote-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
   store.seedProposal({ id: 'proposal-promote', ownerId: 'user-1', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: current.id, sourceHash: current.snapshotHash, after: { ...recipe, waterTemp: { ...recipe.waterTemp, celsius: 96 } }, status: 'proposed' });
   const brewed = store.execute({ actionId: 'promote-brew', mode: 'brew_once', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'proposal-promote' });
-  assert.throws(() => store.execute({ actionId: 'promote-too-soon', mode: 'promote_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id }), /tasted/);
   const tasting = applyRuphusTastingState({ attempt: { ...brewed.attempt, status: 'completed' }, tastingId: 'tasting-promote', coffeeId: 'bean-1', sensory: { notes: 'balanced' } });
   store.seedAttempt({ ...brewed.attempt, ...tasting.attempt });
   const promoted = store.execute({ actionId: 'promote-1', mode: 'promote_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: brewed.attempt.id, expectedRevisionId: current.id });
   assert.equal(promoted.revision.snapshot.waterTemp.celsius, 96);
+});
+
+test('saving a trial before tasting preserves execution and rejects another target or stale source', () => {
+  const { store, recipe } = setup();
+  const current = store.execute({ actionId: 'trial-base', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'v60_hot', recipe }).revision;
+  store.seedProposal({ id: 'trial-proposal', ownerId: 'user-1', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: current.id, sourceHash: current.snapshotHash, after: { ...recipe, waterTemp: { ...recipe.waterTemp, celsius: 97 } }, status: 'proposed' });
+  const trial = store.execute({ actionId: 'trial-brew', mode: 'brew_once', coffeeId: 'bean-1', slotKey: 'v60_hot', proposalId: 'trial-proposal' });
+  assert.equal(trial.receipt.promoteAvailable, true);
+  store.execute({ actionId: 'trial-timer', mode: 'timer_started', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: trial.attempt.id });
+  const command = { actionId: 'trial-save', mode: 'promote_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: trial.attempt.id };
+  const saved = store.execute(command);
+  assert.equal(saved.revision.snapshot.waterTemp.celsius, 97);
+  assert.equal(store.snapshot().attempts.find(item => item.id === trial.attempt.id).status, 'timer_started');
+  assert.equal(saved.receipt.physicalBrewConfirmed, false);
+  assert.equal(store.execute(command).revision.id, saved.revision.id);
+  assert.equal(store.execute({ ...command, actionId: 'trial-save-again' }).revision.id, saved.revision.id);
+  const completed = store.execute({ actionId: 'trial-complete', mode: 'complete_attempt', coffeeId: 'bean-1', slotKey: 'v60_hot', attemptId: trial.attempt.id, expectedRevisionId: current.id });
+  assert.equal(completed.attempt.status, 'completed');
+  assert.equal(applyRuphusTastingState({ attempt: completed.attempt, coffeeId: 'bean-1', tastingId: 'trial-tasting', sensory: { notes: 'Good' } }).attempt.status, 'tasted');
+  store.execute({ actionId: 'trial-undo', mode: 'undo_revision', coffeeId: 'bean-1', slotKey: 'v60_hot' });
+  assert.throws(() => store.execute({ ...command, actionId: 'trial-old-save' }), /changed|stale/i);
 });

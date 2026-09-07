@@ -4,10 +4,11 @@ import { ArtifactAction } from './ArtifactAction';
 export function ActionReceiptCard({ artifact = {}, onAction }) {
   const status = artifact.status || 'succeeded';
   const canUndo = status === 'succeeded' && artifact.undoAvailable === true;
-  const canPromote = status === 'attempt_tasted' && artifact.promoteAvailable === true;
+  const canPromote = ['succeeded', 'attempt_tasted'].includes(status) && artifact.promoteAvailable === true && Boolean(onAction);
   const canStart = artifact.mode === 'apply_proposal' && artifact.executionAvailable === true && Boolean(onAction);
   const completedCopy = status === 'succeeded' ? {
     apply_proposal: ['Recipe updated', 'Your saved recipe is ready for your next brew.'],
+    promote_attempt: ['Recipe updated', 'This trial is now your saved recipe.'],
     undo_revision: ['Change undone', 'Your previous recipe is restored.'],
     keep_current: ['Recipe kept', 'Your saved recipe is unchanged.'],
     brew_once: ['Ready to try', 'Use this version for one brew. Your saved recipe is unchanged.'],

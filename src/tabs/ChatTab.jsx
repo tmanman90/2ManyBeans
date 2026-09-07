@@ -407,7 +407,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!result?.receipt) return;
     const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
     if (!artifact.proposalId && result.proposal?.id) artifact.proposalId = result.proposal.id;
-    const settledProposalStatus = result.proposal?.status || (result.receipt.mode === 'apply_proposal' ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
+    const settledProposalStatus = result.proposal?.status || (['apply_proposal', 'promote_attempt'].includes(result.receipt.mode) ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
     setMessages(previous => {
       const updated = retainActionReceipt(previous, artifact, settledProposalStatus);
       persist(threadForPersistence(updated), { protocolVersion: 1 });
