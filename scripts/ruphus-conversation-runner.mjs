@@ -64,8 +64,8 @@ export async function loadFixtureManifest(root = FIXTURE_ROOT) {
   return { account, cases };
 }
 
-export function fixtureFactSheet(account) {
-  return account.coffees.map((coffee) => {
+export function fixtureFactSheet(account, fixture = null) {
+  const summary = account.coffees.map((coffee) => {
     const recipes = (coffee.recipes || []).map((slot) => {
       const recipe = account.recipes[`${coffee.id}:${slot}`] || {};
       return [recipe.displayName || slot, recipe.dose != null ? `${recipe.dose}g coffee` : null, recipe.water != null ? `${recipe.water}g water` : null, recipe.grind || null, recipe.temperature != null ? `${recipe.temperature}C` : null].filter(Boolean).join(', ');
@@ -75,12 +75,19 @@ export function fixtureFactSheet(account) {
     const attempts = (account.attempts || []).filter((item) => item.coffeeId === coffee.id).map((item) => `${item.date}: ${item.slot}, ${item.dose}g coffee, ${item.water}g water, ${item.grind}, ${item.drawdown}${item.notes || item.note ? `, attempt note: ${item.notes || item.note}` : ''}`).join(' | ') || 'none';
     return `Jar ${coffee.jarSlot ?? 'off rotation'}: ${coffee.name} — ${coffee.roaster}, ${coffee.origin}, ${coffee.process}; roasted ${coffee.roastDate || 'unknown'}, opened ${coffee.openDate || 'unknown'}; recipes ${recipes}; brews ${brews}; attempts ${attempts}; tastings ${tastings}.`;
   }).join('\n');
+  if (!fixture?.trialRecovery) return summary;
+  const { coffeeId, slotKey, waterGrams } = fixture.trialRecovery;
+  const recipe = account.recipes[`${coffeeId}:${slotKey}`];
+  const coffee = account.coffees.find(item => item.id === coffeeId);
+  return `${summary}\nCurrent conversation's existing one-brew trial: ${coffee.name}, ${recipe.displayName}, ${recipe.dose} g coffee and ${waterGrams} g water. An older alternative trial uses ${waterGrams - 5} g water. Both timers were started; neither trial was saved permanently. The current chat's receipt identifies the ${waterGrams} g trial. Saved recipe is still ${recipe.water} g water.`;
 }
 export const factSheet = fixtureFactSheet;
 
 export function parseTranscript(markdown) {
   const transcript = [];
   for (const line of String(markdown || '').split(/\r?\n/)) {
+    const card = line.match(/^Native card:\s*(.+)$/);
+    if (card) { transcript.push({ role: 'assistant', text: `Visible trial recipe card: ${card[1]}` }); continue; }
     const match = line.match(/^\s*(User|Ruphus|Assistant)\s*:\s*(.*?)\s*$/i);
     if (!match || !match[2]) continue;
     transcript.push({ role: /^user$/i.test(match[1]) ? 'user' : 'assistant', text: match[2] });
@@ -688,7 +695,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
   if (stage !== 'smoke') {
     const references = { gold: [], knownBad: [] }; const goldIds = new Set();
     for (const fixture of cases.cases.filter((item) => item.critical)) {
-      for (const kind of ['gold', 'knownBad']) references[kind].push({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript: await loadTranscript(join(root, kind === 'gold' ? 'gold' : 'known-bad', `${names[fixture.id]}.md`)) });
+      for (const kind of ['gold', 'knownBad']) references[kind].push({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account, fixture), transcript: await loadTranscript(join(root, kind === 'gold' ? 'gold' : 'known-bad', `${names[fixture.id]}.md`)) });
     }
     const goldPackets = createCalibrationPackets({ gold: references.gold, knownBad: references.knownBad, factSheet: fixtureFactSheet(account), seed: `${commit}:calibration` });
     const goldPacketIds = new Set(references.gold.map((item) => createBlindJudgePacket({ ...item, id: `${item.id}:gold`, seed: `${commit}:calibration` }).packetId));
@@ -718,7 +725,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     const transcript = candidate.transcript;
     const visibleTranscript = judgeVisibleTranscript(candidate);
     if (judge && stage !== 'smoke') {
-      const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account), transcript: visibleTranscript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      const packet = createBlindJudgePacket({ id: fixture.id, intent: fixture.intent, factSheet: fixtureFactSheet(account, fixture), transcript: visibleTranscript, seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       const judged = await judgeTranscript({ judge: async (input) => dispatchValidatedJudge(judge, input, guard), packet });
       candidate.judge = judged.sufficient ? judged.result : null;
       candidate.judgeMeta = judged.sufficient ? { provider: judged.provider, model: judged.model, usage: judged.usage } : { sufficient: false };
@@ -726,7 +733,7 @@ export async function runLiveStage({ root = FIXTURE_ROOT, stage = 'smoke', fixtu
     }
     if (pairwise && fixture.critical && (stage === 'full' || stage === 'targeted')) {
       const reference = await loadTranscript(join(root, 'known-bad', `${names[fixture.id]}.md`));
-      const packet = createBlindPairwisePacket({ candidate: visibleTranscript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
+      const packet = createBlindPairwisePacket({ candidate: visibleTranscript, reference, intent: fixture.intent, factSheet: fixtureFactSheet(account, fixture), seed: `${commit}:${run.fixtureId}:${run.repeat}` });
       const pairwiseResult = await dispatchValidatedJudge(pairwise, packet, guard);
       candidate.pairwise = pairwisePass(pairwiseResult?.result || pairwiseResult, packet);
       candidate.pairwiseProvenance = { provider: pairwiseResult?.provider || pairwise.provider || null, model: pairwiseResult?.model || pairwise.model || null, usage: pairwiseResult?.usage || null, packetId: packet.packetId, orderToken: packet.orderToken };

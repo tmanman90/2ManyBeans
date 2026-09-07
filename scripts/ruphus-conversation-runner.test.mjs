@@ -27,6 +27,9 @@ const validJudgment = () => ({
 test('owner trial regression requires its exact actionable card, not reassuring prose', async () => {
   const { cases } = await loadFixtureManifest();
   const fixture = cases.cases.find(item => item.id === 'AE15');
+  const { account } = await loadFixtureManifest();
+  assert.match(fixtureFactSheet(account, fixture), /current chat's receipt identifies the 240 g trial/);
+  assert.match(fixtureFactSheet(account, fixture), /older alternative trial uses 235 g/);
   const artifact = { type: 'action_receipt', mode: 'brew_once', status: 'ready', promoteAvailable: true, ...fixture.trialRecovery, recipe: { coffeeGrams: 15, waterGrams: 240 } };
   const frames = [{ type: 'artifact_ready', artifact }];
   assert.deepEqual(gradeTrialRecovery(fixture, frames), []);

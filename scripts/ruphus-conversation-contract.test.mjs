@@ -235,6 +235,7 @@ test('gold transcripts pass and known-bad transcripts reproduce named old dogfoo
     let prior = [];
     for (let index = 0; index < assistants.length; index += 1) {
       const reply = assistants[index].text;
+      if (reply.startsWith('Visible trial recipe card:')) { assert.match(reply, /240 g water.*Make this my recipe/); continue; }
       const user = gold[gold.indexOf(assistants[index]) - 1]?.text || '';
       const result = gradeReply({ reply, userTurn: user, priorReplies: prior });
       assert.deepEqual(result.catastrophic, [], `${fixture.id} gold catastrophic`);
