@@ -26,11 +26,14 @@ export function buildDynamicEvidenceBlock(evidence = {}) {
   const launch = evidence.launchContext || evidence.context || null;
   const turnBinding = evidence.turnBinding || null;
   const methodBinding = evidence.methodBinding || null;
+  const proposalReadiness = evidence.proposalState?.diagnosisReady === true && evidence.proposalState?.userAgreed === true
+    ? '\n<RECIPE_REVIEW_REQUEST>\nThe user has asked to turn the discussed adjustment into a review card. Read the exact recipe, then prepare that change with the proposal tool. Do not ask for another yes or merely repeat the advice. If the target or adjustment is genuinely unclear, clarify it; if preparation fails, explain that nothing was saved. The card tap, not this request, authorizes saving.\n</RECIPE_REVIEW_REQUEST>'
+    : '';
   const lockedTarget = turnBinding?.status === 'locked'
     ? `\n<AUTHORITATIVE_TURN_TARGET>\nThe user's current message resolves to ${turnBinding.coffeeName}. Answer about ${turnBinding.coffeeName} only, and use ${turnBinding.coffeeRef} for any read. Do not answer from the prior coffee focus.\n</AUTHORITATIVE_TURN_TARGET>`
     : '';
   const lockedMethod = methodBinding?.status === 'locked'
     ? `\n<AUTHORITATIVE_METHOD_TARGET>\nThe user used ${methodBinding.displayName}. Do not substitute, suggest, or ask about another brewer.\n</AUTHORITATIVE_METHOD_TARGET>`
     : '';
-  return `\n<COFFEE_ROTATION_SNAPSHOT>\n${JSON.stringify(snapshot)}\n</COFFEE_ROTATION_SNAPSHOT>\n<EVIDENCE_LEDGER>\n${JSON.stringify(ledger)}\n</EVIDENCE_LEDGER>\n<LAUNCH_CLUE>\n${JSON.stringify(launch)}\n</LAUNCH_CLUE>\n<TRUSTED_TURN_BINDING>\n${JSON.stringify(turnBinding)}\n</TRUSTED_TURN_BINDING>\n<TRUSTED_METHOD_BINDING>\n${JSON.stringify(methodBinding)}\n</TRUSTED_METHOD_BINDING>${lockedTarget}${lockedMethod}`;
+  return `\n<COFFEE_ROTATION_SNAPSHOT>\n${JSON.stringify(snapshot)}\n</COFFEE_ROTATION_SNAPSHOT>\n<EVIDENCE_LEDGER>\n${JSON.stringify(ledger)}\n</EVIDENCE_LEDGER>\n<LAUNCH_CLUE>\n${JSON.stringify(launch)}\n</LAUNCH_CLUE>\n<TRUSTED_TURN_BINDING>\n${JSON.stringify(turnBinding)}\n</TRUSTED_TURN_BINDING>\n<TRUSTED_METHOD_BINDING>\n${JSON.stringify(methodBinding)}\n</TRUSTED_METHOD_BINDING>${lockedTarget}${lockedMethod}${proposalReadiness}`;
 }

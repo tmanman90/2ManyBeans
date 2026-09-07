@@ -87,6 +87,29 @@ test('tools expose only resolver, composite evidence, recipe, and proposal', asy
   const evidence = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 }); calls.push(evidence); assert.equal(evidence.coffee.status, 'available');
   await assert.rejects(() => tools.call('read_coffee_evidence', { coffeeRef: 'c1', uid: 'evil', windowDays: 14 }), /server-bound/);
 });
+test('persisted proposals expose only server-enabled registered actions', async () => {
+  for (const enabled of [false, true]) {
+    const context = { ...base, __ruphusRefs: { c1: 'coffee-1' }, proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+    const tools = createRuphusTools({
+      uid: 'u1', context,
+      proposalActions: enabled ? ['apply_proposal', 'brew_once', 'keep_current', 'delete_account'] : [],
+      readers: { readRecipe: async () => generateV60Recipe({}, { dose: 15 }) },
+      proposalStore: async (input) => ({ id: input.proposalId, status: 'proposed', sourceRevisionId: 'revision-1' }),
+    });
+    await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+    const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'temperature', value: 93 } });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.artifact.actions, enabled ? ['apply_proposal', 'brew_once', 'keep_current'] : []);
+  }
+});
+test('proposal request guidance reaches the provider only after diagnosis and assent', () => {
+  assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: false } }), /RECIPE_REVIEW_REQUEST/);
+  assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: false, userAgreed: true } }), /RECIPE_REVIEW_REQUEST/);
+  const block = buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: true } });
+  assert.match(block, /Read the exact recipe, then prepare that change/);
+  assert.match(block, /Do not ask for another yes/);
+  assert.match(block, /card tap, not this request, authorizes saving/);
+});
 test('this coffee resolves the current named coffee, then the verified launch coffee', async () => {
   const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel' }, { id: 'coffee-2', name: 'Colombia La Esperanza' }] };
   const launchContext = { ...base, launchCoffeeId: 'c2', __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' }, ledger: { entries: [], namedCoffees: [] } };

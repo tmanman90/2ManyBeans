@@ -9,7 +9,7 @@ import { persistProposal } from './_lib/ruphusRepository.js';
 import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { SLOT_KEYS } from '../src/lib/ruphus/contracts.js';
-import { isAgentAccessAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
+import { isAgentAccessAllowed, isMutationAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
 import { normalizeAgentSession, prepareSession, sessionAge } from '../src/lib/ruphus/session.js';
 import { boundLedger, MAX_LEDGER_BYTES } from './_lib/ruphusEvidence.js';
 
@@ -87,8 +87,16 @@ export function deriveProposalReadiness({ conversation = [], ledger = null, user
     && /\b(?:watery|thin|sour|sharp|bitter|harsh|muted|flat|weak|strong|extraction|grind|dose|temperature|ratio|contact time|drawdown)\b/i.test(previousAssistant)
     && Array.isArray(ledger?.entries) && ledger.entries.length > 0
     && (!unresolvedSensoryQuestion || answeredSensoryQuestion);
-  const userAgreed = /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
+  // This only permits preparing a review card, never saving a recipe. Match
+  // ordinary requests as well as assent, while leaving questions and refusal
+  // as conversation rather than requiring the user to discover magic words.
+  const refusalOrExploration = /\b(?:don['’]t|do not|not yet|hold off|wait|instead|what if|how (?:do|would|can|to)|explain|why|before)\b/i.test(userText);
+  const explicitRequest = /\b(?:update|save|apply|change|make)\s+(?:(?:my|the|this|that|our)\s+)?(?:recipe|change|adjustment)\b/i.test(userText);
+  const userAgreed = !refusalOrExploration && (explicitRequest || /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText));
   return { diagnosisReady, userAgreed };
+}
+export function enabledProposalActions(uid, env = process.env) {
+  return ['apply_proposal', 'brew_once', 'keep_current'].filter((mode) => isMutationAllowed({ uid, mode, rawUids: env.RUPHUS_AGENT_V3_MUTATION_UIDS, rawAccessUids: env.RUPHUS_AGENT_V3_UIDS }));
 }
 export function devReadFaultForRequest({ uid, header, env = process.env } = {}) {
   if (header !== 'tastings_timeout' || env.VERCEL_ENV !== 'preview' || env.TMB_APP_VARIANT !== 'dev' || uid !== env.RUPHUS_DEV_FIXTURE_UID) return null;
@@ -189,7 +197,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     context.sessionId = turnId;
     context.sessionState.lastActivityAt = activeSession?.lastActivityAt || null;
     context.sessionState.boundaryIndex = activeSession?.boundaryIndex || 0;
-    const tools = createRuphusTools({ uid, context, readers, proposalStore: (input) => persistProposal({ db, ...input }) });
+    const tools = createRuphusTools({ uid, context, readers, proposalActions: enabledProposalActions(uid), proposalStore: (input) => persistProposal({ db, ...input }) });
     // E5: retry the unavailable active-topic read before allowing a prose-only turn.
     await retryUnavailableEvidence({ session: activeSession, context, tools, force: replay.resumed });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });

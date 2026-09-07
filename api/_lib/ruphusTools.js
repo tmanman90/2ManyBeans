@@ -187,7 +187,7 @@ function recipeSlotKey(recipe) {
   return null;
 }
 
-export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true } = {}) {
+export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true, proposalActions = [] } = {}) {
   if (!uid || !context) throw new Error('tools require owner and context');
   if (!(context.__ruphusResolvedTargets instanceof Map)) Object.defineProperty(context, '__ruphusResolvedTargets', { value: new Map(), enumerable: false, writable: true, configurable: true });
   const snapshot = context.__ruphusServerSnapshot || context.rotationSnapshot || { coffees: [], refs: {} };
@@ -328,7 +328,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
     if (context.proposalState) context.proposalState.proposalIssued = true;
-    return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}) }) };
+    const actions = typeof proposalStore === 'function' && proposal?.status === 'proposed' && proposal?.sourceRevisionId
+      ? ['apply_proposal', 'brew_once', 'keep_current'].filter((mode) => proposalActions.includes(mode))
+      : [];
+    return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, actions, ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}) }) };
   };
   const definitions = RUPHUS_READ_TOOL_NAMES.map((name) => {
     if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };

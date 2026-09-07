@@ -4,7 +4,7 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation } from '../api/ruphus-agent.js';
+import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation } from '../api/ruphus-agent.js';
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
@@ -165,6 +165,24 @@ test('active server history is authoritative and proposal readiness requires gro
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does watery mean thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It is still watery. Go ahead and change it.' }), { diagnosisReady: false, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does flat mean thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It was flat. Go ahead.' }), { diagnosisReady: false, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Was the watery cup thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It was thin. Go ahead and change it.' }), { diagnosisReady: false, userAgreed: true });
+});
+test('recipe update requests earn a proposal without magic words or another yes', () => {
+  const conversation = [{ role: 'assistant', content: 'For the hot Kalita, reduce the water by 10 g and keep the dose and grind unchanged. That is the first test I would try for more body.' }];
+  const ledger = { entries: [{ kind: 'evidence', status: 'available' }] };
+  for (const userText of ['Ok can we update recipe', 'Could you update my recipe?', 'Please save that change', 'Apply that adjustment', 'Yes']) {
+    assert.equal(deriveProposalReadiness({ conversation, ledger, userText }).userAgreed, true, userText);
+  }
+  for (const userText of ["Don't change it", 'Yes but do not update the recipe', 'Can you explain how to update the recipe?', 'What if we update the recipe?', 'Not yet, go ahead and explain', 'Would that taste better?']) {
+    assert.equal(deriveProposalReadiness({ conversation, ledger, userText }).userAgreed, false, userText);
+  }
+});
+test('proposal controls require both server allowlists, never just chat access', () => {
+  assert.deepEqual(enabledProposalActions('owner', {}), []);
+  assert.deepEqual(enabledProposalActions('owner', { RUPHUS_AGENT_V3_UIDS: 'owner' }), []);
+  assert.deepEqual(enabledProposalActions('owner', { RUPHUS_AGENT_V3_MUTATION_UIDS: 'owner' }), []);
+  const env = { RUPHUS_AGENT_V3_UIDS: 'owner,fixture', RUPHUS_AGENT_V3_MUTATION_UIDS: 'owner,fixture' };
+  assert.deepEqual(enabledProposalActions('owner', env), ['apply_proposal', 'brew_once', 'keep_current']);
+  assert.deepEqual(enabledProposalActions('other', env), []);
 });
 test('typed recipe launch and active slot read the owner-scoped immutable revision and reject substitutes', async () => {
   const revision = { id: 'rev-1', coffeeId: 'bean-1', slotKey: 'v60_hot', snapshotHash: 'hash-1', snapshot: { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 } };
