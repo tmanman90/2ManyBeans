@@ -156,10 +156,24 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
       if (liveConversation?.trialJourney) {
         stage = 'try_once';
         await proposal.getByRole('button', { name: 'Try for one brew', exact: true }).click();
-        await page.waitForFunction(() => document.body.innerText.includes('Ready for one brew') || document.body.innerText.includes('Brew once ready'));
+        // Brew once hands off to the timer, rather than leaving Chat visible.
+        await page.getByRole('button', { name: 'Close brew timer', exact: true }).waitFor();
         await page.evaluate(async firestoreModule => { const { db } = await import('/src/firebase.js'); const { waitForPendingWrites } = await import(firestoreModule); await waitForPendingWrites(db); }, firestoreModule);
         stage = 'return_after_trial';
         await page.reload({ waitUntil: 'domcontentloaded' });
+        // This operator check deliberately uses memory-only auth, so restore
+        // the same fixture identity through the supported SDK after reload.
+        await page.evaluate(async ({ authModule, customToken, fixtureUid }) => {
+          const { auth } = await import('/src/firebase.js');
+          const { signInWithCustomToken } = await import(authModule);
+          const result = await signInWithCustomToken(auth, customToken);
+          if (result.user.uid !== fixtureUid) throw new Error('Wrong fixture identity');
+        }, { authModule, customToken, fixtureUid });
+        // The unfinished attempt is deliberately restored on relaunch.
+        await page.getByRole('button', { name: 'Close brew timer', exact: true }).click();
+        await page.getByRole('button', { name: 'Stop', exact: true }).click();
+        await page.getByText('Hand Brew Recipe', { exact: true }).locator('..').getByRole('button', { name: 'Close', exact: true }).click();
+        await page.getByText('Your first bean!', { exact: true }).waitFor({ state: 'hidden' });
         await page.getByRole('button', { name: 'Chat', exact: true }).click();
         const input = page.getByPlaceholder('Ask Professor Ruphus...', { exact: true });
         await input.fill(liveConversation.turns[3]);
