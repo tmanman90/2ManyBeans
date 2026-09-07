@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildSeedPlan, assertDevTarget, createFirestoreSessionReset, executableFixtureRecipe, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
+import { buildSeedPlan, assertDevTarget, createFirestoreSessionReset, executableFixtureRecipe, fixtureAttemptCleanup, rewriteRelativeDates, seedFixture } from './seed-ruphus-dev-fixture.mjs';
 import { validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { buildProposal } from '../api/_lib/ruphusRepository.js';
 
@@ -8,6 +8,16 @@ test('fixture seeding fails closed outside an explicitly authorized Dev target',
   assert.throws(() => assertDevTarget({ projectId: 'coffee-prod', fixtureUid: 'fixture', authorized: true }), /non-Dev/);
   assert.throws(() => assertDevTarget({ projectId: 'coffee-dev', fixtureUid: 'fixture', authorized: false }), /authorization/);
   assert.equal(assertDevTarget({ projectId: 'coffee-dev', fixtureUid: 'fixture-account', authorized: true }), true);
+});
+
+test('conversation reset removes only extra attempts in the verified fixture, preserving frozen history', () => {
+  const prefix = 'projects/coffee-dev/databases/(default)/documents/users/fixture-account/brewAttempts/';
+  const input = { projectId: 'coffee-dev', fixtureUid: 'fixture-account', authorized: true, profile: { subscription: { source: 'ruphus-dev-fixture' } }, account: { brews: [{ id: 'brew' }], attempts: [{ id: 'attempt' }] }, documents: ['brew', 'attempt', 'previous-ui-trial'].map(id => ({ name: prefix + id })) };
+  assert.deepEqual(fixtureAttemptCleanup(input), [prefix + 'previous-ui-trial']);
+  assert.throws(() => fixtureAttemptCleanup({ ...input, profile: {} }), /dedicated fixture/);
+  assert.throws(() => fixtureAttemptCleanup({ ...input, authorized: false }), /authorization/);
+  assert.throws(() => fixtureAttemptCleanup({ ...input, documents: [...input.documents, { name: prefix.replace('fixture-account', 'owner-account') + 'trial' }] }), /foreign document/);
+  assert.throws(() => fixtureAttemptCleanup({ ...input, documents: [{ name: prefix + 'trial/child' }] }), /foreign document/);
 });
 
 test('relative fixture dates are rewritten from one run clock and seed plan is idempotent-shaped', () => {

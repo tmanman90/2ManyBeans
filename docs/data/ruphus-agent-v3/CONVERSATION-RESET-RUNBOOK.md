@@ -23,7 +23,7 @@ preflight stops the run; it never falls back to production.
   credentials for the run.
 - Redacted diagnostic artifacts expire after 30 days. User-visible
   conversation history is product data and is not diagnostic telemetry.
-- The authorized live-testing budget is **$30 total across all stages and
+- The authorized live-testing budget is **$35 total across all stages and
   providers combined**. The persistent runner ledger reserves maximum cost
   before every candidate, judge, and pairwise dispatch and refuses a dispatch
   that could exceed the remaining total.
@@ -41,7 +41,7 @@ Record identifiers, never secrets, in the decision document:
 | App | `com.talmeltzer.coffeehub.dev` and display name `2manybeans Dev` |
 | Updater | `CapacitorUpdater.autoUpdate` is `false` in the verified Dev bundle |
 | Mutation | Client and server allowlists contain only the approved Dev UID; rollout tests prove only Apply, Brew once, and Keep are exposed from a proposal |
-| Budget | One cumulative ledger with authorized cap `$30`, starting spend, and remaining amount |
+| Budget | One cumulative ledger with authorized cap `$35`, starting spend, and remaining amount |
 
 Stop immediately if any identity is missing, if the preview redirects to an
 unverified host, if deployment-protection query parameters are lost, or if a

@@ -107,6 +107,20 @@ export async function seedFixture({ projectId, fixtureUid, authorized = false, r
   return { dryRun: false, manifestHash: account.manifestHash, operations: operations.length };
 }
 
+// A conversation-only stage must not inherit trial attempts from earlier UI
+// action tests. Resolve every deletion first; never operate on an owner account.
+export function fixtureAttemptCleanup({ projectId, fixtureUid, authorized, profile, account, documents }) {
+  assertDevTarget({ projectId, fixtureUid, authorized });
+  if (profile?.subscription?.source !== 'ruphus-dev-fixture') throw new Error('attempt reset requires the dedicated fixture profile');
+  const prefix = `projects/${projectId}/databases/(default)/documents/users/${fixtureUid}/brewAttempts/`;
+  const retained = new Set([...(account.brews || []), ...(account.attempts || [])].map(item => item.id));
+  return documents.flatMap(document => {
+    const name = document.name;
+    if (typeof name !== 'string' || !name.startsWith(prefix) || !name.slice(prefix.length) || name.slice(prefix.length).includes('/')) throw new Error('attempt reset refuses a foreign document');
+    return retained.has(name.slice(prefix.length)) ? [] : [name];
+  });
+}
+
 export async function createFirestoreSessionReset({ projectId, fixtureUid, db: providedDb = null } = {}) {
   assertDevTarget({ projectId, fixtureUid, authorized: true });
   let db = providedDb;

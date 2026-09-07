@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { loadFixtureManifest, createCostGuard, loadCumulativeCostLedger, loadSmokeLedger, persistCumulativeCostLedger, runLiveCase, runLiveStage, persistRunArtifact } from './ruphus-conversation-runner.mjs';
 import { createAnthropicJudgeAdapter } from './ruphus-conversation-judge.mjs';
-import { createFirestoreSessionReset, seedFixture } from './seed-ruphus-dev-fixture.mjs';
+import { createFirestoreSessionReset, fixtureAttemptCleanup, seedFixture } from './seed-ruphus-dev-fixture.mjs';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { canonicalRecipeSnapshot, resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { canonicalHash } from '../src/lib/ruphus/contracts.js';
@@ -269,6 +269,16 @@ try {
   } else if (mode === 'smoke' || mode === 'full') {
     const judge = mode === 'full' ? createAnthropicJudgeAdapter({}) : null;
     report.stage = `seed_live_${mode}`;
+    const documents = [];
+    let pageToken;
+    do {
+      const page = await request(`${base}/brewAttempts${pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : ''}`);
+      documents.push(...(page.documents || []));
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    const removals = fixtureAttemptCleanup({ projectId: project, fixtureUid: uid, authorized: true, profile: fixtureProfile, account, documents });
+    for (const name of removals) await request(`https://firestore.googleapis.com/v1/${name}`, { method: 'DELETE' });
+    report.priorFixtureTrialAttemptsRemoved = removals.length;
     await seedFixture({ projectId: project, fixtureUid: uid, authorized: true, write: async (path, data) => {
       assert.ok(path === `users/${uid}` || path.startsWith(`users/${uid}/`));
       await request(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}`, { method: 'PATCH', body: encode(data).mapValue });

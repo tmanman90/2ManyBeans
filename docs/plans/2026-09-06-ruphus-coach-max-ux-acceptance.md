@@ -12,7 +12,7 @@ Deliver the user-approved September 6 UX direction: a knowledgeable coffee compa
 
 - Continue on `codex/feat-ruphus-agent-v3` in the existing isolated worktree. Preserve unrelated edits and all diagnostic ledgers/report directories; never stage diagnostics.
 - Dev-only configuration, backend, Firebase, and native app. Production remains untouched. No production data writes, push, merge, release, automatic recipe mutation, or hardware actions.
-- Preserve the existing $30 total testing cap and 30-day redacted diagnostic retention. Check cumulative spend before any live test; unknown spend is not free spend.
+- Preserve the owner-authorized September 7 $35 total testing cap (raised from $30, not reset) and 30-day redacted diagnostic retention. Check cumulative spend before any live test; unknown spend is not free spend.
 - Use supported authentication only. Keep secrets out of output, artifacts, and process arguments.
 - Follow repository instructions: execute agent work sequentially in the main task. Root retains product/visual acceptance ownership.
 
