@@ -441,7 +441,8 @@ export function nextBranchTurn(fixture, index, reply) {
   const question = reply?.question || (/\?\s*$/.test(String(reply?.text || '')) ? String(reply.text).trim() : null);
   if (!question) return { text: planned, unexpectedBranch: false, question: null };
   const branches = (fixture.branches || []).filter((candidate) => candidate.afterTurn == null || index + 1 >= Number(candidate.afterTurn));
-  const direct = branches.find((candidate) => new RegExp(candidate.when, 'i').test(question));
+  const sensoryWording = question.replace(/\blacking\s+(aroma|flavou?r)\b/gi, 'little $1');
+  const direct = branches.find((candidate) => new RegExp(candidate.when, 'i').test(sensoryWording));
   const proposalPermission = /\b(?:want me to|would you like me to|shall i|should i|want to|would you like to)\b[^?]*(?:propos|prepar|make|set up|recipe change|grind change|try|put[^?]{0,40}forward)/i.test(question);
   const semantic = proposalPermission ? branches.find((candidate) => /propos|prepar|change|want to try|would you like to try|next test|bounded/i.test(candidate.when)) : null;
   const branch = direct || semantic;

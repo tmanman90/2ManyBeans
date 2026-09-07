@@ -37,6 +37,8 @@ test('length and shape graders distinguish ordinary caps from runtime hard cap',
 
 test('sized live recommendations can explain effects without becoming unsized instructions', () => {
   for (const reply of [
+    'For Colombia La Esperanza’s hot Kalita, I’d grind finer by one small Ode step: 4.2 to 4.1. Sour and muted points to under-extraction, and this should increase contact without changing the rest of the recipe; let the next cup confirm whether the cup gains clarity.',
+    'For Colombia La Esperanza on the hot Kalita, go one small step finer: Ode 4.2 to 4.1. Sour and muted points to under-extraction; finer grounds should increase contact and help bring the cup into focus. Keep the dose, water, ratio, and temperature unchanged for this test.',
     'For thin and sour, I’d choose a finer grind before adding dose: move the Ode from 4.2 to 4.1 for the Kalita 155. That should target the sourness and may add body; more dose would mainly strengthen the cup without directly addressing likely under-extraction. Keep the water and dose unchanged for this test.',
     'For the hot Kalita, I’d grind one small step finer on the Ode: 4.2 to 4.1. That should increase extraction and target the sour, muted character without changing the dose, water, or temperature.',
     'For El Vergel’s hot V60, go one small finer grind step: Ode 4.2 to 4.1. That should encourage more extraction and may lift the muted, sour character; keep the dose, water, and temperature unchanged for this test.',
@@ -44,6 +46,8 @@ test('sized live recommendations can explain effects without becoming unsized in
   ]) assert.deepEqual(gradeC5Numbers({ reply }), []);
   for (const reply of [
     'Grind one small step finer. Also use more water.',
+    'Grind one small step finer, and this should increase contact; also increase the water.',
+    'Finer grounds should increase contact.',
     'Grind one small step finer. More dose would strengthen it; use more water.',
     'That should increase extraction.',
     'Grind finer. That should target the sourness.',
