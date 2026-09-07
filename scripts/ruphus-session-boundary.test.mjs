@@ -121,6 +121,11 @@ test('new chat advances a boundary and clears ledger without deleting messages',
   const original = normalizeAgentSession({ messages: [{ id: 'm1', role: 'user', text: 'hello', createdAt: 1 }], ledger: { entries: [{ namedCoffees: ['El Vergel'] }] }, boundaryIndex: 0, lastActivityAt: 1 });
   const next = startNewChat(original, { now: 2 });
   assert.equal(next.messages.length, 1); assert.equal(next.boundaryIndex, 1); assert.equal(next.ledger.entries.length, 0); assert.equal(continuePrevious(next, { now: 3 }).messages[0].text, 'hello');
+  assert.equal(sessionPresentation(next, { now: 3 }).showContinue, true, 'a fresh archive must remain reachable immediately');
+  const resumed = continuePrevious(next, { now: 3 });
+  assert.equal(resumed.boundaryIndex, 0, 'explicit Continue restores replay eligibility');
+  assert.equal(sessionPresentation(resumed, { now: 3 }).showContinue, false);
+  assert.equal(sessionPresentation({ ...next, messages: [] }, { now: 3 }).showContinue, false);
 });
 test('stale sessions present Continue before replay and recent sessions resume visibly', () => {
   const now = 1000000000;

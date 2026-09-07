@@ -126,14 +126,16 @@ export function continuePrevious(session, { now = Date.now() } = {}) {
   const normalized = normalizeAgentSession(session);
   if (!normalized) return null;
   const stale = sessionAge({ lastActivityAt: normalized.lastActivityAt, now }).state === 'stale';
-  return { ...normalized, ledger: stale ? emptyLedger() : boundedLedger(normalized.ledger), lastActivityAt: Number(now), updatedAt: Number(now), ...(stale ? { historyWidened: true } : {}) };
+  const archived = normalized.messages.length > 0 && normalized.boundaryIndex === normalized.messages.length;
+  return { ...normalized, boundaryIndex: archived ? 0 : normalized.boundaryIndex, ledger: stale || archived ? emptyLedger() : boundedLedger(normalized.ledger), lastActivityAt: Number(now), updatedAt: Number(now), ...(stale ? { historyWidened: true } : {}) };
 }
 
 export function sessionPresentation(session, { now = Date.now() } = {}) {
   const normalized = normalizeAgentSession(session);
   if (!normalized) return { state: 'fresh', showOpening: false, showContinue: false, session: null };
   const age = sessionAge({ lastActivityAt: normalized.lastActivityAt, now });
-  return { state: age.state, showOpening: age.state !== 'fresh', showContinue: age.state === 'stale', session: normalized };
+  const archived = normalized.messages.length > 0 && normalized.boundaryIndex === normalized.messages.length;
+  return { state: age.state, showOpening: archived || age.state !== 'fresh', showContinue: normalized.messages.length > 0 && (archived || age.state === 'stale'), session: normalized };
 }
 
 export function rebuildStaleSession(session, { now = Date.now() } = {}) {
