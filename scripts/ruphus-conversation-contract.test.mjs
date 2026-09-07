@@ -39,9 +39,12 @@ test('sized live recommendations can explain effects without becoming unsized in
   for (const reply of [
     'For thin and sour, I’d choose a finer grind before adding dose: move the Ode from 4.2 to 4.1 for the Kalita 155. That should target the sourness and may add body; more dose would mainly strengthen the cup without directly addressing likely under-extraction. Keep the water and dose unchanged for this test.',
     'For the hot Kalita, I’d grind one small step finer on the Ode: 4.2 to 4.1. That should increase extraction and target the sour, muted character without changing the dose, water, or temperature.',
+    'For El Vergel’s hot V60, go one small finer grind step: Ode 4.2 to 4.1. That should encourage more extraction and may lift the muted, sour character; keep the dose, water, and temperature unchanged for this test.',
+    'Finer grind beats more dose here. Thin plus sour points toward under-extraction, so try one small Ode step finer, from 4.2 to 4.1, while keeping dose and water unchanged; more dose would mainly strengthen the cup and could make extraction harder.',
   ]) assert.deepEqual(gradeC5Numbers({ reply }), []);
   for (const reply of [
     'Grind one small step finer. Also use more water.',
+    'Grind one small step finer. More dose would strengthen it; use more water.',
     'That should increase extraction.',
     'Grind finer. That should target the sourness.',
   ]) assert.ok(gradeC5Numbers({ reply }).some((item) => item.code === 'C5_DIRECTION_SIZE'));
