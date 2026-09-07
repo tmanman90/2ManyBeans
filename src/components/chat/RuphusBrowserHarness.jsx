@@ -20,6 +20,8 @@ export function RuphusBrowserHarness({ legacy = false }) {
   const [focused, setFocused] = useState(false);
   const [writeCount, setWriteCount] = useState(0);
   const [lastAction, setLastAction] = useState('');
+  const [proposalPending, setProposalPending] = useState(false);
+  const [proposalStale, setProposalStale] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
   const [session, setSession] = useState(() => createHarnessSession());
   const presentation = sessionPresentation(session, { now: HARNESS_CLOCK });
@@ -28,7 +30,7 @@ export function RuphusBrowserHarness({ legacy = false }) {
     setFrames([{ type: 'context_loading' }]);
     setTimeout(() => setFrames(prev => [...prev, { type: 'text_delta' }, { type: 'artifact_ready' }]), 0);
   };
-  const artifact = { id: 'harness-proposal', type: 'recipe_proposal', status: 'proposed', coffeeId: 'bean-1', slotKey: 'v60_hot', sourceRevisionId: 'revision-1', sourceHash: 'source-1', actions: ['apply_proposal', 'brew_once', 'keep_current'], before: { ratio: 16 }, after: { ratio: 16.5 } };
+  const artifact = { id: 'harness-proposal', type: 'recipe_proposal', status: 'proposed', coffeeId: 'bean-1', coffeeName: 'El Vergel', slotKey: 'kalita_hot', sourceRevisionId: 'revision-1', sourceHash: 'source-1', actions: ['apply_proposal', 'brew_once', 'keep_current'], before: { waterGrams: 215, coffeeGrams: 13, grindSize: { setting: '5.6' }, waterTemp: { celsius: 94 }, ratio: '1:16.5' }, after: { waterGrams: 205, coffeeGrams: 13, grindSize: { setting: '5.6' }, waterTemp: { celsius: 94 }, ratio: '1:15.8', kalitaSize: '155', steps: [{ time: '0:00', action: 'Bloom with 39g water.' }, { time: '0:30', action: 'Pour to 97g total.' }, { time: '1:15', action: 'Finish at 205g total.' }] } };
   const handleAction = ({ mode }) => { setLastAction(mode); setWriteCount(value => value + 1); };
   return <main data-ruphus-harness="true" data-agent-enabled={agentEnabled ? 'true' : 'false'} data-write-count={writeCount} data-last-action={lastAction} style={{ minHeight: '100vh', padding: 20, background: C.bg, color: C.text, fontFamily: fonts.body }}>
     <h1 style={{ fontFamily: fonts.heading }}>Ruphus browser harness</h1>
@@ -48,7 +50,9 @@ export function RuphusBrowserHarness({ legacy = false }) {
       <button type="button" data-ruphus-stream="true" onClick={runStream}>Simulate Agent stream</button>
       {frames.some(frame => frame.type === 'context_loading') && <RuphusLifecycleCaption frame={{ type: 'context_loading' }} />}
       {frames.some(frame => frame.type === 'text_delta') && <RuphusMessage text="I’m reading this cup in context." />}
-      {frames.some(frame => frame.type === 'artifact_ready') && <ArtifactRenderer artifact={artifact} onAction={handleAction} />}
+      {frames.some(frame => frame.type === 'artifact_ready') && <ArtifactRenderer artifact={{ ...artifact, ...(proposalStale ? { status: 'stale' } : {}) }} onAction={handleAction} actionPending={proposalPending} />}
+      <button type="button" data-proposal-pending-toggle onClick={() => setProposalPending(value => !value)}>Toggle pending action</button>
+      <button type="button" data-proposal-stale-toggle onClick={() => setProposalStale(value => !value)}>Toggle stale proposal</button>
       <input aria-label="Harness composer" data-keyboard-input="true" onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
       <div data-keyboard-visible={focused ? 'true' : 'false'} style={{ paddingBottom: focused ? 260 : 12 }}>Keyboard padding contract</div>
     </section>

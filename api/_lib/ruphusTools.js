@@ -69,6 +69,25 @@ function patchForChange(before, change) {
   if (control === 'dose') return { [Object.hasOwn(before, 'coffeeGrams') ? 'coffeeGrams' : 'dose']: Number(value) };
   if (control === 'water') {
     const water = Number(value);
+    if (!Number.isFinite(water) || water <= 0) return null;
+    if (before.mode === 'hot' && before.isIced !== true) {
+      const previousWater = Number(before.waterGrams ?? before.water);
+      const dose = Number(before.coffeeGrams ?? before.dose);
+      const patch = { [Object.hasOwn(before, 'waterGrams') ? 'waterGrams' : 'water']: water };
+      for (const key of ['waterGrams', 'water']) if (Object.hasOwn(before, key)) patch[key] = water;
+      if (Number.isFinite(dose) && dose > 0) {
+        const ratio = Math.round(water / dose * 10) / 10;
+        patch.ratio = typeof before.ratio === 'number' ? ratio : `1:${ratio}`;
+      }
+      // Reduce the final pour, not the bloom or earlier pulse schedule. Keep
+      // cumulative-water instructions consistent with the timer's numbers.
+      if (Array.isArray(before.steps)) patch.steps = before.steps.map((step) => step.waterTotal === previousWater ? {
+        ...step,
+        waterTotal: water,
+        ...(typeof step.action === 'string' ? { action: step.action.replace(/\b(\d+(?:\.\d+)?)\s*g\b/gi, (match, amount) => Number(amount) === previousWater ? `${water}g` : match) } : {}),
+      } : step);
+      return patch;
+    }
     const steps = Array.isArray(before.steps) && before.steps.length ? before.steps.map((step, index) => index === before.steps.length - 1 ? { ...step, waterTotal: water } : step) : undefined;
     return { [Object.hasOwn(before, 'waterGrams') ? 'waterGrams' : 'water']: water, ...(steps ? { steps } : {}) };
   }
@@ -325,7 +344,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const validationRecipe = after.sourceLineage ? after : recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
-    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
+    const coffeeName = snapshot.coffees?.find((item) => item.refKey === args.coffeeRef)?.name
+      || (context.turnBinding?.coffeeRef === args.coffeeRef ? context.turnBinding.coffeeName : null);
+    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
     if (context.proposalState) context.proposalState.proposalIssued = true;
     const actions = typeof proposalStore === 'function' && proposal?.status === 'proposed' && proposal?.sourceRevisionId

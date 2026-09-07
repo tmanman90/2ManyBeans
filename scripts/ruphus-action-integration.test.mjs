@@ -7,6 +7,10 @@ import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { applyRuphusTastingState } from '../api/ruphus-tasting.js';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { createMemoryRuphusRepository } from '../api/_lib/ruphusRepository.js';
+import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { deriveProposalReadiness } from '../api/ruphus-agent.js';
+import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
 function setup() {
   const store = createMemoryCommandStore({ uid: 'user-1' });
@@ -14,6 +18,47 @@ function setup() {
   store.seedBean('bean-1', { id: 'bean-1', ownerId: 'user-1', handBrewRecipes: { v60: recipe }, handBrewRecipe: recipe });
   return { store, recipe };
 }
+
+test('Kalita update request produces a persisted card, then explicit Apply changes canonical recipe and Undo restores it', async () => {
+  const uid = 'user-1';
+  const store = createMemoryCommandStore({ uid });
+  const before = generateKalitaRecipe({ targetRatio: 215 / 13 }, { dose: 13, size: '155' });
+  store.seedBean('bean-1', { name: 'El Vergel', handBrewRecipes: { kalita: before }, handBrewRecipe: before });
+  store.execute({ actionId: 'initial', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'kalita_hot', recipe: before });
+  const repository = createMemoryRuphusRepository();
+  repository.seedBean(uid, store.getBean('bean-1'));
+  const userText = 'Ok can we update recipe';
+  const conversation = [{ role: 'assistant', content: 'For a little more body, reduce the water by 10 g and keep the dose and grind unchanged.' }];
+  const ledger = { entries: [{ kind: 'evidence', status: 'available', namedCoffees: ['El Vergel'] }] };
+  const context = { userText, conversation, ledger, sessionId: 'kalita-conversation', rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel' }], refs: { c1: 'bean-1' } }, proposalState: { target: null, ...deriveProposalReadiness({ conversation, ledger, userText }) } };
+  const tools = createRuphusTools({ uid, context, proposalActions: ['apply_proposal', 'brew_once', 'keep_current'],
+    readers: { readRecipe: async () => resolveLegacyRecipe(repository.getBean(uid, 'bean-1'), 'kalita_hot').recipe },
+    proposalStore: async (input) => repository.createProposal(input),
+  });
+  const frames = []; let round = 0;
+  const provider = { runTurn: async () => (++round === 1
+    ? { toolCalls: [{ callId: 'read', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'kalita_hot' } }] }
+    : { toolCalls: [{ callId: 'propose', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'water', value: 205 } } }] }) };
+  const turn = await runRuphusTurn({ turnId: 'kalita-update', context, userText, provider, tools, emit: frame => frames.push(frame) });
+  assert.equal(turn.ok, true);
+  const artifact = frames.find(frame => frame.type === 'artifact_ready')?.artifact;
+  assert.ok(artifact);
+  assert.equal(artifact.coffeeName, 'El Vergel');
+  assert.deepEqual(artifact.actions, ['apply_proposal', 'brew_once', 'keep_current']);
+  assert.equal(resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe.waterGrams, 215);
+  store.seedProposal(repository.getProposal(uid, artifact.id));
+  const storage = { getItem: () => null, setItem: () => {} };
+  const { request } = resolveRuphusActionRequest({ uid, mode: 'apply_proposal', artifact, storage, idFactory: () => 'owner-tap' });
+  const applied = store.execute(request);
+  const after = resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe;
+  assert.equal(after.waterGrams, 205);
+  assert.equal(after.steps.at(-1).waterTotal, 205);
+  assert.match(after.steps.at(-1).action, /205g/);
+  assert.equal(applied.receipt.executionAvailable, true);
+  assert.equal(store.execute(request).revision.id, applied.revision.id);
+  store.execute({ actionId: 'owner-undo', mode: 'undo_revision', coffeeId: 'bean-1', slotKey: 'kalita_hot', expectedRevisionId: applied.revision.id });
+  assert.equal(resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe.waterGrams, 215);
+});
 
 test('Apply creates one active revision and idempotent replay does not duplicate it', () => {
   const { store, recipe } = setup();

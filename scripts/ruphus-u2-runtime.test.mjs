@@ -197,6 +197,27 @@ test('dose proposal regenerates every executable alias and timed instruction fro
   assert.doesNotMatch(JSON.stringify(saved[0].after), /15g/);
   assert.equal(saved[0].after.steps.some((step) => /15g/.test(step.action)), false);
 });
+test('Kalita water proposal keeps the ratio, aliases, and final pour consistent', async () => {
+  const source = generateKalitaRecipe({ targetRatio: 215 / 13 }, { dose: 13, size: '155' });
+  const before = { ...source, water: source.waterGrams, dose: 13 };
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, proposalState: { target: null, diagnosisReady: true, userAgreed: true } };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'water', value: 205 } });
+  assert.equal(result.ok, true);
+  const after = result.artifact.after;
+  assert.equal(after.waterGrams, 205);
+  assert.equal(after.water, 205);
+  assert.equal(after.ratio, '1:15.8');
+  assert.equal(after.coffeeGrams, 13);
+  assert.deepEqual(after.waterTemp, before.waterTemp);
+  assert.deepEqual(after.grindSize, before.grindSize);
+  assert.deepEqual(after.steps.slice(0, -1), before.steps.slice(0, -1));
+  assert.equal(after.steps.at(-1).waterTotal, 205);
+  assert.match(after.steps.at(-1).action, /205g total/);
+  assert.doesNotMatch(after.steps.at(-1).action, /215g/);
+  assert.equal(before.waterGrams, 215);
+});
 test('conditional sensory diagnosis cannot mint proposal authority', async () => {
   const before = generateV60Recipe({}, { dose: 15 });
   const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: {

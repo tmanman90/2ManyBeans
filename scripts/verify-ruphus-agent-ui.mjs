@@ -41,7 +41,7 @@ async function startLocalServer() {
   });
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.RUPHUS_UI_BROWSER_PATH ? { executablePath: process.env.RUPHUS_UI_BROWSER_PATH } : {}) });
 try {
   if (!baseUrl) await startLocalServer();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -74,12 +74,30 @@ await page.waitForSelector('[data-ruphus-lifecycle-caption]', { state: 'visible'
 await page.waitForSelector('[data-ruphus-message="agent-v3"]', { state: 'visible' });
 await page.waitForSelector('[data-artifact="recipe_proposal"]', { state: 'visible' });
 assert.equal(await page.locator('[data-proposal-actions="true"] button').count(), 3);
-await page.getByRole('button', { name: 'Apply', exact: true }).click();
+const proposal = page.locator('[data-artifact="recipe_proposal"]');
+assert.match(await proposal.innerText(), /El Vergel · Kalita 155/);
+assert.match(await proposal.locator('[data-recipe-change="water"]').innerText(), /215 g → 205 g/);
+assert.match(await proposal.innerText(), /saved recipe is unchanged/);
+await proposal.locator('summary').click();
+assert.match(await proposal.locator('ol').innerText(), /Finish at 205g total/);
+await proposal.locator('summary').click();
+await proposal.screenshot({ path: '/tmp/ruphus-proposal-mobile.png' });
+await page.getByRole('button', { name: 'Update saved recipe', exact: true }).click();
 assert.equal(await page.locator('[data-ruphus-harness]').getAttribute('data-write-count'), '1');
 assert.equal(await page.locator('[data-ruphus-harness]').getAttribute('data-last-action'), 'apply_proposal');
+await page.locator('[data-proposal-pending-toggle]').click();
+assert.equal(await proposal.locator('button:disabled').count(), 3);
+assert.match(await proposal.innerText(), /Working on your choice/);
+await page.locator('[data-proposal-pending-toggle]').click();
+await page.locator('[data-proposal-stale-toggle]').click();
+assert.equal(await proposal.locator('button').count(), 0);
+assert.match(await proposal.innerText(), /out of date/);
+await page.locator('[data-proposal-stale-toggle]').click();
 await page.locator('[data-keyboard-input]').focus();
 assert.equal(await page.locator('[data-keyboard-visible="true"]').count(), 1);
   await page.screenshot({ path: '/tmp/ruphus-agent-v3-mobile.png', fullPage: false });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await proposal.screenshot({ path: '/tmp/ruphus-proposal-desktop.png' });
 
   const legacy = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await legacy.goto(`${baseUrl}?ruphus-harness=1&legacy=1`, { waitUntil: 'domcontentloaded' });
