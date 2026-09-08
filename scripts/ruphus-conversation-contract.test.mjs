@@ -14,6 +14,17 @@ import {
   loadTranscript, parseTranscript, runInjectedCorpus,
 } from './ruphus-conversation-runner.mjs';
 
+test('sized grind comparisons and their predicted outcome are not extra unsized controls', () => {
+  const replies = [
+    'For the Kalita 155, I’d try a finer grind before adding dose: move the Ode from 4.2 to 4.1. Thin plus sour points more toward under-extraction, and that small grind change should increase extraction without also making the brew stronger; then judge the next cup’s balance.',
+    'Finer grind would beat more dose here. Thin plus sour points to under-extraction, so I’d take the Kalita 155 from Ode 4.2 to 4.1 for the next 15 g / 250 g brew, keeping the dose and water unchanged. Dose would mainly strengthen the cup, but may leave that sourness behind.',
+  ];
+  for (const reply of replies) assert.deepEqual(gradeC5Numbers({ reply }), [], reply);
+  for (const extra of ['Also increase the water.', 'Also use more bloom time.', 'Also make the water hotter.']) {
+    assert.ok(gradeC5Numbers({ reply: `${replies[0]} ${extra}` }).some(item => item.code === 'C5_DIRECTION_SIZE'), extra);
+  }
+});
+
 test('contract exposes versioned C6a/C6b surfaces and pure grader output', () => {
   assert.equal(CONTRACT_VERSION, 'conversation-contract-v1');
   assert.ok(C6A_MACHINE_TOKENS.includes('resolve_coffee'));
