@@ -14,6 +14,17 @@ import {
   loadTranscript, parseTranscript, runInjectedCorpus,
 } from './ruphus-conversation-runner.mjs';
 
+test('a missing link to the identified cup is not absence of coffee tasting history', () => {
+  for (const reply of [
+    'The tasting note was from 21 days ago. The more recent hot V60 brew was 3 days ago, but there’s no linked tasting for it.',
+    'There is a recent V60 brew, but no tasting tied to that cup.',
+  ]) {
+    assert.deepEqual(gradeEvidenceScope({ reply, readWindow: { days: 14 }, evidence: { tastings: [{ note: 'thin' }] } }), []);
+    assert.ok(gradeEvidenceScope({ reply, evidence: { unavailable: ['tastings'] } }).length);
+  }
+  assert.ok(gradeEvidenceScope({ reply: 'There are no tastings for this coffee.', readWindow: { days: 14 }, evidence: { tastings: [{ note: 'thin' }] } }).length);
+});
+
 test('sized grind comparisons and their predicted outcome are not extra unsized controls', () => {
   const replies = [
     'For the Kalita 155, I’d try a finer grind before adding dose: move the Ode from 4.2 to 4.1. Thin plus sour points more toward under-extraction, and that small grind change should increase extraction without also making the brew stronger; then judge the next cup’s balance.',

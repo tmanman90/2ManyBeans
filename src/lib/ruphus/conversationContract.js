@@ -262,6 +262,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
   if (unavailable.has(claimedKind) || unavailable.has(claimedKind.replace(/s$/, ''))) {
     return [violation('EVIDENCE_SCOPE', CATEGORIES.ORDINARY, `reply claims ${claimedKind} are absent even though that source was unavailable`, { runtime: true })];
   }
+  if (/\bno\s+tasting\s+tied\s+to\s+(?:that|this|the)\s+(?:cup|brew)\b|\bno\s+linked\s+tasting\s+for\s+it\b/i.test(value)) return [];
   if (/\bnothing\b[^.?!]*(?:(?:brew log|brew details|notes)[^.?!]*\b(?:flags?|points?|suggests?|indicates?|alarms?|alarming|concerns?|concerning|wrong|problematic)\b|\b(?:alarms?|alarming|concerns?|concerning|wrong|problematic)\b[^.?!]*(?:brew log|brew details|notes))/i.test(value)) return [];
   if (/\bno\s+(?:(?:linked|separate|recorded)\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+(?:is\s+)?(?:attached|linked|describing)\s+(?:to\s+)?(?:that|the|this)?\s*(?:brew|cup|it)?\b|\bno\s+(?:(?:linked|separate|recorded)\s+)?(?:tasting|brew|recipe)(?:\s+note)?\s+for\s+that\s+(?:brew|cup)\b|\b(?:v60|kalita|aiden|brew|cup)\b[^?!]{0,128}\b(?:had|has|with)\b[^?!]{0,64}\bno\s+(?:(?:linked|separate|recorded|attached)\s+)?tasting(?:\s+note)?\b/i.test(value)) return [];
   const windowed = object(readWindow) && (readWindow.days || readWindow.from || readWindow.to);
