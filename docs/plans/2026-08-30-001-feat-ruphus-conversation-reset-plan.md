@@ -10,6 +10,38 @@ origin: docs/brainstorms/2026-08-30-ruphus-conversation-first-reset-requirements
 
 ## Summary
 
+### September 8 owner-authorized acceptance amendment (controlling)
+
+This amendment supersedes conflicting physical-device, seeded-native-account,
+and owner-verdict completion requirements below and in the origin document.
+Engineering acceptance uses Tal's already-signed-in **Dev simulator account**,
+not the seeded fake account. Do not use the phone. Preserve the existing login,
+inventory, tasting records, and transcript; never uninstall, clear its container,
+seed/reset this account, or add an authentication backdoor. Exercise native
+journeys through supported UI and existing authenticated command seams. Capture
+the original exact recipe before any test mutation, use the app's Undo command,
+and verify canonical recipe values are restored. Do not manufacture brew or
+tasting history, physical brew completion, or Fellow success.
+
+Native engineering journeys cover direct Chat/typing, contextual entry, coffee
+and method correction, an earned proposal, Brew once and return to the retained
+card, natural-language permanent-save recovery, explicit save and Undo, relaunch
+restoration, and New chat/Continue without deleting prior history. Use the
+account's actual available records; fixture-only history/outage/age cases remain
+seeded backend or rendered-harness evidence, never invented native evidence.
+
+Keep seeded live backend evaluations and rendered harness results as separate
+evidence categories. The unchanged final backend quality gate plus verified
+native Dev journeys and environment isolation establish **Engineering PASS**.
+R29 personal unscripted verdicts may remain pending and must not block remaining
+engineering work or Engineering PASS. Do not label them passed or claim personal
+product approval. Any newly observed reproducible engineering defect still
+requires a fix and proportionate regression proof. Physical-device acceptance
+is deferred by owner direction, not failed. Production remains out of scope.
+
+The owner increased the cumulative testing ceiling from $45 to **$55 total**;
+retain all existing spend and diagnostics. This is not a new $55 allowance.
+
 Make Professor Ruphus a warm, experienced coffee friend in a natural multi-turn mobile conversation, and prove it with staged real-provider conversations, a blind calibrated judge, and unscripted owner conversations on a physical Dev device before touching heavier session or rollout architecture. Build the smallest vertical slice on the existing session model: remove the launch cage, deterministically bind high-confidence coffee references before model reasoning, give the model a compact rotation and setup snapshot and barista-language evidence with a bounded ledger, infer method by priority order, enforce a deliberately narrow runtime contract, and delete the user-visible failure seams. The first full gate is a backend conversation checkpoint, not a product claim. Product PASS (Dev-dogfood-ready) requires the Chat surface work, the explicit native proposal/action loop for the authorized Dev owner, a final full gate on the final code, proven environment identity, and the product owner's unscripted device conversations logged with zero bad verdicts and every fixture they produce passed at full cadence on the final code. Durable multi-session storage is deferrable until after that and never blocks proving or dogfooding. Everything stays behind the existing Dev-only gates; production is out of scope.
 
 ---

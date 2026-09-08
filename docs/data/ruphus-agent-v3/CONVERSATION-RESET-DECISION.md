@@ -1,5 +1,15 @@
 # Conversation reset decision
 
+## September 8 resumed engineering acceptance
+
+Owner authorized $10 more, raising the cumulative ceiling to $55, and replaced
+seeded-account/physical native acceptance with journeys on the already-signed-in
+Dev simulator account. The plan's controlling amendment records login/data
+preservation, recipe Undo/readback, no authentication backdoor, and separate
+seeded backend evidence. Personal verdicts remain pending and do not block
+engineering work. No phone use is authorized. The latest full backend gate is
+running against the existing f2euiw6w7 preview; no result is claimed yet.
+
 ## September 8 latest-source gate — budget stop
 
 Preview `https://twomanybeans-ruphus-f2euiw6w7-tmanman90s-projects.vercel.app`

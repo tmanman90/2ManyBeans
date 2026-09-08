@@ -22,7 +22,8 @@ export const U3_STAGE_RULES = Object.freeze({
 });
 export const CRITICAL_FIXTURE_IDS = Object.freeze(['AE01', 'AE02', 'AE03', 'AE04', 'AE05', 'AE06', 'AE07', 'AE08', 'AE09', 'AE10', 'AE14']);
 export const SUPPORTING_FIXTURE_IDS = Object.freeze(['AE11', 'AE12', 'AE13']);
-export const U3_TOTAL_LIVE_COST_CAP_USD = 45;
+// Owner authorized another $10 on September 8; cumulative, not per run.
+export const U3_TOTAL_LIVE_COST_CAP_USD = 55;
 export const U3_ENDPOINT_TIMEOUT_MS = 45_000;
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const cloneWithout = (value, keys) => Object.fromEntries(Object.entries(value || {}).filter(([key]) => !keys.includes(key)));

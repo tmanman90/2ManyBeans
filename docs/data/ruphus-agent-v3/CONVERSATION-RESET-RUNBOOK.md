@@ -6,6 +6,20 @@ preflight stops the run; it never falls back to production.
 
 ## Current continuation boundary
 
+September 8 owner amendment supersedes conflicting account/device/verdict rules
+below: native acceptance uses the already-signed-in Dev simulator owner account.
+Preserve its login and existing data. Never seed/reset it or inject authentication.
+Capture exact recipe values before test commands and verify Undo restores them.
+Seeded backend tests remain separate. Phone testing is deferred; personal R29
+verdicts remain pending without blocking engineering work or Engineering PASS.
+The current cumulative ceiling is **$55**, increased from $45 by the owner.
+Read the live ledger before dispatch; all prior spend remains counted.
+Latest product ed35525 is on preview `f2euiw6w7` (metadata eda694a); its two
+same-commit smokes passed. The budget-stopped full gate is now being resumed.
+The earlier bdf6860 full PASS remains historical, not latest-source proof.
+
+### Historical boundary (superseded by the amendment above)
+
 The final live gate already passed on product source `bdf686024cd692f48c734a1bf7d6127b527757e7`;
 see the current acceptance summary in `CONVERSATION-RESET-DECISION.md` for the
 exact report and remaining evidence. Do not restart the paid cadence merely
@@ -35,14 +49,15 @@ from the passing endpoint gate or the already-proven core simulator journey.
   native Apply, Brew once, and Keep taps may use the existing app-owned recipe
   command boundary when both access and mutation allowlists pass. Do not add
   autonomous commands, prepare Fellow, or claim a physical brew.
-- Do not deploy Firebase rules and do not read or mutate cloud coffee data
-  outside the dedicated Dev fixture account.
+- Do not deploy Firebase rules or touch production coffee data. Seed/reset only
+  the dedicated Dev fixture account. Separately, use the owner's existing Dev
+  simulator data for authorized native journeys, with recipe changes undone.
 - Never print, persist, screenshot, or commit authentication tokens or provider
   keys. Inject credentials non-printingly and obtain fresh deployment
   credentials for the run.
 - Redacted diagnostic artifacts expire after 30 days. User-visible
   conversation history is product data and is not diagnostic telemetry.
-- The authorized live-testing budget is **$45 total across all stages and
+- The authorized live-testing budget is **$55 total across all stages and
   providers combined**. The persistent runner ledger reserves maximum cost
   before every candidate, judge, and pairwise dispatch and refuses a dispatch
   that could exceed the remaining total.
