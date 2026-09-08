@@ -1,5 +1,32 @@
 # Conversation reset decision
 
+## September 8 latest-source gate — budget stop
+
+Preview `https://twomanybeans-ruphus-f2euiw6w7-tmanman90s-projects.vercel.app`
+is READY on source/metadata commit `eda694ac781f70d9b5a34b6043e41cbc95854f1e`
+(product change ed35525). Two same-commit live smokes passed:
+`u3-action-check-1788881776259` ($0.029315) and
+`u3-action-check-1788881989242` ($0.028379).
+Full attempt `u3-action-check-1788882162749` stopped before scoring on judge
+credential lookup. Retried using the existing local app judge credential in
+process memory only, without changing code or managed settings.
+
+Full attempt `u3-action-check-1788882234227` stopped with
+`U3 cost cap reached; hard stop before dispatch`. Cumulative actual spend is
+$42.994550 of $45, reserved $0. The configured $2.009 judge-call reservation
+exceeds the $2.005450 remaining; no cap override was attempted. This latest-code
+full gate is incomplete, not PASS. Preserve the failed/partial artifacts and
+the earlier bdf6860 passing evidence separately. No native reinstall, phone,
+Capgo, production, owner-account fixture seeding or login operation occurred.
+
+Reservation investigation: Anthropic's token-counting documentation explicitly
+describes preflight counts as estimates whose actual usage may differ. An
+estimate alone is not a proven replacement for the hard maximum reservation.
+No speculative multiplier, lower cap, model substitution or accounting edit
+was introduced. Source: https://platform.claude.com/docs/en/build-with-claude/token-counting
+The paid process is terminal and reserved spend is zero; do not blindly repeat
+the full gate with the same reservation settings and remaining budget.
+
 ## September 8 native scrolling follow-up — 08:28 PDT
 
 08:32 PDT entry follow-up, same installed app: tapping Rotation's Ask Ruphus
