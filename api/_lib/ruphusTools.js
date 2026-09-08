@@ -289,7 +289,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         historyDays: evidence.windowDays,
         launchHintConsumed: methodCorrected || context.__ruphusLaunchHintConsumed === true,
         methodCorrected,
-        focusChanged: Boolean(context.launchCoffeeId && context.launchCoffeeId !== args.coffeeRef),
+        // Launch origin is not the previous conversational focus. A verified
+        // same-coffee method memory survives subsequent turns after a switch.
+        focusChanged: Boolean(!methodFocus && context.launchCoffeeId && context.launchCoffeeId !== args.coffeeRef),
         methodFocus,
         methodFocusCoffeeRef: methodFocus ? args.coffeeRef : null,
       });

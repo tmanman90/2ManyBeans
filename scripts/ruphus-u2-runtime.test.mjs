@@ -36,6 +36,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /Use fresh, fresher, and freshest only for literal roast age/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /When TRUSTED_METHOD_BINDING says locked/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /A missing saved recipe does not make an explicitly named brewer ambiguous/);
 });
 test('locked turn binding is the final explicit developer target', () => {
   const block = buildDynamicEvidenceBlock({
@@ -359,6 +360,25 @@ test('same-coffee evidence carries the verified method focus until correction or
   const switched = await tools.call('read_coffee_evidence', { coffeeRef: 'c2', windowDays: 14 });
   assert.notEqual(switched.method.slot, 'kalita_hot');
   assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.namedCoffees?.includes('El Vergel')), false);
+});
+
+test('a switched coffee keeps its explicit brewer on follow-up even without a saved matching recipe', async () => {
+  const current = { ...base, launchCoffeeId: 'c1', __ruphusLaunchHintConsumed: true,
+    __ruphusRefs: { c1: 'coffee-1', c3: 'coffee-3' },
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel' }, { refKey: 'c3', name: 'Rwanda', recipes: ['aiden', 'kalita_hot'] }], refs: { c1: 'coffee-1', c3: 'coffee-3' } },
+    ledger: { entries: [{ kind: 'method_focus', status: 'available', namedCoffees: ['Rwanda'], methodFocus: { displayName: 'hot V60' } }] },
+    userText: 'Thin but sweet and clean',
+  };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: {
+    readCoffee: async () => ({ id: 'coffee-3', name: 'Rwanda' }),
+    readRecipe: async () => [{ ...generateKalitaRecipe({}, { dose: 15 }), slotKey: 'kalita_hot' }],
+    readBrews: async () => [], readTastings: async () => [],
+  } });
+  const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c3', windowDays: 14 });
+  assert.equal(result.method.slot, 'v60_hot');
+  assert.equal(result.method.tier, 'M2');
+  assert.equal(result.method.ask, undefined);
+  assert.equal(current.ledger.entries.at(-1).methodFocus.displayName, 'hot V60');
 });
 
 test('direct recipe read carries the verified matching launch revision', async () => {
