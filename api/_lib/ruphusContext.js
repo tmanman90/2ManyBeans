@@ -5,7 +5,25 @@ import { bindRuphusTurn } from './ruphusTurnBinder.js';
 import { explicitMethodFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 
 function safeDynamic({ userText, launchContext, conversation, ledger }, maxBytes) {
-  const dynamic = sanitizeEvidence({ userText, launchContext, conversation, ledger }, { maxBytes });
+  // The transcript is durable; only its provider projection is windowed. A
+  // growing restored chat must not turn an ordinary send into an HTTP 400.
+  let recent = conversation.slice();
+  let memory = ledger;
+  const sanitize = () => sanitizeEvidence({ userText, launchContext, conversation: recent, ledger: memory }, { maxBytes });
+  let dynamic = sanitize();
+  while (dynamic.truncated) {
+    const nextTurn = recent.findIndex((message, index) => index > 0 && message.role === 'user');
+    if (nextTurn < 0) break;
+    recent = recent.slice(nextTurn);
+    dynamic = sanitize();
+  }
+  // Reserve space for the latest exchange and the current request before
+  // older memory. Coffee/method bindings were already resolved from the full
+  // history; stored messages and authority-bearing trial receipts stay intact.
+  while (dynamic.truncated && memory?.entries?.length) {
+    memory = boundLedger({ entries: memory.entries.slice(1) });
+    dynamic = sanitize();
+  }
   if (dynamic.truncated) throw Object.assign(new Error('dynamic context exceeds configured byte cap'), { code: 'evidence_too_large' });
   return dynamic.value;
 }
@@ -133,6 +151,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     turnLedger = appendLedger(turnLedger, { kind: 'method_focus', status: 'available', namedCoffees: [boundCoffee.name], methodFocus: { displayName: methodBinding.displayName } }, { maxBytes: Math.min(evidenceByteCap, MAX_LEDGER_BYTES) });
   }
   const dynamic = safeDynamic({ userText, launchContext: normalizedLaunch, conversation: Array.isArray(conversation) ? conversation.map((item) => ({ role: item?.role, content: item?.content || item?.text })).filter((item) => item.role === 'user' || item.role === 'assistant') : [], ledger: turnLedger }, evidenceByteCap);
+  turnLedger = dynamic.ledger;
   const widened = shouldWidenHistory({ userText: dynamic.userText || '', correction: sessionState?.correction === true || shouldWidenHistory({ userText: dynamic.userText || '' }), olderReference: sessionState?.olderReference === true });
   const safeSnapshot = publicSnapshot(snapshot);
   const publicBinding = turnBinding.status === 'none'

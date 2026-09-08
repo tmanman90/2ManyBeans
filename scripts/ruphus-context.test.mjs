@@ -1,11 +1,43 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
+import { sanitizeEvidence } from '../src/lib/ruphus/sanitizeEvidence.js';
+
+test('long restored conversations fit the provider budget without deleting transcript or latest exchange', async () => {
+  const conversation = Array.from({ length: 20 }, (_, i) => [
+    { role: 'user', content: `Earlier question ${i}. ${'Coffee conversation. '.repeat(8)}` },
+    { role: 'assistant', content: `Earlier answer ${i}. ${'Coffee advice. '.repeat(8)}` },
+  ]).flat();
+  conversation.push({ role: 'user', content: 'Use the Kalita recipe.' }, { role: 'assistant', content: 'Keep the dose unchanged and reduce water by 10 g.' });
+  const original = structuredClone(conversation);
+  const ledger = { entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['Colombia'] }] };
+  const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'Actually use jar 3 with v60', conversation, ledger, evidenceByteCap: 4096,
+    readers: { listCoffees: async () => [{ id: 'coffee-3', name: 'Kenya', jarSlot: 3, status: 'ACTIVE' }] } });
+  assert.deepEqual(conversation, original);
+  assert.deepEqual(context.conversation.slice(-2), original.slice(-2));
+  assert.ok(context.conversation.length < conversation.length);
+  assert.equal(context.conversation[0].role, 'user');
+  assert.equal(context.turnBinding.coffeeName, 'Kenya');
+  assert.equal(context.methodBinding.slot, 'v60_hot');
+  assert.equal(sanitizeEvidence({ userText: context.userText, launchContext: context.launchContext, conversation: context.conversation, ledger: context.ledger }, { maxBytes: 4096 }).truncated, false);
+});
 
 test('context accepts direct and typed launch clues without preloading record-shaped evidence', async () => {
   const owners = [];
   const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'What should I brew?', evidenceByteCap: 10000, readers: { listCoffees: async ({ uid }) => { owners.push(uid); return [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1, status: 'ACTIVE', recipes: ['v60_hot'] }]; }, readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'Ode 4.2', units: 'metric' }) } });
   assert.deepEqual(owners, ['u1']); assert.equal(context.launchContext.surface, 'direct'); assert.equal(context.launchCoffeeId, null); assert.match(context.rotationSnapshot.text, /El Vergel/); assert.equal(context.recipe, undefined);
+});
+test('history compaction reserves the latest exchange ahead of older UTF-8 memory', async () => {
+  const conversation = [{ role: 'user', content: 'I used the Kalita.' }, { role: 'assistant', content: 'Reduce water by 10 g.' }];
+  const ledger = { entries: Array.from({ length: 4 }, () => ({ kind: 'tastings', status: 'available', summary: '☕'.repeat(220) })) };
+  const original = structuredClone(ledger);
+  const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'Yes', conversation, ledger, evidenceByteCap: 1024, readers: { listCoffees: async () => [] } });
+  assert.deepEqual(context.conversation, conversation);
+  assert.deepEqual(ledger, original);
+  assert.equal(sanitizeEvidence({ userText: context.userText, launchContext: context.launchContext, conversation: context.conversation, ledger: context.ledger }, { maxBytes: 1024 }).truncated, false);
+});
+test('oversized current requests still fail closed instead of silently changing user intent', async () => {
+  await assert.rejects(buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: '☕'.repeat(2000), evidenceByteCap: 4096, readers: { listCoffees: async () => [] } }), { code: 'evidence_too_large' });
 });
 test('context rejects legacy cage fields and forged owner hints', async () => {
   const readers = { listCoffees: async () => [] };
