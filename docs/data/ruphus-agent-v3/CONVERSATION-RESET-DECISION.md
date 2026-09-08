@@ -1,5 +1,23 @@
 # Conversation reset decision
 
+## September 8 local restoration-state fix
+
+Owner clarified that remaining simulator-only fixes are already authorized.
+ChatTab now presents an accessible restoring status instead of an empty-chat
+greeting while initial transcript storage is unresolved (including an empty
+local cache pending remote hydration). Existing visible conversations are not
+hidden, and demo/signed-out opening remains unchanged. The diagnostic probe was
+first changed to reject the premature greeting and failed on the old source;
+it now passes, including 16-turn history restoration/browser scrolling and a
+genuinely empty remote history reaching the normal welcome screen. Screenshot
+`/tmp/ruphus-chat-restoring.png` was visually inspected. Fourteen session and
+persistence tests, scoped lint, web build and diff-check pass.
+
+This is a local UI-only change: no model, endpoint, command, authentication or
+storage protocol change; no paid calls. It is not yet copied into the installed
+simulator or deployed. The previous live gate still proves bdf6860, not this
+new source revision. Native verification remains next; no phone use required.
+
 ## Real Chat diagnostic — delayed transcript and browser scrolling
 
 `node scripts/probe-chat-hydration-scroll.mjs` mounts the actual ChatTab with

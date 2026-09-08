@@ -57,6 +57,9 @@ try {
   await page.addStyleTag({ content: '#root { height: 650px; display: flex; flex-direction: column; }' });
   await page.waitForSelector('[data-chat-hydration="loading"]');
   const prematureWelcome = await page.locator('[data-ruphus-opening]').count() > 0;
+  assert.equal(prematureWelcome, false, 'Do not show a fresh-chat greeting before saved history is known');
+  await page.getByRole('status').filter({ hasText: 'Restoring your conversation' }).waitFor();
+  await page.screenshot({ path: '/tmp/ruphus-chat-restoring.png' });
   await page.evaluate(() => window.releaseChatHistory());
   await page.waitForSelector('[data-chat-hydration="hydrated"]');
   await page.getByText(/Saved turn 15/).waitFor();
@@ -69,10 +72,19 @@ try {
   const firstVisible = await page.getByText(/Saved turn 0\./).isVisible();
   assert.ok(firstVisible);
   await page.screenshot({ path: '/tmp/ruphus-real-chat-scroll-top.png' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-chat-hydration="loading"]');
+  await page.evaluate(() => {
+    localStorage.removeItem('chat_harness-user');
+    window.releaseChatHistory();
+  });
+  await page.waitForSelector('[data-chat-hydration="hydrated"]');
+  await page.locator('[data-ruphus-opening]').waitFor();
+  assert.equal(await page.getByRole('status').filter({ hasText: 'Restoring your conversation' }).count(), 0);
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);
   console.log(JSON.stringify({ prematureWelcomeWhileHistoryLoading: prematureWelcome,
-    realChatBrowserScroll: 'passed', hydratedSavedTurns: 16, networkWrites: 0,
+    realChatBrowserScroll: 'passed', hydratedSavedTurns: 16, emptyHistoryWelcome: 'passed', networkWrites: 0,
     nativeScrollProven: false }));
 } finally {
   await browser?.close();

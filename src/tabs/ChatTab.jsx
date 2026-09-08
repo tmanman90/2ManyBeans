@@ -402,6 +402,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     { role: 'assistant', content: messages[0].content },
   ]);
   const { hydratedMessages, hydratedContext, hydratedArtifacts, hydratedSession, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
+  const restoringThread = !isDemo && Boolean(uid) && isIntroState
+    && (hydrationState === 'loading' || (hydrationState === 'local' && hydratedMessages.length === 0));
   const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
   const mutationEnabled = isRuphusMutationEnabled({ uid, isDemo });
   const { pending: ruphusActionPending, run: runRuphusAction } = useRuphusAction({ uid, onReceipt: (result) => {
@@ -1284,7 +1286,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const starterPrompts = getStarterPrompts(beans, isDemo);
 
   return (
-    <div data-ruphus-agent-enabled={agentEnabled ? 'true' : 'false'} data-chat-hydration={hydrationState} aria-busy={loading} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
+    <div data-ruphus-agent-enabled={agentEnabled ? 'true' : 'false'} data-chat-hydration={hydrationState} aria-busy={loading || restoringThread} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
       {/* Masthead — calm editorial: Fraunces title + subtitle (no eyebrow, no gradient rule). */}
       <div data-masthead style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -1341,7 +1343,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           </div>
         )}
         {/* Intro / empty state — shown only when no user turns yet */}
-        {isIntroState && (
+        {restoringThread && <div role="status" style={{ ...typeScale.body, color: C.textMuted, padding: '16px 0' }}>Restoring your conversation…</div>}
+        {isIntroState && !restoringThread && (
           <RuphusOpening dataLoaded={dataLoaded} coffees={beans} profile={profile} starterPrompts={starterPrompts} onSend={handleStarter} />
         )}
 
