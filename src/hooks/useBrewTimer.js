@@ -20,6 +20,30 @@ import { advanceStepClock, buildTimerSteps, normalizeRecipePhases } from '../lib
 export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
+const checkpointKey = id => `ruphus-timer-v1:${id}`;
+
+function readCheckpoint(id, signature, stepCount) {
+  if (!id) return null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(checkpointKey(id)));
+    const now = Date.now();
+    if (!saved || saved.signature !== signature || !['running', 'paused'].includes(saved.phase)) return null;
+    if (!Number.isInteger(saved.stepIndex) || saved.stepIndex < 0 || saved.stepIndex >= stepCount) return null;
+    if (![saved.startedAt, saved.stepStartedAt, saved.pausedAccumMs, saved.stepPausedAccumMs].every(Number.isFinite)) return null;
+    if (saved.startedAt <= 0 || saved.stepStartedAt < saved.startedAt || saved.stepStartedAt > now) return null;
+    if (saved.pausedAccumMs < 0 || saved.pausedAccumMs > now - saved.startedAt || saved.stepPausedAccumMs < 0 || saved.stepPausedAccumMs > saved.pausedAccumMs) return null;
+    if (saved.phase === 'paused' && (!Number.isFinite(saved.pauseStartedAt) || saved.pauseStartedAt < saved.stepStartedAt || saved.pauseStartedAt > now)) return null;
+    if (saved.phase === 'running' && saved.pauseStartedAt !== null) return null;
+    const anchor = saved.pauseStartedAt ?? now;
+    if (saved.pausedAccumMs > anchor - saved.startedAt || saved.stepPausedAccumMs > anchor - saved.stepStartedAt) return null;
+    return saved;
+  } catch { return null; }
+}
+
+function clearCheckpoint(id) {
+  if (!id) return;
+  try { localStorage.removeItem(checkpointKey(id)); } catch { /* Timer still works without storage. */ }
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -31,6 +55,8 @@ function reducer(state, action) {
       return { ...state, phase: 'paused' };
     case 'RESUME':
       return { ...state, phase: 'running' };
+    case 'RESTORE':
+      return { phase: action.phase, stepIndex: action.stepIndex };
     case 'NEXT_STEP':
       return { ...state, stepIndex: state.stepIndex + 1 };
     case 'SET_STEP':
@@ -50,7 +76,7 @@ const initialState = { phase: 'idle', stepIndex: 0 };
 // entries suitable for the timer. Requires that every step has a numeric
 // `timeSeconds` (populated by repairHandBrewRecipe) and that totalBrewTimeSeconds
 // is > last step's timeSeconds.
-export function useBrewTimer(recipe) {
+export function useBrewTimer(recipe, sessionId = null) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Recompute when recipe changes (regenerate, different bean, etc.).
@@ -67,6 +93,7 @@ export function useBrewTimer(recipe) {
   const pausedAccumMsRef = useRef(0);       // total ms spent paused (global)
   const stepPausedAccumMsRef = useRef(0);   // ms paused within current step
   const completionRef = useRef(null);
+  const checkpointRef = useRef(null);
 
   // Display state — 10Hz MM:SS readout. Ring animation does NOT come from here;
   // the component reads refs directly via requestAnimationFrame.
@@ -118,11 +145,30 @@ export function useBrewTimer(recipe) {
     const elapsed = readGlobalMs();
     const nextCompletion = { kind: completionKind, elapsedMs: elapsed };
     completionRef.current = nextCompletion;
+    clearCheckpoint(checkpointRef.current?.id);
     setCompletion(nextCompletion);
     setGlobalElapsedMs(elapsed);
     dispatch({ type: 'FINISH' });
     return elapsed;
   }, [state.phase, readGlobalMs]);
+
+  // Persist clock anchors on transitions, not every display tick. A process
+  // restart keeps wall-clock elapsed time; a normal Stop/Finish clears it.
+  useEffect(() => {
+    if (!checkpointRef.current?.id || !['running', 'paused'].includes(state.phase)) return;
+    try {
+      localStorage.setItem(checkpointKey(checkpointRef.current.id), JSON.stringify({
+        signature: checkpointRef.current.signature,
+        phase: state.phase,
+        stepIndex: state.stepIndex,
+        startedAt: startedAtRef.current,
+        stepStartedAt: stepStartedAtRef.current,
+        pauseStartedAt: pauseStartedAtRef.current,
+        pausedAccumMs: pausedAccumMsRef.current,
+        stepPausedAccumMs: stepPausedAccumMsRef.current,
+      }));
+    } catch { /* Timer still works without storage. */ }
+  }, [state.phase, state.stepIndex]);
 
   // Low-frequency ticker — drives the numeric MM:SS readout AND owns step
   // advancement. Reads live from refs to avoid any stale-state off-by-one.
@@ -181,8 +227,23 @@ export function useBrewTimer(recipe) {
     if (!timerSteps) return;
     completionRef.current = null;
     setCompletion(null);
+    const signature = JSON.stringify(timerSteps.map(step => [step.startSeconds, step.durationSeconds]));
+    checkpointRef.current = { id: sessionId, signature };
+    const saved = readCheckpoint(sessionId, signature, timerSteps.length);
+    if (saved) {
+      startedAtRef.current = saved.startedAt;
+      stepStartedAtRef.current = saved.stepStartedAt;
+      pauseStartedAtRef.current = saved.pauseStartedAt;
+      pausedAccumMsRef.current = saved.pausedAccumMs;
+      stepPausedAccumMsRef.current = saved.stepPausedAccumMs;
+      const anchor = saved.pauseStartedAt ?? Date.now();
+      setGlobalElapsedMs(anchor - saved.startedAt - saved.pausedAccumMs);
+      setStepElapsedMs(anchor - saved.stepStartedAt - saved.stepPausedAccumMs);
+      dispatch({ type: 'RESTORE', phase: saved.phase, stepIndex: saved.stepIndex });
+      return;
+    }
     dispatch({ type: 'START' });
-  }, [timerSteps]);
+  }, [timerSteps, sessionId]);
 
   // Called by the 3-2-1 countdown overlay when it reaches 0.
   const beginRunning = useCallback(() => {
@@ -245,6 +306,8 @@ export function useBrewTimer(recipe) {
   }, [timerSteps, state.stepIndex]);
 
   const reset = useCallback(() => {
+    clearCheckpoint(checkpointRef.current?.id);
+    checkpointRef.current = null;
     startedAtRef.current = null;
     stepStartedAtRef.current = null;
     pauseStartedAtRef.current = null;

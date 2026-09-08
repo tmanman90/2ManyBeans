@@ -1124,6 +1124,7 @@ export const HandBrewModal = ({
       )}
     </Modal>
     <BrewTimer
+      key={attemptId || 'standard-brew'}
       open={timerOpen}
       recipe={timerRecipe}
       bean={bean}

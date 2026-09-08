@@ -295,7 +295,7 @@ function ControlButton({ onClick, children, ariaLabel, primary, disabled }) {
 }
 
 export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = null, onClose, onStartTasting, onSaveTimingEvent }) => {
-  const timer = useBrewTimer(recipe);
+  const timer = useBrewTimer(recipe, attemptId);
   const {
     phase, stepIndex, timerSteps, currentStep, currentStepDurationMs,
     globalElapsedMs, stepElapsedMs, totalMs,
