@@ -277,6 +277,14 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
           else await dialog.dismiss();
         });
         await page.getByRole('button', { name: 'New chat', exact: true }).click();
+        // The app queues a read-before-write transaction. pending writes alone
+        // can resolve before that transaction has reached its write phase.
+        await page.waitForFunction(async ({ firestoreModule, fixtureUid, minimum }) => {
+          const { db } = await import('/src/firebase.js');
+          const { doc, getDocFromServer } = await import(firestoreModule);
+          const data = (await getDocFromServer(doc(db, 'users', fixtureUid, 'chatSessions', 'active'))).data();
+          return data?.messages?.length >= minimum && data.boundaryIndex === data.messages.length && data.ledger?.entries?.length === 0;
+        }, { firestoreModule, fixtureUid, minimum: liveConversation.turns.length * 2 }, { timeout: 15000, polling: 250 });
         const boundary = await page.evaluate(async ({ firestoreModule, fixtureUid }) => {
           const { db } = await import('/src/firebase.js');
           const { doc, getDocFromServer, waitForPendingWrites } = await import(firestoreModule);
@@ -284,6 +292,7 @@ export async function checkAuthenticatedDevEntry({ config, customToken, fixtureU
           const data = (await getDocFromServer(doc(db, 'users', fixtureUid, 'chatSessions', 'active'))).data();
           return { count: data.messages.length, boundaryIndex: data.boundaryIndex, evidenceCleared: data.ledger.entries.length === 0 };
         }, { firestoreModule, fixtureUid });
+        console.log(JSON.stringify({ newChatBoundary: boundary, expectedMinimumMessages: liveConversation.turns.length * 2 }));
         assert.ok(boundary.count >= liveConversation.turns.length * 2, 'New chat must retain the conversation just completed, not only the initial hydration');
         assert.equal(boundary.boundaryIndex, boundary.count);
         assert.equal(boundary.evidenceCleared, true);
