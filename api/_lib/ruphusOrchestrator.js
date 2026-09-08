@@ -15,7 +15,7 @@ const SEVERE_SECOND_FAILURES = new Set([
 
 export function methodBindingTriggers({ reply = '', binding = null } = {}) {
   if (binding?.status !== 'locked' || !binding.slot) return [];
-  const incompatible = mentionedMethodSlots(reply).filter((slot) => slot !== binding.slot);
+  const incompatible = mentionedMethodSlots(reply, { ignoreExplicitlyRejected: true }).filter((slot) => slot !== binding.slot);
   return incompatible.length ? [{ code: 'RT6_METHOD_CONTRADICTION', severity: 'catastrophic', methods: incompatible }] : [];
 }
 

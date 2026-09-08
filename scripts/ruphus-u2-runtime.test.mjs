@@ -274,6 +274,22 @@ test('orchestrator regenerates a reply that contradicts the user-locked brewer',
   assert.equal(runs, 2);
   assert.deepEqual(result.trace.regenerations[0].triggers, ['RT6_METHOD_CONTRADICTION']);
 });
+test('method correction can explicitly retire the old brewer without a false contradiction retry', async () => {
+  const binding = { status: 'locked', slot: 'v60_hot', displayName: 'hot V60', source: 'M1' };
+  for (const reply of ['Got it—V60, not Kalita.', 'V60 rather than the Kalita—was it muted?', 'You used the V60 instead of your Kalita.']) {
+    assert.deepEqual(methodBindingTriggers({ reply, binding }), [], reply);
+  }
+  for (const reply of ['Use the Kalita instead.', 'Not Kalita. Use Aiden instead.', 'I am not sure whether Kalita would help.', 'Try iced V60 instead of the hot V60.']) {
+    assert.ok(methodBindingTriggers({ reply, binding }).length, reply);
+  }
+  let calls = 0;
+  const context = { ...base, methodBinding: binding, trace: { focusChanges: [], reads: [], regenerations: [] } };
+  const reply = 'Got it—V60, not Kalita. Did it feel thin and clean, or dull and muted?';
+  const result = await runRuphusTurn({ turnId: 'negative-method-correction', context, userText: 'Actually I brewed it on the V60 this morning.', provider: { async runTurn() { calls += 1; return { text: reply }; } }, tools: createRuphusTools({ uid: 'u1', context }) });
+  assert.equal(result.text, reply);
+  assert.equal(calls, 1);
+  assert.deepEqual(result.trace.regenerations, []);
+});
 test('a premature proposal becomes normal advice without dispatch or interruption', async () => {
   const frames = []; let runs = 0; let dispatched = 0;
   const provider = { async runTurn(input) {

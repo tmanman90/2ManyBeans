@@ -39,8 +39,11 @@ export function explicitMethodFromText(value) {
   return positive.length === 1 ? positive[0] : null;
 }
 
-export function mentionedMethodSlots(value) {
-  return [...new Set([...String(value || '').matchAll(METHOD_MENTION)].map((match) => slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`)).filter(Boolean))];
+export function mentionedMethodSlots(value, { ignoreExplicitlyRejected = false } = {}) {
+  const source = String(value || '');
+  const mentions = [...source.matchAll(METHOD_MENTION)].filter((match) => !ignoreExplicitlyRejected
+    || !/\b(?:not|rather\s+than|instead\s+of)(?:\s+(?:the|an?|your))?\s*$/i.test(source.slice(0, match.index)));
+  return [...new Set(mentions.map((match) => slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`)).filter(Boolean))];
 }
 
 function latestRecipeSlot(recipes, records) {
