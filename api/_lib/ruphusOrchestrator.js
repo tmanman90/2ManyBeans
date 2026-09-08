@@ -141,7 +141,14 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
       if (!calls.length) break;
       toolRounds += 1;
-      if (toolRounds > maxToolRounds) {
+      // Two evidence rounds may already have resolved and read the exact
+      // recipe. Deliver the one eligible proposal requested by that final
+      // model response; this neither adds a read nor another model call.
+      const finalProposal = toolRounds === maxToolRounds + 1 && readCalls > 0
+        && !roundLimitRecovered && !proposalClaimed && calls.length === 1
+        && calls[0].name === 'propose_recipe_change'
+        && proposalEligibleForTarget(context, calls[0].args || {});
+      if (toolRounds > maxToolRounds && !finalProposal) {
         if (roundLimitRecovered || !calls.every((request) => READS.has(request.name))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
         roundLimitRecovered = true;
         const results = calls.map((request) => ({ callId: request.callId, name: request.name, result: { ok: false, code: 'read_budget_complete', message: 'Use the coffee evidence already provided and answer without another read.' } }));
@@ -189,6 +196,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
       if (proposed) { text += proposalHandoff(proposed.result.artifact); break; }
+      if (finalProposal) { text = 'I couldn’t prepare that change safely. Your saved recipe is unchanged.'; break; }
       const recoveredTrial = results.find(item => item.name === 'review_trial_recipe' && item.result?.ok === true && item.result?.artifact);
       if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');

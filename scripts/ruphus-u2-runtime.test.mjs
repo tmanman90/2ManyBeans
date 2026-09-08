@@ -152,6 +152,39 @@ test('a successful recipe proposal ends with one truthful review handoff', async
   assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
   assert.deepEqual(result.artifacts, frames.filter(frame => frame.type === 'artifact_ready').map(frame => frame.artifact), 'Server persistence receives the exact card delivered to the client');
 });
+test('two evidence rounds can finish with one eligible proposal without another model dispatch', async () => {
+  const calls = []; let modelCalls = 0; const frames = [];
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } };
+  const names = ['resolve_coffee', 'read_recipe', 'propose_recipe_change'];
+  const result = await runRuphusTurn({ turnId: 'final-proposal', context: current, userText: 'Ok update the recipe',
+    provider: { runTurn: async () => ({ toolCalls: [{ name: names[modelCalls++], args: { coffeeRef: 'c1', slot: 'v60_hot' } }], usage: { input_tokens: 10, output_tokens: 2 } }) },
+    tools: { names, definitions: [], call: async name => {
+      calls.push(name);
+      return name !== 'propose_recipe_change' ? { ok: true } : { ok: true, artifact: { id: 'p-final', type: 'recipe_proposal', changedPaths: ['dose'], before: { dose: 13 }, after: { dose: 14 } } };
+    } }, emit: frame => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, names);
+  assert.equal(modelCalls, 3);
+  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+
+test('the final proposal slot cannot bypass agreement, target binding, or the call budget', async () => {
+  for (const scenario of ['no agreement', 'wrong target', 'invalid proposal']) {
+    let modelCalls = 0; let proposalCalls = 0;
+    const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: scenario !== 'no agreement' } };
+    const names = ['resolve_coffee', 'read_recipe', 'propose_recipe_change'];
+    const result = await runRuphusTurn({ turnId: 'final-proposal-rejected', context: current, userText: 'Update recipe',
+      provider: { runTurn: async () => { assert.ok(modelCalls < 3, 'no extra model call for final proposal failure'); return { toolCalls: [{ name: names[modelCalls++], args: { coffeeRef: scenario === 'wrong target' ? 'c2' : 'c1', slot: 'v60_hot' } }], usage: { input_tokens: 10, output_tokens: 2 } }; } },
+      tools: { names, definitions: [], call: async name => { if (name === 'propose_recipe_change') proposalCalls += 1; return { ok: name !== 'propose_recipe_change', code: 'one_change_required' }; } } });
+    assert.equal(modelCalls, 3);
+    assert.equal(proposalCalls, scenario === 'invalid proposal' ? 1 : 0);
+    assert.equal(result.artifacts?.length || 0, 0);
+    if (scenario === 'invalid proposal') { assert.equal(result.ok, true); assert.match(result.text, /saved recipe is unchanged/); }
+    else assert.equal(result.ok, false);
+  }
+});
+
 test('proposal candidates treat null schema fields as unchanged recipe values', async () => {
   const before = generateV60Recipe({}, { dose: 15 }); const saved = [];
   const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's1' };
