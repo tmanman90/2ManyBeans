@@ -1,5 +1,23 @@
 # Conversation reset decision
 
+## September 8 native scrolling follow-up — 08:28 PDT
+
+Post-install regression: `node scripts/verify-ruphus-agent-ui.mjs` passes on
+current source (ed35525 plus documentation), mobile and desktop, including
+context-free opening, hydration toggle, injected proposal actions and keyboard
+padding, with no network writes. This is rendered harness evidence, not a new
+paid-provider gate or complete native fixture matrix.
+
+On the same installed ed35525 Dev app and authenticated simulator, CUA gestures
+through a localhost serve-sim mirror successfully moved the native transcript
+back to the original Kalita conversation and forward to the retained permanent-
+recipe request and trial card. The trial disclosure opened without invoking a
+save. This closes the earlier unproven native-scroll observation for this
+conversation; it is not a complete fixture or physical-device acceptance pass.
+Returned to the signed-in three-jar Rotation screen. No phone operation, model
+call, recipe mutation, reinstall, logout, production change or deployment.
+The exact simulator mirror was stopped and its shared lease released afterward.
+
 ## September 8 installed simulator restoration fix — 08:20 PDT
 
 After Orbit explicitly released its completed build, acquired the shared lease.
