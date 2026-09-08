@@ -48,7 +48,10 @@ export function retainActionReceipt(messages, receipt, proposalStatus) {
     if (!ownsProposal && !ownsReceipt && !ownsSavedTrial) return message;
     const artifacts = message.artifacts.filter(item => item.id !== receipt.id).map(item => {
       if (ownsProposal && item.id === receipt.proposalId && proposalStatus) return { ...item, status: proposalStatus };
-      if (receipt.mode === 'promote_attempt' && receipt.status === 'succeeded' && item.attemptId === receipt.attemptId) return { ...item, promoteAvailable: false };
+      if (receipt.mode === 'promote_attempt' && receipt.status === 'succeeded' && item.attemptId === receipt.attemptId) return {
+        ...item, promoteAvailable: false,
+        ...(item.mode === 'brew_once' ? { title: 'Trial selected', message: 'You chose this version for one brew. See the recipe update below.' } : {}),
+      };
       return item;
     });
     if (!attached && (latestTrialMessage < 0 || index === latestTrialMessage)) {
