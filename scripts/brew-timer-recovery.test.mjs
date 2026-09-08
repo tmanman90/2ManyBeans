@@ -9,9 +9,9 @@ assert.match(readFileSync(new URL('../src/components/HandBrewModal.jsx', import.
 
 // Exercise the real hook across page/process lifetimes, not a replica of its
 // clock arithmetic. This isolated page never loads Firebase or makes API calls.
-const html = `<div id="root"></div><script type="module">
-import React from '/node_modules/.vite/deps/react.js';
-import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
+const probe = `
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 import { useBrewTimer } from '/src/hooks/useBrewTimer.js';
 const { useEffect } = React;
 window.clock = Number(new URL(location.href).searchParams.get('now') || 100000);
@@ -24,11 +24,15 @@ function Probe() {
   return React.createElement('div', null, timer.phase + ':' + timer.globalElapsedMs);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Probe));
-</script>`;
+`;
+const html = '<div id="root"></div><script type="module" src="/timer-recovery-probe.js"></script>';
 let browser;
 const server = await createServer({
   server: { host: '127.0.0.1', port: 0 }, logLevel: 'silent',
-  plugins: [{ name: 'timer-recovery-probe', configureServer(vite) {
+  plugins: [{ name: 'timer-recovery-probe',
+    resolveId(id) { if (id === '/timer-recovery-probe.js') return '\0timer-recovery-probe'; },
+    load(id) { if (id === '\0timer-recovery-probe') return probe; },
+    configureServer(vite) {
     vite.middlewares.use('/__timer-recovery', (_request, response) => {
       response.setHeader('Content-Type', 'text/html');
       response.end(html);
