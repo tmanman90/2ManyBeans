@@ -4,6 +4,25 @@ This runbook governs the conversation-reset live gate and installed-app proof.
 It is Dev-only. A missing identity check, an ambiguous target, or a failed
 preflight stops the run; it never falls back to production.
 
+## Current continuation boundary
+
+The final live gate already passed on product source `bdf686024cd692f48c734a1bf7d6127b527757e7`;
+see the current acceptance summary in `CONVERSATION-RESET-DECISION.md` for the
+exact report and remaining evidence. Do not restart the paid cadence merely
+because this runbook lists it below. The cumulative ledger currently records
+$42.533545 spent, $0 reserved, and a $45 authorized ceiling; read the ledger
+again before any future paid dispatch.
+
+Phone operations are not currently authorized. Preserve the existing native
+login: no sign-out, uninstall, reset, or container clearing. Native app auth
+currently supports Google/Apple, while the seeded fixture runner authenticates
+through a custom-token API path that is not exposed in the native app. Do not
+inject that token into native storage or add a login backdoor to bridge the gap.
+The complete native fixture matrix needs a supported fixture sign-in path;
+the physical category needs renewed device-operation authority, and R29 needs
+the owner's actual unscripted conversations and verdicts. None is inferred
+from the passing endpoint gate or the already-proven core simulator journey.
+
 ## Authority and hard boundaries
 
 - Use only a separate Firebase Dev project. Never use `manybeans-7893c`.
@@ -23,7 +42,7 @@ preflight stops the run; it never falls back to production.
   credentials for the run.
 - Redacted diagnostic artifacts expire after 30 days. User-visible
   conversation history is product data and is not diagnostic telemetry.
-- The authorized live-testing budget is **$35 total across all stages and
+- The authorized live-testing budget is **$45 total across all stages and
   providers combined**. The persistent runner ledger reserves maximum cost
   before every candidate, judge, and pairwise dispatch and refuses a dispatch
   that could exceed the remaining total.
@@ -41,7 +60,7 @@ Record identifiers, never secrets, in the decision document:
 | App | `com.talmeltzer.coffeehub.dev` and display name `2manybeans Dev` |
 | Updater | `CapacitorUpdater.autoUpdate` is `false` in the verified Dev bundle |
 | Mutation | Client and server allowlists contain only the approved Dev UID; rollout tests prove only Apply, Brew once, and Keep are exposed from a proposal |
-| Budget | One cumulative ledger with authorized cap `$35`, starting spend, and remaining amount |
+| Budget | One cumulative ledger with authorized cap `$45`, starting spend, and remaining amount |
 
 Stop immediately if any identity is missing, if the preview redirects to an
 unverified host, if deployment-protection query parameters are lost, or if a
