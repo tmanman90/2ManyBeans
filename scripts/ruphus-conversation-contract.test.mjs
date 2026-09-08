@@ -173,6 +173,7 @@ test('correction, proposal, focus, and evidence-scope graders classify failures'
   assert.equal(gradeEvidenceScope({ reply: 'The recent hot V60 brew itself has no recorded tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'coffee-level-only' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The more recent hot V60 has recipe notes, but no attached tasting.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'coffee-level-only' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: "I don't have a saved coffee called Moon Base, so I can't reliably tell you its recipe.", readWindow: { days: 14 }, evidence: {} }).length, 0);
+  assert.equal(gradeEvidenceScope({ reply: 'I don’t have Moon Base among your saved coffees, so I can’t reliably tell you its history or match a recipe.', readWindow: { days: 14 }, evidence: { records: [{}] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: "I still can't match that name to a saved coffee, so I don't have reliable notes on its tasting profile.", readWindow: { days: 14 }, evidence: {} }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent brew itself has no tasting attached.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);
   assert.equal(gradeEvidenceScope({ reply: 'The recent V60 has no linked tasting note.', readWindow: { days: 14 }, evidence: { tastings: [{ id: 'visible' }] } }).length, 0);

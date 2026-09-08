@@ -247,7 +247,7 @@ export function gradeEvidenceScope({ reply = '', readWindow = null, evidence = {
   // Saved-coffee inventory is not a time-windowed history claim. Do not read
   // “I don't have a saved coffee called X ... or its recipe” as an exhaustive
   // assertion that recipe history is absent.
-  if (/\b(?:don[’']?t|do not)\s+have\b[^.?!]{0,80}\b(?:a\s+)?saved\s+coffee\b/i.test(value)) return [];
+  if (/\b(?:don[’']?t|do not)\s+have\b[^.?!]{0,80}\b(?:a\s+)?saved\s+coffees?\b/i.test(value)) return [];
   if (/\b(?:can[’']?t|cannot)\s+match\b[^.?!]{0,80}\b(?:a\s+)?saved\s+coffee\b|\bisn[’']?t\b[^.?!]{0,80}\b(?:among|in)\b[^.?!]{0,40}\bsaved\s+coffees?\b/i.test(value)) return [];
   const absence = value.match(/\b(?:no|none|nothing)\b[^.?!]*(?:tasting|brew|recipe)s?\b|\b(?:don[’']?t|do not)\s+have\b[^.?!]*(?:tasting|brew|recipe)s?\b/i);
   if (!absence) return [];

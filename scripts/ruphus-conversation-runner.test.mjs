@@ -346,6 +346,22 @@ test('live playback does not treat an explicit lack of saved history as a histor
   assert.equal(result.results[0].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), false);
 });
 
+test('refusing to invent history is not history evidence, but a following factual claim still is', async () => {
+  const { account, cases } = await loadFixtureManifest();
+  const fixture = { ...cases.cases.find((item) => item.id === 'AE11'), turns: ['It is a SEY coffee from Burundi.'], branches: [] };
+  for (const [text, expected] of [
+    ['Got it—Moon Base is a SEY coffee from Burundi, but it isn’t among the saved coffees I can see. I won’t invent its process or tasting history; share the bag’s varietal, process, or roast details and I can help interpret it and suggest a brew.', false],
+    ['I will not invent its tasting history. Share the bag details.', false],
+    ['I won’t invent its process. The previous brew was sour.', true],
+  ]) {
+    const frames = [{ type: 'turn_completed', text }, { type: 'usage', usage: { input_tokens: 1, output_tokens: 1 } }];
+    const fetchImpl = async () => ({ ok: true, headers: { get: () => 'application/x-ndjson' }, text: async () => `${frames.map((frame) => JSON.stringify(frame)).join('\n')}\n` });
+    const cost = { spentUsd: 0, charge(value) { this.spentUsd += value; }, assertCanCall() {} };
+    const result = await runLiveCase(account, fixture, { endpoint: 'https://dev.example.test/api/ruphus-agent', token: 'auth', fetchImpl, costGuard: cost });
+    assert.equal(result.results[0].grader.ordinary.some((item) => item.code === 'U3_EVIDENCE_BEFORE_HISTORY'), expected, text);
+  }
+});
+
 test('live playback grades evidence against the source window actually read', async () => {
   const { account, cases } = await loadFixtureManifest();
   const fixture = { ...cases.cases.find((item) => item.id === 'AE06'), turns: ['How did this coffee taste?'], branches: [] };

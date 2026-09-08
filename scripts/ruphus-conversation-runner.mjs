@@ -478,7 +478,7 @@ function makesHistoryClaim(reply) {
   return sentences.some((sentence) => {
     const history = /\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i;
     if (!history.test(sentence)) return false;
-    return !/\b(?:no|not|isn[’']?t|aren[’']?t|can[’']?t|cannot|couldn[’']?t|don[’']?t|do not|without)\b[^.!?]{0,96}\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i.test(sentence);
+    return !/\b(?:no|not|isn[’']?t|aren[’']?t|can[’']?t|cannot|couldn[’']?t|don[’']?t|do not|won[’']?t\s+invent|without)\b[^.!?]{0,96}\b(?:history|earlier|previous|last tasting|last brew|last cup|recorded\s+(?:brew|tasting|history|note))\b/i.test(sentence);
   });
 }
 
