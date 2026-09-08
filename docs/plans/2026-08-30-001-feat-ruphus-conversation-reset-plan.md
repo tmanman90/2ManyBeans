@@ -1,7 +1,7 @@
 ---
 title: "feat: Reset Ruphus around natural conversation"
 type: feat
-status: active
+status: completed
 date: 2026-08-30
 origin: docs/brainstorms/2026-08-30-ruphus-conversation-first-reset-requirements.md
 ---
@@ -11,6 +11,11 @@ origin: docs/brainstorms/2026-08-30-ruphus-conversation-first-reset-requirements
 ## Summary
 
 ### September 8 owner-authorized acceptance amendment (controlling)
+
+Engineering acceptance completed on product source `f086e1c`; see
+`docs/data/ruphus-agent-v3/CONVERSATION-RESET-DECISION.md` for exact native,
+seeded backend, visual and restoration evidence. Personal verdicts remain
+pending; no personal product approval or production release is claimed.
 
 This amendment supersedes conflicting physical-device, seeded-native-account,
 and owner-verdict completion requirements below and in the origin document.

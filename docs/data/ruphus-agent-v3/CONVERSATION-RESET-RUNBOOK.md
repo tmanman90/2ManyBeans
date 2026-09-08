@@ -14,9 +14,22 @@ Seeded backend tests remain separate. Phone testing is deferred; personal R29
 verdicts remain pending without blocking engineering work or Engineering PASS.
 The current cumulative ceiling is **$55**, increased from $45 by the owner.
 Read the live ledger before dispatch; all prior spend remains counted.
-Latest product ed35525 is on preview `f2euiw6w7` (metadata eda694a); its two
-same-commit smokes passed. The budget-stopped full gate is now being resumed.
-The earlier bdf6860 full PASS remains historical, not latest-source proof.
+Latest product `f086e1c` is on preview `a9dccf36i`; its two same-commit smokes
+passed. The signed-in native proposal/trial/save/Undo journey and final-build
+restoration checks passed; canonical readback verifies the original recipe.
+The first full run stopped after 46 cases because the operator OAuth expired;
+that failed report is retained. The rerun `u3-action-check-1788896138333` passed
+the final gate: 69 runs, zero catastrophic findings and two retained ordinary
+flags, passing calibrated quality and latency criteria. Engineering PASS is
+recorded in the decision file under the controlling owner amendment. Personal
+verdicts remain pending. Accounted spend $47.994262, reserved $0 of $55; no paid
+run remains active. Do not restart paid testing without a concrete new need.
+
+Before a long seeded run, verify the existing Firebase CLI operator credential
+has at least 45 minutes of validity, renewing it through its standard refresh
+flow when needed. A successful projects-list call alone does not establish this.
+Report only remaining lifetime, never token values. This credential is separate
+from the native signed-in account; do not change native authentication.
 
 ### Historical boundary (superseded by the amendment above)
 

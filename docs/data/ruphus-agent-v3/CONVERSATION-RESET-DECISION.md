@@ -2,13 +2,154 @@
 
 ## September 8 resumed engineering acceptance
 
+### Final engineering verdict: PASS under the September 8 amendment
+
+Product source `f086e1c5513b6aaa49f6947e010b5f7670bd17fa` is deployed only to
+`https://twomanybeans-ruphus-a9dccf36i-tmanman90s-projects.vercel.app` and installed
+in-place as `com.talmeltzer.coffeehub.dev` on the already-signed-in simulator.
+The controlling plan amendment accepts actual owner-native journeys, with the
+prior natural-language trial recovery proof retained separately from today's
+repeated proposal/trial/return/save/Undo and final-build restoration checks.
+Original recipe restoration was reverified after the final backend gate.
+
+Final seeded backend gate PASS: `u3-action-check-1788896138333/report.json`,
+same-source clean smokes `u3-action-check-1788894606734` and
+`u3-action-check-1788894780177`. Full: 69 runs, 67 deterministic-clean, zero
+catastrophic findings; retained ordinary flags AE08 `C6B_CONTEXT_PHRASE` and
+AE10 `U3_EVIDENCE_BEFORE_HISTORY`. The run is PASS under the approved thresholds,
+not flawless/clean. Judge calibration, quality and pairwise criteria passed.
+Checked reply p50 3523 ms, p90 5299 ms; read-round p90 234 ms; all latency
+budgets passed. Successful full-run cost $1.473452. Cumulative accounted testing
+cost $47.994262 of $55, reserved $0, with all interrupted reports retained.
+
+Final local evidence: 181 focused Node tests PASS, 64 focused session/runtime/UI
+tests PASS, mobile/desktop rendered harness PASS, targeted source/test lint,
+build and diff-check PASS. Final native in-place build/launch PASS; login,
+three-jar inventory, conversation/receipts, New chat/Continue preserved.
+No authentication backdoor, sign-out, uninstall, container reset, fabricated
+tasting/physical brew, production change, Capgo publish, rules deployment,
+push or merge. Diagnostic ledgers/reports remain unstaged and undeleted.
+Personal R29 verdicts remain pending and are not marked PASS. Physical-device
+testing is deferred by owner direction; U5 multi-conversation storage remains
+explicitly deferred. Engineering acceptance is not a claim of a perfect product
+or the owner's subjective Coach Max verdict. No paid run remains active.
+
+The entries below are chronological evidence, including superseded failures.
+
+The first final full run `u3-action-check-1788894918006` is retained FAILED:
+operator Dev-administration OAuth expired during fixture reset after 46 graded
+cases (zero recorded catastrophic/ordinary findings). It is not a full PASS.
+The operator credential was renewed through the Firebase CLI's existing refresh
+flow and verified to have 59 minutes remaining; native account authentication
+was not changed. Rerunning full only on the same frozen `f086e1c`; its two clean
+smokes remain valid. Accounted spend before rerun $46.520810, reserved $0.
+
+Final-source native restoration checkpoint on `f086e1c`: preview a9dccf36i,
+XcodeBuildMCP build-and-run PASS in 19.0 s (process 27737), native asset identity
+and Dev isolation independently verified. Signed-in Rotation retains all three
+coffees. Chat restores the action receipts after in-place installation. New chat
+shows the earlier conversation's Continue control; Continue restores the prior
+transcript and Undo receipt. No AI call or recipe mutation was needed for these
+checks. Final focused matrix 181/181 PASS; first same-commit seeded smoke PASS
+(`u3-action-check-1788894606734`), second smoke/full sequence still running.
+
+Native `1c40409` checkpoint PASS for the previously failing owner journey:
+in-place XcodeBuildMCP install/launch of the cbakr5o4a Dev preview preserved
+signed-in Rotation and history. `Ok update the recipe` produced the real card
+for 13 g to 14 g, keeping 215 g water, grind 5.6 and 94 C; cost $0.001240.
+Try for one brew opened the Kalita timer with 14 g and the matching 42 g bloom.
+The test timer was stopped, not marked physically brewed. Returning to Chat
+retained the trial receipt and Make this my recipe. Promotion succeeded, Undo
+succeeded, and canonical readback verified the original live recipe projection
+and persisted promotion/Undo chain. No tasting was fabricated. Native bundle
+identity, current preview, isolated Firebase, autoUpdate false and dev channel
+were independently verified. Accounted spend $45.340237, reserved $0.
+An older trial receipt's unchanged-recipe wording remained stale after promotion;
+the narrow follow-up replaces it with historical wording. Its regression failed
+before the change; 64 focused tests plus rendered mobile/desktop harness pass.
+This checkpoint does not replace the separate final seeded backend gate or
+pending personal verdicts. Older entries below describe their own point in time.
+
+Latest checkpoint: native V60 continuity on `951e0be` passed across the follow-up
+`13 g coffee and 215 g water` without another brewer reminder. The subsequent
+Kalita update exposed tool-round exhaustion. Commit `776efe1` permits one
+eligible, exact-target proposal after two evidence rounds without raising the
+model-call maximum; 105 focused tests passed. Its native retest still failed to
+show a card: the model spent the rounds resolving coffee and reading composite
+evidence, then could not dispatch the exact recipe read. No saved recipe changed;
+read-only canonical verification confirms the original recipe remains restored.
+
+Commit `1c40409` binds narrow current-recipe update requests to established
+conversation coffee and omits redundant model resolution for already-locked
+turns. Both new regressions failed before the fix; 92 focused tests, source/test
+lint, build and diff-check pass afterward. Native verification is pending, so
+this is not engineering acceptance. Accounted spend is $45.338997, reserved $0,
+against the authorized $55 total. The signed-in simulator session is preserved.
+
+Native follow-up on 6ec4851: the same restored-history correction now completes
+successfully in the real signed-in app, binds jar 3 Rwanda/hot V60, and costs
+$0.001863 (server total 14.166 s, first lifecycle frame 772 ms). The next taste
+answer exposed a separate continuity error: comparing every read against the
+original launch coffee incorrectly treated subsequent turns as new switches,
+discarding the same-coffee method memory. The tool fell back to saved brewers
+instead of retaining the explicit V60, which has no matching saved recipe.
+Commit `951e0be` fixes that condition and clarifies missing-recipe conversation
+guidance. Its new regression fails before the fix (Aiden instead of V60) and
+passes after; the combined focused suite is 113/113, lint/build/diff-check PASS.
+Preview 7exfj6hxo is READY on 951e0be; XcodeBuildMCP in-place build-and-run
+completed in 16.8 s and process 18830 opened signed-in Rotation. Retest ongoing.
+
+The 6ec4851 seeded smoke `u3-action-check-1788886694144` timed out and is
+retained as FAILED, not a clean smoke. Its unknown failed-provider usage was
+conservatively charged at the reserved maximum by the existing runner. After
+the two native replies, accounted spend is $45.330198 before the next probe;
+this is a conservative ledger total, not a claim that the timed-out call
+actually consumed its maximum. No recipe was changed in these probes.
+
+Latest engineering finding: the signed-in native correction `Actually use jar 3
+with v60` produced three HTTP 400 responses at 16:43 UTC. Owner Dev telemetry
+identifies all three as `evidence_too_large`; `safeDynamic` rejected the restored
+33-message transcript before provider dispatch. The 4096-byte dynamic budget
+was shared with bounded memory, while history alone occupied 3920 bytes.
+Read-only replay reproduces the failure. Commit `6ec4851` windows only the
+provider history at whole-turn boundaries, preserving the latest exchange,
+current request and durable transcript; older memory yields only when needed.
+The same owner replay now builds successfully with 29 provider messages and a
+locked hot V60 correction. Native retest on the fixed preview remains pending.
+Regression coverage: 112 focused tests PASS, targeted source/test ESLint PASS,
+build PASS, diff-check PASS. No owner recipe changed. The three rejected
+requests are proven pre-provider and settle at $0; cumulative spend remains
+$44.497033, reserved $0 of the authorized $55. Diagnostic ledgers are unstaged.
+
+The preceding f2euiw6w7 backend full gate completed PASS in
+`u3-action-check-1788884060168/report.json`: calibrated judge, 69 runs, 68
+deterministic-clean, zero catastrophic and one retained AE14 ordinary result;
+checked-reply p50 3904 ms/p90 6241 ms and read-round p90 232 ms. It cost
+$1.502483. This is separate seeded backend evidence, not a native PASS and not
+proof of the subsequent context-window fix.
+
+Native latest-preview checkpoint (09:20–09:25 PDT): XcodeBuildMCP build-and-run
+succeeded in 88.7 seconds, installed in place and launched Dev process 63248 on
+simulator 7EC6BF90-33B7-4B1A-A651-464B4AC9AA9E. Independent built-asset checks
+confirm f2euiw6w7, isolated Firebase, Dev name/bundle, Ask/restoration labels,
+updater false and dev channel. CUA mirror showed signed-in three-jar Rotation,
+retained Brew once/Undo receipts, New chat confirmation and fresh opening,
+Earlier conversation/Continue restoring receipts, touch-keyboard `Test` entry
+then complete removal of only that unsent probe, and Rotation Ask Ruphus entry
+without an automatic question. No new model send or recipe mutation in these
+UI checks. Pre-test read-only canonical verification again confirms prior
+promotion, Undo and original live recipe projection. Runtime scan found no
+Uncaught Error/TypeError/ReferenceError or Unhandled Promise Rejection match.
+Build log: `build_run_sim_2026-09-08T16-17-58-804Z_pid60862_888b8b54.log` in the
+XcodeBuildMCP worktree logs directory. Returned to signed-in Rotation.
+
 Owner authorized $10 more, raising the cumulative ceiling to $55, and replaced
 seeded-account/physical native acceptance with journeys on the already-signed-in
 Dev simulator account. The plan's controlling amendment records login/data
 preservation, recipe Undo/readback, no authentication backdoor, and separate
 seeded backend evidence. Personal verdicts remain pending and do not block
-engineering work. No phone use is authorized. The latest full backend gate is
-running against the existing f2euiw6w7 preview; no result is claimed yet.
+engineering work. No phone use is authorized. Backend gate and subsequent
+native findings are recorded above; engineering acceptance remains in progress.
 
 ## September 8 latest-source gate — budget stop
 
