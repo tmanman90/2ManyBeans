@@ -2,6 +2,13 @@
 
 ## September 8 native scrolling follow-up — 08:28 PDT
 
+08:32 PDT entry follow-up, same installed app: tapping Rotation's Ask Ruphus
+opens the retained Chat transcript without sending a question. Tasting opens
+normally but this authenticated Dev account has no visible tasting history;
+tasting-card native routing therefore remains insufficient evidence. No
+synthetic records were added to the owner account to mask the fixture-sign-in
+gap. Returned to Rotation and stopped the exact simulator mirror/lease.
+
 Post-install regression: `node scripts/verify-ruphus-agent-ui.mjs` passes on
 current source (ed35525 plus documentation), mobile and desktop, including
 context-free opening, hydration toggle, injected proposal actions and keyboard
