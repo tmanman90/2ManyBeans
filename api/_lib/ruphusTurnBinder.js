@@ -6,6 +6,7 @@ const normalize = (value) => text(value).toLocaleLowerCase().normalize('NFKD').r
 const SUPPORTED_PRONOUN = /^(?:this|that|current|earlier|previous)(?:\s+(?:coffee|bean|one))?$|^(?:back\s+to\s+)?the\s+first\s+(?:coffee|bean|one)$/i;
 const PRONOUN_PHRASE = /\b(?:this|that|current|earlier|previous)\s+(?:coffee|bean|one)\b/i;
 const RECIPE_PRONOUN = /\b(this|that|current)\s+(?:(?:hot|iced)\s+)?(?:(?:kalita(?:\s+(?:155|185))?|v60|aiden)\s+)?(?:trial(?:\s+recipe)?|recipe)\b/i;
+const CURRENT_RECIPE_ACTION = /^(?:(?:ok(?:ay)?|yes|sure|please)[, ]+)*(?:(?:can|could)\s+(?:we|you)\s+)?(?:update|change|save|apply)\s+(?:my|the|our)\s+recipe(?:\s+please)?$/i;
 const ORDINAL = /\b(?:jar|shelf|bean)\s*#?\s*\d+\b/i;
 const OTHER = /\bother\b/i;
 const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
@@ -53,6 +54,10 @@ function isSupportedReference(userText, coffees, ledger, launchContext, refs) {
   const value = text(userText).replace(/[.!?]+$/, '').trim();
   if (exactNameReference(value, coffees)) return { reference: exactNameReference(value, coffees) };
   if (ORDINAL.test(value)) return { reference: value.match(ORDINAL)[0] };
+  if (CURRENT_RECIPE_ACTION.test(value)) {
+    const current = currentName({ coffees, ledger, launchContext, refs });
+    return current ? { reference: 'current coffee', current } : null;
+  }
   const phrase = value.match(PRONOUN_PHRASE)?.[0];
   if (phrase) return { reference: phrase, current: currentName({ coffees, ledger, launchContext, refs }) };
   const recipePronoun = value.match(RECIPE_PRONOUN);

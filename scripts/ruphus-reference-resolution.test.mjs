@@ -7,6 +7,15 @@ const coffees = [
   { id: 'a', refKey: 'c-a', name: 'El Vergel', roaster: 'Good Medicine', origin: 'Colombia', process: 'washed', jarSlot: 1 },
   { id: 'b', refKey: 'c-b', name: 'Colombia La Esperanza', roaster: 'Good Medicine', origin: 'Colombia', process: 'natural', jarSlot: 2 },
 ];
+test('current recipe update follows established coffee without capturing a new target', () => {
+  const context = { coffees, refs: { 'c-a': 'a', 'c-b': 'b' }, ledger: { namedCoffees: ['Colombia La Esperanza'] }, launchContext: { coffeeRef: 'c-a' } };
+  for (const userText of ['Ok update the recipe', 'Please save my recipe.', 'Can we update the recipe?']) {
+    assert.equal(bindRuphusTurn({ ...context, userText }).coffeeRef, 'c-b');
+    assert.notEqual(bindRuphusTurn({ coffees, refs: context.refs, userText }).status, 'locked');
+  }
+  assert.equal(bindRuphusTurn({ ...context, userText: 'Update the recipe for an Ethiopian coffee' }).status, 'none');
+  assert.equal(bindRuphusTurn({ ...context, userText: 'Update El Vergel recipe' }).coffeeRef, 'c-a');
+});
 test('trial recipe references retain the current coffee without inventing one', () => {
   const refs = { 'c-a': 'a', 'c-b': 'b' };
   const ledger = { namedCoffees: ['Colombia La Esperanza'] };

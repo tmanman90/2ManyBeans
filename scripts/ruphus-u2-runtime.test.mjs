@@ -8,6 +8,13 @@ import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 
 const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
+test('locked coffee is supplied directly instead of offering redundant model resolution', () => {
+  const locked = createRuphusTools({ uid: 'owner', context: { ...structuredClone(base), turnBinding: { status: 'locked', coffeeRef: 'c1' } } });
+  assert.equal(locked.definitions.some(({ name }) => name === 'resolve_coffee'), false);
+  assert.equal(locked.definitions.some(({ name }) => name === 'read_recipe'), true);
+  const unbound = createRuphusTools({ uid: 'owner', context: structuredClone(base) });
+  assert.equal(unbound.definitions.some(({ name }) => name === 'resolve_coffee'), true);
+});
 test('prompt uses held brew details and deterministic focus before asking', () => {
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never ask for dose, water, grind, temperature, or brew time when a tool result already supplies it/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /method result contains an ask list, reply only with one natural question/);
