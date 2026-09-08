@@ -1,5 +1,20 @@
 # Conversation reset decision
 
+## Real Chat diagnostic — delayed transcript and browser scrolling
+
+`node scripts/probe-chat-hydration-scroll.mjs` mounts the actual ChatTab with
+the existing harness providers and an injected, manually released storage
+promise. It restores 16 synthetic turns; no external traffic or non-GET
+request is allowed. Result: `prematureWelcomeWhileHistoryLoading:true` and
+`realChatBrowserScroll:passed`, with zero page errors/network writes. A wheel
+gesture moved the overflowing real log to its top and the first saved turn
+was visually inspected in `/tmp/ruphus-real-chat-scroll-top.png`. This is
+browser scroll evidence, not native touch or expanded-recipe-card proof.
+The loading flash is reproducible: `isIntroState` renders RuphusOpening before
+useChatSession finishes, without a hydration-state condition. No product
+fix is applied yet; the explicit fix question remains pending. Probe lint
+and diff-check pass. No paid call, login change, simulator or phone operation.
+
 ## September 7 simulator-only follow-up — 22:45–22:51 PDT
 
 After explicit owner authorization and Orbit's shared-window release, acquired
