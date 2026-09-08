@@ -115,13 +115,13 @@ test('judge transcript includes the visible proposal card without internal ident
   assert.doesNotMatch(JSON.stringify(visible), /private-id/);
 });
 
-test('authorized $35 total retains prior spend and refuses overspend', () => {
-  assert.equal(U3_TOTAL_LIVE_COST_CAP_USD, 35);
-  const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: 28.066506 });
-  assert.ok(Math.abs(guard.remainingUsd - 6.933494) < 1e-9);
+test('authorized $45 total retains prior spend and refuses overspend', () => {
+  assert.equal(U3_TOTAL_LIVE_COST_CAP_USD, 45);
+  const guard = createCostGuard(U3_TOTAL_LIVE_COST_CAP_USD, { initialSpentUsd: 32.998109 });
+  assert.ok(Math.abs(guard.remainingUsd - 12.001891) < 1e-9);
   guard.reserveMaximum(2.009);
-  assert.throws(() => guard.reserveMaximum(5), /cost cap/);
-  assert.equal(guard.spentUsd, 28.066506);
+  assert.throws(() => guard.reserveMaximum(10), /cost cap/);
+  assert.equal(guard.spentUsd, 32.998109);
 });
 
 test('U3 cost cap is explicit and hard-stops before overspend', () => {
