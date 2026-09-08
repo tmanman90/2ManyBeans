@@ -1,5 +1,46 @@
 # Conversation reset decision
 
+## September 7 simulator-only follow-up — 22:45–22:51 PDT
+
+After explicit owner authorization and Orbit's shared-window release, acquired
+the canonical shared lease and launched the existing Dev install in place
+(process 65151, simulator `7EC6BF90-33B7-4B1A-A651-464B4AC9AA9E`). No build,
+install, phone operation, logout, reset, or paid model call occurred.
+
+Screenshot-driven native Simulator CUA verified:
+
+- Signed-in three-jar Rotation and separate Learn / Ask Ruphus controls.
+- Direct Chat hydrated its retained trial and Make this my recipe action.
+  A welcome panel was visible briefly before transcript hydration; do not
+  describe this as a seamless loading transition.
+- Software-keyboard touch entry of the unsent text `Kalita`; composer and Send
+  remained above the keyboard. Cleared only that test draft. Initial desktop
+  typing did not reach the field; keyboard routing was adjusted and touch
+  input proved the field works. This is not proof of every keyboard mode.
+- Expanded trial details contained 14 g coffee, 42 g bloom and 215 g total
+  water. Tasting → Chat retained the expanded card and save control.
+- Receipt-level Make this my recipe saves directly, rather than opening a
+  review dialog. This test produced Recipe updated, then Undo produced Recipe
+  update undone / Change undone. Read-only Dev Firestore verification confirmed
+  the promoted revision matched the trial and the Undo revision/live projection
+  matched the preceding recipe. The original Dev recipe is restored.
+- New chat displayed an Earlier conversation card; Continue restored the
+  retained trial and Undo receipts without a model call or transcript deletion.
+
+Evidence: screenshot
+`/var/folders/xx/hyp761n50hq2mw2ndtfrgs8c0000gn/T/screenshot_optimized_16756ebe-add1-4292-9411-e783a1363607.jpg`
+shows the restored receipts. Runtime log for process 65151 had zero matches for
+the explicit Uncaught Error/TypeError/ReferenceError and Unhandled Promise
+Rejection scan; this limited scan is not a claim of exhaustive error absence.
+AXe snapshot failed with the existing CoreSimulator architecture error. Native
+CUA drag/wheel attempts did not establish manual long-card scrolling, so that
+check remains insufficient evidence; tab return did position the action visibly.
+No new conversational switching, retry, or full seeded-fixture matrix claim.
+
+Left the app signed in on Rotation and released the lease to Orbit. Cumulative
+testing remains $42.533545, reserved $0. These additional simulator checks do
+not establish physical-device or R29 owner-unscripted acceptance.
+
 ## Current acceptance summary — September 7 final live gate PASS
 
 Final product source `bdf686024cd692f48c734a1bf7d6127b527757e7` passes the unchanged full live gate in `conversation-eval/u3-action-check-1788840130579/report.json`: 69 conversations, 66 deterministic-clean, zero catastrophic failures, calibrated different-family judge, all per-run judge/pairwise criteria passing, and all latency budgets passing. Checked replies: p50 3.39s, p90 5.02s; read rounds p90 230ms. Three ordinary findings remain preserved: AE01-2 and AE07-3 unmatched clarification branches, AE14-3 regeneration before a correct V60 reply. These are not erased or relabeled. Prerequisite same-source smokes `1788839408184` and `1788839610207` each passed with zero findings. Fresh CLI token lifetime was verified at 59 minutes immediately before this full run.
