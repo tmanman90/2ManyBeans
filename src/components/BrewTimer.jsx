@@ -511,6 +511,7 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
   };
 
   const handleConfirmClose = () => {
+    reset();
     setConfirmClose(false);
     onClose?.();
   };

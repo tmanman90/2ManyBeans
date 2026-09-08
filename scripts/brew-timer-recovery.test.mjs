@@ -4,6 +4,7 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 
 assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId\)/);
+assert.ok(/const handleConfirmClose = \(\) => \{\s*reset\(\);/.test(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8')), 'Stop clears the checkpoint before the attempt modal unmounts');
 assert.match(readFileSync(new URL('../src/components/HandBrewModal.jsx', import.meta.url), 'utf8'), /key=\{attemptId \|\| 'standard-brew'\}/);
 
 // Exercise the real hook across page/process lifetimes, not a replica of its
