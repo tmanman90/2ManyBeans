@@ -1,5 +1,22 @@
 # Conversation reset decision
 
+## September 8 installed simulator restoration fix — 08:20 PDT
+
+After Orbit explicitly released its completed build, acquired the shared lease.
+Guarded Dev copy and independent built-bundle inspection verify Dev app ID,
+isolated Firebase, existing `4k1bn2ol0` preview, updater disabled, and the new
+restoration label. XcodeBuildMCP incremental simulator build passed in 12.7s;
+in-place install and launch process 32221 passed without deleting its container.
+CUA screenshots directly showed signed-in three-jar Rotation, then the new
+Restoring your conversation status, then the retained trial/Undo transcript.
+This closes installed native observation of the loading-state fix on ed35525.
+Final screenshot:
+`/var/folders/xx/hyp761n50hq2mw2ndtfrgs8c0000gn/T/screenshot_optimized_aa738b34-167f-4d20-8887-b921ac6eb302.jpg`.
+Native CUA drag still did not demonstrate transcript scrolling; do not count
+that as passed. Returned to Rotation and released the lease. No phone, paid
+model call, production change, Capgo upload or login change. Backend preview
+still runs the previously accepted backend; no new final-code live gate claimed.
+
 ## September 8 local restoration-state fix
 
 Owner clarified that remaining simulator-only fixes are already authorized.
