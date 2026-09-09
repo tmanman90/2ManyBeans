@@ -83,6 +83,29 @@ test('technique reader returns executable alternatives and preserves another-sel
   assert.ok(!next.options.some((option) => option.familyId === selected.familyId));
 });
 
+test('new-chat technique replay ignores archived selection artifacts', () => {
+  const archivedProposal = {
+    type: 'recipe_proposal',
+    coffeeId: 'coffee-1',
+    slotKey: 'v60_hot',
+    techniqueExperiment: {
+      kind: 'v60_technique',
+      techniqueId: 'hoffmann-large-batch',
+      familyId: 'hoffmann-large-batch',
+      sourceId: 'hoffmann-large-batch-v1',
+    },
+  };
+  const selections = techniqueSelectionsFromSession({
+    boundaryIndex: 1,
+    messages: [
+      { role: 'assistant', text: 'Archived experiment', artifacts: [archivedProposal] },
+      { role: 'user', text: 'Start a new chat' },
+    ],
+  }, { c1: 'coffee-1' });
+
+  assert.equal(selections.size, 0);
+});
+
 test('missing V60 does not turn an Aiden recipe into an actionable technique proposal', async () => {
   const context = baseContext();
   const tools = createRuphusTools({

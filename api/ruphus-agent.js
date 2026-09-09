@@ -71,7 +71,7 @@ export function trialReceiptsForSession(session, { now = Date.now() } = {}) {
 // keeping machine identifiers out of provider replay.
 export function techniqueSelectionsFromSession(session, refs = {}) {
   const selections = new Map();
-  const messages = Array.isArray(session?.messages) ? session.messages : [];
+  const messages = Array.isArray(session?.messages) ? session.messages.slice(session.boundaryIndex || 0) : [];
   for (const message of messages) {
     for (const artifact of Array.isArray(message?.artifacts) ? message.artifacts : []) {
       const experiment = artifact?.type === 'recipe_proposal' ? artifact.techniqueExperiment : null;
