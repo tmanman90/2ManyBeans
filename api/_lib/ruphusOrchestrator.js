@@ -70,6 +70,17 @@ function proposalUnit(control) {
   return '';
 }
 
+function recipeRatio(recipe = {}) {
+  const declared = recipe.ratio ?? recipe.finalBeverageRatio;
+  const match = String(declared ?? '').match(/(?:1\s*[:/]\s*)?([0-9]+(?:\.[0-9]+)?)/);
+  const value = match ? Number(match[1]) : Number(recipe.waterGrams ?? recipe.water) / Number(recipe.coffeeGrams ?? recipe.userCoffeeGrams ?? recipe.dose);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function displayRatio(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/u, '');
+}
+
 export function proposalHandoff(artifact = {}) {
   const technique = artifact.techniqueExperiment;
   if (technique?.kind === 'v60_technique') {
@@ -85,6 +96,18 @@ export function proposalHandoff(artifact = {}) {
   const before = control ? proposalValue(artifact.before, control) : null;
   const after = control ? proposalValue(artifact.after, control) : null;
   if (!control || before == null || after == null) return 'I’ve prepared one recipe change for you to review. It has not been applied.';
+  if (['dose', 'water', 'ratio'].includes(control)) {
+    const beforeRatio = recipeRatio(artifact.before);
+    const afterRatio = recipeRatio(artifact.after);
+    if (beforeRatio != null && afterRatio != null) {
+      const detail = control === 'dose'
+        ? ` That changes your dose from ${before} g to ${after} g for the same water.`
+        : control === 'water' && proposalValue(artifact.after, 'dose') != null
+          ? ` At your current ${proposalValue(artifact.after, 'dose')} g dose, that's ${after} g of water.`
+          : '';
+      return `Try a 1:${displayRatio(afterRatio)} ratio instead of 1:${displayRatio(beforeRatio)}.${detail} Open the recipe to choose your dose and review the pours; nothing is saved yet.`;
+    }
+  }
   const unit = proposalUnit(control);
   const unchanged = ['dose', 'water', 'grind', 'temperature']
     .filter((item) => item !== control && proposalValue(artifact.before, item) != null && proposalValue(artifact.before, item) === proposalValue(artifact.after, item))

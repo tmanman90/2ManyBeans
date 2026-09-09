@@ -279,7 +279,9 @@ test('conditional sensory diagnosis cannot mint proposal authority', async () =>
   assert.equal(current.proposalState.proposalIssued, false);
 });
 test('proposal handoff names the exact change and makes review authority explicit', () => {
-  assert.equal(proposalHandoff({ changedPaths: ['dose'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 16, waterGrams: 250, grind: '4.2', temperature: 94 } }), 'Prepared: change the dose from 15g to 16g. Water, grind, and temperature stay the same. Review it before applying.');
+  assert.equal(proposalHandoff({ changedPaths: ['dose'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 16, waterGrams: 250, grind: '4.2', temperature: 94 } }), 'Try a 1:15.6 ratio instead of 1:16.7. That changes your dose from 15 g to 16 g for the same water. Open the recipe to choose your dose and review the pours; nothing is saved yet.');
+  assert.equal(proposalHandoff({ changedPaths: ['water'], before: { coffeeGrams: 13, waterGrams: 215, ratio: '1:16.53846153846154', grind: '5.8', temperature: 96 }, after: { coffeeGrams: 13, waterGrams: 202, ratio: '1:15.538461538461538', grind: '5.8', temperature: 96 } }), "Try a 1:15.5 ratio instead of 1:16.5. At your current 13 g dose, that's 202 g of water. Open the recipe to choose your dose and review the pours; nothing is saved yet.");
+  assert.match(proposalHandoff({ changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } }), /change the grind from 4\.2 to 4\.0/);
 });
 test('the same recipe advice is idempotent within one session but distinct across chats', async () => {
   const before = generateV60Recipe({}, { dose: 15 });
