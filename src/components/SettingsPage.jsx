@@ -1436,6 +1436,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             marginBottom: 8,
           }}>
             v{__APP_VERSION__}{otaBundle ? ` · OTA ${otaBundle}` : ''}
+            {__APP_VARIANT__ === 'dev' && <div>Dev build {__APP_BUILD_ID__}</div>}
           </div>
 
           {/* --- Account Section --- */}

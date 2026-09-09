@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execFileSync } from 'node:child_process'
 
 const isCapacitor = process.env.CAPACITOR_BUILD === 'true'
 const appVariant = process.env.TMB_APP_VARIANT === 'dev' ? 'dev' : 'prod'
+let devBuildId = ''
+if (appVariant === 'dev') {
+  let revision = process.env.VERCEL_GIT_COMMIT_SHA || ''
+  if (!revision) {
+    try { revision = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { revision = 'unknown' }
+  }
+  devBuildId = `${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}-${revision.slice(0, 12)}`
+}
 const googleIosClientId = appVariant === 'dev'
   ? '902243550931-oapf974v3f78m5plmoh4urqos01cj6v9.apps.googleusercontent.com'
   : '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com'
@@ -12,6 +21,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
     __APP_VARIANT__: JSON.stringify(appVariant),
+    __APP_BUILD_ID__: JSON.stringify(devBuildId),
     __GOOGLE_IOS_CLIENT_ID__: JSON.stringify(googleIosClientId),
   },
   server: {
