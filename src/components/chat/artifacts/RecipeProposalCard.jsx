@@ -20,11 +20,20 @@ const ratioLabel = (value) => {
   return /^\d+(?:\.\d+)?$/.test(text) ? `1:${text}` : text;
 };
 
-const techniqueLabel = (proposal, after) => after.techniqueLabel || after.techniqueName || proposal.techniqueLabel || proposal.techniqueName || (typeof proposal.technique === 'string' ? proposal.technique : null) || (typeof after.technique === 'string' ? after.technique : null);
+const techniqueDisplayName = (proposal, after) => after.techniqueLabel || after.techniqueName || proposal.techniqueLabel || proposal.techniqueName || null;
+const techniqueValue = (recipe = {}) => recipe.techniqueId || recipe.technique || recipe.techniqueName || recipe.techniqueLabel || null;
+const changedValue = (before, after, fields) => fields.map(({ label, selector, unit }) => ({
+  label,
+  unit,
+  oldValue: selector(before),
+  newValue: selector(after),
+})).find(({ oldValue, newValue }) => (oldValue != null || newValue != null) && String(oldValue) !== String(newValue));
+const temperature = (recipe = {}) => recipe.waterTemp?.celsius ?? recipe.temperatureC ?? recipe.temperature;
+const grind = (recipe = {}) => recipe.grindSize?.setting ?? recipe.grind;
 
 const previewCopy = {
-  proposed: 'Review the full recipe before you choose what to do next.',
-  applying: 'Opening the recipe page…',
+  proposed: 'Your saved recipe is unchanged until you choose.',
+  applying: 'Working on your choice…',
   applied: 'Saved to your recipe.',
   kept: 'Your saved recipe is unchanged.',
   attempt_created: 'Ready for one brew. Your saved recipe is unchanged.',
@@ -38,27 +47,26 @@ function PreviewCard({ proposal, after, before, status, onPreview }) {
   const ratio = ratioLabel(after.ratio ?? after.finalBeverageRatio ?? before.ratio ?? before.finalBeverageRatio);
   const beforeRatio = ratioLabel(before.ratio ?? before.finalBeverageRatio);
   const ratioChanged = beforeRatio && ratio && beforeRatio !== ratio;
-  const technique = techniqueLabel(proposal, after);
-  const recommendation = proposal.recommendation || proposal.reasoning || proposal.explanation || after.reasoning;
-  const rows = [
-    ['Water', before.waterGrams ?? before.water, after.waterGrams ?? after.water, ' g'],
-    ['Dose', before.coffeeGrams ?? before.dose, after.coffeeGrams ?? after.dose, ' g'],
-    ['Grind', before.grindSize?.setting ?? before.grind, after.grindSize?.setting ?? after.grind, ''],
-    ['Temperature', before.waterTemp?.celsius ?? before.temperatureC ?? before.temperature, after.waterTemp?.celsius ?? after.temperatureC ?? after.temperature, '°C'],
-  ].filter(([, oldValue, newValue]) => oldValue != null || newValue != null)
-    .filter(([, oldValue, newValue]) => String(oldValue) !== String(newValue));
+  const technique = techniqueDisplayName(proposal, after);
+  const techniqueChanged = technique && String(techniqueValue(before)) !== String(techniqueValue(after));
+  const derivativeChange = changedValue(before, after, [
+    { label: 'Temperature', selector: temperature, unit: '°C' },
+    { label: 'Grind', selector: grind, unit: '' },
+  ]);
+  const primaryChange = ratioChanged
+    ? { label: 'Ratio', oldValue: beforeRatio, newValue: ratio }
+    : techniqueChanged
+      ? { label: 'Technique', oldValue: null, newValue: technique }
+      : derivativeChange
+        ? derivativeChange
+        : null;
   const canPreview = status === 'proposed' && typeof onPreview === 'function';
   const disabled = !canPreview || status === 'stale' || status === 'superseded' || status === 'applying';
 
-  return <section aria-label={`${coffeeName} recipe preview`} data-artifact="recipe_proposal" data-preview="true" data-preview-card="true" data-status={status} style={{ width: '100%', boxSizing: 'border-box', padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
-    <div style={{ ...typeScale.label, color: C.textLight, marginBottom: 6 }}>Recipe preview</div>
-    <div style={{ ...typeScale.h2, color: C.text }}>{coffeeName}</div>
-    <div style={{ color: C.textMuted, marginTop: 4 }}>{brewerName(proposal.slotKey, after)}</div>
-    {recommendation && <p style={{ color: C.textMuted, margin: '12px 0 0', lineHeight: 1.5 }}>{recommendation}</p>}
-    {technique && <div data-preview-technique="true" style={{ marginTop: 14, padding: '10px 12px', borderRadius: radius.sm, background: C.accentSoft }}><div style={{ ...typeScale.label, color: C.accent, marginBottom: 3 }}>Technique</div><strong>{technique}</strong></div>}
-    {(ratio || beforeRatio) && <div data-preview-ratio="true" style={{ marginTop: 14, padding: '12px 14px', borderRadius: radius.md, border: `1px solid ${C.accentLight}`, background: C.accentSoft, fontVariantNumeric: 'tabular-nums' }}><div style={{ ...typeScale.label, color: C.accent, marginBottom: 3 }}>Target ratio</div><div style={{ ...typeScale.h3, color: C.text }}>{ratio || beforeRatio}</div>{ratioChanged && <div style={{ color: C.textMuted, marginTop: 2 }}>from {beforeRatio}</div>}</div>}
-    {rows.length > 0 && <div data-preview-supporting-values="true" style={{ display: 'grid', gap: 8, marginTop: 14 }}>{rows.map(([label, oldValue, newValue, unit]) => <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontVariantNumeric: 'tabular-nums' }}><span style={{ color: C.textMuted }}>{label}</span><strong>{amount(oldValue, unit)} → {amount(newValue, unit)}</strong></div>)}</div>}
-    <Btn variant="primary" onClick={() => onPreview?.(proposal)} disabled={disabled} aria-label="View recipe" style={{ minHeight: 44, width: '100%', marginTop: 16 }}>{status === 'applying' ? 'Opening…' : 'View recipe'}</Btn>
+  return <section aria-label={`${coffeeName} recipe preview`} data-artifact="recipe_proposal" data-preview="true" data-preview-card="true" data-preview-id={proposal.id || undefined} data-status={status} style={{ width: '100%', boxSizing: 'border-box', padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
+    <div style={{ ...typeScale.h3, color: C.text }}>{coffeeName} <span aria-hidden="true" style={{ color: C.textLight }}>·</span> <span style={{ color: C.textMuted }}>{brewerName(proposal.slotKey, after)}</span></div>
+    {primaryChange ? <div data-preview-change="true" style={{ marginTop: 12, color: C.text, fontVariantNumeric: 'tabular-nums' }}><span style={{ color: C.textMuted }}>{primaryChange.label}</span>{' '}<strong>{primaryChange.oldValue == null ? primaryChange.newValue : `${amount(primaryChange.oldValue, primaryChange.unit)} → ${amount(primaryChange.newValue, primaryChange.unit)}`}</strong></div> : <div data-preview-change="true" style={{ marginTop: 12, color: C.textMuted }}>Recipe updated</div>}
+    <Btn variant="primary" onClick={() => onPreview?.(proposal)} disabled={disabled} aria-label="View recipe" style={{ minHeight: 44, width: '100%', marginTop: 16 }}>{status === 'applying' ? 'Working…' : 'View recipe'}</Btn>
     <p aria-live="polite" style={{ color: C.textMuted, margin: '10px 0 0', lineHeight: 1.5 }}>{previewCopy[status] || 'This suggestion is no longer open.'}</p>
   </section>;
 }

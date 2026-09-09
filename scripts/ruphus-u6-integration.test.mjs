@@ -15,9 +15,16 @@ test('brew_once handoff carries an owner-keyed attempt into the app and timer se
   assert.match(app, /useRuphusAttemptOutbox\(uid\)/);
   assert.match(app, /onRuphusAttempt=\{handleRuphusAttempt\}/);
   assert.match(rotation, /openAidenAttempt\?\.\(bean, ruphusAttempt\)/);
-  assert.match(rotation, /openHandAttempt\(bean, ruphusAttempt\)/);
+  assert.match(rotation, /openHandAttempt\(bean, startImmediately \?/);
   assert.match(timer, /sessionId: attemptId \|\|/);
-  assert.match(await source('src/components/HandBrewModal.jsx'), /if \(attemptId\) setTimerOpen\(true\)/);
+  assert.doesNotMatch(await source('src/components/HandBrewModal.jsx'), /if \(attemptId\) setTimerOpen\(true\)/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /onTimerStart/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /autoStartAttempt/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /if \(previewMode \|\| attemptId\) return/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /Could not start this brew:/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /!previewMode && !attemptId/);
+  assert.match(await source('src/hooks/useHandBrew.js'), /startAttemptTimer/);
+  assert.match(rotation, /ruphusAttemptAutoStartId/);
   assert.match(timer, /attemptId/);
   assert.match(timer, /revisionId/);
   assert.match(timing, /attemptId,/);

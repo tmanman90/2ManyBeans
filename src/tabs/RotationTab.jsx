@@ -69,7 +69,7 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
   </m.button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null, ruphusAttemptAutoStartId = null, onRuphusAttemptAutoStartConsumed = null }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -87,8 +87,12 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     if (!bean) return;
     consumedAttemptRef.current = ruphusAttempt.id;
     if (ruphusAttempt.slotKey === 'aiden') openAidenAttempt?.(bean, ruphusAttempt);
-    else openHandAttempt(bean, ruphusAttempt);
-  }, [ruphusAttempt, beans, openAidenAttempt, openHandAttempt]);
+    else {
+      const startImmediately = ruphusAttemptAutoStartId === ruphusAttempt.id;
+      openHandAttempt(bean, startImmediately ? { ...ruphusAttempt, startImmediately: true } : ruphusAttempt);
+      if (startImmediately) onRuphusAttemptAutoStartConsumed?.();
+    }
+  }, [ruphusAttempt, beans, openAidenAttempt, openHandAttempt, ruphusAttemptAutoStartId, onRuphusAttemptAutoStartConsumed]);
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
@@ -603,6 +607,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         attemptId={handBrew.attemptContext?.id || null}
         revisionId={handBrew.attemptContext?.revisionId || null}
         provenanceSource={handBrew.attemptContext?.source || null}
+        autoStartAttempt={handBrew.autoStartAttempt}
         recipeProvenance={handBrew.handBrewBean?.recipeProvenance?.[`${handBrew.handBrewRecipe?.device === 'kalita' ? 'kalita' : 'v60'}_${handBrew.handBrewRecipe?.mode === 'iced' ? 'iced' : 'hot'}`] || null}
         onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         onStartTasting={onStartTastingSession}
@@ -610,6 +615,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
+        onTimerStart={handBrew.startAttemptTimer}
       />
       <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
         {returnConfirm && (

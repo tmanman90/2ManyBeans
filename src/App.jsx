@@ -65,6 +65,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
   const [pendingTastingAttemptId, setPendingTastingAttemptId] = useState(null);
+  const [pendingRuphusAutoStartId, setPendingRuphusAutoStartId] = useState(null);
   const [ruphusLaunch, setRuphusLaunch] = useState(null);
   const { attempt: ruphusAttemptRecord, put: putRuphusAttempt, update: updateRuphusAttempt, dismiss: dismissRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
   const ruphusAttempt = ruphusAttemptRecord?.stage === 'tasting' || ruphusAttemptRecord?.stage === 'dismissed' ? null : ruphusAttemptRecord;
@@ -112,7 +113,10 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     setTab('chat');
   };
   const handleRuphusAttempt = (attempt) => {
-    putRuphusAttempt(attempt);
+    if (!attempt?.id) return;
+    const { startImmediately, ...durableAttempt } = attempt;
+    putRuphusAttempt(durableAttempt);
+    setPendingRuphusAutoStartId(startImmediately === true ? attempt.id : null);
     setTab('rotation');
   };
 
@@ -321,6 +325,8 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
             onOpenRuphus={(contextRef, starterIntent) => openRuphus(contextRef, starterIntent)}
             ruphusAttempt={ruphusAttempt}
             onDismissRuphusAttempt={dismissRuphusAttempt}
+            ruphusAttemptAutoStartId={pendingRuphusAutoStartId}
+            onRuphusAttemptAutoStartConsumed={() => setPendingRuphusAutoStartId(null)}
           />
         )}
         {tab === 'inventory' && (

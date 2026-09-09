@@ -427,6 +427,7 @@ export const HandBrewModal = ({
   extraFooter, bean, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onStartTasting, onOpenRuphus = null, onDismissAttempt = null,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
+  previewMode = false, previewPending = false, previewError = null, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -436,14 +437,18 @@ export const HandBrewModal = ({
   const [icedMode, setIcedMode] = useState(false);
   const [timerRecipeOverride, setTimerRecipeOverride] = useState(null);
   const modalContentRef = useRef(null);
+  const autoStartConsumedRef = useRef(false);
+  const startRequestRef = useRef(0);
 
   useEffect(() => {
+    startRequestRef.current += 1;
+    setTimerOpen(false);
     if (open) {
       setIcedMode(false);
       setTimerRecipeOverride(null);
-      if (attemptId) setTimerOpen(true);
+      if (!autoStartAttempt) autoStartConsumedRef.current = false;
     }
-  }, [open, attemptId]);
+  }, [open, attemptId, autoStartAttempt]);
 
   const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
     ? userCoffeeGrams
@@ -501,28 +506,43 @@ export const HandBrewModal = ({
   };
 
   const persistIfChanged = useCallback(() => {
+    if (previewMode || attemptId) return;
     if (onPersistDose && typeof effectiveDose === 'number') {
       const stored = recipe?.userCoffeeGrams;
       if (effectiveDose !== stored) {
         onPersistDose(effectiveDose);
       }
     }
-  }, [onPersistDose, effectiveDose, recipe?.userCoffeeGrams]);
+  }, [attemptId, onPersistDose, effectiveDose, recipe?.userCoffeeGrams, previewMode]);
 
   const handleClose = useCallback(() => {
+    startRequestRef.current += 1;
     persistIfChanged();
     onClose?.();
   }, [persistIfChanged, onClose]);
 
-  const handleStartBrew = useCallback(() => {
+  const handleStartBrew = useCallback(async () => {
+    const requestToken = ++startRequestRef.current;
+    if (previewMode) {
+      await onPreviewStart?.();
+      return;
+    }
+    if (attemptId && onTimerStart && !(await onTimerStart())) return;
+    if (!open || requestToken !== startRequestRef.current) return;
     persistIfChanged();
     setTimerOpen(true);
-  }, [persistIfChanged]);
+  }, [attemptId, onPreviewStart, onTimerStart, open, persistIfChanged, previewMode]);
 
   const handleStartIcedBrew = useCallback(() => {
     setTimerRecipeOverride(icedRecipe);
     setTimerOpen(true);
   }, [icedRecipe]);
+
+  useEffect(() => {
+    if (!open || previewMode || !autoStartAttempt || autoStartConsumedRef.current || !attemptId || !timerReady) return;
+    autoStartConsumedRef.current = true;
+    handleStartBrew();
+  }, [autoStartAttempt, attemptId, handleStartBrew, open, previewMode, timerReady]);
 
   const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
   const icedTimerSteps = useMemo(() => buildTimerSteps(icedRecipe), [icedRecipe]);
@@ -607,17 +627,17 @@ export const HandBrewModal = ({
               </div>
             )}
           </div>
-          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot` } : recipeProvenance} />
+          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot` } : (recipeProvenance || {})} />
           {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext('hot', recipe, recipeProvenance), 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
-          {recipe.device === 'kalita' && (
+          {recipe.device === 'kalita' && !previewMode && !attemptId && (
             <KalitaSizeSwitch
               value={recipe.kalitaSize}
               onChange={onKalitaSizeChange}
               disabled={loading}
             />
           )}
-          {recipe.device === 'v60' && (
+          {recipe.device === 'v60' && !previewMode && !attemptId && (
             <V60VariantSwitch
               value={recipe.variant}
               onChange={onV60VariantChange}
@@ -627,9 +647,9 @@ export const HandBrewModal = ({
 
           {/* Param tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <DoseStepperCard
+            {attemptId ? <ParamCard label="Coffee" value={`${displayRecipe.coffeeGrams}g`} icon={Coffee} iconColor={C.accent} /> : <DoseStepperCard
               dose={displayRecipe.coffeeGrams}
-              onChange={onCoffeeGramsChange}
+              onChange={previewPending ? () => {} : onCoffeeGramsChange}
               {...(device === 'v60' ? { min: 12, max: 30 } : device === 'kalita' ? {
                 min: kalitaDoseBounds(displayRecipe.kalitaSize).minDose,
                 max: kalitaDoseBounds(displayRecipe.kalitaSize).maxDose,
@@ -638,7 +658,7 @@ export const HandBrewModal = ({
                 min: V60_SWITCH_DOSE_BOUNDS.minDose,
                 max: V60_SWITCH_DOSE_BOUNDS.maxDose,
               } : {})}
-            />
+            />}
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
@@ -680,6 +700,9 @@ export const HandBrewModal = ({
               {recipe.sourceLineage?.adaptation && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{recipe.sourceLineage.adaptation}</div>}
             </div>
           )}
+
+          {previewError && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>{previewError}</div>}
+          {error && recipe && !previewMode && attemptId && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>Could not start this brew: {error}</div>}
 
           {/* Grind card */}
           {recipe.grindSize && (
@@ -799,6 +822,7 @@ export const HandBrewModal = ({
           {timerReady && (
             <m.button
               onClick={handleStartBrew}
+              disabled={previewPending}
               aria-label="Start brew timer"
               whileTap={{ scale: 0.97 }}
               transition={spring.snappy}
@@ -823,11 +847,17 @@ export const HandBrewModal = ({
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Play size={16} fill="#FFF8F0" strokeWidth={0} /> {displayRecipe.phaseContractVersion ? 'Start Bloom & Timer' : 'Start Brew'}
+              <Play size={16} fill="#FFF8F0" strokeWidth={0} /> {previewPending ? 'Preparing…' : (previewMode ? 'Start brew' : (displayRecipe.phaseContractVersion ? 'Start Bloom & Timer' : 'Start Brew'))}
             </m.button>
           )}
 
-          {onRegenerate && (
+          {previewMode && onPreviewSave && (
+            <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || !timerReady} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
+              {previewPending ? 'Preparing…' : 'Save recipe'}
+            </Btn>
+          )}
+
+          {onRegenerate && !previewMode && !attemptId && (
             <Btn variant="ghost" onClick={handleRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate hand brew recipe">
               <RefreshCw size={14} /> Regenerate Recipe
             </Btn>
@@ -837,12 +867,12 @@ export const HandBrewModal = ({
               iced Switch is out of scope for this slice (plan Scope
               Boundaries). A short note explains why instead of silently
               omitting the option. */}
-          {timerReady && icedUnsupported && (
+          {!previewMode && !attemptId && timerReady && icedUnsupported && (
             <div style={{ ...type.caption, color: C.textLight, textAlign: 'center', marginTop: 10 }}>
               Iced isn't available yet for the Switch — switch to classic V60 for an iced recipe.
             </div>
           )}
-          {timerReady && !icedUnsupported && (
+          {!previewMode && !attemptId && timerReady && !icedUnsupported && (
             <m.button
               onClick={handleEnterIced}
               whileTap={{ scale: 0.97 }}

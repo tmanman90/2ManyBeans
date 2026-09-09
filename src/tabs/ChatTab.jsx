@@ -33,6 +33,9 @@ import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatPars
 import { isRuphusAgentV3Enabled, isRuphusMutationEnabled } from '../lib/ruphus/featureFlags';
 import { streamAgentWithAuth } from '../lib/ruphus/streamAgent';
 import { useRuphusAction } from '../hooks/useRuphusAction';
+import { prepareRecipePreview } from '../lib/recipeCommands';
+import { createRecipePreview } from '../lib/ruphus/recipePreview';
+import { clearRecipePreviewDraft, readRecipePreviewDraft, restoreRecipePreviewAction, writeRecipePreviewDraft } from '../lib/ruphus/recipePreviewDraft';
 import { RuphusMessage } from '../components/chat/RuphusMessage';
 import { RuphusLifecycleCaption } from '../components/chat/RuphusLifecycleCaption';
 import { RuphusOpening } from '../components/chat/RuphusOpening';
@@ -415,7 +418,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     // Persist before navigation can unmount Chat; React updaters must stay pure.
     persist(threadForPersistence(updated), { protocolVersion: 1 });
     setMessages(updated);
-    if (result.attempt) onRuphusAttempt?.(result.attempt);
+    if (result.attempt) {
+      const startImmediately = previewStartRef.current?.proposalId === (result.proposal?.id || artifact.proposalId);
+      previewStartRef.current = null;
+      onRuphusAttempt?.(startImmediately ? { ...result.attempt, startImmediately: true } : result.attempt);
+    }
   } });
   const [agentContext, setAgentContext] = useState(null);
   const [agentFrame, setAgentFrame] = useState(null);
@@ -427,6 +434,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const agentArtifactsRef = useRef([]);
   const agentContextRef = useRef(null);
   const agentSessionIdRef = useRef(null);
+  const recipePreviewRef = useRef(null);
+  const recipePreviewActionPendingRef = useRef(false);
+  const previewStartRef = useRef(null);
   // Input state lives in the ChatInputBar child so keystrokes don't
   // re-render the parent's message list on every character.
   const [loading, setLoading] = useState(false);
@@ -438,6 +448,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [showJumpLatest, setShowJumpLatest] = useState(false);
   const [savingRecipeKey, setSavingRecipeKey] = useState(null);
   const [toast, setToast] = useState(null);
+  const [recipePreview, setRecipePreview] = useState(null);
+  const [recipePreviewPending, setRecipePreviewPending] = useState(false);
+  const [recipePreviewError, setRecipePreviewError] = useState(null);
   const handleRuphusAction = useCallback(async (request) => {
     if (!mutationEnabled) return null;
     try { return await runRuphusAction(request); } catch (error) {
@@ -577,6 +590,107 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const isHandBrew = preferences.brewMethod !== 'aiden';
   const aiden = useAidenBrew(ephemeralUpdateBean);
   const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
+
+  const openRecipePreview = useCallback((artifact) => {
+    if (!artifact || !['v60_hot', 'kalita_hot'].includes(artifact.slotKey)) return;
+    const bean = beans.find((item) => item.id === artifact.coffeeId);
+    if (!bean) {
+      setToast('That coffee is no longer in your rotation.');
+      return;
+    }
+    const baseRecipe = artifact.after;
+    const savedDraft = readRecipePreviewDraft({ uid, proposalId: artifact.id });
+    const validDraft = savedDraft?.coffeeId === artifact.coffeeId && savedDraft.slotKey === artifact.slotKey ? savedDraft : null;
+    const dose = validDraft?.dose || baseRecipe?.coffeeGrams || baseRecipe?.dose;
+    const configuration = validDraft?.configuration || artifact.preview?.configuration?.configuration || artifact.preview?.configuration || {};
+    try {
+      const preview = createRecipePreview({ recipe: baseRecipe, dose, ratio: baseRecipe?.ratio, configuration });
+      const preparedProposal = restoreRecipePreviewAction({ draft: validDraft, sourceArtifact: artifact, preview });
+      const next = { artifact, sourceArtifact: artifact, bean, baseRecipe, recipe: preview, dose: preview.coffeeGrams, configuration, requestId: validDraft?.requestId || null, preparedProposal, pendingAction: validDraft?.pendingAction || null, actionId: validDraft?.actionId || null };
+      recipePreviewRef.current = next;
+      setRecipePreviewError(null);
+      setRecipePreview(next);
+      writeRecipePreviewDraft({ uid, proposalId: artifact.id, coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, dose: preview.coffeeGrams, configuration, sourceRevisionId: artifact.sourceRevisionId, sourceHash: artifact.sourceHash, requestId: next.requestId, ...(preparedProposal ? { preparedProposalId: preparedProposal.id, preparedSourceRevisionId: preparedProposal.sourceRevisionId, preparedSourceHash: preparedProposal.sourceHash, pendingAction: preparedProposal.mode, actionId: preparedProposal.actionId } : {}) });
+    } catch (error) {
+      setToast(error.message || 'This recipe preview is unavailable.');
+    }
+  }, [beans, uid]);
+
+  const closeRecipePreview = useCallback(() => {
+    const proposalId = recipePreviewRef.current?.artifact?.id;
+    setRecipePreview(null);
+    setRecipePreviewError(null);
+    recipePreviewRef.current = null;
+    requestAnimationFrame(() => {
+      if (!proposalId) return;
+      document.querySelector(`[data-artifact="recipe_proposal"][data-preview-id="${proposalId}"] button`)?.focus();
+    });
+  }, []);
+
+  const handleRecipePreviewDoseChange = useCallback((newDose) => {
+    const current = recipePreviewRef.current;
+    if (!current || !Number.isFinite(newDose) || newDose <= 0 || recipePreviewPending || recipePreviewActionPendingRef.current) return;
+    try {
+      const preview = createRecipePreview({ recipe: current.baseRecipe, dose: newDose, ratio: current.baseRecipe?.ratio, configuration: current.configuration });
+      // A dose edit is a new server intent. Keep the prior request ID only
+      // for an unchanged retry, never for a changed payload.
+      const next = { ...current, recipe: preview, dose: preview.coffeeGrams, requestId: null, preparedProposal: null, pendingAction: null, actionId: null };
+      recipePreviewRef.current = next;
+      setRecipePreviewError(null);
+      setRecipePreview(next);
+      writeRecipePreviewDraft({ uid, proposalId: current.artifact.id, coffeeId: current.artifact.coffeeId, slotKey: current.artifact.slotKey, dose: preview.coffeeGrams, configuration: current.configuration, sourceRevisionId: current.artifact.sourceRevisionId, sourceHash: current.artifact.sourceHash });
+    } catch (error) {
+      setRecipePreviewError(error.message || 'That dose is outside this recipe’s supported range.');
+    }
+  }, [recipePreviewPending, uid]);
+
+  const handleRecipePreviewAction = useCallback(async (mode) => {
+    const current = recipePreviewRef.current;
+    if (!current || recipePreviewPending || recipePreviewActionPendingRef.current || !agentSessionIdRef.current) return null;
+    recipePreviewActionPendingRef.current = true;
+    const requestId = current.requestId || globalThis.crypto?.randomUUID?.() || `preview-${Date.now()}`;
+    const sourceArtifact = current.sourceArtifact || current.artifact;
+    const actionId = current.pendingAction === mode && current.actionId ? current.actionId : globalThis.crypto?.randomUUID?.() || `preview-action-${Date.now()}`;
+    writeRecipePreviewDraft({ uid, proposalId: sourceArtifact.id, coffeeId: sourceArtifact.coffeeId, slotKey: sourceArtifact.slotKey, dose: current.dose, configuration: current.configuration, sourceRevisionId: sourceArtifact.sourceRevisionId, sourceHash: sourceArtifact.sourceHash, requestId, ...(current.preparedProposal ? { preparedProposalId: current.preparedProposal.id, preparedSourceRevisionId: current.preparedProposal.sourceRevisionId, preparedSourceHash: current.preparedProposal.sourceHash, pendingAction: mode, actionId } : {}) });
+    const requestState = { ...current, requestId, pendingAction: mode, actionId };
+    recipePreviewRef.current = requestState;
+    setRecipePreview(requestState);
+    setRecipePreviewPending(true);
+    setRecipePreviewError(null);
+    try {
+      let preparedProposal = current.preparedProposal;
+      if (!preparedProposal) {
+        const sourceArtifact = current.sourceArtifact || current.artifact;
+        const prepared = await prepareRecipePreview({ requestId, proposalId: sourceArtifact.id, coffeeId: sourceArtifact.coffeeId, slotKey: sourceArtifact.slotKey, sessionId: agentSessionIdRef.current, dose: current.dose, configuration: current.configuration });
+        preparedProposal = { ...sourceArtifact, ...(prepared.proposal || {}), type: 'recipe_proposal', after: prepared.preview || prepared.proposal?.after || current.recipe };
+      }
+      preparedProposal = { ...preparedProposal, actionId, mode };
+      const latest = recipePreviewRef.current;
+      if (!latest || (latest.sourceArtifact || latest.artifact).id !== (current.sourceArtifact || current.artifact).id || latest.dose !== current.dose) return null;
+      const preparedState = { ...latest, preparedProposal, pendingAction: mode, actionId, recipe: preparedProposal.after || latest.recipe, dose: preparedProposal.after?.coffeeGrams || latest.dose };
+      writeRecipePreviewDraft({ uid, proposalId: sourceArtifact.id, coffeeId: sourceArtifact.coffeeId, slotKey: sourceArtifact.slotKey, dose: preparedState.dose, configuration: preparedState.configuration, sourceRevisionId: sourceArtifact.sourceRevisionId, sourceHash: sourceArtifact.sourceHash, requestId, preparedProposalId: preparedProposal.id, preparedSourceRevisionId: preparedProposal.sourceRevisionId, preparedSourceHash: preparedProposal.sourceHash, pendingAction: mode, actionId });
+      recipePreviewRef.current = preparedState;
+      setRecipePreview(preparedState);
+      if (mode === 'brew_once') previewStartRef.current = { proposalId: preparedProposal.id };
+      const result = await handleRuphusAction({ mode, artifact: preparedProposal });
+      if (!result) {
+        previewStartRef.current = null;
+        setRecipePreviewError('This preview could not be started. Review it and try again.');
+        return null;
+      }
+      clearRecipePreviewDraft({ uid, proposalId: (current.sourceArtifact || current.artifact).id });
+      setRecipePreview(null);
+      recipePreviewRef.current = null;
+      return result;
+    } catch (error) {
+      previewStartRef.current = null;
+      setRecipePreviewError(error.message || 'This preview could not be prepared. Review it and try again.');
+      return null;
+    } finally {
+      recipePreviewActionPendingRef.current = false;
+      setRecipePreviewPending(false);
+    }
+  }, [handleRuphusAction, recipePreviewPending, uid]);
 
   useEffect(() => {
     if (!streamingSlot && scrollRef.current) scrollRef.current.scrollTop = isIntroState ? 0 : scrollRef.current.scrollHeight;
@@ -1355,7 +1469,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (i === 0 && msg.role === 'assistant' && !msg.content?.trim() && !msg.artifacts?.length && !msg.photos?.length) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
+                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
@@ -1383,7 +1497,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           />
         )}
         {agentEnabled && loading && agentText && <RuphusMessage text={agentText} />}
-        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} actionPending={Boolean(ruphusActionPending)} />)}</div>}
+        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} actionPending={Boolean(ruphusActionPending)} />)}</div>}
       </div>
 
       {showJumpLatest && streamingSlot && (
@@ -1473,6 +1587,21 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         onRetryIcedPush={aiden.onRetryIcedPush}
       />
       <HandBrewModal
+        key={`ruphus-preview-${recipePreview?.artifact?.id || 'closed'}`}
+        open={Boolean(recipePreview)}
+        previewMode
+        previewPending={recipePreviewPending}
+        previewError={recipePreviewError}
+        onClose={closeRecipePreview}
+        recipe={recipePreview?.recipe || null}
+        bean={recipePreview?.bean || null}
+        deviceKey={recipePreview?.recipe?.device || null}
+        userCoffeeGrams={recipePreview?.dose}
+        onCoffeeGramsChange={handleRecipePreviewDoseChange}
+        onPreviewStart={() => handleRecipePreviewAction('brew_once')}
+        onPreviewSave={() => handleRecipePreviewAction('apply_proposal')}
+      />
+      <HandBrewModal
         open={handBrew.handBrewModal}
         onClose={handBrew.closeHandBrewModal}
         recipe={handBrew.handBrewRecipe}
@@ -1495,6 +1624,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
+        onTimerStart={handBrew.startAttemptTimer}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>

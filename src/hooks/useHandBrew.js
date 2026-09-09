@@ -80,15 +80,25 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     if (!bean?.id || !attempt?.snapshot) return;
     setHandBrewBean(bean);
     setHandBrewRecipe(attempt.snapshot);
-    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null, source: attempt.revisionSource || null });
+    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null, source: attempt.revisionSource || null, slotKey: attempt.slotKey || 'v60_hot', autoStart: attempt.startImmediately === true });
     setHandBrewIcedRecipe(null);
     setHandBrewError(null);
     setHandBrewPhase('recipe');
     setHandBrewModal(true);
-    executeRecipeCommand({ actionId: `timer_started_${attempt.id}`, mode: 'timer_started', coffeeId: bean.id, slotKey: attempt.slotKey || 'v60_hot', attemptId: attempt.id, expectedRevisionId: attempt.revisionId || undefined }).catch((error) => {
-      if (mountedRef.current) setHandBrewError(`Could not start this brew timer: ${error.message || 'try again.'}`);
-    });
   }, []);
+
+  // Opening or returning to an attempt is read-only. The command is sent only
+  // after the user presses Start brew in HandBrewModal.
+  const startAttemptTimer = useCallback(async () => {
+    if (!attemptContext?.id || !handBrewBean?.id) return true;
+    try {
+      await executeRecipeCommand({ actionId: `timer_started_${attemptContext.id}`, mode: 'timer_started', coffeeId: handBrewBean.id, slotKey: attemptContext.slotKey || handBrewRecipe?.slotKey || 'v60_hot', attemptId: attemptContext.id, expectedRevisionId: attemptContext.revisionId || undefined });
+      return true;
+    } catch (error) {
+      if (mountedRef.current) setHandBrewError(`Could not start this brew timer: ${error.message || 'try again.'}`);
+      return false;
+    }
+  }, [attemptContext, handBrewBean?.id, handBrewRecipe?.slotKey]);
 
   const queueLatestRecipeWrite = (beanId, payload) => {
     return recipeWriteQueueRef.current.enqueue(beanId, {
@@ -681,7 +691,9 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   return {
     handBrewModal, handBrewRecipe, handBrewIcedRecipe, handBrewIcedLoading, handBrewIcedError, handBrewIcedUnsupported, handBrewLoading, handBrewError,
     handBrewPhase, handBrewBean, handBrewResearch, attemptContext,
+    autoStartAttempt: attemptContext?.autoStart === true,
     handleBrewHandBrew, closeHandBrewModal, openAttempt,
+    startAttemptTimer,
     handleKalitaSizeChange,
     handleV60VariantChange,
     handleKalitaIcedChillingMethodChange,

@@ -16,10 +16,11 @@ test('recipe preview renderer forwards the side-effect-free preview callback', (
 test('hot manual preview cards are compact, ratio-first, and keep legacy actions out', () => {
   assert.match(card, /new Set\(\['v60_hot', 'kalita_hot'\]\)/);
   assert.match(preview, /data-preview-card="true"/);
-  assert.match(preview, /data-preview-ratio="true"/);
   assert.match(preview, /View recipe/);
+  assert.match(preview, /ratioChanged/);
   assert.doesNotMatch(preview, /<details|prepSteps|postBrewSteps|after\.steps/);
-  assert.ok(preview.indexOf('data-preview-ratio') < preview.indexOf('data-preview-supporting-values'));
+  assert.match(preview, /data-preview-change="true"/);
+  assert.doesNotMatch(preview, /data-preview-supporting-values|recommendation|reasoning/);
 });
 
 test('preview status disables stale and superseded openings without changing status copy', () => {
@@ -27,6 +28,12 @@ test('preview status disables stale and superseded openings without changing sta
   assert.match(card, /stale: 'This preview is out of date/);
   assert.match(card, /superseded: 'This preview was replaced/);
   assert.match(card, /attempt_created: 'Ready for one brew/);
+});
+
+test('preview change copy never leaks machine technique slugs', () => {
+  assert.match(preview, /techniqueDisplayName/);
+  assert.doesNotMatch(preview, /typeof proposal\.technique === 'string'/);
+  assert.doesNotMatch(preview, /typeof after\.technique === 'string'/);
 });
 
 test('legacy proposal actions remain available when no preview callback is supplied', () => {
