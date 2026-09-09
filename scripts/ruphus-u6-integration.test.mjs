@@ -17,6 +17,9 @@ test('brew_once handoff carries an owner-keyed attempt into the app and timer se
   assert.match(rotation, /openAidenAttempt\?\.\(bean, ruphusAttempt\)/);
   assert.match(rotation, /openHandAttempt\(bean, startImmediately \?/);
   assert.match(timer, /sessionId: attemptId \|\|/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /timerRecipeForMode/);
+  assert.match(await source('src/components/HandBrewModal.jsx'), /const doseUpdating = !attemptId/);
+  assert.match(await source('src/lib/brewTimerRecipe.js'), /return attemptId \? recipe : scaleRecipeForDose/);
   assert.doesNotMatch(await source('src/components/HandBrewModal.jsx'), /if \(attemptId\) setTimerOpen\(true\)/);
   assert.match(await source('src/components/HandBrewModal.jsx'), /onTimerStart/);
   assert.match(await source('src/components/HandBrewModal.jsx'), /autoStartAttempt/);

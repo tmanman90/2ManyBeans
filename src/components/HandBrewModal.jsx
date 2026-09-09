@@ -10,7 +10,7 @@ import { DoseStepperCard } from './DoseStepperCard';
 import { Coffee, Droplets, Thermometer, RefreshCw, Play, Scale, Snowflake, ArrowLeft } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
-import { scaleRecipeForDose } from '../lib/recipeScaling';
+import { timerRecipeForMode } from '../lib/brewTimerRecipe';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
 import { isDeterministicV60Hot } from '../lib/v60Generation';
 import { isDeterministicKalitaHot } from '../lib/kalitaIcedAdapter';
@@ -453,13 +453,13 @@ export const HandBrewModal = ({
   const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
     ? userCoffeeGrams
     : recipe?.coffeeGrams;
-  const doseUpdating = recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
+  const doseUpdating = !attemptId && recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
 
   const scaledRecipe = useMemo(
-    () => (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1'
+    () => (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1' && !attemptId
       ? recipe
-      : scaleRecipeForDose(recipe, effectiveDose)),
-    [recipe, effectiveDose]
+      : timerRecipeForMode({ recipe, attemptId, effectiveDose })),
+    [recipe, attemptId, effectiveDose]
   );
   const displayRecipe = useMemo(() => normalizeRecipePhases(scaledRecipe), [scaledRecipe]);
   const hotGuideRange = useMemo(() => renderGuideRange(displayRecipe), [displayRecipe]);

@@ -78,8 +78,13 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
 
   const openAttempt = useCallback((bean, attempt) => {
     if (!bean?.id || !attempt?.snapshot) return;
+    const attemptDose = Number(attempt.snapshot.coffeeGrams ?? attempt.snapshot.dose ?? attempt.snapshot.userCoffeeGrams);
+    const snapshot = Number.isFinite(attemptDose) && attemptDose > 0
+      ? { ...attempt.snapshot, userCoffeeGrams: attemptDose }
+      : attempt.snapshot;
     setHandBrewBean(bean);
-    setHandBrewRecipe(attempt.snapshot);
+    setHandBrewRecipe(snapshot);
+    setUserCoffeeGrams(Number.isFinite(attemptDose) && attemptDose > 0 ? attemptDose : undefined);
     setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null, source: attempt.revisionSource || null, slotKey: attempt.slotKey || 'v60_hot', autoStart: attempt.startImmediately === true });
     setHandBrewIcedRecipe(null);
     setHandBrewError(null);
