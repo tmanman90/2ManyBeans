@@ -12,6 +12,7 @@ import { SLOT_KEYS } from '../src/lib/ruphus/contracts.js';
 import { isAgentAccessAllowed, isMutationAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
 import { normalizeAgentSession, prepareSession, sessionAge } from '../src/lib/ruphus/session.js';
 import { boundLedger, MAX_LEDGER_BYTES } from './_lib/ruphusEvidence.js';
+import { answeredSensoryClarifier as hasSensoryAnswer } from './_lib/ruphusSensoryAnswer.js';
 
 export const allowedAgentUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_UIDS || '').split(',').map((uid) => uid.trim()).filter(Boolean));
 function writeFrame(res, frame) { res.write(`${JSON.stringify(frame)}\n`); }
@@ -120,7 +121,7 @@ export function deriveProposalReadiness({ conversation = [], ledger = null, user
   const explicitRequest = /\b(?:can (?:you|we)|could you|please|would you|will you|go ahead|make|apply|save|update|change|try|test|prepare|propose|suggest)\b[^.!?]{0,100}\b(?:recipe|change|adjust|that|it|one|this|proposal|dose|grind|water|temperature|ratio)\b/i.test(userText)
     || /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
   const weaknessOnly = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(userText);
-  const answeredSensoryClarifier = weaknessOnly && unresolvedSensoryQuestion;
+  const answeredSensoryClarifier = weaknessOnly && unresolvedSensoryQuestion || hasSensoryAnswer(userText, conversation);
   const diagnosisReady = groundedEvidence && !refusalOrExploration
     && ((resolvedSensory || answeredSensoryClarifier) || previousRecommendation && explicitRequest);
   const userAgreed = !refusalOrExploration && (explicitRequest || diagnosisReady);

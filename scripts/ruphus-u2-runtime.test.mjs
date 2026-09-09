@@ -183,13 +183,13 @@ test('the final proposal slot cannot bypass agreement, target binding, or the ca
     const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: scenario !== 'no agreement' } };
     const names = ['resolve_coffee', 'read_recipe', 'propose_recipe_change'];
     const result = await runRuphusTurn({ turnId: 'final-proposal-rejected', context: current, userText: 'Update recipe',
-      provider: { runTurn: async () => { assert.ok(modelCalls < 3, 'no extra model call for final proposal failure'); return { toolCalls: [{ name: names[modelCalls++], args: { coffeeRef: scenario === 'wrong target' ? 'c2' : 'c1', slot: 'v60_hot' } }], usage: { input_tokens: 10, output_tokens: 2 } }; } },
+      provider: { runTurn: async input => { if (scenario === 'no agreement' && modelCalls === 3) { modelCalls += 1; assert.deepEqual(input.tools, []); return { text: 'We can leave the recipe unchanged for now.' }; } assert.ok(modelCalls < 3, 'no extra model call for invalid target'); return { toolCalls: [{ name: names[modelCalls++], args: { coffeeRef: scenario === 'wrong target' ? 'c2' : 'c1', slot: 'v60_hot' } }], usage: { input_tokens: 10, output_tokens: 2 } }; } },
       tools: { names, definitions: [], call: async name => { if (name === 'propose_recipe_change') proposalCalls += 1; return { ok: name !== 'propose_recipe_change', code: 'one_change_required' }; } } });
-    assert.equal(modelCalls, 3);
+    assert.equal(modelCalls, scenario === 'no agreement' ? 4 : 3);
     assert.equal(proposalCalls, scenario === 'invalid proposal' ? 1 : 0);
     assert.equal(result.artifacts?.length || 0, 0);
     if (scenario === 'invalid proposal') { assert.equal(result.ok, true); assert.match(result.text, /saved recipe is unchanged/); }
-    else assert.equal(result.ok, false);
+    else assert.equal(result.ok, scenario === 'no agreement');
   }
 });
 

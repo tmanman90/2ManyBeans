@@ -11,6 +11,7 @@ import { generateKalitaIcedRecipe } from '../../src/lib/kalitaIcedAdapter.js';
 import { generateV60TechniqueOption, listV60TechniqueOptions } from '../../src/lib/ruphus/techniqueOptions.js';
 import { createRecipePreview } from '../../src/lib/ruphus/recipePreview.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
+import { answeredSensoryClarifier } from './ruphusSensoryAnswer.js';
 
 export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
 export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
@@ -242,7 +243,7 @@ function diagnosticRecommendationReady(text = '', conversation = []) {
   const directControl = /\b(?:dose|ratio|water|grind|temperature|heat)\b[^.!?]{0,60}\b(?:change|adjust|increase|decrease|try|test|use|move|raise|lower|more|less|finer|coarser)\b/i.test(value);
   const priorClarifier = [...(Array.isArray(conversation) ? conversation : [])].reverse().find((message) => message?.role === 'assistant')?.content || '';
   const askedSensoryClarifier = /\?/.test(priorClarifier) && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/i.test(priorClarifier);
-  return (weakness && sensory) || directControl || (weaknessAnswer && !sensory && askedSensoryClarifier);
+  return (weakness && sensory) || directControl || (weaknessAnswer && !sensory && askedSensoryClarifier) || answeredSensoryClarifier(value, conversation);
 }
 
 function setPreviewReadiness(context, { coffeeRef, slotKey, recipe, techniqueRequest = false } = {}) {

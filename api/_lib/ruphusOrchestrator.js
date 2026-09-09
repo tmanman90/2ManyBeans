@@ -178,13 +178,18 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         && calls[0].name === 'propose_recipe_change'
         && proposalEligibleForTarget(context, calls[0].args || {});
       if (toolRounds > maxToolRounds && !finalProposal) {
-        if (roundLimitRecovered || !calls.every((request) => READS.has(request.name))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
+        const target = proposalTarget(context?.proposalState || {});
+        const unreadyReview = calls.length === 1 && calls[0].name === 'propose_recipe_change'
+          && !proposalClaimed && target.coffeeRef && target.slot
+          && calls[0].args?.coffeeRef === target.coffeeRef
+          && (calls[0].args?.slot || calls[0].args?.slotKey) === target.slot;
+        if (roundLimitRecovered || (!unreadyReview && !calls.every((request) => READS.has(request.name)))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
         roundLimitRecovered = true;
         const results = calls.map((request) => ({ callId: request.callId, name: request.name, result: { ok: false, code: 'read_budget_complete', message: 'Use the coffee evidence already provided and answer without another read.' } }));
         response = await provider.runTurn({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
-          correctiveInstruction: 'The useful coffee and recipe evidence is already in this turn. Answer naturally from that evidence, make at most one concrete suggestion, and do not call another tool.',
+          correctiveInstruction: 'The useful coffee and recipe evidence is already in this turn. A recipe card has not been prepared and no change has been saved. Answer the user naturally from that evidence, make at most one concrete suggestion, and do not call another tool or claim a card is ready. If the user is uncertain, help them without forcing a recipe change.',
         });
         rememberUsage(response);
         continue;
