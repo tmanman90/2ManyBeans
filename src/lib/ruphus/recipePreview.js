@@ -6,7 +6,6 @@
 // and fails closed when the route cannot preserve its timing contract.
 
 import { generateKalitaRecipe } from '../kalitaAdapter.js';
-import { generateV60Recipe } from '../v60Adapter.js';
 import { generateV60SwitchRecipe } from '../v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../v60IcedAdapter.js';
 import { generateKalitaIcedRecipe } from '../kalitaIcedAdapter.js';
@@ -17,7 +16,6 @@ export const RECIPE_PREVIEW_VERSION = 'ruphus-recipe-preview-v1';
 export const RECIPE_PREVIEW_TIMING_POLICY = 'preserve-source-timing-v1';
 
 const V60_BOUNDS = Object.freeze({ minDose: 12, maxDose: 30 });
-const EPSILON = 0.01;
 
 export class RecipePreviewError extends Error {
   constructor(code, message, details = {}) {
@@ -69,11 +67,14 @@ function profileFor(recipe, route, dose) {
   return 'v60-iced-12-30';
 }
 
-function actionGrams(action, factor) {
+function actionGrams(action, doseFactor, waterFactor = doseFactor) {
   if (typeof action !== 'string') return action;
-  return action.replace(/(?<![\w.])(\d+(?:\.\d+)?)(\s*)(grams?|g)\b/gi, (match, quantity, spacing, unit) => {
+  return action.replace(/(?<![\w.])(\d+(?:\.\d+)?)(\s*)(grams?|g)\b/gi, (match, quantity, spacing, unit, offset, source) => {
     const grams = Number(quantity);
-    return finitePositive(grams) ? `${roundGrams(grams * factor)}${spacing}${unit}` : match;
+    if (!finitePositive(grams)) return match;
+    const context = `${source.slice(Math.max(0, offset - 18), offset)} ${source.slice(offset + match.length, offset + match.length + 18)}`;
+    const factor = /coffee|grounds?|dose/i.test(context) ? doseFactor : waterFactor;
+    return `${roundGrams(grams * factor)}${spacing}${unit}`;
   });
 }
 
@@ -81,7 +82,7 @@ function mapSteps(steps, waterFactor, doseFactor, finalWater) {
   return steps.map((step, index) => {
     if (!step || typeof step !== 'object') return step;
     const result = { ...step };
-    if (typeof step.action === 'string') result.action = actionGrams(step.action, doseFactor);
+    if (typeof step.action === 'string') result.action = actionGrams(step.action, doseFactor, waterFactor);
     if (Number.isFinite(step.waterTotal)) {
       result.waterTotal = index === steps.length - 1 ? finalWater : roundGrams(step.waterTotal * waterFactor);
     }
@@ -89,11 +90,11 @@ function mapSteps(steps, waterFactor, doseFactor, finalWater) {
   });
 }
 
-function mapTextSteps(steps, factor) {
+function mapTextSteps(steps, doseFactor, waterFactor = doseFactor) {
   if (!Array.isArray(steps)) return steps;
   return steps.map((step) => {
     if (!step || typeof step !== 'object') return step;
-    return typeof step.action === 'string' ? { ...step, action: actionGrams(step.action, factor) } : { ...step };
+    return typeof step.action === 'string' ? { ...step, action: actionGrams(step.action, doseFactor, waterFactor) } : { ...step };
   });
 }
 
@@ -152,6 +153,7 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
     if (generated.technique !== recipe.technique || generated.kalitaSize !== recipe.kalitaSize) {
       throw new RecipePreviewError('technique-conflict', 'This dose requires a different Kalita technique or size; review it explicitly before continuing.', { previousTechnique: recipe.technique, nextTechnique: generated.technique });
     }
+    if (!options.configuration?.grinder && recipe.grindSize) generated.grindSize = structuredClone(recipe.grindSize);
     return generated;
   }
   if (route === 'v60-switch-hot') {
@@ -161,6 +163,7 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
     if (generated.technique !== recipe.technique || generated.roastPreset !== recipe.roastPreset) {
       throw new RecipePreviewError('technique-conflict', 'This dose requires a different V60 Switch technique profile; review it explicitly before continuing.');
     }
+    if (!options.configuration?.grinder && recipe.grindSize) generated.grindSize = structuredClone(recipe.grindSize);
     return generated;
   }
   if (route === 'v60-iced') return generateV60IcedRecipe(intent, configuration);
@@ -203,7 +206,8 @@ export function validateRecipePreview(recipe, options = {}) {
   const dose = Number(requestedDose);
   const bounds = route ? doseBounds(recipe, route) : null;
   if (bounds && finitePositive(dose) && (dose < bounds.minDose || dose > bounds.maxDose)) errors.push('unsupported-dose');
-  const ratio = ratioNumber(options.targetRatio ?? options.ratio) ?? baseRatio(recipe, route || '');
+  const suppliedRatio = options.targetRatio ?? options.ratio;
+  const ratio = suppliedRatio == null ? baseRatio(recipe, route || '') : ratioNumber(suppliedRatio);
   if (ratio == null) errors.push('invalid-target-ratio');
   if (route === 'v60-switch-hot' && finitePositive(dose) && finitePositive(ratio) && dose * ratio > V60_SWITCH_WATER_CAP_GRAMS) errors.push('water-cap-conflict');
   return { valid: errors.length === 0, errors, route, dose, ratio, bounds };
@@ -230,21 +234,21 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   }
   const baseWater = route.endsWith('iced') ? recipe.hotWaterGrams : recipe.waterGrams;
   const targetTotalWater = roundGrams(targetDose * targetRatioValue);
-  const waterFactor = targetTotalWater / baseWater;
   const doseFactor = targetDose / recipe.coffeeGrams;
-  if (!finitePositive(baseWater) || !finitePositive(waterFactor)) throw new RecipePreviewError('invalid-base-water', 'The source recipe has no executable water total.');
   const sourceTotalWater = route.endsWith('iced')
     ? (recipe.finalBeverageWaterTargetGrams || recipe.hotWaterGrams + (recipe.initialBrewIceGrams ?? recipe.recipeIceGrams ?? recipe.iceGrams))
     : null;
   const targetHotWater = route.endsWith('iced')
     ? roundGrams(targetTotalWater * (recipe.hotWaterGrams / sourceTotalWater))
     : targetTotalWater;
+  const waterFactor = targetHotWater / baseWater;
+  if (!finitePositive(baseWater) || !finitePositive(waterFactor)) throw new RecipePreviewError('invalid-base-water', 'The source recipe has no executable water total.');
   let preview = {
     ...recipe,
     coffeeGrams: targetDose,
     waterGrams: targetHotWater,
     ratio: ratioLabel(targetRatioValue),
-    prepSteps: mapTextSteps(recipe.prepSteps, doseFactor),
+    prepSteps: mapTextSteps(recipe.prepSteps, doseFactor, waterFactor),
     steps: mapSteps(recipe.steps, waterFactor, doseFactor, targetHotWater),
   };
   if (route.endsWith('iced')) {
@@ -259,7 +263,7 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
       finalBeverageWaterTargetGrams: targetTotalWater,
       finalBeverageRatio: ratioLabel(targetRatioValue),
       hotExtractionRatio: `1:${Math.round((preview.waterGrams / targetDose) * 100) / 100}`,
-      postBrewSteps: mapTextSteps(recipe.postBrewSteps, targetIce / (recipe.initialBrewIceGrams ?? recipe.recipeIceGrams ?? recipe.iceGrams)),
+      postBrewSteps: mapTextSteps(recipe.postBrewSteps, doseFactor, targetIce / (recipe.initialBrewIceGrams ?? recipe.recipeIceGrams ?? recipe.iceGrams)),
       _previewSourceTotalWater: sourceTotalWater,
     };
   }
