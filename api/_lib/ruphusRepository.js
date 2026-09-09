@@ -187,7 +187,13 @@ export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, a
       tx.update(beanRef, { activeRevisionIds: { ...(bean.activeRevisionIds || {}), [slotKey]: activeRevisionId } });
     }
     pairSnap.docs.forEach((doc) => tx.update(doc.ref, { status: 'superseded', supersededAt: createdAt }));
-    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before: resolved.recipe, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: recipeIdentityHash(resolved.recipe, slotKey), sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt });
+    // Older active revisions can retain the historical `pour-over` method
+    // label even though the owner-scoped slot is V60. Normalize only the
+    // proposal snapshot's slot identity for the generic proposal contract;
+    // sourceRevisionId/sourceHash remain bound to the untouched revision.
+    const proposalBefore = canonicalCandidate(resolved.recipe, slotKey);
+    const sourceHash = recipeIdentityHash(resolved.recipe, slotKey);
+    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before: proposalBefore, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: sourceHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt });
     tx.create(proposalRef, proposal);
     const open = [...sessionSnap.docs.filter((doc) => !pairSnap.docs.some((pair) => pair.id === doc.id)), { id: proposalId, data: () => proposal }].sort((a, b) => String(a.data().createdAt).localeCompare(String(b.data().createdAt)));
     while (open.length > OPEN_PROPOSAL_RETENTION) { const oldest = open.shift(); if (oldest.id !== proposalId) tx.update(oldest.ref, { status: 'archived', archivedAt: createdAt }); }
@@ -228,7 +234,7 @@ export async function persistRecipePreview({ db, uid, coffeeId, slotKey, session
     if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
     // Project from the reviewed proposal intent, while retaining the active
     // canonical recipe as the derived proposal's lineage anchor.
-    const before = resolved.recipe;
+    const before = canonicalCandidate(resolved.recipe, slotKey);
     const resolvedHash = recipeIdentityHash(resolved.recipe, slotKey);
     if (sourceProposal.sourceRevisionId !== activeRevisionId || sourceProposal.sourceHash !== resolvedHash || (sourceRevisionId && sourceRevisionId !== activeRevisionId) || (sourceHash && sourceHash !== resolvedHash)) throw Object.assign(new Error('The proposal source changed since this preview was prepared.'), { code: 'stale' });
     const pairQuery = proposalCollection.where('sessionId', '==', sessionId).where('coffeeId', '==', coffeeId).where('slotKey', '==', slotKey).where('status', '==', 'proposed');
