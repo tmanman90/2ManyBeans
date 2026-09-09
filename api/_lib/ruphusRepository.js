@@ -4,6 +4,7 @@ import { canonicalHash, clone, validateProposal } from '../../src/lib/ruphus/con
 import { resolveLegacyRecipe, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 
 export const OPEN_PROPOSAL_RETENTION = 8;
+export const RECIPE_PREVIEW_VERSION = 'ruphus-recipe-preview-v1';
 
 const nowIso = () => new Date().toISOString();
 const id = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -26,13 +27,14 @@ function assertOwner(uid) {
   if (typeof uid !== 'string' || !uid.trim()) throw Object.assign(new Error('owner is required'), { code: 'owner_required' });
 }
 
-function buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after, sourceRevisionId = null, sourceRevisionHash, sourceDose = null, sourceAidenGrind = null, createdAt }) {
+function buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after, sourceRevisionId = null, sourceRevisionHash, sourceDose = null, sourceAidenGrind = null, createdAt, preview = null }) {
   const proposal = {
     id: proposalId, ownerId: uid, coffeeId, slotKey, sessionId,
     sourceRevisionId, sourceHash: sourceRevisionHash || recipeIdentityHash(before, slotKey),
     ...(slotKey === 'aiden' ? { sourceAidenGrind: clone(sourceAidenGrind) } : { sourceDose }),
     before: clone(before), after: clone(after), recipeHash: canonicalHash(after),
     status: 'proposed', createdAt,
+    ...(preview ? { preview: clone(preview), previewVersion: RECIPE_PREVIEW_VERSION } : {}),
   };
   const result = validateProposal(proposal);
   if (!result.valid) throw Object.assign(new Error(result.errors.join('; ')), { code: 'invalid_proposal' });
@@ -83,11 +85,70 @@ export function createMemoryRuphusRepository({ clock = () => Date.now() } = {}) 
       }
       return clone(proposal);
     },
+    createPreview({ uid, coffeeId, slotKey, sessionId, after, previewKey, previewDose, previewRatio, previewConfiguration, sourceRevisionId, sourceHash, sourceProposalId, proposalId = id('preview') }) {
+      assertOwner(uid);
+      if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
+      if (!previewKey) throw Object.assign(new Error('preview key is required'), { code: 'preview_key_required' });
+      if (!sourceProposalId) throw Object.assign(new Error('source proposal is required'), { code: 'proposal_required' });
+      const bean = this.getBean(uid, coffeeId);
+      const sourceProposal = proposals.get(key(uid, sourceProposalId));
+      if (!sourceProposal || sourceProposal.ownerId !== uid || sourceProposal.coffeeId !== coffeeId || sourceProposal.slotKey !== slotKey || sourceProposal.sessionId !== sessionId) throw Object.assign(new Error('proposal is not bound to this coffee, slot, or session'), { code: 'proposal_binding_invalid' });
+      if (sourceProposal.status !== 'proposed') throw Object.assign(new Error('proposal is no longer available'), { code: 'stale' });
+      const resolved = resolveLegacyRecipe(bean, slotKey);
+      if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
+      const before = sourceProposal.after;
+      const activeRevisionId = bean.activeRevisionIds?.[slotKey] || null;
+      const currentHash = recipeIdentityHash(resolved.recipe, slotKey);
+      if (sourceProposal.sourceRevisionId !== activeRevisionId || sourceProposal.sourceHash !== currentHash || (sourceRevisionId && sourceRevisionId !== activeRevisionId) || (sourceHash && sourceHash !== currentHash)) {
+        throw Object.assign(new Error('The saved recipe changed since this preview was prepared.'), { code: 'stale' });
+      }
+      const existing = this.listProposals(uid, { coffeeId, slotKey, sessionId }).find((proposal) => proposal.status === 'proposed' && proposal.preview?.key === previewKey);
+      if (existing) return clone(existing);
+      const createdAt = new Date(clock()).toISOString();
+      for (const proposal of this.listProposals(uid, { coffeeId, slotKey, sessionId }).filter((item) => item.status === 'proposed' && item.preview)) {
+        proposal.status = 'superseded'; proposal.supersededAt = createdAt; proposals.set(key(uid, proposal.id), proposal);
+      }
+      const candidate = canonicalCandidate(after, slotKey);
+      const validation = validateExecutableRecipe(candidate, slotKey);
+      if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
+      const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: currentHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt, preview: { key: previewKey, dose: previewDose, ratio: previewRatio, configuration: previewConfiguration, sourceProposalId } });
+      proposals.set(key(uid, proposal.id), proposal);
+      return clone(proposal);
+    },
     snapshot() { return { beans: [...beans.values()].map(clone), revisions: [...revisions.values()].map(clone), proposals: [...proposals.values()].map(clone) }; },
   };
 }
 
 function adminCollection(db, uid, collection) { return db.collection('users').doc(uid).collection(collection); }
+
+/** Read the owner-scoped base used by preview preparation. */
+export async function readRecipeForPreview({ db, uid, coffeeId, slotKey, proposalId, sessionId } = {}) {
+  assertOwner(uid);
+  if (!db?.collection) throw new Error('Firestore database is required');
+  const beanSnap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get();
+  if (!beanSnap?.exists) throw Object.assign(new Error('coffee not found'), { code: 'not_found' });
+  const bean = { id: coffeeId, ...beanSnap.data() };
+  if (!proposalId) throw Object.assign(new Error('source proposal is required'), { code: 'proposal_required' });
+  const proposalSnap = await adminCollection(db, uid, 'proposals').doc(proposalId).get();
+  if (!proposalSnap?.exists) throw Object.assign(new Error('proposal not found'), { code: 'not_found' });
+  const sourceProposal = { id: proposalSnap.id, ...proposalSnap.data() };
+  if (sourceProposal.ownerId !== uid || sourceProposal.coffeeId !== coffeeId || sourceProposal.slotKey !== slotKey || (sessionId && sourceProposal.sessionId !== sessionId)) throw Object.assign(new Error('proposal is not bound to this coffee, slot, or session'), { code: 'proposal_binding_invalid' });
+  if (sourceProposal.status !== 'proposed') throw Object.assign(new Error('proposal is no longer available'), { code: 'stale' });
+  const revisionId = bean.activeRevisionIds?.[slotKey] || null;
+  if (revisionId) {
+    const revisionSnap = await adminCollection(db, uid, 'recipeRevisions').doc(revisionId).get();
+    if (!revisionSnap?.exists || revisionSnap.data()?.coffeeId !== coffeeId || revisionSnap.data()?.slotKey !== slotKey) throw Object.assign(new Error('active revision is unavailable'), { code: 'active_revision_not_found' });
+    const revision = revisionSnap.data() || {};
+    const sourceHash = revision.snapshotHash || recipeIdentityHash(revision.snapshot, slotKey);
+    if (sourceProposal.sourceRevisionId !== revisionId || sourceProposal.sourceHash !== sourceHash) throw Object.assign(new Error('proposal source is stale'), { code: 'stale' });
+    return { bean, recipe: clone(sourceProposal.after || {}), sourceProposal, revisionId, sourceHash };
+  }
+  const resolved = resolveLegacyRecipe(bean, slotKey);
+  if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
+  const sourceHash = recipeIdentityHash(resolved.recipe, slotKey);
+  if (sourceProposal.sourceRevisionId || sourceProposal.sourceHash !== sourceHash) throw Object.assign(new Error('proposal source is stale'), { code: 'stale' });
+  return { bean, recipe: clone(sourceProposal.after || {}), sourceProposal, revisionId: null, sourceHash };
+}
 
 /** Persist one validated proposal using an Admin SDK transaction. */
 export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, after, proposalId = id('proposal'), now = nowIso }) {
@@ -126,6 +187,60 @@ export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, a
     tx.create(proposalRef, proposal);
     const open = [...sessionSnap.docs.filter((doc) => !pairSnap.docs.some((pair) => pair.id === doc.id)), { id: proposalId, data: () => proposal }].sort((a, b) => String(a.data().createdAt).localeCompare(String(b.data().createdAt)));
     while (open.length > OPEN_PROPOSAL_RETENTION) { const oldest = open.shift(); if (oldest.id !== proposalId) tx.update(oldest.ref, { status: 'archived', archivedAt: createdAt }); }
+    return proposal;
+  });
+}
+
+/**
+ * Persist a server-derived preview version. The transaction re-resolves the
+ * owner-scoped active revision and source hash before writing, so a client
+ * cannot turn arbitrary recipe JSON into an actionable proposal.
+ */
+export async function persistRecipePreview({ db, uid, coffeeId, slotKey, sessionId, after, previewKey, previewDose, previewRatio, previewConfiguration = {}, sourceRevisionId = null, sourceHash = null, sourceProposalId, proposalId = id('preview'), now = nowIso }) {
+  assertOwner(uid);
+  if (!db?.runTransaction || !db?.collection) throw new Error('Firestore database is required');
+  if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
+  if (!previewKey) throw Object.assign(new Error('preview key is required'), { code: 'preview_key_required' });
+  const beanRef = db.collection('users').doc(uid).collection('beans').doc(coffeeId);
+  const proposalCollection = adminCollection(db, uid, 'proposals');
+  const proposalRef = proposalCollection.doc(proposalId);
+  const revisions = adminCollection(db, uid, 'recipeRevisions');
+  const createdAt = now();
+  return db.runTransaction(async (tx) => {
+    const beanSnap = await tx.get(beanRef);
+    if (!beanSnap.exists) throw Object.assign(new Error('coffee not found'), { code: 'not_found' });
+    const bean = { id: coffeeId, ...beanSnap.data() };
+    if (!sourceProposalId) throw Object.assign(new Error('source proposal is required'), { code: 'proposal_required' });
+    const sourceProposalRef = proposalCollection.doc(sourceProposalId);
+    const sourceProposalSnap = await tx.get(sourceProposalRef);
+    if (!sourceProposalSnap.exists) throw Object.assign(new Error('proposal not found'), { code: 'not_found' });
+    const sourceProposal = { id: sourceProposalSnap.id, ...sourceProposalSnap.data() };
+    if (sourceProposal.ownerId !== uid || sourceProposal.coffeeId !== coffeeId || sourceProposal.slotKey !== slotKey || sourceProposal.sessionId !== sessionId) throw Object.assign(new Error('proposal is not bound to this coffee, slot, or session'), { code: 'proposal_binding_invalid' });
+    if (sourceProposal.status !== 'proposed') throw Object.assign(new Error('proposal is no longer available'), { code: 'stale' });
+    let activeRevisionId = bean.activeRevisionIds?.[slotKey] || null;
+    const activeRevisionSnap = activeRevisionId ? await tx.get(revisions.doc(activeRevisionId)) : null;
+    if (activeRevisionId && (!activeRevisionSnap?.exists || activeRevisionSnap.data()?.coffeeId !== coffeeId || activeRevisionSnap.data()?.slotKey !== slotKey)) throw Object.assign(new Error('active revision is unavailable'), { code: 'active_revision_not_found' });
+    const resolved = activeRevisionSnap?.exists ? { ok: true, recipe: clone(activeRevisionSnap.data()?.snapshot || {}) } : resolveLegacyRecipe(bean, slotKey);
+    if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
+    const before = sourceProposal.after;
+    const resolvedHash = recipeIdentityHash(before, slotKey);
+    if (sourceProposal.sourceRevisionId !== activeRevisionId || sourceProposal.sourceHash !== resolvedHash || (sourceRevisionId && sourceRevisionId !== activeRevisionId) || (sourceHash && sourceHash !== resolvedHash)) throw Object.assign(new Error('The proposal source changed since this preview was prepared.'), { code: 'stale' });
+    const pairQuery = proposalCollection.where('sessionId', '==', sessionId).where('coffeeId', '==', coffeeId).where('slotKey', '==', slotKey).where('status', '==', 'proposed');
+    const pairSnap = await tx.get(pairQuery);
+    const existing = pairSnap.docs.find((doc) => doc.data()?.preview?.key === previewKey);
+    if (existing) return { id: existing.id, ...existing.data() };
+    const candidate = canonicalCandidate(after, slotKey);
+    const validation = validateExecutableRecipe(candidate, slotKey);
+    if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
+    if (!activeRevisionId) {
+      activeRevisionId = id('revision');
+      tx.set(revisions.doc(activeRevisionId), { id: activeRevisionId, ownerId: uid, coffeeId, slotKey, snapshot: clone(before), snapshotHash: resolvedHash, status: 'active', parentId: null, createdAt });
+      tx.update(beanRef, { activeRevisionIds: { ...(bean.activeRevisionIds || {}), [slotKey]: activeRevisionId } });
+    }
+    const superseded = pairSnap.docs.filter((doc) => doc.data()?.preview);
+    superseded.forEach((doc) => tx.update(doc.ref, { status: 'superseded', supersededAt: createdAt }));
+    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: resolvedHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt, preview: { key: previewKey, dose: previewDose, ratio: previewRatio, configuration: previewConfiguration, sourceProposalId } });
+    tx.create(proposalRef, proposal);
     return proposal;
   });
 }

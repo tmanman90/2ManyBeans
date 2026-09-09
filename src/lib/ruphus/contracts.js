@@ -5,6 +5,7 @@ import { validateLaunchContext, LAUNCH_SURFACES, LAUNCH_ITEM_KINDS, RECIPE_SLOTS
 
 export const RUPHUS_PROTOCOL_VERSION = 'ruphus-agent-v3';
 export const RUPHUS_CONTRACT_VERSION = 1;
+export const RECIPE_PREVIEW_PROTOCOL_VERSION = 1;
 
 export const LIFECYCLE_TYPES = Object.freeze([
   'turn_accepted', 'context_loading', 'text_delta', 'tool_started', 'tool_result',
@@ -167,6 +168,22 @@ export function validateCommandRequest(value) {
   if (!text(value.actionId, 180) || !text(value.mode, 80) || !text(value.coffeeId, 180)) errors.push('actionId, mode, and coffeeId are required');
   if (value.mode && !['replace_active_recipe', 'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose', 'set_aiden_grind', 'set_aiden_link', 'undo_revision'].includes(value.mode)) errors.push('unsupported command mode');
   if (own(value, 'uid') || own(value, 'ownerId')) errors.push('owner identity is server-bound');
+  return { valid: errors.length === 0, errors };
+}
+
+// Preview preparation is deliberately distinct from command authority. A
+// request identifies an owner-scoped recipe slot and target configuration; it
+// never carries a client-selected recipe snapshot or owner identity.
+export function validateRecipePreviewRequest(value) {
+  const errors = [];
+  if (!object(value)) return { valid: false, errors: ['preview request must be an object'] };
+  for (const key of ['requestId', 'proposalId', 'coffeeId', 'slotKey', 'sessionId']) if (!text(value[key], 180)) errors.push(`${key} is required`);
+  if (value.slotKey && !SLOT_KEYS.includes(value.slotKey)) errors.push('unsupported slotKey');
+  if (!Number.isFinite(value.dose) || value.dose <= 0) errors.push('dose must be positive');
+  if (own(value, 'ratio') || own(value, 'targetRatio')) errors.push('ratio is immutable in the source proposal');
+  if (own(value, 'intent')) errors.push('intent is immutable in the source proposal');
+  if (value.configuration != null && !object(value.configuration)) errors.push('configuration must be an object');
+  for (const key of ['uid', 'ownerId', 'userId', 'recipe', 'after', 'snapshot']) if (own(value, key)) errors.push(`${key} is server-bound`);
   return { valid: errors.length === 0, errors };
 }
 

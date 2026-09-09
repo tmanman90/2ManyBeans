@@ -37,6 +37,23 @@ export async function executeRecipeCommand(command) {
   return result;
 }
 
+// Prepare a server-validated, non-mutating recipe version for the recipe page.
+// The server resolves the owner-scoped base recipe; this client helper never
+// sends a recipe snapshot as write authority.
+export async function prepareRecipePreview({ requestId = crypto.randomUUID(), ...request } = {}) {
+  const user = getAuth().currentUser;
+  if (!user?.uid) throw new Error('Sign in to prepare a recipe preview.');
+  const token = await user.getIdToken();
+  const response = await fetch(ruphusApiUrl('/api/ruphus-preview'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ...request, requestId, clientVersion: ruphusClientVersion() }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(result.message || result.error || 'Recipe preview failed.'), { code: result.error || 'preview_failed', details: result.details });
+  return result;
+}
+
 export function commandForBeanUpdate(bean, updates, { actionId = crypto.randomUUID() } = {}) {
   const protectedUpdates = protectedRecipeUpdates(updates);
   const keys = Object.keys(protectedUpdates);

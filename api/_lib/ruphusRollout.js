@@ -12,6 +12,7 @@ export const CENSUS_CAPABILITIES = new Set([
   'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started',
   'complete_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose',
   'set_aiden_grind', 'set_aiden_link', 'undo_revision', 'replace_active_recipe',
+  'recipe_preview_v1',
 ]);
 export const MUTATION_ROLLOUT_MODES = new Set([
   'apply_proposal',
@@ -38,6 +39,11 @@ export function isAgentAccessAllowed({ uid, rawUids = process.env.RUPHUS_AGENT_V
 
 export function isMutationAllowed({ uid, mode, rawUids = process.env.RUPHUS_AGENT_V3_MUTATION_UIDS, rawAccessUids = process.env.RUPHUS_AGENT_V3_UIDS } = {}) {
   return MUTATION_ROLLOUT_MODES.has(mode) && isUidAllowed(uid, rawUids) && isUidAllowed(uid, rawAccessUids);
+}
+
+export function isRecipePreviewAllowed({ uid, rawUids = process.env.RUPHUS_AGENT_V3_UIDS, rawPreviewUids = process.env.RUPHUS_AGENT_V3_PREVIEW_UIDS } = {}) {
+  const previewUids = typeof rawPreviewUids === 'string' && rawPreviewUids.trim() ? rawPreviewUids : rawUids;
+  return isUidAllowed(uid, previewUids) && isUidAllowed(uid, rawUids);
 }
 
 export function parseClientVersion(value) {
