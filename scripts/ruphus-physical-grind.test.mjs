@@ -67,6 +67,17 @@ test('invalid decimal from the model recovers to one real click and emits a card
   assert.equal(h.writes(), 1);
 });
 
+test('direct recipe read grounds the review follow-up before proposal dispatch', async () => {
+  const h = await harness({ text: 'Show recipe' });
+  h.context.conversation = [{ role: 'assistant', content: 'Go one click finer: 5.6 to 5.2.' }];
+  h.context.proposalState = { diagnosisReady: false, userAgreed: false };
+  await h.tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  assert.equal(h.context.proposalState.previewReady, true);
+  const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 5.2 } });
+  assert.equal(result.ok, true);
+  assert.equal(result.artifact.after.grindSize.setting, '5.2');
+});
+
 test('real proposal chain rejects 5.5 and accepts one physical finer click with coherent microns', async () => {
   const h = await harness();
   const args = { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 5.5 } };
