@@ -12,6 +12,12 @@ export const RUPHUS_V60_TECHNIQUE_OPTIONS_VERSION = 'ruphus-v60-technique-option
 const DOSE_BOUNDS = Object.freeze([...V60_RULES['v60-dose-scaling-v1'].bounds.dose]);
 const ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
 const SCALING_RULE_ID = 'v60-dose-scaling-v1';
+const TECHNIQUE_NAMES = Object.freeze({
+  'hoffmann-one-cup-v1': 'James Hoffmann One-Cup V60',
+  'hoffmann-large-batch-v1': 'James Hoffmann Large-Batch V60',
+  'kasuya-46-v1': 'Tetsu Kasuya 4:6',
+  'heart-continuous-v1': 'Heart Continuous Pour',
+});
 
 // These are deliberately descriptive app-facing differences, assembled only
 // from fields in the audited source registry. They are not a second recipe
@@ -66,8 +72,8 @@ function optionForSource(source) {
     familyKey: family.familyKey,
     sourceId: source.id,
     sourceIds: [source.id],
-    name: family.label,
-    label: family.label,
+    name: TECHNIQUE_NAMES[source.id] || family.label,
+    label: TECHNIQUE_NAMES[source.id] || family.label,
     differences: [...(DIFFERENCES[source.id] || [])],
     bounds: Object.freeze({
       dose: [...sourceBounds],

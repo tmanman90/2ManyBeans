@@ -1,4 +1,4 @@
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
 import { V60_ICED_SOURCE_REGISTRY_VERSION, V60_ICED_RULES, V60_ICED_SOURCES, V60_ICED_TECHNIQUES, icedSourceById, isKnownV60IcedParameterSource } from '../data/v60IcedSourceRegistry.js';
 
 export const V60_ICED_ENGINE_VERSION = 'v60-iced-engine-v2';
@@ -59,7 +59,7 @@ function grindFor(grinder, intent = {}) {
   const target = clamp(690 + clamp(Number(intent.grindAdjustmentMicrons) || 0, -45, 45), 655, 725);
   const scale = GRINDER_MICRON_SCALES[grinder];
   if (!scale) return { setting: null, microns: target, micronRange: [655, 725], description: descriptorForMicrons(target), grinderSpecific: false };
-  const setting = Math.round(clamp((target - scale.base) / scale.perStep + 1, 1, 40) * 10) / 10;
+  const setting = quantizeGrinderSetting(clamp((target - scale.base) / scale.perStep + 1, 1, 40), grinder);
   const microns = grinderSettingToMicrons(setting, grinder);
   return { setting: String(setting), microns, description: descriptorForMicrons(microns), grinderSpecific: true };
 }

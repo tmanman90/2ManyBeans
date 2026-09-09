@@ -2,19 +2,35 @@
 // Each tab renders method.label based on the user's preference.
 // Adding a new brew method requires one entry here, not editing three tabs.
 
-// Valid Fellow Ode Gen 2 grind steps (31 positions)
+// App notation for the Ode's 31 physical positions: whole, first tick (.2),
+// second tick (.6). These labels are not decimal fractions of a dial interval.
 export const ODE_GEN2_STEPS = [
-  1, 1.1, 1.2, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2,
-  5, 5.1, 5.2, 6, 6.1, 6.2, 7, 7.1, 7.2, 8, 8.1, 8.2,
-  9, 9.1, 9.2, 10, 10.1, 10.2, 11,
+  1, 1.2, 1.6, 2, 2.2, 2.6, 3, 3.2, 3.6, 4, 4.2, 4.6,
+  5, 5.2, 5.6, 6, 6.2, 6.6, 7, 7.2, 7.6, 8, 8.2, 8.6,
+  9, 9.2, 9.6, 10, 10.2, 10.6, 11,
 ];
+
+export const isOdeStep = (value) => value !== null && value !== '' && ODE_GEN2_STEPS.includes(Number(value));
+
+export function moveOdeClicks(setting, clicks) {
+  if (!isOdeStep(setting) || !Number.isInteger(clicks)) return null;
+  const index = ODE_GEN2_STEPS.indexOf(Number(setting));
+  return ODE_GEN2_STEPS[Math.max(0, Math.min(30, index + clicks))];
+}
+
+// Convert a continuous dial coordinate (used by approximate micron scales)
+// to a physical click label. Never use decimal label arithmetic for clicks.
+export function quantizeGrinderSetting(coordinate, grinder) {
+  if (grinder !== 'fellow-ode-gen2') return Math.round(coordinate * 10) / 10;
+  return ODE_GEN2_STEPS[Math.max(0, Math.min(30, Math.round((coordinate - 1) * 3)))];
+}
 
 export function nearestOdeStep(target, preferCoarser = true) {
   let closest = ODE_GEN2_STEPS[0];
   let minDist = Math.abs(target - closest);
   for (const step of ODE_GEN2_STEPS) {
     const dist = Math.abs(target - step);
-    if (dist < minDist || (dist === minDist && preferCoarser && step > closest)) {
+    if (dist < minDist - 1e-9 || (Math.abs(dist - minDist) < 1e-9 && preferCoarser && step > closest)) {
       closest = step;
       minDist = dist;
     }
@@ -54,7 +70,9 @@ export const GRINDER_MICRON_SCALES = {
 export function grinderSettingToMicrons(setting, grinderKey) {
   const g = GRINDER_MICRON_SCALES[grinderKey];
   if (!g || setting == null || isNaN(setting)) return null;
-  return Math.round(g.base + (setting - 1) * g.perStep);
+  const coordinate = grinderKey === 'fellow-ode-gen2' && isOdeStep(setting)
+    ? 1 + ODE_GEN2_STEPS.indexOf(Number(setting)) / 3 : Number(setting);
+  return Math.round(g.base + (coordinate - 1) * g.perStep);
 }
 
 // Approximate micron value for Ode Gen 2 step (derived from the scale table)

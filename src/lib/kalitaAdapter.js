@@ -1,4 +1,4 @@
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
 import { kalitaDoseBounds, normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
@@ -25,7 +25,7 @@ export function normalizeKalitaConfiguration(config = {}) {
 function buildGrind(grinder, targetMicrons) {
   const scale = GRINDER_MICRON_SCALES[grinder] || GRINDER_MICRON_SCALES['fellow-ode-gen2'];
   const range = GRINDER_RANGES[grinder] || GRINDER_RANGES['fellow-ode-gen2'];
-  const setting = Math.round(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]) * 10) / 10;
+  const setting = quantizeGrinderSetting(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]), GRINDER_MICRON_SCALES[grinder] ? grinder : 'fellow-ode-gen2');
   const microns = grinderSettingToMicrons(setting, GRINDER_MICRON_SCALES[grinder] ? grinder : 'fellow-ode-gen2');
   return { setting: String(setting), microns, description: descriptorForMicrons(microns) };
 }

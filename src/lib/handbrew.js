@@ -7,7 +7,7 @@ import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { classifyFamilyFallback } from './beanFields';
-import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons, parseTimeString, normalizeStepTimes } from './brewMethods';
+import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons, parseTimeString, normalizeStepTimes, isOdeStep, nearestOdeStep } from './brewMethods';
 export { parseTimeString } from './brewMethods';
 
 const PROXY_URL = `${API_BASE}/api/openai`;
@@ -18,7 +18,7 @@ const PROXY_URL = `${API_BASE}/api/openai`;
 const GRINDER_POUROVER_STARTS = {
   'fellow-ode-gen2': {
     label: 'Fellow Ode Gen 2',
-    scale: '1-11 with .1/.2 sub-steps',
+    scale: '31 clicks from 1-11, labelled whole number, .2, .6 (for example 5, 5.2, 5.6, 6)',
     pourOverStart: { light: 4.5, medium: 5.5, dark: 7.0 },
     validRange: { min: 4, max: 8 },
     aidenNote: 'Aiden light roast uses 3.1-4.0. Pour-over must be coarser (4+).',
@@ -333,6 +333,11 @@ export function repairHandBrewRecipe(recipe, grinderKey, family, roastLevel, dev
     // Reconcile microns with the (possibly clamped) setting via the grinder's
     // calibration — the model's freehand micron estimate is often on a
     // different scale, and UI must never show a setting/micron contradiction.
+    if (grinderKey === 'fellow-ode-gen2' && Number.isFinite(Number(recipe.grindSize.setting)) && !isOdeStep(recipe.grindSize.setting)) {
+      const physical = nearestOdeStep(Number(recipe.grindSize.setting));
+      repairs.push(`Grind moved to physical Ode click ${physical}`);
+      recipe.grindSize.setting = String(physical);
+    }
     const finalSetting = parseFloat(recipe.grindSize.setting);
     const trueMicrons = grinderSettingToMicrons(finalSetting, grinderKey);
     if (trueMicrons != null) {

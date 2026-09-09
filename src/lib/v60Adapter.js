@@ -1,4 +1,4 @@
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
 import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
@@ -102,7 +102,7 @@ function grindFor(grinder, technique, intent, override = null) {
     };
   }
   const raw = clamp((targetMicrons - scale.base) / scale.perStep + 1, 1, 40);
-  const setting = Math.round(raw * 10) / 10;
+  const setting = quantizeGrinderSetting(raw, grinder);
   const microns = grinderSettingToMicrons(setting, grinder);
   return { setting: String(setting), microns, description: descriptorForMicrons(microns), grinderSpecific: true };
 }

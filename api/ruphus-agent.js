@@ -9,6 +9,7 @@ import { persistProposal } from './_lib/ruphusRepository.js';
 import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { SLOT_KEYS } from '../src/lib/ruphus/contracts.js';
+import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 import { isAgentAccessAllowed, isMutationAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
 import { normalizeAgentSession, prepareSession, sessionAge } from '../src/lib/ruphus/session.js';
 import { boundLedger, MAX_LEDGER_BYTES } from './_lib/ruphusEvidence.js';
@@ -232,6 +233,8 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
     Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
     Object.defineProperty(context, '__ruphusTechniqueSelections', { value: techniqueSelectionsFromSession(activeSession, context.__ruphusRefs), enumerable: false, writable: true, configurable: true });
+    context.proposalReviews = replay.stale ? [] : recentProposalReviews(activeSession, context.__ruphusRefs, { coffeeRef: context.turnBinding?.status === 'locked' ? context.turnBinding.coffeeRef : null, slot: context.methodBinding?.status === 'locked' ? context.methodBinding.slot : null });
+    Object.defineProperty(context, '__ruphusPriorProposals', { value: replay.stale ? [] : (activeSession?.messages || []).slice(activeSession?.boundaryIndex || 0).flatMap(message => message.artifacts || []).filter(item => item.type === 'recipe_proposal'), enumerable: false });
     // A conversation reference, not write authority; the tool rechecks the
     // owner-scoped attempt and canonical receipt before displaying anything.
     Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(activeSession, { now: startedAt }), enumerable: false });

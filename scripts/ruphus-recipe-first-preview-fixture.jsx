@@ -6,14 +6,17 @@ import { RecipeProposalCard } from '../src/components/chat/artifacts/RecipePropo
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
+import { generateV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { clearRecipePreviewDraft, readRecipePreviewDraft, writeRecipePreviewDraft } from '../src/lib/ruphus/recipePreviewDraft.js';
 
 const uid = 'ruphus-recipe-first-fixture';
 const proposalId = 'changed-ratio-fixture';
 const bean = { id: 'fixture-coffee', name: 'Changed Ratio Coffee' };
+const techniqueMode = new URLSearchParams(window.location.search).has('technique');
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
-const proposed = createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 });
-const artifact = { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed };
+const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
+const proposed = selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 });
+const artifact = { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
 
@@ -49,7 +52,7 @@ function Fixture() {
         onClose={closePreview}
         recipe={preview?.recipe}
         bean={bean}
-        deviceKey="kalita"
+        deviceKey={techniqueMode ? 'v60' : 'kalita'}
         userCoffeeGrams={preview?.dose}
         onCoffeeGramsChange={changeDose}
         previewError={previewError}

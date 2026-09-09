@@ -230,6 +230,38 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
       if (proposed) { text += proposalHandoff(proposed.result.artifact); break; }
+      const invalidGrind = results.find(item => item.name === 'propose_recipe_change' && item.result?.code === 'physical_grind_required');
+      if (invalidGrind) {
+        const original = calls.find(call => call.name === 'propose_recipe_change');
+        const value = Number(original?.args?.change?.value);
+        const target = context.__ruphusResolvedTargets?.get(`${original?.args?.coffeeRef}:${original?.args?.slot}`);
+        const current = Number(target?.before?.grindSize?.setting ?? target?.before?.grind);
+        const corrected = value < current ? invalidGrind.result.validNearbySettings?.finer : value > current ? invalidGrind.result.validNearbySettings?.coarser : null;
+        // One deterministic physical-click correction of the same proposal,
+        // not another model-selected control, read, or saved recipe write.
+        if (original?.args?.change?.control === 'grind' && Number.isFinite(corrected) && toolCalls < maxToolCalls) {
+          toolCalls += 1;
+          toolNames.push('propose_recipe_change');
+          send('tool_started', { name: 'propose_recipe_change' });
+          const result = await tools.call('propose_recipe_change', { ...original.args, change: { control: 'grind', value: corrected } });
+          toolEvidence.push({ name: 'propose_recipe_change', result });
+          send('tool_result', { name: 'propose_recipe_change', result });
+          if (result?.ok && result.artifact) {
+            artifacts.push(JSON.parse(JSON.stringify(result.artifact)));
+            if (result.proposal?.id) proposalIds.push(result.proposal.id);
+            send('artifact_ready', { artifact: result.artifact });
+            text += proposalHandoff(result.artifact);
+            break;
+          }
+        }
+        text = 'That suggested grind isn’t a physical click on your Ode. I haven’t prepared or saved a change.';
+        break;
+      }
+      if (results.some(item => item.name === 'propose_recipe_change' && ['duplicate_alternative', 'no_recipe_change'].includes(item.result?.code))) {
+        response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.' });
+        rememberUsage(response);
+        continue;
+      }
       if (finalProposal) { text = 'I couldn’t prepare that change safely. Your saved recipe is unchanged.'; break; }
       const recoveredTrial = results.find(item => item.name === 'review_trial_recipe' && item.result?.ok === true && item.result?.artifact);
       if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }

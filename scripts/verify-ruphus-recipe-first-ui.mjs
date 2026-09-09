@@ -111,6 +111,16 @@ try {
     await errorPage.getByRole('button', { name: 'Back to chat', exact: true }).click();
     await errorPage.getByRole('button', { name: 'View recipe', exact: true }).waitFor({ state: 'visible' });
     await errorPage.close();
+    const techniquePage = await context.newPage();
+    await techniquePage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?technique=1`, { waitUntil: 'domcontentloaded' });
+    await techniquePage.getByText('Tetsu Kasuya 4:6', { exact: true }).waitFor();
+    assert.match(await techniquePage.locator('[data-preview-change]').innerText(), /Technique.*Tetsu Kasuya/);
+    await techniquePage.screenshot({ path: '/tmp/ruphus-named-technique-mobile.png' });
+    await techniquePage.getByRole('button', { name: 'View recipe', exact: true }).click();
+    await techniquePage.getByText('Tetsu Kasuya 4:6 method', { exact: true }).waitFor();
+    assert.equal(await techniquePage.locator('[data-start-count]').innerText(), '0');
+    assert.equal(await techniquePage.locator('[data-save-count]').innerText(), '0');
+    await techniquePage.close();
     await context.close();
   } finally { await browser.close(); }
 } finally {

@@ -12,6 +12,8 @@ import { generateV60TechniqueOption, listV60TechniqueOptions } from '../../src/l
 import { createRecipePreview } from '../../src/lib/ruphus/recipePreview.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 import { answeredSensoryClarifier } from './ruphusSensoryAnswer.js';
+import { isAlternativeRequest, sameRecipeReview } from '../../src/lib/ruphus/proposalContinuity.js';
+import { ODE_GEN2_STEPS, isOdeStep, grinderSettingToMicrons, descriptorForMicrons } from '../../src/lib/brewMethods.js';
 
 export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
 export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
@@ -450,7 +452,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         // The first selection is a complete source-backed experiment. Do not
         // copy the current family's controls into it; later dose previews use
         // this selected recipe as their reviewed source of truth.
-        const generated = generateV60TechniqueOption(selected.id, {}, { dose });
+        const generated = generateV60TechniqueOption(selected.id, {}, { dose, grinder: snapshot.setup?.grinder });
+        generated.recipe.techniqueLabel = selected.name;
         const preview = createRecipePreview({ recipe: generated.recipe, dose, ratio: recipeRatio(generated.recipe) });
         requestedPatch = preview;
         experimentMetadata = {
@@ -473,6 +476,25 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const before = clone(target.before);
     let after = mergeRecipePatch(before, requestedPatch);
     if (args.change?.control === 'dose') after = generatedDoseRecipe(before, slotKey, Number(args.change.value)) || after;
+    const grinder = snapshot.setup?.grinder;
+    const previousGrind = before.grindSize?.setting ?? before.grind;
+    const nextGrind = after.grindSize?.setting ?? after.grind;
+    if (grinder === 'fellow-ode-gen2' && String(previousGrind) !== String(nextGrind)) {
+      if (!isOdeStep(nextGrind)) {
+        const current = Number(previousGrind);
+        const finer = ODE_GEN2_STEPS.filter(step => step < current).at(-1);
+        const coarser = ODE_GEN2_STEPS.find(step => step > current);
+        return { ok: false, code: 'physical_grind_required', message: 'The Ode has physical clicks labelled whole number, .2, .6. Choose a real click, not a decimal adjustment. Nothing was saved.', validNearbySettings: { finer, coarser } };
+      }
+      if (after.grindSize) {
+        const microns = grinderSettingToMicrons(nextGrind, grinder);
+        after.grindSize = { ...after.grindSize, setting: String(nextGrind), microns, description: descriptorForMicrons(microns) };
+      }
+    }
+    if (canonicalHash(before) === canonicalHash(after)) return { ok: false, code: 'no_recipe_change', message: 'That is already the current recipe. Choose a genuinely different adjustment or explain why you would keep it.' };
+    if (isAlternativeRequest(context.userText) && (context.__ruphusPriorProposals || []).some(item => item.coffeeId === coffeeId && item.slotKey === slotKey && sameRecipeReview(item.after, after))) {
+      return { ok: false, code: 'duplicate_alternative', message: 'You already offered that recipe. Choose a genuinely different supported adjustment, or explain why no other supported option is appropriate. Do not present the same recipe as new.' };
+    }
     const paths = args.change?.control === 'dose' ? ['dose'] : changedPaths(before, after).filter(Boolean);
     const controls = techniqueExperiment ? ['technique'] : args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
     if (recipeSourceHash(recipe, slotKey) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };

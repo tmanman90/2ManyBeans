@@ -4,7 +4,7 @@
 // steep-aware grind. Mirrors kalitaAdapter.js's shape (reason codes,
 // configurationKey convention, recipe object contract, fail-closed
 // validation) per the plan's Key Technical Decisions.
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
 import {
   V60_SWITCH_SIZE, V60_SWITCH_CONFIGURATION_KEY, V60_SWITCH_DOSE_BOUNDS, V60_SWITCH_WATER_CAP_GRAMS,
   V60_SWITCH_CLASSIC_BASELINE_MICRONS, V60_SWITCH_ROAST_PRESETS, V60_SWITCH_PROCESS_OVERRIDE, V60_SWITCH_GUARDRAILS,
@@ -53,7 +53,7 @@ export function normalizeV60SwitchConfiguration(config = {}) {
 function buildGrind(grinder, targetMicrons) {
   const scale = GRINDER_MICRON_SCALES[grinder] || GRINDER_MICRON_SCALES['fellow-ode-gen2'];
   const range = GRINDER_RANGES[grinder] || GRINDER_RANGES['fellow-ode-gen2'];
-  const setting = Math.round(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]) * 10) / 10;
+  const setting = quantizeGrinderSetting(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]), GRINDER_MICRON_SCALES[grinder] ? grinder : 'fellow-ode-gen2');
   const microns = grinderSettingToMicrons(setting, GRINDER_MICRON_SCALES[grinder] ? grinder : 'fellow-ode-gen2');
   return { setting: String(setting), microns, description: descriptorForMicrons(microns) };
 }
