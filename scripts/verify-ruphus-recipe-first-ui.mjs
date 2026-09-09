@@ -76,7 +76,7 @@ try {
 
     const errorPage = await context.newPage();
     await errorPage.setViewportSize({ width: 390, height: 844 });
-    await errorPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?start-error=1`, { waitUntil: 'domcontentloaded' });
+    await errorPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?start-stale=1`, { waitUntil: 'domcontentloaded' });
     await errorPage.getByRole('button', { name: 'View recipe', exact: true }).click();
     await errorPage.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
     await errorPage.waitForTimeout(1000);
@@ -105,7 +105,11 @@ try {
     assert.ok(errorBox.y + errorBox.height <= startBox.y + 1, 'Preview error must sit above Start action');
     assert.ok(startBox.y - (errorBox.y + errorBox.height) <= 12, 'Preview error must remain adjacent to preview actions');
     assert.ok(saveBox.y >= startBox.y + startBox.height - 1, 'Save action must remain below Start action');
+    assert.equal(await startButton.isDisabled(), true, 'Stale preview cannot start a brew');
+    assert.equal(await saveButton.isDisabled(), true, 'Stale preview cannot save a recipe');
     assert.equal(await errorPage.getByRole('alert').count(), 1);
+    await errorPage.getByRole('button', { name: 'Back to chat', exact: true }).click();
+    await errorPage.getByRole('button', { name: 'View recipe', exact: true }).waitFor({ state: 'visible' });
     await errorPage.close();
     await context.close();
   } finally { await browser.close(); }

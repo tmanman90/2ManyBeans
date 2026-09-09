@@ -427,7 +427,7 @@ export const HandBrewModal = ({
   extraFooter, bean, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onStartTasting, onOpenRuphus = null, onDismissAttempt = null,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
-  previewMode = false, previewPending = false, previewError = null, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
+  previewMode = false, previewPending = false, previewError = null, previewStale = false, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -817,13 +817,16 @@ export const HandBrewModal = ({
             </div>
           )}
 
-          {previewMode && previewError && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>{previewError}</div>}
+          {previewMode && previewError && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>
+            <div>{previewError}</div>
+            {previewStale && <Btn variant="secondary" onClick={onClose} style={{ width: '100%', justifyContent: 'center', marginTop: 10, minHeight: 44 }} aria-label="Back to chat">Back to chat</Btn>}
+          </div>}
 
           {/* Start Brew button */}
           {timerReady && (
             <m.button
               onClick={handleStartBrew}
-              disabled={previewPending}
+              disabled={previewPending || previewStale}
               aria-label="Start brew timer"
               whileTap={{ scale: 0.97 }}
               transition={spring.snappy}
@@ -853,7 +856,7 @@ export const HandBrewModal = ({
           )}
 
           {previewMode && onPreviewSave && (
-            <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || !timerReady} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
+            <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || previewStale || !timerReady} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
               {previewPending ? 'Preparing…' : 'Save recipe'}
             </Btn>
           )}

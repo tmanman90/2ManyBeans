@@ -54,6 +54,9 @@ const STATIC_STARTERS = ['What should I brew today?', 'Scan a bag', 'Coach my ta
 const CHAT_THINKING_CAPTIONS = ['Thinking it over', 'Consulting the books', 'Putting it together'];
 const SEARCH_DISCLAIMER = "Couldn't check the web — answering from what I know.";
 const NEEDS_SEARCH_RE = /---NEEDS_SEARCH---([\s\S]*?)---END_SEARCH---/;
+const STALE_RECIPE_PREVIEW_MESSAGE = 'Your saved recipe changed, so this preview is out of date. Return to chat and ask Ruphus for a fresh recipe.';
+
+const isStaleRecipeError = (error) => error?.code === 'stale' || /(?:stale|out of date)/i.test(error?.message || '');
 
 function newMessage(fields) {
   return { id: crypto.randomUUID(), createdAt: Date.now(), ...fields };
@@ -436,6 +439,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const agentSessionIdRef = useRef(null);
   const recipePreviewRef = useRef(null);
   const recipePreviewActionPendingRef = useRef(false);
+  const recipePreviewStaleRef = useRef(false);
   const previewStartRef = useRef(null);
   // Input state lives in the ChatInputBar child so keystrokes don't
   // re-render the parent's message list on every character.
@@ -451,13 +455,22 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [recipePreview, setRecipePreview] = useState(null);
   const [recipePreviewPending, setRecipePreviewPending] = useState(false);
   const [recipePreviewError, setRecipePreviewError] = useState(null);
+  const [recipePreviewStale, setRecipePreviewStale] = useState(false);
   const handleRuphusAction = useCallback(async (request) => {
     if (!mutationEnabled) return null;
     try { return await runRuphusAction(request); } catch (error) {
-      if (error?.code === 'stale' && request?.artifact?.id) {
-        const markStale = (item) => item?.type === 'recipe_proposal' && item.id === request.artifact.id ? { ...item, status: 'stale' } : item;
+      if (isStaleRecipeError(error) && request?.artifact?.id) {
+        const currentPreview = recipePreviewRef.current;
+        const currentIds = [currentPreview?.artifact?.id, currentPreview?.sourceArtifact?.id, currentPreview?.preparedProposal?.id];
+        const staleIds = new Set([request.artifact.id, ...currentIds.filter(Boolean)]);
+        const markStale = (item) => item?.type === 'recipe_proposal' && staleIds.has(item.id) ? { ...item, status: 'stale' } : item;
         setMessages((previous) => previous.map((message) => Array.isArray(message.artifacts) ? { ...message, artifacts: message.artifacts.map(markStale) } : message));
         setAgentArtifacts((previous) => previous.map(markStale));
+        if (currentIds.includes(request.artifact.id)) {
+          recipePreviewStaleRef.current = true;
+          setRecipePreviewStale(true);
+          setRecipePreviewError(STALE_RECIPE_PREVIEW_MESSAGE);
+        }
       }
       setToast(error.message || 'Action unavailable');
       return null;
@@ -608,6 +621,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       const preparedProposal = restoreRecipePreviewAction({ draft: validDraft, sourceArtifact: artifact, preview });
       const next = { artifact, sourceArtifact: artifact, bean, baseRecipe, recipe: preview, dose: preview.coffeeGrams, configuration, requestId: validDraft?.requestId || null, preparedProposal, pendingAction: validDraft?.pendingAction || null, actionId: validDraft?.actionId || null };
       recipePreviewRef.current = next;
+      recipePreviewStaleRef.current = false;
+      setRecipePreviewStale(false);
       setRecipePreviewError(null);
       setRecipePreview(next);
       writeRecipePreviewDraft({ uid, proposalId: artifact.id, coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, dose: preview.coffeeGrams, configuration, sourceRevisionId: artifact.sourceRevisionId, sourceHash: artifact.sourceHash, requestId: next.requestId, ...(preparedProposal ? { preparedProposalId: preparedProposal.id, preparedSourceRevisionId: preparedProposal.sourceRevisionId, preparedSourceHash: preparedProposal.sourceHash, pendingAction: preparedProposal.mode, actionId: preparedProposal.actionId } : {}) });
@@ -620,6 +635,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const proposalId = recipePreviewRef.current?.artifact?.id;
     setRecipePreview(null);
     setRecipePreviewError(null);
+    recipePreviewStaleRef.current = false;
+    setRecipePreviewStale(false);
     recipePreviewRef.current = null;
     requestAnimationFrame(() => {
       if (!proposalId) return;
@@ -629,13 +646,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
 
   const handleRecipePreviewDoseChange = useCallback((newDose) => {
     const current = recipePreviewRef.current;
-    if (!current || !Number.isFinite(newDose) || newDose <= 0 || recipePreviewPending || recipePreviewActionPendingRef.current) return;
+    if (!current || recipePreviewStaleRef.current || !Number.isFinite(newDose) || newDose <= 0 || recipePreviewPending || recipePreviewActionPendingRef.current) return;
     try {
       const preview = createRecipePreview({ recipe: current.baseRecipe, dose: newDose, ratio: current.baseRecipe?.ratio, configuration: current.configuration });
       // A dose edit is a new server intent. Keep the prior request ID only
       // for an unchanged retry, never for a changed payload.
       const next = { ...current, recipe: preview, dose: preview.coffeeGrams, requestId: null, preparedProposal: null, pendingAction: null, actionId: null };
       recipePreviewRef.current = next;
+      recipePreviewStaleRef.current = false;
+      setRecipePreviewStale(false);
       setRecipePreviewError(null);
       setRecipePreview(next);
       writeRecipePreviewDraft({ uid, proposalId: current.artifact.id, coffeeId: current.artifact.coffeeId, slotKey: current.artifact.slotKey, dose: preview.coffeeGrams, configuration: current.configuration, sourceRevisionId: current.artifact.sourceRevisionId, sourceHash: current.artifact.sourceHash });
@@ -646,7 +665,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
 
   const handleRecipePreviewAction = useCallback(async (mode) => {
     const current = recipePreviewRef.current;
-    if (!current || recipePreviewPending || recipePreviewActionPendingRef.current || !agentSessionIdRef.current) return null;
+    if (!current || recipePreviewStaleRef.current || recipePreviewPending || recipePreviewActionPendingRef.current || !agentSessionIdRef.current) return null;
     recipePreviewActionPendingRef.current = true;
     const requestId = current.requestId || globalThis.crypto?.randomUUID?.() || `preview-${Date.now()}`;
     const sourceArtifact = current.sourceArtifact || current.artifact;
@@ -676,7 +695,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       const result = await handleRuphusAction({ mode, artifact: preparedProposal });
       if (!result) {
         previewStartRef.current = null;
-        setRecipePreviewError('This preview could not be started. Review it and try again.');
+        if (!recipePreviewStaleRef.current) setRecipePreviewError('This preview could not be started. Review it and try again.');
         return null;
       }
       clearRecipePreviewDraft({ uid, proposalId: (current.sourceArtifact || current.artifact).id });
@@ -685,7 +704,16 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       return result;
     } catch (error) {
       previewStartRef.current = null;
-      setRecipePreviewError(error.message || 'This preview could not be prepared. Review it and try again.');
+      if (isStaleRecipeError(error)) {
+        recipePreviewStaleRef.current = true;
+        setRecipePreviewStale(true);
+        setRecipePreviewError(STALE_RECIPE_PREVIEW_MESSAGE);
+        const markStale = (item) => item?.type === 'recipe_proposal' && item.id === sourceArtifact.id ? { ...item, status: 'stale' } : item;
+        setMessages((previous) => previous.map((message) => Array.isArray(message.artifacts) ? { ...message, artifacts: message.artifacts.map(markStale) } : message));
+        setAgentArtifacts((previous) => previous.map(markStale));
+      } else {
+        setRecipePreviewError(error.message || 'This preview could not be prepared. Review it and try again.');
+      }
       return null;
     } finally {
       recipePreviewActionPendingRef.current = false;
@@ -1593,6 +1621,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         previewMode
         previewPending={recipePreviewPending}
         previewError={recipePreviewError}
+        previewStale={recipePreviewStale}
         onClose={closeRecipePreview}
         recipe={recipePreview?.recipe || null}
         bean={recipePreview?.bean || null}

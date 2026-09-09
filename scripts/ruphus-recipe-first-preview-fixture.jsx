@@ -15,10 +15,12 @@ const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const proposed = createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 });
 const artifact = { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
+const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
 
 function Fixture() {
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
+  const [previewStale, setPreviewStale] = useState(false);
   const [startCount, setStartCount] = useState(0);
   const [saveCount, setSaveCount] = useState(0);
   const openPreview = () => {
@@ -28,7 +30,7 @@ function Fixture() {
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
     setPreview({ recipe, dose });
   };
-  const closePreview = () => { setPreview(null); setPreviewError(null); };
+  const closePreview = () => { setPreview(null); setPreviewError(null); setPreviewStale(false); };
   const changeDose = (dose) => {
     const recipe = createRecipePreview({ recipe: proposed, dose, ratio: proposed.ratio });
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
@@ -51,7 +53,13 @@ function Fixture() {
         userCoffeeGrams={preview?.dose}
         onCoffeeGramsChange={changeDose}
         previewError={previewError}
+        previewStale={previewStale}
         onPreviewStart={() => {
+          if (forceStartStale) {
+            setPreviewStale(true);
+            setPreviewError('Your saved recipe changed, so this preview is out of date. Return to chat and ask Ruphus for a fresh recipe.');
+            return;
+          }
           if (forceStartError) {
             setPreviewError('This preview could not be started. Review it and try again.');
             return;
