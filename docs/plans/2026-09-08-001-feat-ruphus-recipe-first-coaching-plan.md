@@ -1,7 +1,7 @@
 ---
 title: "feat: Ruphus recipe-first coaching and technique exploration"
 type: feat
-status: active
+status: completed
 date: 2026-09-08
 ---
 

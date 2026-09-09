@@ -6,6 +6,25 @@ preflight stops the run; it never falls back to production.
 
 ## Current continuation boundary
 
+### September 9 recipe-first implementation closeout
+
+The approved recipe-first plan is engineering-complete on isolated branch
+`codex/ruphus-recipe-first`, product `b4968e9`. See
+[`RECIPE-FIRST-ACCEPTANCE.md`](RECIPE-FIRST-ACCEPTANCE.md) for exact integrated
+native journeys, corrective builds, original-state restoration and screenshots.
+The currently installed **Dev simulator**, not the phone, uses preview
+`https://twomanybeans-ruphus-8qu8ndiav-tmanman90s-projects.vercel.app` and isolated
+Firebase `twomanybeans-ruphus-dev`; autoUpdate is false, channel dev. Ratio-first
+cards, adjustable recipe-before-timer, V60 experiments, relaunch/lost-response
+recovery and Save/Undo have native evidence. All 48 original saved recipes were
+restored and the owner login preserved. No physical brew or production release.
+Cumulative spend is $48.011302, reserved $0 of the existing $55 cap; this plan's
+increment was $0.017040. No additional paid engineering check remains necessary.
+Owner personal verdict remains pending. The older conversation-reset evidence
+below is historical and separate; it is not re-run or promoted to new proof.
+
+### September 8 conversation-reset closeout
+
 September 8 owner amendment supersedes conflicting account/device/verdict rules
 below: native acceptance uses the already-signed-in Dev simulator owner account.
 Preserve its login and existing data. Never seed/reset it or inject authentication.
