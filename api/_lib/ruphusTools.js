@@ -1,6 +1,6 @@
 import { canonicalHash, clone, RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
-import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
+import { canonicalRecipeSnapshot, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
 import { resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 import { generateV60Recipe } from '../../src/lib/v60Adapter.js';
@@ -44,11 +44,10 @@ function recipeControl(path = '') {
   if (['temperature', 'temperatureC', 'waterTemp'].includes(root)) return 'temperature';
   return root;
 }
-function recipeValue(recipe) {
-  if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return recipe;
-  const value = clone(recipe); for (const key of ['selectedPath', 'selectedHash', 'sourceLineage']) delete value[key];
-  const stack = [value]; while (stack.length) { const current = stack.pop(); if (!current || typeof current !== 'object') continue; for (const key of Object.keys(current)) { if (current[key] === null) delete current[key]; else if (typeof current[key] === 'object') stack.push(current[key]); } }
-  return value;
+function recipeSourceHash(recipe, slotKey) {
+  if (recipe?.selectedHash) return recipe.selectedHash;
+  if (recipe?.recipeHash) return recipe.recipeHash;
+  return canonicalRecipeSnapshot(recipe, slotKey).recipeHash;
 }
 function mergeRecipePatch(before, patch) {
   const result = clone(before);
@@ -357,7 +356,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const target = method?.slot ? evidence.recipe?.records?.find((item) => recipeSlotKey(item) === method.slot) : null;
       if (target && context.__ruphusResolvedTargets instanceof Map) {
         const slotKey = recipeSlotKey(target);
-        context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(target), sourceHash: target.selectedHash || canonicalHash(recipeValue(target)) });
+        context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(target), sourceHash: recipeSourceHash(target, slotKey) });
         if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
         setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe: target, techniqueRequest: techniqueRequestReady(context.userText) });
       }
@@ -384,7 +383,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         offeredIds: options.flatMap((option) => [option.id, option.familyId, option.sourceId]),
         selectedIds: prior?.selectedIds || [],
       });
-      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(key, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipe.selectedHash || canonicalHash(recipeValue(recipe)), techniqueOptions: options });
+      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(key, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
       setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, techniqueRequest: true });
       return { ok: true, actionable: true, coffeeRef: args.coffeeRef, slot: slotKey, current: { technique: recipe.technique || null, sourceLineage: clone(recipe.sourceLineage || null) }, options };
     }
@@ -409,7 +408,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
       if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
-      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipe.selectedHash || canonicalHash(recipeValue(recipe)) });
+      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
       if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: modelRecipe(recipe) };
     }
@@ -473,7 +472,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (args.change?.control === 'dose') after = generatedDoseRecipe(before, slotKey, Number(args.change.value)) || after;
     const paths = args.change?.control === 'dose' ? ['dose'] : changedPaths(before, after).filter(Boolean);
     const controls = techniqueExperiment ? ['technique'] : args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
-    if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
+    if (recipeSourceHash(recipe, slotKey) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (!techniqueExperiment && (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0]))) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
     const validationRecipe = after.sourceLineage ? after : recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);

@@ -115,9 +115,9 @@ export function deriveProposalReadiness({ conversation = [], ledger = null, user
     && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/iu.test(sentence));
   const refusalOrExploration = /\b(?:don['’]t|do not|not yet|hold off|wait|instead|what if|how (?:do|would|can|to)|explain|why|before)\b/i.test(userText);
   const resolvedSensory = /\b(?:watery|weak|flat|hollow|thin|diluted|washed out)\b[^.!?]{0,70}\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|dry|astringent)\b|\b(?:sour|sharp|muted|bitter|harsh)\b[^.!?]{0,70}\b(?:watery|weak|flat|hollow|thin|dry|astringent)\b/i.test(userText);
-  const previousRecommendation = /\b(?:try|test|use|make|move|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|finer|coarser)\b/i.test(previousAssistant)
+  const previousRecommendation = /\b(?:try|test|use|make|move|adjust|change|increase|decrease|reduce|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|finer|coarser)\b/i.test(previousAssistant)
     && /\b(?:dose|coffee|ratio|water|grind|temperature|heat|extraction)\b/i.test(previousAssistant);
-  const explicitRequest = /\b(?:can you|could you|please|would you|will you|go ahead|make|apply|save|update|change|try|test|prepare|propose|suggest)\b[^.!?]{0,100}\b(?:recipe|change|adjust|that|it|one|this|proposal|dose|grind|water|temperature|ratio)\b/i.test(userText)
+  const explicitRequest = /\b(?:can (?:you|we)|could you|please|would you|will you|go ahead|make|apply|save|update|change|try|test|prepare|propose|suggest)\b[^.!?]{0,100}\b(?:recipe|change|adjust|that|it|one|this|proposal|dose|grind|water|temperature|ratio)\b/i.test(userText)
     || /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
   const weaknessOnly = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(userText);
   const answeredSensoryClarifier = weaknessOnly && unresolvedSensoryQuestion;
