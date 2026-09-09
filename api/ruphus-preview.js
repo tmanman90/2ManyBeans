@@ -8,11 +8,13 @@ const pick = (value, keys) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return Object.fromEntries(keys.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]));
 };
-const safeIntent = (value) => pick(value, ['targetRatio', 'targetTemperatureC', 'techniquePreference', 'finesRisk', 'solubilityRisk', 'energyTendency', 'desiredStrength', 'contactTimeAdjustmentSeconds', 'grindAdjustmentMicrons', 'confidence', 'cupDirection', 'softPriors', 'reasonCodes']);
-const safeConfiguration = (value) => pick(value, ['size', 'kalitaSize', 'grinder', 'roast', 'process', 'chillingMethod', 'closedBloomSeconds', 'forcedSteepDurationSeconds']);
+// U2 exposes dose-only drafts. Technique, grinder, temperature, size, and
+// chilling controls remain immutable until a server-issued technique identity
+// exists in the later exploration unit.
+const safeConfiguration = (value) => pick(value, []);
 const requestKey = ({ proposalId, coffeeId, slotKey, sessionId, dose, configuration }) => canonicalHash({ proposalId, coffeeId, slotKey, sessionId, dose, configuration: safeConfiguration(configuration) });
 
-export default withCorsAuthPro(async (req, res, decodedToken) => {
+export async function handleRecipePreview(req, res, decodedToken, { db = getDb() } = {}) {
   const uid = decodedToken?.uid;
   const body = req.body || {};
   const request = { ...body, requestId: body.requestId || body.previewId };
@@ -20,9 +22,8 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
   if (!uid || !shape.valid) return res.status(400).json({ error: 'invalid_preview_request', details: shape.errors });
   if (!isAgentAccessAllowed({ uid, rawUids: process.env.RUPHUS_AGENT_V3_UIDS })) return res.status(404).json({ error: 'recipe_preview_unavailable' });
   if (Object.hasOwn(body, 'recipe') || Object.hasOwn(body, 'after') || Object.hasOwn(body, 'snapshot') || Object.hasOwn(body, 'ownerId') || Object.hasOwn(body, 'uid') || Object.hasOwn(body, 'intent') || Object.hasOwn(body, 'ratio') || Object.hasOwn(body, 'targetRatio')) return res.status(400).json({ error: 'preview_recipe_is_server_bound' });
-  let db;
+  if (body.configuration && Object.keys(body.configuration).length) return res.status(400).json({ error: 'unsupported_preview_configuration' });
   try {
-    db = getDb();
     const configuration = safeConfiguration(body.configuration);
     const base = await readRecipeForPreview({ db, uid, coffeeId: body.coffeeId, slotKey: body.slotKey, proposalId: body.proposalId, sessionId: body.sessionId });
     const preview = createRecipePreview({ recipe: base.recipe, dose: body.dose, configuration, allowIced: true });
@@ -30,7 +31,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const proposal = await persistRecipePreview({
       db, uid, coffeeId: body.coffeeId, slotKey: body.slotKey, sessionId: body.sessionId,
       after: preview, previewKey: key, previewDose: preview.coffeeGrams, previewRatio: preview.ratio,
-      previewConfiguration: { configuration }, sourceRevisionId: base.revisionId, sourceHash: base.sourceHash, sourceProposalId: body.proposalId,
+      previewConfiguration: { configuration }, sourceRevisionId: base.revisionId, sourceHash: base.sourceHash, sourceProposalId: body.proposalId, requestId: request.requestId,
     });
     await persistRuphusTrace({ db, uid, event: { feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-preview', contextId: body.coffeeId, requestId: request.requestId, proposalId: proposal.id, proposalValid: true, source: 'preview-preparation' }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
     return res.status(200).json({ ok: true, preview, proposal, saved: false, mutation: 'none', serverValidated: true, previewVersion: preview.recipePreview?.version || null });
@@ -39,6 +40,8 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const status = ['stale', 'idempotency_conflict'].includes(error.code) ? 409 : error.code === 'not_found' ? 404 : 400;
     return res.status(status).json({ error: error.code || 'preview_failed', message: error.message, details: error.details || null });
   }
-});
+}
 
-export { requestKey, safeIntent, safeConfiguration };
+export default withCorsAuthPro((req, res, decodedToken) => handleRecipePreview(req, res, decodedToken));
+
+export { requestKey, safeConfiguration };

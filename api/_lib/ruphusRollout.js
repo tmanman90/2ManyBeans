@@ -41,11 +41,6 @@ export function isMutationAllowed({ uid, mode, rawUids = process.env.RUPHUS_AGEN
   return MUTATION_ROLLOUT_MODES.has(mode) && isUidAllowed(uid, rawUids) && isUidAllowed(uid, rawAccessUids);
 }
 
-export function isRecipePreviewAllowed({ uid, rawUids = process.env.RUPHUS_AGENT_V3_UIDS, rawPreviewUids = process.env.RUPHUS_AGENT_V3_PREVIEW_UIDS } = {}) {
-  const previewUids = typeof rawPreviewUids === 'string' && rawPreviewUids.trim() ? rawPreviewUids : rawUids;
-  return isUidAllowed(uid, previewUids) && isUidAllowed(uid, rawUids);
-}
-
 export function parseClientVersion(value) {
   if (typeof value !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.trim())) return null;
   const parsed = value.trim().split('.').map(Number);

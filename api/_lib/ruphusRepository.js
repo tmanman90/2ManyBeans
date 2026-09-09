@@ -85,7 +85,7 @@ export function createMemoryRuphusRepository({ clock = () => Date.now() } = {}) 
       }
       return clone(proposal);
     },
-    createPreview({ uid, coffeeId, slotKey, sessionId, after, previewKey, previewDose, previewRatio, previewConfiguration, sourceRevisionId, sourceHash, sourceProposalId, proposalId = id('preview') }) {
+    createPreview({ uid, coffeeId, slotKey, sessionId, after, previewKey, previewDose, previewRatio, previewConfiguration, sourceRevisionId, sourceHash, sourceProposalId, requestId, proposalId = id('preview') }) {
       assertOwner(uid);
       if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
       if (!previewKey) throw Object.assign(new Error('preview key is required'), { code: 'preview_key_required' });
@@ -96,13 +96,17 @@ export function createMemoryRuphusRepository({ clock = () => Date.now() } = {}) 
       if (sourceProposal.status !== 'proposed') throw Object.assign(new Error('proposal is no longer available'), { code: 'stale' });
       const resolved = resolveLegacyRecipe(bean, slotKey);
       if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
-      const before = sourceProposal.after;
+      // The reviewed proposal's `after` is the immutable intent to project;
+      // lineage still points at the active canonical recipe.
+      const before = resolved.recipe;
       const activeRevisionId = bean.activeRevisionIds?.[slotKey] || null;
       const currentHash = recipeIdentityHash(resolved.recipe, slotKey);
       if (sourceProposal.sourceRevisionId !== activeRevisionId || sourceProposal.sourceHash !== currentHash || (sourceRevisionId && sourceRevisionId !== activeRevisionId) || (sourceHash && sourceHash !== currentHash)) {
         throw Object.assign(new Error('The saved recipe changed since this preview was prepared.'), { code: 'stale' });
       }
       const existing = this.listProposals(uid, { coffeeId, slotKey, sessionId }).find((proposal) => proposal.status === 'proposed' && proposal.preview?.key === previewKey);
+      const identityConflict = this.listProposals(uid, { coffeeId, slotKey, sessionId }).find((proposal) => proposal.status === 'proposed' && proposal.preview?.requestId === requestId && proposal.preview?.key !== previewKey);
+      if (identityConflict) throw Object.assign(new Error('Preview request id was reused with different input.'), { code: 'idempotency_conflict' });
       if (existing) return clone(existing);
       const createdAt = new Date(clock()).toISOString();
       for (const proposal of this.listProposals(uid, { coffeeId, slotKey, sessionId }).filter((item) => item.status === 'proposed' && item.preview)) {
@@ -111,7 +115,7 @@ export function createMemoryRuphusRepository({ clock = () => Date.now() } = {}) 
       const candidate = canonicalCandidate(after, slotKey);
       const validation = validateExecutableRecipe(candidate, slotKey);
       if (!validation.valid) throw Object.assign(new Error(validation.errors.join('; ')), { code: 'invalid_recipe' });
-      const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: currentHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt, preview: { key: previewKey, dose: previewDose, ratio: previewRatio, configuration: previewConfiguration, sourceProposalId } });
+      const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: currentHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt, preview: { key: previewKey, requestId, dose: previewDose, ratio: previewRatio, configuration: previewConfiguration, sourceProposalId } });
       proposals.set(key(uid, proposal.id), proposal);
       return clone(proposal);
     },
@@ -196,7 +200,7 @@ export async function persistProposal({ db, uid, coffeeId, slotKey, sessionId, a
  * owner-scoped active revision and source hash before writing, so a client
  * cannot turn arbitrary recipe JSON into an actionable proposal.
  */
-export async function persistRecipePreview({ db, uid, coffeeId, slotKey, sessionId, after, previewKey, previewDose, previewRatio, previewConfiguration = {}, sourceRevisionId = null, sourceHash = null, sourceProposalId, proposalId = id('preview'), now = nowIso }) {
+export async function persistRecipePreview({ db, uid, coffeeId, slotKey, sessionId, after, previewKey, previewDose, previewRatio, previewConfiguration = {}, sourceRevisionId = null, sourceHash = null, sourceProposalId, requestId, proposalId = id('preview'), now = nowIso }) {
   assertOwner(uid);
   if (!db?.runTransaction || !db?.collection) throw new Error('Firestore database is required');
   if (!sessionId) throw Object.assign(new Error('session is required'), { code: 'session_required' });
@@ -222,12 +226,16 @@ export async function persistRecipePreview({ db, uid, coffeeId, slotKey, session
     if (activeRevisionId && (!activeRevisionSnap?.exists || activeRevisionSnap.data()?.coffeeId !== coffeeId || activeRevisionSnap.data()?.slotKey !== slotKey)) throw Object.assign(new Error('active revision is unavailable'), { code: 'active_revision_not_found' });
     const resolved = activeRevisionSnap?.exists ? { ok: true, recipe: clone(activeRevisionSnap.data()?.snapshot || {}) } : resolveLegacyRecipe(bean, slotKey);
     if (!resolved.ok) throw Object.assign(new Error(resolved.code), { code: resolved.code });
-    const before = sourceProposal.after;
-    const resolvedHash = recipeIdentityHash(before, slotKey);
+    // Project from the reviewed proposal intent, while retaining the active
+    // canonical recipe as the derived proposal's lineage anchor.
+    const before = resolved.recipe;
+    const resolvedHash = recipeIdentityHash(resolved.recipe, slotKey);
     if (sourceProposal.sourceRevisionId !== activeRevisionId || sourceProposal.sourceHash !== resolvedHash || (sourceRevisionId && sourceRevisionId !== activeRevisionId) || (sourceHash && sourceHash !== resolvedHash)) throw Object.assign(new Error('The proposal source changed since this preview was prepared.'), { code: 'stale' });
     const pairQuery = proposalCollection.where('sessionId', '==', sessionId).where('coffeeId', '==', coffeeId).where('slotKey', '==', slotKey).where('status', '==', 'proposed');
     const pairSnap = await tx.get(pairQuery);
     const existing = pairSnap.docs.find((doc) => doc.data()?.preview?.key === previewKey);
+    const identityConflict = pairSnap.docs.find((doc) => doc.data()?.preview?.requestId === requestId && doc.data()?.preview?.key !== previewKey);
+    if (identityConflict) throw Object.assign(new Error('Preview request id was reused with different input.'), { code: 'idempotency_conflict' });
     if (existing) return { id: existing.id, ...existing.data() };
     const candidate = canonicalCandidate(after, slotKey);
     const validation = validateExecutableRecipe(candidate, slotKey);
@@ -239,7 +247,7 @@ export async function persistRecipePreview({ db, uid, coffeeId, slotKey, session
     }
     const superseded = pairSnap.docs.filter((doc) => doc.data()?.preview);
     superseded.forEach((doc) => tx.update(doc.ref, { status: 'superseded', supersededAt: createdAt }));
-    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: resolvedHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt, preview: { key: previewKey, dose: previewDose, ratio: previewRatio, configuration: previewConfiguration, sourceProposalId } });
+    const proposal = buildProposal({ proposalId, uid, coffeeId, slotKey, sessionId, before, after: candidate, sourceRevisionId: activeRevisionId, sourceRevisionHash: resolvedHash, sourceDose: resolved.recipe.userCoffeeGrams ?? null, sourceAidenGrind: bean.aidenGrind ?? null, createdAt, preview: { key: previewKey, requestId, dose: previewDose, ratio: previewRatio, configuration: previewConfiguration, sourceProposalId } });
     tx.create(proposalRef, proposal);
     return proposal;
   });
