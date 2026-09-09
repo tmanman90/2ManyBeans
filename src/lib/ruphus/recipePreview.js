@@ -202,8 +202,21 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
 
 function annotate(recipe, base, dose, ratio, route, regenerated = false) {
   const baseRatioValue = baseRatio(base, route);
+  const reasoning = route === 'v60-hot' && typeof recipe.reasoning === 'string' && dose !== base.coffeeGrams
+    ? recipe.reasoning.replace(new RegExp(`\\b${base.coffeeGrams}g\\b`, 'i'), `${dose}g`)
+    : recipe.reasoning;
+  const sourceLineage = route === 'v60-hot' && recipe.sourceLineage && dose !== base.coffeeGrams
+    ? {
+      ...recipe.sourceLineage,
+      ...(typeof recipe.sourceLineage.adaptation === 'string'
+        ? { adaptation: recipe.sourceLineage.adaptation.replace(/\bscaled to \d+(?:\.\d+)?g\b/i, `scaled to ${dose}g`) }
+        : {}),
+    }
+    : recipe.sourceLineage;
   return {
     ...recipe,
+    ...(reasoning ? { reasoning } : {}),
+    ...(sourceLineage ? { sourceLineage } : {}),
     ratioIntent: {
       targetRatio: ratio,
       baseRatio: baseRatioValue,

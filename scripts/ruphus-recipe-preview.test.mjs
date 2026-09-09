@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 import {
@@ -61,6 +62,23 @@ import {
     () => createRecipePreview({ recipe: source, dose: 20 }),
     (error) => error instanceof RecipePreviewError && error.code === 'unsupported-dose-profile',
   );
+}
+
+// An explicit large-batch family keeps its source-backed explanation through
+// a same-profile reviewed-dose preview, and the adaptation label follows the
+// displayed dose rather than the proposal's 20g example.
+{
+  const selected = generateV60TechniqueOption('hoffmann-large-batch', {}, { dose: 20 }).recipe;
+  const preview = createRecipePreview({ recipe: selected, dose: 21 });
+
+  assert.equal(preview.coffeeGrams, 21);
+  assert.equal(preview.waterGrams, 350);
+  assert.equal(preview.steps[0].waterTotal, 42);
+  assert.match(preview.reasoning, /^The selected family uses the dedicated large-batch cadence/i);
+  assert.doesNotMatch(preview.reasoning, /\b20g\b/i);
+  assert.doesNotMatch(preview.reasoning, /balanced small-dose pulse/i);
+  assert.match(preview.sourceLineage.adaptation, /scaled to 21g/i);
+  assert.doesNotMatch(preview.sourceLineage.adaptation, /scaled to 20g/i);
 }
 
 // A regenerated Switch profile retains fixed grind controls from the reviewed

@@ -177,7 +177,9 @@ function reasonForTechnique(technique, config) {
   switch (technique.reasonCode) {
     case 'EXACT_STRUCTURED_SOURCE': return 'This coffee includes a complete roaster recipe, so the app follows that published V60 02 method directly.';
     case 'PARTIAL_STRUCTURED_SOURCE_ADAPTED': return 'The roaster supplied useful V60 guidance but not a complete timed recipe, so the app keeps those details inside a tested V60 02 profile.';
-    case 'LARGE_DOSE_DEDICATED_PROFILE': return `${config.dose}g needs the dedicated large-batch cadence so the deeper bed stays evenly saturated.`;
+    case 'LARGE_DOSE_DEDICATED_PROFILE': return technique.explicitSelection
+      ? 'The selected family uses the dedicated large-batch cadence so the deeper bed stays evenly saturated.'
+      : `${config.dose}g needs the dedicated large-batch cadence so the deeper bed stays evenly saturated.`;
     case 'HIGH_FINES_LOW_AGITATION': return 'This coffee is likely to produce more fines, so one gentle main pour limits agitation and helps prevent stalling.';
     case 'COARSE_PULSE_SOLUBILITY_PROFILE': return 'This coffee benefits from a coarser grind and separated pulses that build sweetness without excessive agitation.';
     case 'HIGH_ENERGY_LOW_FINES_PROFILE': return 'This coffee can handle more brewing energy, so two staged pours and controlled spins support an even extraction.';
@@ -187,6 +189,16 @@ function reasonForTechnique(technique, config) {
     default: return 'This coffee suits a balanced small-dose pulse pattern for clarity, sweetness, and repeatability.';
   }
 }
+
+// Explicit experiments use the same source-backed family explanations as the
+// automatic selector. The explicit-selection marker is kept separately so a
+// reviewed family cannot inherit the current recipe's default rationale.
+const EXPLICIT_REASON_CODES = Object.freeze({
+  'hoffmann-small-pulses': 'CENTER_SPIRAL_PULSE_PROFILE',
+  'hoffmann-large-batch': 'LARGE_DOSE_DEDICATED_PROFILE',
+  'kasuya-coarse-pulses': 'COARSE_PULSE_SOLUBILITY_PROFILE',
+  'gentle-main-pour': 'LOW_ENERGY_GENTLE_PROFILE',
+});
 
 function buildRecipe(intent, config, technique, { fallback = false, preserveIntentOverrides = false } = {}) {
   const source = technique.sourceRecipe || sourceById(technique.sourceIds[0]) || V60_SOURCES[0];
@@ -270,7 +282,7 @@ function buildRecipe(intent, config, technique, { fallback = false, preserveInte
     guideRangeSeconds: guideRange, timerReady: true, phaseContractVersion: V60_PHASE_CONTRACT_VERSION,
     candidate: true, doseTimingPolicy: 'generated-dose-v60-v3', engineVersion: V60_ENGINE_VERSION, rulesVersion: V60_RULES_VERSION,
     sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, sourceLineage: lineage, timingProfile: `v60:hot:${technique.id}`,
-    reasonCodes: [...(intent.reasonCodes || []), technique.reasonCode, fallback && 'V60_CONSERVATIVE_BASELINE'].filter(Boolean),
+    reasonCodes: [...(intent.reasonCodes || []), technique.reasonCode, technique.explicitSelection && 'EXPLICIT_TECHNIQUE_SELECTION', fallback && 'V60_CONSERVATIVE_BASELINE'].filter(Boolean),
     fallback: Boolean(fallback), generationStatus: fallback ? 'fallback' : 'candidate',
     reasoning: reasonForTechnique(technique, config),
     tips: 'Finish when the steady stream slows to occasional drips. Save the actual drawdown; taste decides what to change next time.',
@@ -367,7 +379,12 @@ function explicitTechnique(techniqueId) {
     || !source.grind || !source.geometry || !source.agitation) {
     throw new Error(`V60 technique family ${techniqueId} is not an executable registry option`);
   }
-  return { ...technique, sourceIds: [source.id], reasonCode: 'EXPLICIT_TECHNIQUE_SELECTION' };
+  return {
+    ...technique,
+    sourceIds: [source.id],
+    reasonCode: EXPLICIT_REASON_CODES[technique.id] || 'EXPLICIT_TECHNIQUE_SELECTION',
+    explicitSelection: true,
+  };
 }
 
 /**
