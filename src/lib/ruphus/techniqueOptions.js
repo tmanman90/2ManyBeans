@@ -18,19 +18,19 @@ const SCALING_RULE_ID = 'v60-dose-scaling-v1';
 // corpus and cannot make an otherwise ineligible source executable.
 const DIFFERENCES = Object.freeze({
   'hoffmann-one-cup-v1': [
-    'Four controlled pulse pours after a 50g bloom.',
+    'Source recipe: four controlled pulse pours after a 50g bloom.',
     'Medium-fine grind with a gentle bloom and final swirl.',
   ],
   'hoffmann-large-batch-v1': [
-    'Dedicated large-batch cadence: 60g bloom, then staged pours to 300g and 500g.',
+    'Source recipe: dedicated large-batch cadence with a 60g bloom, then staged pours to 300g and 500g.',
     'Stir and swirl after the final pour; filter contact is not prohibited by the source.',
   ],
   'kasuya-46-v1': [
-    'Five centered pulses using the 4:6 method.',
+    'Source recipe: five centered pulses using the 4:6 method.',
     'Coarse grind and no final swirl.',
   ],
   'heart-continuous-v1': [
-    'One slow, continuous center pour after a 40–50g bloom.',
+    'Source recipe: one slow, continuous center pour after a 40–50g bloom.',
     'Vigorous bloom stir and final stir, with a 93–96C source range.',
   ],
 });
@@ -118,7 +118,7 @@ function currentIdentity(current = {}) {
 export function listV60TechniqueOptions(current = {}) {
   const identity = currentIdentity(current);
   const currentOption = identity ? OPTIONS_BY_ID.get(identity) : null;
-  const unknownCurrent = Boolean(identity && !currentOption);
+  const unknownCurrent = !currentOption;
   const excludedIds = new Set([
     ...(Array.isArray(current?.excludeIds) ? current.excludeIds : []),
     ...(Array.isArray(current?.excludedIds) ? current.excludedIds : []),
