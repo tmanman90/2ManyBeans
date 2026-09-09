@@ -21,7 +21,7 @@ const GRINDER_POUROVER_STARTS = {
     scale: '31 clicks from 1-11, labelled whole number, .2, .6 (for example 5, 5.2, 5.6, 6)',
     pourOverStart: { light: 4.5, medium: 5.5, dark: 7.0 },
     validRange: { min: 4, max: 8 },
-    aidenNote: 'Aiden light roast uses 3.1-4.0. Pour-over must be coarser (4+).',
+    aidenNote: 'Do not copy Aiden grind settings into a manual recipe; use its own recipe and cup feedback.',
   },
   'fellow-opus': {
     label: 'Fellow Opus',

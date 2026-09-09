@@ -272,13 +272,15 @@ V60 SWITCH (valve-equipped V60 — hybrid percolation + immersion, app default 0
 // keys. Dynamic USER SETUP block names which blurb is active.
 export const GRINDER_KNOWLEDGE = `
 GRINDERS (micron calibrations per Honest Coffee Guide measured ranges):
-Fellow Ode Gen 2: scale 1-11 with 0.1/0.2 sub-steps (e.g. 4.1, 4.2). Lower
+Fellow Ode Gen 2: 31 physical clicks, labelled whole number, .2, .6 in this app
+  (e.g. 4, 4.2, 4.6, 5). Never suggest nonexistent 4.3 or 5.5. Lower
   number = finer grind. ~275µm at 1, ~88µm per whole number (5 ≈ 630µm,
   6 ≈ 720µm, 7 ≈ 805µm). V60 range roughly 4-6; light roast V60 starts
-  around 4.5. Flat-bed brewers (Kalita) run COARSER: light roast starts
-  5.5-6.5 — the device restricts flow, and dense light washed beans shed
+  around 4.6. Flat-bed brewers (Kalita) run COARSER: light roast starts
+  5.6-6.6 — the device restricts flow, and dense light washed beans shed
   fines that stall the flat bed if ground fine. Note: Aiden light-roast
-  recipes use 3.1-4.0 on the Ode, which is too fine for manual pour-over.
+  recipes may use 3.2-4 on the Ode; do not transfer a setting across brewers
+  without checking the actual recipe and cup feedback.
 Fellow Opus: dial 1-11 with quarter-step clicks. Lower number = finer.
   ~230µm at 1, ~93µm per whole number. Pour-over range about 3-8.5; light
   roast starts around 4.5.
