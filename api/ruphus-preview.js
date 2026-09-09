@@ -1,4 +1,5 @@
 import { withCorsAuthPro, getDb } from './_lib/cors-auth.js';
+import { RATE_LIMIT } from './_lib/claudeShared.js';
 import { canonicalHash, validateRecipePreviewRequest } from '../src/lib/ruphus/contracts.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { readRecipeForPreview, persistRecipePreview } from './_lib/ruphusRepository.js';
@@ -42,6 +43,6 @@ export async function handleRecipePreview(req, res, decodedToken, { db = getDb()
   }
 }
 
-export default withCorsAuthPro((req, res, decodedToken) => handleRecipePreview(req, res, decodedToken));
+export default withCorsAuthPro((req, res, decodedToken) => handleRecipePreview(req, res, decodedToken), { rateLimit: RATE_LIMIT });
 
 export { requestKey, safeConfiguration };

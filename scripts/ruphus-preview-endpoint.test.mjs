@@ -5,6 +5,7 @@ import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { validateRecipePreviewRequest } from '../src/lib/ruphus/contracts.js';
 import { createMemoryRuphusRepository, persistRecipePreview } from '../api/_lib/ruphusRepository.js';
 import { isAgentAccessAllowed } from '../api/_lib/ruphusRollout.js';
+import { RATE_LIMIT } from '../api/_lib/claudeShared.js';
 import { handleRecipePreview } from '../api/ruphus-preview.js';
 
 // The request carries configuration only. A recipe snapshot, owner identity,
@@ -137,6 +138,9 @@ const endpoint = await readFile(new URL('../api/ruphus-preview.js', import.meta.
 assert.match(endpoint, /createRecipePreview\(/);
 assert.match(endpoint, /persistRecipePreview\(/);
 assert.match(endpoint, /handleRecipePreview/);
+assert.match(endpoint, /claudeShared\.js/);
+assert.match(endpoint, /rateLimit: RATE_LIMIT/);
+assert.deepEqual(RATE_LIMIT, { key: 'claude', limit: 120, windowMs: 60 * 60 * 1000 });
 assert.match(endpoint, /saved: false/);
 assert.match(endpoint, /preview_recipe_is_server_bound/);
 
