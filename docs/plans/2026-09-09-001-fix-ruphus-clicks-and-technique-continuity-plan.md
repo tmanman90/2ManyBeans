@@ -1,7 +1,7 @@
 ---
 title: Physical grinder clicks and coherent technique conversation
 type: fix
-status: active
+status: completed
 date: 2026-09-09
 ---
 
