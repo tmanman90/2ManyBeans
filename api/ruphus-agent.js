@@ -64,6 +64,28 @@ export function trialReceiptsForSession(session, { now = Date.now() } = {}) {
     .filter(item => item.type === 'action_receipt' && item.mode === 'brew_once' && item.attemptId)
     .map(item => ({ id: item.id, attemptId: item.attemptId, coffeeId: item.coffeeId, slotKey: item.slotKey }));
 }
+
+// Technique selections are recovered from the bounded, owner-scoped session
+// artifacts rather than prose or the public evidence ledger. This preserves
+// the user's previously selected source identity across a fresh request while
+// keeping machine identifiers out of provider replay.
+export function techniqueSelectionsFromSession(session, refs = {}) {
+  const selections = new Map();
+  const messages = Array.isArray(session?.messages) ? session.messages : [];
+  for (const message of messages) {
+    for (const artifact of Array.isArray(message?.artifacts) ? message.artifacts : []) {
+      const experiment = artifact?.type === 'recipe_proposal' ? artifact.techniqueExperiment : null;
+      if (experiment?.kind !== 'v60_technique' || !artifact.coffeeId || !artifact.slotKey) continue;
+      const coffeeRef = Object.entries(refs || {}).find(([, coffeeId]) => coffeeId === artifact.coffeeId)?.[0];
+      if (!coffeeRef) continue;
+      const key = `${coffeeRef}:${artifact.slotKey}`;
+      const prior = selections.get(key) || { selectedIds: [] };
+      prior.selectedIds = [...new Set([...prior.selectedIds, experiment.techniqueId, experiment.familyId, experiment.sourceId].filter(Boolean))];
+      selections.set(key, prior);
+    }
+  }
+  return selections;
+}
 export function sessionReplayInputs({ session, conversation, ledger, continuePrevious = false, now = Date.now() } = {}) {
   const stale = Boolean(session && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale');
   if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? staleReplayConversation(session, { now }) : [], ledger: null, referenceLedger: continuePrevious === true ? replayFocusLedger(session?.ledger) : null };
@@ -87,19 +109,21 @@ export function replayFocusLedger(ledger) {
 
 export function deriveProposalReadiness({ conversation = [], ledger = null, userText = '' } = {}) {
   const previousAssistant = [...conversation].reverse().find((message) => message?.role === 'assistant')?.content || '';
+  const entries = Array.isArray(ledger?.entries) ? ledger.entries : [];
+  const groundedEvidence = entries.some((entry) => ['available', 'complete', 'partial'].includes(entry?.status));
   const unresolvedSensoryQuestion = previousAssistant.split(/(?<=[.!?])\s+|\n+/u).some((sentence) => /\?/u.test(sentence)
-    && /\b(?:was|is|does|did|which|mean)\b[^?]{0,220}\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/iu.test(sentence));
-  const answeredSensoryQuestion = /\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|full[- ]?bodied)\b/iu.test(userText);
-  const diagnosisReady = previousAssistant.trim().split(/\s+/).filter(Boolean).length >= 8
-    && /\b(?:watery|thin|sour|sharp|bitter|harsh|muted|flat|weak|strong|extraction|grind|dose|temperature|ratio|contact time|drawdown)\b/i.test(previousAssistant)
-    && Array.isArray(ledger?.entries) && ledger.entries.length > 0
-    && (!unresolvedSensoryQuestion || answeredSensoryQuestion);
-  // This only permits preparing a review card, never saving a recipe. Match
-  // ordinary requests as well as assent, while leaving questions and refusal
-  // as conversation rather than requiring the user to discover magic words.
+    && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/iu.test(sentence));
   const refusalOrExploration = /\b(?:don['’]t|do not|not yet|hold off|wait|instead|what if|how (?:do|would|can|to)|explain|why|before)\b/i.test(userText);
-  const explicitRequest = /\b(?:update|save|apply|change|make)\s+(?:(?:my|the|this|that|our)\s+)?(?:recipe|change|adjustment)\b/i.test(userText);
-  const userAgreed = !refusalOrExploration && (explicitRequest || /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText));
+  const resolvedSensory = /\b(?:watery|weak|flat|hollow|thin|diluted|washed out)\b[^.!?]{0,70}\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|dry|astringent)\b|\b(?:sour|sharp|muted|bitter|harsh)\b[^.!?]{0,70}\b(?:watery|weak|flat|hollow|thin|dry|astringent)\b/i.test(userText);
+  const previousRecommendation = /\b(?:try|test|use|make|move|adjust|change|increase|decrease|aim|set|turn|start|shift|bump|drop|target|recommend|suggest|should|finer|coarser)\b/i.test(previousAssistant)
+    && /\b(?:dose|coffee|ratio|water|grind|temperature|heat|extraction)\b/i.test(previousAssistant);
+  const explicitRequest = /\b(?:can you|could you|please|would you|will you|go ahead|make|apply|save|update|change|try|test|prepare|propose|suggest)\b[^.!?]{0,100}\b(?:recipe|change|adjust|that|it|one|this|proposal|dose|grind|water|temperature|ratio)\b/i.test(userText)
+    || /\b(?:yes|do it|go ahead|make that change|make the change|try that|change it)\b/i.test(userText);
+  const weaknessOnly = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(userText);
+  const answeredSensoryClarifier = weaknessOnly && unresolvedSensoryQuestion;
+  const diagnosisReady = groundedEvidence && !refusalOrExploration
+    && ((resolvedSensory || answeredSensoryClarifier) || previousRecommendation && explicitRequest);
+  const userAgreed = !refusalOrExploration && (explicitRequest || diagnosisReady);
   return { diagnosisReady, userAgreed };
 }
 export function enabledProposalActions(uid, env = process.env) {
@@ -206,6 +230,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
     context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
     Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
+    Object.defineProperty(context, '__ruphusTechniqueSelections', { value: techniqueSelectionsFromSession(activeSession, context.__ruphusRefs), enumerable: false, writable: true, configurable: true });
     // A conversation reference, not write authority; the tool rechecks the
     // owner-scoped attempt and canonical receipt before displaying anything.
     Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(activeSession, { now: startedAt }), enumerable: false });

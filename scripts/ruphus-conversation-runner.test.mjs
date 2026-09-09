@@ -4,8 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gradeTrialRecovery, loadFixtureManifest, U3_TOTAL_LIVE_COST_CAP_USD } from './ruphus-conversation-runner.mjs';
-import { buildRotationSnapshot } from '../api/_lib/ruphusEvidence.js';
+import { deriveRunnerPreviewReadiness, gradeTrialRecovery, loadFixtureManifest, U3_TOTAL_LIVE_COST_CAP_USD } from './ruphus-conversation-runner.mjs';
+import { buildRotationSnapshot, publicEvidence } from '../api/_lib/ruphusEvidence.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { gradeReply } from '../src/lib/ruphus/conversationContract.js';
 import {
@@ -46,6 +46,30 @@ test('blind fact sheet includes attempt notes visible to the candidate', async (
   const factSheet = fixtureFactSheet(account);
   assert.match(factSheet, /attempt note: watery/);
   assert.match(factSheet, /Colombia La Esperanza/);
+});
+
+test('runner derives preview readiness independently of the emitted proposal card', () => {
+  const evidenceResult = publicEvidence({ recipe: { kind: 'recipe', status: 'available', summary: '15 g to 250 g' }, unavailable: [] });
+  const evidence = [{ type: 'tool_result', name: 'read_coffee_evidence', result: evidenceResult }];
+  const trace = { expectedCoffeeId: 'fixture-right', actualCoffeeId: 'fixture-right', ambiguity: false };
+  const priorReplies = [{ reply: 'The watery cup points to low extraction. Try one small step finer while keeping the dose unchanged.' }];
+  const ready = deriveRunnerPreviewReadiness({ userTurn: 'Go ahead and make that change.', frames: evidence, priorReplies, trace });
+  assert.equal(ready, true);
+  const historyUnavailable = publicEvidence({ recipe: { kind: 'recipe', status: 'available', summary: '15 g to 250 g' }, unavailable: ['tastings'] });
+  assert.equal(deriveRunnerPreviewReadiness({ userTurn: 'Go ahead and make that change.', frames: [{ type: 'tool_result', name: 'read_coffee_evidence', result: historyUnavailable }], priorReplies, trace }), true);
+  const recipeUnavailable = publicEvidence({ recipe: { kind: 'recipe', status: 'unavailable', summary: 'Could not check recipe' }, unavailable: ['recipe'] });
+  assert.equal(deriveRunnerPreviewReadiness({ userTurn: 'Go ahead and make that change.', frames: [{ type: 'tool_result', name: 'read_coffee_evidence', result: recipeUnavailable }], priorReplies, trace }), false);
+  assert.ok(gradeReply({ reply: 'The recipe is unchanged.', userTurn: 'Go ahead and make that change.', frames: evidence, priorReplies, previewReady: ready }).ordinary.some((item) => item.code === 'C9_PROPOSAL_MISSING'));
+
+  const ambiguousTrace = { expectedCoffeeId: 'fixture-right', actualCoffeeId: null, ambiguity: true };
+  const injectedProposal = [...evidence, { type: 'artifact_ready', artifact: { type: 'recipe_proposal' } }];
+  const unresolved = deriveRunnerPreviewReadiness({ userTurn: 'What do you think?', frames: injectedProposal, priorReplies: [], trace: ambiguousTrace });
+  assert.equal(unresolved, false);
+  assert.ok(gradeReply({ reply: 'Prepared for review.', userTurn: 'What do you think?', frames: injectedProposal, priorReplies: [], previewReady: unresolved }).ordinary.some((item) => item.code === 'C9_PREMATURE_PROPOSAL'));
+
+  const validProposal = [...evidence, { type: 'artifact_ready', artifact: { type: 'recipe_proposal' } }];
+  assert.equal(deriveRunnerPreviewReadiness({ userTurn: 'Go ahead and make that change.', frames: validProposal, priorReplies, trace }), true);
+  assert.deepEqual(gradeReply({ reply: 'Prepared for review.', userTurn: 'Go ahead and make that change.', frames: validProposal, priorReplies, previewReady: true }).ordinary.filter((item) => /^C9_/.test(item.code)), []);
 });
 
 test('judge dispatch retries one malformed structured result without weakening validation', async () => {

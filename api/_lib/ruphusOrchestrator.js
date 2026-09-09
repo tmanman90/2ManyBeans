@@ -6,7 +6,7 @@ import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
 
 const REPLACEMENT = 'I lost my train of thought there. Ask me that again and I’ll keep it short.';
-const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'review_trial_recipe']);
+const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
   'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
@@ -71,6 +71,11 @@ function proposalUnit(control) {
 }
 
 export function proposalHandoff(artifact = {}) {
+  const technique = artifact.techniqueExperiment;
+  if (technique?.kind === 'v60_technique') {
+    const name = String(technique.name || 'that source-backed V60 technique').trim();
+    return `Prepared: ${name} as a different V60 technique experiment. Its full adapted schedule is ready to review; it has not been applied.`;
+  }
   const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
   const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
     : rawControl === 'waterGrams' ? 'water'
@@ -95,8 +100,8 @@ export function proposalHandoff(artifact = {}) {
  * or agreement about another coffee must not authorize this turn.
  *
  * Main-lane input contract:
- * { proposalState: { target: { coffeeRef, slot }, diagnosisReady: true,
- *   userAgreed: true, proposalIssued?: false } }
+ * { proposalState: { target: { coffeeRef, slot }, previewReady: true,
+ *   proposalIssued?: false } }
  */
 export function proposalEligibleForTarget(context, request = {}) {
   const state = context?.proposalState;
@@ -106,8 +111,9 @@ export function proposalEligibleForTarget(context, request = {}) {
   const requestSlot = request?.slot || request?.slotKey || null;
   const diagnosis = state.diagnosis || {};
   const agreement = state.agreement || {};
-  const diagnosisReady = state.diagnosisReady === true || diagnosis.ready === true || diagnosis.complete === true;
-  const userAgreed = state.userAgreed === true || agreement.accepted === true || agreement.ready === true;
+  const previewReady = state.previewReady === true;
+  const diagnosisReady = previewReady || state.diagnosisReady === true || diagnosis.ready === true || diagnosis.complete === true;
+  const userAgreed = previewReady || state.userAgreed === true || agreement.accepted === true || agreement.ready === true;
   const diagnosisTarget = { coffeeRef: state.diagnosisCoffeeRef || diagnosis.coffeeRef || target.coffeeRef, slot: state.diagnosisSlot || diagnosis.slot || diagnosis.slotKey || target.slot };
   const agreementTarget = { coffeeRef: state.agreementCoffeeRef || agreement.coffeeRef || target.coffeeRef, slot: state.agreementSlot || agreement.slot || agreement.slotKey || target.slot };
   return Boolean(
@@ -178,7 +184,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const results = await Promise.all(calls.map(async (request) => {
         send('tool_started', { name: request.name, ...(request.callId ? { callId: request.callId } : {}) }); toolNames.push(request.name);
         const result = blockedProposalCalls.has(request.callId || request)
-          ? { ok: false, code: 'proposal_timing', message: 'Give the recipe advice first and wait for explicit agreement before preparing a proposal.' }
+          ? { ok: false, code: 'proposal_timing', message: 'Resolve the coffee and recipe, then give the bounded recommendation before preparing its review card.' }
           : await tools.call(request.name, request.args || {});
         toolEvidence.push({ callId: request.callId, name: request.name, result });
         if (READS.has(request.name)) trace.reads.push({ name: request.name, at: new Date().toISOString() });
@@ -231,7 +237,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     if (checked) send('text_delta', { text: checked });
     const timing = { firstFrameMs: firstFrameAt == null ? null : firstFrameAt - turnStartedAt, checkedReplyMs: performance.now() - turnStartedAt, readRoundMs: readRoundMs || null, regenerationCount: trace.regenerations.length };
     send('turn_completed', { text: checked, timing });
-    return { ok: true, turnId, text: checked, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace }) };
+    const emittedArtifacts = artifacts.map((artifact) => ({ type: 'artifact_ready', artifact }));
+    return { ok: true, turnId, text: checked, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace, frames: emittedArtifacts, previewReady: context?.proposalState?.previewReady === true }) };
   } catch (error) {
     send(error.code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code: error.code || 'turn_failed', message: error.message });
     return { ok: false, turnId, code: error.code || 'turn_failed', text: '', toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };

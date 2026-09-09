@@ -31,7 +31,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /Before choosing among coffees, read the recent evidence for every plausible candidate/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /stay with the most recently named coffee/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /only reaffirms the already focused coffee, acknowledge it in one short phrase/);
-  assert.match(RUPHUS_SYSTEM_PROMPT, /Give specific recipe advice before agreement/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /give the advice and prepare its separate review card in the same turn without asking for another yes/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /thin but sweet or clean points to strength/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /launchItem method in LAUNCH_CLUE is verified app context/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /older coffee-level tasting that is not linked to the current brew does not diagnose today's cup/);
@@ -39,7 +39,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /do not add that there is no separate tasting unless the checked evidence explicitly establishes that absence/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /locked binding says Colombia La Esperanza for “the other Colombia,” answer about Colombia La Esperanza/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);
-  assert.match(RUPHUS_SYSTEM_PROMPT, /do not ask for agreement, advertise a proposal, or say you will prepare one/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Technique requests are a separate typed experiment/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Use fresh, fresher, and freshest only for literal roast age/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /When TRUSTED_METHOD_BINDING says locked/);
@@ -77,9 +77,10 @@ test('locked method binding is injected after general setup and rejects another 
 test('tools expose reads, trial review, and proposal but no mutation', async () => {
   const calls = [];
   const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });
-  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'review_trial_recipe', 'propose_recipe_change']);
+  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
   const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
-  assert.deepEqual(proposalSchema.properties.change.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
+  const changeSchema = proposalSchema.properties.change.anyOf.find((schema) => schema.type === 'object');
+  assert.deepEqual(changeSchema.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
   assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);
   assert.deepEqual(tools.definitions.find((definition) => definition.name === 'read_recipe').parameters.properties.slot.enum, ['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
   const assertStrictSchema = (schema) => {
@@ -120,9 +121,9 @@ test('proposal request guidance reaches the provider only after diagnosis and as
   assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: false } }), /RECIPE_REVIEW_REQUEST/);
   assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: false, userAgreed: true } }), /RECIPE_REVIEW_REQUEST/);
   const block = buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: true } });
-  assert.match(block, /Read the exact recipe, then prepare that change/);
-  assert.match(block, /Do not ask for another yes/);
-  assert.match(block, /card tap, not this request, authorizes saving/);
+  assert.match(block, /Prepare the bounded change or explicitly selected technique experiment/);
+  assert.match(block, /without asking for another yes/);
+  assert.match(block, /native card Start or Save control, not this request, authorizes a change/);
 });
 test('this coffee resolves the current named coffee, then the verified launch coffee', async () => {
   const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel' }, { id: 'coffee-2', name: 'Colombia La Esperanza' }] };

@@ -194,7 +194,7 @@ test('active server history is authoritative and proposal readiness requires gro
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does watery mean thin but clean, or sour and muted? I would test one small grind step after your answer.' }], ledger: session.ledger, userText: 'Sour and muted. Go ahead with one finer step.' }), { diagnosisReady: true, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does watery mean thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It is still watery. Go ahead and change it.' }), { diagnosisReady: false, userAgreed: true });
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Does flat mean thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It was flat. Go ahead.' }), { diagnosisReady: false, userAgreed: true });
-  assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Was the watery cup thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It was thin. Go ahead and change it.' }), { diagnosisReady: false, userAgreed: true });
+  assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Was the watery cup thin but clean, or sour and muted?' }], ledger: session.ledger, userText: 'It was thin.' }), { diagnosisReady: true, userAgreed: true });
 });
 test('recipe update requests earn a proposal without magic words or another yes', () => {
   const conversation = [{ role: 'assistant', content: 'For the hot Kalita, reduce the water by 10 g and keep the dose and grind unchanged. That is the first test I would try for more body.' }];

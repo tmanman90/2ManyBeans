@@ -37,7 +37,7 @@ test('sized grind comparisons and their predicted outcome are not extra unsized 
 });
 
 test('contract exposes versioned C6a/C6b surfaces and pure grader output', () => {
-  assert.equal(CONTRACT_VERSION, 'conversation-contract-v1');
+  assert.equal(CONTRACT_VERSION, 'conversation-contract-v2-recipe-first');
   assert.ok(C6A_MACHINE_TOKENS.includes('resolve_coffee'));
   assert.ok(C6B_PHRASES.includes('ledger'));
   assert.equal(typeof C6B_ALLOWLIST_VERSION, 'string');

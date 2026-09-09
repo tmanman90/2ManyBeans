@@ -6,6 +6,7 @@
 // and fails closed when the route cannot preserve its timing contract.
 
 import { generateKalitaRecipe } from '../kalitaAdapter.js';
+import { generateV60RecipeForTechnique } from '../v60Adapter.js';
 import { generateV60SwitchRecipe } from '../v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../v60IcedAdapter.js';
 import { generateKalitaIcedRecipe } from '../kalitaIcedAdapter.js';
@@ -149,6 +150,7 @@ function derivedIntent(recipe, route, options) {
   const intent = { ...supplied };
   if (intent.targetRatio == null) intent.targetRatio = baseRatio(recipe, route);
   if (intent.targetTemperatureC == null && Number.isFinite(recipe?.waterTemp?.celsius)) intent.targetTemperatureC = recipe.waterTemp.celsius;
+  if (intent.reviewedGrindSize == null && recipe?.grindSize && typeof recipe.grindSize === 'object') intent.reviewedGrindSize = recipe.grindSize;
   if (intent.techniquePreference == null && route === 'kalita-hot' && typeof recipe.technique === 'string') intent.techniquePreference = recipe.technique;
   if (intent.reasonCodes == null && Array.isArray(recipe.reasonCodes)) intent.reasonCodes = [...recipe.reasonCodes];
   if (intent.confidence == null && recipe.confidence != null) intent.confidence = recipe.confidence;
@@ -166,6 +168,17 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
       throw new RecipePreviewError('technique-conflict', 'This dose requires a different Kalita technique or size; review it explicitly before continuing.', { previousTechnique: recipe.technique, nextTechnique: generated.technique });
     }
     if (!options.configuration?.grinder && recipe.grindSize) generated.grindSize = structuredClone(recipe.grindSize);
+    return reconcileGeneratedRatio(generated, ratio);
+  }
+  if (route === 'v60-hot') {
+    const techniqueId = recipe.sourceLineage?.technique || recipe.technique;
+    if (!recipe.reasonCodes?.includes('EXPLICIT_TECHNIQUE_SELECTION') || !techniqueId) {
+      throw new RecipePreviewError('technique-conflict', 'This dose crosses the selected V60 profile boundary; review an explicit supported technique before continuing.');
+    }
+    const generated = generateV60RecipeForTechnique(techniqueId, intent, { ...configuration, dose, grindSize: recipe.grindSize });
+    if (generated.sourceLineage?.technique !== techniqueId) {
+      throw new RecipePreviewError('technique-conflict', 'The selected V60 technique could not be preserved at this dose.');
+    }
     return reconcileGeneratedRatio(generated, ratio);
   }
   if (route === 'v60-switch-hot') {
@@ -236,7 +249,8 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   const sourceProfile = profileFor(recipe, route, recipe.coffeeGrams);
   const targetProfile = profileFor(recipe, route, targetDose);
   const profileChanged = sourceProfile !== targetProfile;
-  const canRegenerate = route === 'kalita-hot' || route === 'v60-switch-hot' || route.endsWith('iced');
+  const canRegenerate = route === 'kalita-hot' || route === 'v60-switch-hot' || route.endsWith('iced')
+    || (route === 'v60-hot' && recipe.reasonCodes?.includes('EXPLICIT_TECHNIQUE_SELECTION'));
   if (profileChanged && !canRegenerate) {
     throw new RecipePreviewError('unsupported-dose-profile', 'This dose crosses a source profile boundary; the app needs an explicit recipe configuration before it can prepare a safe preview.', { sourceProfile, targetProfile });
   }

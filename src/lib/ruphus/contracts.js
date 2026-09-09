@@ -6,6 +6,7 @@ import { validateLaunchContext, LAUNCH_SURFACES, LAUNCH_ITEM_KINDS, RECIPE_SLOTS
 export const RUPHUS_PROTOCOL_VERSION = 'ruphus-agent-v3';
 export const RUPHUS_CONTRACT_VERSION = 1;
 export const RECIPE_PREVIEW_PROTOCOL_VERSION = 1;
+export const RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION = 1;
 
 export const LIFECYCLE_TYPES = Object.freeze([
   'turn_accepted', 'context_loading', 'text_delta', 'tool_started', 'tool_result',

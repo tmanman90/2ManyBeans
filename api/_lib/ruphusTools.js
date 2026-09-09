@@ -1,4 +1,4 @@
-import { canonicalHash, clone, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
+import { canonicalHash, clone, RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
@@ -8,9 +8,11 @@ import { generateV60SwitchRecipe } from '../../src/lib/v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
 import { generateKalitaRecipe } from '../../src/lib/kalitaAdapter.js';
 import { generateKalitaIcedRecipe } from '../../src/lib/kalitaIcedAdapter.js';
+import { generateV60TechniqueOption, listV60TechniqueOptions } from '../../src/lib/ruphus/techniqueOptions.js';
+import { createRecipePreview } from '../../src/lib/ruphus/recipePreview.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 
-export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'review_trial_recipe', 'propose_recipe_change']);
+export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
 export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
 const nullable = (schema) => ({ anyOf: [schema, { type: 'null' }] });
 const strictObject = (properties) => ({ type: 'object', properties: Object.fromEntries(Object.entries(properties).map(([key, schema]) => [key, nullable(schema)])), required: Object.keys(properties), additionalProperties: false });
@@ -206,6 +208,52 @@ function recipeSlotKey(recipe) {
   return null;
 }
 
+function recipeRatio(recipe) {
+  const value = recipe?.ratio ?? recipe?.finalBeverageRatio;
+  if (Number.isFinite(Number(value))) return Number(value);
+  const match = String(value || '').match(/(?:1\s*[:/]\s*)?([0-9]+(?:\.[0-9]+)?)/);
+  return match ? Number(match[1]) : null;
+}
+
+function techniqueIdentity(recipe = {}) {
+  return {
+    currentFamilyId: recipe.sourceLineage?.familyId || recipe.sourceLineage?.technique || recipe.technique || null,
+    currentTechniqueId: recipe.sourceLineage?.technique || recipe.technique || null,
+    currentSourceId: recipe.sourceLineage?.sourceIds?.[0] || recipe.sourceId || null,
+  };
+}
+
+function techniqueKey(coffeeRef, slotKey) { return `${coffeeRef}:${slotKey}`; }
+
+function safeTechniqueAdaptation(value) {
+  return String(value || '').replace(/\s+through\s+v60-dose-scaling-v1\.?/i, ' through the app’s supported dose range.');
+}
+
+function techniqueRequestReady(text = '') {
+  return /\b(?:different|another|alternative|new)\b[^.!?]{0,80}\b(?:technique|method|recipe)\b|\b(?:technique|method)\b[^.!?]{0,80}\b(?:different|another|alternative)\b/i.test(text);
+}
+
+function diagnosticRecommendationReady(text = '', conversation = []) {
+  const value = String(text || '');
+  if (/\b(?:don't|do not|not yet|wait|instead|what if|explain|why)\b/i.test(value)) return false;
+  const weakness = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(value);
+  const sensory = /\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|dry|astringent)\b/i.test(value);
+  const directControl = /\b(?:dose|ratio|water|grind|temperature|heat)\b[^.!?]{0,60}\b(?:change|adjust|increase|decrease|try|test|use|move|raise|lower|more|less|finer|coarser)\b/i.test(value);
+  const priorClarifier = [...(Array.isArray(conversation) ? conversation : [])].reverse().find((message) => message?.role === 'assistant')?.content || '';
+  const askedSensoryClarifier = /\?/.test(priorClarifier) && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/i.test(priorClarifier);
+  return (weakness && sensory) || directControl || (weakness && !sensory && askedSensoryClarifier);
+}
+
+function setPreviewReadiness(context, { coffeeRef, slotKey, recipe, techniqueRequest = false } = {}) {
+  if (!context?.proposalState || !recipe || !coffeeRef || !['v60_hot', 'kalita_hot'].includes(slotKey)) return;
+  if (diagnosticRecommendationReady(context.userText, context.conversation) || techniqueRequest || techniqueRequestReady(context.userText)) {
+    context.proposalState.previewReady = true;
+    context.proposalState.diagnosisReady = true;
+    context.proposalState.userAgreed = true;
+    context.proposalState.target = context.proposalState.target || { coffeeRef, slot: slotKey };
+  }
+}
+
 export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true, proposalActions = [] } = {}) {
   if (!uid || !context) throw new Error('tools require owner and context');
   if (!(context.__ruphusResolvedTargets instanceof Map)) Object.defineProperty(context, '__ruphusResolvedTargets', { value: new Map(), enumerable: false, writable: true, configurable: true });
@@ -311,10 +359,35 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         const slotKey = recipeSlotKey(target);
         context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(target), sourceHash: target.selectedHash || canonicalHash(recipeValue(target)) });
         if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
+        setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe: target, techniqueRequest: techniqueRequestReady(context.userText) });
       }
       return { ...publicEvidence(evidence), method, coffeeRef: args.coffeeRef };
     }
     const slotKey = args.slot || args.slotKey;
+    if (name === 'read_technique_options') {
+      if (slotKey !== 'v60_hot') return { ok: false, actionable: false, code: 'unsupported_technique_brewer', message: 'Technique exploration is available for a saved hot V60 recipe only.' };
+      const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
+      if (!recipe || recipe.code || recipe.device !== 'v60' || recipe.mode !== 'hot' || recipe.isIced === true) {
+        return { ok: true, actionable: false, current: null, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can compare these source-backed hot V60 techniques, but I need a saved hot V60 recipe before I can prepare an executable experiment.' };
+      }
+      const variant = String(recipe.variant || recipe.v60Variant || '').toLowerCase();
+      const nonStandard = variant === 'switch' || (recipe.v60Size != null && String(recipe.v60Size) !== '02') || (recipe.configurationKey != null && recipe.configurationKey !== 'v60:02:standard-paper');
+      if (nonStandard) {
+        return { ok: true, actionable: false, current: { technique: recipe.technique || null, variant: variant || null }, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can discuss standard hot V60 techniques, but this saved recipe is a different V60 configuration, so I will not prepare a timer-ready experiment from it.' };
+      }
+      const key = techniqueKey(args.coffeeRef, slotKey);
+      const prior = context.__ruphusTechniqueSelections?.get(key);
+      const options = listV60TechniqueOptions({ ...techniqueIdentity(recipe), excludeIds: prior?.selectedIds || [] }).map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) }));
+      if (!(context.__ruphusTechniqueSelections instanceof Map)) Object.defineProperty(context, '__ruphusTechniqueSelections', { value: new Map(), enumerable: false, writable: true, configurable: true });
+      context.__ruphusTechniqueSelections.set(key, {
+        current: techniqueIdentity(recipe),
+        offeredIds: options.flatMap((option) => [option.id, option.familyId, option.sourceId]),
+        selectedIds: prior?.selectedIds || [],
+      });
+      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(key, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipe.selectedHash || canonicalHash(recipeValue(recipe)), techniqueOptions: options });
+      setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, techniqueRequest: true });
+      return { ok: true, actionable: true, coffeeRef: args.coffeeRef, slot: slotKey, current: { technique: recipe.technique || null, sourceLineage: clone(recipe.sourceLineage || null) }, options };
+    }
     if (name === 'review_trial_recipe') {
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       if (typeof readers.readAttempts !== 'function' || typeof readers.readTrialReceipt !== 'function') return { ok: false, message: 'I could not check your trial recipe right now.' };
@@ -340,15 +413,57 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: modelRecipe(recipe) };
     }
+    const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
+    const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
+    const techniqueExperiment = experiment?.kind === 'v60_technique';
+    if (experimentHasSelection && !techniqueExperiment) return { ok: false, code: 'invalid_proposal_intent', message: 'Technique experiments must use the supported V60 technique intent.' };
+    if (techniqueExperiment && args.change) return { ok: false, code: 'invalid_proposal_intent', message: 'Choose either one recipe adjustment or one technique experiment, not both.' };
     if (!canPropose
-      || (context.proposalState && (context.proposalState.diagnosisReady !== true || context.proposalState.userAgreed !== true))
+      || (context.proposalState && context.proposalState.previewReady !== true && (context.proposalState.diagnosisReady !== true || context.proposalState.userAgreed !== true))
       || conditionalSensoryClarification(context.proposalState)) {
       throw Object.assign(new Error('proposal is not yet earned'), { code: 'proposal_timing' });
     }
     if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
     const target = context.__ruphusResolvedTargets instanceof Map ? context.__ruphusResolvedTargets.get(`${args.coffeeRef}:${slotKey}`) : null;
     if (!target || target.coffeeId !== coffeeId || target.coffeeRef !== args.coffeeRef) return { ok: false, code: 'proposal_target_required', message: 'Read the exact coffee and recipe before suggesting a change.' };
-    const requestedPatch = args.change ? patchForChange(target.before || {}, args.change) : args.afterRecipe;
+    let experimentMetadata = null;
+    let requestedPatch = args.change ? patchForChange(target.before || {}, args.change) : args.afterRecipe;
+    if (args.change?.control === 'ratio') {
+      try {
+        const beforeRecipe = target.before || {};
+        const dose = Number(beforeRecipe.coffeeGrams ?? beforeRecipe.userCoffeeGrams ?? beforeRecipe.dose);
+        requestedPatch = createRecipePreview({ recipe: beforeRecipe, dose, ratio: args.change.value, allowIced: true });
+      } catch (error) {
+        return { ok: false, code: error.code || 'invalid_ratio_preview', message: error.message };
+      }
+    }
+    if (techniqueExperiment) {
+      if (slotKey !== 'v60_hot') return { ok: false, code: 'unsupported_technique_brewer', message: 'Technique experiments require a saved hot V60 recipe.' };
+      const selectedId = experiment.techniqueId || experiment.familyId || experiment.sourceId;
+      const selected = (target.techniqueOptions || []).find((option) => [option.id, option.familyId, option.sourceId].includes(selectedId));
+      if (!selected) return { ok: false, code: 'technique_option_required', message: 'Choose one of the supported techniques I just showed you.' };
+      const before = target.before || {};
+      const dose = Number(before.coffeeGrams ?? before.userCoffeeGrams ?? before.dose);
+      try {
+        // The first selection is a complete source-backed experiment. Do not
+        // copy the current family's controls into it; later dose previews use
+        // this selected recipe as their reviewed source of truth.
+        const generated = generateV60TechniqueOption(selected.id, {}, { dose });
+        const preview = createRecipePreview({ recipe: generated.recipe, dose, ratio: recipeRatio(generated.recipe) });
+        requestedPatch = preview;
+        experimentMetadata = {
+          protocolVersion: RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION,
+          kind: 'v60_technique', techniqueId: selected.id, familyId: selected.familyId, sourceId: selected.sourceId,
+          name: selected.name, differences: clone(selected.differences), adaptation: safeTechniqueAdaptation(selected.adaptation),
+          attribution: clone(selected.attribution), sourceRegistryVersion: selected.sourceRegistryVersion,
+          currentTechnique: before.technique || before.sourceLineage?.technique || null,
+        };
+        const state = context.__ruphusTechniqueSelections?.get(techniqueKey(args.coffeeRef, slotKey));
+        if (state) state.selectedIds = [...new Set([...(state.selectedIds || []), selected.id, selected.familyId, selected.sourceId])];
+      } catch (error) {
+        return { ok: false, code: error.code || 'technique_generation_failed', message: error.message };
+      }
+    }
     if (!requestedPatch || typeof requestedPatch !== 'object' || Array.isArray(requestedPatch)) return { ok: false, code: 'invalid_proposal', message: 'Choose one recipe control and a concrete value.' };
     if (context.proposalState?.target && (context.proposalState.target.coffeeRef !== args.coffeeRef || context.proposalState.target.slot !== slotKey)) return { ok: false, code: 'proposal_target_mismatch', message: 'That suggestion is bound to a different coffee and recipe.' };
     const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
@@ -357,15 +472,15 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     let after = mergeRecipePatch(before, requestedPatch);
     if (args.change?.control === 'dose') after = generatedDoseRecipe(before, slotKey, Number(args.change.value)) || after;
     const paths = args.change?.control === 'dose' ? ['dose'] : changedPaths(before, after).filter(Boolean);
-    const controls = args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
+    const controls = techniqueExperiment ? ['technique'] : args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
     if ((recipe.selectedHash || canonicalHash(recipeValue(recipe))) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
-    if (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0])) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
+    if (!techniqueExperiment && (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0]))) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
     const validationRecipe = after.sourceLineage ? after : recipe.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
     const coffeeName = snapshot.coffees?.find((item) => item.refKey === args.coffeeRef)?.name
       || (context.turnBinding?.coffeeRef === args.coffeeRef ? context.turnBinding.coffeeName : null);
-    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: paths, actions: [], recipeHash: canonicalHash(after), sourceHash: recipe.selectedHash || context.evidenceHash });
+    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: techniqueExperiment ? ['technique', ...paths] : paths, ...(experimentMetadata ? { techniqueExperiment: experimentMetadata } : {}), actions: [], recipeHash: canonicalHash(after), sourceHash: target.sourceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
     if (context.proposalState) context.proposalState.proposalIssued = true;
     const actions = typeof proposalStore === 'function' && proposal?.status === 'proposed' && proposal?.sourceRevisionId
@@ -377,8 +492,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'review_trial_recipe') return { type: 'function', name, description: 'Recover an existing Brew once trial when the user asks to keep it, make it permanent, or save that trial. This reads the actual trial and displays its save control; it never saves or requires tasting. Use instead of generating a new recipe from conversation prose. Use null trialRef initially; if several trials are returned, clarify using their dates or adjustments, then pass the chosen trialRef.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, trialRef: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'trialRef'], additionalProperties: false } };
     if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
-    if (name === 'read_recipe') return { type: 'function', name, description: 'After explicit user agreement, read one exact recipe slot once immediately before a proposal. Do not use this during diagnosis because read_coffee_evidence already includes the recipe.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
-    return { type: 'function', name, description: 'Propose one bounded recipe-control change after the user agrees. Choose exactly one control and give its concrete new value.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, change: { type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false } }, required: ['coffeeRef', 'slot', 'change'], additionalProperties: false } };
+    if (name === 'read_recipe') return { type: 'function', name, description: 'When a bounded recommendation or selected technique needs exact source data, read one exact recipe slot once immediately before a proposal. Do not use this during diagnosis because read_coffee_evidence already includes the recipe.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
+    if (name === 'read_technique_options') return { type: 'function', name, description: 'For an explicit request for a different hot V60 technique, read eligible source-backed alternatives for this coffee. The returned options are safe to discuss; choose one exact option before requesting an experiment.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot'] } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
+    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, or one explicitly selected source-backed V60 technique experiment. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })) }, required: ['coffeeRef', 'slot', 'change', 'experiment'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
 }

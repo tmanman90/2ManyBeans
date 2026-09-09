@@ -1,5 +1,6 @@
 {
   "manifestVersion": 3,
+  "behaviorVersion": "conversation-contract-v2-recipe-first",
   "manifestHash": "f92486c57c9c0766",
   "cases": [
     {"id":"AE01","critical":true,"intent":"Chat opened from Rwanda Rambagirakawa's Aiden recipe; user switches to jar #1, El Vergel, before asking for brew advice","launchContext":{"coffeeRef":"fixture-rwanda","surface":"recipe_aiden","launchItem":{"kind":"recipe","ref":"fixture-rwanda:aiden","method":"aiden"}},"turns":["Use the bean in jar #1 instead.","what should I change","It was sour and muted."],"expected":{"focus":["fixture-el-vergel"],"turns":[{"focus":"fixture-el-vergel","ambiguity":false},{"focus":"fixture-el-vergel","ambiguity":false},{"focus":"fixture-el-vergel","ambiguity":false}],"hintDiscarded":true},"branches":[{"when":"thin but sweet|sweet and clean|sour, sharp, or muted|sour.*muted","answer":"It was sour and muted."},{"when":"want me to (?:propose|prepare|make)|would you like me to (?:propose|prepare|make)|want to try|would you like to try","answer":"Not yet."}]},

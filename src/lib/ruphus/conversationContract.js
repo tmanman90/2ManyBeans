@@ -8,13 +8,13 @@ const sentenceCount = (value) => textOf(value).replace(/(\d)\.(\d)/g, '$1\u0000$
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const PRIVATE_USE = /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u;
 
-export const CONTRACT_VERSION = 'conversation-contract-v1';
+export const CONTRACT_VERSION = 'conversation-contract-v2-recipe-first';
 export const CATEGORIES = Object.freeze({ CATASTROPHIC: 'catastrophic', ORDINARY: 'ordinary' });
 
 // C6a is the runtime-hard vocabulary.  C6b is intentionally separate: it is
 // evaluated for feel, but never causes runtime replacement or regeneration.
 export const C6A_MACHINE_TOKENS = Object.freeze([
-  'resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_tastings',
+  'resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'read_tastings',
   'read_attempts', 'propose_recipe_change', 'coffeeId', 'coffeeGrams',
   'waterGrams', 'waterTemp', 'grindSize', 'slotKey', 'revisionId',
   'sourceHash', 'recipeHash', 'as an AI', 'language model',
@@ -226,15 +226,18 @@ export function gradeC8Correction({ reply = '', userTurn = '', _priorReplies = [
   return [];
 }
 
-export function gradeC9ProposalTiming({ reply = '', frames = [], priorReplies = [], userTurn = '' } = {}) {
+export function gradeC9ProposalTiming({ reply = '', frames = [], priorReplies = [], userTurn = '', previewReady = false } = {}) {
   const value = textOf(reply);
   const result = [];
   const hasProposal = Array.isArray(frames) && frames.some((frame) => frame?.type === 'artifact_ready' && frame?.artifact?.type === 'recipe_proposal');
   if (PROPOSAL_SHAPE.test(value) || JSON_SHAPE.test(value)) result.push(violation('CF6_PROPOSAL_PROSE', CATEGORIES.CATASTROPHIC, 'proposal is rendered in prose', { runtime: true }));
-  if (!hasProposal) return result;
+  if (!hasProposal) {
+    if (previewReady) result.push(violation('C9_PROPOSAL_MISSING', CATEGORIES.ORDINARY, 'a ready recipe turn did not emit its native proposal card'));
+    return result;
+  }
   const substantive = Array.isArray(priorReplies) && priorReplies.some((item) => words(item?.reply ?? item?.text ?? item).length >= 8);
   const agreement = /\b(?:change|do it|yes|agree|try that|make that|go ahead|update (?:the |my |this |our )?recipe)\b/i.test(textOf(userTurn));
-  if (!substantive || !agreement) result.push(violation('C9_PREMATURE_PROPOSAL', CATEGORIES.ORDINARY, 'proposal appeared before diagnosis and agreement'));
+  if (!previewReady && (!substantive || !agreement)) result.push(violation('C9_PREMATURE_PROPOSAL', CATEGORIES.ORDINARY, 'proposal appeared before grounded recommendation readiness'));
   return result;
 }
 

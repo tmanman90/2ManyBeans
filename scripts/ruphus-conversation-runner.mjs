@@ -49,6 +49,7 @@ export function assertFixtureIntegrity(account, cases) {
   const expected = fixtureHash(account);
   if (typeof account.manifestHash !== 'string' || account.manifestHash !== expected) throw new Error('fixture account manifest hash mismatch; bump manifest version and regenerate hash');
   if (cases.manifestHash !== expected) throw new Error('fixture cases manifest hash mismatch; bump manifest version and regenerate hash');
+  if (cases.behaviorVersion !== CONTRACT_VERSION) throw new Error(`fixture behavior version must match ${CONTRACT_VERSION}`);
   const ids = new Set();
   for (const fixture of cases.cases) validateFixtureCase(fixture, ids);
   if (!Array.from({ length: ids.size }, (_, index) => `AE${String(index + 1).padStart(2, '0')}`).every(id => ids.has(id))) throw new Error('fixture ids must preserve the baseline and append consecutively');
@@ -169,6 +170,35 @@ function defaultTools(account, fixture) {
   return createRuphusTools({ uid: 'dev-fixture-owner', context: fixtureContext(account, fixture) });
 }
 
+export function deriveRunnerPreviewReadiness({ userTurn = '', frames = [], priorReplies = [], trace = {} } = {}) {
+  const values = Array.isArray(frames) ? frames : [];
+  const recipeAvailable = (result = {}) => {
+    if (result?.ok === false || (Array.isArray(result?.unavailable) && result.unavailable.includes('recipe'))) return false;
+    const recipe = result?.recipe;
+    if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return false;
+    if (recipe.status) return recipe.status === 'available' || recipe.value != null;
+    return Object.keys(recipe).length > 0;
+  };
+  const evidenceRead = values.some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence' && recipeAvailable(frame.result));
+  const recipeRead = values.some((frame) => frame?.type === 'tool_result' && ['read_coffee_evidence', 'read_recipe'].includes(frame?.name) && recipeAvailable(frame.result));
+  const targetBound = trace?.ambiguity !== true && Boolean(trace?.actualCoffeeId || trace?.expectedCoffeeId);
+  const priorText = (Array.isArray(priorReplies) ? priorReplies : []).map((item) => String(item?.reply ?? item?.text ?? item)).join(' ');
+  const priorRecommendation = (Array.isArray(priorReplies) ? priorReplies : []).some((item) => {
+    const text = String(item?.reply ?? item?.text ?? item);
+    return text.trim().split(/\s+/).filter(Boolean).length >= 8
+      && /\b(?:try|test|change|adjust|increase|decrease|finer|coarser|dose|ratio|water|grind|temperature)\b/i.test(text);
+  });
+  const agreement = /\b(?:yes|do it|go ahead|make that change|change it|update (?:the |my )?recipe|try that)\b/i.test(String(userTurn));
+  const resolvedSensory = /\b(?:watery|weak|flat|hollow|thin|diluted|washed out)\b[^.!?]{0,70}\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|dry|astringent)\b|\b(?:sour|sharp|muted|bitter|harsh)\b[^.!?]{0,70}\b(?:watery|weak|flat|hollow|thin|dry|astringent)\b/i.test(String(userTurn));
+  const priorClarifier = (Array.isArray(priorReplies) ? priorReplies : []).slice().reverse().find((item) => /\?/.test(String(item?.reply ?? item?.text ?? item)));
+  const weaknessAnswer = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(String(userTurn))
+    && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/i.test(String(priorClarifier?.reply ?? priorClarifier?.text ?? priorClarifier ?? ''));
+  const techniqueReady = values.some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_technique_options' && frame?.result?.ok === true && frame?.result?.actionable === true)
+    && /\b(?:different|another|alternative|technique|method|kasuya|hoffmann|switch)\b/i.test(`${userTurn} ${priorText}`);
+  const groundedSource = evidenceRead || (recipeRead && priorRecommendation);
+  return targetBound && groundedSource && (resolvedSensory || weaknessAnswer || (priorRecommendation && agreement) || techniqueReady);
+}
+
 /** Run one case through the production orchestrator with provider/tool seams injected. */
 export async function runInjectedTurn(account, fixture, { reply = null, provider = null, tools = null, emit = null } = {}) {
   const frames = [];
@@ -180,7 +210,7 @@ export async function runInjectedTurn(account, fixture, { reply = null, provider
     tools: tools || defaultTools(account, fixture),
     emit: (frame) => { frames.push(frame); emit?.(frame); },
   });
-  const graded = gradeReply({ reply: result.text, replyKind: 'default', userTurn: fixture.turns.at(-1), frames });
+  const graded = gradeReply({ reply: result.text, replyKind: 'default', userTurn: fixture.turns.at(-1), frames, previewReady: deriveRunnerPreviewReadiness({ userTurn: fixture.turns.at(-1), frames, trace: result.trace }) });
   return { mode: 'injected', label: 'plumbing only', fixtureId: fixture.id, transcript: [{ role: 'user', text: fixture.turns.at(-1) }, { role: 'assistant', text: result.text }], frames, orchestrator: result, grader: graded };
 }
 
@@ -642,7 +672,8 @@ export async function runLiveCase(account, fixture, { endpoint, token, costGuard
     const compositeEvidence = [...toolFrames].reverse().find((frame) => frame?.name === 'read_coffee_evidence')?.result || null;
     const gradedEvidence = compositeEvidence ? { ...compositeEvidence, records: toolFrames } : { records: toolFrames };
     const gradedWindow = compositeEvidence ? (compositeEvidence.windowDays == null ? null : { days: compositeEvidence.windowDays }) : { days: 14 };
-    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], trace, ambiguous: trace.ambiguity, readWindow: gradedWindow, evidence: gradedEvidence, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies: transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text })) });
+    const priorReplies = transcript.filter((turn) => turn.role === 'assistant').slice(0, -1).map((turn) => ({ reply: turn.text }));
+    const grader = gradeReply({ reply: result.text, userTurn: userText, frames: result.frames || [], previewReady: deriveRunnerPreviewReadiness({ userTurn: userText, frames: result.frames || [], priorReplies, trace }), trace, ambiguous: trace.ambiguity, readWindow: gradedWindow, evidence: gradedEvidence, expectedCoffeeId: trace.expectedCoffeeId, actualCoffeeId: trace.actualCoffeeId, priorReplies });
     for (const violation of gradeTrialRecovery(fixture, result.frames)) grader[violation.category].push(violation);
     const currentEvidenceBeforeHistory = (result.frames || []).some((frame) => frame?.type === 'tool_result' && frame?.name === 'read_coffee_evidence');
     const priorEvidenceBeforeHistory = results.some((item) => item.evidenceBeforeHistory === true);

@@ -12,7 +12,7 @@ export const CENSUS_CAPABILITIES = new Set([
   'apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started',
   'complete_attempt', 'prepare_attempt', 'promote_attempt', 'set_dose',
   'set_aiden_grind', 'set_aiden_link', 'undo_revision', 'replace_active_recipe',
-  'recipe_preview_v1',
+  'recipe_preview_v1', 'technique_experiment_v1',
 ]);
 export const MUTATION_ROLLOUT_MODES = new Set([
   'apply_proposal',
