@@ -98,6 +98,18 @@ function mapTextSteps(steps, doseFactor, waterFactor = doseFactor) {
   });
 }
 
+function reconcileGeneratedRatio(recipe, ratio) {
+  const targetWater = roundGrams(recipe.coffeeGrams * ratio);
+  if (targetWater === recipe.waterGrams) return recipe;
+  const waterFactor = targetWater / recipe.waterGrams;
+  return {
+    ...recipe,
+    waterGrams: targetWater,
+    ratio: ratioLabel(ratio),
+    steps: mapSteps(recipe.steps || [], waterFactor, 1, targetWater),
+  };
+}
+
 function validateSource(recipe, route) {
   const errors = [];
   if (!recipe || typeof recipe !== 'object') errors.push('missing-recipe');
@@ -154,7 +166,7 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
       throw new RecipePreviewError('technique-conflict', 'This dose requires a different Kalita technique or size; review it explicitly before continuing.', { previousTechnique: recipe.technique, nextTechnique: generated.technique });
     }
     if (!options.configuration?.grinder && recipe.grindSize) generated.grindSize = structuredClone(recipe.grindSize);
-    return generated;
+    return reconcileGeneratedRatio(generated, ratio);
   }
   if (route === 'v60-switch-hot') {
     configuration.roast = configuration.roast || recipe.roastPreset;

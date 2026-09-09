@@ -26,7 +26,9 @@ assert.ok(!all.some((option) => option.sourceId === 'rao-two-stage-v1' || option
 
 assert.equal(listV60TechniqueOptions({ currentFamilyId: 'hoffmann-small-pulses' }).some((option) => option.familyId === 'hoffmann-small-pulses'), false);
 assert.equal(listV60TechniqueOptions({ currentSourceId: 'hoffmann-one-cup-v1' }).length, all.length - 1);
-assert.equal(listV60TechniqueOptions({ currentTechniqueId: 'not-known' }).length, all.length);
+const unknownCurrent = listV60TechniqueOptions({ currentTechniqueId: 'not-known' });
+assert.equal(unknownCurrent.length, all.length);
+assert.ok(unknownCurrent.every((option) => option.comparisonStatus === 'unknown-current-technique'));
 assert.equal(listV60TechniqueOptions({ excludeIds: ['kasuya-46-v1'] }).some((option) => option.sourceId === 'kasuya-46-v1'), false);
 assert.equal(listV60TechniqueOptions({ excludedIds: ['heart-continuous-v1'] }).some((option) => option.familyId === 'gentle-main-pour'), false);
 assert.equal(getV60TechniqueOption('kasuya-coarse-pulses').sourceId, 'kasuya-46-v1');

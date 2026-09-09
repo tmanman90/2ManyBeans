@@ -1,4 +1,5 @@
 import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v3';
@@ -342,6 +343,7 @@ export function generateV60RecipeForTechnique(techniqueId, intent = {}, configur
   const recipe = buildRecipe(intent, config, technique);
   const validation = validateV60Candidate(recipe);
   if (!validation.valid) throw new Error(`Explicit V60 technique contract failed: ${validation.errors.join(', ')}`);
+  if (!buildTimerSteps(recipe)) throw new Error('Explicit V60 technique contract failed: invalid timer schedule');
   return recipe;
 }
 

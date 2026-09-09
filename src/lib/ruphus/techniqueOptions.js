@@ -118,6 +118,7 @@ function currentIdentity(current = {}) {
 export function listV60TechniqueOptions(current = {}) {
   const identity = currentIdentity(current);
   const currentOption = identity ? OPTIONS_BY_ID.get(identity) : null;
+  const unknownCurrent = Boolean(identity && !currentOption);
   const excludedIds = new Set([
     ...(Array.isArray(current?.excludeIds) ? current.excludeIds : []),
     ...(Array.isArray(current?.excludedIds) ? current.excludedIds : []),
@@ -131,7 +132,10 @@ export function listV60TechniqueOptions(current = {}) {
       && !excludedIds.has(option.id)
       && !excludedIds.has(option.familyId)
       && !excludedIds.has(option.sourceId))
-    .map(({ source: _source, ...option }) => ({ ...option }));
+    .map(({ source: _source, ...option }) => ({
+      ...option,
+      ...(unknownCurrent ? { comparisonStatus: 'unknown-current-technique' } : {}),
+    }));
 }
 
 export function getV60TechniqueOption(id) {
