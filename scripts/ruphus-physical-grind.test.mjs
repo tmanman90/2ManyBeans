@@ -6,10 +6,19 @@ import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
-import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { createRuphusTools, diagnosticRecommendationReady } from '../api/_lib/ruphusTools.js';
 import { recentProposalReviews, isAlternativeRequest } from '../src/lib/ruphus/proposalContinuity.js';
 import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+
+test('short sour reports and review follow-ups unlock a review without authorizing a save', () => {
+  assert.equal(diagnosticRecommendationReady('Jar one kalita sour'), true);
+  const conversation = [{ role: 'assistant', content: 'Go one physical click finer: 5.6 to 5.2.' }];
+  assert.equal(diagnosticRecommendationReady('Show recipe', conversation), true);
+  assert.equal(diagnosticRecommendationReady('Show recipe', []), false);
+  assert.equal(diagnosticRecommendationReady('What if it is sour?'), false);
+  assert.equal(diagnosticRecommendationReady('Do not update recipe', conversation), false);
+});
 
 test('31 Ode labels represent physical clicks, not decimal increments', () => {
   assert.equal(ODE_GEN2_STEPS.length, 31);

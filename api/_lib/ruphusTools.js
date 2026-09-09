@@ -236,7 +236,7 @@ function techniqueRequestReady(text = '') {
   return /\b(?:different|another|alternative|new)\b[^.!?]{0,80}\b(?:technique|method|recipe)\b|\b(?:technique|method)\b[^.!?]{0,80}\b(?:different|another|alternative)\b/i.test(text);
 }
 
-function diagnosticRecommendationReady(text = '', conversation = []) {
+export function diagnosticRecommendationReady(text = '', conversation = []) {
   const value = String(text || '');
   if (/\b(?:don't|do not|not yet|wait|instead|what if|explain|why)\b/i.test(value)) return false;
   const weakness = /\b(?:watery|weak|flat|hollow|thin|diluted|washed out)\b/i.test(value);
@@ -244,8 +244,13 @@ function diagnosticRecommendationReady(text = '', conversation = []) {
   const sensory = /\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|dry|astringent)\b/i.test(value);
   const directControl = /\b(?:dose|ratio|water|grind|temperature|heat)\b[^.!?]{0,60}\b(?:change|adjust|increase|decrease|try|test|use|move|raise|lower|more|less|finer|coarser)\b/i.test(value);
   const priorClarifier = [...(Array.isArray(conversation) ? conversation : [])].reverse().find((message) => message?.role === 'assistant')?.content || '';
+  const reviewFollowup = /\b(?:show|view|open|prepare|update)\b[^.!?]{0,40}\brecipe\b/i.test(value)
+    && /\b(?:finer|coarser|increase|decrease|reduce|raise|lower|change|try)\b/i.test(priorClarifier)
+    && /\d/.test(priorClarifier);
+  const extractionReport = /\b(?:sour|sharp|muted|bitter|harsh|dry|astringent)\b/i.test(value)
+    && !/\?|\b(?:if|might|maybe|usually|sometimes)\b/i.test(value);
   const askedSensoryClarifier = /\?/.test(priorClarifier) && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/i.test(priorClarifier);
-  return (weakness && sensory) || directControl || (weaknessAnswer && !sensory && askedSensoryClarifier) || answeredSensoryClarifier(value, conversation);
+  return reviewFollowup || extractionReport || (weakness && sensory) || directControl || (weaknessAnswer && !sensory && askedSensoryClarifier) || answeredSensoryClarifier(value, conversation);
 }
 
 function setPreviewReadiness(context, { coffeeRef, slotKey, recipe, techniqueRequest = false } = {}) {
