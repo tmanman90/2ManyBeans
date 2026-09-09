@@ -8,7 +8,7 @@ import { applyRuphusTastingState } from '../api/ruphus-tasting.js';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { createMemoryRuphusRepository } from '../api/_lib/ruphusRepository.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
-import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { proposalEligibleForTarget, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { deriveProposalReadiness } from '../api/ruphus-agent.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
@@ -58,6 +58,35 @@ test('Kalita update request produces a persisted card, then explicit Apply chang
   assert.equal(store.execute(request).revision.id, applied.revision.id);
   store.execute({ actionId: 'owner-undo', mode: 'undo_revision', coffeeId: 'bean-1', slotKey: 'kalita_hot', expectedRevisionId: applied.revision.id });
   assert.equal(resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe.waterGrams, 215);
+});
+
+test('native watery Kalita prompt binds a generic pour-over recipe across two reads before proposing', async () => {
+  const recipe = generateKalitaRecipe({}, { dose: 13, size: '155' });
+  const userText = 'I brewed the coffee in Jar #1 with the hot Kalita 155 recipe. It tasted watered down: thin but sweet and clean, not sour. What would you change?';
+  const context = {
+    userText, conversation: [], ledger: { entries: [] }, sessionId: 'native-kalita-two-reads',
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', recipes: ['kalita_hot'] }], refs: { c1: 'bean-1' } },
+    __ruphusRefs: { c1: 'bean-1' }, proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false },
+  };
+  const tools = createRuphusTools({ uid: 'user-1', context,
+    readers: { readCoffee: async () => ({ id: 'bean-1', name: 'El Vergel' }), readRecipe: async () => recipe, readBrews: async () => [], readTastings: async () => [] },
+    proposalStore: async (input) => ({ id: input.proposalId, status: 'proposed', sourceRevisionId: 'revision-1', ...input }),
+    proposalActions: ['apply_proposal'],
+  });
+  let round = 0; let eligibleBeforeProposal = false;
+  const turn = await runRuphusTurn({ turnId: 'native-kalita-two-reads', context, userText, tools, provider: { runTurn: async () => {
+    round += 1;
+    if (round === 1) return { toolCalls: [{ callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } }] };
+    if (round === 2) return { toolCalls: [{ callId: 'recipe', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'kalita_hot' } }] };
+    eligibleBeforeProposal = proposalEligibleForTarget(context, { coffeeRef: 'c1', slot: 'kalita_hot' });
+    return { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'water', value: 198 }, experiment: null } }] };
+  } }, emit: () => {} });
+  assert.equal(turn.ok, true);
+  assert.deepEqual(turn.toolNames, ['read_coffee_evidence', 'read_recipe', 'propose_recipe_change']);
+  assert.equal(context.proposalState.target?.slot, 'kalita_hot');
+  assert.equal(context.proposalState.previewReady, true);
+  assert.equal(eligibleBeforeProposal, true);
+  assert.equal(turn.artifacts[0].after.waterGrams, 198);
 });
 
 test('Apply creates one active revision and idempotent replay does not duplicate it', () => {

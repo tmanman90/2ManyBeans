@@ -203,7 +203,8 @@ function methodFocusForCoffee(ledger, snapshot, coffeeRef) {
 function recipeSlotKey(recipe) {
   const raw = recipe?.slotKey || recipe?.slot || recipe?.method;
   if (SLOT_KEYS.includes(raw)) return raw;
-  if (raw === 'v60' || raw === 'kalita') return `${raw}_${recipe?.mode === 'iced' ? 'iced' : 'hot'}`;
+  const method = [raw, recipe?.method, recipe?.device].find((value) => value === 'v60' || value === 'kalita');
+  if (method === 'v60' || method === 'kalita') return `${method}_${recipe?.mode === 'iced' ? 'iced' : 'hot'}`;
   return null;
 }
 
@@ -235,12 +236,13 @@ function techniqueRequestReady(text = '') {
 function diagnosticRecommendationReady(text = '', conversation = []) {
   const value = String(text || '');
   if (/\b(?:don't|do not|not yet|wait|instead|what if|explain|why)\b/i.test(value)) return false;
-  const weakness = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(value);
+  const weakness = /\b(?:watery|weak|flat|hollow|thin|diluted|washed out)\b/i.test(value);
+  const weaknessAnswer = /^\s*(?:it\s+(?:was|is)\s+)?(?:watery|weak|flat|hollow|thin|diluted|washed out)\s*[.!?]?\s*$/i.test(value);
   const sensory = /\b(?:sweet|clean|sour|sharp|muted|bitter|harsh|dry|astringent)\b/i.test(value);
   const directControl = /\b(?:dose|ratio|water|grind|temperature|heat)\b[^.!?]{0,60}\b(?:change|adjust|increase|decrease|try|test|use|move|raise|lower|more|less|finer|coarser)\b/i.test(value);
   const priorClarifier = [...(Array.isArray(conversation) ? conversation : [])].reverse().find((message) => message?.role === 'assistant')?.content || '';
   const askedSensoryClarifier = /\?/.test(priorClarifier) && /\b(?:thin|sweet|clean|sour|sharp|muted|bitter|harsh|flat|watery|weak|hollow)\b/i.test(priorClarifier);
-  return (weakness && sensory) || directControl || (weakness && !sensory && askedSensoryClarifier);
+  return (weakness && sensory) || directControl || (weaknessAnswer && !sensory && askedSensoryClarifier);
 }
 
 function setPreviewReadiness(context, { coffeeRef, slotKey, recipe, techniqueRequest = false } = {}) {
