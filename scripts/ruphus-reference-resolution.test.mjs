@@ -27,6 +27,7 @@ test('trial recipe references retain the current coffee without inventing one', 
 });
 test('resolver handles unique jar, close spelling, and ambiguity', () => {
   assert.equal(resolveCoffeeReference({ reference: 'jar #1', coffees }).coffee.id, 'a');
+  assert.equal(resolveCoffeeReference({ reference: 'jar one', coffees }).coffee.id, 'a');
   assert.equal(resolveCoffeeReference({ reference: 'El Virgil', coffees }).coffee.id, 'a');
   const ambiguous = resolveCoffeeReference({ reference: 'the Colombian one', coffees });
   assert.equal(ambiguous.ok, false); assert.equal(ambiguous.reason, 'ambiguous'); assert.equal(ambiguous.candidates.length, 2);
@@ -67,6 +68,7 @@ test('trusted turn binding admits exact discourse references but leaves fuzzy an
   assert.equal(bindRuphusTurn({ userText: 'back to the first one', coffees, refs, ledger: other.ledger }).coffeeRef, 'c-a');
   assert.equal(bindRuphusTurn({ userText: 'El Virgil', coffees, refs }).status, 'none');
   assert.equal(bindRuphusTurn({ userText: 'jar 2', coffees: [coffees[0]], refs: { 'c-a': 'a', 'c-foreign': 'foreign' } }).status, 'none');
+  assert.equal(bindRuphusTurn({ userText: 'jar one', coffees, refs }).coffeeRef, 'c-a');
 });
 
 test('trusted binding exposes genuine bounded ambiguity without guessing', () => {

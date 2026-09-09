@@ -50,9 +50,11 @@ export function resolveCoffeeReference({ reference, coffees = [], ledger = {}, n
   const byExact = pool.map((coffee, index) => ({ coffee, index })).filter(({ coffee }) => [coffee?.id, coffee?.refKey, coffee?.coffeeRef, coffee?.name].some((value) => normalize(value) === normalize(query)));
   if (byExact.length === 1) return { ok: true, ...candidate(byExact[0].coffee, byExact[0].index, 'exact', 1) };
 
-  const jar = query.match(/(?:jar|shelf|bean)\s*#?\s*(\d+)/i);
+  const jar = query.match(/(?:jar|shelf|bean)\s*#?\s*(\d+|one|two|three)\b/i);
   if (jar) {
-    const matches = pool.map((coffee, index) => ({ coffee, index })).filter(({ coffee }) => Number(coffee?.jarSlot) === Number(jar[1]));
+    const ordinal = { one: 1, two: 2, three: 3 };
+    const jarSlot = ordinal[jar[1].toLocaleLowerCase()] || Number(jar[1]);
+    const matches = pool.map((coffee, index) => ({ coffee, index })).filter(({ coffee }) => Number(coffee?.jarSlot) === jarSlot);
     if (matches.length === 1) return { ok: true, ...candidate(matches[0].coffee, matches[0].index, 'jar', 1) };
     if (matches.length > 1) return { ok: false, reason: 'ambiguous', candidates: matches.map(({ coffee, index }) => candidate(coffee, index, 'jar', 0.9)) };
   }

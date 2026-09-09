@@ -14,6 +14,7 @@ test('natural brewer mentions bind directly while negated brewers never become t
   assert.equal(explicitMethodFromText('My V60 tasted thin.'), 'v60_hot');
   assert.equal(explicitMethodFromText("Huh no, I didn't brew this on Aiden."), null);
   assert.equal(explicitMethodFromText('Not Aiden—I used the Kalita 155.'), 'kalita_hot');
+  assert.equal(explicitMethodFromText('It tasted thin but sweet and clean, not sour with the hot Kalita recipe.'), 'kalita_hot');
 });
 test('method inference applies recent agreement, iced mode, and M6 ask', () => {
   assert.equal(resolveMethod({ brews: [{ slot: 'v60_iced' }, { slot: 'v60_iced' }], isChangeRequest: true }).slot, 'v60_iced');

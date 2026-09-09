@@ -25,7 +25,10 @@ const recordTime = (record) => {
 };
 
 const METHOD_MENTION = /\b(?:(hot|iced)\s+)?(aiden|v\s*60|kalita)(?:\s+(?:155|185))?\b/gi;
-const NEGATED_METHOD_PREFIX = /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not|without)\b(?:\s+[a-z0-9']+){0,5}\s*$/i;
+// Only treat a method mention as negated when the short bridge after the
+// negator is method-grammar. Sensory clauses such as “not sour with the hot
+// Kalita” must leave Kalita as the explicit method.
+const NEGATED_METHOD_PREFIX = /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not|without)\b(?:\s+(?:the|a|an|my|your|this|that|it|use|used|brew|brewed|make|made|choose|pick|on|with|instead|rather|than|for|to|did|do)){0,5}\s*$/i;
 
 export function explicitMethodFromText(value) {
   const source = String(value || '');
