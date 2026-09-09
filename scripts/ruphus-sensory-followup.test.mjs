@@ -40,6 +40,11 @@ test('natural answers to the sensory question earn a grounded review, not anothe
   }
 });
 
+test('retrying the answer after the displayed connection error retains the question', () => {
+  const retry = [...conversation, { role: 'user', content: 'Tasted sour' }, { role: 'assistant', content: "Couldn't reach the AI. Try again in a sec." }];
+  assert.equal(deriveProposalReadiness({ conversation: retry, ledger: { entries: [{ status: 'available' }] }, userText: 'Tasted sour' }).diagnosisReady, true);
+});
+
 test('sensory answers complete two real evidence reads and a recipe card without a round-limit failure', async () => {
   for (const userText of answers) {
     const before = generateKalitaRecipe({}, { dose: 13 });
