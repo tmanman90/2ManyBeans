@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 import {
   createRecipePreview,
   RecipePreviewError,
@@ -60,6 +61,15 @@ import {
     () => createRecipePreview({ recipe: source, dose: 20 }),
     (error) => error instanceof RecipePreviewError && error.code === 'unsupported-dose-profile',
   );
+}
+
+// A regenerated Switch profile retains fixed grind controls from the reviewed
+// source when no new grinder configuration was explicitly selected.
+{
+  const source = generateV60SwitchRecipe({}, { dose: 20, roast: 'medium', grinder: 'fellow-opus' });
+  const preview = createRecipePreview({ recipe: source, dose: 22, configuration: { roast: 'medium' } });
+  assert.deepEqual(preview.grindSize, source.grindSize);
+  assert.equal(preview.steps.at(-1).waterTotal, preview.waterGrams);
 }
 
 // Dose bounds, malformed ratios and incomplete timed sources fail closed.

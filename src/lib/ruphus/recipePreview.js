@@ -230,6 +230,8 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   }
   if (profileChanged || (canRegenerate && optionsRequireRegeneration({ intent, configuration }))) {
     const regenerated = regeneratedPreview(recipe, route, targetDose, targetRatioValue, { intent, configuration });
+    const checkedGenerated = validateRecipePreview(regenerated, { dose: targetDose, targetRatio: targetRatioValue });
+    if (!checkedGenerated.valid) throw new RecipePreviewError('invalid-derived-recipe', `Derived recipe preview is unavailable: ${checkedGenerated.errors.join(', ')}.`, checkedGenerated);
     return annotate(regenerated, recipe, targetDose, targetRatioValue, route, true);
   }
   const baseWater = route.endsWith('iced') ? recipe.hotWaterGrams : recipe.waterGrams;
@@ -268,6 +270,8 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
     };
   }
   delete preview._previewSourceTotalWater;
+  const checkedPreview = validateRecipePreview(preview, { dose: targetDose, targetRatio: targetRatioValue });
+  if (!checkedPreview.valid) throw new RecipePreviewError('invalid-derived-recipe', `Derived recipe preview is unavailable: ${checkedPreview.errors.join(', ')}.`, checkedPreview);
   return annotate(preview, recipe, targetDose, targetRatioValue, route);
 }
 
