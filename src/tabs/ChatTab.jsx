@@ -661,7 +661,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       let preparedProposal = current.preparedProposal;
       if (!preparedProposal) {
         const sourceArtifact = current.sourceArtifact || current.artifact;
-        const prepared = await prepareRecipePreview({ requestId, proposalId: sourceArtifact.id, coffeeId: sourceArtifact.coffeeId, slotKey: sourceArtifact.slotKey, sessionId: agentSessionIdRef.current, dose: current.dose, configuration: current.configuration });
+        const previewSessionId = sourceArtifact.sessionId || agentSessionIdRef.current;
+        const prepared = await prepareRecipePreview({ requestId, proposalId: sourceArtifact.id, coffeeId: sourceArtifact.coffeeId, slotKey: sourceArtifact.slotKey, sessionId: previewSessionId, dose: current.dose, configuration: current.configuration });
         preparedProposal = { ...sourceArtifact, ...(prepared.proposal || {}), type: 'recipe_proposal', after: prepared.preview || prepared.proposal?.after || current.recipe };
       }
       preparedProposal = { ...preparedProposal, actionId, mode };

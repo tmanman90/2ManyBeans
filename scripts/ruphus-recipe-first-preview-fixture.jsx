@@ -14,9 +14,11 @@ const bean = { id: 'fixture-coffee', name: 'Changed Ratio Coffee' };
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const proposed = createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 });
 const artifact = { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed };
+const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 
 function Fixture() {
   const [preview, setPreview] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
   const [startCount, setStartCount] = useState(0);
   const [saveCount, setSaveCount] = useState(0);
   const openPreview = () => {
@@ -26,7 +28,7 @@ function Fixture() {
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
     setPreview({ recipe, dose });
   };
-  const closePreview = () => setPreview(null);
+  const closePreview = () => { setPreview(null); setPreviewError(null); };
   const changeDose = (dose) => {
     const recipe = createRecipePreview({ recipe: proposed, dose, ratio: proposed.ratio });
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
@@ -48,7 +50,14 @@ function Fixture() {
         deviceKey="kalita"
         userCoffeeGrams={preview?.dose}
         onCoffeeGramsChange={changeDose}
-        onPreviewStart={() => setStartCount((value) => value + 1)}
+        previewError={previewError}
+        onPreviewStart={() => {
+          if (forceStartError) {
+            setPreviewError('This preview could not be started. Review it and try again.');
+            return;
+          }
+          setStartCount((value) => value + 1);
+        }}
         onPreviewSave={() => setSaveCount((value) => value + 1)}
       />
     </main>

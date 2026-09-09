@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { buildRuphusOpening } from '../src/lib/ruphus/opening.js';
 import { buildRecipeLaunchContext, resolveTastingLaunchMethod } from '../src/lib/ruphus/launch.js';
 import { validateLaunchContext } from '../src/lib/ruphus/conversationContract.js';
+import { reconcileProposalArtifacts } from '../src/lib/ruphus/proposalArtifacts.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 test('U4 proposal UI exposes only registered native actions and no machine controls', () => {
@@ -92,10 +93,40 @@ test('M1 session hydration reconciles owner-readable proposal records', () => {
   const session = read('src/hooks/useChatSession.js');
   assert.match(session, /loadRemoteArtifacts/);
   assert.match(session, /collection\(db, 'users', uid, 'proposals'/);
+  assert.match(session, /loadBySession: async \(sessionId\) => \{[\s\S]*getDocs\(query\(proposals/);
+  assert.doesNotMatch(session, /if \(!sessionId\) return \[\];/);
+  assert.match(session, /getDoc\(doc\(proposals, proposalId\)\)/);
+  assert.match(read('src/lib/ruphus/proposalArtifacts.js'), /artifact\?\.type === 'recipe_proposal'/);
   assert.match(session, /setHydratedArtifacts/);
   assert.match(session, /startNewChat/);
   assert.match(session, /hydratedSession/);
   assert.doesNotMatch(session, /deleteDoc|deleteRemote|deleteLocal/);
+});
+
+test('sessionless legacy cards recover their stored proposal session by exact owner ID', async () => {
+  const session = { messages: [{ artifacts: [{ id: 'legacy-proposal', type: 'recipe_proposal' }] }] };
+  let sessionReads = 0;
+  let exactReads = 0;
+  const recovered = await reconcileProposalArtifacts({
+    session,
+    loadBySession: async () => { sessionReads += 1; return []; },
+    loadById: async (id) => { exactReads += 1; return { id, sessionId: 'original-turn', coffeeId: 'coffee-1', slotKey: 'kalita_hot' }; },
+  });
+  assert.equal(sessionReads, 0);
+  assert.equal(exactReads, 1);
+  assert.deepEqual(recovered[0], { id: 'legacy-proposal', sessionId: 'original-turn', coffeeId: 'coffee-1', slotKey: 'kalita_hot' });
+});
+
+test('hydration avoids exact rereads for records already returned by the session query', async () => {
+  const session = { contextRef: { sessionId: 'current-session' }, messages: [{ artifacts: [{ id: 'current-proposal', type: 'recipe_proposal' }] }] };
+  let exactReads = 0;
+  const recovered = await reconcileProposalArtifacts({
+    session,
+    loadBySession: async () => [{ id: 'current-proposal', sessionId: 'current-session' }],
+    loadById: async () => { exactReads += 1; return null; },
+  });
+  assert.equal(exactReads, 0);
+  assert.deepEqual(recovered, [{ id: 'current-proposal', sessionId: 'current-session' }]);
 });
 
 test('Agent chat sends recent conversation, follows selected-coffee artifacts, and strips markdown', () => {

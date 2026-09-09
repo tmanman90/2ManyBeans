@@ -73,6 +73,40 @@ try {
     await page.screenshot({ path: screenshots.desktop, fullPage: false });
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ flow: 'passed', ratio: '1:16 → 1:15', dose: '13g → 20g', water: '300g', startCount: 1, saveCount: 0, writes: 0, reducedMotion: true, screenshots }));
+
+    const errorPage = await context.newPage();
+    await errorPage.setViewportSize({ width: 390, height: 844 });
+    await errorPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?start-error=1`, { waitUntil: 'domcontentloaded' });
+    await errorPage.getByRole('button', { name: 'View recipe', exact: true }).click();
+    await errorPage.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
+    await errorPage.waitForTimeout(1000);
+    await errorPage.evaluate(() => {
+      const body = [...document.querySelectorAll('div')]
+        .filter((element) => (
+          element.scrollHeight > element.clientHeight
+          && ['auto', 'scroll'].includes(getComputedStyle(element).overflowY)
+        ))
+        .sort((left, right) => (right.scrollHeight - right.clientHeight) - (left.scrollHeight - left.clientHeight))[0];
+      if (!body) throw new Error('Could not locate the scrollable recipe body');
+      body.scrollTop = body.scrollHeight;
+    });
+    const startButton = errorPage.getByRole('button', { name: 'Start brew timer', exact: true });
+    const saveButton = errorPage.getByRole('button', { name: 'Save recipe', exact: true });
+    const startBeforeError = await startButton.boundingBox();
+    assert.ok(startBeforeError && startBeforeError.y < 844 && startBeforeError.y + startBeforeError.height > 0, 'Start action must be in the viewport before failure');
+    await startButton.click({ force: true });
+    const previewError = errorPage.getByRole('alert');
+    await previewError.waitFor({ state: 'visible' });
+    const errorBox = await previewError.boundingBox();
+    const startBox = await startButton.boundingBox();
+    const saveBox = await saveButton.boundingBox();
+    assert.ok(errorBox && startBox && saveBox, 'Preview error and actions must render');
+    assert.ok(errorBox.y < 844 && errorBox.y + errorBox.height > 0, 'Preview error must remain in the viewport after failure');
+    assert.ok(errorBox.y + errorBox.height <= startBox.y + 1, 'Preview error must sit above Start action');
+    assert.ok(startBox.y - (errorBox.y + errorBox.height) <= 12, 'Preview error must remain adjacent to preview actions');
+    assert.ok(saveBox.y >= startBox.y + startBox.height - 1, 'Save action must remain below Start action');
+    assert.equal(await errorPage.getByRole('alert').count(), 1);
+    await errorPage.close();
     await context.close();
   } finally { await browser.close(); }
 } finally {

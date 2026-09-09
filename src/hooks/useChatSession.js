@@ -6,6 +6,7 @@ import { resolveTerminal } from '../lib/streamChat';
 import { parseBeanScan, parseRecipeCard } from '../lib/chatParse';
 import { recipeSummary } from '../components/chat/RecipeCard';
 import { normalizeAgentSession, inflateAgentSession, startNewChat, clientSessionWrite } from '../lib/ruphus/session.js';
+import { reconcileProposalArtifacts } from '../lib/ruphus/proposalArtifacts.js';
 
 const MAX_MESSAGES = 50;
 const MAX_TEXT = 2000;
@@ -78,10 +79,21 @@ function createDefaultAdapter(uid) {
       return setDoc(ref, write.data, { merge: write.merge });
     },
     async loadRemoteArtifacts(session) {
-      const sessionId = session?.contextRef?.sessionId;
-      if (!sessionId) return [];
-      const records = await getDocs(query(collection(db, 'users', uid, 'proposals'), where('sessionId', '==', sessionId)));
-      return records.docs.map(item => ({ id: item.id, ...item.data() }));
+      const proposals = collection(db, 'users', uid, 'proposals');
+      // Older cards were written before the proposal session identity was
+      // copied into the artifact. Reconcile their exact owner-scoped records
+      // by ID so relaunch can recover the server-issued session binding.
+      return reconcileProposalArtifacts({
+        session,
+        loadBySession: async (sessionId) => {
+          const records = await getDocs(query(proposals, where('sessionId', '==', sessionId)));
+          return records.docs.map(item => ({ id: item.id, ...item.data() }));
+        },
+        loadById: async (proposalId) => {
+          const item = await getDoc(doc(proposals, proposalId));
+          return item.exists() ? { id: item.id, ...item.data() } : null;
+        },
+      });
     },
     loadLocal() {
       return cacheRead(key);

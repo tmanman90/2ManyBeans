@@ -701,7 +701,6 @@ export const HandBrewModal = ({
             </div>
           )}
 
-          {previewError && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>{previewError}</div>}
           {error && recipe && !previewMode && attemptId && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>Could not start this brew: {error}</div>}
 
           {/* Grind card */}
@@ -817,6 +816,8 @@ export const HandBrewModal = ({
               {recipe.reasoning}
             </div>
           )}
+
+          {previewMode && previewError && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>{previewError}</div>}
 
           {/* Start Brew button */}
           {timerReady && (
