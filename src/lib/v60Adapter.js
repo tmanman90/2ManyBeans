@@ -298,6 +298,55 @@ export function generateV60Recipe(intent = {}, configuration = {}, evidence = nu
   return recipe;
 }
 
+function explicitConfiguration(configuration = {}) {
+  const brewer = configuration.brewer ?? configuration.device ?? configuration.method;
+  const size = configuration.v60Size ?? configuration.size;
+  if (brewer != null && !/v60/i.test(String(brewer))) {
+    throw new Error('Explicit V60 technique requires a hot V60 brewer');
+  }
+  if (size != null && String(size) !== '02') {
+    throw new Error('Explicit V60 technique requires V60 02');
+  }
+  if (configuration.configurationKey != null && configuration.configurationKey !== V60_CONFIGURATION_KEY) {
+    throw new Error('Explicit V60 technique requires V60 02 standard paper configuration');
+  }
+  return normalizeV60Configuration(configuration);
+}
+
+function explicitTechnique(techniqueId) {
+  const technique = Object.values(V60_TECHNIQUES).find((candidate) => candidate.id === techniqueId
+    || candidate.sourceIds.includes(techniqueId));
+  if (!technique) throw new Error(`Unknown or unsupported V60 technique family: ${String(techniqueId)}`);
+  const source = sourceById(technique.sourceIds[0]);
+  if (!source || source.supportedV60_02 === false || source.status !== 'original' || source.executableCadence !== true
+    || !Number.isFinite(source.ratio) || !Number.isFinite(source.temperatureC) || !Number.isFinite(source.guideSeconds)
+    || !source.grind || !source.geometry || !source.agitation) {
+    throw new Error(`V60 technique family ${techniqueId} is not an executable registry option`);
+  }
+  return { ...technique, sourceIds: [source.id], reasonCode: 'EXPLICIT_TECHNIQUE_SELECTION' };
+}
+
+/**
+ * Generate one registry-backed V60 family without consulting the automatic
+ * intent selector. This is the authority boundary for technique experiments.
+ */
+export function generateV60RecipeForTechnique(techniqueId, intent = {}, configuration = {}, _evidence = null) {
+  if (techniqueId && typeof techniqueId === 'object') {
+    const request = techniqueId;
+    techniqueId = request.familyId || request.techniqueId || request.sourceId || request.id;
+    intent = request.intent || {};
+    configuration = request.configuration || {};
+  }
+  const config = explicitConfiguration(configuration);
+  const technique = explicitTechnique(techniqueId);
+  const recipe = buildRecipe(intent, config, technique);
+  const validation = validateV60Candidate(recipe);
+  if (!validation.valid) throw new Error(`Explicit V60 technique contract failed: ${validation.errors.join(', ')}`);
+  return recipe;
+}
+
+export const generateV60TechniqueRecipe = generateV60RecipeForTechnique;
+
 export function generateV60Fallback(configuration = {}, reason = 'candidate-failed') {
   const config = normalizeV60Configuration(configuration);
   const recipe = buildRecipe({}, config, { ...V60_TECHNIQUES.smallPulse, reasonCode: 'V60_CONSERVATIVE_BASELINE' }, { fallback: true });
