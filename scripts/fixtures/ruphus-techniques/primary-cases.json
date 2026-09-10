@@ -113,6 +113,48 @@
       ]
     },
     {
+      "id": "fuglen-wave-155",
+      "url": "https://fuglen.cafe24.com/sub/brew.html/brew.html",
+      "locator": "BREW GUIDE; KALITA WAVE 155; steps 1–6",
+      "assertions": {
+        "equipment.brewer": "kalita",
+        "equipment.size": "155",
+        "equipment.model": "Wave",
+        "equipment.filter": "wave-155",
+        "mode": "hot",
+        "coffeeGrams": 15,
+        "water.brewGrams": 250,
+        "temperature.value": 92,
+        "temperature.unit": "C",
+        "grind.description": null,
+        "clock.origin": "first-water",
+        "stages.0.trigger.type": "elapsed",
+        "stages.0.trigger.seconds": 0,
+        "stages.0.waterToGrams": 40,
+        "stages.1.trigger.seconds": 50,
+        "stages.1.waterToGrams": 80,
+        "stages.2.trigger.seconds": 60,
+        "stages.2.waterToGrams": 250,
+        "stages.2.geometry": "Center stream",
+        "stages.3.kind": "finish",
+        "stages.3.trigger.type": "condition",
+        "finish.minSeconds": 120,
+        "finish.maxSeconds": 150,
+        "admission.status": "ready"
+      },
+      "expectedReadiness": {
+        "sourceValid": true,
+        "admitted": true,
+        "guided": true,
+        "timerReady": true
+      },
+      "requiredBoundaries": [
+        "The primary Fuglen guide explicitly names the Kalita Wave 155; Kalita manufacturer context verifies the native Wave 155 filter pairing.",
+        "Fuglen's 0:50 pour to 80g and 1:00 center pour to 250g are distinct from Kurasu's 0:40 aggressive pour to 60g and 1:10 final pour to 200g.",
+        "The source gives a 2:00–2:30 finish range, not a single finish timestamp; no pour durations or grind setting are invented."
+      ]
+    },
+    {
       "id": "hario-switch-03-matt-winton-hybrid-24-2022",
       "url": "https://www.youtube.com/watch?v=g9diFrEkn3M",
       "locator": "HARIO Official Channel; 03 Size Switch Recipe chapter 08:07–09:48",

@@ -201,10 +201,24 @@ test('choice listing separates timer-ready choices from readable references', ()
   assert.deepEqual(hot155WithReferences.map((source) => source.id), [
     'kurasu-wave-155-2023',
     'vibrant-wave-155',
+    'fuglen-wave-155',
     'drop-wave-155',
     'ozone-wave-155-scaled-from-185-2026',
   ]);
   assert.ok(hot155WithReferences.some((source) => source.id === 'vibrant-wave-155'));
+  const hot155 = listManualSourceRecords(records, {
+    device: 'kalita', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot',
+  });
+  assert.deepEqual(hot155.map((source) => source.id), [
+    'kurasu-wave-155-2023',
+    'fuglen-wave-155',
+  ]);
+  assert.notDeepEqual(
+    hot155[0].stages.map((stage) => [stage.trigger, stage.waterToGrams]),
+    hot155[1].stages.map((stage) => [stage.trigger, stage.waterToGrams]),
+  );
+  assert.equal(hot155[0].source.url.includes('kurasu.kyoto'), true);
+  assert.equal(hot155[1].source.url.includes('fuglen.'), true);
   assert.equal(listManualSourceRecords(records, {
     device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot',
   }).map((source) => source.id).join(','), 'hario-switch-03-matt-winton-hybrid-24-2022,hario-switch-03-instruction-manual-36-2023');
