@@ -1,0 +1,278 @@
+{
+  "verifiedAt": "2026-09-10",
+  "verifiedBy": "Independent primary-source transcription for the Ruphus source-contract slice",
+  "sourceFoundationCommit": "9f1b547",
+  "scope": "The assertions below are authored from the cited primary source text/video and manufacturer pages. They are not generated from the implementation records, do not prove sensory quality, and do not authorize hardware transfer.",
+  "cases": [
+    {
+      "id": "kurasu-wave-155-2023",
+      "url": "https://kurasu.kyoto/blogs/kurasu-journal/how-to-brew-with-kalita-wave-2023",
+      "locator": "Recipe; Step by step; Tips 1–5",
+      "assertions": {
+        "equipment.brewer": "kalita",
+        "equipment.size": "155",
+        "equipment.model": "Wave",
+        "equipment.filter": "wave-155",
+        "mode": "hot",
+        "coffeeGrams": 14,
+        "water.brewGrams": 200,
+        "temperature.value": 92,
+        "temperature.unit": "C",
+        "grind.description": "Coarse",
+        "clock.origin": "first-water",
+        "stages.0.trigger.type": "elapsed",
+        "stages.0.trigger.seconds": 0,
+        "stages.0.waterToGrams": 30,
+        "stages.1.trigger.seconds": 40,
+        "stages.1.waterToGrams": 60,
+        "stages.1.agitation": "Aggressive pouring",
+        "stages.2.trigger.seconds": 70,
+        "stages.2.waterToGrams": 200,
+        "stages.2.geometry": "Stationary center stream",
+        "finish.minSeconds": 125,
+        "finish.maxSeconds": 135,
+        "admission.status": "ready"
+      }
+    },
+    {
+      "id": "ozone-wave-185-2026",
+      "url": "https://ozonecoffee.co.uk/pages/kalita-wave-brew-guide",
+      "locator": "How to Use a Kalita Wave; Basic Recipe; Brewing Instructions 1–9",
+      "assertions": {
+        "equipment.brewer": "kalita",
+        "equipment.size": "185",
+        "equipment.model": "Wave",
+        "equipment.filter": "wave-185",
+        "mode": "hot",
+        "coffeeGrams": 25,
+        "water.brewGrams": 400,
+        "temperature.value": 93,
+        "temperature.unit": "C",
+        "grind.description": "Medium filter grind",
+        "clock.origin": "first-water",
+        "stages.0.trigger.seconds": 0,
+        "stages.0.waterToGrams": 50,
+        "stages.1.trigger.seconds": 30,
+        "stages.1.waterToGrams": 160,
+        "stages.1.geometry": "Three concentric circles, starting at the centre and moving outwards",
+        "stages.2.trigger.seconds": 45,
+        "stages.2.waterToGrams": 220,
+        "stages.3.trigger.seconds": 60,
+        "stages.3.waterToGrams": 280,
+        "stages.4.trigger.seconds": 75,
+        "stages.4.waterToGrams": 340,
+        "stages.5.trigger.seconds": 105,
+        "stages.5.waterToGrams": 400,
+        "finish.minSeconds": 180,
+        "finish.maxSeconds": 180,
+        "admission.status": "ready"
+      }
+    },
+    {
+      "id": "ozone-wave-155-scaled-from-185-2026",
+      "url": "https://ozonecoffee.co.uk/pages/kalita-wave-brew-guide",
+      "locator": "155/185 FAQ; proportional starting point",
+      "assertions": {
+        "equipment.brewer": "kalita",
+        "equipment.size": "155",
+        "coffeeGrams": 15,
+        "water.brewGrams": 240,
+        "temperature.value": 93,
+        "temperature.unit": "C",
+        "clock.origin": null,
+        "admission.status": "research-only"
+      },
+      "requiredBoundaries": [
+        "The source suggests approximately 15g/240g for a 155 but does not publish a 155 timing schedule.",
+        "The source 185 timing checkpoints are not an original 155 timer contract."
+      ]
+    },
+    {
+      "id": "vibrant-wave-155",
+      "url": "https://www.vibrantcoffeeroasters.com/kalitawave155",
+      "locator": "What You’ll Need; steps 1–6; Quick Tip",
+      "assertions": {
+        "equipment.size": "155",
+        "coffeeGrams": 15,
+        "water.brewGrams": 250,
+        "stages.0.waterToGrams": 45,
+        "stages.1.trigger.seconds": 40,
+        "stages.1.durationSeconds": 21,
+        "stages.2.trigger.type": "condition",
+        "stages.2.waterToGrams": 250,
+        "admission.status": "ready"
+      },
+      "expectedReadiness": {
+        "sourceValid": true,
+        "admitted": true,
+        "guided": false,
+        "timerReady": false
+      },
+      "requiredBoundaries": [
+        "The final pour depends on a water-level observation; no seconds are invented."
+      ]
+    },
+    {
+      "id": "hario-switch-03-matt-winton-hybrid-24-2022",
+      "url": "https://www.youtube.com/watch?v=g9diFrEkn3M",
+      "locator": "HARIO Official Channel; 03 Size Switch Recipe chapter 08:07–09:48",
+      "assertions": {
+        "equipment.brewer": "switch",
+        "equipment.size": "03",
+        "equipment.model": "V60 Switch",
+        "equipment.filter": "v60-03-paper",
+        "equipment.material": "glass",
+        "mode": "hot",
+        "coffeeGrams": 24,
+        "water.brewMilliliters": 360,
+        "temperature.value": 93,
+        "temperature.unit": "C",
+        "clock.origin": "first-water",
+        "stages.0.waterToGrams": 50,
+        "stages.0.valve": "open",
+        "stages.1.trigger.seconds": 30,
+        "stages.1.valve": "closed",
+        "stages.2.waterToMilliliters": 360,
+        "stages.2.valve": "closed",
+        "stages.3.trigger.seconds": 180,
+        "stages.3.valve": "open",
+        "stages.4.kind": "finish",
+        "stages.4.trigger.type": "condition",
+        "finish": null,
+        "admission.status": "ready"
+      },
+      "requiredBoundaries": [
+        "The bloom remains 50g while the full brew target remains 360mL; the projection must not convert or relabel either unit.",
+        "The roughly one-minute drawdown is qualitative; no fixed finish timestamp is invented."
+      ]
+    },
+    {
+      "id": "hario-switch-03-instruction-manual-36-2023",
+      "url": "https://www.hario.com/product/SSD-360.pdf",
+      "locator": "SSD-360 instruction manual; English How to use steps 1–4; Material guide",
+      "assertions": {
+        "equipment.brewer": "switch",
+        "equipment.size": "03",
+        "equipment.model": "V60 Switch",
+        "equipment.filter": "v60-03-paper",
+        "equipment.material": "glass",
+        "mode": "hot",
+        "coffeeGrams": 36,
+        "water.brewMilliliters": 440,
+        "temperature": null,
+        "grind.description": "Medium grind",
+        "clock.origin": "after-main-pour",
+        "stages.0.id": "main-pour",
+        "stages.0.trigger.type": "manual",
+        "stages.0.waterToMilliliters": 440,
+        "stages.0.valve": "closed",
+        "stages.1.trigger.event": "main-pour:complete",
+        "stages.1.trigger.seconds": 120,
+        "stages.1.waterToMilliliters": 440,
+        "stages.1.valve": "closed",
+        "stages.2.trigger.event": "steep:complete",
+        "stages.2.trigger.seconds": 0,
+        "stages.2.valve": "open",
+        "stages.3.trigger.type": "condition",
+        "stages.3.valve": "open",
+        "finish": null,
+        "admission.status": "ready"
+      },
+      "expectedReadiness": {
+        "sourceValid": true,
+        "admitted": true,
+        "guided": true,
+        "timerReady": true
+      },
+      "requiredBoundaries": [
+        "The manufacturer source specifies approximately 440mL input water and approximately 360mL finished capacity/output context; the latter is not a raw-input cap.",
+        "The source gives no numeric water temperature; the record keeps temperature unknown.",
+        "The approximately two-minute steep is anchored after the confirmed main-pour completion; drawdown remains an observation rather than an invented finish timestamp.",
+        "The source dose is 36g. Smaller doses require an explicit app adaptation policy and are not author-provided alternatives."
+      ]
+    },
+    {
+      "id": "kurasu-switch-immersion-10-2022",
+      "url": "https://kurasu.kyoto/blogs/kurasu-journal/2-brewing-recipes-with-hario-immersion-dripper-switch",
+      "locator": "Immersion Recipe steps 1–7",
+      "assertions": {
+        "equipment.brewer": "switch",
+        "equipment.size": null,
+        "equipment.model": "V60 Switch",
+        "mode": "hot",
+        "coffeeGrams": 10,
+        "water.brewGrams": 160,
+        "stages.0.valve": "closed",
+        "stages.1.trigger.seconds": 120,
+        "stages.2.trigger.seconds": 135,
+        "stages.2.valve": "open",
+        "admission.status": "research-only"
+      },
+      "expectedReadiness": {
+        "sourceValid": true,
+        "admitted": false,
+        "guided": true,
+        "timerReady": false
+      },
+      "requiredBoundaries": [
+        "The source Switch size is unresolved; this record cannot satisfy an exact 03 configuration.",
+        "The source's 15-second pour wording remains unresolved and is not used to create a new timing claim."
+      ]
+    },
+    {
+      "id": "hario-partners-manufacturer",
+      "url": "https://www.hario-usa.com/blogs/recipes-and-more-from-friends/v60-switch-recipe-with-partners-coffee",
+      "locator": "Partners V60 Switch Recipe; recipe lines 65–80",
+      "assertions": {
+        "equipment.brewer": "switch",
+        "equipment.size": null,
+        "equipment.model": "V60 Switch",
+        "equipment.filter": null,
+        "coffeeGrams": 15,
+        "water.brewGrams": 240,
+        "temperature.value": null,
+        "stages.0.waterToGrams": 30,
+        "stages.0.trigger.seconds": 0,
+        "stages.0.durationSeconds": 10,
+        "stages.1.trigger.seconds": 40,
+        "stages.1.waterToGrams": 140,
+        "stages.1.durationSeconds": 15,
+        "stages.2.trigger.seconds": 75,
+        "stages.2.valve": "closed",
+        "stages.3.waterToGrams": 240,
+        "stages.4.trigger.seconds": 150,
+        "stages.4.valve": "open",
+        "stages.5.trigger.seconds": 240,
+        "stages.5.valve": "closed",
+        "finish.minSeconds": 240,
+        "finish.maxSeconds": 240,
+        "admission.status": "research-only"
+      },
+      "requiredBoundaries": [
+        "This revision corrects the stale 16g/256g/90-second attribution; the primary page states 15g/240g, close at 1:15, open at 2:30 and remove at 4:00.",
+        "The source does not specify Switch size, filter model or numeric temperature, so it cannot be silently admitted to Switch 03."
+      ]
+    },
+    {
+      "id": "kurasu-v60-classic-02-20-2018",
+      "url": "https://jp.kurasu.kyoto/blogs/kurasu-journal/hario-v60-po-gu-moderu-jian-zheng-purodakutorebiyu",
+      "locator": "Classic V60 side of HARIO V60/Kasuya comparison; steps 1–6",
+      "assertions": {
+        "equipment.brewer": "v60",
+        "equipment.size": "02",
+        "equipment.model": "V60",
+        "equipment.filter": "v60-02-paper",
+        "mode": "hot",
+        "coffeeGrams": 20,
+        "water.brewGrams": 300,
+        "grind.description": "Coarse (EK #11)",
+        "stages.0.waterToGrams": 50,
+        "stages.1.trigger.event": "first:complete",
+        "stages.1.trigger.seconds": 45,
+        "stages.4.waterToGrams": 300,
+        "stages.5.trigger.seconds": 210,
+        "admission.status": "ready"
+      }
+    }
+  ]
+}
