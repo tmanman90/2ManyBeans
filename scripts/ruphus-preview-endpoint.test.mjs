@@ -82,7 +82,7 @@ import { Firestore } from '@google-cloud/firestore';
   assert.equal(Object.hasOwn(response.body.preview, 'waterGrams'), false);
   assert.equal(Object.hasOwn(response.body.preview, 'ratio'), false);
   assert.equal(response.body.preview.sourceProjection.sourceId, source.sourceProjection.sourceId);
-  assert.equal(response.body.preview.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v1');
+  assert.equal(response.body.preview.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v2');
   assert.equal(response.body.proposal.preview.ratio, null);
   const serializer = new Firestore({ projectId: 'ruphus-source-endpoint-regression' })._serializer;
   assert.doesNotThrow(() => serializer.encodeFields(response.body.proposal));

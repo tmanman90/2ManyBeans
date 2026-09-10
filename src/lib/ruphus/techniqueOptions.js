@@ -9,6 +9,8 @@ import { generateV60RecipeForTechnique } from '../v60Adapter.js';
 import { KALITA_SOURCES } from '../../data/manualSources/kalita.js';
 import { SWITCH_SOURCES } from '../../data/manualSources/switch.js';
 import { V60_SOURCES as MANUAL_V60_SOURCES } from '../../data/manualSources/v60.js';
+import { KALITA_CONFIGURATION } from '../../data/kalitaConfiguration.js';
+import { V60_SWITCH_DOSE_BOUNDS } from '../../data/v60SwitchConfiguration.js';
 import {
   MANUAL_SOURCE_PROJECTION_VERSION,
   ManualSourceProjectionError,
@@ -18,14 +20,7 @@ import {
 
 export const RUPHUS_V60_TECHNIQUE_OPTIONS_VERSION = 'ruphus-v60-technique-options-v1';
 export const RUPHUS_MANUAL_SOURCE_OPTIONS_VERSION = 'ruphus-manual-source-options-v1';
-export const MANUAL_SOURCE_DOSE_POLICY_VERSION = 'ruphus-manual-source-checkpoint-v1';
-
-// This is an app adaptation envelope, not an author claim. It deliberately
-// supports a useful 20g hand-brew serving while keeping the source's timing
-// checkpoints/event anchors unchanged. A source below 20g may be upscaled to
-// exactly 20g; a larger source may be downscaled no further than 20g. The
-// source's exact example remains available outside this adaptation envelope.
-export const MANUAL_SOURCE_ADAPTED_DOSE_MIN_GRAMS = 20;
+export const MANUAL_SOURCE_DOSE_POLICY_VERSION = 'ruphus-manual-source-checkpoint-v2';
 
 const MANUAL_SOURCE_RECORDS = Object.freeze([
   ...KALITA_SOURCES,
@@ -289,23 +284,21 @@ function manualSourceFamilyId(record) {
   return record?.familyId || MANUAL_SOURCE_FAMILY_BY_ID[record?.id] || record?.id || null;
 }
 
-function adaptedDoseBounds(sourceDose) {
+function adaptedDoseBounds(record) {
+  const sourceDose = sourceDoseNumber(record);
   if (!Number.isFinite(sourceDose)) return null;
-  return sourceDose < MANUAL_SOURCE_ADAPTED_DOSE_MIN_GRAMS
-    ? [MANUAL_SOURCE_ADAPTED_DOSE_MIN_GRAMS, MANUAL_SOURCE_ADAPTED_DOSE_MIN_GRAMS]
-    : [MANUAL_SOURCE_ADAPTED_DOSE_MIN_GRAMS, sourceDose];
-}
-
-function sourceTechniqueTargetDose(sourceDose, requestedDose) {
-  if (!Number.isFinite(requestedDose)) return null;
-  const bounds = adaptedDoseBounds(sourceDose);
-  if (!bounds) return requestedDose;
-  // Selecting a source technique may also select its supported app serving
-  // dose. This is an explicit option target (shown on the card), not a
-  // silent clamp of an arbitrary preview request.
-  if (requestedDose < bounds[0]) return bounds[0];
-  if (requestedDose > bounds[1]) return bounds[1];
-  return requestedDose;
+  const equipment = record?.equipment || {};
+  if (equipment.brewer === 'kalita') {
+    const bounds = KALITA_CONFIGURATION[String(equipment.size)];
+    return bounds ? [bounds.minDose, bounds.maxDose] : null;
+  }
+  if (equipment.brewer === 'switch' && String(equipment.size) === '03') {
+    // Downscaling every source quantity cannot increase any retained phase
+    // load or coffee bed. The source's original load, not finished capacity
+    // or total throughput, is the conservative upper bound for this policy.
+    return [V60_SWITCH_DOSE_BOUNDS.minDose, Math.min(sourceDose, V60_SWITCH_DOSE_BOUNDS.maxDose)];
+  }
+  return null;
 }
 
 function sourceProjectionError(code, message, details = {}) {
@@ -327,8 +320,8 @@ export function validateManualSourceDoseAdaptation(projection) {
   if (projection?.projectionVersion !== MANUAL_SOURCE_PROJECTION_VERSION) errors.push('invalid-projection-version');
   if (!projection?.readiness?.sourceValid || !projection?.readiness?.admitted || !projection?.readiness?.guided) errors.push('source-not-timer-ready');
   if (!finitePositiveNumber(sourceDose) || !finitePositiveNumber(targetDose)) errors.push('invalid-dose');
-  const bounds = adaptedDoseBounds(sourceDose);
-  if (bounds && (targetDose < bounds[0] || targetDose > bounds[1])) errors.push('unsupported-dose-adaptation');
+  const bounds = adaptedDoseBounds(projection?.sourceSnapshot);
+  if (!bounds || targetDose < bounds[0] || targetDose > bounds[1]) errors.push('unsupported-dose-adaptation');
   if (projection?.adaptation?.status !== 'scaled') errors.push('dose-is-not-scaled');
   const stages = projection?.sourceExecution?.stages;
   if (!Array.isArray(stages) || !stages.length) errors.push('missing-source-stages');
@@ -355,6 +348,7 @@ export function applyManualSourceDosePolicy(projection) {
     ...projection.adaptation,
     timing: 'app-source-checkpoints',
     timingPolicy: MANUAL_SOURCE_DOSE_POLICY_VERSION,
+    changes: (projection.adaptation.changes || []).filter(change => !/\.durationSeconds$/.test(change.path || change.field || '')),
     notes: [
       ...(projection.adaptation.notes || []),
       `The app keeps the source checkpoint/event anchors unchanged at ${projection.coffeeGrams}g; this is an app guide, not an author-timed validation.`,
@@ -363,6 +357,15 @@ export function applyManualSourceDosePolicy(projection) {
   };
   const next = {
     ...projection,
+    sourceExecution: {
+      ...projection.sourceExecution,
+      stages: projection.sourceExecution.stages.map((stage, index) => ({
+        ...stage, durationSeconds: projection.sourceSnapshot.stages[index].durationSeconds ?? null,
+      })),
+    },
+    stages: projection.stages.map((stage, index) => ({
+      ...stage, durationSeconds: projection.sourceSnapshot.stages[index].durationSeconds ?? null,
+    })),
     readiness: {
       ...projection.readiness,
       timerReady: true,
@@ -485,7 +488,7 @@ export function recipeFromManualSourceProjection(projection, { techniqueId = nul
 
 function sourceOption(record, projection) {
   const sourceDose = sourceDoseNumber(record);
-  const bounds = adaptedDoseBounds(sourceDose);
+  const bounds = adaptedDoseBounds(record);
   const water = projection.water;
   const exact = projection.adaptation?.status === 'original';
   const blockers = projection.readiness?.blockers || [];
@@ -559,8 +562,10 @@ export function listManualSourceTechniqueOptions(first = {}, second = {}, third 
     const resolved = sourceRecord(record?.id, record?.revision);
     if (!resolved) continue;
     const exactConfiguration = manualSourceConfiguration(resolved, configuration);
-    const targetDose = sourceTechniqueTargetDose(sourceDoseNumber(resolved), Number(configuration.dose ?? configuration.coffeeGrams));
+    const requestedDose = configuration.dose ?? configuration.coffeeGrams;
+    const targetDose = requestedDose == null ? null : Number(requestedDose);
     let projection;
+    let unavailableReason = null;
     try {
       projection = projectManualSourceForApp(resolved.id, {
         ...exactConfiguration,
@@ -568,8 +573,9 @@ export function listManualSourceTechniqueOptions(first = {}, second = {}, third 
         ...(configuration.sourceDoseSelection != null ? { sourceDoseSelection: configuration.sourceDoseSelection } : {}),
         ...(configuration.allowDoseAdaptation != null ? { allowDoseAdaptation: configuration.allowDoseAdaptation } : {}),
       });
-    } catch (_error) {
+    } catch (error) {
       if (!includeReferenceOnly) continue;
+      unavailableReason = error.message;
       try {
         projection = projectManualSource(resolved, exactConfiguration);
       } catch {
@@ -577,6 +583,13 @@ export function listManualSourceTechniqueOptions(first = {}, second = {}, third 
       }
     }
     const option = sourceOption(resolved, projection);
+    if (unavailableReason) {
+      option.executable = false;
+      option.timerReady = false;
+      option.referenceOnly = true;
+      option.reason = unavailableReason;
+      option.requestedDoseGrams = targetDose;
+    }
     if ((!includeReferenceOnly && !option.executable)
       || excluded.has(option.id) || excluded.has(option.familyId) || excluded.has(option.sourceId) || excludedFamilies.has(option.familyId)
       || (current && [option.id, option.familyId, option.sourceId].includes(current))

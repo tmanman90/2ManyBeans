@@ -34,6 +34,12 @@ Use supported existing signed-in Dev seams; no authentication backdoor or logout
 
 ## Source discovery affecting acceptance
 
+### Explicit app dose guide policy
+
+`ruphus-manual-source-checkpoint-v2` preserves the requested serving; option discovery never clamps it to 20g. Kalita adaptations use existing exact-size `KALITA_CONFIGURATION` dose bounds (155:12–20g;185:15–36g). These are app equipment policy, not author-endorsed timing or sensory claims. Typed water quantities scale proportionally; published checkpoints and pour durations are retained as an explicitly disclosed app guide. Original source prose remains original rather than being rewritten.
+
+Switch adaptations are downscale-only: the existing 15g equipment-policy floor applies, and the upper bound is the smaller of the source's original load and existing 30g app dose bound. Every retained-water phase and the grounds load therefore remains no greater than the admitted original; no inferred 340g/360mL raw-input cap is used. The supported original source recipe remains available unchanged (including HARIO's 36g/440mL original). Outside-policy requests remain readable references with an explanation, never silently changed or promoted to timer-ready. Focused regression proves native units, unchanged phase durations, original source doses, 20g adaptation and just-outside boundaries.
+
 On 2026-09-10, root retrieved and visually inspected both pages of HARIO's official [SSD-360 manual](https://www.hario.com/product/SSD-360.pdf), printed revision `80682101 SSD-360説明書2301`. It specifies the 03 paper filter, 36g coffee with approximately 440mL hot water, closed-valve pouring followed by approximately two minutes of steeping, then release. Numeric brew temperature is not specified. This provides a primary-source full-immersion candidate; it is not implementation or brew evidence.
 
 The manual labels 360mL as **finished capacity**. Do not reinterpret that number as a measured bowl brim/input limit. Capacity validation must preserve the supported original while evaluating retained water, coffee load and any explicit scaling policy; it must not silently clamp the recipe. The older `manual_pdf/SSD.pdf` and USA-linked `product/SSD-200.pdf` describe the 02 and do not by themselves prove an original 03 recipe.

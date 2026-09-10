@@ -80,7 +80,7 @@ test('unsupported source projection versions fail closed before legacy heuristic
   assert.throws(() => createRecipePreview({ recipe: malformed, dose: 24 }), (error) => error.code === 'invalid-source-projection-version');
 });
 
-test('source option selection promotes a sub-20 Kalita base to the explicit 20g app guide', () => {
+test('source option selection preserves the requested Kalita serving instead of promoting it', () => {
   const options = listManualSourceTechniqueOptions({
     device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 14,
     currentSourceId: 'kurasu-wave-155-2023',
@@ -89,10 +89,10 @@ test('source option selection promotes a sub-20 Kalita base to the explicit 20g 
   assert.equal(options.filter((option) => option.sourceId === 'fuglen-wave-155').length, 0);
   const executable = options.filter((option) => option.executable === true);
   assert.ok(executable.length >= 1);
-  assert.ok(executable.every((option) => option.targetDoseGrams === 20));
+  assert.ok(executable.every((option) => option.targetDoseGrams === 14));
   const source = generateManualSourceTechniqueOption(executable[0].sourceId, {}, { ...executable[0].sourceConfiguration, dose: executable[0].targetDoseGrams }).recipe;
-  assert.equal(source.coffeeGrams, 20);
-  assert.equal(source.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v1');
+  assert.equal(source.coffeeGrams, 14);
+  assert.equal(source.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v2');
   assert.equal(validateManualSourceRecipeSnapshot(source).valid, true);
 });
 
@@ -117,7 +117,26 @@ test('ordinary source dose proposals dispatch through the native source preview'
   assert.equal(proposal.artifact.after.coffeeGrams, 20);
   assert.equal(proposal.artifact.after.waterMilliliters, 300);
   assert.equal(Object.hasOwn(proposal.artifact.after, 'waterGrams'), false);
-  assert.equal(proposal.artifact.after.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v1');
+  assert.equal(proposal.artifact.after.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v2');
+});
+
+test('source dose guides preserve pour duration, size boundaries and conservative Switch loads', () => {
+  const id = 'art-of-brew-wave-155-pulse-2024';
+  const original = generateManualSourceTechniqueOption(id).recipe;
+  const scaled = createRecipePreview({ recipe: original, dose: 20 });
+  assert.equal(scaled.coffeeGrams, 20);
+  assert.equal(scaled.waterGrams, 320);
+  assert.deepEqual(scaled.sourceProjection.sourceExecution.stages.map(stage => stage.durationSeconds ?? null), original.sourceProjection.sourceExecution.stages.map(stage => stage.durationSeconds ?? null));
+  assert.throws(() => createRecipePreview({ recipe: original, dose: 20.1 }), /unsupported-dose|supports an app dose/);
+  assert.throws(() => createRecipePreview({ recipe: original, dose: 11.9 }), /unsupported-dose|supports an app dose/);
+  const immersion = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023').recipe;
+  assert.equal(immersion.coffeeGrams, 36);
+  assert.equal(immersion.waterMilliliters, 440);
+  assert.equal(createRecipePreview({ recipe: immersion, dose: 20 }).waterMilliliters, 244.44);
+  assert.throws(() => createRecipePreview({ recipe: immersion, dose: 36.1 }), /unsupported-dose|supports an app dose/);
+  const unsupported = listManualSourceTechniqueOptions({ device: 'kalita', size: '155', mode: 'hot', dose: 21 }, { includeReferenceOnly: true });
+  assert.ok(unsupported.length > 0);
+  assert.ok(unsupported.every(option => !option.executable && option.referenceOnly));
 });
 
 console.log('Ruphus source backend contract passed');
