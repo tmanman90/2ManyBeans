@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Technique-exploration journey assertions; not passing evidence or a replacement for frozen backend evaluations.",
+  "preservation": ["Use the existing signed-in Dev account", "Capture original recipe hashes before actions", "Undo and verify every saved recipe change", "Do not reset authentication or domain history"],
+  "cases": [
+    {
+      "id": "TE01",
+      "precondition": "Jar #1 has a supported standard V60 hot recipe",
+      "turns": ["What's an interesting different V60 technique to try with Jar #1?", "Show me another one", "Compare those two", "Show me the first one again"],
+      "assertions": ["First response includes exactly one named persisted card without a second request", "Second card has a distinct eligible family", "Comparison creates no new proposal", "First-again selection identifies the original proposal and does not reactivate its stale action ID"]
+    },
+    {
+      "id": "TE02",
+      "precondition": "A coffee has a Kalita 155 recipe; the same slot must not imply a 185 base",
+      "turns": ["Show me a different Kalita 155 technique for this coffee", "Actually I mean the 185"],
+      "assertions": ["155 card carries exact size and source revision", "Correction retires 155 focus", "Missing 185 base gets the existing generation entry, never implicit replacement", "A compatible 185 base yields only 185-eligible choices"]
+    },
+    {
+      "id": "TE03",
+      "precondition": "A coffee has the supported ribbed Switch 03 hot recipe",
+      "turns": ["Show me a different Switch technique", "Can I try full immersion instead?"],
+      "assertions": ["Hybrid and immersion are genuinely distinct families", "Every valve cue keeps its source timing anchor", "Native volume units remain visible", "Over-capacity dose is rejected with a usable supported-dose suggestion"]
+    },
+    {
+      "id": "TE04",
+      "precondition": "An actionable source-backed card exists and its original saved recipe hash is captured",
+      "actions": ["View recipe", "Change dose within the source-supported range", "Start explicitly", "Return to chat", "Ask to save this trial permanently", "Save explicitly", "Undo"],
+      "assertions": ["View does not start a timer or create a trial", "Technique identity and all quantities survive dose change", "Server snapshot, displayed recipe and timer agree", "Later save targets the actual trial snapshot", "Undo restores the original saved recipe hash"]
+    },
+    {
+      "id": "TE05",
+      "precondition": "Reference-only or unsupported configuration is requested",
+      "turns": ["Show me an iced Switch recipe", "What about the two-temperature Devil recipe?"],
+      "assertions": ["Useful reference explanation does not create an executable card", "No invented timing, temperature or hardware transfer", "Domain limitations are not reported as AI connectivity failure"]
+    },
+    {
+      "id": "TE06",
+      "precondition": "Available families and saved-family identity are known",
+      "actions": ["Request alternatives until eligible families are exhausted", "Retry the final request", "Start New chat and request a technique"],
+      "assertions": ["Successfully delivered families are excluded, not failed attempts", "Exhaustion offers revisit, comparison or references without calling a repeat new", "Retry does not consume another family", "New chat resets conversational exclusions but preserves saved recipe history"]
+    },
+    {
+      "id": "TE07",
+      "precondition": "A proposal is being prepared or an explicit action is in flight",
+      "actions": ["Interrupt the response", "Retry through the existing recovery control", "Navigate away and return", "Relaunch without logout"],
+      "assertions": ["No duplicate proposal or mutation from response loss", "Cancelled preparation adds no late card", "Existing useful prose and cards survive errors", "Restored timer does not replay completed valve actions", "Signed-in account remains intact"]
+    },
+    {
+      "id": "TE08",
+      "precondition": "TE01 and TE04 are rendered with a 320px viewport, enlarged text and reduced motion",
+      "actions": ["Receive the card while scrolled to latest", "Receive a response while reading older content", "Open and close recipe details with keyboard visible"],
+      "assertions": ["Card and View recipe are reachable above the composer", "Reading position is preserved", "Return focus goes to originating card", "Touch controls remain at least 44px", "Reduced motion is respected"]
+    }
+  ]
+}

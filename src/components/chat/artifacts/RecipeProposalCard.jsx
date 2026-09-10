@@ -1,6 +1,7 @@
 import { C, radius, shadows, type as typeScale } from '../../../styles/theme';
 import { ArtifactAction } from './ArtifactAction';
 import { Btn } from '../../Btn';
+import { recipeCardMetadata } from '../../../lib/ruphus/recipeCardMetadata';
 
 const ACTIONS = Object.freeze([
   { mode: 'apply_proposal', label: 'Update saved recipe' },
@@ -8,7 +9,7 @@ const ACTIONS = Object.freeze([
   { mode: 'keep_current', label: 'Leave unchanged' },
 ]);
 
-const brewerName = (slot, recipe) => ({ aiden: 'Aiden', v60_hot: 'V60', v60_iced: 'Iced V60', kalita_hot: `Kalita ${recipe.kalitaSize || ''}`.trim(), kalita_iced: `Iced Kalita ${recipe.kalitaSize || ''}`.trim() }[slot] || 'Recipe');
+const brewerName = (slot, recipe) => recipeCardMetadata(recipe, slot).brewerLabel;
 const amount = (value, unit = '') => value == null ? '—' : `${value}${unit}`;
 const HOT_PREVIEW_SLOTS = new Set(['v60_hot', 'kalita_hot']);
 
@@ -44,6 +45,7 @@ const previewCopy = {
 
 function PreviewCard({ proposal, after, before, status, onPreview }) {
   const coffeeName = proposal.coffeeName || proposal.coffee?.name || 'Your coffee';
+  const metadata = recipeCardMetadata(after, proposal.slotKey);
   const ratio = ratioLabel(after.ratio ?? after.finalBeverageRatio ?? before.ratio ?? before.finalBeverageRatio);
   const beforeRatio = ratioLabel(before.ratio ?? before.finalBeverageRatio);
   const ratioChanged = beforeRatio && ratio && beforeRatio !== ratio;
@@ -68,7 +70,7 @@ function PreviewCard({ proposal, after, before, status, onPreview }) {
   return <section aria-label={`${coffeeName} recipe preview`} data-artifact="recipe_proposal" data-preview="true" data-preview-card="true" data-preview-id={proposal.id || undefined} data-status={status} style={{ width: '100%', boxSizing: 'border-box', padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={{ ...typeScale.h3, color: C.text }}>{coffeeName} <span aria-hidden="true" style={{ color: C.textLight }}>·</span> <span style={{ color: C.textMuted }}>{brewerName(proposal.slotKey, after)}</span></div>
     {primaryChange ? <div data-preview-change="true" style={{ marginTop: 12, color: C.text, fontVariantNumeric: 'tabular-nums' }}><span style={{ color: C.textMuted }}>{primaryChange.label}</span>{' '}<strong>{primaryChange.oldValue == null ? primaryChange.newValue : `${amount(primaryChange.oldValue, primaryChange.unit)} → ${amount(primaryChange.newValue, primaryChange.unit)}`}</strong></div> : <div data-preview-change="true" style={{ marginTop: 12, color: C.textMuted }}>Recipe updated</div>}
-    {proposal.techniqueExperiment && <p style={{ color: C.textMuted, margin: '8px 0 0', lineHeight: 1.5 }}>Adapted for your dose{ratioChanged ? ` · Ratio ${beforeRatio} → ${ratio}` : ''}</p>}
+    {proposal.techniqueExperiment && <p style={{ color: C.textMuted, margin: '8px 0 0', lineHeight: 1.5 }}>{[metadata.adaptationLabel, metadata.sourceSummary || (ratio ? `Ratio ${ratio}` : null)].filter(Boolean).join(' · ')}</p>}
     <Btn variant="primary" onClick={() => onPreview?.(proposal)} disabled={disabled} aria-label="View recipe" style={{ minHeight: 44, width: '100%', marginTop: 16 }}>{status === 'applying' ? 'Working…' : 'View recipe'}</Btn>
     <p aria-live="polite" style={{ color: C.textMuted, margin: '10px 0 0', lineHeight: 1.5 }}>{previewCopy[status] || 'This suggestion is no longer open.'}</p>
   </section>;
