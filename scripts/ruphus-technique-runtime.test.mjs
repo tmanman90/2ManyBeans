@@ -200,7 +200,7 @@ test('missing V60 does not turn an Aiden recipe into an actionable technique pro
   assert.equal(result.current, null);
 });
 
-test('V60 Switch and nonstandard V60 configurations remain discussion-only', async () => {
+test('saved Switch 03 resolves source-backed options instead of standard V60 techniques', async () => {
   const context = baseContext();
   const tools = createRuphusTools({
     uid: 'owner-1',
@@ -209,8 +209,11 @@ test('V60 Switch and nonstandard V60 configurations remain discussion-only', asy
   });
   const result = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
   assert.equal(result.ok, true);
-  assert.equal(result.actionable, false);
-  assert.equal(result.current.variant, 'switch');
+  assert.equal(result.actionable, true);
+  assert.ok(result.options.length > 0);
+  assert.equal(result.sourceOptions, true);
+  assert.ok(result.options.every(option => option.sourceConfiguration?.model === 'V60 Switch'));
+  assert.ok(result.options.every(option => option.sourceConfiguration?.size === '03'));
 });
 
 test('reference-only and unknown technique IDs cannot execute through the proposal tool', async () => {
