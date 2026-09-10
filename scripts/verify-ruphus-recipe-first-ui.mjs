@@ -18,6 +18,9 @@ const screenshots = {
   cardMobile: '/tmp/ruphus-recipe-first-preview-card-mobile.png',
   mobile: '/tmp/ruphus-recipe-first-preview-mobile.png',
   desktop: '/tmp/ruphus-recipe-first-preview-desktop.png',
+  sourceCard320: '/tmp/ruphus-source-recipe-first-card-320-large-text.png',
+  sourcePreview320: '/tmp/ruphus-source-recipe-first-preview-320-large-text.png',
+  sourceHistorical320: '/tmp/ruphus-source-recipe-first-historical-320-large-text.png',
 };
 let server;
 let output = '';
@@ -33,12 +36,27 @@ try {
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', reducedMotion: 'reduce' });
+    const localOrigin = new URL(baseUrl).origin;
+    const blockedRequests = [];
+    await context.route('**/*', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (request.method() !== 'GET' || url.origin !== localOrigin) {
+        blockedRequests.push(`${request.method()} ${request.url()}`);
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
     const page = await context.newPage();
     const errors = [];
     const writes = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
-    page.on('request', (request) => { if (request.method() !== 'GET') writes.push(`${request.method()} ${request.url()}`); });
+    const attachPageHealth = (target, targetErrors, targetWrites) => {
+      target.on('pageerror', (error) => targetErrors.push(error.message));
+      target.on('console', (message) => { if (message.type() === 'error') targetErrors.push(message.text()); });
+      target.on('request', (request) => { if (request.method() !== 'GET') targetWrites.push(`${request.method()} ${request.url()}`); });
+    };
+    attachPageHealth(page, errors, writes);
     await page.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.clear());
     await page.screenshot({ path: screenshots.cardMobile, fullPage: false });
@@ -114,6 +132,96 @@ try {
     assert.equal(await historyPage.locator('[data-start-count]').innerText(), '0');
     assert.equal(await historyPage.locator('[data-save-count]').innerText(), '0');
     await historyPage.close();
+
+    // Source-backed card -> preview and historical detail at the narrowest
+    // mobile width under a large-text setting. The fixture uses the real
+    // ArtifactRenderer, HandBrewModal and HistoricalRecipeInspector; only
+    // local owner glue captures the originating control for this harness.
+    const sourcePage = await context.newPage();
+    const sourceErrors = [];
+    const sourceWrites = [];
+    attachPageHealth(sourcePage, sourceErrors, sourceWrites);
+    await sourcePage.setViewportSize({ width: 320, height: 844 });
+    await sourcePage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?source=1`, { waitUntil: 'domcontentloaded' });
+    await sourcePage.evaluate(() => {
+      localStorage.clear();
+      document.documentElement.style.setProperty('-webkit-text-size-adjust', '200%');
+    });
+    await sourcePage.locator('[data-preview-card]').waitFor({ state: 'visible' });
+    const sourceResponsive = await sourcePage.evaluate(() => {
+      const card = document.querySelector('[data-preview-card]');
+      const button = card?.querySelector('button[aria-label="View recipe"]');
+      const cardBox = card?.getBoundingClientRect();
+      const buttonBox = button?.getBoundingClientRect();
+      return {
+        mediaReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        fixtureReducedMotion: document.querySelector('[data-reduced-motion]')?.dataset.reducedMotion,
+        viewportWidth: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        cardVisible: Boolean(cardBox && cardBox.top < window.innerHeight && cardBox.bottom > 0),
+        cardWidth: cardBox?.width || 0,
+        viewButtonVisible: Boolean(buttonBox && buttonBox.top < window.innerHeight && buttonBox.bottom > 0),
+        viewButtonHeight: buttonBox?.height || 0,
+      };
+    });
+    assert.equal(sourceResponsive.mediaReducedMotion, true);
+    assert.equal(sourceResponsive.fixtureReducedMotion, 'true');
+    assert.equal(sourceResponsive.viewportWidth, 320);
+    assert.ok(sourceResponsive.documentWidth <= sourceResponsive.viewportWidth, 'Source card must not overflow the 320px viewport');
+    assert.equal(sourceResponsive.cardVisible, true, 'Source card must be visible in the first viewport');
+    assert.equal(sourceResponsive.viewButtonVisible, true, 'Source card View recipe action must be visible at large text');
+    assert.ok(sourceResponsive.viewButtonHeight >= 44, 'Source card action must retain a 44px touch target');
+    assert.match(await sourcePage.locator('[data-preview-card]').innerText(), /HARIO Switch 03 Matt Winton bloom hybrid/);
+    assert.match(await sourcePage.locator('[data-preview-card]').innerText(), /360mL water/);
+    await sourcePage.screenshot({ path: screenshots.sourceCard320, fullPage: false });
+    const sourceViewButton = sourcePage.getByRole('button', { name: 'View recipe', exact: true });
+    await sourceViewButton.focus();
+    await sourceViewButton.click();
+    await sourcePage.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
+    assert.match(await sourcePage.locator('body').innerText(), /HARIO Switch 03 Matt Winton bloom hybrid/);
+    assert.match(await sourcePage.locator('body').innerText(), /50g/);
+    assert.match(await sourcePage.locator('body').innerText(), /360mL/);
+    assert.ok(await sourcePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Source preview must not overflow the 320px viewport');
+    await sourcePage.screenshot({ path: screenshots.sourcePreview320, fullPage: false });
+    await sourcePage.getByRole('button', { name: 'Close', exact: true }).click();
+    await sourcePage.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'View recipe');
+    assert.equal(await sourcePage.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'View recipe', 'Preview close must return focus to its originating source-card control');
+    assert.deepEqual(sourceWrites, []);
+    assert.deepEqual(sourceErrors, []);
+    await sourcePage.close();
+
+    const sourceHistoricalPage = await context.newPage();
+    const sourceHistoricalErrors = [];
+    const sourceHistoricalWrites = [];
+    attachPageHealth(sourceHistoricalPage, sourceHistoricalErrors, sourceHistoricalWrites);
+    await sourceHistoricalPage.setViewportSize({ width: 320, height: 844 });
+    await sourceHistoricalPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?source=1&historical=1`, { waitUntil: 'domcontentloaded' });
+    await sourceHistoricalPage.evaluate(() => {
+      localStorage.clear();
+      document.documentElement.style.setProperty('-webkit-text-size-adjust', '200%');
+    });
+    const sourceHistoricalViewButton = sourceHistoricalPage.getByRole('button', { name: 'View recipe', exact: true });
+    await sourceHistoricalViewButton.focus();
+    await sourceHistoricalViewButton.click();
+    const sourceHistoricalDetail = sourceHistoricalPage.locator('[data-historical-inspection="true"]');
+    await sourceHistoricalDetail.waitFor({ state: 'visible' });
+    assert.match(await sourceHistoricalDetail.innerText(), /Historical recipe · read only/);
+    assert.match(await sourceHistoricalDetail.innerText(), /HARIO Switch 03 Matt Winton bloom hybrid/);
+    assert.match(await sourceHistoricalDetail.innerText(), /24g coffee/);
+    assert.match(await sourceHistoricalDetail.innerText(), /360 mL water/);
+    assert.equal(await sourceHistoricalPage.getByText('Hand Brew Recipe', { exact: true }).count(), 0, 'Historical source inspection must not open an actionable preview');
+    assert.equal(await sourceHistoricalPage.evaluate(() => document.activeElement?.matches('[data-historical-inspection="true"]')), true, 'Historical detail must receive focus on open');
+    assert.ok(await sourceHistoricalPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Historical source detail must not overflow the 320px viewport');
+    await sourceHistoricalPage.screenshot({ path: screenshots.sourceHistorical320, fullPage: false });
+    await sourceHistoricalPage.getByRole('button', { name: 'Close historical recipe', exact: true }).click();
+    await sourceHistoricalPage.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'View recipe');
+    assert.equal(await sourceHistoricalPage.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'View recipe', 'Historical close must return focus to its originating source-card control');
+    assert.deepEqual(sourceHistoricalWrites, []);
+    assert.deepEqual(sourceHistoricalErrors, []);
+    await sourceHistoricalPage.close();
+    assert.deepEqual(blockedRequests, [], 'Rendered fixture must not request non-local or non-GET resources');
+    console.log(JSON.stringify({ sourceResponsive, sourceHistorical: { width: 320, largeText: '200%', reducedMotion: true, focusReturn: true }, blockedRequests: blockedRequests.length, sourceWrites: 0 }));
+
     // Real deterministic orchestration output rendered through the actual card:
     // provider transport is injected; no live model or account is involved.
     const userText = 'What’s an interesting different V60 technique to try with Jar #1?';
@@ -136,8 +244,7 @@ try {
     assert.equal(turn.ok, true);
     assert.equal(turn.artifacts.length, 1);
     const runtimePage = await context.newPage();
-    runtimePage.on('pageerror', error => errors.push(error.message));
-    runtimePage.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    attachPageHealth(runtimePage, errors, writes);
     await runtimePage.addInitScript(data => { window.__ruphusTechniqueTurn = data; }, { userText, frames });
     await runtimePage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?technique=1`, { waitUntil: 'domcontentloaded' });
     assert.equal(await runtimePage.locator('[data-artifact="recipe_proposal"]').count(), 0);
