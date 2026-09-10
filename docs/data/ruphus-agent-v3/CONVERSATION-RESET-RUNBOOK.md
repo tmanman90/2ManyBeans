@@ -6,6 +6,40 @@ preflight stops the run; it never falls back to production.
 
 ## Current continuation boundary
 
+### September 10 technique-exploration implementation (open)
+
+The active follow-up is `codex/ruphus-technique-exploration`, governed by
+[`2026-09-10-001-feat-ruphus-technique-exploration-plan.md`](../../plans/2026-09-10-001-feat-ruphus-technique-exploration-plan.md).
+Use [`TECHNIQUE-EXPLORATION-ACCEPTANCE.md`](TECHNIQUE-EXPLORATION-ACCEPTANCE.md)
+for current source, runtime, rendering, live and native evidence. The older
+closeouts below do not prove this expansion or describe its current install.
+
+Current private candidate source is `0bfea57` (includes the expanded-question
+same-turn card fix `8e6b05f`), preview
+`https://twomanybeans-ruphus-6lgwnteqe-tmanman90s-projects.vercel.app`.
+The matching Dev simulator app is compiled but **not installed**. The existing
+signed-in simulator still has source `422028f` and preview `oqrw05np8`.
+Do not count the new preview or compiled assets as installed acceptance.
+
+Tal is using the Mac: foreground Simulator, Device Hub, iPhone Mirroring and
+keyboard capture are prohibited while that constraint remains. Native
+interaction is paused; background code/build/browser work may continue.
+Preserve login and data, install in place when interaction can safely resume,
+and never seed or reset the owner account. Latest successful recipe readback
+compares all 57 original/current snapshots unchanged. The operator credential
+was refreshed through Firebase CLI, independently of the app's login.
+
+Execute the eight scoped journeys in
+`scripts/fixtures/ruphus-techniques/conversation-cases.json`; do not restart
+the historical model tournament below. Source-backed injected Save/Undo
+journeys remain separate from actual signed-in UI acceptance. Before each
+paid request, reread/reserve against the original `feat-ruphus-agent-v3`
+`docs/data/ruphus-agent-v3/conversation-eval/live-cost-ledger.json`.
+Last settled spend is $48.039648, reserved $0, of the unchanged $55 total cap.
+Keep diagnostics, leave Capgo and production unchanged, and record live
+closure only after a named card actually persists and renders. Personal
+sensory verdicts remain separate and do not block engineering work.
+
 ### September 9 recipe-first implementation closeout
 
 The approved recipe-first plan is engineering-complete on isolated branch
