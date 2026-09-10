@@ -1,5 +1,5 @@
 import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION } from '../../src/lib/ruphus/contracts.js';
-import { gradeReply, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
+import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
 import { RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
@@ -12,6 +12,12 @@ const SEVERE_SECOND_FAILURES = new Set([
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
   'RT6_METHOD_CONTRADICTION',
 ]);
+const TECHNIQUE_RECOVERY = 'I can explain a different hot V60 approach, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
+const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
+
+function cancelledError() {
+  return Object.assign(new Error('turn cancelled'), { code: 'turn_cancelled' });
+}
 
 export function methodBindingTriggers({ reply = '', binding = null } = {}) {
   if (binding?.status !== 'locked' || !binding.slot) return [];
@@ -117,6 +123,10 @@ export function proposalHandoff(artifact = {}) {
   return `Prepared: change the ${control} from ${before}${unit} to ${after}${unit}.${unchangedText} Review it before applying.`;
 }
 
+function appendHandoff(current, handoff) {
+  return [String(current || '').trim(), String(handoff || '').trim()].filter(Boolean).join(' ');
+}
+
 /**
  * Proposal eligibility is a trusted, target-bound context input. The
  * conversation transcript is deliberately not consulted: an old diagnosis
@@ -124,7 +134,8 @@ export function proposalHandoff(artifact = {}) {
  *
  * Main-lane input contract:
  * { proposalState: { target: { coffeeRef, slot }, previewReady: true,
- *   proposalIssued?: false } }
+ *   proposalIssued?: false } } or a target-bound techniqueReady record with
+ *   the selected option identity.
  */
 export function proposalEligibleForTarget(context, request = {}) {
   const state = context?.proposalState;
@@ -139,6 +150,19 @@ export function proposalEligibleForTarget(context, request = {}) {
   const userAgreed = previewReady || state.userAgreed === true || agreement.accepted === true || agreement.ready === true;
   const diagnosisTarget = { coffeeRef: state.diagnosisCoffeeRef || diagnosis.coffeeRef || target.coffeeRef, slot: state.diagnosisSlot || diagnosis.slot || diagnosis.slotKey || target.slot };
   const agreementTarget = { coffeeRef: state.agreementCoffeeRef || agreement.coffeeRef || target.coffeeRef, slot: state.agreementSlot || agreement.slot || agreement.slotKey || target.slot };
+  const technique = request?.experiment?.kind === 'v60_technique';
+  if (technique) {
+    const ready = state.techniqueReady;
+    const selectedId = request.experiment.techniqueId || request.experiment.familyId || request.experiment.sourceId;
+    const resolvedTarget = context?.__ruphusResolvedTargets instanceof Map
+      ? context.__ruphusResolvedTargets.get(`${target.coffeeRef}:${target.slot}`)
+      : null;
+    return Boolean(target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
+      && ready?.coffeeRef === target.coffeeRef && ready?.slot === target.slot
+      && (!resolvedTarget?.sourceHash || !ready.sourceHash || resolvedTarget.sourceHash === ready.sourceHash)
+      && Array.isArray(ready.optionIds) && ready.optionIds.includes(selectedId)
+      && isTechniqueExplorationRequest(context?.userText || ''));
+  }
   return Boolean(
     target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
       && diagnosisReady && userAgreed
@@ -147,7 +171,7 @@ export function proposalEligibleForTarget(context, request = {}) {
   );
 }
 
-export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
+export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, signal, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
   if (!turnId || !provider?.runTurn || !tools?.call) throw new Error('turn requires identity, provider, and tools');
   const turnStartedAt = performance.now(); let firstFrameAt = null; let readRoundMs = 0;
   const send = (type, fields = {}) => {
@@ -163,12 +187,100 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
   const rememberUsage = (value) => { usageSamples.push(value?.usage ?? null); const retryCount = value?.retryCount ?? value?.retry_count; if (typeof retryCount === 'number' && Number.isFinite(retryCount) && retryCount >= 0) providerRetrySamples.push({ retryCount }); };
   const accounting = () => { const retryCount = aggregateProviderRetryCount(providerRetrySamples); return { usage: aggregateProviderUsage('openai', usageSamples), ...(retryCount === undefined ? {} : { retryCount }) }; };
+  const pendingTools = new Set();
+  const throwIfCancelled = () => { if (signal?.aborted) throw cancelledError(); };
+  let techniqueContinuationUsed = false;
+  const runTool = async (request, { blockedResult = null } = {}) => {
+    throwIfCancelled();
+    const pending = { callId: request.callId || null, name: request.name };
+    const proposalStateBefore = request.name === 'propose_recipe_change' && context?.proposalState
+      ? {
+        proposalIssued: context.proposalState.proposalIssued,
+        previewReady: context.proposalState.previewReady,
+        diagnosisReady: context.proposalState.diagnosisReady,
+        userAgreed: context.proposalState.userAgreed,
+      }
+      : null;
+    const techniqueSelectionKey = request.name === 'propose_recipe_change'
+      && request.args?.experiment?.kind === 'v60_technique'
+      ? `${request.args.coffeeRef}:${request.args.slot || request.args.slotKey}`
+      : null;
+    const techniqueSelectionBefore = techniqueSelectionKey && context?.__ruphusTechniqueSelections instanceof Map
+      ? context.__ruphusTechniqueSelections.get(techniqueSelectionKey)
+      : null;
+    const selectedIdsBefore = techniqueSelectionBefore && Array.isArray(techniqueSelectionBefore.selectedIds)
+      ? [...techniqueSelectionBefore.selectedIds]
+      : null;
+    pendingTools.add(pending);
+    try {
+      send('tool_started', { name: request.name, ...(request.callId ? { callId: request.callId } : {}) });
+      throwIfCancelled();
+      toolNames.push(request.name);
+      const result = blockedResult || await tools.call(request.name, request.args || {});
+      throwIfCancelled();
+      pendingTools.delete(pending);
+      toolEvidence.push({ callId: request.callId, name: request.name, result });
+      if (READS.has(request.name)) trace.reads.push({ name: request.name, at: new Date().toISOString() });
+      if (result?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== result.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: result.coffeeRef });
+      if (result?.proposal?.id) proposalIds.push(result.proposal.id);
+      send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result });
+      throwIfCancelled();
+      if (result?.artifact) {
+        artifacts.push(JSON.parse(JSON.stringify(result.artifact)));
+        send('artifact_ready', { artifact: result.artifact });
+        pending.artifactEmitted = true;
+      }
+      return { callId: request.callId, name: request.name, result };
+    } catch (error) {
+      if ((signal?.aborted || error?.code === 'turn_cancelled') && proposalStateBefore && !pending.artifactEmitted) {
+        Object.assign(context.proposalState, proposalStateBefore);
+      }
+      if ((signal?.aborted || error?.code === 'turn_cancelled') && techniqueSelectionKey && selectedIdsBefore
+        && context?.__ruphusTechniqueSelections instanceof Map) {
+        const current = context.__ruphusTechniqueSelections.get(techniqueSelectionKey);
+        if (current) current.selectedIds = [...selectedIdsBefore];
+      }
+      if (!signal?.aborted && error?.code !== 'turn_cancelled') pendingTools.delete(pending);
+      throw error;
+    }
+  };
   try {
-    response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions }); rememberUsage(response);
+    throwIfCancelled();
+    response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, signal }); throwIfCancelled(); rememberUsage(response);
     while (response) {
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
-      if (!calls.length) break;
+      throwIfCancelled();
+      if (!calls.length) {
+        const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
+          && item.result?.ok === true && item.result?.actionable === true
+          && Array.isArray(item.result?.options) && item.result.options.length > 0);
+        if (techniqueRead && !proposalClaimed && isTechniqueExplorationRequest(userText || context?.userText || '')) {
+          if (toolCalls >= maxToolCalls) {
+            text = TECHNIQUE_RECOVERY;
+            break;
+          }
+          if (!techniqueContinuationUsed) {
+            techniqueContinuationUsed = true;
+            response = await provider.runTurn({
+              turnId, context, userText, conversation: context?.conversation || [],
+              tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+              previous: response, toolResult: { results: [techniqueRead] }, regeneration: true,
+              correctiveInstruction: 'The user explicitly asked for a different hot V60 technique. Choose one exact named option from the trusted technique reader and call propose_recipe_change now. Do not ask for another yes, call another read, or claim a review card unless the proposal tool returns its artifact.',
+              signal,
+            });
+            throwIfCancelled();
+            rememberUsage(response);
+            continue;
+          }
+          text = TECHNIQUE_RECOVERY;
+        }
+        break;
+      }
+      if (techniqueContinuationUsed && calls.some((request) => request.name !== 'propose_recipe_change')) {
+        text = TECHNIQUE_RECOVERY;
+        break;
+      }
       toolRounds += 1;
       // Two evidence rounds may already have resolved and read the exact
       // recipe. Deliver the one eligible proposal requested by that final
@@ -190,7 +302,9 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
           correctiveInstruction: 'The useful coffee and recipe evidence is already in this turn. A recipe card has not been prepared and no change has been saved. Answer the user naturally from that evidence, make at most one concrete suggestion, and do not call another tool or claim a card is ready. If the user is uncertain, help them without forcing a recipe change.',
+          signal,
         });
+        throwIfCancelled();
         rememberUsage(response);
         continue;
       }
@@ -209,27 +323,16 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (proposalRequests.length) proposalClaimed = true;
       toolCalls += calls.length;
       const readRoundStartedAt = performance.now();
-      const results = await Promise.all(calls.map(async (request) => {
-        send('tool_started', { name: request.name, ...(request.callId ? { callId: request.callId } : {}) }); toolNames.push(request.name);
-        const result = blockedProposalCalls.has(request.callId || request)
+      const results = await Promise.all(calls.map((request) => runTool(request, {
+        blockedResult: blockedProposalCalls.has(request.callId || request)
           ? { ok: false, code: 'proposal_timing', message: 'Resolve the coffee and recipe, then give the bounded recommendation before preparing its review card.' }
-          : await tools.call(request.name, request.args || {});
-        toolEvidence.push({ callId: request.callId, name: request.name, result });
-        if (READS.has(request.name)) trace.reads.push({ name: request.name, at: new Date().toISOString() });
-        if (result?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== result.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: result.coffeeRef });
-        if (result?.proposal?.id) proposalIds.push(result.proposal.id);
-        send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result });
-        if (result?.artifact) {
-          artifacts.push(JSON.parse(JSON.stringify(result.artifact)));
-          send('artifact_ready', { artifact: result.artifact });
-        }
-        return { callId: request.callId, name: request.name, result };
-      }));
+          : null,
+      })));
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
-      if (proposed) { text += proposalHandoff(proposed.result.artifact); break; }
+      if (proposed) { text = appendHandoff(text, proposalHandoff(proposed.result.artifact)); break; }
       const invalidGrind = results.find(item => item.name === 'propose_recipe_change' && item.result?.code === 'physical_grind_required');
       if (invalidGrind) {
         const original = calls.find(call => call.name === 'propose_recipe_change');
@@ -241,16 +344,10 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         // not another model-selected control, read, or saved recipe write.
         if (original?.args?.change?.control === 'grind' && Number.isFinite(corrected) && toolCalls < maxToolCalls) {
           toolCalls += 1;
-          toolNames.push('propose_recipe_change');
-          send('tool_started', { name: 'propose_recipe_change' });
-          const result = await tools.call('propose_recipe_change', { ...original.args, change: { control: 'grind', value: corrected } });
-          toolEvidence.push({ name: 'propose_recipe_change', result });
-          send('tool_result', { name: 'propose_recipe_change', result });
+          const correction = await runTool({ name: 'propose_recipe_change', args: { ...original.args, change: { control: 'grind', value: corrected } } });
+          const result = correction.result;
           if (result?.ok && result.artifact) {
-            artifacts.push(JSON.parse(JSON.stringify(result.artifact)));
-            if (result.proposal?.id) proposalIds.push(result.proposal.id);
-            send('artifact_ready', { artifact: result.artifact });
-            text += proposalHandoff(result.artifact);
+            text = appendHandoff(text, proposalHandoff(result.artifact));
             break;
           }
         }
@@ -258,7 +355,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         break;
       }
       if (results.some(item => item.name === 'propose_recipe_change' && ['duplicate_alternative', 'no_recipe_change'].includes(item.result?.code))) {
-        response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.' });
+        response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.', signal });
+        throwIfCancelled();
         rememberUsage(response);
         continue;
       }
@@ -267,17 +365,24 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
+        if (isTechniqueExplorationRequest(userText || context?.userText || '')) techniqueContinuationUsed = true;
         response = await provider.runTurn({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
           correctiveInstruction: 'The recipe change is not authorized yet. Reply with useful coffee advice only, make at most one concrete suggestion, and do not call another tool or claim a change was prepared.',
+          signal,
         });
+        throwIfCancelled();
         rememberUsage(response);
         continue;
       }
-      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results } }); rememberUsage(response);
+      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results }, signal }); throwIfCancelled(); rememberUsage(response);
     }
+    throwIfCancelled();
     let checked = text.trim();
+    if (!artifacts.some((artifact) => artifact?.type === 'recipe_proposal')
+      && isTechniqueExplorationRequest(userText || context?.userText || '')
+      && PREPARATION_CLAIM.test(checked)) checked = TECHNIQUE_RECOVERY;
     const checkedEvidence = runtimeEvidence(toolEvidence);
     let triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
     if (triggers.length) {
@@ -286,7 +391,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         ? ` The user explicitly used ${context.methodBinding.displayName}; do not mention, suggest, or ask about another brewer.`
         : '';
       const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}`;
-      const regenerated = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true });
+      const regenerated = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
+      throwIfCancelled();
       rememberUsage(regenerated); const regeneratedText = String(regenerated?.text || '').trim();
       const second = checkedTriggers({ reply: regeneratedText, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
       if (!second.length) { checked = regeneratedText; triggers = []; } else if (second.some((trigger) => SEVERE_SECOND_FAILURES.has(trigger.code))) { checked = REPLACEMENT; }
@@ -294,13 +400,22 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       trace.regenerations.at(-1).secondFailure = second.map((trigger) => trigger.code);
       trace.regenerations.at(-1).delivered = checked === REPLACEMENT ? 'replacement' : 'regenerated';
     }
+    throwIfCancelled();
     if (checked) send('text_delta', { text: checked });
     const timing = { firstFrameMs: firstFrameAt == null ? null : firstFrameAt - turnStartedAt, checkedReplyMs: performance.now() - turnStartedAt, readRoundMs: readRoundMs || null, regenerationCount: trace.regenerations.length };
     send('turn_completed', { text: checked, timing });
     const emittedArtifacts = artifacts.map((artifact) => ({ type: 'artifact_ready', artifact }));
     return { ok: true, turnId, text: checked, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace, frames: emittedArtifacts, previewReady: context?.proposalState?.previewReady === true }) };
   } catch (error) {
-    send(error.code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code: error.code || 'turn_failed', message: error.message });
-    return { ok: false, turnId, code: error.code || 'turn_failed', text: '', toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };
+    const cancelled = signal?.aborted === true || error?.code === 'turn_cancelled';
+    if (cancelled) {
+      for (const pending of pendingTools) {
+        send('tool_result', { name: pending.name, ...(pending.callId ? { callId: pending.callId } : {}), result: { ok: false, code: 'turn_cancelled', message: 'Turn cancelled.' } });
+      }
+      pendingTools.clear();
+    }
+    const code = cancelled ? 'turn_cancelled' : error.code || 'turn_failed';
+    send(code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code, message: error.message });
+    return { ok: false, turnId, code, text: '', artifacts, toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };
   }
 }

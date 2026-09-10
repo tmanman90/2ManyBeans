@@ -8,6 +8,19 @@ const sentenceCount = (value) => textOf(value).replace(/(\d)\.(\d)/g, '$1\u0000$
 const object = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const PRIVATE_USE = /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u;
 
+// This is intentionally narrower than a generic mention of a technique. An
+// information question may discuss the same source-backed methods without
+// authorizing an executable alternative or a review card in this turn.
+export function isTechniqueExplorationRequest(value = '') {
+  const text = textOf(value).replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+  if (!text || !/\b(?:technique|method)\b/i.test(text)) return false;
+  const action = /\b(?:try|use|brew|prepare|make|test|show|give|recommend|suggest|explore|switch|choose|pick)\b/i.test(text);
+  const alternative = /\b(?:different|another|alternative|new|interesting)\b/i.test(text);
+  const informational = /^(?:how\s+(?:does|do|can|would|to)\b|what\s+(?:is|are)\b|tell\s+me\s+about\b|explain\b|compare\b|what's\s+the\s+difference\b)/i.test(text);
+  if (informational && !action) return false;
+  return action || alternative;
+}
+
 export const CONTRACT_VERSION = 'conversation-contract-v2-recipe-first';
 export const CATEGORIES = Object.freeze({ CATASTROPHIC: 'catastrophic', ORDINARY: 'ordinary' });
 
