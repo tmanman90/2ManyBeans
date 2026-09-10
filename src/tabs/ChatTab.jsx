@@ -201,6 +201,89 @@ const TypingIndicator = ({ reduce, captions }) => (
   </m.div>
 );
 
+const historicalQuantity = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value && typeof value === 'object' && Number.isFinite(value.min) && Number.isFinite(value.max)) return `${value.min}–${value.max}`;
+  return null;
+};
+
+const historicalWater = (recipe = {}) => {
+  const projectionWater = recipe.sourceProjection?.water;
+  if (recipe.sourceProjection && Object.hasOwn(recipe.sourceProjection, 'water')) {
+    const quantity = projectionWater && projectionWater.unit ? historicalQuantity(projectionWater.value) : null;
+    return quantity ? `${quantity} ${projectionWater.unit}` : null;
+  }
+  if (historicalQuantity(recipe.waterMilliliters)) return `${historicalQuantity(recipe.waterMilliliters)} mL`;
+  if (historicalQuantity(recipe.waterGrams)) return `${historicalQuantity(recipe.waterGrams)} g`;
+  if (historicalQuantity(recipe.water)) return `${historicalQuantity(recipe.water)} g`;
+  return null;
+};
+
+const historicalStageTime = (stage = {}) => {
+  if (typeof stage.time === 'string' && stage.time.trim()) return stage.time;
+  if (stage.trigger?.type === 'elapsed' && Number.isFinite(stage.trigger.seconds)) return `At ${stage.trigger.seconds}s`;
+  if (stage.trigger?.type === 'after' && typeof stage.trigger.event === 'string') return `After ${stage.trigger.event}`;
+  if (stage.trigger?.type === 'condition' && typeof stage.trigger.condition === 'string') return `When ${stage.trigger.condition}`;
+  if (stage.trigger?.type === 'manual') return 'When ready';
+  return null;
+};
+
+const historicalStageText = (stage = {}) => {
+  if (typeof stage.label === 'string' && stage.label.trim()) return stage.label;
+  if (typeof stage.action === 'string' && stage.action.trim()) return stage.action;
+  return 'Source stage';
+};
+
+const historicalStageWater = (stage = {}) => {
+  if (stage.water?.value != null && stage.water.unit) {
+    const quantity = historicalQuantity(stage.water.value);
+    if (quantity) return `${quantity} ${stage.water.unit}`;
+  }
+  if (historicalQuantity(stage.waterToMilliliters)) return `${historicalQuantity(stage.waterToMilliliters)} mL`;
+  if (historicalQuantity(stage.waterToGrams)) return `${historicalQuantity(stage.waterToGrams)} g`;
+  if (historicalQuantity(stage.waterTotal)) return `${historicalQuantity(stage.waterTotal)} ${stage.waterUnit || 'g'}`;
+  return null;
+};
+
+function HistoricalRecipeInspector({ proposal, onClose }) {
+  if (!proposal?.after) return null;
+  const recipe = proposal.after;
+  const projection = recipe.sourceProjection || {};
+  const stages = Array.isArray(projection.stages) ? projection.stages : Array.isArray(recipe.steps) ? recipe.steps : [];
+  const technique = proposal.techniqueExperiment?.name || recipe.techniqueLabel || recipe.technique || 'Source recipe';
+  const coffee = proposal.coffeeName || 'This coffee';
+  const dose = historicalQuantity(recipe.coffeeGrams ?? recipe.dose ?? recipe.sourceProjection?.coffeeGrams);
+  const water = historicalWater(recipe);
+  return (
+    <aside
+      tabIndex="-1"
+      data-historical-inspection="true"
+      aria-label="Historical recipe inspection"
+      style={{ width: '100%', boxSizing: 'border-box', padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}
+    >
+      <div style={{ ...typeScale.caption, color: C.textMuted, marginBottom: 6 }}>Historical recipe · read only</div>
+      <div style={{ ...typeScale.h3, color: C.text }}>{technique}</div>
+      <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: 4 }}>{coffee}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0', color: C.text, fontVariantNumeric: 'tabular-nums' }}>
+        {dose && <span>{dose}g coffee</span>}
+        {water && <span>{water} water</span>}
+      </div>
+      {stages.length > 0 && (
+        <ol style={{ margin: '8px 0 14px', paddingLeft: 22, color: C.text }}>
+          {stages.slice(0, 12).map((stage, index) => (
+            <li key={stage.id || index} style={{ padding: '6px 0', lineHeight: 1.45 }}>
+              {historicalStageTime(stage) && <span style={{ color: C.textMuted }}>{historicalStageTime(stage)} — </span>}
+              {historicalStageText(stage)}
+              {historicalStageWater(stage) && <span style={{ color: C.textMuted }}> · {historicalStageWater(stage)}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+      <Btn variant="ghost" onClick={onClose} style={{ width: '100%', justifyContent: 'center', minHeight: 44 }} aria-label="Close historical recipe">Close recipe</Btn>
+    </aside>
+  );
+}
+
 // Isolated input bar -- owns its own `input` state so keystrokes never
 // re-render the parent ChatTab (which re-renders the full message list).
 // Memoized on its props so even parent re-renders don't cascade here unless
@@ -456,6 +539,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [recipePreviewPending, setRecipePreviewPending] = useState(false);
   const [recipePreviewError, setRecipePreviewError] = useState(null);
   const [recipePreviewStale, setRecipePreviewStale] = useState(false);
+  const [historicalProposal, setHistoricalProposal] = useState(null);
   const handleRuphusAction = useCallback(async (request) => {
     if (!mutationEnabled) return null;
     try { return await runRuphusAction(request); } catch (error) {
@@ -534,6 +618,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     setLoading(false);
     sendingRef.current = false;
     userTouchedThreadRef.current = false;
+    setHistoricalProposal(null);
   }, []);
 
   const hydrateThread = useCallback((thread) => {
@@ -630,6 +715,22 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       setToast(error.message || 'This recipe preview is unavailable.');
     }
   }, [beans, uid]);
+
+  // Historical cards have no action authority. Inspection keeps the exact
+  // delivered artifact (including a source projection) and never enters the
+  // generic recipe-preview regeneration or command path.
+  const handleHistoricalProposalInspect = useCallback((artifact) => {
+    if (!artifact || artifact.type !== 'recipe_proposal' || !artifact.after) return;
+    setHistoricalProposal({ ...artifact, before: artifact.before ? { ...artifact.before } : artifact.before, after: { ...artifact.after } });
+  }, []);
+
+  const closeHistoricalProposal = useCallback(() => setHistoricalProposal(null), []);
+
+  useEffect(() => {
+    if (!historicalProposal) return;
+    const frame = requestAnimationFrame(() => document.querySelector('[data-historical-inspection="true"]')?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [historicalProposal]);
 
   const closeRecipePreview = useCallback(() => {
     const proposalId = recipePreviewRef.current?.artifact?.id;
@@ -1350,6 +1451,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!window.confirm('Start a fresh conversation?')) return;
     clear(threadForPersistence(messages), agentContextRef.current);
     resetIntroThread();
+    setHistoricalProposal(null);
     agentSessionIdRef.current = null;
     setLegacyChatOverride(false);
     setAgentRecovery(null);
@@ -1498,7 +1600,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (i === 0 && msg.role === 'assistant' && !msg.content?.trim() && !msg.artifacts?.length && !msg.photos?.length) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
+                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} onInspect={handleHistoricalProposalInspect} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
@@ -1526,7 +1628,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           />
         )}
         {agentEnabled && loading && agentText && <RuphusMessage text={agentText} />}
-        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} actionPending={Boolean(ruphusActionPending)} />)}</div>}
+        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} onInspect={handleHistoricalProposalInspect} actionPending={Boolean(ruphusActionPending)} />)}</div>}
+        {historicalProposal && <HistoricalRecipeInspector proposal={historicalProposal} onClose={closeHistoricalProposal} />}
       </div>
 
       {showJumpLatest && streamingSlot && (

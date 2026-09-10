@@ -81,8 +81,9 @@ export function techniqueSelectionsFromSession(session, refs = {}) {
       const coffeeRef = Object.entries(refs || {}).find(([, coffeeId]) => coffeeId === artifact.coffeeId)?.[0];
       if (!coffeeRef) continue;
       const key = `${coffeeRef}:${artifact.slotKey}`;
-      const prior = selections.get(key) || { selectedIds: [] };
+      const prior = selections.get(key) || { selectedIds: [], proposalIds: [] };
       prior.selectedIds = [...new Set([...prior.selectedIds, experiment.techniqueId, experiment.familyId, experiment.sourceId].filter(Boolean))];
+      if (typeof artifact.id === 'string' && artifact.id.trim()) prior.proposalIds = [...new Set([...prior.proposalIds, artifact.id.trim()])];
       selections.set(key, prior);
     }
   }
