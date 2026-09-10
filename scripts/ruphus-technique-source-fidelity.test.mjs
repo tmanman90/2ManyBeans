@@ -202,6 +202,8 @@ test('choice listing separates timer-ready choices from readable references', ()
     'kurasu-wave-155-2023',
     'vibrant-wave-155',
     'fuglen-wave-155',
+    'foundation-wave-155',
+    'art-of-brew-wave-155-pulse-2024',
     'drop-wave-155',
     'ozone-wave-155-scaled-from-185-2026',
   ]);
@@ -212,13 +214,26 @@ test('choice listing separates timer-ready choices from readable references', ()
   assert.deepEqual(hot155.map((source) => source.id), [
     'kurasu-wave-155-2023',
     'fuglen-wave-155',
+    'foundation-wave-155',
+    'art-of-brew-wave-155-pulse-2024',
   ]);
+  const kurasu155 = hot155.find((source) => source.id === 'kurasu-wave-155-2023');
+  const foundation155 = hot155.find((source) => source.id === 'foundation-wave-155');
+  const artOfBrew155 = hot155.find((source) => source.id === 'art-of-brew-wave-155-pulse-2024');
   assert.notDeepEqual(
-    hot155[0].stages.map((stage) => [stage.trigger, stage.waterToGrams]),
-    hot155[1].stages.map((stage) => [stage.trigger, stage.waterToGrams]),
+    kurasu155.stages.map((stage) => [stage.kind, stage.trigger, stage.waterToGrams]),
+    foundation155.stages.map((stage) => [stage.kind, stage.trigger, stage.waterToGrams]),
   );
-  assert.equal(hot155[0].source.url.includes('kurasu.kyoto'), true);
-  assert.equal(hot155[1].source.url.includes('fuglen.'), true);
+  assert.deepEqual(artOfBrew155.stages.map((stage) => stage.trigger.seconds), [0, 30, 50, 70, 90, 110]);
+  assert.deepEqual(artOfBrew155.stages.map((stage) => stage.waterToGrams), [37.5, 75, 100, 125, 150, 200]);
+  assert.notDeepEqual(
+    kurasu155.stages.map((stage) => [stage.kind, stage.trigger, stage.waterToGrams]),
+    artOfBrew155.stages.map((stage) => [stage.kind, stage.trigger, stage.waterToGrams]),
+  );
+  assert.equal(kurasu155.source.url.includes('kurasu.kyoto'), true);
+  assert.equal(foundation155.source.url.includes('foundationroasters.'), true);
+  assert.equal(artOfBrew155.source.url.includes('youtube.com/watch?v=VTlI3SmlYSQ'), true);
+  assert.equal(artOfBrew155.temperature, null);
   assert.equal(listManualSourceRecords(records, {
     device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot',
   }).map((source) => source.id).join(','), 'hario-switch-03-matt-winton-hybrid-24-2022,hario-switch-03-instruction-manual-36-2023');

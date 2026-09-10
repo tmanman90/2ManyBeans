@@ -150,8 +150,102 @@
       },
       "requiredBoundaries": [
         "The primary Fuglen guide explicitly names the Kalita Wave 155; Kalita manufacturer context verifies the native Wave 155 filter pairing.",
-        "Fuglen's 0:50 pour to 80g and 1:00 center pour to 250g are distinct from Kurasu's 0:40 aggressive pour to 60g and 1:10 final pour to 200g.",
+        "Fuglen's 0:50 pour to 80g and 1:00 center pour to 250g are preserved as source-specific timings; timing and ratio differences alone are not counted as a distinct family.",
         "The source gives a 2:00–2:30 finish range, not a single finish timestamp; no pour durations or grind setting are invented."
+      ]
+    },
+    {
+      "id": "foundation-wave-155",
+      "url": "https://www.foundationroasters.co.uk/brew-guides/blog-post-title-one-tdwes",
+      "locator": "How to brew Kalita wave; Equipment; Method steps 1–6; FAQs on filters and size",
+      "assertions": {
+        "equipment.brewer": "kalita",
+        "equipment.size": "155",
+        "equipment.model": "Wave",
+        "equipment.filter": "wave-155",
+        "mode": "hot",
+        "coffeeGrams": 16,
+        "water.brewGrams": 260,
+        "temperature.value": 94,
+        "temperature.unit": "C",
+        "grind.description": "Medium grind",
+        "clock.origin": "first-water",
+        "stages.0.trigger.type": "elapsed",
+        "stages.0.trigger.seconds": 0,
+        "stages.0.waterToGrams": 32,
+        "stages.1.trigger.seconds": 30,
+        "stages.1.waterToGrams": 260,
+        "stages.2.kind": "finish",
+        "stages.2.trigger.type": "condition",
+        "finish.minSeconds": 160,
+        "finish.maxSeconds": 160,
+        "admission.status": "ready"
+      },
+      "expectedReadiness": {
+        "sourceValid": true,
+        "admitted": true,
+        "guided": true,
+        "timerReady": true
+      },
+      "requiredBoundaries": [
+        "The primary Foundation guide explicitly uses a Kalita Wave 155 and says to use Kalita Wave filters; manufacturer context confirms the native 155 filter pairing.",
+        "Foundation uses one gradual main-pour step after the 30-second bloom, unlike Kurasu's separate aggressive second pour and later stationary-center pour; the source does not specify the main-pour geometry or whether the stream is uninterrupted, so this record is not used as the pulse-family proof.",
+        "The source's 2:40 figure is an aim with grind-adjustment guidance, so the projection keeps a target rather than claiming a narrower finish range or a pour duration not published."
+      ]
+    },
+    {
+      "id": "art-of-brew-wave-155-pulse-2024",
+      "url": "https://www.youtube.com/watch?v=VTlI3SmlYSQ",
+      "locator": "Video description; Brewing Method; Coffee; grinder; filter; total brew weight",
+      "assertions": {
+        "equipment.brewer": "kalita",
+        "equipment.size": "155",
+        "equipment.model": "Wave",
+        "equipment.filter": "wave-155",
+        "equipment.material": "stainless steel",
+        "mode": "hot",
+        "coffeeGrams": 12.5,
+        "water.brewGrams": 200,
+        "temperature": null,
+        "grind.description": "Medium",
+        "grind.native": {
+          "grinder": "1ZPresso K-Plus",
+          "setting": "70 clicks"
+        },
+        "clock.origin": "first-water",
+        "stages.0.trigger.type": "elapsed",
+        "stages.0.trigger.seconds": 0,
+        "stages.0.durationSeconds": 30,
+        "stages.0.waterToGrams": 37.5,
+        "stages.1.trigger.seconds": 30,
+        "stages.1.durationSeconds": 10,
+        "stages.1.waterToGrams": 75,
+        "stages.2.trigger.seconds": 50,
+        "stages.2.durationSeconds": 10,
+        "stages.2.waterToGrams": 100,
+        "stages.3.trigger.seconds": 70,
+        "stages.3.durationSeconds": 10,
+        "stages.3.waterToGrams": 125,
+        "stages.4.trigger.seconds": 90,
+        "stages.4.durationSeconds": 10,
+        "stages.4.waterToGrams": 150,
+        "stages.5.trigger.seconds": 110,
+        "stages.5.durationSeconds": 15,
+        "stages.5.waterToGrams": 200,
+        "finish": null,
+        "admission.status": "ready"
+      },
+      "expectedReadiness": {
+        "sourceValid": true,
+        "admitted": true,
+        "guided": true,
+        "timerReady": true
+      },
+      "requiredBoundaries": [
+        "The primary Art of Brew video description names a Kalita Wave 155 stainless-steel brewer and Kalita 155 filters; manufacturer context verifies the native Wave 155 filter pairing.",
+        "The description gives a bloom, first pour, three named pulses and a final pour at exact source intervals; the six-phase pulse structure is the meaningful family distinction from Kurasu's three-stage wetting/centre schedule, not dose or temperature variation alone.",
+        "The description lists per-phase additions totaling 200g; cumulative typed checkpoints are mechanically summed for the source contract and preserve the source's native gram unit.",
+        "The source prints 88° without a temperature unit and does not publish a drain-finish endpoint after the final 2:05 pour; both remain unknown rather than being inferred."
       ]
     },
     {

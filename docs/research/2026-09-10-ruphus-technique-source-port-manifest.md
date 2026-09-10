@@ -1,12 +1,12 @@
 # Ruphus technique source-port manifest
 
-Checked 2026-09-10 against source-foundation commit `9f1b547` (`codex/manual-brew-source-foundation`). This is the bounded U2 source-contract port for Kalita, Switch and classic V60 records. It is a source-fidelity and readiness manifest, not evidence of a physical brew, sensory quality, or a live-provider/device run.
+Checked 2026-09-10 against source-foundation commit `9f1b547` (`codex/manual-brew-source-foundation`). This is the bounded U2/U3 source-contract port for Kalita, Switch and classic V60 records. It is a source-fidelity and readiness manifest, not evidence of a physical brew, sensory quality, or a live-provider/device run.
 
 ## Ported closure
 
 | Path | Role | Provenance and boundary |
 |---|---|---|
-| `src/data/manualSources/kalita.js` | 13 scoped Kalita records | Baseline ported from source-foundation `9f1b547`; U3 adds the independently verified Fuglen original. Includes Kurasu/Vibrant/Fuglen/Drop 155, Drop/Onyx/Ozone 185, existing iced records, and the explicit Ozone 155 proportional adapter. |
+| `src/data/manualSources/kalita.js` | 15 scoped Kalita records | Baseline ported from source-foundation `9f1b547`; U3 adds the independently verified Fuglen, Foundation and Art of Brew originals. Includes Kurasu/Vibrant/Fuglen/Foundation/Art of Brew/Drop 155, Drop/Onyx/Ozone 185, existing iced records, and the explicit Ozone 155 proportional adapter. |
 | `src/data/manualSources/switch.js` | 8 scoped Switch records | Ported from source-foundation `9f1b547`; includes the HARIO/Matt Winton Switch 03 hybrid, the official HARIO SSD-360 Switch 03 immersion manual, unresolved-size Kurasu leads, 02 references, and corrected HARIO/Partners revision 2. |
 | `src/data/manualSources/v60.js` | 10 scoped classic V60 records | Ported from source-foundation `9f1b547`; no Switch/MUGEN records are reclassified as classic V60. |
 | `src/lib/manualRecipeContract.js` | Pure structural source-record validation and immutable source freezing | Selective port from `9f1b547`; no registry, persistence, UI, or legacy recipe conversion. |
@@ -20,11 +20,11 @@ The pure closure intentionally excludes `manualBrewSourceRegistry.js`, `manualSo
 
 ## Inventory and readiness
 
-The port contains 31 records: 13 Kalita, 8 Switch and 10 classic V60. Thirteen records have `admission.status: "ready"`; twelve are timer-ready after the independent timed-guidance check. A source-admitted record with a condition-based intermediate step is retained as a readable reference and is not included in the timer-ready list.
+The port contains 33 records: 15 Kalita, 8 Switch and 10 classic V60. Fifteen records have `admission.status: "ready"`; fourteen are timer-ready after the independent timed-guidance check. A source-admitted record with a condition-based intermediate step is retained as a readable reference and is not included in the timer-ready list.
 
 | Exact configuration reviewed | Records in scoped inventory | Source-admitted | Timer-ready | Current boundary |
 |---|---:|---:|---:|---|
-| Kalita Wave 155, hot | 5 | 3 | 2 | Kurasu and Fuglen are executable, meaningfully distinct timed schedules; Vibrant remains observation-only at the last pour; Drop lacks a confirmed clock; Ozone 155 is an explicit proportional starting point without 155 timing. |
+| Kalita Wave 155, hot | 7 | 5 | 4 | Kurasu, Foundation, Fuglen and Art of Brew are executable source schedules. Kurasu and Art of Brew are the two evidenced families: Art of Brew has six timed pulse phases, while Kurasu has a three-stage wetting/centre schedule. Fuglen is retained but its small-bloom/second-wetting/center-finish structure is not counted as a distinct family from Kurasu; Foundation's single gradual main-pour step remains source-ready but its geometry is unspecified and is not used as the pulse-family proof; Vibrant remains observation-only; Drop lacks a confirmed clock; Ozone 155 is an explicit proportional starting point without 155 timing. |
 | Kalita Wave 185, hot | 4 | 3 | 3 | Onyx Monarch, Onyx EU La Soledad/Sidra and Ozone 185 have timed schedules; Drop remains a clock-gap reference. |
 | Kalita Wave 155, iced | 2 | 2 | 2 | Kurasu is after-brew chilling; Yamatoya is a 155 server-ice route; these are not collapsed into hot recipes. |
 | Kalita Wave 185, iced | 3 | 2 | 2 | Kurasu and Little Waves are timed; Espresso Parts remains research-only. |
@@ -37,7 +37,9 @@ The port contains 31 records: 13 Kalita, 8 Switch and 10 classic V60. Thirteen r
 ### Kalita
 
 - Kurasu Wave 155 retains 14g coffee, 200g brew water, 92°C, first-water clock, 30g/60g/200g cumulative checkpoints at 0:00/0:40/1:10, and a 2:05–2:15 finish range.
-- Fuglen’s primary guide explicitly names Kalita Wave 155 and retains 15g coffee, 250g water, 92°C, 40g at 0:00, 80g at 0:50, one center-stream pour to 250g at 1:00, and a 2:00–2:30 finish range. Its 0:50/80g then 1:00/250g schedule is a distinct second 155 family from Kurasu’s aggressive 0:40/60g and 1:10/200g pattern; no V60 or 185 schedule is transferred.
+- Fuglen’s primary guide explicitly names Kalita Wave 155 and retains 15g coffee, 250g water, 92°C, 40g at 0:00, 80g at 0:50, one center-stream pour to 250g at 1:00, and a 2:00–2:30 finish range. Its source-specific timings are preserved, but its small-bloom/second-wetting/center-finish structure is not counted as a distinct family from Kurasu; no V60 or 185 schedule is transferred.
+- Foundation’s primary guide explicitly uses a Kalita Wave 155 and retains 16g coffee, 260g water, approximately 94°C, a 32g bloom at 0:00 with a 30-second wait, then one gradual main-pour step to 260g from 0:30, aiming for 2:40 total. The source does not specify whether that stream is uninterrupted, its geometry or its pour duration; the record stays executable because its only non-final cue is timed, but it is not used as the pulse-family proof.
+- Art of Brew’s primary video description names the Kalita Wave 155 stainless-steel brewer and Kalita 155 filters, and retains 12.5g coffee, 200g water, first-water clock, 1ZPresso K-Plus at 70 clicks (medium), and six timed phases: 37.5g bloom from 0:00–0:30, 37.5g first pour from 0:30–0:40, 25g pulse 1 from 0:50–1:00, 25g pulse 2 from 1:10–1:20, 25g pulse 3 from 1:30–1:40, and 50g final pour from 1:50–2:05. The description prints 88° without a unit and does not publish a drain-finish endpoint; both remain unknown. The repeated six-phase pulse structure is the meaningful family distinction from Kurasu’s three-stage wetting/centre schedule, not dose or temperature variation alone. Cumulative typed checkpoints mechanically sum the source’s per-phase additions and preserve grams.
 - Ozone Wave 185 retains 25g, 400g, 93°C, medium filter grind, 50g/160g/220g/280g/340g/400g checkpoints at 0:00/0:30/0:45/1:00/1:15/1:45, and its approximately 3:00 finish is represented as a 180-second finish target.
 - Ozone’s page gives an approximately 15g/240g smaller Wave FAQ starting point but does not publish a 155 timing schedule. `ozone-wave-155-scaled-from-185-2026` therefore has no clock, is `research-only`, and records the 185-to-155 quantity choice as an explicit adapter. No 185 checkpoint is silently presented as a 155 timer anchor.
 - Vibrant’s final pour remains a water-level condition. The record is admitted as source material but `manualGuidanceReadiness` blocks guided execution; no invented seconds are added.
@@ -91,6 +93,8 @@ Remaining factual blockers are intentionally visible:
 - [Kurasu Kalita Wave 2023](https://kurasu.kyoto/blogs/kurasu-journal/how-to-brew-with-kalita-wave-2023)
 - [Ozone Kalita Wave guide](https://ozonecoffee.co.uk/pages/kalita-wave-brew-guide)
 - [Fuglen Kalita Wave brew guide](https://fuglen.cafe24.com/sub/brew.html/brew.html)
+- [Foundation Coffee Roasters Kalita Wave guide](https://www.foundationroasters.co.uk/brew-guides/blog-post-title-one-tdwes)
+- [Art of Brew Kalita Wave 155 Pulse Recipe](https://www.youtube.com/watch?v=VTlI3SmlYSQ)
 - [Kalita Wave 155 filter compatibility](https://kalitausa.com/products/kalita-wave-155-filter-100ct)
 - [HARIO V60 Switch 03 product page](https://www.hario.co.uk/collections/hario-v60-immersion-drippers/products/hario-v60-switch-immersion-dripper-size-03)
 - [HARIO SSD-360 instruction manual](https://www.hario.com/product/SSD-360.pdf)
