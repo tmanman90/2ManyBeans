@@ -13,14 +13,16 @@ const uid = 'ruphus-recipe-first-fixture';
 const proposalId = 'changed-ratio-fixture';
 const bean = { id: 'fixture-coffee', name: 'Changed Ratio Coffee' };
 const techniqueMode = new URLSearchParams(window.location.search).has('technique');
+const runtimeTurn = window.__ruphusTechniqueTurn;
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
 const proposed = selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 });
-const artifact = { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
+const artifact = runtimeTurn?.frames?.find(frame => frame.type === 'artifact_ready')?.artifact || { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
 
 function Fixture() {
+  const [sent, setSent] = useState(!runtimeTurn);
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   const [previewStale, setPreviewStale] = useState(false);
@@ -41,7 +43,12 @@ function Fixture() {
   };
   return <UserPreferencesProvider value={{ preferences: { grinder: 'fellow-ode-gen2' }, updatePreferences: async () => {} }}>
     <main data-preview-fixture="true" style={{ minHeight: '100vh', padding: 20, background: '#F5EEE6' }}>
-      <RecipeProposalCard proposal={artifact} onPreview={openPreview} />
+      {runtimeTurn && <section aria-label="Technique conversation">
+        <p>{runtimeTurn.userText}</p>
+        {!sent && <button type="button" onClick={() => setSent(true)} style={{ minHeight: 44 }}>Send technique request</button>}
+        {sent && <p data-runtime-reply>{runtimeTurn.frames.filter(frame => frame.type === 'text_delta').map(frame => frame.text).join('')}</p>}
+      </section>}
+      {sent && <RecipeProposalCard proposal={artifact} onPreview={openPreview} />}
       <div style={{ display: 'none' }} aria-hidden="true">
         <button type="button" data-reset onClick={() => { clearRecipePreviewDraft({ uid, proposalId }); setPreview(null); setStartCount(0); setSaveCount(0); }}>Reset fixture</button>
         <output data-start-count>{startCount}</output><output data-save-count>{saveCount}</output>

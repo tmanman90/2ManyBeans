@@ -8,7 +8,7 @@ Authority: `docs/plans/2026-09-10-001-feat-ruphus-technique-exploration-plan.md`
 
 | Journey | Required observation | Evidence |
 |---|---|---|
-| First technique request | One named response and one compact card without another user message | Pending |
+| First technique request | One named response and one compact card without another user message | Deterministic runtime and rendered component passed; live/native pending |
 | Another / compare / first again | Distinct eligible family; comparison creates no duplicate; historical selection does not reactivate stale action | Pending |
 | Kalita155 and185 | Source-faithful named options; no implicit size change | Pending |
 | Switch03 | Hybrid and immersion remain distinct; valve instructions and phase capacity survive preview and execution | Pending |
@@ -20,8 +20,9 @@ Authority: `docs/plans/2026-09-10-001-feat-ruphus-technique-exploration-plan.md`
 ## Evidence boundaries
 
 - Source fidelity: root independently ran `node --test scripts/ruphus-technique-source-fidelity.test.mjs` at integrated source commit `1ee5bfa`: 8/8 pass. This proves the port's scoped fixtures, not selectable runtime coverage or completed U2.
-- Same-turn runtime: root ran current U1 work-in-progress `node --test scripts/ruphus-technique-conversation.test.mjs`: 8/8 pass, including structured-only selection, negated/comparison prose, cancellation and domain recovery. Final-commit compatibility and rendered U1 evidence remain pending.
-- Rendered browser: pending current implementation.
+- Same-turn runtime: root ran the conversation, U2 runtime, endpoint and conversation-contract suites at `ba94722`: 83/83 pass, including structured-only selection, negated/comparison prose, cancellation and domain recovery.
+- Rendered browser: `node scripts/verify-ruphus-recipe-first-ui.mjs` passed. Existing preview dose/start/no-save flow and one-request runtime-frame-to-card rendering passed with no writes or page errors. Root visually inspected `/tmp/ruphus-same-turn-technique-mobile.png`; the named card and View recipe control are readable. This fixture proves actual runtime output rendered by the card component, not full ChatTab, live provider, or native acceptance. Verifier lint passed; JSX fixture is not covered by the repository ESLint configuration and was compiled by the rendered harness.
+- Source timer core: root independently ran `scripts/ruphus-source-timer.test.mjs` after `cf64f0c`: 6/6 pass. UI and durable outbox integration remain pending.
 - Live provider: not run. Authoritative original-worktree ledger read at setup: spent $48.035805, reserved $0, cumulative authorization $55. Re-read before paid dispatch; copied ledgers are not authoritative.
 - Native: read-only XcodeBuildMCP inventory sees booted iPhone17Pro simulator `7EC6BF90-33B7-4B1A-A651-464B4AC9AA9E`. No install, launch, login verification or app interaction performed for this plan yet. Coordinate shared simulator before use.
 - Phone, production and physical brew: not touched; not prerequisites for the authorized simulator journeys.

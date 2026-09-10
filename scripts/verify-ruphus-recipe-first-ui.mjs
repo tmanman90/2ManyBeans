@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { chromium } from 'playwright';
+import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 
 const firebaseEnv = {
   VITE_FIREBASE_API_KEY: 'ruphus-harness-not-a-key',
@@ -54,16 +57,7 @@ try {
     await page.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
     await page.waitForTimeout(1000);
     await page.setViewportSize({ width: 390, height: 1200 });
-    await page.evaluate(() => {
-      const body = [...document.querySelectorAll('div')]
-        .filter((element) => (
-          element.scrollHeight > element.clientHeight
-          && ['auto', 'scroll'].includes(getComputedStyle(element).overflowY)
-        ))
-        .sort((left, right) => (right.scrollHeight - right.clientHeight) - (left.scrollHeight - left.clientHeight))[0];
-      if (!body) throw new Error('Could not locate the scrollable recipe body');
-      body.scrollTop = body.scrollHeight;
-    });
+    await page.getByRole('button', { name: 'Start brew timer', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: screenshots.mobile, fullPage: false });
     await page.getByRole('button', { name: 'Start brew timer', exact: true }).click();
     assert.equal(await page.locator('[data-start-count]').innerText(), '1');
@@ -80,16 +74,7 @@ try {
     await errorPage.getByRole('button', { name: 'View recipe', exact: true }).click();
     await errorPage.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
     await errorPage.waitForTimeout(1000);
-    await errorPage.evaluate(() => {
-      const body = [...document.querySelectorAll('div')]
-        .filter((element) => (
-          element.scrollHeight > element.clientHeight
-          && ['auto', 'scroll'].includes(getComputedStyle(element).overflowY)
-        ))
-        .sort((left, right) => (right.scrollHeight - right.clientHeight) - (left.scrollHeight - left.clientHeight))[0];
-      if (!body) throw new Error('Could not locate the scrollable recipe body');
-      body.scrollTop = body.scrollHeight;
-    });
+    await errorPage.getByRole('button', { name: 'Start brew timer', exact: true }).scrollIntoViewIfNeeded();
     const startButton = errorPage.getByRole('button', { name: 'Start brew timer', exact: true });
     const saveButton = errorPage.getByRole('button', { name: 'Save recipe', exact: true });
     const startBeforeError = await startButton.boundingBox();
@@ -121,6 +106,42 @@ try {
     assert.equal(await techniquePage.locator('[data-start-count]').innerText(), '0');
     assert.equal(await techniquePage.locator('[data-save-count]').innerText(), '0');
     await techniquePage.close();
+    // Real deterministic orchestration output rendered through the actual card:
+    // provider transport is injected; no live model or account is involved.
+    const userText = 'What’s an interesting different V60 technique to try with Jar #1?';
+    const turnContext = {
+      userText, conversation: [], sessionId: 'rendered-technique-turn',
+      rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'Jar #1 coffee', recipes: ['v60_hot'] }], refs: { c1: 'fixture-coffee' } },
+      __ruphusRefs: { c1: 'fixture-coffee' },
+      proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false },
+    };
+    const tools = createRuphusTools({ uid: 'rendered-fixture', context: turnContext, readers: { readRecipe: async () => generateV60Recipe({}, { dose: 20 }) } });
+    const frames = [];
+    let calls = 0;
+    const turn = await runRuphusTurn({ turnId: 'rendered-technique', context: turnContext, userText, tools, emit: frame => frames.push(frame), provider: { runTurn: async ({ toolResult }) => {
+      calls += 1;
+      if (calls === 1) return { toolCalls: [{ callId: 'read', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      if (calls === 2) return { text: 'Here is a different approach for your coffee.' };
+      const option = toolResult.results.find(item => item.name === 'read_technique_options').result.options[0];
+      return { toolCalls: [{ callId: 'prepare', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', change: null, experiment: { kind: 'v60_technique', techniqueId: option.id } } }] };
+    } } });
+    assert.equal(turn.ok, true);
+    assert.equal(turn.artifacts.length, 1);
+    const runtimePage = await context.newPage();
+    runtimePage.on('pageerror', error => errors.push(error.message));
+    runtimePage.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await runtimePage.addInitScript(data => { window.__ruphusTechniqueTurn = data; }, { userText, frames });
+    await runtimePage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?technique=1`, { waitUntil: 'domcontentloaded' });
+    assert.equal(await runtimePage.locator('[data-artifact="recipe_proposal"]').count(), 0);
+    await runtimePage.getByRole('button', { name: 'Send technique request', exact: true }).click();
+    await runtimePage.getByRole('button', { name: 'View recipe', exact: true }).waitFor();
+    assert.equal(await runtimePage.locator('[data-artifact="recipe_proposal"]').count(), 1);
+    assert.ok((await runtimePage.locator('[data-runtime-reply]').innerText()).trim());
+    assert.equal(await runtimePage.locator('vite-error-overlay').count(), 0);
+    await runtimePage.screenshot({ path: '/tmp/ruphus-same-turn-technique-mobile.png' });
+    assert.deepEqual(errors, []);
+    console.log('Same-turn deterministic response renders one native recipe card after one user request; live provider/native app not claimed.');
+    await runtimePage.close();
     await context.close();
   } finally { await browser.close(); }
 } finally {
