@@ -20,6 +20,87 @@ const baseContext = (userText = 'Show me a different V60 technique.') => ({
 
 const standardRecipe = () => generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
 
+for (const optionsFinishFirst of [true, false]) {
+  test(`parallel exact recipe and technique reads preserve options (options first: ${optionsFinishFirst})`, async () => {
+    const context = baseContext('What’s an interesting different V60 technique to try with Jar #1?');
+    context.conversation = [{ role: 'assistant', content: 'Your Kalita ratio preview is ready. Your saved recipe is unchanged.' }];
+    const recipe = standardRecipe();
+    let release;
+    const delayed = new Promise(resolve => { release = resolve; });
+    let reads = 0;
+    const tools = createRuphusTools({ uid: 'owner-1', context, readers: {
+      readRecipe: async () => { if (++reads === 2) await delayed; return recipe; },
+    } });
+    const firstName = optionsFinishFirst ? 'read_technique_options' : 'read_recipe';
+    const secondName = optionsFinishFirst ? 'read_recipe' : 'read_technique_options';
+    const first = tools.call(firstName, { coffeeRef: 'c1', slot: 'v60_hot' });
+    const second = tools.call(secondName, { coffeeRef: 'c1', slot: 'v60_hot' });
+    const firstResult = await first;
+    release();
+    const secondResult = await second;
+    const options = optionsFinishFirst ? firstResult : secondResult;
+    const proposal = await tools.call('propose_recipe_change', {
+      coffeeRef: 'c1', slot: 'v60_hot', change: null,
+      experiment: { kind: 'v60_technique', techniqueId: options.options[0].id },
+    });
+    assert.equal(proposal.ok, true, proposal.code);
+    assert.equal(proposal.artifact.slotKey, 'v60_hot');
+    assert.equal(proposal.artifact.techniqueExperiment.techniqueId, options.options[0].id);
+  });
+}
+
+test('an exact recipe refresh with changed source invalidates earlier technique options', async () => {
+  const context = baseContext();
+  let recipe = standardRecipe();
+  const tools = createRuphusTools({ uid: 'owner-1', context, readers: { readRecipe: async () => recipe } });
+  const options = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
+  recipe = generateV60Recipe({}, { dose: 25, grinder: 'fellow-ode-gen2' });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const proposal = await tools.call('propose_recipe_change', {
+    coffeeRef: 'c1', slot: 'v60_hot', change: null,
+    experiment: { kind: 'v60_technique', techniqueId: options.options[0].id },
+  });
+  assert.equal(proposal.ok, false);
+  assert.equal(proposal.code, 'technique_option_required');
+});
+
+test('Kalita preview followed by parallel V60 reads completes with a named card, not a round-limit error', async () => {
+  const context = baseContext('What’s an interesting different V60 technique to try with Jar #1?');
+  context.conversation = [{ role: 'assistant', content: 'Kalita ratio 1:16.5 → 1:15.4. View recipe. Your saved recipe is unchanged.' }];
+  const tools = { ...createRuphusTools({ uid: 'owner-1', context, readers: { readRecipe: async () => standardRecipe() } }) };
+  let release;
+  const optionReadDone = new Promise(resolve => { release = resolve; });
+  const call = tools.call;
+  tools.call = async (name, args) => {
+    if (name === 'read_recipe') await optionReadDone;
+    const result = await call(name, args);
+    if (name === 'read_technique_options') release();
+    return result;
+  };
+  let rounds = 0;
+  const frames = [];
+  const result = await runRuphusTurn({ turnId: 'kalita-to-v60', context, userText: context.userText, tools,
+    emit: frame => frames.push(frame),
+    provider: { runTurn: async ({ toolResult }) => {
+      rounds++;
+      if (rounds === 1) return { toolCalls: [
+        { callId: 'recipe', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'v60_hot' } },
+        { callId: 'options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } },
+      ] };
+      assert.equal(rounds, 2, 'successful reads should lead directly to a proposal');
+      const option = toolResult.results.find(item => item.name === 'read_technique_options').result.options[0];
+      return { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: {
+        coffeeRef: 'c1', slot: 'v60_hot', change: null, experiment: { kind: 'v60_technique', techniqueId: option.id },
+      } }] };
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].slotKey, 'v60_hot');
+  assert.ok(result.artifacts[0].after.techniqueLabel);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+
 test('a one-word answer to the active sensory clarifier earns readiness only with grounded evidence', () => {
   const grounded = { version: 1, entries: [{ kind: 'evidence_read', status: 'available' }] };
   assert.deepEqual(deriveProposalReadiness({ conversation: [{ role: 'assistant', content: 'Was it thin but sweet or sour/sharp?' }], ledger: grounded, userText: 'Thin' }), { diagnosisReady: true, userAgreed: true });

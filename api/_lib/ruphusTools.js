@@ -269,6 +269,18 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
   const snapshot = context.__ruphusServerSnapshot || context.rotationSnapshot || { coffees: [], refs: {} };
   const refs = context.__ruphusRefs ? { ...context.__ruphusRefs } : { ...(snapshot.refs || {}) };
   const resolveId = (coffeeRef) => refs[coffeeRef] || null;
+  const rememberTarget = (target) => {
+    const key = `${target.coffeeRef}:${target.slotKey}`;
+    const previous = context.__ruphusResolvedTargets.get(key);
+    // Independent reads can complete in either order. Preserve enrichment
+    // only for the identical owner-bound recipe snapshot, never across drift.
+    const sameSource = previous?.coffeeId === target.coffeeId && previous?.sourceHash === target.sourceHash;
+    context.__ruphusResolvedTargets.set(key, {
+      ...target,
+      ...(sameSource && previous.techniqueOptions && !target.techniqueOptions
+        ? { techniqueOptions: previous.techniqueOptions } : {}),
+    });
+  };
   const list = async () => {
     const coffees = typeof readers.listCoffees === 'function' ? await readers.listCoffees({ uid }) : snapshot.coffees || [];
     return Array.isArray(coffees) ? coffees : [];
@@ -366,7 +378,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const target = method?.slot ? evidence.recipe?.records?.find((item) => recipeSlotKey(item) === method.slot) : null;
       if (target && context.__ruphusResolvedTargets instanceof Map) {
         const slotKey = recipeSlotKey(target);
-        context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(target), sourceHash: recipeSourceHash(target, slotKey) });
+        rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(target), sourceHash: recipeSourceHash(target, slotKey) });
         if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
         setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe: target, techniqueRequest: techniqueRequestReady(context.userText) });
       }
@@ -393,7 +405,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         offeredIds: options.flatMap((option) => [option.id, option.familyId, option.sourceId]),
         selectedIds: prior?.selectedIds || [],
       });
-      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(key, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
+      rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
       setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, techniqueRequest: true });
       return { ok: true, actionable: true, coffeeRef: args.coffeeRef, slot: slotKey, current: { technique: recipe.technique || null, sourceLineage: clone(recipe.sourceLineage || null) }, options };
     }
@@ -418,7 +430,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
       if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
-      if (context.__ruphusResolvedTargets instanceof Map) context.__ruphusResolvedTargets.set(`${args.coffeeRef}:${slotKey}`, { coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
+      rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
       if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe });
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipe.water ?? recipe.waterGrams ?? '?'}g water.`, recipe: modelRecipe(recipe) };
