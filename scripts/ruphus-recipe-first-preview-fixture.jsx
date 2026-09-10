@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '../src/styles/global.css';
 import { UserPreferencesProvider } from '../src/hooks/useUserProfile.jsx';
 import { ArtifactRenderer } from '../src/components/chat/ArtifactRenderer.jsx';
+import { HistoricalRecipeInspector } from '../src/tabs/ChatTab.jsx';
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
@@ -51,7 +52,7 @@ function Fixture() {
         {sent && <p data-runtime-reply>{runtimeTurn.frames.filter(frame => frame.type === 'text_delta').map(frame => frame.text).join('')}</p>}
       </section>}
       {sent && <ArtifactRenderer artifact={historical ? { ...artifact, status: 'superseded' } : artifact} onPreview={openPreview} onInspect={item => setInspectedId(item.id)} />}
-      {inspectedId && <p data-inspected-id={inspectedId}>Viewing the historical recipe. No changes made.</p>}
+      {inspectedId && <div data-inspected-id={inspectedId}><HistoricalRecipeInspector proposal={artifact} onClose={() => setInspectedId(null)} /></div>}
       <div style={{ display: 'none' }} aria-hidden="true">
         <button type="button" data-reset onClick={() => { clearRecipePreviewDraft({ uid, proposalId }); setPreview(null); setStartCount(0); setSaveCount(0); }}>Reset fixture</button>
         <output data-start-count>{startCount}</output><output data-save-count>{saveCount}</output>

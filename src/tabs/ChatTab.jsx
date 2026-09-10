@@ -222,7 +222,7 @@ const historicalWater = (recipe = {}) => {
 const historicalStageTime = (stage = {}) => {
   if (typeof stage.time === 'string' && stage.time.trim()) return stage.time;
   if (stage.trigger?.type === 'elapsed' && Number.isFinite(stage.trigger.seconds)) return `At ${stage.trigger.seconds}s`;
-  if (stage.trigger?.type === 'after' && typeof stage.trigger.event === 'string') return `After ${stage.trigger.event}`;
+  if (stage.trigger?.type === 'after' && typeof stage.trigger.event === 'string') return `${Number.isFinite(stage.trigger.seconds) ? `${stage.trigger.seconds}s after` : 'After'} ${stage.trigger.event.replace(/:complete$/, ' finished').replace(/[-_]/g, ' ')}`;
   if (stage.trigger?.type === 'condition' && typeof stage.trigger.condition === 'string') return `When ${stage.trigger.condition}`;
   if (stage.trigger?.type === 'manual') return 'When ready';
   return null;
@@ -245,7 +245,7 @@ const historicalStageWater = (stage = {}) => {
   return null;
 };
 
-function HistoricalRecipeInspector({ proposal, onClose }) {
+export function HistoricalRecipeInspector({ proposal, onClose }) {
   if (!proposal?.after) return null;
   const recipe = proposal.after;
   const projection = recipe.sourceProjection || {};
@@ -270,11 +270,13 @@ function HistoricalRecipeInspector({ proposal, onClose }) {
       </div>
       {stages.length > 0 && (
         <ol style={{ margin: '8px 0 14px', paddingLeft: 22, color: C.text }}>
-          {stages.slice(0, 12).map((stage, index) => (
+          {stages.map((stage, index) => (
             <li key={stage.id || index} style={{ padding: '6px 0', lineHeight: 1.45 }}>
               {historicalStageTime(stage) && <span style={{ color: C.textMuted }}>{historicalStageTime(stage)} — </span>}
               {historicalStageText(stage)}
               {historicalStageWater(stage) && <span style={{ color: C.textMuted }}> · {historicalStageWater(stage)}</span>}
+              {Number.isFinite(stage.durationSeconds) && <span style={{ color: C.textMuted }}> · over {stage.durationSeconds}s</span>}
+              {stage.valve && <span style={{ color: C.textMuted }}> · Valve {stage.valve}</span>}
             </li>
           ))}
         </ol>
@@ -540,6 +542,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [recipePreviewError, setRecipePreviewError] = useState(null);
   const [recipePreviewStale, setRecipePreviewStale] = useState(false);
   const [historicalProposal, setHistoricalProposal] = useState(null);
+  const historicalOriginRef = useRef(null);
   const handleRuphusAction = useCallback(async (request) => {
     if (!mutationEnabled) return null;
     try { return await runRuphusAction(request); } catch (error) {
@@ -721,10 +724,15 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   // generic recipe-preview regeneration or command path.
   const handleHistoricalProposalInspect = useCallback((artifact) => {
     if (!artifact || artifact.type !== 'recipe_proposal' || !artifact.after) return;
+    historicalOriginRef.current = document.activeElement;
     setHistoricalProposal({ ...artifact, before: artifact.before ? { ...artifact.before } : artifact.before, after: { ...artifact.after } });
   }, []);
 
-  const closeHistoricalProposal = useCallback(() => setHistoricalProposal(null), []);
+  const closeHistoricalProposal = useCallback(() => {
+    setHistoricalProposal(null);
+    const origin = historicalOriginRef.current;
+    requestAnimationFrame(() => { if (origin?.isConnected) origin.focus(); });
+  }, []);
 
   useEffect(() => {
     if (!historicalProposal) return;
