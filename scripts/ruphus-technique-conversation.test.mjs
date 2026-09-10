@@ -28,6 +28,38 @@ function optionFrom(toolResult) {
   return toolResult?.results?.find((item) => item.name === 'read_technique_options')?.result?.options?.[0] || null;
 }
 
+test('expanded and contracted recommendation questions prepare a same-turn card', async () => {
+  const userText = 'What is an interesting different technique for jar one with the v60?';
+  assert.equal(isTechniqueExplorationRequest(userText), true);
+  assert.equal(isTechniqueExplorationRequest("What's an interesting different technique for jar one with the v60?"), true);
+  const context = contextFor(userText);
+  const tools = toolsFor(context);
+  const frames = [];
+  let providerCalls = 0;
+  let selected;
+  const result = await runRuphusTurn({
+    turnId: 'technique-live-prompt-card', context, userText, tools, emit: (frame) => frames.push(frame),
+    provider: { runTurn: async ({ toolResult }) => {
+      providerCalls += 1;
+      if (providerCalls === 1) return { toolCalls: [{ callId: 'options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      if (providerCalls === 2) {
+        selected = optionFrom(toolResult);
+        return { text: `Try ${selected.name} for a distinct pour cadence.`, toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: {
+          coffeeRef: 'c1', slot: 'v60_hot', change: null,
+          experiment: { kind: 'v60_technique', techniqueId: selected.id },
+        } }] };
+      }
+      return { text: 'I can prepare one exact source-backed option after the technique is selected.' };
+    } },
+  });
+
+  assert.equal(providerCalls, 2);
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].techniqueExperiment.name, selected.name);
+  assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1);
+});
+
 test('explicit V60 exploration turns one exact structured selection into a native card in the same turn', async () => {
   const userText = 'What’s an interesting V60 technique for Jar #1?';
   assert.equal(isTechniqueExplorationRequest(userText), true);

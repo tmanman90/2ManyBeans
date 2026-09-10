@@ -17,7 +17,11 @@ export function isTechniqueExplorationRequest(value = '') {
   const action = /\b(?:try|use|brew|prepare|make|test|show|give|recommend|suggest|explore|switch|choose|pick)\b/i.test(text);
   const alternative = /\b(?:different|another|alternative|new|interesting)\b/i.test(text);
   const informational = /^(?:how\s+(?:does|do|can|would|to)\b|what\s+(?:is|are)\b|tell\s+me\s+about\b|explain\b|compare\b|what's\s+the\s+difference\b)/i.test(text);
-  if (informational && !action) return false;
+  // Expanded "what is" wording can be a recommendation request when it
+  // names an interesting/alternative method for a concrete brewer or coffee.
+  // Keep standalone explanations and comparisons informational-only.
+  const recommendationQuestion = /^what\s+(?:is|are)\b[\s\S]*\b(?:interesting|different|another|alternative|new)\b[\s\S]*\b(?:technique|method)\b[\s\S]*\b(?:for|with|to)\b/i.test(text);
+  if (informational && !action && !recommendationQuestion) return false;
   return action || alternative;
 }
 
