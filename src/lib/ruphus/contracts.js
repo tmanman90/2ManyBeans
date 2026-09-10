@@ -1,4 +1,5 @@
 import { validateLaunchContext, LAUNCH_SURFACES, LAUNCH_ITEM_KINDS, RECIPE_SLOTS } from './conversationContract.js';
+import { MANUAL_SOURCE_PROJECTION_VERSION, validateManualSourceProjection } from '../manualSourceProjection.js';
 
 // Browser/server-neutral contracts for the Agent v3 boundary.  This module is
 // intentionally free of Firebase, React, provider SDKs, and evaluator code.
@@ -102,9 +103,75 @@ export function validateContextRef(value) {
 
 export { validateLaunchContext, LAUNCH_SURFACES, LAUNCH_ITEM_KINDS, RECIPE_SLOTS };
 
+export function isManualSourceRecipe(value) {
+  return object(value) && object(value.sourceProjection)
+    && value.sourceProjection.projectionVersion === MANUAL_SOURCE_PROJECTION_VERSION;
+}
+
+export function hasManualSourceProjection(value) {
+  return object(value) && object(value.sourceProjection);
+}
+
+function sourceWaterFromExecution(execution) {
+  const water = execution?.water || {};
+  if (water.brewGrams != null) return { value: water.brewGrams, unit: 'g' };
+  if (water.brewMilliliters != null) return { value: water.brewMilliliters, unit: 'mL' };
+  return null;
+}
+
+function sourceRecipeSize(value, projection) {
+  const equipment = projection?.equipment || {};
+  if (equipment.brewer === 'kalita') return value.kalitaSize ?? value.size ?? null;
+  return value.v60Size ?? value.size ?? null;
+}
+
+/**
+ * Validate the versioned source envelope before the legacy recipe contract.
+ * The nested projection remains the only source of native units and timing;
+ * mass aliases are deliberately not accepted for a volume-native source.
+ */
+export function validateManualSourceRecipeSnapshot(value) {
+  const errors = [];
+  if (!object(value)) return { valid: false, errors: ['source recipe must be an object'] };
+  const projection = value.sourceProjection;
+  const projectionResult = validateManualSourceProjection(projection);
+  if (!projectionResult.valid) errors.push(...projectionResult.errors.map((error) => `source-projection:${error}`));
+  if (projection?.projectionVersion !== MANUAL_SOURCE_PROJECTION_VERSION) errors.push('source-projection-version-required');
+  const equipment = projection?.equipment || {};
+  const expectedDevice = equipment.brewer === 'kalita' ? 'kalita' : 'v60';
+  if (value.method !== expectedDevice || value.device !== expectedDevice) errors.push('source-device-mismatch');
+  if (value.mode !== projection?.mode) errors.push('source-mode-mismatch');
+  const expectedVariant = equipment.brewer === 'switch' ? 'switch' : equipment.brewer === 'v60' ? 'classic' : 'wave';
+  if (value.variant !== expectedVariant) errors.push('source-variant-mismatch');
+  const expectedSize = projection?.sourceConfiguration?.size ?? equipment.size;
+  const declaredSize = sourceRecipeSize(value, projection);
+  if (expectedSize && expectedSize !== 'any' && String(declaredSize) !== String(expectedSize)) errors.push('source-size-mismatch');
+  if (value.sourceId !== projection?.sourceId || Number(value.sourceRevision) !== Number(projection?.sourceRevision)) errors.push('source-lineage-mismatch');
+  if (value.coffeeGrams !== projection?.coffeeGrams || !Number.isFinite(value.coffeeGrams) || value.coffeeGrams <= 0) errors.push('source-dose-mismatch');
+  const expectedWater = sourceWaterFromExecution(projection?.sourceExecution);
+  if (!expectedWater || JSON.stringify(projection?.water) !== JSON.stringify(expectedWater)) errors.push('source-water-projection-mismatch');
+  if (!['g', 'mL'].includes(projection?.water?.unit) || !Number.isFinite(projection?.water?.value) || projection.water.value <= 0) errors.push('source-water-unit-invalid');
+  if (projection?.water?.unit === 'mL') {
+    if (own(value, 'waterGrams') || own(value, 'water') || own(value, 'ratio') || own(value, 'finalBeverageRatio') || own(value, 'hotExtractionRatio')) errors.push('volume-source-mass-alias');
+    if (!Number.isFinite(value.waterMilliliters) || value.waterMilliliters !== projection.water.value) errors.push('source-volume-mismatch');
+  } else {
+    if (own(value, 'waterMilliliters')) errors.push('mass-source-volume-alias');
+    if (!Number.isFinite(value.waterGrams) || value.waterGrams !== projection.water.value) errors.push('source-mass-mismatch');
+  }
+  if (value.sourceNativeWaterUnit != null && value.sourceNativeWaterUnit !== projection.water?.unit) errors.push('source-native-unit-mismatch');
+  if (value.timerReady !== projection?.timerReady || value.timerReady !== true) errors.push('source-not-timer-ready');
+  const sourceIds = projection?.sourceLineage?.sourceId ? [projection.sourceLineage.sourceId] : [];
+  if (JSON.stringify(value.sourceLineage?.sourceIds || []) !== JSON.stringify(sourceIds)) errors.push('source-lineage-ids-mismatch');
+  if (value.sourceLineage?.sourceRevision !== projection?.sourceRevision) errors.push('source-lineage-revision-mismatch');
+  if (!Array.isArray(value.stages) || JSON.stringify(value.stages) !== JSON.stringify(projection?.stages)) errors.push('source-stages-mismatch');
+  if (value.sourceFormatVersion != null && value.sourceFormatVersion !== projection?.projectionVersion) errors.push('source-format-version-mismatch');
+  return { valid: errors.length === 0, errors: [...new Set(errors)] };
+}
+
 export function validateRecipeSnapshot(value) {
   const errors = [];
   if (!object(value)) return { valid: false, errors: ['recipe must be an object'] };
+  if (object(value.sourceProjection)) return validateManualSourceRecipeSnapshot(value);
   if (!text(value.method, 80) || !SUPPORTED_METHODS.includes(value.method)) errors.push('unsupported recipe method');
   if (!text(value.device, 80)) errors.push('recipe device is required');
   if (!['hot', 'iced'].includes(value.mode)) errors.push('recipe mode must be hot or iced');
@@ -181,10 +248,13 @@ export function validateRecipePreviewRequest(value) {
   for (const key of ['requestId', 'proposalId', 'coffeeId', 'slotKey', 'sessionId']) if (!text(value[key], 180)) errors.push(`${key} is required`);
   if (value.slotKey && !SLOT_KEYS.includes(value.slotKey)) errors.push('unsupported slotKey');
   if (!Number.isFinite(value.dose) || value.dose <= 0) errors.push('dose must be positive');
+  if (own(value, 'sourceId') && !text(value.sourceId, 180)) errors.push('sourceId must be a non-empty string');
+  if (own(value, 'sourceRevision') && (!Number.isInteger(value.sourceRevision) || value.sourceRevision < 1)) errors.push('sourceRevision must be a positive integer');
+  if (own(value, 'sourceConfiguration') && !object(value.sourceConfiguration)) errors.push('sourceConfiguration must be an object');
   if (own(value, 'ratio') || own(value, 'targetRatio')) errors.push('ratio is immutable in the source proposal');
   if (own(value, 'intent')) errors.push('intent is immutable in the source proposal');
   if (value.configuration != null && !object(value.configuration)) errors.push('configuration must be an object');
-  for (const key of ['uid', 'ownerId', 'userId', 'recipe', 'after', 'snapshot']) if (own(value, key)) errors.push(`${key} is server-bound`);
+  for (const key of ['uid', 'ownerId', 'userId', 'recipe', 'after', 'snapshot', 'sourceProjection']) if (own(value, key)) errors.push(`${key} is server-bound`);
   return { valid: errors.length === 0, errors };
 }
 

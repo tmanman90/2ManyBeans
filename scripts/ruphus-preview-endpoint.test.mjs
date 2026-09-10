@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { validateRecipePreviewRequest } from '../src/lib/ruphus/contracts.js';
 import { createMemoryRuphusRepository, persistRecipePreview } from '../api/_lib/ruphusRepository.js';
 import { isAgentAccessAllowed } from '../api/_lib/ruphusRollout.js';
 import { RATE_LIMIT } from '../api/_lib/claudeShared.js';
 import { handleRecipePreview } from '../api/ruphus-preview.js';
+import { Firestore } from '@google-cloud/firestore';
 
 // The request carries configuration only. A recipe snapshot, owner identity,
 // or arbitrary action payload is never accepted as preview input.
@@ -15,6 +18,85 @@ import { handleRecipePreview } from '../api/ruphus-preview.js';
   assert.equal(shape.valid, false);
   assert.ok(shape.errors.some((error) => /server-bound/.test(error)));
   assert.equal(validateRecipePreviewRequest({ requestId: 'r1', proposalId: 'p1', coffeeId: 'coffee', slotKey: 'kalita_hot', sessionId: 's', dose: 20, ratio: '1:16' }).valid, false);
+}
+
+// A versioned source proposal is reconstructed from its trusted source
+// identity before a dose preview. The source's native mL fields remain mL;
+// the endpoint never accepts a client-supplied projection as authority.
+{
+  const uid = 'source-preview-owner';
+  const baseRecipe = generateV60Recipe({}, { dose: 20 });
+  const source = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, { dose: 36 }).recipe;
+  const repository = createMemoryRuphusRepository();
+  repository.seedBean(uid, { id: 'coffee', ownerId: uid, handBrewRecipes: { v60: baseRecipe } });
+  const sourceProposal = repository.createProposal({ uid, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', after: source, proposalId: 'source-switch-proposal' });
+  const snapshot = repository.snapshot();
+  const root = `users/${uid}`;
+  const data = new Map([
+    [`${root}/beans/coffee`, snapshot.beans[0]],
+    [`${root}/proposals/${sourceProposal.id}`, sourceProposal],
+  ]);
+  const revision = snapshot.revisions.find((item) => item.id === sourceProposal.sourceRevisionId);
+  data.set(`${root}/recipeRevisions/${revision.id}`, revision);
+  const readField = (value, field) => field.split('.').reduce((current, key) => current?.[key], value);
+  const ref = (path) => ({
+    path,
+    id: path.split('/').at(-1),
+    collection: (name) => ref(`${path}/${name}`),
+    doc: (id) => ref(`${path}/${id}`),
+    get: async () => ({ exists: data.has(path), id: path.split('/').at(-1), data: () => structuredClone(data.get(path)) }),
+    where: (field, operator, value) => ({ kind: 'query', collectionPath: path, filters: [{ field, operator, value }], where(nextField, nextOperator, nextValue) { return { kind: 'query', collectionPath: path, filters: [...this.filters, { field: nextField, operator: nextOperator, value: nextValue }], where: this.where }; } }),
+  });
+  const db = {
+    collection: (name) => ref(name),
+    runTransaction: async (callback) => {
+      const pending = [];
+      const tx = {
+        get: async (target) => {
+          if (target.kind === 'query') {
+            const prefix = `${target.collectionPath}/`;
+            const docs = [...data.entries()]
+              .filter(([path]) => path.startsWith(prefix) && !path.slice(prefix.length).includes('/'))
+              .map(([path, value]) => ({ id: path.split('/').at(-1), ref: ref(path), data: () => structuredClone(value) }))
+              .filter((doc) => target.filters.every(({ field, operator, value }) => operator === '==' && readField(doc.data(), field) === value));
+            return { docs };
+          }
+          const value = data.get(target.path);
+          return { exists: data.has(target.path), id: target.id, data: () => structuredClone(value) };
+        },
+        create: (target, value) => { assert.equal(data.has(target.path), false); pending.push([target.path, structuredClone(value)]); },
+        set: (target, value) => pending.push([target.path, structuredClone(value)]),
+        update: (target, value) => pending.push([target.path, { ...(data.get(target.path) || {}), ...structuredClone(value) }]),
+      };
+      const result = await callback(tx);
+      pending.forEach(([path, value]) => data.set(path, value));
+      return result;
+    },
+  };
+  process.env.RUPHUS_AGENT_V3_UIDS = uid;
+  const response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'source-preview-20', proposalId: sourceProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 20 } }, response, { uid }, { db });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.preview.coffeeGrams, 20);
+  assert.equal(response.body.preview.waterMilliliters, 244.44);
+  assert.equal(Object.hasOwn(response.body.preview, 'waterGrams'), false);
+  assert.equal(Object.hasOwn(response.body.preview, 'ratio'), false);
+  assert.equal(response.body.preview.sourceProjection.sourceId, source.sourceProjection.sourceId);
+  assert.equal(response.body.preview.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v1');
+  assert.equal(response.body.proposal.preview.ratio, null);
+  const serializer = new Firestore({ projectId: 'ruphus-source-endpoint-regression' })._serializer;
+  assert.doesNotThrow(() => serializer.encodeFields(response.body.proposal));
+
+  const wrongHardware = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'source-preview-wrong-size', proposalId: sourceProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 20, sourceId: source.sourceProjection.sourceId, sourceRevision: source.sourceProjection.sourceRevision, sourceConfiguration: { size: '02' } } }, wrongHardware, { uid }, { db });
+  assert.equal(wrongHardware.statusCode, 400);
+  assert.equal(wrongHardware.body.error, 'source_configuration_mismatch');
+
+  const clientProjection = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'source-preview-client-snapshot', proposalId: sourceProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 20, sourceProjection: {} } }, clientProjection, { uid }, { db });
+  assert.equal(clientProjection.statusCode, 400);
+  assert.equal(clientProjection.body.error, 'invalid_preview_request');
+  delete process.env.RUPHUS_AGENT_V3_UIDS;
 }
 
 // Preparation is non-mutating, owner-scoped, and replayable by its preview key.

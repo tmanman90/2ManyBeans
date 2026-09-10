@@ -12,6 +12,13 @@ import { generateV60IcedRecipe } from '../v60IcedAdapter.js';
 import { generateKalitaIcedRecipe } from '../kalitaIcedAdapter.js';
 import { kalitaDoseBounds } from '../../data/kalitaConfiguration.js';
 import { V60_SWITCH_DOSE_BOUNDS, V60_SWITCH_WATER_CAP_GRAMS } from '../../data/v60SwitchConfiguration.js';
+import { hasManualSourceProjection, isManualSourceRecipe, validateManualSourceRecipeSnapshot } from './contracts.js';
+import { MANUAL_SOURCE_PROJECTION_VERSION } from '../manualSourceProjection.js';
+import {
+  MANUAL_SOURCE_DOSE_POLICY_VERSION,
+  projectManualSourceForApp,
+  recipeFromManualSourceProjection,
+} from './techniqueOptions.js';
 
 export const RECIPE_PREVIEW_VERSION = 'ruphus-recipe-preview-v1';
 export const RECIPE_PREVIEW_TIMING_POLICY = 'preserve-source-timing-v1';
@@ -141,6 +148,70 @@ function validateSource(recipe, route) {
   return errors;
 }
 
+function sourceDoseBounds(recipe) {
+  const projection = recipe?.sourceProjection;
+  const sourceDose = projection?.adaptation?.sourceDose;
+  if (Number.isFinite(sourceDose)) return sourceDose < 20 ? [20, 20] : [20, sourceDose];
+  return null;
+}
+
+function validateManualSourcePreview(recipe, options = {}) {
+  const errors = [];
+  const route = routeFor(recipe);
+  const contract = validateManualSourceRecipeSnapshot(recipe);
+  if (!contract.valid) errors.push(...contract.errors);
+  if (!route) errors.push('unsupported-source-route');
+  if (recipe?.sourceProjection?.projectionVersion !== MANUAL_SOURCE_PROJECTION_VERSION) errors.push('invalid-source-projection-version');
+  if (recipe?.timerReady !== true) errors.push('not-timer-ready');
+  const requestedDose = options.dose ?? options.requestedDose;
+  if (!finitePositive(Number(requestedDose))) errors.push('invalid-requested-dose');
+  const dose = Number(requestedDose);
+  const sourceDose = recipe?.sourceProjection?.adaptation?.sourceDose;
+  const bounds = sourceDoseBounds(recipe);
+  if (bounds && finitePositive(dose) && dose !== recipe.coffeeGrams && (dose < bounds[0] || dose > bounds[1])) errors.push('unsupported-dose-adaptation');
+  if (options.targetRatio != null || options.ratio != null) errors.push('source-ratio-adaptation-unsupported');
+  return { valid: errors.length === 0, errors: [...new Set(errors)], route, dose, ratio: null, bounds, sourceDose };
+}
+
+function sourceConfigurationFromRecipe(recipe) {
+  const projection = recipe?.sourceProjection;
+  return {
+    ...(projection?.sourceConfiguration || {}),
+    sourceRevision: projection?.sourceRevision,
+  };
+}
+
+function createManualSourcePreview({ recipe, dose, ratio, targetRatio, configuration = {}, allowIced = true } = {}) {
+  const checked = validateManualSourcePreview(recipe, { dose, ratio, targetRatio });
+  if (!allowIced && checked.route?.endsWith('iced')) throw new RecipePreviewError('iced-preview-disabled', 'This iced source route is kept read-only until its complete water and ice contract is enabled.');
+  if (!checked.valid) throw new RecipePreviewError(checked.errors[0], `Source recipe preview is unavailable: ${checked.errors.join(', ')}.`, checked);
+  const projection = recipe.sourceProjection;
+  const targetProjection = projectManualSourceForApp(projection.sourceId, {
+    ...sourceConfigurationFromRecipe(recipe),
+    ...configuration,
+    dose: checked.dose,
+  });
+  const target = recipeFromManualSourceProjection(targetProjection, {
+    techniqueId: recipe.technique || projection.sourceId,
+    techniqueLabel: recipe.techniqueLabel || projection.sourceLineage?.title || projection.sourceId,
+  });
+  const result = {
+    ...target,
+    recipePreview: {
+      version: RECIPE_PREVIEW_VERSION,
+      timingPolicy: targetProjection.adaptation?.timingPolicy || MANUAL_SOURCE_DOSE_POLICY_VERSION,
+      baseDose: projection.coffeeGrams,
+      requestedDose: checked.dose,
+      route: checked.route,
+      regenerated: false,
+      sourceLineage: target.sourceLineage || null,
+    },
+  };
+  const resultContract = validateManualSourceRecipeSnapshot(result);
+  if (!resultContract.valid) throw new RecipePreviewError('invalid-derived-source-recipe', `Derived source recipe preview is unavailable: ${resultContract.errors.join(', ')}.`, resultContract);
+  return result;
+}
+
 function baseRatio(recipe, route) {
   return ratioNumber(route.endsWith('iced') ? (recipe.finalBeverageRatio || recipe.ratio) : recipe.ratio);
 }
@@ -237,6 +308,10 @@ function annotate(recipe, base, dose, ratio, route, regenerated = false) {
 }
 
 export function validateRecipePreview(recipe, options = {}) {
+  if (hasManualSourceProjection(recipe)) {
+    if (!isManualSourceRecipe(recipe)) return { valid: false, errors: ['invalid-source-projection-version'], route: null, dose: Number(options.dose ?? options.requestedDose), ratio: null, bounds: null };
+    return validateManualSourcePreview(recipe, options);
+  }
   const route = routeFor(recipe);
   const errors = validateSource(recipe, route);
   const requestedDose = options.dose ?? options.requestedDose;
@@ -253,6 +328,10 @@ export function validateRecipePreview(recipe, options = {}) {
 
 export function createRecipePreview({ recipe, dose, requestedDose, ratio, targetRatio, intent = {}, configuration = {}, allowIced = true } = {}) {
   const requested = dose ?? requestedDose;
+  if (hasManualSourceProjection(recipe)) {
+    if (!isManualSourceRecipe(recipe)) throw new RecipePreviewError('invalid-source-projection-version', 'Source recipe preview requires a supported projection version.');
+    return createManualSourcePreview({ recipe, dose: requested, ratio, targetRatio, configuration, allowIced });
+  }
   const route = routeFor(recipe);
   if (!allowIced && route?.endsWith('iced')) throw new RecipePreviewError('iced-preview-disabled', 'This iced route is kept read-only until its complete water and ice contract is enabled.');
   const checked = validateRecipePreview(recipe, { dose: requested, ratio, targetRatio });

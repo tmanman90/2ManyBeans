@@ -1,4 +1,4 @@
-import { canonicalHash, clone, SLOT_KEYS, validateRecipeSnapshot } from './contracts.js';
+import { canonicalHash, clone, SLOT_KEYS, hasManualSourceProjection, validateManualSourceRecipeSnapshot, validateRecipeSnapshot } from './contracts.js';
 import { buildAidenTitle, validateAidenProfile } from '../aidenProfileValidation.js';
 import { validateV60Candidate } from '../v60Adapter.js';
 import { validateV60SwitchCandidate } from '../v60SwitchAdapter.js';
@@ -28,10 +28,20 @@ const matchesMappedSlot = (recipe, slotKey) => {
     && !(slotKey === 'v60_iced' && variant === 'switch');
 };
 const normalize = (recipe, slotKey) => ({ ...clone(recipe), method: SLOT_DEFINITIONS[slotKey].method, device: SLOT_DEFINITIONS[slotKey].device, mode: SLOT_DEFINITIONS[slotKey].mode });
-const validator = (recipe, slotKey) => slotKey === 'aiden' ? validateAidenProfile(recipe) : slotKey === 'v60_hot' ? (identity(recipe).variant === 'switch' ? validateV60SwitchCandidate(recipe) : validateV60Candidate(recipe)) : slotKey === 'v60_iced' ? validateV60IcedCandidate(recipe) : slotKey === 'kalita_hot' ? validateKalitaCandidate(recipe) : validateKalitaIcedCandidate(recipe);
+const legacyValidator = (recipe, slotKey) => slotKey === 'aiden' ? validateAidenProfile(recipe) : slotKey === 'v60_hot' ? (identity(recipe).variant === 'switch' ? validateV60SwitchCandidate(recipe) : validateV60Candidate(recipe)) : slotKey === 'v60_iced' ? validateV60IcedCandidate(recipe) : slotKey === 'kalita_hot' ? validateKalitaCandidate(recipe) : validateKalitaIcedCandidate(recipe);
+const validator = (recipe, slotKey) => hasManualSourceProjection(recipe) ? validateManualSourceRecipeSnapshot(recipe) : legacyValidator(recipe, slotKey);
 
 export function canonicalRecipeSnapshot(recipe, slotKey) { const normalized = normalize(recipe, slotKey); const canonical = clone(normalized); delete canonical.userCoffeeGrams; delete canonical.aidenGrind; return { ...normalized, recipeHash: canonicalHash(canonical) }; }
-export function validateExecutableRecipe(recipe, slotKey) { const generic = validateRecipeSnapshot(normalize(recipe, slotKey)); if (!generic.valid) return generic; return validator(normalize(recipe, slotKey), slotKey); }
+export function validateExecutableRecipe(recipe, slotKey) {
+  const normalized = normalize(recipe, slotKey);
+  const generic = validateRecipeSnapshot(normalized);
+  if (!generic.valid) return generic;
+  // New source projections own their typed stage/clock contract. Calling a
+  // legacy adapter here would reject native mL recipes or silently apply a
+  // heuristic Kalita/Switch schedule over the selected source.
+  if (hasManualSourceProjection(normalized)) return validateManualSourceRecipeSnapshot(normalized);
+  return legacyValidator(normalized, slotKey);
+}
 export function resolveLegacyRecipe(bean, slotKey) {
   if (!SLOT_KEYS.includes(slotKey)) return { ok: false, code: 'unsupported_slot', slotKey };
   const def = SLOT_DEFINITIONS[slotKey]; const mapped = atPath(bean, def.path);
@@ -52,7 +62,7 @@ export function resolveRequestedRecipe(bean, { slotKey, method, mode = 'hot', v6
   const recipe = result.recipe;
   if (method && recipe.method !== method) return { ok: false, code: 'recipe_slot_mismatch', slotKey: requested };
   if (mode && recipe.mode !== mode) return { ok: false, code: 'recipe_slot_mismatch', slotKey: requested };
-  if (requested === 'v60_hot' && v60Variant && String(recipe.v60Variant || 'classic').toLowerCase() !== String(v60Variant).toLowerCase()) return { ok: false, code: 'recipe_variant_mismatch', slotKey: requested };
+  if (requested === 'v60_hot' && v60Variant && String(recipe.variant || recipe.v60Variant || 'classic').toLowerCase() !== String(v60Variant).toLowerCase()) return { ok: false, code: 'recipe_variant_mismatch', slotKey: requested };
   if (requested.startsWith('kalita') && kalitaSize && String(recipe.kalitaSize || recipe.size) !== String(kalitaSize)) return { ok: false, code: 'recipe_size_mismatch', slotKey: requested };
   const validation = validateExecutableRecipe(recipe, requested);
   if (!validation.valid) return { ...result, ok: false, code: 'legacy_recipe_ambiguous', validation };
