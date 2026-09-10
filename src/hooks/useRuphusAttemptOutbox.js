@@ -17,10 +17,10 @@ export function useRuphusAttemptOutbox(uid) {
     try { localStorage.setItem(keyFor(uid), JSON.stringify(next)); } catch { /* local recovery is best-effort */ }
     setAttempt(next);
   }, [uid]);
-  const update = useCallback((changes = {}) => {
+  const update = useCallback((changes = {}, expectedAttemptId = null) => {
     if (!uid) return;
     setAttempt(current => {
-      if (!current) return current;
+      if (!current || (expectedAttemptId && current.id !== expectedAttemptId)) return current;
       const next = { ...current, ...changes, ownerUid: uid };
       try { localStorage.setItem(keyFor(uid), JSON.stringify(next)); } catch { /* best effort */ }
       return next;

@@ -69,7 +69,7 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
   </m.button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null, ruphusAttemptAutoStartId = null, onRuphusAttemptAutoStartConsumed = null }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null, onUpdateRuphusAttempt = null, ruphusAttemptAutoStartId = null, onRuphusAttemptAutoStartConsumed = null }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
@@ -79,6 +79,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
   const { openAttempt: openAidenAttempt } = aiden;
   const { openAttempt: openHandAttempt } = handBrew;
+  const activeRuphusAttemptId = ruphusAttempt?.id || null;
+  const persistSourceTimerState = useCallback((state) => {
+    if (!activeRuphusAttemptId || !state || !onUpdateRuphusAttempt) return;
+    onUpdateRuphusAttempt({ sourceTimerState: state }, activeRuphusAttemptId);
+  }, [activeRuphusAttemptId, onUpdateRuphusAttempt]);
   const consumedAttemptRef = useRef(null);
   useEffect(() => {
     if (!ruphusAttempt) return;
@@ -616,6 +621,9 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
         onTimerStart={handBrew.startAttemptTimer}
+        sourceTimerState={ruphusAttempt?.sourceTimerState || null}
+        sourceTimerBinding={ruphusAttempt?.sourceTimerBinding || ruphusAttempt?.sourceTimerIdentity || null}
+        onSourceTimerStateChange={persistSourceTimerState}
       />
       <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
         {returnConfirm && (

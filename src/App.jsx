@@ -325,6 +325,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
             onOpenRuphus={(contextRef, starterIntent) => openRuphus(contextRef, starterIntent)}
             ruphusAttempt={ruphusAttempt}
             onDismissRuphusAttempt={dismissRuphusAttempt}
+            onUpdateRuphusAttempt={updateRuphusAttempt}
             ruphusAttemptAutoStartId={pendingRuphusAutoStartId}
             onRuphusAttemptAutoStartConsumed={() => setPendingRuphusAutoStartId(null)}
           />

@@ -6,6 +6,7 @@ import { fadeUp, spring } from '../lib/motion';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { BrewTimer } from './BrewTimer';
+import { ManualSourceBrewTimer } from './ManualSourceBrewTimer';
 import { DoseStepperCard } from './DoseStepperCard';
 import { Coffee, Droplets, Thermometer, RefreshCw, Play, Scale, Snowflake, ArrowLeft } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
@@ -24,6 +25,21 @@ import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
 const ICE_TILE_BG    = C.frostSoft;
+const sourcePrimaryButtonStyle = {
+  width: '100%',
+  minHeight: 52,
+  padding: '16px 20px',
+  borderRadius: radius.md,
+  background: `linear-gradient(160deg, #C4844A 0%, ${C.accent} 100%)`,
+  color: '#FFF8F0',
+  border: `1px solid ${C.accent}`,
+  fontSize: 16,
+  fontWeight: 700,
+  fontFamily: fonts.body,
+  cursor: 'pointer',
+  boxShadow: `${shadows.button}, 0 4px 14px rgba(168,106,56,0.22)`,
+  WebkitTapHighlightColor: 'transparent',
+};
 
 // ── Eyebrow label ─────────────────────────────────────────────────────────────
 const SectionLabel = ({ children, style }) => (
@@ -51,6 +67,138 @@ const TimingMemoryHint = ({ memory, context }) => {
         </div>
       )}
     </div>
+  );
+};
+
+const sourceStageQuantity = (stage) => {
+  if (stage?.waterToGrams != null) return `${stage.waterToGrams}g`;
+  if (stage?.waterToMilliliters != null) return `${stage.waterToMilliliters}mL`;
+  return null;
+};
+
+const sourceTriggerLabel = (stage, projection) => {
+  const trigger = stage?.trigger;
+  if (!trigger) return null;
+  if (trigger.type === 'manual') return 'Begin when ready';
+  if (trigger.type === 'condition') return `When observed: ${trigger.condition}`;
+  if (trigger.type === 'after') {
+    const event = String(trigger.event || '').replace(/:complete$/, '').replace(/[-_]/g, ' ');
+    return trigger.seconds === 0
+      ? `Immediately after ${event} finishes`
+      : `${formatTimingMs(trigger.seconds * 1000)} after ${event} finishes`;
+  }
+  if (trigger.type === 'elapsed') {
+    const origin = projection?.clock?.origin;
+    const clock = origin === 'after-main-pour'
+      ? 'after the main pour finishes'
+      : origin === 'after-bloom-pour'
+        ? 'after the bloom pour finishes'
+        : origin === 'first-water'
+          ? 'from the first water'
+          : 'source clock';
+    return `At ${formatTimingMs(trigger.seconds * 1000)} ${clock}`;
+  }
+  return null;
+};
+
+const sourceEquipmentLabel = (projection) => {
+  const configuration = projection?.sourceConfiguration || projection?.equipment || {};
+  const brewer = configuration.device === 'v60' && configuration.variant === 'switch'
+    ? 'V60 Switch'
+    : configuration.device || configuration.brewer || 'Source brewer';
+  return `${brewer}${configuration.size ? ` ${configuration.size}` : ''}`;
+};
+
+const SourceProjectionPreview = ({ projection, onStart, disabled, previewPending, previewError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
+  const source = projection?.sourceSnapshot || projection?.sourceExecution || {};
+  const stages = Array.isArray(projection?.sourceExecution?.stages) ? projection.sourceExecution.stages : [];
+  const water = projection?.water?.value == null ? null : `${projection.water.value}${projection.water.unit}`;
+  const ready = projection?.timerReady === true && Boolean(projection?.sourceExecution);
+  return (
+    <m.div {...fadeUp}>
+      <div style={{ marginBottom: 16 }}>
+        <SectionLabel style={{ marginBottom: 6 }}>Source recipe · {sourceEquipmentLabel(projection)}</SectionLabel>
+        <div style={{ fontFamily: fonts.heading, fontSize: 24, fontWeight: 600, color: C.text, lineHeight: 1.1 }}>{source.title || 'Source recipe'}</div>
+        <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{source.author || 'Named source'} · {projection?.mode === 'iced' ? 'Iced' : 'Hot'}</div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: water ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 14 }}>
+        <ParamCard label="Coffee" value={projection?.coffeeGrams == null ? 'Source amount' : `${projection.coffeeGrams}g`} icon={Coffee} iconColor={C.accent} />
+        {water && <ParamCard label="Water" value={water} icon={Droplets} iconColor={C.blue} />}
+      </div>
+
+      {projection?.preparation?.length > 0 && (
+        <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
+          <SectionLabel style={{ color: C.accent, marginBottom: 6 }}>Prepare before the clock</SectionLabel>
+          <ol style={{ margin: 0, paddingLeft: 20, color: C.text, lineHeight: 1.5 }}>
+            {projection.preparation.map((instruction, index) => <li key={index}>{instruction}</li>)}
+          </ol>
+        </div>
+      )}
+
+      <div style={{ background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, padding: 14, marginBottom: 14, boxShadow: shadows.e1 }}>
+        <SectionLabel style={{ marginBottom: 8 }}>Source schedule</SectionLabel>
+        <ol style={{ display: 'grid', gap: 10, margin: 0, paddingLeft: 22, color: C.text }}>
+          {stages.map((stage) => (
+            <li key={stage.id} style={{ paddingLeft: 2, lineHeight: 1.45 }}>
+              <div style={{ fontSize: 14 }}>{stage.label}</div>
+              <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>
+                {sourceStageQuantity(stage) && <span>{sourceStageQuantity(stage)} · </span>}
+                {stage.valve && <span>Valve {stage.valve} · </span>}
+                {sourceTriggerLabel(stage, projection)}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {projection?.temperature && (
+        <div style={{ ...type.body, color: C.textMuted, margin: '-2px 4px 12px' }}>
+          Water temperature: {projection.temperature.value == null ? projection.temperature.description : `${projection.temperature.value}°${projection.temperature.unit}`}
+        </div>
+      )}
+
+      {projection?.adaptation?.disclosure && (
+        <div role="note" style={{ ...type.caption, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          {projection.adaptation.disclosure}
+        </div>
+      )}
+
+      {previewMode && previewError && (
+        <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          {previewError}
+          {previewStale && <Btn variant="secondary" onClick={onClose} style={{ width: '100%', justifyContent: 'center', marginTop: 10, minHeight: 44 }} aria-label="Back to chat">Back to chat</Btn>}
+        </div>
+      )}
+      {error && !previewMode && attemptId && (
+        <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          Could not start this brew: {error}
+        </div>
+      )}
+
+      {!ready && (
+        <div role="status" style={{ ...type.body, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          This source remains readable, but guided execution is unavailable until its timing and configuration are validated.
+          {projection?.readiness?.blockers?.length > 0 && <div style={{ ...type.caption, marginTop: 5 }}>Reason: {projection.readiness.blockers.join('; ')}</div>}
+        </div>
+      )}
+
+      {ready && (
+        <m.button
+          type="button"
+          onClick={onStart}
+          disabled={disabled || previewStale}
+          aria-label="Start source brew guide"
+          whileTap={{ scale: 0.97 }}
+          transition={spring.snappy}
+          style={{ ...sourcePrimaryButtonStyle, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: disabled || previewStale ? 0.55 : 1 }}
+        >
+          <Play size={16} fill="currentColor" aria-hidden="true" /> {previewPending ? 'Preparing…' : (previewMode ? 'Start brew' : 'Start source guide')}
+        </m.button>
+      )}
+
+      {extraFooter}
+    </m.div>
   );
 };
 
@@ -428,6 +576,7 @@ export const HandBrewModal = ({
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
   previewMode = false, previewPending = false, previewError = null, previewStale = false, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
+  sourceTimerState = null, onSourceTimerStateChange = null, sourceTimerBinding = null,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -439,6 +588,8 @@ export const HandBrewModal = ({
   const modalContentRef = useRef(null);
   const autoStartConsumedRef = useRef(false);
   const startRequestRef = useRef(0);
+  const sourceProjection = recipe?.sourceProjection || null;
+  const sourceExecution = sourceProjection?.sourceExecution || null;
 
   useEffect(() => {
     startRequestRef.current += 1;
@@ -456,17 +607,19 @@ export const HandBrewModal = ({
   const doseUpdating = !attemptId && recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
 
   const scaledRecipe = useMemo(
-    () => (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1' && !attemptId
+    () => (sourceProjection ? null : (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1' && !attemptId
       ? recipe
-      : timerRecipeForMode({ recipe, attemptId, effectiveDose })),
-    [recipe, attemptId, effectiveDose]
+      : timerRecipeForMode({ recipe, attemptId, effectiveDose }))),
+    [recipe, attemptId, effectiveDose, sourceProjection]
   );
   const displayRecipe = useMemo(() => normalizeRecipePhases(scaledRecipe), [scaledRecipe]);
   const hotGuideRange = useMemo(() => renderGuideRange(displayRecipe), [displayRecipe]);
   const hotTimerSteps = useMemo(() => buildTimerSteps(displayRecipe), [displayRecipe]);
-  const timerReady = Boolean(hotTimerSteps) && !doseUpdating;
+  const timerReady = Boolean(hotTimerSteps);
+  const sourceTimerReady = Boolean(sourceProjection?.timerReady === true && sourceExecution);
+  const effectiveTimerReady = sourceProjection ? sourceTimerReady : timerReady && !doseUpdating;
 
-  const device = deviceKey || recipe?.device || 'v60';
+  const device = deviceKey || recipe?.device || sourceProjection?.sourceConfiguration?.device || 'v60';
   const handDevice = device === 'kalita' ? 'kalita' : 'v60';
   const recipeLaunchContext = (mode, displayedRecipe, provenance = null) => {
     const slot = `${handDevice}_${mode}`;
@@ -539,13 +692,13 @@ export const HandBrewModal = ({
   }, [icedRecipe]);
 
   useEffect(() => {
-    if (!open || previewMode || !autoStartAttempt || autoStartConsumedRef.current || !attemptId || !timerReady) return;
+    if (!open || previewMode || !autoStartAttempt || autoStartConsumedRef.current || !attemptId || !effectiveTimerReady) return;
     autoStartConsumedRef.current = true;
     handleStartBrew();
-  }, [autoStartAttempt, attemptId, handleStartBrew, open, previewMode, timerReady]);
+  }, [autoStartAttempt, attemptId, effectiveTimerReady, handleStartBrew, open, previewMode]);
 
   const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
-  const icedTimerSteps = useMemo(() => buildTimerSteps(icedRecipe), [icedRecipe]);
+  const icedTimerSteps = useMemo(() => (sourceProjection ? null : buildTimerSteps(icedRecipe)), [icedRecipe, sourceProjection]);
   const icedTimerReady = Boolean(icedTimerSteps) && !doseUpdating && icedRecipe.coffeeGrams === effectiveDose;
   const timingContext = useMemo(
     () => timingContextFromRecipe({ beanId: bean?.id, recipe: displayRecipe, mode: 'hot' }),
@@ -601,8 +754,26 @@ export const HandBrewModal = ({
         </m.div>
       )}
 
+      {/* Source projections stay on their native schedule and bypass the
+          legacy normalize/buildTimerSteps path. */}
+      {recipe && !icedMode && sourceProjection && (
+        <SourceProjectionPreview
+          projection={sourceProjection}
+          onStart={handleStartBrew}
+          disabled={previewPending}
+          previewPending={previewPending}
+          previewError={previewError}
+          previewStale={previewStale}
+          previewMode={previewMode}
+          error={error}
+          onClose={onClose}
+          attemptId={attemptId}
+          extraFooter={extraFooter}
+        />
+      )}
+
       {/* Hot recipe display */}
-      {recipe && !icedMode && (
+      {recipe && !icedMode && !sourceProjection && (
         <m.div ref={modalContentRef} {...fadeUp}>
           {/* Recipe header */}
           <div style={{ marginBottom: 16 }}>
@@ -823,7 +994,7 @@ export const HandBrewModal = ({
           </div>}
 
           {/* Start Brew button */}
-          {timerReady && (
+          {effectiveTimerReady && (
             <m.button
               onClick={handleStartBrew}
               disabled={previewPending || previewStale}
@@ -856,7 +1027,7 @@ export const HandBrewModal = ({
           )}
 
           {previewMode && onPreviewSave && (
-            <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || previewStale || !timerReady} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
+            <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || previewStale || !effectiveTimerReady} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
               {previewPending ? 'Preparing…' : 'Save recipe'}
             </Btn>
           )}
@@ -871,12 +1042,12 @@ export const HandBrewModal = ({
               iced Switch is out of scope for this slice (plan Scope
               Boundaries). A short note explains why instead of silently
               omitting the option. */}
-          {!previewMode && !attemptId && timerReady && icedUnsupported && (
+          {!previewMode && !attemptId && effectiveTimerReady && icedUnsupported && (
             <div style={{ ...type.caption, color: C.textLight, textAlign: 'center', marginTop: 10 }}>
               Iced isn't available yet for the Switch — switch to classic V60 for an iced recipe.
             </div>
           )}
-          {!previewMode && !attemptId && timerReady && !icedUnsupported && (
+          {!previewMode && !attemptId && effectiveTimerReady && !icedUnsupported && (
             <m.button
               onClick={handleEnterIced}
               whileTap={{ scale: 0.97 }}
@@ -1157,22 +1328,44 @@ export const HandBrewModal = ({
         </m.div>
       )}
     </Modal>
-    <BrewTimer
-      key={attemptId || 'standard-brew'}
-      open={timerOpen}
-      recipe={timerRecipe}
-      bean={bean}
-      attemptId={attemptId}
-      revisionId={revisionId}
-      onSaveTimingEvent={onSaveTimingEvent}
-      onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); onDismissAttempt?.(attemptId); }}
-      onStartTasting={(beanId) => {
-        setTimerOpen(false);
-        setTimerRecipeOverride(null);
-        handleClose();
-        onStartTasting?.(beanId, attemptId);
-      }}
-    />
+    {sourceProjection ? (
+      <ManualSourceBrewTimer
+        key={attemptId || `${sourceProjection.sourceId}:${sourceProjection.sourceRevision}`}
+        open={timerOpen}
+        projection={sourceProjection}
+        sourceTimerState={sourceTimerState}
+        sourceTimerBinding={sourceTimerBinding}
+        onSourceTimerStateChange={onSourceTimerStateChange}
+        bean={bean}
+        attemptId={attemptId}
+        revisionId={revisionId}
+        onSaveTimingEvent={onSaveTimingEvent}
+        onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
+        onStartTasting={(beanId) => {
+          setTimerOpen(false);
+          setTimerRecipeOverride(null);
+          handleClose();
+          onStartTasting?.(beanId, attemptId);
+        }}
+      />
+    ) : (
+      <BrewTimer
+        key={attemptId || 'standard-brew'}
+        open={timerOpen}
+        recipe={timerRecipe}
+        bean={bean}
+        attemptId={attemptId}
+        revisionId={revisionId}
+        onSaveTimingEvent={onSaveTimingEvent}
+        onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); onDismissAttempt?.(attemptId); }}
+        onStartTasting={(beanId) => {
+          setTimerOpen(false);
+          setTimerRecipeOverride(null);
+          handleClose();
+          onStartTasting?.(beanId, attemptId);
+        }}
+      />
+    )}
     </>
   );
 };
