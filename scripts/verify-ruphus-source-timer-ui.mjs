@@ -3,7 +3,10 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { chromium } from 'playwright';
 
-const child = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+const child = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '0'], {
+  env: { ...process.env, TMB_APP_VARIANT: 'dev', VITE_FIREBASE_API_KEY: 'ruphus-harness-not-a-key', VITE_FIREBASE_AUTH_DOMAIN: 'ruphus-harness.invalid', VITE_FIREBASE_PROJECT_ID: 'ruphus-harness', VITE_FIREBASE_STORAGE_BUCKET: 'ruphus-harness.invalid', VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000', VITE_FIREBASE_APP_ID: '1:000000000000:web:ruphus-harness' },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
 let output = '';
 child.stdout.on('data', (chunk) => { output += chunk.toString(); });
 child.stderr.on('data', (chunk) => { output += chunk.toString(); });
@@ -20,6 +23,7 @@ const baseUrl = await new Promise((resolve, reject) => {
 const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' });
+  await context.route('**/*', route => new URL(route.request().url()).origin === baseUrl && route.request().method() === 'GET' ? route.continue() : route.abort());
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
