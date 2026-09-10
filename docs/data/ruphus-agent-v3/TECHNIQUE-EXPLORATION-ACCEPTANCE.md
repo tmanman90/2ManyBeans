@@ -54,6 +54,10 @@ Matching client assets were rebuilt using managed preview configuration in memor
 
 Supported Firebase CLI operator refresh succeeded without changing app authentication. The original in-memory baseline then compared successfully: 57 original/current saved recipes, `restored:true`, no changed slots. No paid model request, Capgo upload, phone interaction or production change occurred in this candidate preparation.
 
+### Mac non-interference constraint
+
+A bounded read-only worker audit did not establish a supported, focus-independent text-input path. XcodeBuildMCP headless launch suppresses desktop opening but its keyboard helpers reject headless operation; non-headless helpers may foreground the desktop UI. serve-sim's direct touch path works in the observed mirror, but the earlier text-input attempts did not enter text. Its startup launches Simulator in the background, and the Xcode27 keyboard bridge requires a visible/focused Device Hub. Source comments about iOS27 do not by themselves explain this iOS26.4 guest. Do not infer that an untested keyboard fallback works, or reopen the frontend to obtain proof while Tal is using the Mac. The investigation made no native calls or state changes. Native acceptance remains open until a non-interfering path is verified or Tal permits foreground simulator testing again; no phone is required.
+
 ### Visual-proof correction
 
 Commit `1c0ca4e` added 320px/reduced-motion coverage, but root inspection found unsettled opacity and no proof that Chromium enlarged text. Correction `cf04064` waits for settled modal opacity/translation and measures baseline versus enlarged glyph/line-box sizes. Chromium ignored 200% text-size-adjust, so the harness explicitly applies a 125% text-only fallback (not page zoom). Root reran the verifier at 8e6b05f: card title 17→21.25px, preview title 24→30px, historical title 17→21.25px; document width remains 320px, View control 46px, focus return passes, zero writes/errors/blocked requests. Root inspected the corrected preview screenshot. This closes the browser proof gap; it is not native Dynamic Type or composer acceptance.
