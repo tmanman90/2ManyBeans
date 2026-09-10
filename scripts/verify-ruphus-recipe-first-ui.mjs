@@ -106,6 +106,14 @@ try {
     assert.equal(await techniquePage.locator('[data-start-count]').innerText(), '0');
     assert.equal(await techniquePage.locator('[data-save-count]').innerText(), '0');
     await techniquePage.close();
+    const historyPage = await context.newPage();
+    await historyPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?technique=1&historical=1`, { waitUntil: 'domcontentloaded' });
+    await historyPage.getByRole('button', { name: 'View recipe', exact: true }).click();
+    await historyPage.locator('[data-inspected-id="changed-ratio-fixture"]').waitFor();
+    assert.equal(await historyPage.getByText('Hand Brew Recipe', { exact: true }).count(), 0, 'Historical inspection must not regenerate an actionable preview');
+    assert.equal(await historyPage.locator('[data-start-count]').innerText(), '0');
+    assert.equal(await historyPage.locator('[data-save-count]').innerText(), '0');
+    await historyPage.close();
     // Real deterministic orchestration output rendered through the actual card:
     // provider transport is injected; no live model or account is involved.
     const userText = 'What’s an interesting different V60 technique to try with Jar #1?';

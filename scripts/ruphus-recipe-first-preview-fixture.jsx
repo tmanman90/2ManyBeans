@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../src/styles/global.css';
 import { UserPreferencesProvider } from '../src/hooks/useUserProfile.jsx';
-import { RecipeProposalCard } from '../src/components/chat/artifacts/RecipeProposalCard.jsx';
+import { ArtifactRenderer } from '../src/components/chat/ArtifactRenderer.jsx';
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
@@ -20,6 +20,7 @@ const proposed = selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 
 const artifact = runtimeTurn?.frames?.find(frame => frame.type === 'artifact_ready')?.artifact || { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
+const historical = new URLSearchParams(window.location.search).has('historical');
 
 function Fixture() {
   const [sent, setSent] = useState(!runtimeTurn);
@@ -28,6 +29,7 @@ function Fixture() {
   const [previewStale, setPreviewStale] = useState(false);
   const [startCount, setStartCount] = useState(0);
   const [saveCount, setSaveCount] = useState(0);
+  const [inspectedId, setInspectedId] = useState(null);
   const openPreview = () => {
     const draft = readRecipePreviewDraft({ uid, proposalId });
     const dose = draft?.dose || proposed.coffeeGrams;
@@ -48,7 +50,8 @@ function Fixture() {
         {!sent && <button type="button" onClick={() => setSent(true)} style={{ minHeight: 44 }}>Send technique request</button>}
         {sent && <p data-runtime-reply>{runtimeTurn.frames.filter(frame => frame.type === 'text_delta').map(frame => frame.text).join('')}</p>}
       </section>}
-      {sent && <RecipeProposalCard proposal={artifact} onPreview={openPreview} />}
+      {sent && <ArtifactRenderer artifact={historical ? { ...artifact, status: 'superseded' } : artifact} onPreview={openPreview} onInspect={item => setInspectedId(item.id)} />}
+      {inspectedId && <p data-inspected-id={inspectedId}>Viewing the historical recipe. No changes made.</p>}
       <div style={{ display: 'none' }} aria-hidden="true">
         <button type="button" data-reset onClick={() => { clearRecipePreviewDraft({ uid, proposalId }); setPreview(null); setStartCount(0); setSaveCount(0); }}>Reset fixture</button>
         <output data-start-count>{startCount}</output><output data-save-count>{saveCount}</output>
