@@ -22,6 +22,8 @@ The pure closure intentionally excludes `manualBrewSourceRegistry.js`, `manualSo
 
 The port contains 33 records: 15 Kalita, 8 Switch and 10 classic V60. Fifteen records have `admission.status: "ready"`; fourteen are timer-ready after the independent timed-guidance check. A source-admitted record with a condition-based intermediate step is retained as a readable reference and is not included in the timer-ready list.
 
+These are source/readiness counts, not counts of choices offered by chat. The new guided conversation routes are hot Wave155/185 and ribbed Switch03; existing classic V60 hot alternatives remain a separate preserved catalog. The iced audit below does not enable new iced source cards: existing V60/Kalita iced engines and saved recipes remain unchanged, with extraction water, brew ice and after-brew chilling kept distinct. Switch iced and incomplete source records remain reference coverage. Eligibility at a requested dose can be narrower than source readiness.
+
 | Exact configuration reviewed | Records in scoped inventory | Source-admitted | Timer-ready | Current boundary |
 |---|---:|---:|---:|---|
 | Kalita Wave 155, hot | 7 | 5 | 4 | Kurasu, Foundation, Fuglen and Art of Brew are executable source schedules. Kurasu and Art of Brew are the two evidenced families: Art of Brew has six timed pulse phases, while Kurasu has a three-stage wetting/centre schedule. Fuglen is retained but its small-bloom/second-wetting/center-finish structure is not counted as a distinct family from Kurasu; Foundation's single gradual main-pour step remains source-ready but its geometry is unspecified and is not used as the pulse-family proof; Vibrant remains observation-only; Drop lacks a confirmed clock; Ozone 155 is an explicit proportional starting point without 155 timing. |
@@ -86,7 +88,7 @@ Remaining factual blockers are intentionally visible:
 
 1. Ozone’s 155 quantity suggestion has no original 155 timing schedule; it remains a research-only adapter.
 2. Kurasu immersion/hybrid and HARIO/Partners do not identify exact Switch 03 hardware; they remain reference-only.
-3. The official HARIO SSD-360 immersion original is source-ready at its published 36g/approximately 440mL example. Smaller doses still require an explicit app adaptation policy; no smaller author-provided alternative is claimed.
+3. The official HARIO SSD-360 immersion original is source-ready at its published 36g/approximately 440mL example. Smaller doses are now governed by the explicit `ruphus-manual-source-checkpoint-v2` app policy recorded in [the acceptance record](../data/ruphus-agent-v3/TECHNIQUE-EXPLORATION-ACCEPTANCE.md#explicit-app-dose-guide-policy); they are not smaller author-provided originals. Native acceptance remains separate from that deterministic adaptation proof.
 
 ## Primary source links
 
