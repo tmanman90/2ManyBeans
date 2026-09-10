@@ -252,16 +252,137 @@ function safeTechniqueAdaptation(value) {
 }
 
 function sourceConfigurationForRecipe(recipe = {}) {
-  const projectionConfiguration = recipe.sourceProjection?.sourceConfiguration || {};
+  const projectionConfiguration = recipe.sourceProjection?.sourceConfiguration || recipe.sourceConfiguration || {};
+  const configurationKey = String(recipe.configurationKey || '');
+  const kalitaKey = configurationKey.match(/^kalita:(155|185):wave-paper:hot$/i);
+  const switchKey = configurationKey.match(/^v60:(02|03):standard-paper:switch:hot$/i);
+  const size = projectionConfiguration.size
+    || recipe.v60Size
+    || recipe.kalitaSize
+    || recipe.size
+    || kalitaKey?.[1]
+    || switchKey?.[1];
+  const defaults = recipe.device === 'kalita' && kalitaKey
+    ? { model: 'Wave', filter: `wave-${kalitaKey[1]}` }
+    : recipe.device === 'v60' && (recipe.variant || recipe.v60Variant) === 'switch' && switchKey
+      ? { model: 'V60 Switch', filter: `v60-${switchKey[1]}-paper` }
+      : {};
   return {
     ...projectionConfiguration,
     device: projectionConfiguration.device || recipe.device,
     variant: projectionConfiguration.variant || recipe.variant || recipe.v60Variant,
     mode: projectionConfiguration.mode || recipe.mode || (recipe.isIced ? 'iced' : 'hot'),
-    size: projectionConfiguration.size || recipe.v60Size || recipe.kalitaSize || recipe.size,
+    size,
+    ...(defaults.model && !projectionConfiguration.model && !recipe.model ? { model: defaults.model } : {}),
+    ...(defaults.filter && !projectionConfiguration.filter && !recipe.filter ? { filter: defaults.filter } : {}),
     ...(Number.isFinite(recipe.coffeeGrams) ? { dose: recipe.coffeeGrams } : {}),
     ...(recipe.sourceProjection?.sourceRevision != null ? { sourceRevision: recipe.sourceProjection.sourceRevision } : {}),
   };
+}
+
+function sourceFormatSupported(context) {
+  // Direct tool tests and internal callers predate the client capability field;
+  // the authenticated endpoint installs an explicit boolean for every request.
+  return context?.__ruphusSourceFormatCapability !== false;
+}
+
+export function isExplicitTechniqueReuseRequest(value = '') {
+  const text = String(value || '').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  const reference = /\b(?:first|1st|second|2nd|third|3rd|last|that|those|kurasu|fuglen|foundation|vibrant|onyx|ozone|hario|matt)\b/i.test(text);
+  const explicitVerb = /\b(?:use|try|brew|prepare|make|pick|choose|revisit|repeat)\b/i.test(text);
+  const namedRepeat = /\bshow\b[\s\S]*\b(?:again|back|repeat)\b/i.test(text)
+    && !/\b(?:first|1st|second|2nd|third|3rd|last|that|those)\b/i.test(text);
+  return reference && (explicitVerb || namedRepeat);
+}
+
+function sourceRouteForRecipe(recipe = {}, slotKey) {
+  if (!['v60_hot', 'kalita_hot'].includes(slotKey) || !recipe || typeof recipe !== 'object') return null;
+  const configuration = sourceConfigurationForRecipe(recipe);
+  const device = String(configuration.device || recipe.device || '').toLowerCase();
+  const mode = String(configuration.mode || recipe.mode || (recipe.isIced ? 'iced' : 'hot')).toLowerCase();
+  const variant = String(configuration.variant || recipe.variant || recipe.v60Variant || 'classic').toLowerCase();
+  const size = String(configuration.size || '');
+  const configurationKey = String(recipe.configurationKey || '');
+  if (slotKey === 'kalita_hot' && device === 'kalita' && mode === 'hot' && recipe.isIced !== true) {
+    const expectedKey = `kalita:${size}:wave-paper:hot`;
+    const supportedSize = ['155', '185'].includes(size);
+    const exactFilter = configuration.filter == null || configuration.filter === `wave-${size}`;
+    const exactModel = configuration.model == null || configuration.model === 'Wave';
+    const keyMatches = recipe.sourceProjection?.projectionVersion
+      ? true
+      : !configurationKey || configurationKey === expectedKey;
+    return { kind: 'manual_source_technique', supported: supportedSize && exactFilter && exactModel && keyMatches, configuration, reason: supportedSize ? 'This saved Kalita recipe is not an exact Wave 155/185 configuration.' : 'Source alternatives are available only for an exact hot Kalita Wave 155 or 185 configuration.' };
+  }
+  if (slotKey === 'v60_hot' && device === 'v60' && variant === 'switch' && mode === 'hot' && recipe.isIced !== true) {
+    const expectedKey = `v60:${size}:standard-paper:switch:hot`;
+    const supportedSize = size === '03';
+    const exactFilter = configuration.filter == null || configuration.filter === `v60-${size}-paper`;
+    const exactModel = configuration.model == null || configuration.model === 'V60 Switch';
+    const keyMatches = recipe.sourceProjection?.projectionVersion
+      ? true
+      : !configurationKey || configurationKey === expectedKey;
+    return { kind: 'manual_source_technique', supported: supportedSize && exactFilter && exactModel && keyMatches, configuration, reason: supportedSize ? 'This saved Switch recipe is not an exact ribbed Switch 03 configuration.' : 'Source alternatives are available only for the exact ribbed Switch 03 configuration.' };
+  }
+  return null;
+}
+
+function capabilityGatedSourceOptions(options, supported) {
+  if (supported) return options;
+  return options.map((option) => ({
+    ...option,
+    executable: false,
+    timerReady: false,
+    referenceOnly: true,
+    capabilityRequired: 'technique_experiment_v1',
+    reason: [option.reason, 'Update the app before starting this source-backed schedule.'].filter(Boolean).join('; '),
+  }));
+}
+
+const sourceReferenceOrdinal = (text) => {
+  const value = String(text || '').toLowerCase();
+  if (/\b(?:first|1st)\b/.test(value)) return 0;
+  if (/\b(?:second|2nd)\b/.test(value)) return 1;
+  if (/\b(?:third|3rd)\b/.test(value)) return 2;
+  if (/\blast\b/.test(value)) return -1;
+  return null;
+};
+
+function explicitSourceReference(context, slotKey, coffeeRef = null) {
+  const text = String(context?.userText || '').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+  if (!text || !isExplicitTechniqueReuseRequest(text)) return null;
+  const reviews = (Array.isArray(context?.proposalReviews) ? context.proposalReviews : [])
+    .filter((review) => review?.slot === slotKey && typeof review?.sourceId === 'string' && review.sourceId);
+  const ordinal = sourceReferenceOrdinal(text);
+  const scopedReviews = coffeeRef ? reviews.filter((review) => review.coffeeRef === coffeeRef) : reviews;
+  if (ordinal != null && !coffeeRef) {
+    const reviewByCoffee = [...new Set(reviews.map((review) => review.coffeeRef).filter(Boolean))]
+      .map((ref) => {
+        const perCoffee = reviews.filter((review) => review.coffeeRef === ref);
+        return ordinal === -1 ? perCoffee.at(-1) : perCoffee[ordinal];
+      })
+      .filter(Boolean);
+    if (reviewByCoffee.length > 1) return { status: 'ambiguous', candidates: reviewByCoffee.map((review) => ({ coffeeRef: review.coffeeRef, name: review.name || review.sourceId, ordinal: review.ordinal })) };
+  }
+  let candidates = ordinal == null
+    ? scopedReviews.filter((review) => {
+      const firstWord = String(review.name || '').trim().split(/\s+/)[0];
+      return firstWord && new RegExp(`\\b${firstWord.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+    })
+    : [ordinal === -1 ? scopedReviews.at(-1) : scopedReviews[ordinal]].filter(Boolean);
+  candidates = candidates.filter((review) => review.coffeeRef && review.sourceId);
+  const coffeeRefs = [...new Set(candidates.map((review) => review.coffeeRef))];
+  if (coffeeRefs.length > 1) return { status: 'ambiguous', candidates: candidates.map((review) => ({ coffeeRef: review.coffeeRef, name: review.name || review.sourceId, ordinal: review.ordinal })) };
+  const review = candidates.at(-1);
+  return review ? {
+    status: 'matched',
+    sourceId: review.sourceId,
+    sourceRevision: review.sourceRevision,
+    familyId: review.familyId || review.techniqueExperiment?.familyId || null,
+    proposalId: review.proposalId || review.artifactId || null,
+    name: review.name || review.sourceId,
+    coffeeRef: review.coffeeRef,
+  } : { status: 'missing' };
 }
 
 export function diagnosticRecommendationReady(text = '', conversation = []) {
@@ -294,18 +415,21 @@ function setPreviewReadiness(context, { coffeeRef, slotKey, recipe } = {}) {
   }
 }
 
-function setTechniqueReadiness(context, { coffeeRef, slotKey, recipe, options = [] } = {}) {
-  if (!context?.proposalState || !recipe || !coffeeRef || slotKey !== 'v60_hot' || !isTechniqueExplorationRequest(context.userText) || !options.length) return;
+function setTechniqueReadiness(context, { coffeeRef, slotKey, recipe, options = [], kind = 'v60_technique' } = {}) {
+  if (!context?.proposalState || !recipe || !coffeeRef || !['v60_hot', 'kalita_hot'].includes(slotKey)
+    || (!isTechniqueExplorationRequest(context.userText) && !isExplicitTechniqueReuseRequest(context.userText))
+    || !options.length) return;
   const sourceHash = recipeSourceHash(recipe, slotKey);
   const optionIds = options.flatMap((option) => [option.id, option.familyId, option.sourceId]).filter(Boolean);
-  context.proposalState.techniqueReady = { coffeeRef, slot: slotKey, sourceHash, optionIds: [...new Set(optionIds)] };
+  context.proposalState.techniqueReady = { coffeeRef, slot: slotKey, sourceHash, kind, optionIds: [...new Set(optionIds)] };
   context.proposalState.target = context.proposalState.target || { coffeeRef, slot: slotKey };
 }
 
-function techniqueReadinessMatches(context, { coffeeRef, slotKey, target = null } = {}) {
+function techniqueReadinessMatches(context, { coffeeRef, slotKey, target = null, kind = null } = {}) {
   const ready = context?.proposalState?.techniqueReady;
   return Boolean(ready?.coffeeRef === coffeeRef
     && ready?.slot === slotKey
+    && (!kind || !ready.kind || ready.kind === kind)
     && (!target?.sourceHash || !ready.sourceHash || ready.sourceHash === target.sourceHash));
 }
 
@@ -432,22 +556,57 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     }
     const slotKey = args.slot || args.slotKey;
     if (name === 'read_technique_options') {
-      if (slotKey !== 'v60_hot') return { ok: false, actionable: false, code: 'unsupported_technique_brewer', message: 'Technique exploration is available for a saved hot V60 recipe only.' };
+      if (!['v60_hot', 'kalita_hot'].includes(slotKey)) return { ok: false, actionable: false, code: 'unsupported_technique_brewer', message: 'Technique exploration is available for a saved hot V60, Kalita, or Switch recipe.' };
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
-      if (!recipe || recipe.code || recipe.device !== 'v60' || recipe.mode !== 'hot' || recipe.isIced === true) {
+      if (!recipe || recipe.code) {
+        if (slotKey === 'kalita_hot') return { ok: true, actionable: false, current: null, options: [], message: 'I need a saved hot Kalita recipe before I can prepare a source-backed technique experiment.' };
         return { ok: true, actionable: false, current: null, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can compare these source-backed hot V60 techniques, but I need a saved hot V60 recipe before I can prepare an executable experiment.' };
+      }
+      const sourceRoute = sourceRouteForRecipe(recipe, slotKey);
+      const sourceProjection = recipe.sourceProjection?.projectionVersion ? recipe.sourceProjection : null;
+      const sourceProjectionBrewer = sourceProjection?.equipment?.brewer;
+      const projectedForSlot = sourceProjection
+        && recipe.mode === 'hot'
+        && recipe.isIced !== true
+        && ((slotKey === 'kalita_hot' && sourceProjectionBrewer === 'kalita')
+          || (slotKey === 'v60_hot' && sourceProjectionBrewer !== 'kalita' && recipe.device === 'v60'));
+      const manualRoute = sourceRoute?.supported || projectedForSlot;
+      if (sourceRoute && !sourceRoute.supported) {
+        return { ok: true, actionable: false, sourceOptions: true, current: { ...techniqueIdentity(recipe), configuration: clone(sourceRoute.configuration) }, options: [], message: sourceRoute.reason };
+      }
+      if (slotKey === 'kalita_hot' && !manualRoute) {
+        return { ok: true, actionable: false, sourceOptions: true, current: { ...techniqueIdentity(recipe), configuration: clone(sourceConfigurationForRecipe(recipe)) }, options: [], message: 'I can discuss source-backed hot Kalita techniques only for the saved recipe’s exact Wave 155 or 185 configuration.' };
       }
       // A selected versioned source owns its hardware, native units and
       // timing. Keep this path separate from the legacy V60 catalog so a
       // Switch 03 source cannot be replaced by the generic V60/Switch engine.
-      if (recipe.sourceProjection?.projectionVersion) {
+      if (manualRoute) {
         const key = techniqueKey(args.coffeeRef, slotKey);
         const prior = context.__ruphusTechniqueSelections?.get(key);
-        const options = listManualSourceTechniqueOptions({
-          ...sourceConfigurationForRecipe(recipe),
-          currentSourceId: recipe.sourceProjection.sourceId,
-          excludeIds: prior?.selectedIds || [],
+        const historical = explicitSourceReference(context, slotKey, args.coffeeRef);
+        if (historical?.status === 'ambiguous') {
+          return { ok: false, actionable: false, code: 'ambiguous_historical_technique', candidates: historical.candidates, message: 'Which coffee’s earlier technique do you want to use?' };
+        }
+        if (historical?.status === 'missing') {
+          return { ok: false, actionable: false, code: 'historical_technique_not_found', options: [], message: 'I could not match that earlier technique to a delivered card in this chat.' };
+        }
+        const currentSourceId = sourceProjection?.sourceId || techniqueIdentity(recipe).currentSourceId;
+        const historicalIds = historical?.status === 'matched'
+          ? [historical.sourceId, historical.familyId].filter(Boolean)
+          : [];
+        const excludedIds = historical?.status === 'matched'
+          ? (prior?.selectedIds || []).filter((id) => !historicalIds.includes(id))
+          : (prior?.selectedIds || []);
+        const listedOptions = listManualSourceTechniqueOptions({
+          ...(sourceRoute?.configuration || sourceConfigurationForRecipe(recipe)),
+          ...(historical?.status === 'matched' ? { currentSourceId: null } : { currentSourceId }),
+          excludeIds: excludedIds,
         }, { includeReferenceOnly: true }).map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) }));
+        const selectedOptions = historical?.status === 'matched'
+          ? listedOptions.filter((option) => [option.id, option.familyId, option.sourceId].includes(historical.sourceId)
+            && (historical.sourceRevision == null || Number(option.sourceRevision) === Number(historical.sourceRevision)))
+          : listedOptions;
+        const options = capabilityGatedSourceOptions(selectedOptions, sourceFormatSupported(context));
         if (!(context.__ruphusTechniqueSelections instanceof Map)) Object.defineProperty(context, '__ruphusTechniqueSelections', { value: new Map(), enumerable: false, writable: true, configurable: true });
         context.__ruphusTechniqueSelections.set(key, {
           current: techniqueIdentity(recipe),
@@ -456,7 +615,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         });
         const executableOptions = options.filter((option) => option.executable === true);
         rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
-        setTechniqueReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, options: executableOptions });
+        setTechniqueReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, options: executableOptions, kind: 'manual_source_technique' });
         return {
           ok: true,
           actionable: executableOptions.length > 0,
@@ -465,13 +624,19 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
           current: { ...techniqueIdentity(recipe), sourceProjection: clone(recipe.sourceProjection) },
           options,
           sourceOptions: true,
-          ...(executableOptions.length ? {} : { message: 'There is no other executable source-backed technique for this exact hardware configuration; reference-only research remains readable.' }),
+          sourceFormatCapability: 'technique_experiment_v1',
+          sourceFormatSupported: sourceFormatSupported(context),
+          ...(historical?.status === 'matched' ? { reusedProposalId: historical.proposalId, reusedSourceId: historical.sourceId } : {}),
+          ...(executableOptions.length ? {} : { message: sourceFormatSupported(context) ? 'There is no other executable source-backed technique for this exact hardware configuration; reference-only research remains readable.' : 'These source schedules are readable, but this app version needs an update before a source-backed schedule can be started.' }),
         };
+      }
+      if (recipe.device !== 'v60' || recipe.mode !== 'hot' || recipe.isIced === true) {
+        return { ok: true, actionable: false, current: null, options: [], message: 'Technique exploration needs the saved hot recipe for this exact brewer.' };
       }
       const variant = String(recipe.variant || recipe.v60Variant || '').toLowerCase();
       const nonStandard = variant === 'switch' || (recipe.v60Size != null && String(recipe.v60Size) !== '02') || (recipe.configurationKey != null && recipe.configurationKey !== 'v60:02:standard-paper');
       if (nonStandard) {
-        return { ok: true, actionable: false, current: { technique: recipe.technique || null, variant: variant || null }, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can discuss standard hot V60 techniques, but this saved recipe is a different V60 configuration, so I will not prepare a timer-ready experiment from it.' };
+        return { ok: true, actionable: false, current: { technique: recipe.technique || null, variant: variant || null }, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can discuss standard hot V60 techniques, but this saved recipe is a different unsupported configuration, so I will not prepare a timer-ready experiment from it.' };
       }
       const key = techniqueKey(args.coffeeRef, slotKey);
       const prior = context.__ruphusTechniqueSelections?.get(key);
@@ -483,7 +648,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         selectedIds: prior?.selectedIds || [],
       });
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
-      setTechniqueReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, options });
+      setTechniqueReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, options, kind: 'v60_technique' });
       return { ok: true, actionable: options.length > 0, coffeeRef: args.coffeeRef, slot: slotKey, current: { technique: recipe.technique || null, sourceLineage: clone(recipe.sourceLineage || null) }, options,
         ...(options.length ? {} : { message: 'There is no other supported source-backed hot V60 technique available for this recipe right now.' }) };
     }
@@ -517,12 +682,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
     const techniqueExperiment = experiment?.kind === 'v60_technique' || experiment?.kind === 'manual_source_technique';
     const manualSourceExperiment = experiment?.kind === 'manual_source_technique';
-    if (experimentHasSelection && !techniqueExperiment) return { ok: false, code: 'invalid_proposal_intent', message: 'Technique experiments must use the supported V60 technique intent.' };
+    if (experimentHasSelection && !techniqueExperiment) return { ok: false, code: 'invalid_proposal_intent', message: 'Technique experiments must use a supported source-backed technique intent.' };
     if (techniqueExperiment && args.change) return { ok: false, code: 'invalid_proposal_intent', message: 'Choose either one recipe adjustment or one technique experiment, not both.' };
     if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
-    if (techniqueExperiment && slotKey !== 'v60_hot') return { ok: false, code: 'unsupported_technique_brewer', message: 'Technique experiments require a saved hot V60 recipe.' };
+    if (techniqueExperiment && (manualSourceExperiment ? !['v60_hot', 'kalita_hot'].includes(slotKey) : slotKey !== 'v60_hot')) return { ok: false, code: 'unsupported_technique_brewer', message: manualSourceExperiment ? 'Source-backed technique experiments require a saved hot V60, Switch 03, or Kalita Wave recipe.' : 'V60 technique experiments require a saved hot V60 recipe.' };
+    if (manualSourceExperiment && !sourceFormatSupported(context)) return { ok: false, code: 'source_format_unsupported', message: 'Update the app before starting a source-backed schedule; this version can still read the source details.' };
     const target = context.__ruphusResolvedTargets instanceof Map ? context.__ruphusResolvedTargets.get(`${args.coffeeRef}:${slotKey}`) : null;
-    if (techniqueExperiment && !techniqueReadinessMatches(context, { coffeeRef: args.coffeeRef, slotKey, target })) {
+    if (techniqueExperiment && !techniqueReadinessMatches(context, { coffeeRef: args.coffeeRef, slotKey, target, kind: manualSourceExperiment ? 'manual_source_technique' : 'v60_technique' })) {
       return { ok: false, code: 'technique_option_required', message: 'Choose one of the supported techniques I just showed you.' };
     }
     if (!canPropose
@@ -550,12 +716,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!selected) return { ok: false, code: 'technique_option_required', message: 'Choose one of the supported techniques I just showed you.' };
         const before = target.before || {};
         const dose = Number(before.coffeeGrams ?? before.userCoffeeGrams ?? before.dose);
-        const sourceDose = Number(selected.sourceDoseGrams);
-        const selectedDose = manualSourceExperiment && Number.isFinite(selected.targetDoseGrams)
-          ? selected.targetDoseGrams
-          : manualSourceExperiment && Number.isFinite(sourceDose)
-            ? (dose < 20 ? 20 : dose > sourceDose ? sourceDose : dose)
-          : dose;
+        const selectedDose = manualSourceExperiment && Number.isFinite(selected.targetDoseGrams) ? selected.targetDoseGrams : dose;
         try {
         // The first selection is a complete source-backed experiment. Do not
         // copy the current family's controls into it; later dose previews use
@@ -590,7 +751,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (hasManualSourceProjection(before) && !techniqueExperiment && args.change?.control !== 'dose') {
       return { ok: false, code: 'source_recipe_control_unsupported', message: 'Source-backed recipes keep their native schedule and units; only the supported dose guide can be changed.' };
     }
-    let after = mergeRecipePatch(before, requestedPatch);
+    // A source-selected experiment is a complete native recipe envelope. Do
+    // not merge it into the legacy adapter snapshot: that would retain
+    // incompatible water aliases (notably Switch mL plus old grams) and
+    // would let the generic preview shape erase the source contract.
+    let after = techniqueExperiment && manualSourceExperiment
+      ? clone(requestedPatch)
+      : mergeRecipePatch(before, requestedPatch);
     if (args.change?.control === 'dose') {
       try {
         after = hasManualSourceProjection(before)
@@ -648,7 +815,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
     if (name === 'read_recipe') return { type: 'function', name, description: 'When a bounded recommendation or selected technique needs exact source data, read one exact recipe slot once immediately before a proposal. Do not use this during diagnosis because read_coffee_evidence already includes the recipe.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
-    if (name === 'read_technique_options') return { type: 'function', name, description: 'For an explicit request for a different hot V60 technique, read eligible source-backed alternatives for this coffee. The returned options are safe to discuss; choose one exact option before requesting an experiment.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot'] } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
+    if (name === 'read_technique_options') return { type: 'function', name, description: 'For an explicit request for a different hot V60, Kalita Wave, or ribbed Switch technique, read eligible source-backed alternatives for this coffee. Match the saved brewer, size, filter, and mode exactly. The returned options are safe to discuss; choose one exact executable option before requesting an experiment. Reference-only options stay readable but cannot produce a proposal.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot', 'kalita_hot'] } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
     return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, or one explicitly selected source-backed technique experiment. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })) }, required: ['coffeeRef', 'slot', 'change', 'experiment'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });

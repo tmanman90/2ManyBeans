@@ -77,7 +77,7 @@ export function techniqueSelectionsFromSession(session, refs = {}) {
   for (const message of messages) {
     for (const artifact of Array.isArray(message?.artifacts) ? message.artifacts : []) {
       const experiment = artifact?.type === 'recipe_proposal' ? artifact.techniqueExperiment : null;
-      if (experiment?.kind !== 'v60_technique' || !artifact.coffeeId || !artifact.slotKey) continue;
+      if (!['v60_technique', 'manual_source_technique'].includes(experiment?.kind) || !artifact.coffeeId || !artifact.slotKey) continue;
       const coffeeRef = Object.entries(refs || {}).find(([, coffeeId]) => coffeeId === artifact.coffeeId)?.[0];
       if (!coffeeRef) continue;
       const key = `${coffeeRef}:${artifact.slotKey}`;
@@ -212,7 +212,7 @@ function firestoreReaders(db) {
 
 export default withCorsAuthPro(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid; if (!isAgentAccessAllowed({ uid, rawUids: process.env.RUPHUS_AGENT_V3_UIDS })) return res.status(404).json({ error: 'agent_v3_unavailable' });
-  const { turnId, contextRef, userText = '', conversation = [], ledger = null, continuePrevious = false } = req.body || {};
+  const { turnId, contextRef, userText = '', conversation = [], ledger = null, continuePrevious = false, commandCapabilities = [] } = req.body || {};
   if (!uid || typeof turnId !== 'string' || !contextRef || typeof userText !== 'string') return res.status(400).json({ error: 'turnId, contextRef, and userText are required' });
   const startedAt = Date.now();
   let firstFrameAt = null;
@@ -232,6 +232,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const olderReference = activeSession?.historyWidened === true || /\b(?:older|last month|three weeks?|weeks? ago|before that|historical|earlier)\b/i.test(priorText);
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
     context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
+    Object.defineProperty(context, '__ruphusSourceFormatCapability', { value: Array.isArray(commandCapabilities) && commandCapabilities.includes('technique_experiment_v1'), enumerable: false, writable: true, configurable: true });
     Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
     Object.defineProperty(context, '__ruphusTechniqueSelections', { value: techniqueSelectionsFromSession(activeSession, context.__ruphusRefs), enumerable: false, writable: true, configurable: true });
     context.proposalReviews = replay.stale ? [] : recentProposalReviews(activeSession, context.__ruphusRefs, { coffeeRef: context.turnBinding?.status === 'locked' ? context.turnBinding.coffeeRef : null, slot: context.methodBinding?.status === 'locked' ? context.methodBinding.slot : null });

@@ -1,6 +1,6 @@
 import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION } from '../../src/lib/ruphus/contracts.js';
 import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
-import { RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
+import { isExplicitTechniqueReuseRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
@@ -12,8 +12,9 @@ const SEVERE_SECOND_FAILURES = new Set([
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
   'RT6_METHOD_CONTRADICTION',
 ]);
-const TECHNIQUE_RECOVERY = 'I can explain a different hot V60 approach, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
+const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
+const techniqueRequest = (value) => isTechniqueExplorationRequest(value || '') || isExplicitTechniqueReuseRequest(value || '');
 
 function cancelledError() {
   return Object.assign(new Error('turn cancelled'), { code: 'turn_cancelled' });
@@ -93,6 +94,13 @@ export function proposalHandoff(artifact = {}) {
     const name = String(technique.name || 'that source-backed V60 technique').trim();
     return `Prepared: ${name} as a different V60 technique experiment. Its full adapted schedule is ready to review; it has not been applied.`;
   }
+  if (technique?.kind === 'manual_source_technique') {
+    const name = String(technique.name || 'that source-backed technique').trim();
+    const after = artifact.after || {};
+    const brewer = after.device === 'kalita' ? 'Kalita' : after.variant === 'switch' ? 'Switch' : 'V60';
+    const size = after.kalitaSize || after.v60Size;
+    return `Prepared: ${name} as a different ${brewer}${size ? ` ${size}` : ''} source technique experiment. Its source-backed schedule is ready to review; it has not been applied.`;
+  }
   const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
   const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
     : rawControl === 'waterGrams' ? 'water'
@@ -150,7 +158,8 @@ export function proposalEligibleForTarget(context, request = {}) {
   const userAgreed = previewReady || state.userAgreed === true || agreement.accepted === true || agreement.ready === true;
   const diagnosisTarget = { coffeeRef: state.diagnosisCoffeeRef || diagnosis.coffeeRef || target.coffeeRef, slot: state.diagnosisSlot || diagnosis.slot || diagnosis.slotKey || target.slot };
   const agreementTarget = { coffeeRef: state.agreementCoffeeRef || agreement.coffeeRef || target.coffeeRef, slot: state.agreementSlot || agreement.slot || agreement.slotKey || target.slot };
-  const technique = request?.experiment?.kind === 'v60_technique';
+  const techniqueKind = request?.experiment?.kind;
+  const technique = techniqueKind === 'v60_technique' || techniqueKind === 'manual_source_technique';
   if (technique) {
     const ready = state.techniqueReady;
     const selectedId = request.experiment.techniqueId || request.experiment.familyId || request.experiment.sourceId;
@@ -159,9 +168,10 @@ export function proposalEligibleForTarget(context, request = {}) {
       : null;
     return Boolean(target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
       && ready?.coffeeRef === target.coffeeRef && ready?.slot === target.slot
+      && (!ready.kind || ready.kind === techniqueKind)
       && (!resolvedTarget?.sourceHash || !ready.sourceHash || resolvedTarget.sourceHash === ready.sourceHash)
       && Array.isArray(ready.optionIds) && ready.optionIds.includes(selectedId)
-      && isTechniqueExplorationRequest(context?.userText || ''));
+      && techniqueRequest(context?.userText || ''));
   }
   return Boolean(
     target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
@@ -202,7 +212,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       }
       : null;
     const techniqueSelectionKey = request.name === 'propose_recipe_change'
-      && request.args?.experiment?.kind === 'v60_technique'
+      && ['v60_technique', 'manual_source_technique'].includes(request.args?.experiment?.kind)
       ? `${request.args.coffeeRef}:${request.args.slot || request.args.slotKey}`
       : null;
     const techniqueSelectionBefore = techniqueSelectionKey && context?.__ruphusTechniqueSelections instanceof Map
@@ -255,7 +265,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
           && item.result?.ok === true && item.result?.actionable === true
           && Array.isArray(item.result?.options) && item.result.options.length > 0);
-        if (techniqueRead && !proposalClaimed && isTechniqueExplorationRequest(userText || context?.userText || '')) {
+        if (techniqueRead && !proposalClaimed && techniqueRequest(userText || context?.userText || '')) {
           if (toolCalls >= maxToolCalls) {
             text = TECHNIQUE_RECOVERY;
             break;
@@ -266,7 +276,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
               turnId, context, userText, conversation: context?.conversation || [],
               tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
               previous: response, toolResult: { results: [techniqueRead] }, regeneration: true,
-              correctiveInstruction: 'The user explicitly asked for a different hot V60 technique. Choose one exact named option from the trusted technique reader and call propose_recipe_change now. Do not ask for another yes, call another read, or claim a review card unless the proposal tool returns its artifact.',
+              correctiveInstruction: 'The user explicitly asked to try a different source-backed technique or reuse one named earlier. Choose one exact executable option from the trusted technique reader and call propose_recipe_change now. Do not ask for another yes, call another read, reuse an old action ID, or claim a review card unless the proposal tool returns its artifact.',
               signal,
             });
             throwIfCancelled();
@@ -365,7 +375,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
-        if (isTechniqueExplorationRequest(userText || context?.userText || '')) techniqueContinuationUsed = true;
+        if (techniqueRequest(userText || context?.userText || '')) techniqueContinuationUsed = true;
         response = await provider.runTurn({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
@@ -381,7 +391,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     throwIfCancelled();
     let checked = text.trim();
     if (!artifacts.some((artifact) => artifact?.type === 'recipe_proposal')
-      && isTechniqueExplorationRequest(userText || context?.userText || '')
+      && techniqueRequest(userText || context?.userText || '')
       && PREPARATION_CLAIM.test(checked)) checked = TECHNIQUE_RECOVERY;
     const checkedEvidence = runtimeEvidence(toolEvidence);
     let triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
