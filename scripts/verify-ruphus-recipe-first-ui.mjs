@@ -56,6 +56,116 @@ try {
       target.on('console', (message) => { if (message.type() === 'error') targetErrors.push(message.text()); });
       target.on('request', (request) => { if (request.method() !== 'GET') targetWrites.push(`${request.method()} ${request.url()}`); });
     };
+    const waitForSettledModal = async (target) => {
+      await target.waitForFunction(() => {
+        const close = document.querySelector('button[aria-label="Close"]');
+        if (!close) return false;
+        let node = close;
+        let fixedOverlay = false;
+        while (node) {
+          const style = getComputedStyle(node);
+          if (style.opacity !== '1') return false;
+          if (style.position === 'fixed' && style.zIndex === '1000') fixedOverlay = true;
+          node = node.parentElement;
+        }
+        const sheet = close.parentElement?.parentElement;
+        if (!sheet || !fixedOverlay) return false;
+        const transform = getComputedStyle(sheet).transform;
+        if (transform === 'none') return true;
+        const values = transform.match(/^matrix(?:3d)?\(([^)]+)\)$/)?.[1].split(',').map(Number) || [];
+        const translateY = values.length === 16 ? values[13] : values.length === 6 ? values[5] : Number.NaN;
+        return Number.isFinite(translateY) && Math.abs(translateY) < 0.5;
+      });
+      return true;
+    };
+    const measureText = (target, scopeKind, specs) => target.evaluate(({ scopeKind: kind, specs: requested }) => {
+      const roots = {
+        card: document.querySelector('[data-preview-card]'),
+        modal: document.querySelector('button[aria-label="Close"]')?.parentElement?.parentElement,
+        historical: document.querySelector('[data-historical-inspection="true"]'),
+      };
+      const root = roots[kind];
+      const metric = (element) => {
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const number = (value) => Number.isFinite(Number.parseFloat(value)) ? Number.parseFloat(value) : null;
+        return {
+          text: (element.textContent || '').trim().slice(0, 80),
+          fontSizePx: number(style.fontSize),
+          lineHeightPx: number(style.lineHeight),
+          boxHeightPx: rect.height,
+          boxWidthPx: rect.width,
+        };
+      };
+      return Object.fromEntries(requested.map(({ name, selector }) => [name, metric(root?.querySelector(selector))]));
+    }, { scopeKind, specs });
+    const markTextTargets = async (target, scopeKind, specs) => {
+      const marked = await target.evaluate(({ scopeKind: kind, specs: requested }) => {
+        const roots = {
+          card: document.querySelector('[data-preview-card]'),
+          modal: document.querySelector('button[aria-label="Close"]')?.parentElement?.parentElement,
+          historical: document.querySelector('[data-historical-inspection="true"]'),
+        };
+        const root = roots[kind];
+        return requested.map(({ name, selector }) => {
+          const element = root?.querySelector(selector);
+          if (!element) return false;
+          element.dataset.largeTextTarget = `${kind}-${name}`;
+          return true;
+        });
+      }, { scopeKind, specs });
+      if (!marked.every(Boolean)) throw new Error(`Could not mark ${scopeKind} large-text metrics: ${JSON.stringify(marked)}`);
+      return specs.map(({ name }) => ({ name, selector: `[data-large-text-target="${scopeKind}-${name}"]` }));
+    };
+    // Chromium does not emulate iOS text-size adjustment for fixed-pixel
+    // inline React styles. This fallback intentionally changes only the
+    // computed font and line-box sizes of text-bearing descendants in the
+    // requested surface; it never applies page zoom, CSS zoom, or transforms.
+    const applyTextOnlyLargeTextFallback = (target, scopeKind, scale) => target.evaluate(({ scopeKind: kind, scale: multiplier }) => {
+      const roots = {
+        card: document.querySelector('[data-preview-card]'),
+        modal: document.querySelector('button[aria-label="Close"]')?.parentElement?.parentElement,
+        historical: document.querySelector('[data-historical-inspection="true"]'),
+      };
+      const root = roots[kind];
+      if (!root) return 0;
+      const elements = [...root.querySelectorAll('div,p,span,strong,button,a,li,h1,h2,h3,h4,label,summary')]
+        .filter((element) => (element.textContent || '').trim() && getComputedStyle(element).display !== 'none');
+      const snapshots = elements.map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          element,
+          fontSize: Number.parseFloat(style.fontSize),
+          lineHeight: Number.parseFloat(style.lineHeight),
+        };
+      });
+      snapshots.forEach(({ element, fontSize, lineHeight }) => {
+        if (Number.isFinite(fontSize)) element.style.setProperty('font-size', `${fontSize * multiplier}px`, 'important');
+        if (Number.isFinite(lineHeight)) element.style.setProperty('line-height', `${lineHeight * multiplier}px`, 'important');
+      });
+      return snapshots.length;
+    }, { scopeKind, scale });
+    const textActuallyGrew = (baseline, candidate) => Object.keys(baseline).every((name) => {
+      const before = baseline[name];
+      const after = candidate[name];
+      if (!before || !after || !Number.isFinite(before.fontSizePx) || !Number.isFinite(after.fontSizePx)) return false;
+      if (after.fontSizePx < before.fontSizePx * 1.2) return false;
+      if (Number.isFinite(before.lineHeightPx) && (!Number.isFinite(after.lineHeightPx) || after.lineHeightPx < before.lineHeightPx * 1.2)) return false;
+      return true;
+    });
+    const textEvidence = (baseline, native, large, fallbackApplied) => ({
+      requestedTextSizeAdjust: '200%',
+      fallbackApplied,
+      baseline,
+      nativeTextSizeAdjust: native,
+      measuredLargeText: large,
+    });
+    const cardTextSpecs = [
+      { name: 'title', selector: ':scope > div:first-child' },
+      { name: 'change', selector: ':scope [data-preview-change]' },
+      { name: 'viewButton', selector: ':scope button[aria-label="View recipe"]' },
+    ];
     attachPageHealth(page, errors, writes);
     await page.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.clear());
@@ -143,10 +253,17 @@ try {
     attachPageHealth(sourcePage, sourceErrors, sourceWrites);
     await sourcePage.setViewportSize({ width: 320, height: 844 });
     await sourcePage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?source=1`, { waitUntil: 'domcontentloaded' });
+    const sourceCardMetricSpecs = await markTextTargets(sourcePage, 'card', cardTextSpecs);
+    const sourceTextBaseline = await measureText(sourcePage, 'card', sourceCardMetricSpecs);
     await sourcePage.evaluate(() => {
       localStorage.clear();
       document.documentElement.style.setProperty('-webkit-text-size-adjust', '200%');
     });
+    const sourceTextNative = await measureText(sourcePage, 'card', sourceCardMetricSpecs);
+    const sourceLargeTextFallback = !textActuallyGrew(sourceTextBaseline, sourceTextNative);
+    if (sourceLargeTextFallback) await applyTextOnlyLargeTextFallback(sourcePage, 'card', 1.25);
+    const sourceTextLarge = await measureText(sourcePage, 'card', sourceCardMetricSpecs);
+    assert.equal(textActuallyGrew(sourceTextBaseline, sourceTextLarge), true, 'Source card text and line boxes must enlarge against an unscaled baseline');
     await sourcePage.locator('[data-preview-card]').waitFor({ state: 'visible' });
     const sourceResponsive = await sourcePage.evaluate(() => {
       const card = document.querySelector('[data-preview-card]');
@@ -174,10 +291,24 @@ try {
     assert.match(await sourcePage.locator('[data-preview-card]').innerText(), /HARIO Switch 03 Matt Winton bloom hybrid/);
     assert.match(await sourcePage.locator('[data-preview-card]').innerText(), /360mL water/);
     await sourcePage.screenshot({ path: screenshots.sourceCard320, fullPage: false });
+    // Re-open the modal from an unscaled document state so its baseline is
+    // genuinely unscaled before the large-text setting is measured.
+    await sourcePage.evaluate(() => document.documentElement.style.removeProperty('-webkit-text-size-adjust'));
     const sourceViewButton = sourcePage.getByRole('button', { name: 'View recipe', exact: true });
     await sourceViewButton.focus();
     await sourceViewButton.click();
     await sourcePage.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
+    const sourcePreviewSettled = await waitForSettledModal(sourcePage);
+    const sourcePreviewMetricSpecs = await markTextTargets(sourcePage, 'modal', [
+      { name: 'title', selector: 'div[style*="font-size: 24px"]' },
+    ]);
+    const sourcePreviewTextBaseline = await measureText(sourcePage, 'modal', sourcePreviewMetricSpecs);
+    await sourcePage.evaluate(() => document.documentElement.style.setProperty('-webkit-text-size-adjust', '200%'));
+    const sourcePreviewTextNative = await measureText(sourcePage, 'modal', sourcePreviewMetricSpecs);
+    const sourcePreviewLargeTextFallback = !textActuallyGrew(sourcePreviewTextBaseline, sourcePreviewTextNative);
+    if (sourcePreviewLargeTextFallback) await applyTextOnlyLargeTextFallback(sourcePage, 'modal', 1.25);
+    const sourcePreviewTextLarge = await measureText(sourcePage, 'modal', sourcePreviewMetricSpecs);
+    assert.equal(textActuallyGrew(sourcePreviewTextBaseline, sourcePreviewTextLarge), true, 'Source preview text and line boxes must enlarge against an unscaled baseline');
     assert.match(await sourcePage.locator('body').innerText(), /HARIO Switch 03 Matt Winton bloom hybrid/);
     assert.match(await sourcePage.locator('body').innerText(), /50g/);
     assert.match(await sourcePage.locator('body').innerText(), /360mL/);
@@ -196,15 +327,35 @@ try {
     attachPageHealth(sourceHistoricalPage, sourceHistoricalErrors, sourceHistoricalWrites);
     await sourceHistoricalPage.setViewportSize({ width: 320, height: 844 });
     await sourceHistoricalPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?source=1&historical=1`, { waitUntil: 'domcontentloaded' });
+    const sourceHistoricalCardMetricSpecs = await markTextTargets(sourceHistoricalPage, 'card', cardTextSpecs);
+    const sourceHistoricalTextBaseline = await measureText(sourceHistoricalPage, 'card', sourceHistoricalCardMetricSpecs);
     await sourceHistoricalPage.evaluate(() => {
       localStorage.clear();
       document.documentElement.style.setProperty('-webkit-text-size-adjust', '200%');
     });
+    const sourceHistoricalTextNative = await measureText(sourceHistoricalPage, 'card', sourceHistoricalCardMetricSpecs);
+    const sourceHistoricalCardLargeTextFallback = !textActuallyGrew(sourceHistoricalTextBaseline, sourceHistoricalTextNative);
+    if (sourceHistoricalCardLargeTextFallback) await applyTextOnlyLargeTextFallback(sourceHistoricalPage, 'card', 1.25);
+    const sourceHistoricalTextLarge = await measureText(sourceHistoricalPage, 'card', sourceHistoricalCardMetricSpecs);
+    assert.equal(textActuallyGrew(sourceHistoricalTextBaseline, sourceHistoricalTextLarge), true, 'Historical source card text and line boxes must enlarge against an unscaled baseline');
+    // As with the preview, remove the setting while mounting the detail so
+    // the historical text comparison starts from a genuinely unscaled state.
+    await sourceHistoricalPage.evaluate(() => document.documentElement.style.removeProperty('-webkit-text-size-adjust'));
     const sourceHistoricalViewButton = sourceHistoricalPage.getByRole('button', { name: 'View recipe', exact: true });
     await sourceHistoricalViewButton.focus();
     await sourceHistoricalViewButton.click();
     const sourceHistoricalDetail = sourceHistoricalPage.locator('[data-historical-inspection="true"]');
     await sourceHistoricalDetail.waitFor({ state: 'visible' });
+    const historicalMetricSpecs = await markTextTargets(sourceHistoricalPage, 'historical', [
+      { name: 'title', selector: ':scope > div:nth-child(2)' },
+    ]);
+    const historicalTextBaseline = await measureText(sourceHistoricalPage, 'historical', historicalMetricSpecs);
+    await sourceHistoricalPage.evaluate(() => document.documentElement.style.setProperty('-webkit-text-size-adjust', '200%'));
+    const historicalTextNative = await measureText(sourceHistoricalPage, 'historical', historicalMetricSpecs);
+    const historicalLargeTextFallback = !textActuallyGrew(historicalTextBaseline, historicalTextNative);
+    if (historicalLargeTextFallback) await applyTextOnlyLargeTextFallback(sourceHistoricalPage, 'historical', 1.25);
+    const historicalTextLarge = await measureText(sourceHistoricalPage, 'historical', historicalMetricSpecs);
+    assert.equal(textActuallyGrew(historicalTextBaseline, historicalTextLarge), true, 'Historical source detail text and line boxes must enlarge against an unscaled baseline');
     assert.match(await sourceHistoricalDetail.innerText(), /Historical recipe · read only/);
     assert.match(await sourceHistoricalDetail.innerText(), /HARIO Switch 03 Matt Winton bloom hybrid/);
     assert.match(await sourceHistoricalDetail.innerText(), /24g coffee/);
@@ -220,7 +371,19 @@ try {
     assert.deepEqual(sourceHistoricalErrors, []);
     await sourceHistoricalPage.close();
     assert.deepEqual(blockedRequests, [], 'Rendered fixture must not request non-local or non-GET resources');
-    console.log(JSON.stringify({ sourceResponsive, sourceHistorical: { width: 320, largeText: '200%', reducedMotion: true, focusReturn: true }, blockedRequests: blockedRequests.length, sourceWrites: 0 }));
+    console.log(JSON.stringify({
+      sourceResponsive,
+      sourcePreviewSettled,
+      sourceTextEvidence: {
+        card: textEvidence(sourceTextBaseline, sourceTextNative, sourceTextLarge, sourceLargeTextFallback),
+        preview: textEvidence(sourcePreviewTextBaseline, sourcePreviewTextNative, sourcePreviewTextLarge, sourcePreviewLargeTextFallback),
+        historicalCard: textEvidence(sourceHistoricalTextBaseline, sourceHistoricalTextNative, sourceHistoricalTextLarge, sourceHistoricalCardLargeTextFallback),
+        historicalDetail: textEvidence(historicalTextBaseline, historicalTextNative, historicalTextLarge, historicalLargeTextFallback),
+      },
+      sourceHistorical: { width: 320, reducedMotion: true, focusReturn: true },
+      blockedRequests: blockedRequests.length,
+      sourceWrites: 0,
+    }));
 
     // Real deterministic orchestration output rendered through the actual card:
     // provider transport is injected; no live model or account is involved.
