@@ -1,7 +1,7 @@
 ---
 title: "feat: Natural Ruphus technique exploration across Kalita, V60 and Switch"
 type: feat
-status: planned
+status: in_progress
 date: 2026-09-10
 ---
 
