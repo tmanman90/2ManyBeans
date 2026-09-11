@@ -14,20 +14,25 @@ Use [`TECHNIQUE-EXPLORATION-ACCEPTANCE.md`](TECHNIQUE-EXPLORATION-ACCEPTANCE.md)
 for current source, runtime, rendering, live and native evidence. The older
 closeouts below do not prove this expansion or describe its current install.
 
-Current installed private candidate source is `bb8580a`, preview
-`https://twomanybeans-ruphus-71ju8ykh3-tmanman90s-projects.vercel.app`.
+Current installed private candidate source is `ef9e184`, preview
+`https://twomanybeans-ruphus-14nnc2fzk-tmanman90s-projects.vercel.app`.
 Built and installed JS content SHA-256 is
-`1fdce24437eff07a39ea09fc4e2a3d1e24e2793ee6867d27b976489370a6bc7d`.
+`0c6b70a747d2ab296b44deb5774cb78383a567118b66d00f5c837d972f2327bf`.
 Dev identity, isolated Firebase, matching preview, updater disabled and channel
 dev were independently verified. Native V60/Kalita paths and Switch hybrid
 card/dose/valve/relaunch paths passed as detailed in the acceptance record.
-Post-trial alternative card continuity, full-immersion card and remaining
-conversation/recovery sequences are still open; the expansion is not PASS.
+Post-trial alternative recovery now delivers the distinct full-immersion card;
+its original36g/440mL guide and post-pour clock were exercised natively.
+The current candidate also fixes adapted-dose stepping and read-only comparison
+binding. Their native replays and remaining conversation/recovery sequences
+are still open; the expansion is not PASS.
 
 Tal explicitly authorized `resume simulator`. Use the existing signed-in
 simulator with mirror touch and accessible on-screen keyboard buttons; do not
 enable Send Keyboard Input to Device or reconnect the hardware keyboard.
-No phone or iPhone Mirroring is needed. Preserve login and data, install in
+No phone or iPhone Mirroring is needed. Computer Use reported the Mac locked
+on September11 before the final interactive replay. Wait for the Mac to be
+unlocked; do not attempt to bypass it. Preserve login and data, install in
 place, and never seed or reset the owner account. Latest successful readback
 compares all 57 original/current snapshots unchanged. The operator credential
 was refreshed through Firebase CLI, independently of the app's login.
@@ -38,7 +43,7 @@ the historical model tournament below. Source-backed injected Save/Undo
 journeys remain separate from actual signed-in UI acceptance. Before each
 paid request, reread/reserve against the original `feat-ruphus-agent-v3`
 `docs/data/ruphus-agent-v3/conversation-eval/live-cost-ledger.json`.
-Last settled spend is $48.082709, reserved $0, of the unchanged $55 total cap.
+Last settled spend is $48.090546, reserved $0, of the unchanged $55 total cap.
 Keep diagnostics, leave Capgo and production unchanged, and record live
 closure only after a named card actually persists and renders. Personal
 sensory verdicts remain separate and do not block engineering work.
