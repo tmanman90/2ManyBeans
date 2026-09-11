@@ -199,6 +199,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   const pendingTools = new Set();
   const throwIfCancelled = () => { if (signal?.aborted) throw cancelledError(); };
   let techniqueContinuationUsed = false;
+  let techniqueRoundRecoveryUsed = false;
   const runTool = async (request, { blockedResult = null } = {}) => {
     throwIfCancelled();
     const pending = { callId: request.callId || null, name: request.name };
@@ -294,17 +295,57 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       // Two evidence rounds may already have resolved and read the exact
       // recipe. Deliver the one eligible proposal requested by that final
       // model response; this neither adds a read nor another model call.
-      const finalProposal = toolRounds === maxToolRounds + 1 && readCalls > 0
+      const proposalRoundException = toolRounds === maxToolRounds + 1
+        || (techniqueRoundRecoveryUsed && toolRounds === maxToolRounds + 2);
+      const finalProposal = proposalRoundException && readCalls > 0
         && !roundLimitRecovered && !proposalClaimed && calls.length === 1
         && calls[0].name === 'propose_recipe_change'
         && proposalEligibleForTarget(context, calls[0].args || {});
       if (toolRounds > maxToolRounds && !finalProposal) {
+        if (techniqueRoundRecoveryUsed) {
+          text = TECHNIQUE_RECOVERY;
+          break;
+        }
         const target = proposalTarget(context?.proposalState || {});
         const unreadyReview = calls.length === 1 && calls[0].name === 'propose_recipe_change'
           && !proposalClaimed && target.coffeeRef && target.slot
           && calls[0].args?.coffeeRef === target.coffeeRef
           && (calls[0].args?.slot || calls[0].args?.slotKey) === target.slot;
         if (roundLimitRecovered || (!unreadyReview && !calls.every((request) => READS.has(request.name)))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
+        const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
+          && item.result?.ok === true && item.result?.actionable === true
+          && Array.isArray(item.result?.options) && item.result.options.length > 0);
+        const canContinueTechnique = !roundLimitRecovered && !proposalClaimed && toolCalls < maxToolCalls
+          && calls.every((request) => READS.has(request.name))
+          && techniqueRead && techniqueRequest(userText || context?.userText || '', context, target);
+        if (canContinueTechnique) {
+          // A model may spend the third round rereading the exact recipe after
+          // the evidence and technique readers have already established a
+          // target-bound option set. Do not dispatch that redundant read; use
+          // the existing one-proposal exception for the selected option.
+          techniqueContinuationUsed = true;
+          techniqueRoundRecoveryUsed = true;
+          const results = calls.map((request) => ({
+            callId: request.callId,
+            name: request.name,
+            result: {
+              ok: false,
+              code: 'read_budget_complete',
+              message: 'Use the coffee evidence and technique options already provided; do not request another read.',
+              techniqueOptions: techniqueRead.result,
+            },
+          }));
+          response = await provider.runTurn({
+            turnId, context, userText, conversation: context?.conversation || [],
+            tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+            previous: response, toolResult: { results }, regeneration: true,
+            correctiveInstruction: 'The exact coffee evidence and eligible source-backed technique options are already loaded. Choose one exact executable option from the trusted technique reader and call propose_recipe_change now. Do not reread the recipe, ask for another detail, or claim a review card unless the proposal tool returns its artifact.',
+            signal,
+          });
+          throwIfCancelled();
+          rememberUsage(response);
+          continue;
+        }
         roundLimitRecovered = true;
         const results = calls.map((request) => ({ callId: request.callId, name: request.name, result: { ok: false, code: 'read_budget_complete', message: 'Use the coffee evidence already provided and answer without another read.' } }));
         response = await provider.runTurn({

@@ -254,6 +254,102 @@ test('off-rotation Switch identity survives the bounded evidence and technique p
   assert.ok(options.options.every(option => option.sourceConfiguration?.variant === 'switch'));
 });
 
+test('an extra exact-recipe read after Switch options recovers into one proposal within the round budget', async () => {
+  const stored = {
+    method: 'pour-over', device: 'v60', variant: 'switch', v60Size: '03', mode: 'hot',
+    dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94,
+  };
+  const coffee = { id: 'el-vergel', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: stored } };
+  const userText = 'Try a different switch technique for el vergel';
+  const context = await buildRuphusContext({
+    uid: 'owner-1', contextRef: { surface: 'direct' }, userText, evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [coffee],
+      readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'fellow-ode-gen2', units: 'metric' }),
+    },
+  });
+  const recipe = resolveLegacyRecipe(coffee, 'v60_hot').recipe;
+  const tools = createRuphusTools({
+    uid: 'owner-1', context,
+    readers: {
+      readCoffee: async () => coffee,
+      readRecipe: async () => recipe,
+      readBrews: async () => [],
+      readTastings: async () => [],
+    },
+  });
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'off-rotation-switch-round-recovery', context, userText, tools,
+    provider: { runTurn: async (input) => {
+      providerCalls += 1;
+      if (providerCalls === 1) return { toolCalls: [{ callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: context.turnBinding.coffeeRef, windowDays: 14 } }] };
+      if (providerCalls === 2) return { toolCalls: [{ callId: 'options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } }] };
+      if (providerCalls === 3) return { toolCalls: [
+        { callId: 'redundant-recipe', name: 'read_recipe', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } },
+        { callId: 'redundant-options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } },
+      ] };
+      assert.equal(providerCalls, 4);
+      assert.equal(input.regeneration, true);
+      assert.deepEqual(input.tools.map((definition) => definition.name), ['propose_recipe_change']);
+      assert.deepEqual(input.toolResult.results.map((item) => item.callId), ['redundant-recipe', 'redundant-options']);
+      assert.ok(input.toolResult.results.every((item) => item.result.code === 'read_budget_complete'));
+      const options = input.toolResult.results[0].result.techniqueOptions.options;
+      return { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: {
+        coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot', change: null,
+        experiment: { kind: 'manual_source_technique', sourceId: options[0].sourceId },
+      } }] };
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(providerCalls, 4);
+  assert.deepEqual(result.toolNames, ['read_coffee_evidence', 'read_technique_options', 'propose_recipe_change']);
+  assert.deepEqual(result.trace.reads.map((read) => read.name), ['read_coffee_evidence', 'read_technique_options']);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].techniqueExperiment.kind, 'manual_source_technique');
+});
+
+test('an invalid proposal after the bounded Switch continuation returns technique recovery, not a round-limit failure', async () => {
+  const userText = 'Try a different switch technique for el vergel';
+  const context = baseContext(userText);
+  const dispatched = [];
+  const option = { id: 'switch-option', familyId: 'switch-family', sourceId: 'switch-source', executable: true, timerReady: true };
+  const tools = {
+    names: ['read_coffee_evidence', 'read_recipe', 'read_technique_options', 'propose_recipe_change'],
+    definitions: [{ name: 'propose_recipe_change' }],
+    call: async (name) => {
+      dispatched.push(name);
+      if (name === 'read_technique_options') return { ok: true, actionable: true, options: [option] };
+      return { ok: true };
+    },
+  };
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'off-rotation-switch-invalid-recovery', context, userText, tools,
+    provider: { runTurn: async (input) => {
+      providerCalls += 1;
+      if (providerCalls === 1) return { toolCalls: [{ callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } }] };
+      if (providerCalls === 2) return { toolCalls: [{ callId: 'options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      if (providerCalls === 3) return { toolCalls: [{ callId: 'repeat-options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      assert.equal(providerCalls, 4);
+      assert.equal(input.regeneration, true);
+      assert.deepEqual(input.toolResult.results.map((item) => item.callId), ['repeat-options']);
+      assert.equal(input.toolResult.results[0].result.code, 'read_budget_complete');
+      assert.deepEqual(input.toolResult.results[0].result.techniqueOptions.options, [option]);
+      return { toolCalls: [{ callId: 'invalid-proposal', name: 'propose_recipe_change', args: {
+        coffeeRef: 'c1', slot: 'v60_hot', change: null,
+        experiment: { kind: 'manual_source_technique', sourceId: 'not-an-offered-option' },
+      } }] };
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.code, undefined);
+  assert.match(result.text, /couldn’t prepare its review recipe safely/i);
+  assert.deepEqual(result.toolNames, ['read_coffee_evidence', 'read_technique_options']);
+  assert.deepEqual(dispatched, ['read_coffee_evidence', 'read_technique_options']);
+  assert.equal(providerCalls, 4);
+});
+
 test('reference-only and unknown technique IDs cannot execute through the proposal tool', async () => {
   const context = baseContext();
   context.proposalState.previewReady = true;
