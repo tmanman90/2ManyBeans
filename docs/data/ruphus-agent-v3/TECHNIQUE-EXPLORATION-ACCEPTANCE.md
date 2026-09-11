@@ -8,12 +8,12 @@ Authority: `docs/plans/2026-09-10-001-feat-ruphus-technique-exploration-plan.md`
 
 | Journey | Required observation | Evidence |
 |---|---|---|
-| First technique request | One named response and one compact card without another user message | Native V60, Kalita155 and185 same-turn cards passed; Switch remains failing |
+| First technique request | One named response and one compact card without another user message | Native V60, Kalita155/185 and Switch03 hybrid same-turn cards passed; post-trial another-card continuity remains open |
 | Another / compare / first again | Distinct eligible family; comparison creates no duplicate; historical selection does not reactivate stale action | Native Kalita another/new-chat reset passed; comparison/history have deterministic and rendered evidence, native sequence remains open |
 | Kalita155 and185 | Source-faithful named options; no implicit size change | Native155 scale/Save/Undo and185 source-unit/timer-start/leave passed; exact-size rejection covered deterministically |
-| Switch03 | Hybrid and immersion remain distinct; valve instructions and phase capacity survive preview and execution | Source/runtime/timer checks passed; fresh native replay still fails tool_round_limit on8b2cf15 |
+| Switch03 | Hybrid and immersion remain distinct; valve instructions and phase capacity survive preview and execution | Native hybrid card,16g/240mL preview/timer and valve-state relaunch passed onbb8580a; immersion follow-up gives prose without a card |
 | Dose → Start → return → Save → Undo | Same validated snapshot throughout; final saved recipe restored | Native V60 trial/later-Save/Undo and Kalita155 scale/Save/Undo passed; injected Switch source journey passed; native Switch open |
-| Missing / unavailable / reference / exhausted | Useful truthful response, no fabricated timer or Aiden substitution | Deterministic coverage exists; native reference/exhaustion remains open |
+| Missing / unavailable / reference / exhausted | Useful truthful response, no fabricated timer or Aiden substitution | Native iced limitation and God/Devil reference guidance passed; native exhaustion remains open |
 | Retry / cancellation / relaunch | Stable identities, no duplicate mutations, login and cards retained | Native signed-in relaunch restored source trial/cards; cancellation/idempotency covered deterministically; native interruption sequence open |
 | Rendering | Composer does not cover controls; small viewport, large text, reduced motion, return focus | Settled320px/measured125% text/reduced-motion browser proof passed; native V60/Kalita cards and controls reachable above composer |
 
@@ -119,6 +119,20 @@ Candidate4c4a653 is installed in place after guarded asset preparation. Preview 
 Fresh native replay on4c4a653 still failed `tool_round_limit`; terminal cost $0.001601, cumulative $48.071531, reserved0. The earlier guard correction alone is not native closure. Root then reproduced the underlying method-binding gap with the actual owner's recipe shapes, without a provider call: El Vergel has `[aiden,v60_hot,kalita_hot,kalita_iced]`; `resolveMethod` for the exact Switch request returns Aiden/M4 because the method grammar does not recognize Switch. Composite evidence can therefore bind a different slot before Switch options arrive. The isolated prior runtime fixture had only a V60 recipe and did not cover this input. R3 correction now requires multi-recipe explicit-Switch priority, verb/equipment disambiguation, and same-slot wrong-variant refusal. A current Switch test incorrectly expects generic V60 options for an explicit Switch request against a standard-V60 base; that assertion must be corrected, not counted as coverage.
 
 ## Source discovery affecting acceptance
+
+### Switch binding closure and post-trial continuity finding — September11
+
+Commit bb8580a082fb2e99b60a95f2819f8aa79c1df068 adds explicit Switch equipment/mode binding before competing saved recipes, verb disambiguation, classic-V60 wrong-variant refusal, and a separate read-only projection of the existing corroborated God/Devil reference. Root independently inspected the production diff and passed30/30 method/Switch/runtime/reference tests, production ESLint and diff-check. Both Luna workers loaded the complete verbatim MSW Kernel. No new source research or executable dual-temperature family was invented.
+
+Private preview `https://twomanybeans-ruphus-71ju8ykh3-tmanman90s-projects.vercel.app` / `dpl_HCyqd3rz2HBBazm5QdhxuZHbAF3Q` verified READY, isolated Dev project, non-production and exact source SHA. Guarded native asset preparation and XcodeBuildMCP build-and-run passed15.4s, PID81533. Built/installed JS fingerprints match `1fdce24437eff07a39ea09fc4e2a3d1e24e2793ee6867d27b976489370a6bc7d`; Dev bundle/name, preview, isolated Firebase, Ask label, autoUpdatefalse and channeldev all pass. In-place installation preserved login and the previous source trial.
+
+Fresh native `Try a different switch technique for el vergel` now delivers HARIO Switch03 Matt Winton bloom hybrid and its compact View card in the same turn. View opens recipe details, not a timer.15g/225mL changed to16g/240mL; scaled first pour33.33g and source-native valve instructions were retained. Explicit Start opened the immutable16g/240mL guide at0:00, valveopen, without starting the clock until Start first pour. Request cost $0.002048, no endpoint failure.
+
+Root exercised **simulated Dev-only** first-pour and valve-close confirmations (no physical brew claim). After the source checkpoint passed, the guide instructed closing without automatically recording it; the following pour was anchored immediately after confirmed closure. Stopping/relaunching only the Dev app through XcodeBuildMCP (new PID88988) restored the exact16g/240mL trial. Reopening its guide resumed at step3 with valveclosed and retained the completed simulated steps, rather than replaying them. Leave and resume later preserved the trial. All57 original saved recipe hashes still matched exactly.
+
+The same-chat post-trial `Show me another one` exposed a remaining R6 gap: correct HARIO full-immersion prose (15g/183mL) but no new card. Terminal telemetry contains resolve_coffee/read_coffee_evidence/read_technique_options, no proposal and no endpoint failure. Cost $0.003551. The worker is reproducing the post-action/session lifecycle; first-card Switch binding is no longer the blocker.
+
+Native `What about the two temperature devil recipe` now gives useful90°C→70°C percolation-first reference guidance and explicitly says it is read-only/non-executable; no invented card or connectivity error. Cost $0.002486. Latest cumulative original ledger: $48.079616 spent, reserved0, authorization55. Native full-immersion card, post-trial alternative continuity, comparison/history, exhaustion and response-interruption checks remain open; no full-plan PASS.
 
 ### Explicit app dose guide policy
 
