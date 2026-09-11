@@ -12,6 +12,10 @@ import { V60_SOURCES as MANUAL_V60_SOURCES } from '../../data/manualSources/v60.
 import { KALITA_CONFIGURATION } from '../../data/kalitaConfiguration.js';
 import { V60_SWITCH_DOSE_BOUNDS } from '../../data/v60SwitchConfiguration.js';
 import {
+  V60_SWITCH_SOURCE_REGISTRY_VERSION,
+  V60_SWITCH_SOURCES,
+} from '../../data/v60SwitchSourceRegistry.js';
+import {
   MANUAL_SOURCE_PROJECTION_VERSION,
   ManualSourceProjectionError,
   projectManualSource,
@@ -211,6 +215,59 @@ export function listV60TechniqueReferences() {
           : 'Source does not provide an executable cadence and complete parameters.',
       };
     });
+}
+
+const SWITCH_REFERENCE_SOURCE_IDS = Object.freeze(['kasuya-hybrid-resolved']);
+
+/**
+ * Project the one resolved dual-temperature Switch source as read-only
+ * guidance. It is intentionally separate from executable options: the
+ * current Switch workflow is single-temperature and cannot execute this
+ * source faithfully without inventing an adaptation.
+ */
+export function listV60SwitchTechniqueReferences() {
+  return SWITCH_REFERENCE_SOURCE_IDS.flatMap((sourceId) => {
+    const source = V60_SWITCH_SOURCES.find((candidate) => candidate.id === sourceId);
+    if (!source) return [];
+    const temperaturePhases = Object.fromEntries([
+      ['phase1C', source.temperaturePhase1C],
+      ['phase2C', source.temperaturePhase2C],
+    ].filter(([, value]) => Number.isFinite(value)));
+    const valveTiming = Object.fromEntries([
+      ['closeTimeSeconds', source.valveCloseTimeSeconds],
+      ['openTimeSeconds', source.valveOpenTimeSeconds],
+    ].filter(([, value]) => Number.isFinite(value)));
+    const phaseSummary = Object.values(temperaturePhases).map((value) => `${value}°C`).join(' then ');
+    return [{
+      id: source.id,
+      sourceId: source.id,
+      name: source.author,
+      label: source.publication,
+      familyId: null,
+      familyKey: null,
+      brewer: source.brewer,
+      sourceDoseGrams: source.doseGrams,
+      sourceRatio: source.ratio,
+      temperaturePhases,
+      structure: source.structure,
+      valveTiming,
+      notes: source.notes,
+      attribution: {
+        author: source.author,
+        canonicalUrl: source.canonicalUrl,
+        publication: source.publication,
+        evidenceType: source.evidenceType,
+        evidenceTier: source.evidenceTier,
+        status: source.status,
+      },
+      sourceRegistryVersion: V60_SWITCH_SOURCE_REGISTRY_VERSION,
+      referenceKind: 'dual-temperature',
+      executable: false,
+      timerReady: false,
+      referenceOnly: true,
+      reason: `Reference-only: this source specifies ${phaseSummary || 'multiple temperature'} phases; the supported Switch workflow is single-temperature, so it must not be executed as the original or silently approximated.`,
+    }];
+  });
 }
 
 function optionOrThrow(id) {

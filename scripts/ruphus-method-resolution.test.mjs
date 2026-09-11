@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { explicitMethodFromText, resolveMethod } from '../src/lib/ruphus/methodResolver.js';
+import { explicitMethodFromText, explicitMethodVariantFromText, resolveMethod } from '../src/lib/ruphus/methodResolver.js';
 
 test('method priority prefers explicit and temporary launch hints', () => {
   assert.equal(resolveMethod({ userText: 'use the Kalita', launchItem: { method: 'aiden' }, coffeeRef: 'a', launchCoffeeRef: 'a' }).slot, 'kalita_hot');
@@ -15,6 +15,29 @@ test('natural brewer mentions bind directly while negated brewers never become t
   assert.equal(explicitMethodFromText("Huh no, I didn't brew this on Aiden."), null);
   assert.equal(explicitMethodFromText('Not Aiden—I used the Kalita 155.'), 'kalita_hot');
   assert.equal(explicitMethodFromText('It tasted thin but sweet and clean, not sour with the hot Kalita recipe.'), 'kalita_hot');
+});
+test('explicit Switch equipment wins across multiple saved slots while switch-to remains a coffee verb', () => {
+  const multiRecipeInput = {
+    recipeSlots: ['aiden', 'v60_hot', 'kalita_hot', 'kalita_iced'],
+    recipes: [
+      { slotKey: 'aiden' },
+      { slotKey: 'v60_hot', variant: 'switch' },
+      { slotKey: 'kalita_hot' },
+      { slotKey: 'kalita_iced' },
+    ],
+    defaultMethod: 'aiden',
+    coffeeRef: 'c1',
+  };
+  assert.equal(explicitMethodVariantFromText('Try a different Switch technique for El Vergel'), 'switch');
+  assert.equal(explicitMethodFromText('Try a different Switch technique for El Vergel'), 'v60_hot');
+  assert.deepEqual(resolveMethod({ ...multiRecipeInput, userText: 'Try a different Switch technique for El Vergel' }), { slot: 'v60_hot', displayName: 'hot V60', tier: 'M1' });
+  assert.equal(explicitMethodFromText('Show me an iced Switch recipe'), 'v60_iced');
+
+  assert.equal(explicitMethodVariantFromText('Switch to Jar 2'), null);
+  assert.equal(explicitMethodFromText('Switch to Jar 2'), null);
+  const coffeeSwitch = resolveMethod({ ...multiRecipeInput, userText: 'Switch to Jar 2' });
+  assert.notEqual(coffeeSwitch.slot, 'v60_hot');
+  assert.notEqual(coffeeSwitch.tier, 'M1');
 });
 test('method inference applies recent agreement, iced mode, and M6 ask', () => {
   assert.equal(resolveMethod({ brews: [{ slot: 'v60_iced' }, { slot: 'v60_iced' }], isChangeRequest: true }).slot, 'v60_iced');

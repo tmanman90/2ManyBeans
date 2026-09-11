@@ -5,6 +5,7 @@ const slot = (value) => {
   const valueText = String(value || '').toLowerCase().replace(/\s+/g, '_');
   if (SLOT_KEYS.includes(valueText)) return valueText;
   if (valueText === 'aiden') return 'aiden';
+  if (valueText === 'switch' || /^switch_0?[23]$/.test(valueText)) return 'v60_hot';
   if (valueText.includes('kalita')) return valueText.includes('iced') ? 'kalita_iced' : 'kalita_hot';
   if (valueText.includes('v60') || valueText === 'v60') return valueText.includes('iced') ? 'v60_iced' : 'v60_hot';
   return null;
@@ -25,10 +26,32 @@ const recordTime = (record) => {
 };
 
 const METHOD_MENTION = /\b(?:(hot|iced)\s+)?(aiden|v\s*60|kalita)(?:\s+(?:155|185))?\b/gi;
+// Switch is a V60 variant, not a standalone recipe slot. Require equipment
+// grammar so the verb in “switch to Jar 2” cannot bind the current coffee to
+// a Switch recipe. The exact variant is enforced later against the saved
+// recipe; this helper only identifies what the user named.
+const SWITCH_EQUIPMENT_MENTION = /\b(?:switch(?:\s+0?[23])?\s+(?:the\s+)?(?:technique|method|recipe|brewer|dripper|filter|size)|(?:ribbed|hario|v60)\s+switch(?:\s+0?[23])?|(?:with|using|on)\s+(?:the\s+)?switch(?:\s+0?[23])?|(?:use|try|brew|prepare|choose|pick|select)\s+(?:the\s+)?switch(?:\s+0?[23])?|switch\s+0?[23])\b/gi;
 // Only treat a method mention as negated when the short bridge after the
 // negator is method-grammar. Sensory clauses such as “not sour with the hot
 // Kalita” must leave Kalita as the explicit method.
 const NEGATED_METHOD_PREFIX = /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not|without)\b(?:\s+(?:the|a|an|my|your|this|that|it|use|used|brew|brewed|make|made|choose|pick|on|with|instead|rather|than|for|to|did|do)){0,5}\s*$/i;
+
+function positiveSwitchMentions(value) {
+  const source = String(value || '');
+  return [...source.matchAll(SWITCH_EQUIPMENT_MENTION)].filter((match) => {
+    const prefix = source.slice(Math.max(0, match.index - 64), match.index);
+    return !NEGATED_METHOD_PREFIX.test(prefix);
+  });
+}
+
+const switchSlotFromText = (value) => explicitMode(value) === 'iced' ? 'v60_iced' : 'v60_hot';
+
+// This is intentionally separate from the canonical method slot. Callers
+// that already resolved a V60 slot can use it to preserve the saved
+// V60/Switch boundary instead of treating a shared slot as equivalent hardware.
+export function explicitMethodVariantFromText(value) {
+  return positiveSwitchMentions(value).length ? 'switch' : null;
+}
 
 export function explicitMethodFromText(value) {
   const source = String(value || '');
@@ -39,6 +62,8 @@ export function explicitMethodFromText(value) {
     const resolved = slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`);
     if (resolved && !positive.includes(resolved)) positive.push(resolved);
   }
+  const switchSlot = positiveSwitchMentions(source).length ? switchSlotFromText(source) : null;
+  if (switchSlot && !positive.includes(switchSlot)) positive.push(switchSlot);
   return positive.length === 1 ? positive[0] : null;
 }
 
@@ -46,7 +71,9 @@ export function mentionedMethodSlots(value, { ignoreExplicitlyRejected = false }
   const source = String(value || '');
   const mentions = [...source.matchAll(METHOD_MENTION)].filter((match) => !ignoreExplicitlyRejected
     || !/\b(?:not|rather\s+than|instead\s+of)(?:\s+(?:the|an?|your))?\s*$/i.test(source.slice(0, match.index)));
-  return [...new Set(mentions.map((match) => slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`)).filter(Boolean))];
+  const slots = mentions.map((match) => slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`)).filter(Boolean);
+  if (positiveSwitchMentions(source).length) slots.push(switchSlotFromText(source));
+  return [...new Set(slots)];
 }
 
 function latestRecipeSlot(recipes, records) {

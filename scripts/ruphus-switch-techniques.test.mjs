@@ -111,6 +111,8 @@ test('Switch 03 exposes both hybrid and full-immersion source choices through th
   assert.ok(read.options.every((option) => option.sourceConfiguration.model === 'V60 Switch'));
   assert.ok(read.options.every((option) => option.sourceConfiguration.filter === 'v60-03-paper'));
   assert.ok(read.options.every((option) => option.executable === true && option.timerReady === true));
+  assert.deepEqual(read.references.map((reference) => reference.sourceId), ['kasuya-hybrid-resolved']);
+  assert.ok(read.references.every((reference) => reference.referenceOnly && reference.executable === false && reference.familyId === null));
   assert.match(read.options[0].differences[0], /open-valve bloom.*closed immersion.*release to drain/i);
   assert.match(read.options[1].differences[0], /stays closed through the pour and steep.*releases to drain/i);
 });
@@ -181,7 +183,7 @@ test('older clients can read Switch source details but cannot prepare an executa
   assert.equal(blocked.code, 'source_format_unsupported');
 });
 
-test('Switch source route fails closed for size/filter mismatches and keeps standard V60 generic', async () => {
+test('Switch source route fails closed for size/filter mismatches and keeps standard V60 requests generic', async () => {
   const switch03 = generateV60SwitchRecipe({}, { dose: 24, size: '03' });
   const wrongSize = { ...switch03, v60Size: '02', configurationKey: 'v60:02:standard-paper:switch:hot' };
   const wrongFilter = { ...switch03, sourceConfiguration: { filter: 'v60-02-paper' } };
@@ -199,9 +201,17 @@ test('Switch source route fails closed for size/filter mismatches and keeps stan
   const standardContext = contextFor({ userText: 'Show me a different Switch technique.', recipe: standard });
   const standardRead = await toolsFor(standardContext, standard).call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
   assert.equal(standardRead.ok, true);
-  assert.equal(standardRead.sourceOptions, undefined);
-  assert.ok(standardRead.options.length > 0);
-  assert.equal(standardRead.options.some((option) => option.sourceId?.startsWith('hario-switch-03-')), false);
+  assert.equal(standardRead.actionable, false);
+  assert.equal(standardRead.sourceOptions, true);
+  assert.deepEqual(standardRead.options, []);
+  assert.match(standardRead.message, /classic V60.*ribbed Switch|saved classic V60/i);
+
+  const genericContext = contextFor({ userText: 'Show me a different V60 technique.', recipe: standard });
+  const genericRead = await toolsFor(genericContext, standard).call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(genericRead.ok, true);
+  assert.equal(genericRead.actionable, true);
+  assert.ok(genericRead.options.length > 0);
+  assert.equal(genericRead.options.some((option) => option.sourceId?.startsWith('hario-switch-03-')), false);
 });
 
 test('stream client advertises the source-format capability without mutating caller state', () => {

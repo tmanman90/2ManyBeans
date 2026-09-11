@@ -2,7 +2,7 @@ import { canonicalHash, clone, hasManualSourceProjection, RECIPE_TECHNIQUE_EXPER
 import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { canonicalRecipeSnapshot, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
-import { resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
+import { explicitMethodVariantFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 import { generateV60Recipe } from '../../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../../src/lib/v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
@@ -12,6 +12,7 @@ import {
   generateManualSourceTechniqueOption,
   generateV60TechniqueOption,
   listManualSourceTechniqueOptions,
+  listV60SwitchTechniqueReferences,
   listV60TechniqueOptions,
 } from '../../src/lib/ruphus/techniqueOptions.js';
 import { createRecipePreview } from '../../src/lib/ruphus/recipePreview.js';
@@ -585,6 +586,29 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         if (slotKey === 'kalita_hot') return { ok: true, actionable: false, current: null, options: [], message: 'I need a saved hot Kalita recipe before I can prepare a source-backed technique experiment.' };
         return { ok: true, actionable: false, current: null, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can compare these source-backed hot V60 techniques, but I need a saved hot V60 recipe before I can prepare an executable experiment.' };
       }
+      const requestedVariant = slotKey === 'v60_hot' ? explicitMethodVariantFromText(context.userText) : null;
+      const savedVariant = String(recipe.variant || recipe.v60Variant || '').toLowerCase() === 'switch' ? 'switch' : 'classic';
+      if (requestedVariant === 'switch' && /\b(?:iced|cold)\b/i.test(context.userText || '')) {
+        return {
+          ok: true,
+          actionable: false,
+          sourceOptions: true,
+          current: { ...techniqueIdentity(recipe), variant: savedVariant, configuration: clone(sourceConfigurationForRecipe(recipe)) },
+          options: [],
+          references: listV60SwitchTechniqueReferences(),
+          message: 'The saved Switch guidance is hot-only, so I will not turn this iced request into a hot experiment.',
+        };
+      }
+      if (requestedVariant && requestedVariant !== savedVariant) {
+        return {
+          ok: true,
+          actionable: false,
+          sourceOptions: true,
+          current: { ...techniqueIdentity(recipe), variant: savedVariant, configuration: clone(sourceConfigurationForRecipe(recipe)) },
+          options: [],
+          message: 'This coffee has a saved classic V60, not the ribbed Switch configuration, so I will not prepare a Switch experiment from it.',
+        };
+      }
       const sourceRoute = sourceRouteForRecipe(recipe, slotKey);
       const sourceProjection = recipe.sourceProjection?.projectionVersion ? recipe.sourceProjection : null;
       const sourceProjectionBrewer = sourceProjection?.equipment?.brewer;
@@ -647,6 +671,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
           slot: slotKey,
           current: { ...techniqueIdentity(recipe), configuration: clone(sourceRoute?.configuration || sourceConfigurationForRecipe(recipe)), sourceProjection: clone(recipe.sourceProjection) },
           options,
+          ...(slotKey === 'v60_hot' ? { references: listV60SwitchTechniqueReferences() } : {}),
           sourceOptions: true,
           sourceFormatCapability: 'technique_experiment_v1',
           sourceFormatSupported: sourceFormatSupported(context),

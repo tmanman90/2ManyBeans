@@ -217,12 +217,50 @@ test('saved Switch 03 resolves source-backed options instead of standard V60 tec
   assert.ok(result.options.every(option => option.sourceConfiguration?.size === '03'));
 });
 
+test('iced Switch requests stay reference-only and cannot prepare a hot proposal', async () => {
+  const userText = 'Show me an iced Switch recipe';
+  const context = baseContext(userText);
+  const recipe = generateV60SwitchRecipe({}, { dose: 15 });
+  const tools = createRuphusTools({
+    uid: 'owner-1',
+    context,
+    readers: { readRecipe: async () => recipe },
+  });
+
+  const evidence = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(evidence.method.slot, 'v60_iced');
+  const hotOptions = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(hotOptions.ok, true);
+  assert.equal(hotOptions.actionable, false);
+  assert.deepEqual(hotOptions.options, []);
+  assert.ok(hotOptions.references?.every((reference) => reference.referenceOnly && reference.executable === false));
+
+  const proposal = await tools.call('propose_recipe_change', {
+    coffeeRef: 'c1',
+    slot: 'v60_hot',
+    change: null,
+    experiment: { kind: 'manual_source_technique', sourceId: hotOptions.references[0].sourceId },
+  });
+  assert.equal(proposal.ok, false);
+  assert.equal(proposal.code, 'technique_option_required');
+});
+
 test('off-rotation Switch identity survives the bounded evidence and technique projections', async () => {
   const stored = {
     method: 'pour-over', device: 'v60', variant: 'switch', v60Size: '03', mode: 'hot',
     dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94,
   };
-  const coffee = { id: 'el-vergel', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: stored } };
+  const coffee = {
+    id: 'el-vergel', name: 'El Vergel', status: 'FINISHED',
+    aidenRecipe: { method: 'aiden', device: 'aiden', mode: 'hot', dose: 20, water: 320 },
+    handBrewRecipes: {
+      v60: stored,
+      kalita: { method: 'kalita', device: 'kalita', mode: 'hot', kalitaSize: '155', dose: 15, water: 240 },
+    },
+    handBrewIcedRecipes: {
+      kalita: { method: 'kalita', device: 'kalita', mode: 'iced', isIced: true, kalitaSize: '155', dose: 15, water: 180 },
+    },
+  };
   const context = await buildRuphusContext({
     uid: 'owner-1', contextRef: { surface: 'direct' },
     userText: 'Try a different switch technique for el vergel', evidenceByteCap: 10000,
@@ -233,19 +271,28 @@ test('off-rotation Switch identity survives the bounded evidence and technique p
   });
   assert.equal(context.rotationSnapshot.coffees.length, 0, 'finished coffee remains outside the public rotation snapshot');
   const recipe = resolveLegacyRecipe(coffee, 'v60_hot').recipe;
+  const evidenceRecipes = [
+    { ...coffee.aidenRecipe, slotKey: 'aiden' },
+    { ...recipe, slotKey: 'v60_hot' },
+    { ...coffee.handBrewRecipes.kalita, slotKey: 'kalita_hot' },
+    { ...coffee.handBrewIcedRecipes.kalita, slotKey: 'kalita_iced' },
+  ];
   const tools = createRuphusTools({
     uid: 'owner-1', context,
     readers: {
       readCoffee: async () => coffee,
-      readRecipe: async ({ slotKey }) => slotKey ? recipe : [recipe],
+      readRecipe: async ({ slotKey }) => slotKey ? recipe : evidenceRecipes,
       readBrews: async () => [],
       readTastings: async () => [],
     },
   });
   const coffeeRef = context.turnBinding.coffeeRef;
   const evidence = await tools.call('read_coffee_evidence', { coffeeRef, windowDays: 14 });
-  assert.equal(evidence.recipe.configurations[0].variant, 'switch');
-  assert.equal(evidence.recipe.configurations[0].v60Size, '03');
+  assert.equal(evidence.method.slot, 'v60_hot');
+  assert.equal(evidence.method.tier, 'M1');
+  assert.deepEqual(context.proposalState.target, { coffeeRef, slot: 'v60_hot' });
+  const switchConfiguration = evidence.recipe.configurations.find((configuration) => configuration.variant === 'switch');
+  assert.equal(switchConfiguration.v60Size, '03');
   assert.equal(evidence.recipe.records, undefined, 'bounded projection still excludes raw records');
   const options = await tools.call('read_technique_options', { coffeeRef, slot: 'v60_hot' });
   assert.equal(options.current.configuration.variant, 'switch');
@@ -259,7 +306,17 @@ test('a mixed off-target request after Switch options recovers into one proposal
     method: 'pour-over', device: 'v60', variant: 'switch', v60Size: '03', mode: 'hot',
     dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94,
   };
-  const coffee = { id: 'el-vergel', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: stored } };
+  const coffee = {
+    id: 'el-vergel', name: 'El Vergel', status: 'FINISHED',
+    aidenRecipe: { method: 'aiden', device: 'aiden', mode: 'hot', dose: 20, water: 320 },
+    handBrewRecipes: {
+      v60: stored,
+      kalita: { method: 'kalita', device: 'kalita', mode: 'hot', kalitaSize: '155', dose: 15, water: 240 },
+    },
+    handBrewIcedRecipes: {
+      kalita: { method: 'kalita', device: 'kalita', mode: 'iced', isIced: true, kalitaSize: '155', dose: 15, water: 180 },
+    },
+  };
   const userText = 'Try a different switch technique for el vergel';
   const context = await buildRuphusContext({
     uid: 'owner-1', contextRef: { surface: 'direct' }, userText, evidenceByteCap: 10000,
@@ -269,11 +326,17 @@ test('a mixed off-target request after Switch options recovers into one proposal
     },
   });
   const recipe = resolveLegacyRecipe(coffee, 'v60_hot').recipe;
+  const evidenceRecipes = [
+    { ...coffee.aidenRecipe, slotKey: 'aiden' },
+    { ...recipe, slotKey: 'v60_hot' },
+    { ...coffee.handBrewRecipes.kalita, slotKey: 'kalita_hot' },
+    { ...coffee.handBrewIcedRecipes.kalita, slotKey: 'kalita_iced' },
+  ];
   const tools = createRuphusTools({
     uid: 'owner-1', context,
     readers: {
       readCoffee: async () => coffee,
-      readRecipe: async () => recipe,
+      readRecipe: async ({ slotKey }) => slotKey ? recipe : evidenceRecipes,
       readBrews: async () => [],
       readTastings: async () => [],
     },
@@ -284,7 +347,12 @@ test('a mixed off-target request after Switch options recovers into one proposal
     provider: { runTurn: async (input) => {
       providerCalls += 1;
       if (providerCalls === 1) return { toolCalls: [{ callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: context.turnBinding.coffeeRef, windowDays: 14 } }] };
-      if (providerCalls === 2) return { toolCalls: [{ callId: 'options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } }] };
+      if (providerCalls === 2) {
+        const evidence = input.toolResult.results.find((item) => item.name === 'read_coffee_evidence').result;
+        assert.equal(evidence.method.slot, 'v60_hot');
+        assert.deepEqual(context.proposalState.target, { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' });
+        return { toolCalls: [{ callId: 'options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } }] };
+      }
       if (providerCalls === 3) return { toolCalls: [
         { callId: 'redundant-recipe', name: 'read_recipe', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } },
         { callId: 'off-target-proposal', name: 'propose_recipe_change', args: {
