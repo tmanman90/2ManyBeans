@@ -146,7 +146,7 @@ test('technique reader returns executable alternatives and preserves another-sel
   assert.notEqual(proposal.artifact.after.grindSize.setting, recipe.grindSize.setting);
   assert.equal(proposal.artifact.after.steps.at(-1).waterTotal, proposal.artifact.after.waterGrams);
   assert.equal(validateV60Candidate(proposal.artifact.after).valid, true);
-  assert.equal(proposalHandoff(proposal.artifact), `Try ${selected.name}. Here’s the recipe to review.`);
+  assert.equal(proposalHandoff(proposal.artifact), `Try ${selected.name}. Source recipe: five centered pulses using the 4:6 method. Here’s the recipe to review.`);
 
   const another = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
   assert.equal(another.ok, true);
@@ -254,7 +254,7 @@ test('off-rotation Switch identity survives the bounded evidence and technique p
   assert.ok(options.options.every(option => option.sourceConfiguration?.variant === 'switch'));
 });
 
-test('an extra exact-recipe read after Switch options recovers into one proposal within the round budget', async () => {
+test('a mixed off-target request after Switch options recovers into one proposal within the round budget', async () => {
   const stored = {
     method: 'pour-over', device: 'v60', variant: 'switch', v60Size: '03', mode: 'hot',
     dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94,
@@ -287,12 +287,15 @@ test('an extra exact-recipe read after Switch options recovers into one proposal
       if (providerCalls === 2) return { toolCalls: [{ callId: 'options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } }] };
       if (providerCalls === 3) return { toolCalls: [
         { callId: 'redundant-recipe', name: 'read_recipe', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } },
-        { callId: 'redundant-options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' } },
+        { callId: 'off-target-proposal', name: 'propose_recipe_change', args: {
+          coffeeRef: context.turnBinding.coffeeRef, slot: 'kalita_hot', change: null,
+          experiment: { kind: 'manual_source_technique', sourceId: 'hario-switch-03-matt-winton-hybrid-24-2022' },
+        } },
       ] };
       assert.equal(providerCalls, 4);
       assert.equal(input.regeneration, true);
       assert.deepEqual(input.tools.map((definition) => definition.name), ['propose_recipe_change']);
-      assert.deepEqual(input.toolResult.results.map((item) => item.callId), ['redundant-recipe', 'redundant-options']);
+      assert.deepEqual(input.toolResult.results.map((item) => item.callId), ['redundant-recipe', 'off-target-proposal']);
       assert.ok(input.toolResult.results.every((item) => item.result.code === 'read_budget_complete'));
       const options = input.toolResult.results[0].result.techniqueOptions.options;
       return { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: {
@@ -312,6 +315,7 @@ test('an extra exact-recipe read after Switch options recovers into one proposal
 test('an invalid proposal after the bounded Switch continuation returns technique recovery, not a round-limit failure', async () => {
   const userText = 'Try a different switch technique for el vergel';
   const context = baseContext(userText);
+  context.proposalState.target = { coffeeRef: 'c1', slot: 'v60_hot' };
   const dispatched = [];
   const option = { id: 'switch-option', familyId: 'switch-family', sourceId: 'switch-source', executable: true, timerReady: true };
   const tools = {
@@ -319,7 +323,7 @@ test('an invalid proposal after the bounded Switch continuation returns techniqu
     definitions: [{ name: 'propose_recipe_change' }],
     call: async (name) => {
       dispatched.push(name);
-      if (name === 'read_technique_options') return { ok: true, actionable: true, options: [option] };
+      if (name === 'read_technique_options') return { ok: true, actionable: true, coffeeRef: 'c1', slot: 'v60_hot', options: [option] };
       return { ok: true };
     },
   };

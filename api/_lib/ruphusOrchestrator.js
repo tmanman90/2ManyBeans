@@ -90,15 +90,17 @@ function displayRatio(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/u, '');
 }
 
-export function proposalHandoff(artifact = {}) {
+export function proposalHandoff(artifact = {}, { includeDifference = true } = {}) {
   const technique = artifact.techniqueExperiment;
   if (technique?.kind === 'v60_technique') {
     const name = String(technique.name || 'this V60 approach').trim();
-    return `Try ${name}. Here’s the recipe to review.`;
+    const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;
+    return `Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`;
   }
   if (technique?.kind === 'manual_source_technique') {
     const name = String(technique.name || 'this coffee approach').trim();
-    return `Try ${name}. Here’s the recipe to review.`;
+    const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;
+    return `Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`;
   }
   const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
   const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
@@ -307,22 +309,21 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
           break;
         }
         const target = proposalTarget(context?.proposalState || {});
-        const unreadyReview = calls.length === 1 && calls[0].name === 'propose_recipe_change'
-          && !proposalClaimed && target.coffeeRef && target.slot
-          && calls[0].args?.coffeeRef === target.coffeeRef
-          && (calls[0].args?.slot || calls[0].args?.slotKey) === target.slot;
-        if (roundLimitRecovered || (!unreadyReview && !calls.every((request) => READS.has(request.name)))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
         const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
           && item.result?.ok === true && item.result?.actionable === true
           && Array.isArray(item.result?.options) && item.result.options.length > 0);
+        const proposalRequests = calls.filter((request) => request.name === 'propose_recipe_change');
         const canContinueTechnique = !roundLimitRecovered && !proposalClaimed && toolCalls < maxToolCalls
-          && calls.every((request) => READS.has(request.name))
-          && techniqueRead && techniqueRequest(userText || context?.userText || '', context, target);
+          && proposalRequests.length <= 1
+          && calls.every((request) => READS.has(request.name) || request.name === 'propose_recipe_change')
+          && techniqueRead
+          && techniqueRead.result.coffeeRef === target.coffeeRef && techniqueRead.result.slot === target.slot
+          && techniqueRequest(userText || context?.userText || '', context, target);
         if (canContinueTechnique) {
-          // A model may spend the third round rereading the exact recipe after
-          // the evidence and technique readers have already established a
-          // target-bound option set. Do not dispatch that redundant read; use
-          // the existing one-proposal exception for the selected option.
+          // A model may bundle a stale/off-target proposal or an extra read
+          // after the evidence and technique readers have already established
+          // a target-bound option set. Do not dispatch any of those requests;
+          // use one proposal-only continuation with the exact current call IDs.
           techniqueContinuationUsed = true;
           techniqueRoundRecoveryUsed = true;
           const results = calls.map((request) => ({
@@ -339,13 +340,18 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
             turnId, context, userText, conversation: context?.conversation || [],
             tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
             previous: response, toolResult: { results }, regeneration: true,
-            correctiveInstruction: 'The exact coffee evidence and eligible source-backed technique options are already loaded. Choose one exact executable option from the trusted technique reader and call propose_recipe_change now. Do not reread the recipe, ask for another detail, or claim a review card unless the proposal tool returns its artifact.',
+            correctiveInstruction: 'The exact coffee evidence and eligible source-backed technique options are already loaded. Choose one exact executable option for the current coffee and slot from the trusted technique reader and call propose_recipe_change now. Do not reread the recipe, change the target, ask for another detail, or claim a review card unless the proposal tool returns its artifact.',
             signal,
           });
           throwIfCancelled();
           rememberUsage(response);
           continue;
         }
+        const unreadyReview = calls.length === 1 && calls[0].name === 'propose_recipe_change'
+          && !proposalClaimed && target.coffeeRef && target.slot
+          && calls[0].args?.coffeeRef === target.coffeeRef
+          && (calls[0].args?.slot || calls[0].args?.slotKey) === target.slot;
+        if (roundLimitRecovered || (!unreadyReview && !calls.every((request) => READS.has(request.name)))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
         roundLimitRecovered = true;
         const results = calls.map((request) => ({ callId: request.callId, name: request.name, result: { ok: false, code: 'read_budget_complete', message: 'Use the coffee evidence already provided and answer without another read.' } }));
         response = await provider.runTurn({
@@ -382,7 +388,13 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
-      if (proposed) { text = appendHandoff(text, proposalHandoff(proposed.result.artifact)); break; }
+      if (proposed) {
+        const difference = proposed.result.artifact?.techniqueExperiment?.differences?.[0];
+        text = appendHandoff(text, proposalHandoff(proposed.result.artifact, {
+          includeDifference: typeof difference !== 'string' || !String(text).includes(difference),
+        }));
+        break;
+      }
       const invalidGrind = results.find(item => item.name === 'propose_recipe_change' && item.result?.code === 'physical_grind_required');
       if (invalidGrind) {
         const original = calls.find(call => call.name === 'propose_recipe_change');
@@ -397,7 +409,10 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
           const correction = await runTool({ name: 'propose_recipe_change', args: { ...original.args, change: { control: 'grind', value: corrected } } });
           const result = correction.result;
           if (result?.ok && result.artifact) {
-            text = appendHandoff(text, proposalHandoff(result.artifact));
+            const difference = result.artifact?.techniqueExperiment?.differences?.[0];
+            text = appendHandoff(text, proposalHandoff(result.artifact, {
+              includeDifference: typeof difference !== 'string' || !String(text).includes(difference),
+            }));
             break;
           }
         }

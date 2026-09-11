@@ -114,6 +114,8 @@ test('Kalita 155 route exposes exact-size source options through the provider sc
   assert.equal(read.options.some((option) => option.sourceConfiguration.size === '185'), false);
   const exactDose = read.options.find((option) => option.executable === true);
   assert.equal(exactDose.targetDoseGrams, 14, 'a requested dose is not silently promoted to a generic serving floor');
+  assert.match(read.options.find((option) => option.sourceId === 'foundation-wave-155').differences[0], /one gradual main pour/i);
+  assert.match(read.options.find((option) => option.sourceId === 'art-of-brew-wave-155-pulse-2024').differences[0], /staged pulse pours rather than one main pour/i);
 
   const run = await runSelectedTechnique({
     recipe,
@@ -136,7 +138,7 @@ test('Kalita 155 route exposes exact-size source options through the provider sc
   assert.equal(artifact.after.sourceProjection.sourceId, 'foundation-wave-155');
   assert.ok(artifact.after.stages.length >= 2);
   assert.ok(artifact.after.stages.every((stage) => stage.trigger));
-  assert.equal(run.result.text, `Try ${run.selected.name}. Here’s the recipe to review.`);
+  assert.equal(run.result.text, `Try ${run.selected.name}. A short bloom is followed by one gradual main pour to the final water target. Here’s the recipe to review.`);
   assert.equal(run.frames.filter((frame) => frame.type === 'artifact_ready').length, 1);
 });
 

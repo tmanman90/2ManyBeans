@@ -111,6 +111,8 @@ test('Switch 03 exposes both hybrid and full-immersion source choices through th
   assert.ok(read.options.every((option) => option.sourceConfiguration.model === 'V60 Switch'));
   assert.ok(read.options.every((option) => option.sourceConfiguration.filter === 'v60-03-paper'));
   assert.ok(read.options.every((option) => option.executable === true && option.timerReady === true));
+  assert.match(read.options[0].differences[0], /open-valve bloom.*closed immersion.*release to drain/i);
+  assert.match(read.options[1].differences[0], /stays closed through the pour and steep.*releases to drain/i);
 });
 
 test('Switch 03 immersion becomes a native mL timed proposal without generic Switch aliases', async () => {
@@ -148,7 +150,7 @@ test('Switch 03 immersion becomes a native mL timed proposal without generic Swi
   assert.equal(stages[3].trigger.type, 'condition');
   assert.equal(stages[3].valve, 'open');
   assert.equal(artifact.after.timerReady, true);
-  assert.equal(run.result.text, `Try ${run.selected.name}. Here’s the recipe to review.`);
+  assert.equal(run.result.text, `Try ${run.selected.name}. The full brew stays closed through the pour and steep, then releases to drain. Here’s the recipe to review.`);
   assert.equal(run.frames.filter((frame) => frame.type === 'artifact_ready').length, 1);
 });
 

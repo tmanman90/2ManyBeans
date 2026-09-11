@@ -486,6 +486,66 @@ export function recipeFromManualSourceProjection(projection, { techniqueId = nul
   return recipe;
 }
 
+function stageText(stage = {}) {
+  return [stage.id, stage.label, stage.geometry, stage.agitation]
+    .filter(value => value != null)
+    .join(' ')
+    .toLowerCase();
+}
+
+/**
+ * Summarize only the source schedule's structural distinction for the chat
+ * handoff. This is intentionally derived from the trusted stage projection;
+ * it does not add a second corpus, infer sensory outcomes, or make a source
+ * executable. The first returned sentence is carried ahead of the existing
+ * dose/clock provenance differences.
+ */
+function sourceStructuralDifference(record, projection) {
+  const stages = Array.isArray(projection?.sourceSnapshot?.stages)
+    ? projection.sourceSnapshot.stages
+    : Array.isArray(record?.stages) ? record.stages : [];
+  const pours = stages.filter(stage => stage?.kind === 'pour');
+  if (!pours.length) return null;
+
+  if (record?.equipment?.brewer === 'switch') {
+    const firstPour = pours[0];
+    const hasClosedStage = stages.some(stage => stage?.valve === 'closed');
+    const hasRelease = stages.some(stage => stage?.kind === 'valve' && stage?.valve === 'open');
+    const hasClosedSteep = stages.some(stage => stage?.kind === 'agitate' && stage?.valve === 'closed');
+    if (firstPour?.valve === 'open' && hasClosedStage && hasRelease) {
+      return 'An open-valve bloom is followed by a closed immersion, then a release to drain.';
+    }
+    if (firstPour?.valve === 'closed' && hasClosedSteep && hasRelease) {
+      return 'The full brew stays closed through the pour and steep, then releases to drain.';
+    }
+    if (firstPour?.valve === 'closed' && hasRelease) {
+      return 'The brew starts closed, then releases to drain.';
+    }
+  }
+
+  if (record?.equipment?.brewer === 'kalita') {
+    const postBloom = pours.slice(1);
+    const hasPulse = postBloom.some(stage => /\bpulse\b/.test(stageText(stage)));
+    const finalStageText = stageText(postBloom.at(-1));
+    const hasCenterFinish = postBloom.at(-1) && /center|centre/.test(finalStageText);
+    const secondText = stageText(postBloom[0]);
+    if (hasPulse) return 'After the bloom, it uses several staged pulse pours rather than one main pour.';
+    if (pours.length === 2 && /\bmain\b|remaining/.test(secondText)) {
+      return 'A short bloom is followed by one gradual main pour to the final water target.';
+    }
+    if (hasCenterFinish && pours.length >= 3) {
+      const centerForm = /stream|stationary/.test(finalStageText) ? 'center-stream' : /circle/.test(finalStageText) ? 'center-circle' : 'center-focused';
+      return `The bloom and second pour lead into a final ${centerForm} pour.`;
+    }
+    if (pours.length >= 3) {
+      return `A bloom is followed by ${pours.length - 1} staged pours to reach the final water target.`;
+    }
+    if (pours.length === 2) return 'A bloom is followed by one further pour to reach the final water target.';
+  }
+
+  return null;
+}
+
 function sourceOption(record, projection) {
   const sourceDose = sourceDoseNumber(record);
   const bounds = adaptedDoseBounds(record);
@@ -493,6 +553,7 @@ function sourceOption(record, projection) {
   const exact = projection.adaptation?.status === 'original';
   const blockers = projection.readiness?.blockers || [];
   const targetDose = sourceDoseNumber(projection);
+  const structuralDifference = sourceStructuralDifference(record, projection);
   const doseDescription = exact
     ? `${sourceDose}g source dose`
     : `${targetDose}g app guide from the ${sourceDose}g source dose`;
@@ -506,6 +567,7 @@ function sourceOption(record, projection) {
     name: record.title,
     label: record.title,
     differences: [
+      ...(structuralDifference ? [structuralDifference] : []),
       `${record.author} source schedule for ${record.equipment?.brewer === 'switch' ? `Switch ${record.equipment?.size || ''}`.trim() : `${record.equipment?.brewer || 'manual'} ${record.equipment?.size || ''}`.trim()}.`,
       ...(water?.value != null ? [`${doseDescription} · ${water.value}${water.unit} native water.`] : []),
       ...(projection.clock?.origin ? [`Clock starts at ${projection.clock.origin}; source valve/event actions remain explicit.`] : ['Source clock is retained as published; no timing is invented.']),
