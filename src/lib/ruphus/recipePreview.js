@@ -16,6 +16,7 @@ import { hasManualSourceProjection, isManualSourceRecipe, validateManualSourceRe
 import { MANUAL_SOURCE_PROJECTION_VERSION } from '../manualSourceProjection.js';
 import {
   MANUAL_SOURCE_DOSE_POLICY_VERSION,
+  adaptedDoseBounds,
   projectManualSourceForApp,
   recipeFromManualSourceProjection,
 } from './techniqueOptions.js';
@@ -148,13 +149,6 @@ function validateSource(recipe, route) {
   return errors;
 }
 
-function sourceDoseBounds(recipe) {
-  const projection = recipe?.sourceProjection;
-  const sourceDose = projection?.adaptation?.sourceDose;
-  if (Number.isFinite(sourceDose)) return sourceDose < 20 ? [20, 20] : [20, sourceDose];
-  return null;
-}
-
 function validateManualSourcePreview(recipe, options = {}) {
   const errors = [];
   const route = routeFor(recipe);
@@ -167,8 +161,8 @@ function validateManualSourcePreview(recipe, options = {}) {
   if (!finitePositive(Number(requestedDose))) errors.push('invalid-requested-dose');
   const dose = Number(requestedDose);
   const sourceDose = recipe?.sourceProjection?.adaptation?.sourceDose;
-  const bounds = sourceDoseBounds(recipe);
-  if (bounds && finitePositive(dose) && dose !== recipe.coffeeGrams && (dose < bounds[0] || dose > bounds[1])) errors.push('unsupported-dose-adaptation');
+  const bounds = adaptedDoseBounds(recipe?.sourceProjection?.sourceSnapshot);
+  if (bounds && finitePositive(dose) && dose !== sourceDose && (dose < bounds[0] || dose > bounds[1])) errors.push('unsupported-dose-adaptation');
   if (options.targetRatio != null || options.ratio != null) errors.push('source-ratio-adaptation-unsupported');
   return { valid: errors.length === 0, errors: [...new Set(errors)], route, dose, ratio: null, bounds, sourceDose };
 }

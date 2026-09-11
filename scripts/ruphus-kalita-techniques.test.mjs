@@ -136,7 +136,7 @@ test('Kalita 155 route exposes exact-size source options through the provider sc
   assert.equal(artifact.after.sourceProjection.sourceId, 'foundation-wave-155');
   assert.ok(artifact.after.stages.length >= 2);
   assert.ok(artifact.after.stages.every((stage) => stage.trigger));
-  assert.match(run.result.text, /Kalita 155 source technique experiment/i);
+  assert.equal(run.result.text, `Try ${run.selected.name}. Here’s the recipe to review.`);
   assert.equal(run.frames.filter((frame) => frame.type === 'artifact_ready').length, 1);
 });
 

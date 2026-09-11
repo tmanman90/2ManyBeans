@@ -284,7 +284,7 @@ function manualSourceFamilyId(record) {
   return record?.familyId || MANUAL_SOURCE_FAMILY_BY_ID[record?.id] || record?.id || null;
 }
 
-function adaptedDoseBounds(record) {
+export function adaptedDoseBounds(record) {
   const sourceDose = sourceDoseNumber(record);
   if (!Number.isFinite(sourceDose)) return null;
   const equipment = record?.equipment || {};

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import { handleRecipePreview } from '../api/ruphus-preview.js';
 import { executeRecipeCommand } from '../api/_lib/ruphusCommandService.js';
@@ -7,6 +8,26 @@ import { createMemoryRuphusRepository } from '../api/_lib/ruphusRepository.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { validateManualSourceRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
+import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
+
+test('chat opening and dose edits preserve source ratios rather than requesting a ratio adaptation', () => {
+  const chat = readFileSync(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
+  const calls = chat.match(/createRecipePreview\(\{[^;]+?\}\)/g);
+  assert.equal(calls.length, 2);
+  for (const call of calls) assert.doesNotMatch(call, /\b(?:ratio|targetRatio):/);
+  const source = generateManualSourceTechniqueOption('kurasu-wave-155-2023', {}, {
+    device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 13,
+  }).recipe;
+  assert.ok(source.ratio);
+  assert.throws(() => createRecipePreview({ recipe: source, dose: 13, ratio: source.ratio }), /source-ratio-adaptation-unsupported/);
+  for (const dose of [12, 13, 14, 20]) {
+    const preview = createRecipePreview({ recipe: source, dose, configuration: {} });
+    assert.equal(preview.coffeeGrams, dose);
+    assert.equal(preview.sourceProjection.sourceId, source.sourceProjection.sourceId);
+    assert.equal(preview.ratio, source.ratio);
+  }
+  assert.throws(() => createRecipePreview({ recipe: source, dose: 21 }), /unsupported-dose-adaptation/);
+});
 
 const CASES = [
   {

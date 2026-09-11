@@ -148,7 +148,7 @@ test('Switch 03 immersion becomes a native mL timed proposal without generic Swi
   assert.equal(stages[3].trigger.type, 'condition');
   assert.equal(stages[3].valve, 'open');
   assert.equal(artifact.after.timerReady, true);
-  assert.match(run.result.text, /Switch 03 source technique experiment/i);
+  assert.equal(run.result.text, `Try ${run.selected.name}. Here’s the recipe to review.`);
   assert.equal(run.frames.filter((frame) => frame.type === 'artifact_ready').length, 1);
 });
 

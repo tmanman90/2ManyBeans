@@ -46,7 +46,7 @@ function Fixture() {
     previewOriginRef.current = document.activeElement;
     const draft = readRecipePreviewDraft({ uid, proposalId });
     const dose = draft?.dose || proposed.coffeeGrams;
-    const recipe = createRecipePreview({ recipe: proposed, dose, ratio: proposed.ratio });
+    const recipe = createRecipePreview({ recipe: proposed, dose });
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
     setPreview({ recipe, dose });
   };
@@ -55,7 +55,7 @@ function Fixture() {
     requestAnimationFrame(() => previewOriginRef.current?.focus());
   };
   const changeDose = (dose) => {
-    const recipe = createRecipePreview({ recipe: proposed, dose, ratio: proposed.ratio });
+    const recipe = createRecipePreview({ recipe: proposed, dose });
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
     setPreview({ recipe, dose });
   };

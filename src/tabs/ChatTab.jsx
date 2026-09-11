@@ -705,7 +705,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const dose = validDraft?.dose || baseRecipe?.coffeeGrams || baseRecipe?.dose;
     const configuration = validDraft?.configuration || artifact.preview?.configuration?.configuration || artifact.preview?.configuration || {};
     try {
-      const preview = createRecipePreview({ recipe: baseRecipe, dose, ratio: baseRecipe?.ratio, configuration });
+      const preview = createRecipePreview({ recipe: baseRecipe, dose, configuration });
       const preparedProposal = restoreRecipePreviewAction({ draft: validDraft, sourceArtifact: artifact, preview });
       const next = { artifact, sourceArtifact: artifact, bean, baseRecipe, recipe: preview, dose: preview.coffeeGrams, configuration, requestId: validDraft?.requestId || null, preparedProposal, pendingAction: validDraft?.pendingAction || null, actionId: validDraft?.actionId || null };
       recipePreviewRef.current = next;
@@ -757,7 +757,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const current = recipePreviewRef.current;
     if (!current || recipePreviewStaleRef.current || !Number.isFinite(newDose) || newDose <= 0 || recipePreviewPending || recipePreviewActionPendingRef.current) return;
     try {
-      const preview = createRecipePreview({ recipe: current.baseRecipe, dose: newDose, ratio: current.baseRecipe?.ratio, configuration: current.configuration });
+      const preview = createRecipePreview({ recipe: current.baseRecipe, dose: newDose, configuration: current.configuration });
       // A dose edit is a new server intent. Keep the prior request ID only
       // for an unchanged retry, never for a changed payload.
       const next = { ...current, recipe: preview, dose: preview.coffeeGrams, requestId: null, preparedProposal: null, pendingAction: null, actionId: null };

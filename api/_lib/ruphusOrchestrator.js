@@ -93,15 +93,12 @@ function displayRatio(value) {
 export function proposalHandoff(artifact = {}) {
   const technique = artifact.techniqueExperiment;
   if (technique?.kind === 'v60_technique') {
-    const name = String(technique.name || 'that source-backed V60 technique').trim();
-    return `Prepared: ${name} as a different V60 technique experiment. Its full adapted schedule is ready to review; it has not been applied.`;
+    const name = String(technique.name || 'this V60 approach').trim();
+    return `Try ${name}. Here’s the recipe to review.`;
   }
   if (technique?.kind === 'manual_source_technique') {
-    const name = String(technique.name || 'that source-backed technique').trim();
-    const after = artifact.after || {};
-    const brewer = after.device === 'kalita' ? 'Kalita' : after.variant === 'switch' ? 'Switch' : 'V60';
-    const size = after.kalitaSize || after.v60Size;
-    return `Prepared: ${name} as a different ${brewer}${size ? ` ${size}` : ''} source technique experiment. Its source-backed schedule is ready to review; it has not been applied.`;
+    const name = String(technique.name || 'this coffee approach').trim();
+    return `Try ${name}. Here’s the recipe to review.`;
   }
   const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
   const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
