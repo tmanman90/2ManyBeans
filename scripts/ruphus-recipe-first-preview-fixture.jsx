@@ -17,12 +17,14 @@ const bean = { id: 'fixture-coffee', name: 'Changed Ratio Coffee' };
 const techniqueMode = new URLSearchParams(window.location.search).has('technique');
 const sourceMode = new URLSearchParams(window.location.search).has('source');
 const sourceOriginalMode = new URLSearchParams(window.location.search).has('source-original');
-const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : 'source-hario-preview-fixture') : 'changed-ratio-fixture';
+const sourceImmersionMode = sourceMode && new URLSearchParams(window.location.search).has('source-immersion');
+const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : sourceImmersionMode ? 'source-immersion-preview-fixture' : 'source-hario-preview-fixture') : 'changed-ratio-fixture';
 const runtimeTurn = window.__ruphusTechniqueTurn;
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
-const sourceOption = sourceMode ? generateManualSourceTechniqueOption(sourceOriginalMode ? 'hario-switch-03-instruction-manual-36-2023' : 'hario-switch-03-matt-winton-hybrid-24-2022', {}, {
+const sourceOption = sourceMode ? generateManualSourceTechniqueOption(sourceOriginalMode || sourceImmersionMode ? 'hario-switch-03-instruction-manual-36-2023' : 'hario-switch-03-matt-winton-hybrid-24-2022', {}, {
   device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot',
+  ...(sourceImmersionMode ? { dose: 15 } : {}),
 }) : null;
 const proposed = sourceOption?.recipe || (selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 }));
 const artifact = sourceMode

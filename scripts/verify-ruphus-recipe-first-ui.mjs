@@ -357,6 +357,29 @@ try {
     assert.deepEqual(sourceOriginalErrors, []);
     await sourceOriginalPage.close();
 
+    const sourceAdaptedPage = await context.newPage();
+    const sourceAdaptedErrors = [];
+    const sourceAdaptedWrites = [];
+    attachPageHealth(sourceAdaptedPage, sourceAdaptedErrors, sourceAdaptedWrites);
+    await sourceAdaptedPage.setViewportSize({ width: 320, height: 844 });
+    await sourceAdaptedPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?source=1&source-immersion=1`, { waitUntil: 'domcontentloaded' });
+    await sourceAdaptedPage.getByRole('button', { name: 'View recipe', exact: true }).click();
+    await sourceAdaptedPage.getByText('Hand Brew Recipe', { exact: true }).waitFor({ state: 'visible' });
+    assert.match(await sourceAdaptedPage.locator('body').innerText(), /15g/);
+    assert.match(await sourceAdaptedPage.locator('body').innerText(), /183\.33mL/);
+    const adaptedDoseIncrease = sourceAdaptedPage.getByRole('button', { name: 'Increase coffee dose', exact: true });
+    assert.equal(await adaptedDoseIncrease.count(), 1, 'Adapted source preview must expose its dose control');
+    await adaptedDoseIncrease.click();
+    await sourceAdaptedPage.getByText('16g', { exact: true }).waitFor({ state: 'visible' });
+    assert.match(await sourceAdaptedPage.locator('body').innerText(), /195\.56mL/);
+    assert.equal(await sourceAdaptedPage.getByRole('button', { name: 'Start source brew guide', exact: true }).isDisabled(), false, 'Adapted source preview must remain startable');
+    assert.equal(await sourceAdaptedPage.getByRole('button', { name: 'Save recipe', exact: true }).isDisabled(), false, 'Adapted source preview must remain saveable');
+    await sourceAdaptedPage.screenshot({ path: '/tmp/ruphus-source-adapted-dose-mobile.png', fullPage: false });
+    await sourceAdaptedPage.getByRole('button', { name: 'Close', exact: true }).click();
+    assert.deepEqual(sourceAdaptedWrites, []);
+    assert.deepEqual(sourceAdaptedErrors, []);
+    await sourceAdaptedPage.close();
+
     const sourceHistoricalPage = await context.newPage();
     const sourceHistoricalErrors = [];
     const sourceHistoricalWrites = [];

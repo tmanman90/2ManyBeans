@@ -129,8 +129,10 @@ const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onP
   const adaptedBounds = adaptedDoseBounds(projection?.sourceSnapshot);
   const originalOutsideAdaptation = sourceDose != null && adaptedBounds
     && (sourceDose < adaptedBounds[0] || sourceDose > adaptedBounds[1]);
+  const currentDoseWithinAdaptation = dose != null && adaptedBounds
+    && dose >= adaptedBounds[0] && dose <= adaptedBounds[1];
   const doseBounds = adaptedBounds
-    ? (originalOutsideAdaptation ? [sourceDose, sourceDose] : adaptedBounds)
+    ? (originalOutsideAdaptation && !currentDoseWithinAdaptation ? [sourceDose, sourceDose] : adaptedBounds)
     : sourceDose == null ? null : [sourceDose, sourceDose];
   const doseChange = (nextDose) => {
     if (previewPending || previewStale || !Number.isFinite(nextDose)) return;
