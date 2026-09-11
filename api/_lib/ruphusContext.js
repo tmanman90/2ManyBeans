@@ -90,7 +90,7 @@ function installServerField(target, key, value) {
   Object.defineProperty(target, key, { value, enumerable: false, writable: true, configurable: true });
 }
 
-export async function buildRuphusContext({ uid, contextRef = {}, userText = '', conversation = [], ledger = null, readers = {}, evidenceByteCap, sessionState = null } = {}) {
+export async function buildRuphusContext({ uid, contextRef = {}, userText = '', conversation = [], ledger = null, readers = {}, evidenceByteCap, sessionState = null, priorTechniqueProposals = [] } = {}) {
   if (!uid || typeof uid !== 'string') throw Object.assign(new Error('owner is required'), { code: 'owner_required' });
   if (contextRef?.uid || contextRef?.ownerId) throw Object.assign(new Error('owner identity is server-bound'), { code: 'forged_owner' });
   const launchValidation = validateLaunchContext(contextRef);
@@ -111,7 +111,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   const launchCoffee = launchCoffeeRef(contextRef, snapshot) || addOwnerLaunchRef(contextRef?.coffeeRef, coffees, snapshot);
   if (contextRef?.coffeeRef && !launchCoffee) throw Object.assign(new Error('launch coffee is outside the owner-scoped context'), { code: 'cross_owner_or_context' });
   const normalizedInternalLaunch = { ...clone(contextRef), ...(launchCoffee && launchCoffee !== contextRef.coffeeRef ? { coffeeRef: launchCoffee } : {}) };
-  const turnBinding = bindRuphusTurn({ userText, coffees, ledger: currentLedger, launchContext: normalizedInternalLaunch, refs: snapshot.refs, evidenceByteCap });
+  const turnBinding = bindRuphusTurn({ userText, coffees, ledger: currentLedger, launchContext: normalizedInternalLaunch, refs: snapshot.refs, evidenceByteCap, priorTechniqueProposals });
   Object.assign(snapshot.refs, turnBinding.refs || {});
   const launchHintConsumed = sessionState?.launchHintConsumed === true || turnBinding.launchHintConsumed === true;
   const launchForTurn = launchHintConsumed && normalizedInternalLaunch.launchItem
@@ -119,8 +119,11 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     : normalizedInternalLaunch;
   const normalizedLaunch = publicLaunchContext(launchForTurn);
   const boundCoffeeRef = turnBinding.status === 'locked' ? turnBinding.coffeeRef : launchCoffee || ledgerCoffeeRef(currentLedger, coffees, snapshot);
-  const boundCoffee = (snapshot.coffees || []).find((coffee) => coffee.refKey === boundCoffeeRef);
-  const carriedMethod = methodFocusForCoffee(turnBinding.ledger, boundCoffee?.name);
+  const boundCoffee = (snapshot.coffees || []).find((coffee) => coffee.refKey === boundCoffeeRef)
+    || (turnBinding.status === 'locked' && turnBinding.coffee?.id && snapshot.refs?.[boundCoffeeRef] === turnBinding.coffee.id ? turnBinding.coffee : null);
+  const boundCoffeeName = boundCoffee?.name || turnBinding.coffeeName || null;
+  const carriedMethod = methodFocusForCoffee(turnBinding.ledger, boundCoffeeName)
+    || (turnBinding.status === 'locked' && turnBinding.techniqueSlot ? { displayName: displayMethod(turnBinding.techniqueSlot) } : null);
   let resolvedMethod = resolveMethod({
     userText,
     launchItem: launchForTurn.launchItem,
@@ -143,12 +146,12 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     }
   }
   let turnLedger = turnBinding.ledger;
-  if (methodBinding && boundCoffee?.name) {
+  if (methodBinding && boundCoffeeName) {
     turnLedger = {
       ...turnLedger,
       entries: Array.isArray(turnLedger?.entries) ? turnLedger.entries.filter((entry) => entry?.kind !== 'method_focus') : [],
     };
-    turnLedger = appendLedger(turnLedger, { kind: 'method_focus', status: 'available', namedCoffees: [boundCoffee.name], methodFocus: { displayName: methodBinding.displayName } }, { maxBytes: Math.min(evidenceByteCap, MAX_LEDGER_BYTES) });
+    turnLedger = appendLedger(turnLedger, { kind: 'method_focus', status: 'available', namedCoffees: [boundCoffeeName], methodFocus: { displayName: methodBinding.displayName } }, { maxBytes: Math.min(evidenceByteCap, MAX_LEDGER_BYTES) });
   }
   const dynamic = safeDynamic({ userText, launchContext: normalizedLaunch, conversation: Array.isArray(conversation) ? conversation.map((item) => ({ role: item?.role, content: item?.content || item?.text })).filter((item) => item.role === 'user' || item.role === 'assistant') : [], ledger: turnLedger }, evidenceByteCap);
   turnLedger = dynamic.ledger;

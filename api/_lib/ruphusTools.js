@@ -404,6 +404,15 @@ const sourceReferenceOrdinal = (text) => {
   return null;
 };
 
+const TECHNIQUE_REFERENCE_FILLERS = new Set(['a', 'an', 'the', 'try', 'use', 'brew', 'prepare', 'make', 'pick', 'choose', 'revisit', 'repeat', 'show', 'me', 'technique', 'method', 'recipe', 'source', 'for', 'with', 'on', 'using', 'switch', 'v60', 'kalita', 'hario', 'hot', 'iced', 'cold', 'full']);
+const techniqueReferenceTokens = (value) => String(value || '').toLocaleLowerCase().match(/[a-z0-9]+/g) || [];
+const reviewHasNamedTechniqueToken = (text, review) => {
+  const requested = new Set(techniqueReferenceTokens(text));
+  const reviewed = techniqueReferenceTokens([review?.name, review?.sourceId, review?.familyId].filter(Boolean).join(' '));
+  return reviewed.some((token) => token.length > 2 && !TECHNIQUE_REFERENCE_FILLERS.has(token) && requested.has(token));
+};
+const hasUnmatchedTechniqueDescription = (text) => /\b(?:immersion|hybrid|bloom|pulse(?:s|d)?|continuous|steep(?:ing)?|batch|pour(?:s|ing)?|drain|release|valve)\b/i.test(text);
+
 function explicitSourceReference(context, slotKey, coffeeRef = null) {
   const text = String(context?.userText || '').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
   if (!text || !isExplicitTechniqueReuseRequest(text)) return null;
@@ -420,16 +429,23 @@ function explicitSourceReference(context, slotKey, coffeeRef = null) {
       .filter(Boolean);
     if (reviewByCoffee.length > 1) return { status: 'ambiguous', candidates: reviewByCoffee.map((review) => ({ coffeeRef: review.coffeeRef, name: review.name || review.sourceId, ordinal: review.ordinal })) };
   }
+  const namedRepeat = /\b(?:again|back|repeat)\b/i.test(text);
   let candidates = ordinal == null
     ? scopedReviews.filter((review) => {
       const firstWord = String(review.name || '').trim().split(/\s+/)[0];
-      return firstWord && new RegExp(`\\b${firstWord.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+      const firstWordMatch = firstWord && new RegExp(`\\b${firstWord.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+      return reviewHasNamedTechniqueToken(text, review) || (namedRepeat && firstWordMatch);
     })
     : [ordinal === -1 ? scopedReviews.at(-1) : scopedReviews[ordinal]].filter(Boolean);
   candidates = candidates.filter((review) => review.coffeeRef && review.sourceId);
   const coffeeRefs = [...new Set(candidates.map((review) => review.coffeeRef))];
   if (coffeeRefs.length > 1) return { status: 'ambiguous', candidates: candidates.map((review) => ({ coffeeRef: review.coffeeRef, name: review.name || review.sourceId, ordinal: review.ordinal })) };
   const review = candidates.at(-1);
+  // A descriptive technique name can identify a different catalog option even
+  // when its vendor (for example HARIO) is also the first word of an earlier
+  // delivered card. Let the current source-option reader handle that request;
+  // ordinal and explicit repeat requests retain historical-card semantics.
+  if (!review && ordinal == null && !namedRepeat && hasUnmatchedTechniqueDescription(text)) return null;
   return review ? {
     status: 'matched',
     sourceId: review.sourceId,

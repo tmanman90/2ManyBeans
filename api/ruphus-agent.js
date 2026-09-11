@@ -89,6 +89,17 @@ export function techniqueSelectionsFromSession(session, refs = {}) {
   }
   return selections;
 }
+
+// Keep the binder's contextual follow-up input server-only and bounded to the
+// active session suffix. The binder validates the artifact shape and target;
+// this projection only prevents stale/archived messages from becoming turn
+// authority before the first provider request.
+export function techniqueProposalsFromSession(session) {
+  const messages = Array.isArray(session?.messages) ? session.messages.slice(session.boundaryIndex || 0) : [];
+  return messages
+    .flatMap((message) => Array.isArray(message?.artifacts) ? message.artifacts : [])
+    .filter((artifact) => artifact?.type === 'recipe_proposal');
+}
 export function sessionReplayInputs({ session, conversation, ledger, continuePrevious = false, now = Date.now() } = {}) {
   const stale = Boolean(session && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale');
   if (stale) return { stale: true, resumed: continuePrevious === true, conversation: continuePrevious === true ? staleReplayConversation(session, { now }) : [], ledger: null, referenceLedger: continuePrevious === true ? replayFocusLedger(session?.ledger) : null };
@@ -231,12 +242,13 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const priorText = suppliedConversation.map((message) => message?.content || message?.text || '').join(' ');
     const olderReference = activeSession?.historyWidened === true || /\b(?:older|last month|three weeks?|weeks? ago|before that|historical|earlier)\b/i.test(priorText);
     const correction = /\b(?:actually|correction|instead|not the|i (?:meant|brewed|used)|it was)\b/i.test(`${priorText} ${userText}`);
-    context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
+    const priorTechniqueProposals = replay.stale ? [] : techniqueProposalsFromSession(activeSession);
+    context = await buildRuphusContext({ uid, contextRef: effectiveContextRef, userText, conversation: suppliedConversation, ledger: replay.referenceLedger || replayLedger, readers, evidenceByteCap: Number(process.env.RUPHUS_AGENT_EVIDENCE_BYTES), priorTechniqueProposals, sessionState: activeSession ? { lastActivityAt: activeSession.lastActivityAt, boundaryIndex: activeSession.boundaryIndex, launchHintConsumed: activeSession.launchHintConsumed, olderReference, correction } : { olderReference, correction } });
     Object.defineProperty(context, '__ruphusSourceFormatCapability', { value: Array.isArray(commandCapabilities) && commandCapabilities.includes('technique_experiment_v1'), enumerable: false, writable: true, configurable: true });
     Object.assign(context.proposalState, deriveProposalReadiness({ conversation: suppliedConversation, ledger: replayLedger, userText }));
     Object.defineProperty(context, '__ruphusTechniqueSelections', { value: techniqueSelectionsFromSession(activeSession, context.__ruphusRefs), enumerable: false, writable: true, configurable: true });
     context.proposalReviews = replay.stale ? [] : recentProposalReviews(activeSession, context.__ruphusRefs, { coffeeRef: context.turnBinding?.status === 'locked' ? context.turnBinding.coffeeRef : null, slot: context.methodBinding?.status === 'locked' ? context.methodBinding.slot : null });
-    Object.defineProperty(context, '__ruphusPriorProposals', { value: replay.stale ? [] : (activeSession?.messages || []).slice(activeSession?.boundaryIndex || 0).flatMap(message => message.artifacts || []).filter(item => item.type === 'recipe_proposal'), enumerable: false });
+    Object.defineProperty(context, '__ruphusPriorProposals', { value: priorTechniqueProposals, enumerable: false });
     // A conversation reference, not write authority; the tool rechecks the
     // owner-scoped attempt and canonical receipt before displaying anything.
     Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(activeSession, { now: startedAt }), enumerable: false });

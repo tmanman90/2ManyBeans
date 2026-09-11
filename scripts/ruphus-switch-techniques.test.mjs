@@ -117,6 +117,26 @@ test('Switch 03 exposes both hybrid and full-immersion source choices through th
   assert.match(read.options[1].differences[0], /stays closed through the pour and steep.*releases to drain/i);
 });
 
+test('an explicit new Switch technique name is not mistaken for the prior HARIO card', async () => {
+  const recipe = generateV60SwitchRecipe({}, { dose: 24, size: '03' });
+  const priorSourceId = 'hario-switch-03-matt-winton-hybrid-24-2022';
+  const context = contextFor({ userText: 'Try the HARIO full immersion Switch technique.', recipe });
+  context.proposalReviews = [{
+    coffeeRef: 'c1', slot: 'v60_hot', sourceId: priorSourceId, familyId: priorSourceId,
+    name: 'HARIO Switch 03 Matt Winton bloom hybrid', proposalId: 'proposal-first',
+  }];
+  Object.defineProperty(context, '__ruphusTechniqueSelections', {
+    value: new Map([['c1:v60_hot', { selectedIds: [priorSourceId], proposalIds: ['proposal-first'] }]]),
+    enumerable: false,
+  });
+
+  const read = await toolsFor(context, recipe).call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(read.ok, true);
+  assert.equal(read.actionable, true);
+  assert.deepEqual(read.options.map((option) => option.sourceId), ['hario-switch-03-instruction-manual-36-2023']);
+  assert.notEqual(read.options[0].sourceId, priorSourceId);
+});
+
 test('Switch 03 immersion becomes a native mL timed proposal without generic Switch aliases', async () => {
   const recipe = generateV60SwitchRecipe({}, { dose: 24, size: '03' });
   const run = await runSelectedTechnique({

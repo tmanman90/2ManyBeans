@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
-import { deriveProposalReadiness, techniqueSelectionsFromSession } from '../api/ruphus-agent.js';
+import { deriveProposalReadiness, techniqueProposalsFromSession, techniqueSelectionsFromSession } from '../api/ruphus-agent.js';
 import { generateV60Recipe, validateV60Candidate } from '../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
@@ -367,6 +367,144 @@ test('off-rotation another request hydrates a retained selection after a trial r
   assert.equal(proposal.ok, true, proposal.code);
   assert.equal(proposal.artifact.techniqueExperiment.sourceId, next.sourceId);
   assert.equal(succeededReceipt.status, 'succeeded');
+});
+
+test('bare another follow-up prebinds the retained off-rotation card before evidence and options', async () => {
+  const recipe = generateV60SwitchRecipe({}, { dose: 15 });
+  const coffee = {
+    id: 'el-vergel', name: 'El Vergel', status: 'FINISHED',
+    aidenRecipe: { method: 'aiden', device: 'aiden', mode: 'hot', dose: 20, water: 320 },
+    handBrewRecipes: {
+      v60: recipe,
+      kalita: { method: 'kalita', device: 'kalita', mode: 'hot', kalitaSize: '155', dose: 15, water: 240 },
+    },
+    handBrewIcedRecipes: {
+      kalita: { method: 'kalita', device: 'kalita', mode: 'iced', isIced: true, kalitaSize: '155', dose: 15, water: 180 },
+    },
+  };
+  const evidenceRecipes = [
+    { ...coffee.aidenRecipe, slotKey: 'aiden' },
+    { ...recipe, slotKey: 'v60_hot' },
+    { ...coffee.handBrewRecipes.kalita, slotKey: 'kalita_hot' },
+    { ...coffee.handBrewIcedRecipes.kalita, slotKey: 'kalita_iced' },
+  ];
+  const priorSourceId = 'hario-switch-03-matt-winton-hybrid-24-2022';
+  const retainedProposal = {
+    id: 'proposal-first', type: 'recipe_proposal', status: 'attempt_created', coffeeId: coffee.id, slotKey: 'v60_hot',
+    before: recipe, after: recipe,
+    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: priorSourceId, familyId: priorSourceId, sourceId: priorSourceId },
+  };
+  const succeededReceipt = {
+    id: 'receipt-first', type: 'action_receipt', mode: 'brew_once', status: 'succeeded',
+    proposalId: retainedProposal.id, attemptId: 'attempt-first', coffeeId: coffee.id, slotKey: 'v60_hot',
+  };
+  const session = {
+    boundaryIndex: 0,
+    messages: [
+      { role: 'assistant', text: 'Try the prior Switch technique.', artifacts: [retainedProposal, succeededReceipt] },
+    ],
+  };
+  const userText = 'Show me another one';
+  const context = await buildRuphusContext({
+    uid: 'owner-1', contextRef: { surface: 'direct' }, userText,
+    ledger: { version: 1, entries: [], namedCoffees: [] },
+    priorTechniqueProposals: techniqueProposalsFromSession(session), evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [coffee],
+      readSetup: async () => ({ defaultMethod: 'aiden', grinder: 'fellow-ode-gen2', units: 'metric' }),
+    },
+  });
+  assert.equal(context.rotationSnapshot.coffees.length, 0);
+  assert.equal(context.turnBinding.status, 'locked');
+  assert.equal(context.turnBinding.coffeeName, coffee.name);
+  assert.equal(context.methodBinding.slot, 'v60_hot');
+  assert.equal(context.methodBinding.source, 'M2');
+  assert.deepEqual(context.rotationSnapshot.refs, undefined);
+
+  // The authenticated endpoint installs the selection map after context
+  // construction. Mirror that server-only handoff here without exposing the
+  // proposal or receipt in the provider-visible context.
+  Object.defineProperty(context, '__ruphusTechniqueSelections', {
+    value: techniqueSelectionsFromSession(session, context.__ruphusRefs),
+    enumerable: false,
+  });
+  Object.defineProperty(context, '__ruphusPriorProposals', { value: [retainedProposal], enumerable: false });
+  Object.defineProperty(context, '__ruphusTrialReceipts', { value: [succeededReceipt], enumerable: false });
+
+  const calls = [];
+  const rawTools = createRuphusTools({
+    uid: 'owner-1', context,
+    readers: {
+      readCoffee: async () => coffee,
+      readRecipe: async ({ slotKey }) => slotKey ? resolveLegacyRecipe(coffee, slotKey).recipe : evidenceRecipes,
+      readBrews: async () => [],
+      readTastings: async () => [],
+    },
+  });
+  const tools = { ...rawTools, call: async (...args) => { calls.push(args); return rawTools.call(...args); } };
+  let providerCalls = 0;
+  let firstProviderInput;
+  const result = await runRuphusTurn({
+    turnId: 'off-rotation-another-prebind', context, userText, tools,
+    provider: { runTurn: async (input) => {
+      providerCalls += 1;
+      if (providerCalls === 1) {
+        firstProviderInput = input;
+        assert.equal(calls.length, 0, 'the retained card should bind before the first provider request');
+        assert.equal(input.context.turnBinding.coffeeName, coffee.name);
+        assert.deepEqual(input.context.methodBinding, { status: 'locked', slot: 'v60_hot', displayName: 'hot V60', source: 'M2' });
+        return { toolCalls: [{ callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: context.turnBinding.coffeeRef, windowDays: 14 } }] };
+      }
+      if (providerCalls === 2) {
+        const evidence = input.toolResult.results.find((item) => item.name === 'read_coffee_evidence').result;
+        assert.equal(evidence.method.slot, 'v60_hot');
+        assert.deepEqual(context.proposalState.target, { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot' });
+        // Native failure shape: the provider answers with a prose-only
+        // "remaining option" claim instead of requesting the trusted option
+        // reader. The authenticated contextual follow-up must recover the
+        // bounded read before accepting any source choice.
+        return { text: 'The remaining option is the Devil reference.' };
+      }
+      if (providerCalls === 3) {
+        const forcedRead = input.toolResult.results.find((item) => item.name === 'read_technique_options');
+        const pairedCall = input.previous.outputItems.find((item) => item.type === 'function_call' && item.call_id === forcedRead.callId);
+        assert.equal(pairedCall?.name, 'read_technique_options', 'the contextual read must have a matching provider call item');
+        const options = input.toolResult.results.find((item) => item.name === 'read_technique_options').result;
+        assert.equal(options.actionable, true);
+        assert.ok(!options.options.some((option) => [option.id, option.familyId, option.sourceId].includes(priorSourceId)));
+        const next = options.options[0];
+        return { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: {
+          coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot', change: null,
+          experiment: { kind: 'manual_source_technique', techniqueId: next.id },
+        } }] };
+      }
+      throw new Error(`unexpected provider call ${providerCalls}`);
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(providerCalls, 3);
+  assert.equal(firstProviderInput.context.turnBinding.coffeeName, coffee.name);
+  assert.deepEqual(calls.map(([name]) => name), ['read_coffee_evidence', 'read_technique_options', 'propose_recipe_change']);
+  assert.deepEqual(result.toolNames, ['read_coffee_evidence', 'read_technique_options', 'propose_recipe_change']);
+  assert.equal(result.artifacts.length, 1);
+  assert.notEqual(result.artifacts[0].techniqueExperiment.sourceId, priorSourceId);
+  assert.equal(result.artifacts[0].coffeeId, coffee.id);
+  assert.doesNotMatch(result.text, /Devil reference/i, 'the card must be selected from trusted options, not omitted-read prose');
+});
+
+test('new-chat and no-history bare technique follow-ups have no recipe target authority', async () => {
+  const recipe = generateV60SwitchRecipe({}, { dose: 15 });
+  const coffee = { id: 'el-vergel', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: recipe } };
+  const archived = { boundaryIndex: 1, messages: [{ artifacts: [{ type: 'recipe_proposal', coffeeId: coffee.id, slotKey: 'v60_hot' }] }, { role: 'user', text: 'Start a new chat' }] };
+  assert.deepEqual(techniqueProposalsFromSession(archived), []);
+  const context = await buildRuphusContext({
+    uid: 'owner-1', contextRef: { surface: 'direct' }, userText: 'Show me another one',
+    priorTechniqueProposals: techniqueProposalsFromSession(archived), evidenceByteCap: 10000,
+    readers: { listCoffees: async () => [coffee], readSetup: async () => ({ defaultMethod: 'aiden' }) },
+  });
+  assert.equal(context.__ruphusTurnBinding, null);
+  assert.equal(context.turnBinding, undefined);
+  assert.equal(context.methodBinding, undefined);
 });
 
 test('a mixed off-target request after Switch options recovers into one proposal within the round budget', async () => {

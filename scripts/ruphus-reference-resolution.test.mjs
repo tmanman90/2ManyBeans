@@ -100,3 +100,37 @@ test('trusted turn binding seeds a valid launch coffee for current references be
   });
   assert.deepEqual({ status: result.status, coffeeRef: result.coffeeRef, coffeeName: result.coffeeName }, { status: 'locked', coffeeRef: 'c-a', coffeeName: 'El Vergel' });
 });
+
+test('bare technique follow-up binds only to a delivered current-session proposal', () => {
+  const proposal = {
+    id: 'proposal-technique', type: 'recipe_proposal', status: 'attempt_created', coffeeId: 'a', slotKey: 'v60_hot',
+    before: { coffeeGrams: 15 }, after: { coffeeGrams: 15 },
+    techniqueExperiment: { kind: 'v60_technique', techniqueId: 'technique-one', familyId: 'family-one', sourceId: 'source-one' },
+  };
+  const bound = bindRuphusTurn({ userText: 'Show me another one', coffees, refs: { 'c-a': 'a', 'c-b': 'b' }, priorTechniqueProposals: [proposal] });
+  assert.equal(bound.status, 'locked');
+  assert.equal(bound.coffeeRef, 'c-a');
+  assert.equal(bound.techniqueSlot, 'v60_hot');
+  assert.equal(bound.techniqueKind, 'v60_technique');
+
+  const noHistory = bindRuphusTurn({ userText: 'Show me another one', coffees, refs: { 'c-a': 'a', 'c-b': 'b' } });
+  assert.equal(noHistory.status, 'none');
+  const proseOnly = bindRuphusTurn({
+    userText: 'Show me another one', coffees, refs: { 'c-a': 'a', 'c-b': 'b' },
+    priorTechniqueProposals: [{ type: 'assistant_message', coffeeId: 'a', text: 'I showed you a technique card.' }],
+  });
+  assert.equal(proseOnly.status, 'none');
+});
+
+test('bare technique follow-up stays unbound when retained proposals point at multiple coffees', () => {
+  const proposal = (id, coffeeId) => ({
+    id, type: 'recipe_proposal', status: 'proposed', coffeeId, slotKey: 'v60_hot',
+    before: { coffeeGrams: 15 }, after: { coffeeGrams: 15 },
+    techniqueExperiment: { kind: 'v60_technique', techniqueId: id, familyId: id, sourceId: `${id}-source` },
+  });
+  const result = bindRuphusTurn({
+    userText: 'Show me another one', coffees, refs: { 'c-a': 'a', 'c-b': 'b' },
+    priorTechniqueProposals: [proposal('one', 'a'), proposal('two', 'b')],
+  });
+  assert.equal(result.status, 'none');
+});

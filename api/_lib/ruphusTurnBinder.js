@@ -10,6 +10,9 @@ const CURRENT_RECIPE_ACTION = /^(?:(?:ok(?:ay)?|yes|sure|please)[, ]+)*(?:(?:can
 const ORDINAL = /\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/i;
 const OTHER = /\bother\b/i;
 const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
+const CONTEXTUAL_TECHNIQUE_FOLLOWUP = /^(?:show|give)\s+me\s+(?:another|a\s+different)\s+(?:one|option)[.!?]?$/i;
+const TECHNIQUE_EXPERIMENT_KINDS = new Set(['v60_technique', 'manual_source_technique']);
+const DELIVERED_PROPOSAL_STATUSES = new Set(['ready', 'proposed', 'applying', 'applied', 'kept', 'attempt_created', 'prepared']);
 const FOCUS_ENTRY = 'coffee_focus';
 const REFERENCE_CONSTRAINT_ENTRY = 'coffee_reference_constraint';
 
@@ -50,7 +53,42 @@ function currentName({ coffees, ledger, launchContext, refs }) {
   return null;
 }
 
-function isSupportedReference(userText, coffees, ledger, launchContext, refs) {
+function deliveredTechniqueProposal(proposal) {
+  const experiment = proposal?.techniqueExperiment;
+  const hasSelection = [experiment?.techniqueId, experiment?.familyId, experiment?.sourceId]
+    .some((value) => typeof value === 'string' && value.trim());
+  return proposal?.type === 'recipe_proposal'
+    && typeof proposal?.id === 'string' && proposal.id.trim()
+    && typeof proposal?.coffeeId === 'string' && proposal.coffeeId.trim()
+    && ['v60_hot', 'kalita_hot'].includes(proposal?.slotKey)
+    && TECHNIQUE_EXPERIMENT_KINDS.has(experiment?.kind)
+    && hasSelection
+    && proposal?.before && typeof proposal.before === 'object' && !Array.isArray(proposal.before)
+    && proposal?.after && typeof proposal.after === 'object' && !Array.isArray(proposal.after)
+    && (proposal.status == null || DELIVERED_PROPOSAL_STATUSES.has(proposal.status));
+}
+
+function contextualTechniqueReference(userText, coffees, ledger, launchContext, refs, priorTechniqueProposals = []) {
+  const value = text(userText).replace(/[.!?]+$/, '').trim();
+  if (!CONTEXTUAL_TECHNIQUE_FOLLOWUP.test(value)) return null;
+  const proposals = (Array.isArray(priorTechniqueProposals) ? priorTechniqueProposals : [])
+    .filter(deliveredTechniqueProposal)
+    .map((proposal) => ({ proposal, coffee: coffees.find((item) => item?.id === proposal.coffeeId) }))
+    .filter((item) => item.coffee);
+  if (!proposals.length) return null;
+  const current = currentName({ coffees, ledger, launchContext, refs });
+  const scoped = current
+    ? proposals.filter(({ coffee }) => normalize(coffee?.name || coffee?.coffeeName) === normalize(current))
+    : proposals;
+  if (!scoped.length) return null;
+  if (!current && new Set(scoped.map(({ coffee }) => coffee.id)).size > 1) return null;
+  const selected = scoped.at(-1);
+  const coffeeName = text(selected.coffee?.name || selected.coffee?.coffeeName);
+  if (!coffeeName) return null;
+  return { reference: coffeeName, current: coffeeName, techniqueSlot: selected.proposal.slotKey, techniqueKind: selected.proposal.techniqueExperiment.kind };
+}
+
+function isSupportedReference(userText, coffees, ledger, launchContext, refs, priorTechniqueProposals = []) {
   const value = text(userText).replace(/[.!?]+$/, '').trim();
   if (exactNameReference(value, coffees)) return { reference: exactNameReference(value, coffees) };
   if (ORDINAL.test(value)) return { reference: value.match(ORDINAL)[0] };
@@ -65,7 +103,7 @@ function isSupportedReference(userText, coffees, ledger, launchContext, refs) {
   if (SUPPORTED_PRONOUN.test(value) || OTHER.test(value) || DESCRIPTOR.test(value)) {
     return { reference: value, current: currentName({ coffees, ledger, launchContext, refs }) };
   }
-  return null;
+  return contextualTechniqueReference(value, coffees, ledger, launchContext, refs, priorTechniqueProposals);
 }
 
 function publicResult(result, refs) {
@@ -100,9 +138,9 @@ function retireReferenceConstraints(ledger) {
   return { ...ledger, entries: ledger.entries.filter((entry) => entry?.kind !== REFERENCE_CONSTRAINT_ENTRY) };
 }
 
-export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launchContext = {}, refs = {}, evidenceByteCap = MAX_LEDGER_BYTES } = {}) {
+export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launchContext = {}, refs = {}, evidenceByteCap = MAX_LEDGER_BYTES, priorTechniqueProposals = [] } = {}) {
   const inventory = Array.isArray(coffees) ? coffees : [];
-  const supported = isSupportedReference(userText, inventory, ledger, launchContext, refs);
+  const supported = isSupportedReference(userText, inventory, ledger, launchContext, refs, priorTechniqueProposals);
   if (!supported) return { status: 'none', ledger, refs: {}, launchHintConsumed: false };
   // A launch coffee is an established current reference even before the
   // first evidence read has populated namedCoffees. Seed only the resolver's
@@ -125,6 +163,10 @@ export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launc
       ? appendReferenceConstraint(retireReferenceConstraints(ledger), constrainedReference, evidenceByteCap)
       : ledger;
     return { ...binding, ledger: nextLedger, refs: {}, launchHintConsumed: false };
+  }
+  if (supported.techniqueSlot && binding.status === 'locked') {
+    binding.techniqueSlot = supported.techniqueSlot;
+    binding.techniqueKind = supported.techniqueKind;
   }
 
   const focusEntry = {

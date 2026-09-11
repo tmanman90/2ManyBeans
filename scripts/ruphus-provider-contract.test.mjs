@@ -53,6 +53,46 @@ test('OpenAI continuation replays prior response items alongside every tool resu
   assert.deepEqual(requests[0].input, [{ type: 'reasoning', id: 'reasoning-1' }, { type: 'function_call_output', call_id: 'call-1', output: '{"ok":true}' }, { type: 'function_call_output', call_id: 'call-2', output: '{"ok":true}' }]);
 });
 
+test('provider adapter keeps app-initiated technique continuation outputs paired', async () => {
+  const requests = [];
+  const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => {
+    requests.push(request);
+    return { id: 'r-contextual-technique', model: RUPHUS_OPENAI_MODEL, output_text: '', output: [] };
+  } } } });
+  const callId = 'contextual-technique-options';
+  await provider.runTurn({
+    turnId: 'contextual-technique-turn',
+    context: {},
+    userText: 'Show me another one',
+    tools: [],
+    previous: {
+      outputItems: [{
+        type: 'function_call',
+        call_id: callId,
+        name: 'read_technique_options',
+        arguments: JSON.stringify({ coffeeRef: 'coffee-1', slot: 'v60_hot' }),
+      }],
+    },
+    toolResult: {
+      results: [{
+        callId,
+        name: 'read_technique_options',
+        result: { ok: true, actionable: true, options: [{ id: 'trusted-option' }] },
+      }],
+    },
+    regeneration: true,
+  });
+  const input = requests[0].input;
+  const call = input.find((item) => item.type === 'function_call' && item.call_id === callId);
+  const output = input.find((item) => item.type === 'function_call_output' && item.call_id === callId);
+  assert.equal(call?.name, 'read_technique_options');
+  assert.equal(output?.output, '{"ok":true,"actionable":true,"options":[{"id":"trusted-option"}]}');
+  const functionCallIds = new Set(input.filter((item) => item.type === 'function_call').map((item) => item.call_id));
+  for (const item of input.filter((candidate) => candidate.type === 'function_call_output')) {
+    assert.ok(functionCallIds.has(item.call_id), `orphan function_call_output: ${item.call_id}`);
+  }
+});
+
 test('stateless continuation accumulates the complete multi-round input sequence', async () => {
   const requests = [];
   const responses = [

@@ -18,6 +18,25 @@ const techniqueRequest = (value, context = null, target = null) => isTechniqueEx
   || isExplicitTechniqueReuseRequest(value || '')
   || isContextualTechniqueFollowupRequest(value || '', context, target || undefined);
 
+function contextualTechniqueReadRequired({ userText = '', context = null, toolEvidence = [] } = {}) {
+  const binding = context?.__ruphusTurnBinding;
+  const target = proposalTarget(context?.proposalState);
+  if (!target?.coffeeRef || !target?.slot
+    || binding?.status !== 'locked'
+    || !binding.techniqueSlot
+    || binding.coffeeRef !== target.coffeeRef
+    || binding.techniqueSlot !== target.slot
+    || !isContextualTechniqueFollowupRequest(userText || context?.userText || '', context, target)) return false;
+  const existingTechniqueRead = [...toolEvidence].reverse().find((item) => item?.name === 'read_technique_options'
+    && item.result?.coffeeRef === target.coffeeRef
+    && item.result?.slot === target.slot);
+  if (existingTechniqueRead) return false;
+  const evidence = [...toolEvidence].reverse().find((item) => item?.name === 'read_coffee_evidence'
+    && item.result?.coffeeRef === target.coffeeRef
+    && item.result?.method?.slot === target.slot);
+  return Boolean(evidence);
+}
+
 function cancelledError() {
   return Object.assign(new Error('turn cancelled'), { code: 'turn_cancelled' });
 }
@@ -264,6 +283,51 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
       throwIfCancelled();
       if (!calls.length) {
+        // A bare same-session technique follow-up has an authenticated target
+        // from its delivered card, but the provider may answer after evidence
+        // without asking for the option reader. Spend the existing second
+        // read round deterministically for that narrow case; ordinary prose
+        // turns and unbound/new-chat requests remain unchanged.
+        if (!techniqueContinuationUsed
+          && contextualTechniqueReadRequired({ userText, context, toolEvidence })
+          && toolRounds < maxToolRounds
+          && readCalls < MAX_READS_PER_TURN
+          && toolCalls < maxToolCalls) {
+          const target = proposalTarget(context?.proposalState);
+          const request = { callId: 'contextual-technique-options', name: 'read_technique_options', args: { coffeeRef: target.coffeeRef, slot: target.slot } };
+          toolRounds += 1;
+          readCalls += 1;
+          toolCalls += 1;
+          techniqueContinuationUsed = true;
+          text = '';
+          const techniqueRead = await runTool(request);
+          // This read is initiated by the trusted session boundary rather
+          // than by a provider function call. Pair it with an internal call
+          // item before handing the result to the Responses adapter so the
+          // API never receives an orphan function_call_output.
+          const pairedPrevious = {
+            ...response,
+            outputItems: [
+              ...(Array.isArray(response?.outputItems) ? response.outputItems : []),
+              {
+                type: 'function_call',
+                call_id: request.callId,
+                name: request.name,
+                arguments: JSON.stringify(request.args || {}),
+              },
+            ],
+          };
+          response = await provider.runTurn({
+            turnId, context, userText, conversation: context?.conversation || [],
+            tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+            previous: pairedPrevious, toolResult: { results: [techniqueRead] }, regeneration: true,
+            correctiveInstruction: 'The authenticated same-session technique follow-up needs one new option from the trusted reader. Choose one exact executable option from the provided technique options and call propose_recipe_change now. Do not cite an option from prose or claim a review card unless the proposal tool returns its artifact.',
+            signal,
+          });
+          throwIfCancelled();
+          rememberUsage(response);
+          continue;
+        }
         const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
           && item.result?.ok === true && item.result?.actionable === true
           && Array.isArray(item.result?.options) && item.result.options.length > 0);
