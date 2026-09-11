@@ -1,6 +1,6 @@
 import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION } from '../../src/lib/ruphus/contracts.js';
 import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
-import { isExplicitTechniqueReuseRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
+import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
@@ -14,7 +14,9 @@ const SEVERE_SECOND_FAILURES = new Set([
 ]);
 const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
-const techniqueRequest = (value) => isTechniqueExplorationRequest(value || '') || isExplicitTechniqueReuseRequest(value || '');
+const techniqueRequest = (value, context = null, target = null) => isTechniqueExplorationRequest(value || '')
+  || isExplicitTechniqueReuseRequest(value || '')
+  || isContextualTechniqueFollowupRequest(value || '', context, target || undefined);
 
 function cancelledError() {
   return Object.assign(new Error('turn cancelled'), { code: 'turn_cancelled' });
@@ -171,7 +173,7 @@ export function proposalEligibleForTarget(context, request = {}) {
       && (!ready.kind || ready.kind === techniqueKind)
       && (!resolvedTarget?.sourceHash || !ready.sourceHash || resolvedTarget.sourceHash === ready.sourceHash)
       && Array.isArray(ready.optionIds) && ready.optionIds.includes(selectedId)
-      && techniqueRequest(context?.userText || ''));
+      && techniqueRequest(context?.userText || '', context, target));
   }
   return Boolean(
     target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
@@ -265,7 +267,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
           && item.result?.ok === true && item.result?.actionable === true
           && Array.isArray(item.result?.options) && item.result.options.length > 0);
-        if (techniqueRead && !proposalClaimed && techniqueRequest(userText || context?.userText || '')) {
+        if (techniqueRead && !proposalClaimed && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))) {
           if (toolCalls >= maxToolCalls) {
             text = TECHNIQUE_RECOVERY;
             break;
@@ -375,7 +377,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
-        if (techniqueRequest(userText || context?.userText || '')) techniqueContinuationUsed = true;
+        if (techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))) techniqueContinuationUsed = true;
         response = await provider.runTurn({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
@@ -391,7 +393,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     throwIfCancelled();
     let checked = text.trim();
     if (!artifacts.some((artifact) => artifact?.type === 'recipe_proposal')
-      && techniqueRequest(userText || context?.userText || '')
+      && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))
       && PREPARATION_CLAIM.test(checked)) checked = TECHNIQUE_RECOVERY;
     const checkedEvidence = runtimeEvidence(toolEvidence);
     let triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });

@@ -296,6 +296,26 @@ export function isExplicitTechniqueReuseRequest(value = '') {
   return reference && (explicitVerb || namedRepeat);
 }
 
+const CONTEXTUAL_TECHNIQUE_FOLLOWUP = /^(?:show|give)\s+me\s+(?:another|a\s+different)\s+(?:one|option)[.!?]?$/i;
+
+// A bare alternative request is actionable only when the authenticated
+// session contains a delivered source-backed card for the exact target. This
+// keeps "Show me another one" out of the global classifier while allowing a
+// same-conversation continuation to reuse the target and choose a fresh
+// option. The endpoint installs this map from owner-scoped session artifacts.
+export function isContextualTechniqueFollowupRequest(value = '', context = {}, target = {}) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!CONTEXTUAL_TECHNIQUE_FOLLOWUP.test(text)) return false;
+  const coffeeRef = target?.coffeeRef || target?.coffeeRefKey || context?.proposalState?.target?.coffeeRef || null;
+  const slot = target?.slot || target?.slotKey || context?.proposalState?.target?.slot || context?.proposalState?.target?.slotKey || null;
+  if (!coffeeRef || !['v60_hot', 'kalita_hot'].includes(slot)) return false;
+  const selection = context?.__ruphusTechniqueSelections instanceof Map
+    ? context.__ruphusTechniqueSelections.get(`${coffeeRef}:${slot}`)
+    : null;
+  return Array.isArray(selection?.selectedIds) && selection.selectedIds.length > 0
+    && Array.isArray(selection?.proposalIds) && selection.proposalIds.length > 0;
+}
+
 function sourceRouteForRecipe(recipe = {}, slotKey) {
   if (!['v60_hot', 'kalita_hot'].includes(slotKey) || !recipe || typeof recipe !== 'object') return null;
   const configuration = sourceConfigurationForRecipe(recipe);
@@ -416,8 +436,11 @@ function setPreviewReadiness(context, { coffeeRef, slotKey, recipe } = {}) {
 }
 
 function setTechniqueReadiness(context, { coffeeRef, slotKey, recipe, options = [], kind = 'v60_technique' } = {}) {
+  const techniqueIntent = isTechniqueExplorationRequest(context?.userText)
+    || isExplicitTechniqueReuseRequest(context?.userText)
+    || isContextualTechniqueFollowupRequest(context?.userText, context, { coffeeRef, slot: slotKey });
   if (!context?.proposalState || !recipe || !coffeeRef || !['v60_hot', 'kalita_hot'].includes(slotKey)
-    || (!isTechniqueExplorationRequest(context.userText) && !isExplicitTechniqueReuseRequest(context.userText))
+    || !techniqueIntent
     || !options.length) return;
   const sourceHash = recipeSourceHash(recipe, slotKey);
   const optionIds = options.flatMap((option) => [option.id, option.familyId, option.sourceId]).filter(Boolean);
@@ -612,6 +635,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
           current: techniqueIdentity(recipe),
           offeredIds: options.flatMap((option) => [option.id, option.familyId, option.sourceId]),
           selectedIds: prior?.selectedIds || [],
+          proposalIds: prior?.proposalIds || [],
         });
         const executableOptions = options.filter((option) => option.executable === true);
         rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
@@ -646,6 +670,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         current: techniqueIdentity(recipe),
         offeredIds: options.flatMap((option) => [option.id, option.familyId, option.sourceId]),
         selectedIds: prior?.selectedIds || [],
+        proposalIds: prior?.proposalIds || [],
       });
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey), techniqueOptions: options });
       setTechniqueReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe, options, kind: 'v60_technique' });
@@ -737,8 +762,6 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
           ...(manualSourceExperiment ? { sourceRevision: selected.sourceRevision, sourceOptionsVersion: selected.sourceOptionsVersion, sourceNativeWaterUnit: selected.sourceWater?.unit || null, sourceDoseGrams: selected.sourceDoseGrams, targetDoseGrams: selectedDose } : {}),
           currentTechnique: before.technique || before.sourceLineage?.technique || null,
         };
-        const state = context.__ruphusTechniqueSelections?.get(techniqueKey(args.coffeeRef, slotKey));
-        if (state) state.selectedIds = [...new Set([...(state.selectedIds || []), selected.id, selected.familyId, selected.sourceId])];
       } catch (error) {
         return { ok: false, code: error.code || 'technique_generation_failed', message: error.message };
       }
@@ -770,7 +793,17 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const grinder = snapshot.setup?.grinder;
     const previousGrind = before.grindSize?.setting ?? before.grind;
     const nextGrind = after.grindSize?.setting ?? after.grind;
-    if (grinder === 'fellow-ode-gen2' && String(previousGrind) !== String(nextGrind)) {
+    // A source-backed manual experiment owns its native grind descriptor. It
+    // may be qualitative or expressed for another grinder, so it must not be
+    // translated into the user's Ode setting or rejected as a non-click. Keep
+    // the exception structural so a numeric app-Ode envelope cannot bypass
+    // the physical-click check merely by declaring a manual experiment.
+    const sourceNativeGrind = manualSourceExperiment
+      && after.sourceProjection?.grind
+      && typeof after.sourceProjection.grind === 'object'
+      && !Array.isArray(after.sourceProjection.grind)
+      && ['description', 'microns', 'native'].some((key) => Object.hasOwn(after.sourceProjection.grind, key));
+    if (grinder === 'fellow-ode-gen2' && !sourceNativeGrind && String(previousGrind) !== String(nextGrind)) {
       if (!isOdeStep(nextGrind)) {
         const current = Number(previousGrind);
         const finer = ODE_GEN2_STEPS.filter(step => step < current).at(-1);
@@ -804,6 +837,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         context.proposalState.diagnosisReady = true;
         context.proposalState.userAgreed = true;
       }
+    }
+    if (techniqueExperiment && context.__ruphusTechniqueSelections instanceof Map) {
+      const state = context.__ruphusTechniqueSelections.get(techniqueKey(args.coffeeRef, slotKey));
+      if (state) state.selectedIds = [...new Set([...(state.selectedIds || []), experimentMetadata.techniqueId, experimentMetadata.familyId, experimentMetadata.sourceId])];
     }
     const actions = typeof proposalStore === 'function' && proposal?.status === 'proposed' && proposal?.sourceRevisionId
       ? ['apply_proposal', 'brew_once', 'keep_current'].filter((mode) => proposalActions.includes(mode))

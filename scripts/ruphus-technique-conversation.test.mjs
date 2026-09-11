@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { createRuphusTools, isContextualTechniqueFollowupRequest } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { techniqueSelectionsFromSession } from '../api/ruphus-agent.js';
 import { isTechniqueExplorationRequest } from '../src/lib/ruphus/conversationContract.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 
@@ -96,6 +97,83 @@ test('explicit V60 exploration turns one exact structured selection into a nativ
   assert.doesNotMatch(result.text, /ask(?:ing)? for another yes/i);
   assert.equal(context.proposalState.techniqueReady.coffeeRef, 'c1');
   assert.equal(context.proposalState.previewReady, true);
+});
+
+test('a bare another-one follow-up is actionable only for a delivered same-target technique card', async () => {
+  const firstText = 'What is an interesting different technique for jar one with the v60?';
+  const firstContext = contextFor(firstText);
+  const firstTools = toolsFor(firstContext);
+  let firstCalls = 0;
+  let firstOption;
+  const first = await runRuphusTurn({
+    turnId: 'technique-contextual-first', context: firstContext, userText: firstText, tools: firstTools,
+    provider: { runTurn: async ({ toolResult }) => {
+      firstCalls += 1;
+      if (firstCalls === 1) return { toolCalls: [{ callId: 'first-options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      firstOption = optionFrom(toolResult);
+      return { toolCalls: [{ callId: 'first-proposal', name: 'propose_recipe_change', args: {
+        coffeeRef: 'c1', slot: 'v60_hot', change: null, experiment: { kind: 'v60_technique', techniqueId: firstOption.id },
+      } }] };
+    } },
+  });
+  assert.equal(first.ok, true, first.code);
+  const firstArtifact = first.artifacts[0];
+
+  const followupText = 'Show me another one';
+  const followupContext = contextFor(followupText);
+  Object.defineProperty(followupContext, '__ruphusTechniqueSelections', {
+    value: techniqueSelectionsFromSession({ boundaryIndex: 0, messages: [{ artifacts: [firstArtifact] }] }, { c1: 'coffee-1' }),
+    enumerable: false,
+  });
+  assert.equal(isTechniqueExplorationRequest(followupText), false, 'the global classifier stays conservative');
+  assert.equal(isContextualTechniqueFollowupRequest(followupText, followupContext, { coffeeRef: 'c1', slot: 'v60_hot' }), true);
+
+  const followupTools = toolsFor(followupContext);
+  let followupCalls = 0;
+  let nextOption;
+  const followup = await runRuphusTurn({
+    turnId: 'technique-contextual-followup', context: followupContext, userText: followupText, tools: followupTools,
+    provider: { runTurn: async ({ toolResult }) => {
+      followupCalls += 1;
+      if (followupCalls === 1) return { toolCalls: [{ callId: 'next-options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      if (followupCalls === 2) {
+        nextOption = optionFrom(toolResult);
+        assert.notEqual(nextOption.sourceId, firstArtifact.techniqueExperiment.sourceId);
+        return { toolCalls: [{ callId: 'next-recipe', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      }
+      return { toolCalls: [{ callId: 'next-proposal', name: 'propose_recipe_change', args: {
+        coffeeRef: 'c1', slot: 'v60_hot', change: null, experiment: { kind: 'v60_technique', techniqueId: nextOption.id },
+      } }] };
+    } },
+  });
+
+  assert.equal(followupCalls, 3);
+  assert.equal(followup.ok, true, followup.code);
+  assert.deepEqual(followup.toolNames, ['read_technique_options', 'read_recipe', 'propose_recipe_change']);
+  assert.equal(followup.artifacts.length, 1);
+  assert.equal(followup.artifacts[0].techniqueExperiment.sourceId, nextOption.sourceId);
+});
+
+test('bare another-one intent does not cross comparison, new-chat, or coffee boundaries', () => {
+  const followupText = 'Show me another one';
+  const artifact = {
+    type: 'recipe_proposal', id: 'proposal-delivered', coffeeId: 'coffee-1', slotKey: 'v60_hot',
+    techniqueExperiment: { kind: 'v60_technique', techniqueId: 'kasuya-coarse-pulses', familyId: 'kasuya-46', sourceId: 'kasuya-46-v1' },
+  };
+  const context = contextFor(followupText);
+  Object.defineProperty(context, '__ruphusTechniqueSelections', {
+    value: techniqueSelectionsFromSession({ messages: [{ artifacts: [artifact] }] }, { c1: 'coffee-1' }),
+    enumerable: false,
+  });
+
+  assert.equal(isContextualTechniqueFollowupRequest('Compare that with another one', context, { coffeeRef: 'c1', slot: 'v60_hot' }), false);
+  assert.equal(isContextualTechniqueFollowupRequest(followupText, context, { coffeeRef: 'c2', slot: 'v60_hot' }), false);
+  const newChat = contextFor(followupText);
+  Object.defineProperty(newChat, '__ruphusTechniqueSelections', {
+    value: techniqueSelectionsFromSession({ boundaryIndex: 1, messages: [{ artifacts: [artifact] }, { role: 'user', text: 'new chat' }] }, { c1: 'coffee-1' }),
+    enumerable: false,
+  });
+  assert.equal(isContextualTechniqueFollowupRequest(followupText, newChat, { coffeeRef: 'c1', slot: 'v60_hot' }), false);
 });
 
 test('provider prose cannot select a technique by negation or comparison', async () => {

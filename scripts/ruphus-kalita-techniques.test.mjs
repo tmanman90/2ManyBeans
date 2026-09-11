@@ -13,6 +13,7 @@ function contextFor({ userText, recipe, selections = null, proposalReviews = [],
     rotationSnapshot: {
       coffees: [{ refKey: 'c1', name: 'El Vergel', recipes: ['kalita_hot'] }],
       refs,
+      setup: { grinder: 'fellow-ode-gen2' },
     },
     __ruphusRefs: refs,
     userText,
@@ -182,6 +183,52 @@ test('Kalita source route fails closed for a mismatched size or filter instead o
     assert.deepEqual(read.options, []);
     assert.equal(read.sourceOptions, true);
   }
+});
+
+test('source-native grind descriptors survive an Ode setup while ordinary Ode changes keep click validation', async () => {
+  const recipe = generateKalitaRecipe({}, { dose: 14, size: '155', grinder: 'fellow-ode-gen2' });
+  const context = contextFor({ userText: 'Try a different Kalita technique for the 155.', recipe });
+  const tools = toolsFor(context, recipe);
+  const read = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  const selected = read.options.find((option) => option.sourceId === 'art-of-brew-wave-155-pulse-2024');
+  assert.ok(selected?.executable);
+
+  const sourceProposal = await tools.call('propose_recipe_change', {
+    coffeeRef: 'c1', slot: 'kalita_hot', change: null,
+    experiment: { kind: 'manual_source_technique', techniqueId: selected.sourceId },
+  });
+  assert.equal(sourceProposal.ok, true, sourceProposal.code);
+  assert.deepEqual(sourceProposal.artifact.after.grind, {
+    description: 'Medium', microns: null, native: { grinder: '1ZPresso K-Plus', setting: '70 clicks' },
+  });
+  assert.equal(sourceProposal.artifact.after.grindSize, undefined);
+
+  const ordinaryContext = contextFor({ userText: 'Change the Kalita grind.', recipe });
+  ordinaryContext.proposalState.previewReady = true;
+  ordinaryContext.proposalState.diagnosisReady = true;
+  ordinaryContext.proposalState.userAgreed = true;
+  const ordinaryTools = toolsFor(ordinaryContext, recipe);
+  await ordinaryTools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  const ordinaryProposal = await ordinaryTools.call('propose_recipe_change', {
+    coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: '5.7' }, experiment: null,
+  });
+  assert.equal(ordinaryProposal.ok, false);
+  assert.equal(ordinaryProposal.code, 'physical_grind_required');
+
+  let staleRecipe = recipe;
+  const staleContext = contextFor({ userText: 'Try a different Kalita technique for the 155.', recipe });
+  const staleTools = createRuphusTools({ uid: 'owner-1', context: staleContext, readers: { readRecipe: async () => staleRecipe } });
+  const staleRead = await staleTools.call('read_technique_options', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  const staleSelection = staleRead.options.find((option) => option.sourceId === 'foundation-wave-155');
+  staleRecipe = generateKalitaRecipe({}, { dose: 15, size: '155', grinder: 'fellow-ode-gen2' });
+  const staleProposal = await staleTools.call('propose_recipe_change', {
+    coffeeRef: 'c1', slot: 'kalita_hot', change: null,
+    experiment: { kind: 'manual_source_technique', techniqueId: staleSelection.sourceId },
+  });
+  assert.equal(staleProposal.ok, false);
+  assert.equal(staleProposal.code, 'proposal_target_stale');
+  const afterFailureRead = await staleTools.call('read_technique_options', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  assert.ok(afterFailureRead.options.some((option) => option.sourceId === staleSelection.sourceId), 'a failed proposal does not consume the source family');
 });
 
 test('first, another, compare, then explicit first reuse selects a fresh current-base source proposal', async () => {
