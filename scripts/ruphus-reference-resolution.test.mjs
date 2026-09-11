@@ -134,3 +134,29 @@ test('bare technique follow-up stays unbound when retained proposals point at mu
   });
   assert.equal(result.status, 'none');
 });
+
+test('read-only comparison and historical technique references bind only to delivered same-session cards', () => {
+  const proposal = (id, coffeeId, sourceId) => ({
+    id, type: 'recipe_proposal', status: 'proposed', coffeeId, slotKey: 'v60_hot',
+    before: { coffeeGrams: 15 }, after: { coffeeGrams: 15 },
+    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: sourceId, familyId: sourceId, sourceId },
+  });
+  const retained = [proposal('hybrid-card', 'a', 'matt-winton-hybrid'), proposal('immersion-card', 'a', 'hario-full-immersion')];
+  const compare = bindRuphusTurn({ userText: 'Compare those two', coffees, refs: {}, priorTechniqueProposals: retained });
+  assert.equal(compare.status, 'locked');
+  assert.equal(compare.coffeeRef && compare.refs[compare.coffeeRef], 'a');
+  assert.equal(compare.techniqueSlot, 'v60_hot');
+
+  const firstAgain = bindRuphusTurn({ userText: 'Show me the first one again', coffees, refs: {}, priorTechniqueProposals: retained });
+  assert.equal(firstAgain.status, 'locked');
+  assert.equal(firstAgain.coffeeRef, compare.coffeeRef);
+  assert.equal(firstAgain.techniqueSlot, 'v60_hot');
+
+  const noHistory = bindRuphusTurn({ userText: 'Compare those two', coffees, refs: {} });
+  assert.equal(noHistory.status, 'none');
+  const mixed = bindRuphusTurn({
+    userText: 'Compare those two', coffees, refs: {},
+    priorTechniqueProposals: [retained[0], proposal('foreign-card', 'b', 'foreign-source')],
+  });
+  assert.equal(mixed.status, 'none');
+});

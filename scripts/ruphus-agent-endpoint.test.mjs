@@ -4,7 +4,8 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation } from '../api/ruphus-agent.js';
+import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation, techniqueProposalsFromSession } from '../api/ruphus-agent.js';
+import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 
 test('New chat excludes archived Aiden conversation from provider replay', () => {
   const session = { lastActivityAt: 1000, boundaryIndex: 2, messages: [
@@ -80,6 +81,51 @@ test('endpoint context binds the sole other coffee before provider dispatch', as
   const contradictory = await tools.call('resolve_coffee', { reference: 'El Vergel' });
   assert.equal(contradictory.coffeeRef, built.turnBinding.coffeeRef);
   assert.equal(contradictory.match, 'turn_binding');
+});
+
+test('endpoint comparison binds delivered off-rotation technique cards before provider review', async () => {
+  const coffee = { id: 'finished-bean', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: generateV60Recipe({}, { dose: 15 }) } };
+  const card = (id, sourceId, name) => ({
+    id, type: 'recipe_proposal', status: 'proposed', coffeeId: coffee.id, slotKey: 'v60_hot',
+    before: { method: 'pour-over', device: 'v60', mode: 'hot', coffeeGrams: 15, waterGrams: 250 },
+    after: { method: 'pour-over', device: 'v60', mode: 'hot', coffeeGrams: 15, waterGrams: 250, techniqueLabel: name, sourceId, sourceLineage: { sourceId, familyId: sourceId } },
+    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: sourceId, familyId: sourceId, sourceId, name },
+  });
+  const first = card('hybrid-card', 'matt-winton-hybrid', 'Matt Winton hybrid');
+  const second = card('immersion-card', 'hario-full-immersion', 'HARIO full immersion');
+  const session = { boundaryIndex: 0, messages: [{ artifacts: [first] }, { artifacts: [second] }] };
+  const build = (userText, prior = techniqueProposalsFromSession(session)) => buildRuphusContext({
+    uid: 'user-1', contextRef: { surface: 'direct' }, userText,
+    priorTechniqueProposals: prior, evidenceByteCap: 10000,
+    readers: { listCoffees: async () => [coffee], readSetup: async () => ({ defaultMethod: 'aiden' }) },
+  });
+
+  const compare = await build('Compare those two');
+  assert.equal(compare.turnBinding.status, 'locked');
+  assert.equal(compare.methodBinding.slot, 'v60_hot');
+  const reviews = recentProposalReviews(session, compare.__ruphusRefs, { coffeeRef: compare.turnBinding.coffeeRef, slot: compare.methodBinding.slot });
+  assert.deepEqual(reviews.map((review) => review.sourceId), ['matt-winton-hybrid', 'hario-full-immersion']);
+  compare.proposalReviews = reviews;
+  const compareResult = await runRuphusTurn({
+    turnId: 'endpoint-compare-cards', context: compare, userText: 'Compare those two',
+    tools: createRuphusTools({ uid: 'user-1', context: compare }),
+    provider: { runTurn: async ({ context }) => {
+      assert.deepEqual(context.proposalReviews.map((review) => review.sourceId), ['matt-winton-hybrid', 'hario-full-immersion']);
+      return { text: 'Matt Winton uses a hybrid bloom and immersion structure; HARIO full immersion keeps the bed closed until release.' };
+    } },
+  });
+  assert.equal(compareResult.ok, true, compareResult.code);
+  assert.equal(compareResult.artifacts.length, 0);
+
+  const firstAgain = await build('Show me the first one again');
+  assert.equal(firstAgain.turnBinding.status, 'locked');
+  assert.equal(firstAgain.turnBinding.coffeeRef, compare.turnBinding.coffeeRef);
+  assert.equal(firstAgain.methodBinding.slot, 'v60_hot');
+
+  const newChat = await build('Compare those two', []);
+  assert.equal(newChat.turnBinding, undefined);
+  const mixed = await build('Compare those two', [first, { ...second, coffeeId: 'other-bean' }]);
+  assert.equal(mixed.turnBinding, undefined);
 });
 
 test('endpoint carries AE02 descriptor clarification into the first provider request', async () => {

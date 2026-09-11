@@ -11,6 +11,8 @@ const ORDINAL = /\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/i;
 const OTHER = /\bother\b/i;
 const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
 const CONTEXTUAL_TECHNIQUE_FOLLOWUP = /^(?:show|give)\s+me\s+(?:another|a\s+different)\s+(?:one|option)[.!?]?$/i;
+const TECHNIQUE_COMPARISON_REFERENCE = /^(?:(?:compare|contrast)\s+(?:(?:those|these|the)\s+)?(?:two|both)(?:\s+(?:source\s+)?(?:techniques?|methods?|options?|cards?))?|(?:what(?:'s|\s+is)\s+the\s+difference\s+between)\s+(?:those|these|the\s+two)(?:\s+(?:source\s+)?(?:techniques?|methods?|options?|cards?))?)[.!?]?$/i;
+const TECHNIQUE_HISTORY_REFERENCE = /^(?:(?:show|give|tell|describe|inspect|review|open|use|try|brew|prepare|make|pick|choose|revisit|repeat)\s+(?:me\s+)?)*(?:the\s+)?(?:first|1st|second|2nd|third|3rd|last|previous|earlier)\s+(?:one|option|technique|method|card|recipe)(?:\s+(?:again|back|repeat))?[.!?]?$/i;
 const TECHNIQUE_EXPERIMENT_KINDS = new Set(['v60_technique', 'manual_source_technique']);
 const DELIVERED_PROPOSAL_STATUSES = new Set(['ready', 'proposed', 'applying', 'applied', 'kept', 'attempt_created', 'prepared']);
 const FOCUS_ENTRY = 'coffee_focus';
@@ -68,9 +70,19 @@ function deliveredTechniqueProposal(proposal) {
     && (proposal.status == null || DELIVERED_PROPOSAL_STATUSES.has(proposal.status));
 }
 
+function techniqueOrdinal(value) {
+  const match = String(value || '').match(/\b(first|1st|second|2nd|third|3rd|last|previous|earlier)\b/i);
+  if (!match) return null;
+  if (/^(?:last|previous|earlier)$/i.test(match[1])) return -1;
+  return { first: 0, '1st': 0, second: 1, '2nd': 1, third: 2, '3rd': 2 }[match[1].toLocaleLowerCase()] ?? null;
+}
+
 function contextualTechniqueReference(userText, coffees, ledger, launchContext, refs, priorTechniqueProposals = []) {
   const value = text(userText).replace(/[.!?]+$/, '').trim();
-  if (!CONTEXTUAL_TECHNIQUE_FOLLOWUP.test(value)) return null;
+  const contextualAlternative = CONTEXTUAL_TECHNIQUE_FOLLOWUP.test(value);
+  const comparison = TECHNIQUE_COMPARISON_REFERENCE.test(value);
+  const historical = TECHNIQUE_HISTORY_REFERENCE.test(value);
+  if (!contextualAlternative && !comparison && !historical) return null;
   const proposals = (Array.isArray(priorTechniqueProposals) ? priorTechniqueProposals : [])
     .filter(deliveredTechniqueProposal)
     .map((proposal) => ({ proposal, coffee: coffees.find((item) => item?.id === proposal.coffeeId) }))
@@ -82,7 +94,22 @@ function contextualTechniqueReference(userText, coffees, ledger, launchContext, 
     : proposals;
   if (!scoped.length) return null;
   if (!current && new Set(scoped.map(({ coffee }) => coffee.id)).size > 1) return null;
-  const selected = scoped.at(-1);
+  let selected;
+  if (comparison) {
+    // “Those two” is only meaningful when the two most recent delivered
+    // cards are for the same coffee and saved brewer. Otherwise leave the
+    // provider to ask rather than guessing across coffees or methods.
+    const pair = scoped.slice(-2);
+    if (pair.length !== 2 || new Set(pair.map(({ coffee }) => coffee.id)).size !== 1
+      || new Set(pair.map(({ proposal }) => proposal.slotKey)).size !== 1) return null;
+    selected = pair.at(-1);
+  } else if (historical) {
+    const ordinal = techniqueOrdinal(value);
+    selected = ordinal === -1 ? scoped.at(-1) : ordinal == null ? null : scoped[ordinal];
+    if (!selected) return null;
+  } else {
+    selected = scoped.at(-1);
+  }
   const coffeeName = text(selected.coffee?.name || selected.coffee?.coffeeName);
   if (!coffeeName) return null;
   return { reference: coffeeName, current: coffeeName, techniqueSlot: selected.proposal.slotKey, techniqueKind: selected.proposal.techniqueExperiment.kind };
