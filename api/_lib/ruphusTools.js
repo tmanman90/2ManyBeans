@@ -645,7 +645,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
           actionable: executableOptions.length > 0,
           coffeeRef: args.coffeeRef,
           slot: slotKey,
-          current: { ...techniqueIdentity(recipe), sourceProjection: clone(recipe.sourceProjection) },
+          current: { ...techniqueIdentity(recipe), configuration: clone(sourceRoute?.configuration || sourceConfigurationForRecipe(recipe)), sourceProjection: clone(recipe.sourceProjection) },
           options,
           sourceOptions: true,
           sourceFormatCapability: 'technique_experiment_v1',

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { deriveProposalReadiness, techniqueSelectionsFromSession } from '../api/ruphus-agent.js';
 import { generateV60Recipe, validateV60Candidate } from '../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
 const baseContext = (userText = 'Show me a different V60 technique.') => ({
   rotationSnapshot: {
@@ -213,6 +215,43 @@ test('saved Switch 03 resolves source-backed options instead of standard V60 tec
   assert.equal(result.sourceOptions, true);
   assert.ok(result.options.every(option => option.sourceConfiguration?.model === 'V60 Switch'));
   assert.ok(result.options.every(option => option.sourceConfiguration?.size === '03'));
+});
+
+test('off-rotation Switch identity survives the bounded evidence and technique projections', async () => {
+  const stored = {
+    method: 'pour-over', device: 'v60', variant: 'switch', v60Size: '03', mode: 'hot',
+    dose: 15, water: 250, grind: 'Ode 4.2', temperature: 94,
+  };
+  const coffee = { id: 'el-vergel', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: stored } };
+  const context = await buildRuphusContext({
+    uid: 'owner-1', contextRef: { surface: 'direct' },
+    userText: 'Try a different switch technique for el vergel', evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [coffee],
+      readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'fellow-ode-gen2', units: 'metric' }),
+    },
+  });
+  assert.equal(context.rotationSnapshot.coffees.length, 0, 'finished coffee remains outside the public rotation snapshot');
+  const recipe = resolveLegacyRecipe(coffee, 'v60_hot').recipe;
+  const tools = createRuphusTools({
+    uid: 'owner-1', context,
+    readers: {
+      readCoffee: async () => coffee,
+      readRecipe: async ({ slotKey }) => slotKey ? recipe : [recipe],
+      readBrews: async () => [],
+      readTastings: async () => [],
+    },
+  });
+  const coffeeRef = context.turnBinding.coffeeRef;
+  const evidence = await tools.call('read_coffee_evidence', { coffeeRef, windowDays: 14 });
+  assert.equal(evidence.recipe.configurations[0].variant, 'switch');
+  assert.equal(evidence.recipe.configurations[0].v60Size, '03');
+  assert.equal(evidence.recipe.records, undefined, 'bounded projection still excludes raw records');
+  const options = await tools.call('read_technique_options', { coffeeRef, slot: 'v60_hot' });
+  assert.equal(options.current.configuration.variant, 'switch');
+  assert.equal(options.current.configuration.size, '03');
+  assert.ok(options.options.length > 0);
+  assert.ok(options.options.every(option => option.sourceConfiguration?.variant === 'switch'));
 });
 
 test('reference-only and unknown technique IDs cannot execute through the proposal tool', async () => {

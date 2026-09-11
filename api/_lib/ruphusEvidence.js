@@ -18,6 +18,8 @@ const slotDisplay = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced
 const LEDGER_FIELDS = Object.freeze(['kind', 'status', 'summary', 'windowDays', 'count', 'at', 'namedCoffees', 'coffee', 'evidence', 'methodFocus']);
 const COFFEE_FIELDS = Object.freeze(['name', 'roaster', 'origin', 'process']);
 const METHOD_FOCUS_NAMES = new Set(['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita']);
+const RECIPE_CONFIGURATION_FIELDS = Object.freeze(['method', 'device', 'mode', 'variant', 'v60Variant', 'v60Size', 'kalitaSize', 'size']);
+const SOURCE_CONFIGURATION_FIELDS = Object.freeze(['device', 'variant', 'mode', 'size', 'model', 'filter', 'material']);
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 
 function safeLedgerValue(value) {
@@ -56,6 +58,28 @@ export function sanitizeLedgerEntry(entry = {}) {
   return result;
 }
 
+function publicRecipeConfiguration(record = {}) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const result = {};
+  for (const key of RECIPE_CONFIGURATION_FIELDS) {
+    const value = record[key];
+    if (typeof value === 'string' && text(value)) result[key] = text(value);
+    else if (typeof value === 'number' && Number.isFinite(value)) result[key] = value;
+  }
+  const source = record.sourceConfiguration;
+  if (source && typeof source === 'object' && !Array.isArray(source)) {
+    const configuration = Object.fromEntries(SOURCE_CONFIGURATION_FIELDS
+      .filter((key) => typeof source[key] === 'string' && text(source[key]))
+      .map((key) => [key, text(source[key])]));
+    if (Object.keys(configuration).length) result.sourceConfiguration = configuration;
+  }
+  const rawSlot = text(record.slotKey || record.slot);
+  const methodSlot = `${text(record.method)}_${text(record.mode || (record.isIced ? 'iced' : 'hot'))}`;
+  const display = slotDisplay[rawSlot] || slotDisplay[methodSlot];
+  if (display) result.slot = display;
+  return Object.keys(result).length ? result : null;
+}
+
 export function publicEvidence(evidence = {}) {
   const result = {};
   for (const kind of ['coffee', 'recipe', 'brews', 'tastings']) {
@@ -63,6 +87,10 @@ export function publicEvidence(evidence = {}) {
     if (!value || typeof value !== 'object') continue;
     result[kind] = Object.fromEntries(['kind', 'status', 'summary', 'windowDays', 'count'].filter((key) => Object.hasOwn(value, key)).map((key) => [key, clone(value[key])]));
     if (value.coffee && typeof value.coffee === 'object') result[kind].coffee = Object.fromEntries(COFFEE_FIELDS.filter((field) => text(value.coffee[field])).map((field) => [field, text(value.coffee[field])]));
+    if (kind === 'recipe' && Array.isArray(value.records)) {
+      const configurations = value.records.map(publicRecipeConfiguration).filter(Boolean);
+      if (configurations.length) result[kind].configurations = configurations;
+    }
   }
   return { ...result, windowDays: evidence.windowDays, readAt: evidence.readAt, unavailable: Array.isArray(evidence.unavailable) ? evidence.unavailable.slice() : [] };
 }
