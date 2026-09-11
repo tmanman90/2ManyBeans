@@ -203,9 +203,9 @@ function withoutMethodFocus(ledger) {
   if (!Array.isArray(ledger?.entries)) return ledger;
   return { ...ledger, entries: ledger.entries.filter((entry) => entry?.kind !== 'method_focus') };
 }
-function methodFocusForCoffee(ledger, snapshot, coffeeRef) {
+function methodFocusForCoffee(ledger, snapshot, coffeeRef, verifiedCoffeeName = null) {
   const coffee = snapshot?.coffees?.find((item) => item.refKey === coffeeRef);
-  const name = String(coffee?.name || '').trim().toLocaleLowerCase();
+  const name = String(coffee?.name || verifiedCoffeeName || '').trim().toLocaleLowerCase();
   if (!name) return null;
   const entry = (Array.isArray(ledger?.entries) ? ledger.entries : []).slice().reverse().find((item) => item?.kind === 'method_focus' && item?.status === 'available' && Array.isArray(item.namedCoffees) && item.namedCoffees.some((value) => String(value).trim().toLocaleLowerCase() === name));
   return entry?.methodFocus?.displayName ? { displayName: entry.methodFocus.displayName } : null;
@@ -247,6 +247,41 @@ function techniqueIdentity(recipe = {}) {
 }
 
 function techniqueKey(coffeeRef, slotKey) { return `${coffeeRef}:${slotKey}`; }
+
+// The endpoint projects the current session's recipe-proposal artifacts before
+// the tools resolve an off-rotation coffee. Once that coffee is owner-verified,
+// merge only the matching bounded proposals into the in-memory selection map.
+// This keeps the contextual "another one" gate target-bound without treating
+// arbitrary prose as technique history.
+function hydrateTechniqueSelection(context, { coffeeRef, coffeeId, slotKey } = {}) {
+  if (!context || !coffeeRef || !coffeeId || !['v60_hot', 'kalita_hot'].includes(slotKey)) return null;
+  if (!(context.__ruphusTechniqueSelections instanceof Map)) {
+    Object.defineProperty(context, '__ruphusTechniqueSelections', { value: new Map(), enumerable: false, writable: true, configurable: true });
+  }
+  const key = techniqueKey(coffeeRef, slotKey);
+  const prior = context.__ruphusTechniqueSelections.get(key) || { selectedIds: [], proposalIds: [] };
+  const proposals = Array.isArray(context.__ruphusPriorProposals) ? context.__ruphusPriorProposals : [];
+  const retained = proposals.filter((proposal) => proposal?.type === 'recipe_proposal'
+    && proposal.coffeeId === coffeeId
+    && proposal.slotKey === slotKey
+    && ['v60_technique', 'manual_source_technique'].includes(proposal.techniqueExperiment?.kind));
+  if (!retained.length) return prior;
+  const selectedIds = [...new Set([
+    ...(Array.isArray(prior.selectedIds) ? prior.selectedIds : []),
+    ...retained.flatMap((proposal) => [
+      proposal.techniqueExperiment?.techniqueId,
+      proposal.techniqueExperiment?.familyId,
+      proposal.techniqueExperiment?.sourceId,
+    ]).filter(Boolean),
+  ])];
+  const proposalIds = [...new Set([
+    ...(Array.isArray(prior.proposalIds) ? prior.proposalIds : []),
+    ...retained.map((proposal) => typeof proposal.id === 'string' ? proposal.id.trim() : '').filter(Boolean),
+  ])];
+  const hydrated = { ...prior, selectedIds, proposalIds };
+  context.__ruphusTechniqueSelections.set(key, hydrated);
+  return hydrated;
+}
 
 function safeTechniqueAdaptation(value) {
   return String(value || '').replace(/\s+through\s+v60-dose-scaling-v1\.?/i, ' through the app’s supported dose range.');
@@ -537,7 +572,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const snapshotCoffee = snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef);
       const methodCorrected = /\b(?:actually|no[, ]|correction|instead|i (?:meant|brewed|used)|it was)\b[\s\S]*\b(?:aiden|v60|kalita|hot|iced)\b/i.test(context.userText || '');
       if (methodCorrected) context.__ruphusLaunchHintConsumed = true;
-      const methodFocus = methodFocusForCoffee(context.ledger, snapshot, args.coffeeRef);
+      const methodFocus = methodFocusForCoffee(context.ledger, snapshot, args.coffeeRef, evidence.coffee?.coffee?.name);
       const method = resolveMethod({
         userText: context.userText || '',
         launchItem,
@@ -586,6 +621,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         if (slotKey === 'kalita_hot') return { ok: true, actionable: false, current: null, options: [], message: 'I need a saved hot Kalita recipe before I can prepare a source-backed technique experiment.' };
         return { ok: true, actionable: false, current: null, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can compare these source-backed hot V60 techniques, but I need a saved hot V60 recipe before I can prepare an executable experiment.' };
       }
+      hydrateTechniqueSelection(context, { coffeeRef: args.coffeeRef, coffeeId, slotKey });
       const requestedVariant = slotKey === 'v60_hot' ? explicitMethodVariantFromText(context.userText) : null;
       const savedVariant = String(recipe.variant || recipe.v60Variant || '').toLowerCase() === 'switch' ? 'switch' : 'classic';
       if (requestedVariant === 'switch' && /\b(?:iced|cold)\b/i.test(context.userText || '')) {
