@@ -21,6 +21,7 @@ import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../
 import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
 import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';
+import { adaptedDoseBounds } from '../lib/ruphus/techniqueOptions.js';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
@@ -71,6 +72,13 @@ const TimingMemoryHint = ({ memory, context }) => {
 };
 
 const sourceStageQuantity = (stage) => {
+  if (stage?.water?.value != null && stage?.water?.unit) {
+    const value = stage.water.value;
+    const rendered = value && typeof value === 'object' && Number.isFinite(value.min) && Number.isFinite(value.max)
+      ? `${value.min}–${value.max}`
+      : value;
+    return `${rendered}${stage.water.unit}`;
+  }
   if (stage?.waterToGrams != null) return `${stage.waterToGrams}g`;
   if (stage?.waterToMilliliters != null) return `${stage.waterToMilliliters}mL`;
   return null;
@@ -109,11 +117,33 @@ const sourceEquipmentLabel = (projection) => {
   return `${brewer}${configuration.size ? ` ${configuration.size}` : ''}`;
 };
 
-const SourceProjectionPreview = ({ projection, onStart, disabled, previewPending, previewError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
+const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
   const source = projection?.sourceSnapshot || projection?.sourceExecution || {};
-  const stages = Array.isArray(projection?.sourceExecution?.stages) ? projection.sourceExecution.stages : [];
+  const stages = Array.isArray(projection?.stages)
+    ? projection.stages
+    : Array.isArray(projection?.sourceExecution?.stages) ? projection.sourceExecution.stages : [];
   const water = projection?.water?.value == null ? null : `${projection.water.value}${projection.water.unit}`;
   const ready = projection?.timerReady === true && Boolean(projection?.sourceExecution);
+  const sourceDose = Number.isFinite(source?.coffeeGrams) ? source.coffeeGrams : null;
+  const dose = Number.isFinite(projection?.coffeeGrams) ? projection.coffeeGrams : sourceDose;
+  const adaptedBounds = adaptedDoseBounds(projection?.sourceSnapshot);
+  const originalOutsideAdaptation = sourceDose != null && adaptedBounds
+    && (sourceDose < adaptedBounds[0] || sourceDose > adaptedBounds[1]);
+  const doseBounds = adaptedBounds
+    ? (originalOutsideAdaptation ? [sourceDose, sourceDose] : adaptedBounds)
+    : sourceDose == null ? null : [sourceDose, sourceDose];
+  const doseChange = (nextDose) => {
+    if (previewPending || previewStale || !Number.isFinite(nextDose)) return;
+    if (sourceDose != null && nextDose !== sourceDose && adaptedBounds
+      && (nextDose < adaptedBounds[0] || nextDose > adaptedBounds[1])) return;
+    onCoffeeGramsChange?.(nextDose);
+  };
+  const grind = projection?.grind || source?.grind;
+  const nativeGrind = grind?.native;
+  const nativeGrindLabel = nativeGrind && typeof nativeGrind === 'object'
+    ? [nativeGrind.grinder, nativeGrind.setting, nativeGrind.generation].filter(Boolean).join(': ')
+    : typeof nativeGrind === 'string' ? nativeGrind : null;
+  const grindLabel = grind?.description || (Number.isFinite(grind?.microns) ? `~${grind.microns}µm` : null);
   return (
     <m.div {...fadeUp}>
       <div style={{ marginBottom: 16 }}>
@@ -123,9 +153,24 @@ const SourceProjectionPreview = ({ projection, onStart, disabled, previewPending
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: water ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 14 }}>
-        <ParamCard label="Coffee" value={projection?.coffeeGrams == null ? 'Source amount' : `${projection.coffeeGrams}g`} icon={Coffee} iconColor={C.accent} />
+        {!attemptId && dose != null && doseBounds && onCoffeeGramsChange
+          ? <DoseStepperCard
+            dose={dose}
+            min={doseBounds[0]}
+            max={doseBounds[1]}
+            onChange={doseChange}
+          />
+          : <ParamCard label="Coffee" value={dose == null ? 'Source amount' : `${dose}g`} icon={Coffee} iconColor={C.accent} />}
         {water && <ParamCard label="Water" value={water} icon={Droplets} iconColor={C.blue} />}
       </div>
+
+      {(grindLabel || nativeGrindLabel) && (
+        <div style={{ background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: radius.lg, padding: '12px 14px', marginBottom: 14, boxShadow: shadows.e1 }}>
+          <SectionLabel style={{ marginBottom: 5 }}>Source grind</SectionLabel>
+          {grindLabel && <div style={{ ...type.body, color: C.text, lineHeight: 1.45 }}>{grindLabel}</div>}
+          {nativeGrindLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: grindLabel ? 3 : 0 }}>Source setting: {nativeGrindLabel}</div>}
+        </div>
+      )}
 
       {projection?.preparation?.length > 0 && (
         <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
@@ -195,6 +240,12 @@ const SourceProjectionPreview = ({ projection, onStart, disabled, previewPending
         >
           <Play size={16} fill="currentColor" aria-hidden="true" /> {previewPending ? 'Preparing…' : (previewMode ? 'Start brew' : 'Start source guide')}
         </m.button>
+      )}
+
+      {previewMode && onPreviewSave && (
+        <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || previewStale || !ready} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
+          {previewPending ? 'Preparing…' : 'Save recipe'}
+        </Btn>
       )}
 
       {extraFooter}
@@ -760,6 +811,8 @@ export const HandBrewModal = ({
         <SourceProjectionPreview
           projection={sourceProjection}
           onStart={handleStartBrew}
+          onCoffeeGramsChange={onCoffeeGramsChange}
+          onPreviewSave={onPreviewSave}
           disabled={previewPending}
           previewPending={previewPending}
           previewError={previewError}

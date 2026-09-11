@@ -16,16 +16,17 @@ const uid = 'ruphus-recipe-first-fixture';
 const bean = { id: 'fixture-coffee', name: 'Changed Ratio Coffee' };
 const techniqueMode = new URLSearchParams(window.location.search).has('technique');
 const sourceMode = new URLSearchParams(window.location.search).has('source');
-const proposalId = sourceMode ? 'source-hario-preview-fixture' : 'changed-ratio-fixture';
+const sourceOriginalMode = new URLSearchParams(window.location.search).has('source-original');
+const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : 'source-hario-preview-fixture') : 'changed-ratio-fixture';
 const runtimeTurn = window.__ruphusTechniqueTurn;
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
-const sourceOption = sourceMode ? generateManualSourceTechniqueOption('hario-switch-03-matt-winton-hybrid-24-2022', {}, {
+const sourceOption = sourceMode ? generateManualSourceTechniqueOption(sourceOriginalMode ? 'hario-switch-03-instruction-manual-36-2023' : 'hario-switch-03-matt-winton-hybrid-24-2022', {}, {
   device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot',
 }) : null;
 const proposed = sourceOption?.recipe || (selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 }));
 const artifact = sourceMode
-  ? { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'v60_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, sourceRevisionId: String(sourceOption.recipe.sourceRevision), sourceHash: 'hario-switch-03-matt-winton-hybrid-24-2022-revision-1', techniqueExperiment: { name: sourceOption.recipe.techniqueLabel, kind: 'manual_source_technique', sourceId: sourceOption.recipe.sourceId } }
+  ? { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'v60_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, sourceRevisionId: String(sourceOption.recipe.sourceRevision), sourceHash: `${sourceOption.recipe.sourceId}-revision-${sourceOption.recipe.sourceRevision}`, techniqueExperiment: { name: sourceOption.recipe.techniqueLabel, kind: 'manual_source_technique', sourceId: sourceOption.recipe.sourceId } }
   : runtimeTurn?.frames?.find(frame => frame.type === 'artifact_ready')?.artifact || { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
