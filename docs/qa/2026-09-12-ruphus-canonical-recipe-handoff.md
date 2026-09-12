@@ -41,12 +41,26 @@ That instruction now preserves the existing sensory-clarification policy.
   and all three original pours preserved. Apply/Brew once/Keep action identifiers
   present. The live run did not execute those actions against cloud data.
 - Saved production recipe was reread and deep-compared unchanged after each run.
-- Total paid verification this repair: $0.018437. Cumulative ledger: $48.205927 of
-  $55, zero reserved, $6.794073 remaining.
+- A fourth live check resumed the failed exchange, including the old "schedule
+  wasn't available" answer. The next update request read fresh source data and
+  returned the same correct, actionable 5.6-to-5.2 review card (3 provider calls).
+- Total paid verification this repair: $0.020561. Cumulative ledger: $48.208051 of
+  $55, zero reserved, $6.791949 remaining.
+
+## Delivery
+
+- Production backend READY: `dpl_gnvGYWYYfAHekpUw81Gd7bqUnc3N`.
+- Source metadata verified: `0df0fa54aad41a96f385765aedeb1bb328c8d3cc`.
+- Stable production address: `https://2manybeans.vercel.app`.
+- Backend-only deployment; existing production owner-only access/mutation gates
+  verified unchanged. No phone reinstall, Capgo upload, or Firebase rule update.
+- Live conversation checks exercised the actual production readers and provider
+  against local repaired runtime, not a newly authenticated deployed HTTP session
+  or physical phone UI. Deployment readiness is separate evidence.
 
 ## Limits
 
 This closes the demonstrated recipe-data handoff defect; it is not a claim that
 every possible conversation succeeds. No authentication bypass, account change,
 Firebase rule change, saved production recipe mutation, or native reinstall was
-performed. Production deployment is recorded separately after Vercel readiness.
+performed. No claim of universal conversational quality or new device acceptance.
