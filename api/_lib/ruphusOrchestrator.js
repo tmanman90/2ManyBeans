@@ -472,6 +472,14 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         && calls[0].name === 'propose_recipe_change'
         && proposalEligibleForTarget(context, calls[0].args || {});
       if (toolRounds > maxToolRounds && !finalProposal) {
+        // Aiden can edit an existing device profile, but cannot generate one
+        // through the manual source catalog. A verified missing profile is a
+        // capability result, not a failed connection or an earned proposal.
+        const missingAiden = calls.length === 1 && calls[0].name === 'propose_recipe_change' && calls[0].args?.slot === 'aiden'
+          ? [...toolEvidence].reverse().find(item => item.name === 'read_recipe' && item.result?.ok === true
+            && item.result.slot === 'aiden' && item.result.coffeeRef === calls[0].args.coffeeRef && item.result.recipe === null)
+          : null;
+        if (missingAiden) { text = missingAiden.result.summary; break; }
         if (techniqueRoundRecoveryUsed) {
           text = TECHNIQUE_RECOVERY;
           break;

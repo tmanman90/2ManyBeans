@@ -7,6 +7,7 @@ import { prepareRuphusAttempt } from '../api/_lib/ruphusAidenPreparation.js';
 import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { toAidenProfile, validateAidenProfile } from '../src/lib/aidenProfileValidation.js';
 import { aidenLinkMatchesProfile } from '../src/lib/ruphus/aidenProfilePreview.js';
+import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 
 const profile = {
   title: 'Jar one Aiden', profileType: 0, ratio: 16,
@@ -29,7 +30,7 @@ function setup(recipe = profile, extraBean = {}) {
     readers: { readCoffee: async () => ({ name: 'Colombia' }), readRecipe: async ({ slotKey }) => slotKey ? read() : [read()], readBrews: async () => [], readTastings: async () => [] },
     proposalStore: (input) => repository.createProposal(input),
   });
-  return { tools, store, repository, uid };
+  return { tools, store, repository, uid, context };
 }
 async function propose(control, value, recipe = profile, extra = {}) {
   const state = setup(recipe);
@@ -127,4 +128,34 @@ test('saved Aiden profiles cannot reuse a link to old settings, including after 
   store.execute({ actionId: 'undo-link-profile', mode: 'undo_revision', coffeeId: 'coffee-1', slotKey: 'aiden', expectedRevisionId: changed.revision.id });
   assert.equal(aidenLinkMatchesProfile(store.getBean('coffee-1')), false, 'new profile link must not masquerade as the restored profile');
   assert.equal(aidenLinkMatchesProfile(store.getBean('coffee-1'), true), true, 'original untouched iced link is reusable after Undo');
+});
+
+test('an Aiden proposal survives the normal evidence → exact recipe → proposal runtime sequence', async () => {
+  const { tools, context } = setup();
+  let round=0;
+  const frames=[];
+  const requests=[
+    { name:'read_coffee_evidence', args:{coffeeRef:'c1'} },
+    { name:'read_recipe', args:{coffeeRef:'c1',slot:'aiden'} },
+    { name:'propose_recipe_change', args:{coffeeRef:'c1',slot:'aiden',intent:'recipe_preview',change:{control:'ratio',value:15.5}} },
+  ];
+  const result=await runRuphusTurn({turnId:'aiden-runtime',context,userText:context.userText,tools,emit:f=>frames.push(f),provider:{runTurn:async()=>({toolCalls:[{callId:`call-${round}`, ...requests[round++]}]})}});
+  assert.equal(result.ok,true,JSON.stringify(result));
+  assert.equal(frames.filter(f=>f.type==='artifact_ready').length,1);
+  assert.match(frames.filter(f=>f.type==='text_delta').map(f=>f.text).join(''),/Aiden profile/);
+});
+
+test('a verified missing Aiden profile is explained instead of failing at the tool-round limit', async () => {
+  const context={proposalState:{target:null}};
+  const frames=[];
+  let round=0;
+  const requests=[{name:'read_coffee_evidence',args:{coffeeRef:'c1'}},{name:'read_recipe',args:{coffeeRef:'c1',slot:'aiden'}},{name:'propose_recipe_change',args:{coffeeRef:'c1',slot:'aiden',intent:'recipe_preview',change:{control:'ratio',value:15.5}}}];
+  const tools={names:['read_coffee_evidence','read_recipe','propose_recipe_change'],definitions:[],call:async(name)=>{
+    assert.notEqual(name,'propose_recipe_change','missing profile must not dispatch a proposal');
+    return {ok:true,coffeeRef:'c1',slot:'aiden',recipe:null,summary:'No Aiden profile is saved for this coffee. Generate its Aiden profile in the brew screen first.'};
+  }};
+  const result=await runRuphusTurn({turnId:'missing-aiden-runtime',context,userText:'Make jar one Aiden stronger',tools,emit:f=>frames.push(f),provider:{runTurn:async()=>({toolCalls:[{callId:`missing-${round}`,...requests[round++]}]})}});
+  assert.equal(result.ok,true,JSON.stringify(result));
+  assert.equal(frames.some(f=>f.type==='artifact_ready'),false);
+  assert.match(frames.filter(f=>f.type==='text_delta').map(f=>f.text).join(''),/No Aiden profile is saved/);
 });

@@ -578,7 +578,7 @@ export function diagnosticRecommendationReady(text = '', conversation = []) {
 }
 
 function setPreviewReadiness(context, { coffeeRef, slotKey, recipe } = {}) {
-  if (!context?.proposalState || !recipe || !coffeeRef || !['v60_hot', 'kalita_hot'].includes(slotKey)) return;
+  if (!context?.proposalState || !recipe || !coffeeRef || !['v60_hot', 'kalita_hot', 'aiden'].includes(slotKey)) return;
   // Technique exploration is a separate typed experiment. Listing source
   // options must not masquerade as an ordinary diagnostic preview, because a
   // catalog with no selected option is not a card-ready proposal.
@@ -937,7 +937,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'read_recipe') {
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
-      if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
+      if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: recipe?.code && recipe.code !== 'recipe_missing' ? `I could not load the saved ${displaySlot(slotKey)} recipe right now. Your recipe is unchanged; try again to review it.` : missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
       if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe });
