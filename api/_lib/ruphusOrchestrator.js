@@ -190,7 +190,8 @@ function appendHandoff(current, handoff) {
  * Main-lane input contract:
  * { proposalState: { target: { coffeeRef, slot }, previewReady: true,
  *   proposalIssued?: false } } or a target-bound techniqueReady record with
- *   the selected option identity.
+ *   the selected option identity. A typed recipe_preview additionally needs
+ *   an exact owner-bound recipe in __ruphusResolvedTargets.
  */
 export function proposalEligibleForTarget(context, request = {}) {
   const state = context?.proposalState;
@@ -207,12 +208,21 @@ export function proposalEligibleForTarget(context, request = {}) {
   const agreementTarget = { coffeeRef: state.agreementCoffeeRef || agreement.coffeeRef || target.coffeeRef, slot: state.agreementSlot || agreement.slot || agreement.slotKey || target.slot };
   const techniqueKind = request?.experiment?.kind;
   const technique = techniqueKind === 'v60_technique' || techniqueKind === 'manual_source_technique';
+  if (!technique && request?.intent === 'information') return false;
+  const typedPreview = !technique && request?.intent === 'recipe_preview';
+  const resolvedTarget = context?.__ruphusResolvedTargets instanceof Map
+    ? context.__ruphusResolvedTargets.get(`${target.coffeeRef}:${target.slot}`)
+    : null;
+  if (typedPreview) {
+    return Boolean(target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
+      && resolvedTarget?.coffeeRef === target.coffeeRef
+      && resolvedTarget?.coffeeId
+      && resolvedTarget?.sourceHash
+      && (!state.target || (state.target.coffeeRef === target.coffeeRef && (state.target.slot || state.target.slotKey) === target.slot)));
+  }
   if (technique) {
     const ready = state.techniqueReady;
     const selectedId = request.experiment.techniqueId || request.experiment.familyId || request.experiment.sourceId;
-    const resolvedTarget = context?.__ruphusResolvedTargets instanceof Map
-      ? context.__ruphusResolvedTargets.get(`${target.coffeeRef}:${target.slot}`)
-      : null;
     return Boolean(target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
       && ready?.coffeeRef === target.coffeeRef && ready?.slot === target.slot
       && (!ready.kind || ready.kind === techniqueKind)

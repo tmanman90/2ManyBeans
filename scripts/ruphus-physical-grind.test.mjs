@@ -94,7 +94,7 @@ test('real proposal chain rejects 5.5 and accepts one physical finer click with 
 
 test('full-patch inputs cannot bypass physical grinder validation; other grinders are not Ode', async () => {
   const h = await harness();
-  const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', afterRecipe: { grindSize: { setting: 4.3 } } });
+  const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', afterRecipe: { grindSize: { setting: 4.3 } } });
   assert.equal(result.code, 'physical_grind_required');
   const other = await harness({ grinder: 'fellow-opus' });
   const allowed = await other.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 5.5 } });

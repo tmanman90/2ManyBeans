@@ -63,6 +63,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /When TRUSTED_METHOD_BINDING says locked/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /A missing saved recipe does not make an explicitly named brewer ambiguous/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /exact grounded diagnosis after reading the exact recipe.*typed intent recipe_preview/);
 });
 test('locked turn binding is the final explicit developer target', () => {
   const block = buildDynamicEvidenceBlock({
@@ -136,6 +137,55 @@ test('persisted proposals expose only server-enabled registered actions', async 
     assert.equal(result.ok, true);
     assert.deepEqual(result.artifact.actions, enabled ? ['apply_proposal', 'brew_once', 'keep_current'] : []);
   }
+});
+test('typed ordinary preview intent can prepare a card after an exact recipe read without agreement', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. What should I try next?', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), sessionId: 'typed-preview', proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.type, 'recipe_proposal');
+  assert.deepEqual(result.artifact.actions, []);
+  assert.equal(context.proposalState.proposalIssued, true);
+});
+test('typed preview remains denied for information-only or unbound calls', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const context = { ...structuredClone(base), userText: 'Explain why this V60 recipe works.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information', change: { control: 'grind', value: '4.0' }, experiment: null }), (error) => error.code === 'proposal_timing');
+  const unbound = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(unbound.code, 'proposal_target_required');
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information', change: { control: 'grind', value: '4.0' }, experiment: null }), (error) => error.code === 'proposal_timing');
+  context.proposalState.target = { coffeeRef: 'c2', slot: 'v60_hot' };
+  const mismatch = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(mismatch.code, 'proposal_target_mismatch');
+});
+test('typed preview rejects a stale exact recipe after it changes', async () => {
+  let current = generateV60Recipe({}, { dose: 15 });
+  const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. Try a small adjustment.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => current } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  current = generateV60Recipe({}, { dose: 16 });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(result.code, 'proposal_target_stale');
+  assert.equal(context.proposalState.proposalIssued, false);
+});
+test('orchestrator completes an exact-read typed preview with one inert artifact', async () => {
+  const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. Try a small adjustment.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => generateV60Recipe({}, { dose: 15 }) } });
+  let calls = 0;
+  const result = await runRuphusTurn({ turnId: 'typed-preview-turn', context, userText: context.userText, tools, emit: () => {}, provider: { runTurn: async () => {
+    calls += 1;
+    return calls === 1
+      ? { toolCalls: [{ callId: 'read', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] }
+      : { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null } }] };
+  } } });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifacts.length, 1);
+  assert.deepEqual(result.artifacts[0].actions, []);
+  assert.equal(calls, 2);
 });
 test('proposal request guidance reaches the provider only after diagnosis and assent', () => {
   assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: false } }), /RECIPE_REVIEW_REQUEST/);
@@ -295,7 +345,7 @@ test('conditional sensory diagnosis cannot mint proposal authority', async () =>
   } };
   const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
   await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
-  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'dose', value: 16 } }), (error) => error.code === 'proposal_timing');
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 16 } }), (error) => error.code === 'proposal_timing');
   assert.equal(current.proposalState.proposalIssued, false);
 });
 test('proposal handoff names the exact change and makes review authority explicit', () => {
@@ -521,6 +571,9 @@ test('proposal eligibility is exact-target scoped and one proposal per round is 
   const unrelated = { ...base, proposalState: { target: { coffeeRef: 'c2', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } };
   assert.equal(proposalEligibleForTarget(unrelated, { coffeeRef: 'c1', slot: 'v60_hot' }), false);
   assert.equal(proposalEligibleForTarget({ ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } }, { coffeeRef: 'c1', slot: 'v60_hot' }), true);
+  const exactRead = { ...base, __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]), proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: false, userAgreed: false } };
+  assert.equal(proposalEligibleForTarget(exactRead, { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' }), true);
+  assert.equal(proposalEligibleForTarget(exactRead, { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information' }), false);
   let dispatched = 0; const frames = [];
   const tools = { names: ['propose_recipe_change'], definitions: [], call: async () => { dispatched += 1; return { ok: true }; } };
   const provider = { async runTurn() { return { toolCalls: [
