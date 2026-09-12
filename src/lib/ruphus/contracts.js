@@ -97,6 +97,26 @@ export function clone(value) {
   return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
 
+// Recipe identity is the source lineage checksum, not a recipe value to be
+// executed.  Dose preferences and Aiden grind projections are intentionally
+// excluded because they are owner-controlled projections over the same saved
+// source.  A missing slot has its own canonical identity so absence can be
+// compared and made stale without fabricating a baseline recipe.
+export function recipeSourceHash(recipe, slotKey = null) {
+  if (recipe == null) return canonicalHash({ slotKey: slotKey || null, absent: true });
+  const identity = clone(recipe);
+  if (slotKey) {
+    const method = slotKey === 'aiden' ? 'aiden' : slotKey.startsWith('kalita') ? 'kalita' : 'v60';
+    identity.method = method;
+    identity.device = method;
+    identity.mode = slotKey.endsWith('iced') ? 'iced' : 'hot';
+  }
+  delete identity.userCoffeeGrams;
+  delete identity.aidenGrind;
+  delete identity.recipeHash;
+  return canonicalHash(identity);
+}
+
 export function validateContextRef(value) {
   return validateLaunchContext(value);
 }
@@ -189,10 +209,18 @@ export function validateProposal(value) {
   if (!object(value)) return { valid: false, errors: ['proposal must be an object'] };
   for (const key of ['id', 'coffeeId', 'slotKey', 'sessionId', 'sourceHash', 'recipeHash']) if (!text(value[key], 180)) errors.push(`${key} is required`);
   if (value.slotKey && !SLOT_KEYS.includes(value.slotKey)) errors.push('unsupported slotKey');
-  for (const key of ['before', 'after']) {
-    const result = validateRecipeSnapshot(value[key]);
-    if (!result.valid) errors.push(`${key}: ${result.errors.join(', ')}`);
+  const sourceState = value.sourceState || 'present';
+  if (!['present', 'absent'].includes(sourceState)) errors.push('invalid sourceState');
+  if (sourceState === 'absent') {
+    if (value.before !== null) errors.push('absent source requires before:null');
+    if (value.sourceRevisionId != null) errors.push('absent source cannot have a source revision');
+    if (value.slotKey && value.sourceHash !== recipeSourceHash(null, value.slotKey)) errors.push('absent source hash mismatch');
+  } else {
+    const result = validateRecipeSnapshot(value.before);
+    if (!result.valid) errors.push(`before: ${result.errors.join(', ')}`);
   }
+  const after = validateRecipeSnapshot(value.after);
+  if (!after.valid) errors.push(`after: ${after.errors.join(', ')}`);
   if (!['proposed', 'applied', 'kept', 'attempt_created', 'stale', 'superseded', 'archived', 'unavailable'].includes(value.status)) errors.push('invalid proposal status');
   if (Object.keys(value).some((key) => key.startsWith('action') || key === 'receipt')) errors.push('proposal cannot contain authority fields');
   return { valid: errors.length === 0, errors };

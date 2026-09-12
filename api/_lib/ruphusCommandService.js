@@ -1,5 +1,6 @@
-import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
-import { resolveLegacyRecipe, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
+import { canonicalHash, clone, recipeSourceHash } from '../../src/lib/ruphus/contracts.js';
+import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
+import { absentRecipeSourceHash, resolveRecipeSource } from '../../src/lib/ruphus/recipeSourceState.js';
 import { normalizeClientVersion } from './ruphusRollout.js';
 
 export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
@@ -22,27 +23,32 @@ const projection = (bean, slotKey, recipe) => {
   return next;
 };
 const stableProjectionHash = (recipe, slotKey) => {
-  const value = clone(recipe || {});
-  value.method = slotMethod(slotKey);
-  value.device = slotMethod(slotKey);
-  value.mode = slotMode(slotKey);
-  delete value.userCoffeeGrams;
-  delete value.aidenGrind;
-  delete value.recipeHash;
-  return canonicalHash(value);
+  return recipeSourceHash(recipe, slotKey);
 };
-const revisionFor = (state, bean, coffeeId, slotKey, replacement = null) => {
+const absentRevision = (state, bean, coffeeId, slotKey) => ({
+  id: null,
+  ownerId: state.uid,
+  coffeeId,
+  slotKey,
+  parentId: null,
+  snapshot: null,
+  snapshotHash: absentRecipeSourceHash(slotKey),
+  sourceState: 'absent',
+  source: 'absent',
+  status: 'absent',
+});
+const revisionFor = (state, bean, coffeeId, slotKey, replacement = null, command = {}) => {
   const revisionId = bean.activeRevisionIds?.[slotKey];
   if (revisionId && state.revisions.has(revisionId)) {
     const current = state.revisions.get(revisionId);
-    const live = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
-    if (!live.ok) fail('source_drift', 'The saved recipe is missing or ambiguous outside the command boundary; refresh before trying this action.');
-    const liveHash = stableProjectionHash(live.recipe, slotKey);
+    const live = resolveRecipeSource({ ...bean, id: coffeeId }, slotKey);
+    if (!live.ok || live.sourceState !== 'present') fail('source_drift', 'The saved recipe is missing or ambiguous outside the command boundary; refresh before trying this action.');
+    const liveHash = live.hash;
     const currentHash = stableProjectionHash(current.snapshot, slotKey);
     if (liveHash !== currentHash) fail('source_drift', 'The saved recipe changed outside the command boundary; refresh before trying this action.');
     return current;
   }
-  const resolved = resolveLegacyRecipe({ ...bean, id: coffeeId }, slotKey);
+  const resolved = resolveRecipeSource({ ...bean, id: coffeeId }, slotKey);
   if (!resolved.ok && state.commandMode === 'replace_active_recipe' && replacement) {
     const initial = { id: id('revision', `${coffeeId}-${slotKey}-initial`), ownerId: state.uid, coffeeId, slotKey, parentId: null, snapshot: clone(replacement), snapshotHash: stableProjectionHash(replacement, slotKey), ...(slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind || null) } : {}), source: 'initial', status: 'active', createdAt: state.now() };
     state.revisions.set(initial.id, initial);
@@ -51,6 +57,20 @@ const revisionFor = (state, bean, coffeeId, slotKey, replacement = null) => {
     return initial;
   }
   if (!resolved.ok) fail(resolved.code, 'No valid recipe is available for this slot.');
+  if (resolved.sourceState === 'absent') {
+    if (!['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision', 'replace_active_recipe'].includes(state.commandMode)) {
+      fail('recipe_missing', 'No saved recipe is available for this slot.');
+    }
+    return absentRevision(state, bean, coffeeId, slotKey);
+  }
+  // Do not materialize a baseline while checking a proposal that was prepared
+  // from an explicitly absent slot. If a saved recipe appeared meanwhile,
+  // proposal binding must fail stale without leaving a memory-store write (the
+  // Firestore transaction would roll it back on the same failure).
+  const proposal = command.proposalId ? state.proposals.get(command.proposalId) : null;
+  const attempt = command.attemptId ? state.attempts.get(command.attemptId) : null;
+  if ((proposal?.sourceState === 'absent' || attempt?.sourceState === 'absent')
+    && ['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt'].includes(state.commandMode)) return absentRevision(state, bean, coffeeId, slotKey);
   const initial = { id: id('revision', `${coffeeId}-${slotKey}-initial`), ownerId: state.uid, coffeeId, slotKey, parentId: null, snapshot: clone(resolved.recipe), snapshotHash: stableProjectionHash(resolved.recipe, slotKey), ...(slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind || null) } : {}), source: 'initial', status: 'active', createdAt: state.now() };
   state.revisions.set(initial.id, initial);
   bean.activeRevisionIds = { ...(bean.activeRevisionIds || {}), [slotKey]: initial.id };
@@ -67,8 +87,10 @@ const checkCommandExpected = (state, current, command) => {
   checkExpected(current, command);
 };
 const checkProposalBinding = (bean, proposal) => {
-  const live = resolveLegacyRecipe({ ...bean, id: proposal.coffeeId }, proposal.slotKey);
-  if (!live.ok || stableProjectionHash(live.recipe, proposal.slotKey) !== proposal.sourceHash) fail('stale', 'The recipe changed since this proposal was prepared.');
+  const live = resolveRecipeSource({ ...bean, id: proposal.coffeeId }, proposal.slotKey);
+  const proposalSourceState = proposal.sourceState || 'present';
+  if (!live.ok || live.sourceState !== proposalSourceState || live.hash !== proposal.sourceHash) fail('stale', 'The recipe changed since this proposal was prepared.');
+  if (proposalSourceState === 'absent') return;
   if (proposal.slotKey === 'aiden') {
     if (canonicalHash(bean.aidenGrind ?? null) !== canonicalHash(proposal.sourceAidenGrind ?? null)) fail('stale', 'The Aiden grind changed since this proposal was prepared.');
   } else if (canonicalHash(live.recipe.userCoffeeGrams ?? null) !== canonicalHash(proposal.sourceDose ?? proposal.before?.userCoffeeGrams ?? null)) {
@@ -76,9 +98,11 @@ const checkProposalBinding = (bean, proposal) => {
   }
 };
 const checkAttemptBinding = (bean, attempt) => {
-  const live = resolveLegacyRecipe({ ...bean, id: attempt.coffeeId }, attempt.slotKey);
+  const live = resolveRecipeSource({ ...bean, id: attempt.coffeeId }, attempt.slotKey);
   const boundRecipeHash = attempt.sourceHash || attempt.snapshotHash;
-  if (!live.ok || stableProjectionHash(live.recipe, attempt.slotKey) !== boundRecipeHash) fail('stale', 'The attempt recipe changed before promotion.');
+  const attemptSourceState = attempt.sourceState || 'present';
+  if (!live.ok || live.sourceState !== attemptSourceState || live.hash !== boundRecipeHash) fail('stale', 'The attempt recipe changed before promotion.');
+  if (attemptSourceState === 'absent') return;
   if (attempt.slotKey === 'aiden' && canonicalHash(bean.aidenGrind ?? null) !== canonicalHash(attempt.aidenGrind ?? null)) fail('stale', 'The Aiden grind changed before promotion.');
   if (attempt.slotKey !== 'aiden' && canonicalHash(live.recipe.userCoffeeGrams ?? null) !== canonicalHash(attempt.dose ?? null)) fail('stale', 'The dose changed before promotion.');
 };
@@ -135,7 +159,7 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
     const slotKey = command.slotKey || (command.mode === 'set_aiden_grind' ? 'aiden' : command.mode === 'set_dose' ? 'v60_hot' : null);
     if (!slotKey) fail('invalid_action', 'slotKey is required');
     state.commandMode = command.mode;
-    const current = revisionFor(state, bean, command.coffeeId, slotKey, command.recipe);
+    const current = revisionFor(state, bean, command.coffeeId, slotKey, command.recipe, command);
     checkCommandExpected(state, current, command);
     const mode = command.mode;
     if (!MUTATION_MODES.includes(mode) && !ORDINARY_MODES.includes(mode)) fail('unsupported_mode', 'Unsupported recipe command.');
@@ -182,25 +206,30 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
       checkExpected(current, { expectedRevisionId: proposal.sourceRevisionId, expectedRevisionHash: proposal.sourceHash });
       checkProposalBinding(bean, proposal);
       if (proposal.status !== 'proposed') fail('stale', 'This proposal is no longer available.');
-      const liveDose = slotKey === 'aiden' ? null : (resolveLegacyRecipe({ ...bean, id: command.coffeeId }, slotKey).recipe?.userCoffeeGrams ?? null);
-      const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey, proposalId: proposal.id, revisionId: current.id, revisionSource: current.source || null, sourceHash: current.snapshotHash, snapshot: clone(proposal.after), snapshotHash: stableProjectionHash(proposal.after, slotKey), dose: liveDose, aidenGrind: slotKey === 'aiden' ? clone(bean.aidenGrind ?? null) : null, status: 'created', createdAt: new Date(state.now()).toISOString() };
+      const liveDose = slotKey === 'aiden' || current.sourceState === 'absent' ? null : (resolveRecipeSource({ ...bean, id: command.coffeeId }, slotKey).recipe?.userCoffeeGrams ?? null);
+      const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey, proposalId: proposal.id, revisionId: current.id, revisionSource: current.source || null, sourceState: current.sourceState || 'present', sourceHash: current.snapshotHash, snapshot: clone(proposal.after), snapshotHash: stableProjectionHash(proposal.after, slotKey), dose: liveDose, aidenGrind: slotKey === 'aiden' ? clone(bean.aidenGrind ?? null) : null, status: 'created', createdAt: new Date(state.now()).toISOString() };
       state.attempts.set(attempt.id, attempt); proposal.status = 'attempt_created'; proposal.attemptId = attempt.id;
-      result = { ok: true, attempt: clone(attempt), proposal: clone(proposal), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, proposalId: proposal.id, coffeeId: command.coffeeId, slotKey, revisionId: current.id, physicalBrewConfirmed: false, tastingRequired: true }) };
+      result = { ok: true, attempt: clone(attempt), proposal: clone(proposal), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, proposalId: proposal.id, coffeeId: command.coffeeId, slotKey, revisionId: current.id, sourceState: attempt.sourceState || 'present', physicalBrewConfirmed: false, tastingRequired: true }) };
     } else if (mode === 'start_attempt') {
       const attempt = createAttempt(state, command, current, null);
-      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, revisionId: current.id, physicalBrewConfirmed: false }) };
+      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, revisionId: current.id, sourceState: attempt.sourceState || 'present', physicalBrewConfirmed: false }) };
     } else if (mode === 'timer_started') {
       const attempt = state.attempts.get(command.attemptId);
       if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.');
       if (!['created', 'timer_started'].includes(attempt.status)) fail('invalid_attempt_state', 'Timer cannot start for this attempt.');
       attempt.status = 'timer_started'; attempt.timerStartedAt = new Date(state.now()).toISOString();
-      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, timerStarted: true, physicalBrewConfirmed: false }) };
+      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, sourceState: attempt.sourceState || 'present', timerStarted: true, physicalBrewConfirmed: false }) };
     } else if (mode === 'undo_revision') {
-      if (!current.parentId) fail('nothing_to_undo', 'The initial recipe cannot be undone.');
-      const parent = state.revisions.get(current.parentId);
-      if (!parent) fail('not_found', 'The revision to restore is unavailable.');
-      result = commitRevision(state, bean, current, command, parent.snapshot, 'undo', null, current.id);
-      result.receipt = receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: parent.id, physicalBrewConfirmed: false, undoAvailable: false });
+      if (!current.parentId && current.parentSourceState !== 'absent') fail('nothing_to_undo', 'The initial recipe cannot be undone.');
+      if (current.parentSourceState === 'absent') {
+        result = commitAbsenceRevision(state, bean, current, command);
+        result.receipt = receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: null, restoredSourceState: 'absent', sourceState: 'absent', physicalBrewConfirmed: false, undoAvailable: false });
+      } else {
+        const parent = state.revisions.get(current.parentId);
+        if (!parent) fail('not_found', 'The revision to restore is unavailable.');
+        result = commitRevision(state, bean, current, command, parent.snapshot, 'undo', null, current.id);
+        result.receipt = receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: parent.id, physicalBrewConfirmed: false, undoAvailable: false });
+      }
     } else if (mode === 'promote_attempt') {
       result = saveAttemptRecipe(state, bean, current, command);
     } else if (mode === 'complete_attempt') {
@@ -209,14 +238,14 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
       const legalPredecessor = command.slotKey === 'aiden' ? attempt.status === 'profile_prepared' : attempt.status === 'timer_started';
       if (!legalPredecessor) fail('invalid_attempt_state', command.slotKey === 'aiden' ? 'Aiden must be profile-prepared before starting tasting.' : 'The timer must be started before completing this brew.');
       attempt.status = 'completed'; attempt.completedAt = new Date(state.now()).toISOString();
-      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, timerCompleted: true, physicalBrewConfirmed: false }) };
+      result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey, sourceState: attempt.sourceState || 'present', timerCompleted: true, physicalBrewConfirmed: false }) };
     } else {
       const attempt = state.attempts.get(command.attemptId);
       if (!attempt || attempt.ownerId !== state.uid) fail('not_found', 'Attempt is unavailable.');
       if (mode === 'prepare_attempt') { attempt.status = 'preparing'; result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, preparation: 'pending', physicalBrewConfirmed: false }) }; }
       else fail('unsupported_mode', 'Unsupported recipe command.');
     }
-    if (mode === 'brew_once') Object.assign(result.receipt, { promoteAvailable: true, revisionId: current.id, sourceHash: current.snapshotHash });
+    if (mode === 'brew_once') Object.assign(result.receipt, { promoteAvailable: true, revisionId: current.id, sourceHash: current.snapshotHash, sourceState: current.sourceState || 'present' });
     const immutable = clone(result);
     if (immutable.receipt) state.receipts.set(immutable.receipt.id, clone({ ...immutable.receipt, ownerId: state.uid }));
     state.actions.set(command.actionId, { fingerprint, status: 'succeeded', result: immutable });
@@ -238,14 +267,14 @@ function getProposal(state, command) {
   return proposal;
 }
 function createAttempt(state, command, revision, proposalId) {
-  const live = resolveLegacyRecipe({ ...state.beans.get(command.coffeeId), id: command.coffeeId }, command.slotKey);
-  const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, proposalId, revisionId: revision.id, revisionSource: revision.source || null, sourceHash: revision.snapshotHash, snapshot: clone(revision.snapshot), snapshotHash: stableProjectionHash(revision.snapshot, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(state.beans.get(command.coffeeId)?.aidenGrind ?? null) } : { dose: live.ok ? (live.recipe.userCoffeeGrams ?? null) : null }), status: 'created', createdAt: new Date(state.now()).toISOString() };
+  const live = revision.sourceState === 'absent' ? liveAbsentSource(command.slotKey) : resolveRecipeSource({ ...state.beans.get(command.coffeeId), id: command.coffeeId }, command.slotKey);
+  const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, proposalId, revisionId: revision.id, revisionSource: revision.source || null, sourceState: revision.sourceState || 'present', sourceHash: revision.snapshotHash, snapshot: clone(revision.snapshot), snapshotHash: stableProjectionHash(revision.snapshot, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(state.beans.get(command.coffeeId)?.aidenGrind ?? null) } : { dose: live.sourceState === 'present' ? (live.recipe.userCoffeeGrams ?? null) : null }), status: 'created', createdAt: new Date(state.now()).toISOString() };
   state.attempts.set(attempt.id, attempt); return attempt;
 }
 function commitRevision(state, bean, current, command, recipe, source, proposal = null, undoneRevisionId = null) {
   const validation = validateExecutableRecipe(recipe, command.slotKey);
   if (!validation.valid) fail('invalid_recipe', validation.errors.join('; '), { errors: validation.errors });
-  const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.id, snapshot: clone(recipe), snapshotHash: stableProjectionHash(recipe, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(command.patch?.aidenGrind ?? bean.aidenGrind ?? null) } : {}), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
+  const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.sourceState === 'absent' ? null : current.id, parentSourceState: current.sourceState || 'present', snapshot: clone(recipe), snapshotHash: stableProjectionHash(recipe, command.slotKey), sourceState: 'present', ...(command.slotKey === 'aiden' ? { aidenGrind: clone(command.patch?.aidenGrind ?? bean.aidenGrind ?? null) } : {}), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
   state.revisions.set(revision.id, revision);
   const next = projection(bean, command.slotKey, recipe); next.activeRevisionIds[command.slotKey] = revision.id;
   const recipeProvenance = { ...(next.recipeProvenance || {}) };
@@ -253,7 +282,49 @@ function commitRevision(state, bean, current, command, recipe, source, proposal 
   if (source === 'replace' || source === 'undo') delete recipeProvenance[command.slotKey];
   next.recipeProvenance = recipeProvenance;
   state.beans.set(command.coffeeId, next);
-  return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.id, proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' }) };
+  return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.sourceState === 'absent' ? null : current.id, parentSourceState: current.sourceState || 'present', sourceState: 'present', createdFirstSavedRecipe: current.sourceState === 'absent', proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' }) };
+}
+
+function liveAbsentSource(slotKey) {
+  return { ok: true, sourceState: 'absent', recipe: null, slotKey, hash: absentRecipeSourceHash(slotKey) };
+}
+
+function absenceProjection(bean, slotKey) {
+  const next = { ...bean };
+  if (slotKey === 'aiden') delete next.aidenRecipe;
+  else {
+    const mapKey = slotMethod(slotKey) === 'kalita' ? 'kalita' : 'v60';
+    const mapName = slotMode(slotKey) === 'iced' ? 'handBrewIcedRecipes' : 'handBrewRecipes';
+    if (next[mapName] && typeof next[mapName] === 'object') {
+      next[mapName] = { ...next[mapName] };
+      delete next[mapName][mapKey];
+      if (!Object.keys(next[mapName]).length) delete next[mapName];
+    }
+    const flat = next.handBrewRecipe;
+    if (flat && (flat.device === slotMethod(slotKey) || flat.method === slotMethod(slotKey)) && (slotMode(slotKey) === 'iced' ? flat.mode === 'iced' || flat.isIced === true : flat.mode !== 'iced' && flat.isIced !== true)) delete next.handBrewRecipe;
+  }
+  next.activeRevisionIds = { ...(next.activeRevisionIds || {}) };
+  delete next.activeRevisionIds[slotKey];
+  if (!Object.keys(next.activeRevisionIds).length) delete next.activeRevisionIds;
+  const recipeProvenance = { ...(next.recipeProvenance || {}) };
+  delete recipeProvenance[slotKey];
+  if (Object.keys(recipeProvenance).length) next.recipeProvenance = recipeProvenance;
+  else delete next.recipeProvenance;
+  return next;
+}
+
+function commitAbsenceRevision(state, bean, current, command) {
+  const revision = {
+    id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId,
+    slotKey: command.slotKey, parentId: current.id || null, parentSourceState: current.sourceState || 'present',
+    snapshot: null, snapshotHash: absentRecipeSourceHash(command.slotKey), sourceState: 'absent',
+    source: 'undo', proposalId: null, undoneRevisionId: current.id || null, status: 'active',
+    createdAt: new Date(state.now()).toISOString(),
+  };
+  state.revisions.set(revision.id, revision);
+  const next = absenceProjection(bean, command.slotKey);
+  state.beans.set(command.coffeeId, next);
+  return { ok: true, revision: clone(revision), bean: clone(next) };
 }
 
 function saveAttemptRecipe(state, bean, current, command) {
@@ -319,15 +390,21 @@ export async function executeRecipeCommand({ db, uid, clientVersion = null, ...c
     const beforeBean = clone(bean);
     const result = executeState(state, { ...command, slotKey });
     const changedBean = state.beans.get(command.coffeeId);
-    const { id: _id, ownerId: _ownerId, ...beanUpdate } = changedBean;
+    const { id: _id, ...beanUpdate } = changedBean;
     if (canonicalHash(beforeBean) !== canonicalHash(changedBean)) {
       const observedAt = new Date().toISOString();
-      tx.update(beanRef, {
+      const deletedFields = Object.keys(beforeBean).filter((field) => !Object.hasOwn(changedBean, field));
+      const update = {
         ...beanUpdate,
         clientVersion: normalizeClientVersion(clientVersion),
         clientVersionUpdatedAt: observedAt,
         updatedAt: observedAt,
-      });
+      };
+      // `update` merges omitted fields in Firestore. Use a full transaction
+      // replacement when Undo removes a top-level projection so an absent
+      // slot cannot leave the promoted recipe behind in the owner bean.
+      if (deletedFields.length) tx.set(beanRef, update);
+      else tx.update(beanRef, update);
     }
     const revisions = db.collection('users').doc(uid).collection('recipeRevisions');
     if (command.proposalId && state.proposals.has(command.proposalId)) tx.set(db.collection('users').doc(uid).collection('proposals').doc(command.proposalId), clone(state.proposals.get(command.proposalId)), { merge: true });
@@ -353,7 +430,7 @@ function executeOnState(state, command) {
   const bean = state.beans.get(command.coffeeId);
   if (!bean) fail('not_found', 'Coffee is not available.');
   state.commandMode = command.mode;
-  const current = revisionFor(state, bean, command.coffeeId, command.slotKey, command.recipe);
+  const current = revisionFor(state, bean, command.coffeeId, command.slotKey, command.recipe, command);
   checkCommandExpected(state, current, command);
   const mode = command.mode;
   if (['apply_proposal', 'brew_once', 'keep_current'].includes(mode) && command.proposalId) {
@@ -384,33 +461,34 @@ function executeOnState(state, command) {
   } else if (mode === 'apply_proposal') {
     const proposal = state.proposals.get(command.proposalId); if (!proposal || proposal.status !== 'proposed') fail('stale', 'This proposal is no longer available.'); checkExpected(current, { expectedRevisionId: proposal.sourceRevisionId, expectedRevisionHash: proposal.sourceHash }); checkProposalBinding(bean, proposal); result = commitRevision(state, bean, current, command, proposal.after, 'apply', proposal); result.receipt.executionAvailable = true; proposal.status = 'applied'; proposal.appliedRevisionId = result.revision.id;
   } else if (mode === 'brew_once') {
-    const proposal = state.proposals.get(command.proposalId); if (!proposal || proposal.status !== 'proposed') fail('stale', 'This proposal is no longer available.'); checkExpected(current, { expectedRevisionId: proposal.sourceRevisionId, expectedRevisionHash: proposal.sourceHash }); const liveBrew = resolveLegacyRecipe({ ...bean, id: command.coffeeId }, command.slotKey); const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, proposalId: proposal.id, revisionId: current.id, revisionSource: current.source || null, sourceHash: current.snapshotHash, snapshot: clone(proposal.after), snapshotHash: stableProjectionHash(proposal.after, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind ?? null) } : { dose: liveBrew.ok ? (liveBrew.recipe.userCoffeeGrams ?? null) : null }), status: 'created', createdAt: new Date().toISOString() }; state.attempts.set(attempt.id, attempt); proposal.status = 'attempt_created'; proposal.attemptId = attempt.id; result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, proposalId: proposal.id, coffeeId: command.coffeeId, slotKey: command.slotKey, physicalBrewConfirmed: false, tastingRequired: true }) };
+    const proposal = state.proposals.get(command.proposalId); if (!proposal || proposal.status !== 'proposed') fail('stale', 'This proposal is no longer available.'); checkExpected(current, { expectedRevisionId: proposal.sourceRevisionId, expectedRevisionHash: proposal.sourceHash }); const liveBrew = current.sourceState === 'absent' ? liveAbsentSource(command.slotKey) : resolveRecipeSource({ ...bean, id: command.coffeeId }, command.slotKey); const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, proposalId: proposal.id, revisionId: current.id, revisionSource: current.source || null, sourceState: current.sourceState || 'present', sourceHash: current.snapshotHash, snapshot: clone(proposal.after), snapshotHash: stableProjectionHash(proposal.after, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind ?? null) } : { dose: liveBrew.sourceState === 'present' ? (liveBrew.recipe.userCoffeeGrams ?? null) : null }), status: 'created', createdAt: new Date().toISOString() }; state.attempts.set(attempt.id, attempt); proposal.status = 'attempt_created'; proposal.attemptId = attempt.id; result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, proposalId: proposal.id, coffeeId: command.coffeeId, slotKey: command.slotKey, sourceState: attempt.sourceState, physicalBrewConfirmed: false, tastingRequired: true }) };
   } else if (mode === 'start_attempt') {
-    const liveStart = resolveLegacyRecipe({ ...bean, id: command.coffeeId }, command.slotKey);
-    const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id, revisionSource: current.source || null, sourceHash: current.snapshotHash, snapshot: clone(current.snapshot), snapshotHash: stableProjectionHash(current.snapshot, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind ?? null) } : { dose: liveStart.ok ? (liveStart.recipe.userCoffeeGrams ?? null) : null }), status: 'created', createdAt: new Date().toISOString() }; state.attempts.set(attempt.id, attempt); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id, physicalBrewConfirmed: false }) };
+    const liveStart = current.sourceState === 'absent' ? liveAbsentSource(command.slotKey) : resolveRecipeSource({ ...bean, id: command.coffeeId }, command.slotKey);
+    const attempt = { id: id('attempt', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id, revisionSource: current.source || null, sourceState: current.sourceState || 'present', sourceHash: current.snapshotHash, snapshot: clone(current.snapshot), snapshotHash: stableProjectionHash(current.snapshot, command.slotKey), ...(command.slotKey === 'aiden' ? { aidenGrind: clone(bean.aidenGrind ?? null) } : { dose: liveStart.sourceState === 'present' ? (liveStart.recipe.userCoffeeGrams ?? null) : null }), status: 'created', createdAt: new Date().toISOString() }; state.attempts.set(attempt.id, attempt); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id, sourceState: attempt.sourceState, physicalBrewConfirmed: false }) };
   } else if (mode === 'timer_started') {
-    const attempt = state.attempts.get(command.attemptId); if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.'); if (!['created', 'timer_started'].includes(attempt.status)) fail('invalid_attempt_state', 'Timer cannot start for this attempt.'); attempt.status = 'timer_started'; attempt.timerStartedAt = new Date().toISOString(); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, timerStarted: true, physicalBrewConfirmed: false }) };
+    const attempt = state.attempts.get(command.attemptId); if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.'); if (!['created', 'timer_started'].includes(attempt.status)) fail('invalid_attempt_state', 'Timer cannot start for this attempt.'); attempt.status = 'timer_started'; attempt.timerStartedAt = new Date(state.now()).toISOString(); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, sourceState: attempt.sourceState || 'present', timerStarted: true, physicalBrewConfirmed: false }) };
   } else if (mode === 'undo_revision') {
-    if (!current.parentId) fail('nothing_to_undo', 'The initial recipe cannot be undone.'); const parent = state.revisions.get(current.parentId); if (!parent) fail('not_found', 'The revision to restore is unavailable.'); result = commitRevision(state, bean, current, command, parent.snapshot, 'undo', null, current.id); result.receipt = receipt({ actionId: command.actionId, mode, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: parent.id });
+    if (!current.parentId && current.parentSourceState !== 'absent') fail('nothing_to_undo', 'The initial recipe cannot be undone.'); if (current.parentSourceState === 'absent') { result = commitAbsenceRevision(state, bean, current, command); result.receipt = receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: null, restoredSourceState: 'absent', sourceState: 'absent', physicalBrewConfirmed: false, undoAvailable: false }); } else { const parent = state.revisions.get(current.parentId); if (!parent) fail('not_found', 'The revision to restore is unavailable.'); result = commitRevision(state, bean, current, command, parent.snapshot, 'undo', null, current.id); result.receipt = receipt({ actionId: command.actionId, mode, revisionId: result.revision.id, undoneRevisionId: current.id, restoredRevisionId: parent.id }); }
   } else if (mode === 'promote_attempt') {
     result = saveAttemptRecipe(state, bean, current, command);
   } else if (mode === 'complete_attempt') {
-    const attempt = state.attempts.get(command.attemptId); if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.'); const legalPredecessor = command.slotKey === 'aiden' ? attempt.status === 'profile_prepared' : attempt.status === 'timer_started'; if (!legalPredecessor) fail('invalid_attempt_state', command.slotKey === 'aiden' ? 'Aiden must be profile-prepared before starting tasting.' : 'The timer must be started before completing this brew.'); attempt.status = 'completed'; attempt.completedAt = new Date().toISOString(); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, timerCompleted: true, physicalBrewConfirmed: false }) };
+    const attempt = state.attempts.get(command.attemptId); if (!attempt || attempt.ownerId !== state.uid || attempt.coffeeId !== command.coffeeId) fail('not_found', 'Attempt is unavailable.'); const legalPredecessor = command.slotKey === 'aiden' ? attempt.status === 'profile_prepared' : attempt.status === 'timer_started'; if (!legalPredecessor) fail('invalid_attempt_state', command.slotKey === 'aiden' ? 'Aiden must be profile-prepared before starting tasting.' : 'The timer must be started before completing this brew.'); attempt.status = 'completed'; attempt.completedAt = new Date().toISOString(); result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, coffeeId: command.coffeeId, slotKey: command.slotKey, sourceState: attempt.sourceState || 'present', timerCompleted: true, physicalBrewConfirmed: false }) };
   } else if (mode === 'prepare_attempt') {
     const attempt = state.attempts.get(command.attemptId); if (!attempt) fail('not_found', 'Attempt is unavailable.'); attempt.status = 'preparing'; result = { ok: true, attempt: clone(attempt), receipt: receipt({ actionId: command.actionId, mode, attemptId: attempt.id, preparation: 'pending', physicalBrewConfirmed: false }) };
   } else fail('unsupported_mode', 'Unsupported recipe command.');
   if (result?.attempt?.id) {
     const attempt = state.attempts.get(result.attempt.id);
     if (attempt) {
-      const liveAttempt = resolveLegacyRecipe({ ...bean, id: attempt.coffeeId }, attempt.slotKey);
+      const liveAttempt = attempt.sourceState === 'absent' ? liveAbsentSource(attempt.slotKey) : resolveRecipeSource({ ...bean, id: attempt.coffeeId }, attempt.slotKey);
       attempt.revisionSource = attempt.revisionSource || current.source || null;
       attempt.sourceHash = attempt.sourceHash || current.snapshotHash;
+      attempt.sourceState = attempt.sourceState || current.sourceState || 'present';
       attempt.snapshotHash = stableProjectionHash(attempt.snapshot, attempt.slotKey);
       if (attempt.slotKey === 'aiden') attempt.aidenGrind = clone(attempt.aidenGrind ?? bean.aidenGrind ?? null);
-      else if (attempt.dose === undefined) attempt.dose = liveAttempt.ok ? (liveAttempt.recipe.userCoffeeGrams ?? null) : null;
+      else if (attempt.dose === undefined) attempt.dose = liveAttempt.sourceState === 'present' ? (liveAttempt.recipe.userCoffeeGrams ?? null) : null;
       result.attempt = clone(attempt);
     }
   }
-  if (mode === 'brew_once') Object.assign(result.receipt, { promoteAvailable: true, revisionId: current.id, sourceHash: current.snapshotHash });
+  if (mode === 'brew_once') Object.assign(result.receipt, { promoteAvailable: true, revisionId: current.id, sourceHash: current.snapshotHash, sourceState: current.sourceState || 'present' });
   state.actions.set(command.actionId, { fingerprint, status: 'succeeded', result: clone(result) }); return clone(result);
 }
