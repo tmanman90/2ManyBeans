@@ -5,7 +5,7 @@ import { cacheRead, cacheWrite, chatKey } from '../lib/offlineCache';
 import { resolveTerminal } from '../lib/streamChat';
 import { parseBeanScan, parseRecipeCard } from '../lib/chatParse';
 import { recipeSummary } from '../components/chat/RecipeCard';
-import { normalizeAgentSession, inflateAgentSession, startNewChat, clientSessionWrite } from '../lib/ruphus/session.js';
+import { normalizeAgentSession, inflateAgentSession, startNewChat, clientSessionWrite, reconcileChatSession } from '../lib/ruphus/session.js';
 import { reconcileProposalArtifacts } from '../lib/ruphus/proposalArtifacts.js';
 
 const MAX_MESSAGES = 50;
@@ -137,7 +137,11 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     let cancelled = false;
     const timers = [];
 
-    Promise.resolve(storage.loadLocal?.()).then(local => {
+    const localLoad = Promise.resolve().then(() => storage.loadLocal?.()).catch(err => {
+      console.warn('[ChatSession] Local hydrate failed:', err);
+      return null;
+    });
+    localLoad.then(local => {
       if (cancelled || !local?.messages) return;
       if (local.protocolVersion === AGENT_PROTOCOL_VERSION) {
         const session = inflateAgentSession(local);
@@ -153,8 +157,9 @@ export function useChatSession({ uid, isDemo, adapter } = {}) {
     }).catch(err => console.warn('[ChatSession] Local hydrate failed:', err));
 
     const loadRemote = (attempt = 1) => {
-      Promise.resolve(storage.loadRemote?.()).then(remote => {
+      Promise.all([localLoad, Promise.resolve().then(() => storage.loadRemote?.())]).then(([local, loadedRemote]) => {
         if (cancelled) return;
+        const remote = reconcileChatSession(local, loadedRemote);
         hydratedRef.current = true;
         const session = remote?.protocolVersion === AGENT_PROTOCOL_VERSION ? inflateAgentSession(remote) : null;
         setHydratedSession(session);

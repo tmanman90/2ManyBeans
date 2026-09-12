@@ -167,6 +167,33 @@ export function inflateAgentSession(session, options = {}) {
   }), ledger: boundedLedger(session.ledger, options), boundaryIndex: Math.max(0, Math.min(session.messages.length, Number.isInteger(session.boundaryIndex) ? session.boundaryIndex : 0)), lastActivityAt: Number(session.lastActivityAt || session.updatedAt) || Date.now(), launchHintConsumed: session.launchHintConsumed === true, historyWidened: session.historyWidened === true };
 }
 
+// Remote evidence and action state remain authoritative. Only recover local
+// unanswered failure pairs that could not be uploaded (for example auth loss).
+// Never resurrect a prior chat or overwrite a successful answer with an error.
+export function reconcileChatSession(local, remote) {
+  if (local?.protocolVersion !== AGENT_PROTOCOL_VERSION) return remote;
+  if (!remote) return normalizeAgentSession(local);
+  if (remote.protocolVersion !== AGENT_PROTOCOL_VERSION
+    || local.contextRef?.sessionId !== remote.contextRef?.sessionId
+    || (local.boundaryIndex || 0) !== (remote.boundaryIndex || 0)) return remote;
+  const messages = [...(remote.messages || [])];
+  const normalized = normalizeAgentSession(local);
+  for (let index = normalized.boundaryIndex; index < normalized.messages.length; index++) {
+    const failed = normalized.messages[index];
+    const question = normalized.messages[index - 1];
+    if (!failed.errored || !failed.retry || question?.role !== 'user'
+      || question.text !== failed.retry.text || !failed.id || !question.id
+      || messages.some(item => item.id === failed.id)) continue;
+    const questionIndex = messages.findIndex(item => item.id === question.id);
+    if (questionIndex >= 0 && messages.slice(questionIndex + 1).some(item => item.role === 'assistant' && !item.errored)) continue;
+    // A distinct newer remote conversation is not a place for an old retry.
+    if (questionIndex < 0 && messages.some(item => Number(item.createdAt) > question.createdAt)) continue;
+    if (questionIndex < 0) messages.push(question);
+    messages.push({ ...failed, artifacts: [] });
+  }
+  return { ...remote, messages };
+}
+
 export function sessionAge({ lastActivityAt, now = Date.now() } = {}) {
   const elapsedMs = Math.max(0, Number(now) - Number(lastActivityAt || now));
   const hours = elapsedMs / 3600000;

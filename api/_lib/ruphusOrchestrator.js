@@ -380,7 +380,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
           && item.result?.ok === true && item.result?.actionable === true
           && Array.isArray(item.result?.options) && item.result.options.length > 0);
-        if (techniqueRead && !proposalClaimed && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))) {
+        if (techniqueRead && !proposalClaimed && context?.proposalState?.techniqueReady?.optionIds?.length
+          && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))) {
           if (toolCalls >= maxToolCalls) {
             text = TECHNIQUE_RECOVERY;
             break;

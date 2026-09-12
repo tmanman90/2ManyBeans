@@ -27,6 +27,59 @@ async function propose(tools, slot, options) {
     experiment: { kind: options.sourceOptions ? 'manual_source_technique' : 'v60_technique', techniqueId: selected.id } });
 }
 
+test('semantic recipe-preview requests do not depend on magic words and finish with a real card', async () => {
+  for (const userText of [
+    'Can you suggest a unique v60 recipe for jar 2',
+    'Surprise me with something to brew in my V60',
+    'I fancy a new way to brew this tomorrow',
+  ]) {
+    const { tools, context } = harness(null, userText);
+    const frames = [];
+    let rounds = 0;
+    const result = await runRuphusTurn({ turnId: `semantic-${userText.length}`, context, userText, tools,
+      emit: frame => frames.push(frame), provider: { runTurn: async input => {
+        rounds++;
+        if (rounds === 1) return { toolCalls: [{ callId: 'source-options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' } }] };
+        if (rounds === 2) return { text: 'Try a pulse-driven V60 with five pours.' };
+        const options = input.toolResult.results[0].result;
+        const selected = options.options.find(item => item.executable);
+        return { toolCalls: [{ callId: 'source-preview', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', experiment: { kind: options.sourceOptions ? 'manual_source_technique' : 'v60_technique', techniqueId: selected.id } } }] };
+      } } });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const card = frames.find(frame => frame.type === 'artifact_ready')?.artifact;
+    assert.ok(card?.after?.sourceLineage || card?.after?.sourceProjection, `request must deliver a complete source card: ${userText}`);
+    assert.ok(card.after.steps?.length || card.after.sourceProjection?.stages?.length, 'complete pour instructions');
+    assert.equal(card.before, null, 'do not invent an existing saved V60');
+    assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
+  }
+});
+
+test('semantic information intent does not create unsolicited cards even for technique vocabulary', async () => {
+  const { tools, context } = harness(null, 'Explain the different V60 methods I could try');
+  const options = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information' });
+  assert.ok(options.options.some(item => item.executable), 'information can still inspect complete sources');
+  assert.equal(context.proposalState.techniqueReady, undefined);
+  const denied = await propose(tools, 'v60_hot', options);
+  assert.equal(denied.ok, false);
+  let calls = 0;
+  const frames = [];
+  const result = await runRuphusTurn({ turnId: 'information-only', context, userText: context.userText, tools, emit: frame => frames.push(frame), provider: { runTurn: async () => {
+    if (++calls === 1) return { toolCalls: [{ name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information' } }] };
+    assert.equal(calls, 2, 'explanation must not trigger a forced preview continuation');
+    return { text: 'Some methods split the water into pulses; others use a continuous pour.' };
+  } } });
+  assert.equal(result.ok, true);
+  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 0);
+});
+
+test('semantic intent never bypasses source availability or owner scope', async () => {
+  const { tools, context } = harness({ code: 'permission_denied' }, 'Something fun to brew');
+  const unavailable = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' });
+  assert.equal(unavailable.actionable, false);
+  assert.equal(context.proposalState.techniqueReady, undefined);
+  await assert.rejects(tools.call('read_technique_options', { coffeeRef: 'other-owner', slot: 'v60_hot', intent: 'recipe_preview' }));
+});
+
 test('155 to 185 correction prepares a real 185 draft while retaining the actual 155 before-state', async () => {
   const saved = generateKalitaRecipe({}, { size: '155', dose: 13 });
   const before = structuredClone(saved);

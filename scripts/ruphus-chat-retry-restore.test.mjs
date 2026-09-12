@@ -28,6 +28,15 @@ const failureBodyFor = (turnId) => [
 ].map(frame => JSON.stringify(frame)).join('\n') + '\n';
 
 const server = await createServer({
+  // Model an auth failure where cloud history never received the failed turn.
+  // Exercise the real hydration hook with a stale remote, not one shared cache
+  // pretending to be both local storage and Firestore.
+  plugins: [{ name: 'stale-remote-chat', enforce: 'pre', transform(source, id) {
+    if (!id.endsWith('/chat-harness.jsx')) return null;
+    const seam = 'loadRemote: async () => loadHarnessSession(),';
+    assert.ok(source.includes(seam));
+    return source.replace(seam, 'loadRemote: async () => JSON.parse(localStorage.getItem("remote_chat_harness")),');
+  } }],
   server: { host: '127.0.0.1', port: 0 },
   // Pin the compile-time Agent gate for this local-only harness.
   define: { __APP_VARIANT__: JSON.stringify('dev') },
@@ -62,6 +71,7 @@ try {
         boundaryIndex: 0,
       }));
     }
+    if (!localStorage.getItem('remote_chat_harness')) localStorage.setItem('remote_chat_harness', localStorage.getItem('chat_harness-user'));
   });
   await page.goto(`${origin}/chat-harness.html`, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-ruphus-agent-enabled="true"]').waitFor();
@@ -72,6 +82,7 @@ try {
 
   const persisted = JSON.parse(await page.evaluate(() => localStorage.getItem('chat_harness-user')));
   const failed = persisted.messages.find(message => message.errored);
+  assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('remote_chat_harness'))).messages.length, 0, 'remote remains stale after failed transport');
   assert.ok(failed, 'failed Agent message must be persisted explicitly');
   assert.deepEqual(failed.retry, {
     kind: 'agent',

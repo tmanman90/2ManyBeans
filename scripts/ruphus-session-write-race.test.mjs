@@ -1,9 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sessionConversationForProvider, writeActiveSession } from '../api/ruphus-agent.js';
-import { clientSessionWrite, startNewChat } from '../src/lib/ruphus/session.js';
+import { clientSessionWrite, startNewChat, reconcileChatSession } from '../src/lib/ruphus/session.js';
 
 const message = (id, role = 'user') => ({ id, role, text: id, createdAt: 1000 });
+
+test('local failed-auth turn survives an older remote transcript without replacing server evidence', () => {
+  const remote = { protocolVersion: 1, contextRef: { sessionId: 'chat-a' }, messages: [message('earlier')], boundaryIndex: 0, updatedAt: 1000, ledger: { entries: [{ summary: 'server evidence' }] } };
+  const local = { ...remote, updatedAt: 2000, ledger: { entries: [{ summary: 'stale local' }] }, messages: [...remote.messages,
+    { ...message('new question'), createdAt: 2000 },
+    { ...message('auth failure', 'assistant'), createdAt: 2001, errored: true, retry: { kind: 'agent', text: 'new question' } },
+  ] };
+  const restored = reconcileChatSession(local, remote);
+  assert.deepEqual(restored.messages.map(item => item.id), ['earlier', 'new question', 'auth failure']);
+  assert.deepEqual(restored.ledger, remote.ledger);
+  assert.deepEqual(reconcileChatSession(local, restored).messages, restored.messages, 'no duplicate retry bubble');
+  const successful = { ...remote, messages: [...remote.messages, local.messages[1], { ...message('answered', 'assistant'), createdAt: 2002 }] };
+  assert.deepEqual(reconcileChatSession(local, successful).messages, successful.messages, 'a remotely answered turn is not marked failed');
+  assert.deepEqual(reconcileChatSession(local, { ...remote, boundaryIndex: 1 }), { ...remote, boundaryIndex: 1 }, 'New chat wins');
+  assert.deepEqual(reconcileChatSession(local, { ...remote, contextRef: { sessionId: 'chat-b' } }), { ...remote, contextRef: { sessionId: 'chat-b' } });
+  assert.deepEqual(reconcileChatSession(local, null).messages.map(item => item.id), local.messages.map(item => item.id), 'first offline chat is not erased by absent remote');
+});
 
 test('durable retry bubbles remain UI state rather than model conversation', () => {
   const session = { lastActivityAt: 1000, boundaryIndex: 0, messages: [
