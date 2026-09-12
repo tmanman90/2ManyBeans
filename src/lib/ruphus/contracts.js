@@ -149,7 +149,7 @@ export function validateManualSourceRecipeSnapshot(value) {
   if (value.sourceId !== projection?.sourceId || Number(value.sourceRevision) !== Number(projection?.sourceRevision)) errors.push('source-lineage-mismatch');
   if (value.coffeeGrams !== projection?.coffeeGrams || !Number.isFinite(value.coffeeGrams) || value.coffeeGrams <= 0) errors.push('source-dose-mismatch');
   const expectedWater = sourceWaterFromExecution(projection?.sourceExecution);
-  if (!expectedWater || JSON.stringify(projection?.water) !== JSON.stringify(expectedWater)) errors.push('source-water-projection-mismatch');
+  if (!expectedWater || canonicalJson(projection?.water) !== canonicalJson(expectedWater)) errors.push('source-water-projection-mismatch');
   if (!['g', 'mL'].includes(projection?.water?.unit) || !Number.isFinite(projection?.water?.value) || projection.water.value <= 0) errors.push('source-water-unit-invalid');
   if (projection?.water?.unit === 'mL') {
     if (own(value, 'waterGrams') || own(value, 'water') || own(value, 'ratio') || own(value, 'finalBeverageRatio') || own(value, 'hotExtractionRatio')) errors.push('volume-source-mass-alias');
@@ -163,7 +163,7 @@ export function validateManualSourceRecipeSnapshot(value) {
   const sourceIds = projection?.sourceLineage?.sourceId ? [projection.sourceLineage.sourceId] : [];
   if (JSON.stringify(value.sourceLineage?.sourceIds || []) !== JSON.stringify(sourceIds)) errors.push('source-lineage-ids-mismatch');
   if (value.sourceLineage?.sourceRevision !== projection?.sourceRevision) errors.push('source-lineage-revision-mismatch');
-  if (!Array.isArray(value.stages) || JSON.stringify(value.stages) !== JSON.stringify(projection?.stages)) errors.push('source-stages-mismatch');
+  if (!Array.isArray(value.stages) || canonicalJson(value.stages) !== canonicalJson(projection?.stages)) errors.push('source-stages-mismatch');
   if (value.sourceFormatVersion != null && value.sourceFormatVersion !== projection?.projectionVersion) errors.push('source-format-version-mismatch');
   return { valid: errors.length === 0, errors: [...new Set(errors)] };
 }

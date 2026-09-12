@@ -29,6 +29,34 @@ test('chat opening and dose edits preserve source ratios rather than requesting 
   assert.throws(() => createRecipePreview({ recipe: source, dose: 21 }), /unsupported-dose-adaptation/);
 });
 
+test('source projection validation tolerates Firestore map key reordering', () => {
+  const source = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 15,
+  }).recipe;
+  const reorderMaps = (value) => {
+    if (Array.isArray(value)) return value.map(reorderMaps);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(Object.keys(value).reverse().map((key) => [key, reorderMaps(value[key])]));
+  };
+  const roundTripped = reorderMaps(source);
+  assert.equal(validateManualSourceRecipeSnapshot(roundTripped).valid, true);
+  const preview = createRecipePreview({ recipe: roundTripped, dose: 16 });
+  assert.equal(preview.coffeeGrams, 16);
+  assert.equal(preview.waterMilliliters, 195.56);
+
+  const waterTampered = reorderMaps(source);
+  waterTampered.sourceProjection.water.value += 1;
+  const waterResult = validateManualSourceRecipeSnapshot(waterTampered);
+  assert.equal(waterResult.valid, false);
+  assert.ok(waterResult.errors.includes('source-water-projection-mismatch'));
+
+  const stageTampered = reorderMaps(source);
+  stageTampered.sourceProjection.stages[0].water.value += 1;
+  const stageResult = validateManualSourceRecipeSnapshot(stageTampered);
+  assert.equal(stageResult.valid, false);
+  assert.ok(stageResult.errors.includes('source-stages-mismatch'));
+});
+
 const CASES = [
   {
     label: 'Kalita Wave 155',

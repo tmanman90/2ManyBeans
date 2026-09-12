@@ -21,6 +21,24 @@ const positive = (value) => finite(value) && value > 0;
 const clone = (value) => structuredClone(value);
 const unique = (values) => [...new Set(values.filter(Boolean))];
 
+// Firestore may return map keys in a different order. Projection arrays keep
+// their order, but their object members are semantic maps, not ordered data.
+function sameSourceValue(first, second) {
+  if (Object.is(first, second)) return true;
+  if (Array.isArray(first) || Array.isArray(second)) {
+    return Array.isArray(first) && Array.isArray(second)
+      && first.length === second.length
+      && first.every((value, index) => sameSourceValue(value, second[index]));
+  }
+  if (first && typeof first === 'object' && second && typeof second === 'object') {
+    const firstKeys = Object.keys(first);
+    const secondKeys = Object.keys(second);
+    return firstKeys.length === secondKeys.length
+      && firstKeys.every((key) => Object.hasOwn(second, key) && sameSourceValue(first[key], second[key]));
+  }
+  return false;
+}
+
 function quantityBounds(value) {
   if (finite(value)) return [value, value];
   if (value && finite(value.min) && finite(value.max) && value.min >= 0 && value.max >= value.min) {
@@ -434,7 +452,7 @@ export function validateManualSourceProjection(projection) {
     const original = sourceStages[index];
     if (!original || stage.id !== original.id || stage.kind !== original.kind) errors.push(`stage-${index}-identity-mismatch`);
     const expectedWater = stageWater(original);
-    if (JSON.stringify(stage.water) !== JSON.stringify(expectedWater)) errors.push(`stage-${index}-unit-or-water-mismatch`);
+    if (!sameSourceValue(stage.water, expectedWater)) errors.push(`stage-${index}-unit-or-water-mismatch`);
     if (stage.valve !== (original.valve ?? null)) errors.push(`stage-${index}-valve-mismatch`);
   }
 
