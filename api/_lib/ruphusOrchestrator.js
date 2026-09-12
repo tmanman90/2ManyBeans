@@ -18,7 +18,7 @@ const SEVERE_SECOND_FAILURES = new Set([
 const PROPOSAL_RECOVERABLE_FAILURES = new Set([
   'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal',
   'invalid_proposal_intent', 'invalid_ratio_preview', 'no_recipe_change',
-  'one_change_required', 'technique-conflict', 'unsupported-dose-profile',
+  'one_change_required', 'technique-conflict', 'unsupported-dose-profile', 'invalid_aiden_change',
 ]);
 const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
@@ -156,6 +156,14 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
     return explanation ? `${explanation} ${handoff}` : handoff;
   };
   const technique = artifact.techniqueExperiment;
+  if (artifact.slotKey === 'aiden') {
+    const before = artifact.before || {};
+    const after = artifact.after || {};
+    const change = before.ratio !== after.ratio
+      ? `ratio 1:${before.ratio} → 1:${after.ratio}`
+      : 'temperature curve, keeping the ratio and pulse timing unchanged';
+    return withExplanation(`Here’s the Aiden profile with the adjusted ${change}. Review it below; saving it and preparing it in Fellow are separate choices.`);
+  }
   if (technique?.kind === 'v60_technique') {
     const name = String(technique.name || 'this V60 approach').trim();
     const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;

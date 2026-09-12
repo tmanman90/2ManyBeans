@@ -20,6 +20,7 @@ const sourceOriginalMode = new URLSearchParams(window.location.search).has('sour
 const sourceImmersionMode = sourceMode && new URLSearchParams(window.location.search).has('source-immersion');
 const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : sourceImmersionMode ? 'source-immersion-preview-fixture' : 'source-hario-preview-fixture') : new URLSearchParams(window.location.search).has('dose-error') ? 'dose-error-fixture' : 'changed-ratio-fixture';
 const runtimeTurn = window.__ruphusTechniqueTurn;
+const aidenMode = new URLSearchParams(window.location.search).has('aiden');
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
 const sourceOption = sourceMode ? generateManualSourceTechniqueOption(sourceOriginalMode || sourceImmersionMode ? 'hario-switch-03-instruction-manual-36-2023' : 'hario-switch-03-matt-winton-hybrid-24-2022', {}, {
@@ -34,6 +35,10 @@ const artifact = sourceMode
   ? { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'v60_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, sourceRevisionId: String(sourceOption.recipe.sourceRevision), sourceHash: `${sourceOption.recipe.sourceId}-revision-${sourceOption.recipe.sourceRevision}`, techniqueExperiment: { name: sourceOption.recipe.techniqueLabel, kind: 'manual_source_technique', sourceId: sourceOption.recipe.sourceId } }
   : runtimeTurn?.frames?.find(frame => frame.type === 'artifact_ready')?.artifact || { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
+if (aidenMode) {
+  const profile = { title: 'Colombia Aiden', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 95, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 20, ssPulseTemperatures: [96, 95], batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: [95, 94] };
+  Object.assign(artifact, { slotKey: 'aiden', before: profile, after: { ...profile, ratio: 15.5 }, actions: ['apply_proposal', 'brew_once', 'keep_current'] });
+}
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
 const forceDoseError = new URLSearchParams(window.location.search).has('dose-error');
 const historical = new URLSearchParams(window.location.search).has('historical');
@@ -55,6 +60,7 @@ function Fixture() {
   const [previewStale, setPreviewStale] = useState(false);
   const [startCount, setStartCount] = useState(0);
   const [saveCount, setSaveCount] = useState(0);
+  const [profileAction, setProfileAction] = useState('');
   const [inspectedId, setInspectedId] = useState(null);
   const previewOriginRef = useRef(null);
   const historicalOriginRef = useRef(null);
@@ -100,7 +106,8 @@ function Fixture() {
         {!sent && <button type="button" onClick={() => setSent(true)} style={{ minHeight: 44 }}>Send technique request</button>}
         {sent && <p data-runtime-reply>{runtimeTurn.frames.filter(frame => frame.type === 'text_delta').map(frame => frame.text).join('')}</p>}
       </section>}
-      {sent && <ArtifactRenderer artifact={historical ? { ...artifact, status: 'superseded' } : artifact} onPreview={openPreview} onInspect={inspect} />}
+      {sent && <ArtifactRenderer artifact={historical ? { ...artifact, status: 'superseded' } : artifact} onPreview={openPreview} onInspect={inspect} onAction={aidenMode ? ({ mode }) => setProfileAction(mode) : undefined} actionPending={aidenMode && new URLSearchParams(window.location.search).has('pending')} />}
+      {aidenMode && <output data-profile-action>{profileAction}</output>}
       {inspectedId && <div data-inspected-id={inspectedId}><HistoricalRecipeInspector proposal={artifact} onClose={closeHistorical} /></div>}
       <div style={{ display: 'none' }} aria-hidden="true">
         <button type="button" data-reset onClick={() => { clearRecipePreviewDraft({ uid, proposalId }); setPreview(null); setStartCount(0); setSaveCount(0); }}>Reset fixture</button>

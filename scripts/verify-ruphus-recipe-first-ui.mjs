@@ -167,6 +167,26 @@ try {
       { name: 'viewButton', selector: ':scope button[aria-label="View recipe"]' },
     ];
     attachPageHealth(page, errors, writes);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?aiden`, { waitUntil: 'networkidle' });
+    assert.match(await page.locator('[data-profile-change="Ratio"]').innerText(), /1:16 → 1:15.5/);
+    assert.equal(await page.locator('[data-profile-action]').innerText(), '');
+    await page.getByText('View full Aiden profile', { exact: true }).click();
+    assert.match(await page.locator('details').innerText(), /2 pulses · 20s interval · 96 → 95°C/);
+    assert.match(await page.locator('details').innerText(), /Choose the serving size on Aiden/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: '/tmp/ruphus-aiden-profile-320.png', fullPage: true });
+    for (const [label, mode] of [['Save profile', 'apply_proposal'], ['Prepare trial in Fellow', 'brew_once'], ['Leave unchanged', 'keep_current']]) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      assert.equal(await page.locator('[data-profile-action]').innerText(), mode);
+    }
+    await page.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?aiden&pending`, { waitUntil: 'networkidle' });
+    assert.equal(await page.getByRole('button', { name: 'Save profile', exact: true }).isDisabled(), true);
+    await page.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?aiden&historical`, { waitUntil: 'networkidle' });
+    assert.equal(await page.getByRole('button', { name: 'Save profile', exact: true }).count(), 0);
+    assert.deepEqual(writes, []);
+    console.log('Aiden full profile review, ratio diff, explicit action dispatch, pending and historical safety passed at 320px; no external calls.');
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.clear());
     await page.screenshot({ path: screenshots.cardMobile, fullPage: false });

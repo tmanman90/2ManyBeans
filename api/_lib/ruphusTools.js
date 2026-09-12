@@ -17,6 +17,8 @@ import {
   listV60TechniqueOptions,
 } from '../../src/lib/ruphus/techniqueOptions.js';
 import { createRecipePreview, normalizePreviewGrind } from '../../src/lib/ruphus/recipePreview.js';
+import { toAidenProfile } from '../../src/lib/aidenProfileValidation.js';
+import { createAidenProfilePreview } from '../../src/lib/ruphus/aidenProfilePreview.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 import { answeredSensoryClarifier } from './ruphusSensoryAnswer.js';
 import { isAlternativeRequest, sameRecipeReview } from '../../src/lib/ruphus/proposalContinuity.js';
@@ -52,7 +54,9 @@ const requestedKalitaSize = (text) => {
 const missingRecipeSummary = (slotKey, available = []) => {
   const otherSlots = available.filter((slot) => slot !== slotKey).map(displaySlot);
   const summary = `This coffee has no ${displaySlot(slotKey)} recipe${otherSlots.length ? `; it has ${otherSlots.join(' and ')}` : ''}.`;
-  return `${summary} A new source-backed manual recipe can be prepared here in chat. Nothing was saved.`;
+  return slotKey === 'aiden'
+    ? `${summary} An existing Aiden profile is needed before its ratio or temperature can be updated here. Nothing was saved.`
+    : `${summary} A new source-backed manual recipe can be prepared here in chat. Nothing was saved.`;
 };
 
 function forbidOwner(args) { if (args?.uid || args?.ownerId || args?.userId) throw Object.assign(new Error('owner identity is server-bound'), { code: 'forged_owner' }); }
@@ -235,6 +239,7 @@ function modelRecipe(recipe) {
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
   const result = {};
   for (const key of Object.keys(RECIPE_PROPERTIES)) if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
+  if (recipe.method === 'aiden' || recipe.device === 'aiden' || recipe.slotKey === 'aiden') Object.assign(result, clone(toAidenProfile(recipe)));
   return result;
 }
 function withoutMethodFocus(ledger) {
@@ -936,7 +941,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
       if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
       setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe });
-      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
+      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
     }
     const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
     const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
@@ -974,7 +979,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (servingDose != null && !techniqueExperiment && !['ratio', 'water', 'grind', 'temperature'].includes(args.change?.control)) {
       return { ok: false, code: 'invalid_proposal_intent', message: 'A serving dose can accompany one recipe control or technique experiment, not a second dose control.' };
     }
-    if (args.change?.control === 'ratio') {
+    if (slotKey === 'aiden') {
+      try {
+        requestedPatch = createAidenProfilePreview(target.before, args.change, { servingDoseGrams: servingDose });
+      } catch (error) {
+        return { ok: false, code: error.code || 'invalid_aiden_change', message: error.message };
+      }
+    } else if (args.change?.control === 'ratio') {
       try {
         const beforeRecipe = target.before || {};
         const dose = servingDose ?? Number(beforeRecipe.coffeeGrams ?? beforeRecipe.userCoffeeGrams ?? beforeRecipe.dose);
@@ -1035,6 +1046,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const recipe = recipeRead?.code === 'recipe_missing' ? null : recipeRead;
     if ((!recipe || recipe.code) && !(techniqueExperiment && target.before === null && !recipe)) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, summary: recipe?.code ? 'I could not verify the saved recipe right now. Nothing was changed.' : missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
     const before = clone(target.before);
+    // Keep trusted app provenance and the separate grinder display through a
+    // profile edit. These fields are never accepted from model arguments.
+    if (slotKey === 'aiden') {
+      for (const key of ['sourceContextHash', 'generatedAt', 'grindRecommendation']) {
+        if (recipe[key] !== undefined) before[key] = clone(recipe[key]);
+      }
+    }
     if (hasManualSourceProjection(before) && !techniqueExperiment && args.change?.control !== 'dose') {
       return { ok: false, code: 'source_recipe_control_unsupported', message: 'Source-backed recipes keep their native schedule and units; only the supported dose guide can be changed.' };
     }

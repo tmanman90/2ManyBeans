@@ -2,6 +2,7 @@ import { canonicalHash, clone, recipeSourceHash } from '../../src/lib/ruphus/con
 import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { absentRecipeSourceHash, resolveRecipeSource } from '../../src/lib/ruphus/recipeSourceState.js';
 import { normalizeClientVersion } from './ruphusRollout.js';
+import { aidenProfileHash } from '../../src/lib/ruphus/aidenProfilePreview.js';
 
 export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
 export const ORDINARY_MODES = Object.freeze(['replace_active_recipe', 'set_dose', 'set_aiden_grind', 'set_aiden_link']);
@@ -12,7 +13,14 @@ const slotMethod = (slotKey) => slotKey === 'aiden' ? 'aiden' : slotKey?.startsW
 const slotMode = (slotKey) => slotKey?.endsWith('iced') ? 'iced' : 'hot';
 const projection = (bean, slotKey, recipe) => {
   const next = { ...bean };
-  if (slotKey === 'aiden') next.aidenRecipe = clone(recipe);
+  if (slotKey === 'aiden') {
+    // Bind legacy links before changing the profile. Retain the link so Undo
+    // can reuse it, but never present it as a link to different settings.
+    for (const key of ['aidenLink', 'aidenIcedLink']) {
+      if (bean[key] && !bean[`${key}ProfileHash`] && bean.aidenRecipe) next[`${key}ProfileHash`] = aidenProfileHash(bean.aidenRecipe);
+    }
+    next.aidenRecipe = clone(recipe);
+  }
   else {
     const mapKey = slotMethod(slotKey) === 'kalita' ? 'kalita' : 'v60';
     const mapName = slotMode(slotKey) === 'iced' ? 'handBrewIcedRecipes' : 'handBrewRecipes';
@@ -111,6 +119,14 @@ const assertLinkPatch = (patch) => {
   const allowed = new Set(['aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay']);
   if (Object.keys(patch).some((key) => !allowed.has(key))) fail('invalid_action', 'Only Aiden link state may be updated by this command.');
 };
+const linkProjection = (bean, command) => {
+  const patch = { ...(command.link == null ? {} : { aidenLink: String(command.link) }), ...(command.icedLink == null ? {} : { aidenIcedLink: String(command.icedLink) }), ...clone(command.patch || {}) };
+  const next = { ...bean, ...patch };
+  for (const key of ['aidenLink', 'aidenIcedLink']) {
+    if (Object.hasOwn(patch, key)) next[`${key}ProfileHash`] = patch[key] && bean.aidenRecipe ? aidenProfileHash(bean.aidenRecipe) : null;
+  }
+  return next;
+};
 const applyBeanPatch = (target, patch = {}) => {
   for (const [path, value] of Object.entries(patch)) {
     const keys = path.split('.');
@@ -184,7 +200,7 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
       result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: current.id, status: 'succeeded' }), bean: next };
     } else if (mode === 'set_aiden_link') {
       assertLinkPatch(command.patch);
-      const next = { ...bean, ...(command.link == null ? {} : { aidenLink: String(command.link) }), ...(command.icedLink == null ? {} : { aidenIcedLink: String(command.icedLink) }), ...clone(command.patch || {}) };
+      const next = linkProjection(bean, command);
       state.beans.set(command.coffeeId, next);
       result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey, revisionId: current.id, status: 'succeeded' }), bean: next };
     } else if (mode === 'keep_current') {
@@ -454,7 +470,7 @@ function executeOnState(state, command) {
     result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id }) };
   } else if (mode === 'set_aiden_link') {
     assertLinkPatch(command.patch);
-    state.beans.set(command.coffeeId, { ...bean, ...(command.link == null ? {} : { aidenLink: String(command.link) }), ...(command.icedLink == null ? {} : { aidenIcedLink: String(command.icedLink) }), ...clone(command.patch || {}) });
+    state.beans.set(command.coffeeId, linkProjection(bean, command));
     result = { ok: true, receipt: receipt({ actionId: command.actionId, mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: current.id }) };
   } else if (mode === 'keep_current') {
     const proposal = state.proposals.get(command.proposalId); if (!proposal) fail('not_found', 'Proposal is unavailable.'); checkExpected(current, { expectedRevisionId: proposal.sourceRevisionId, expectedRevisionHash: proposal.sourceHash }); checkProposalBinding(bean, proposal); proposal.status = 'kept'; result = { ok: true, proposal: clone(proposal), receipt: receipt({ actionId: command.actionId, mode, proposalId: proposal.id, coffeeId: command.coffeeId, slotKey: command.slotKey }) };

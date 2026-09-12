@@ -15,6 +15,7 @@ import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
 import { executeRecipeCommand } from '../lib/recipeCommands';
+import { aidenLinkMatchesProfile } from '../lib/ruphus/aidenProfilePreview';
 
 export function useAidenBrew(updateBean) {
   const mountedRef = useRef(true);
@@ -160,7 +161,7 @@ export function useAidenBrew(updateBean) {
     // Cached recipe with no push pending: free to show (just displays stored data).
     const sourceHash = buildSourceContextHash(bean);
     const cachedRecipeFresh = recipeMatchesSource(bean, bean.aidenRecipe);
-    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && cachedRecipeFresh && bean.aidenLink;
+    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && cachedRecipeFresh && aidenLinkMatchesProfile(bean);
     if (!hasCachedRecipeOnly && !hasPro) {
       // Cancel any in-flight chain so its tail effects don't land after
       // the paywall opens (and possibly persist a Pro-gated recipe to a
@@ -176,7 +177,7 @@ export function useAidenBrew(updateBean) {
     setAidenBean(bean);
     setAidenResult(null);
     setAidenError(null);
-    setIcedResult(bean.aidenIcedLink ? { link: bean.aidenIcedLink, usedRelay: bean.aidenIcedUsedRelay || false } : null);
+    setIcedResult(aidenLinkMatchesProfile(bean, true) ? { link: bean.aidenIcedLink, usedRelay: bean.aidenIcedUsedRelay || false } : null);
     setIcedError(null);
     setIcedLoading(false);
     setAidenModal(true);
@@ -187,7 +188,7 @@ export function useAidenBrew(updateBean) {
       setAidenRecipe(bean.aidenRecipe);
 
       // If we already have a brew.link for this bean, show it directly (no re-push)
-      if (bean.aidenLink) {
+      if (aidenLinkMatchesProfile(bean)) {
         if (!isActive(rid)) return;
         setAidenResult({ link: bean.aidenLink, usedRelay: bean.aidenUsedRelay || false });
         setAidenLoading(false);

@@ -2,6 +2,7 @@ import { C, radius, shadows, type as typeScale } from '../../../styles/theme';
 import { ArtifactAction } from './ArtifactAction';
 import { Btn } from '../../Btn';
 import { recipeCardMetadata } from '../../../lib/ruphus/recipeCardMetadata';
+import { aidenProfileRows } from '../../../lib/ruphus/aidenProfilePreview';
 
 const ACTIONS = Object.freeze([
   { mode: 'apply_proposal', label: 'Update saved recipe' },
@@ -82,10 +83,33 @@ function PreviewCard({ proposal, after, before, status, onPreview, onInspect }) 
   </section>;
 }
 
+function AidenProfileCard({ proposal, before, after, status, onAction, actionPending }) {
+  const previousRows = new Map(aidenProfileRows(before));
+  const changed = aidenProfileRows(after).filter(([label, value]) => previousRows.get(label) !== value);
+  const allowed = new Set(proposal.actions || []);
+  const actions = [
+    { mode: 'apply_proposal', label: 'Save profile' },
+    { mode: 'brew_once', label: 'Prepare trial in Fellow' },
+    { mode: 'keep_current', label: 'Leave unchanged' },
+  ];
+  return <section aria-label={`${proposal.coffeeName || 'Coffee'} Aiden profile review`} data-artifact="recipe_proposal" data-aiden-profile="true" data-status={status} style={{ padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, background: C.cream, boxShadow: shadows.e1 }}>
+    <div style={typeScale.h3}>{proposal.coffeeName || 'Your coffee'} · Aiden</div>
+    <p style={{ margin: '10px 0', color: C.textMuted }}>{after.title || 'Aiden profile'}</p>
+    {changed.map(([label, value]) => <div key={label} data-profile-change={label} style={{ marginTop: 12, lineHeight: 1.5, overflowWrap: 'anywhere' }}><span style={{ color: C.textMuted }}>{label}</span><div>{previousRows.get(label)} → <strong>{value}</strong></div></div>)}
+    <details style={{ marginTop: 12 }}><summary style={{ minHeight: 44, padding: '12px 0', cursor: 'pointer' }}>View full Aiden profile</summary>
+      <dl style={{ margin: 0 }}>{aidenProfileRows(after).map(([label, value]) => <div key={label} style={{ margin: '10px 0', lineHeight: 1.5 }}><dt style={{ color: C.textMuted }}>{label}</dt><dd style={{ margin: 0 }}>{value}</dd></div>)}</dl>
+      <p style={{ lineHeight: 1.5 }}>Choose the serving size on Aiden. The ratio scales with it; grinder settings stay unchanged.</p>
+    </details>
+    {proposal.status === 'proposed' && onAction && <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{actions.filter(action => allowed.has(action.mode)).map(action => <ArtifactAction key={action.mode} action={action.mode} label={action.label} status={status} disabled={actionPending} onClick={() => onAction({ mode: action.mode, artifact: proposal })} />)}</div>}
+    <p aria-live="polite" style={{ color: C.textMuted, margin: '12px 0 0', lineHeight: 1.5 }}>{status === 'proposed' ? 'Save changes the app recipe only. Preparing a trial sends this profile to Fellow without replacing your saved recipe or starting the brewer.' : previewCopy[status] || 'This profile review is no longer open.'}</p>
+  </section>;
+}
+
 export function RecipeProposalCard({ proposal = {}, onAction, onPreview, onInspect, actionPending = false }) {
   const before = proposal.before || {};
   const after = proposal.after || {};
   const status = actionPending ? 'applying' : proposal.status || 'proposed';
+  if (proposal.slotKey === 'aiden') return <AidenProfileCard proposal={proposal} before={before} after={after} status={status} onAction={onAction} actionPending={actionPending} />;
   if (HOT_PREVIEW_SLOTS.has(proposal.slotKey) && (typeof onPreview === 'function' || typeof onInspect === 'function')) return <PreviewCard proposal={proposal} before={before} after={after} status={status} onPreview={onPreview} onInspect={onInspect} />;
   const rows = [
     ['Water', before.waterGrams ?? before.water, after.waterGrams ?? after.water, ' g'],
