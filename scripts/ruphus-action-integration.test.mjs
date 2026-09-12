@@ -20,6 +20,51 @@ function setup() {
   return { store, recipe };
 }
 
+test('muted sensory follow-up reads canonical numbers and yields an actionable grind card with reversible Apply', async () => {
+  const uid = 'user-1';
+  const store = createMemoryCommandStore({ uid });
+  const before = generateKalitaRecipe({ targetRatio: 215 / 13 }, { dose: 13, size: '155' });
+  before.grindSize.setting = '5.6';
+  store.seedBean('bean-1', { name: 'El Vergel', handBrewRecipes: { kalita: before } });
+  store.execute({ actionId: 'initial-muted', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'kalita_hot', recipe: before });
+  const canonicalBefore = resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe;
+  const repository = createMemoryRuphusRepository();
+  repository.seedBean(uid, store.getBean('bean-1'));
+  const userText = 'Muted I guess';
+  const conversation = [
+    { role: 'user', content: 'I brewed jar 1 with the Kalita 155 recipe. It tasted watered down.' },
+    { role: 'assistant', content: 'Was it thin but sweet and clean, or did it also taste sour, sharp, or muted?' },
+  ];
+  const ledger = { entries: [{ kind: 'method_focus', status: 'available', namedCoffees: ['El Vergel'], methodFocus: { displayName: 'hot Kalita' } }] };
+  const context = { userText, conversation, ledger, sessionId: 'muted-kalita', rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel' }], refs: { c1: 'bean-1' } }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, ...deriveProposalReadiness({ conversation, ledger, userText }) } };
+  const tools = createRuphusTools({ uid, context, proposalActions: ['apply_proposal', 'brew_once', 'keep_current'],
+    readers: { readCoffee: async () => ({ name: 'El Vergel' }), readRecipe: async ({ slotKey }) => { const recipe = { ...resolveLegacyRecipe(repository.getBean(uid, 'bean-1'), 'kalita_hot').recipe, slotKey: 'kalita_hot' }; return slotKey ? recipe : [recipe]; }, readBrews: async () => [], readTastings: async () => [] },
+    proposalStore: input => repository.createProposal(input),
+  });
+  let round = 0;
+  const provider = { runTurn: async ({ toolResult }) => {
+    if (++round === 1) return { toolCalls: [{ callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } }] };
+    assert.equal(toolResult.results[0].result.selectedRecipe.grindSize.setting, '5.6');
+    assert.deepEqual(toolResult.results[0].result.selectedRecipe.steps, before.steps);
+    return { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: '5.2' } } }] };
+  } };
+  const result = await runRuphusTurn({ turnId: 'muted-kalita', context, userText, tools, provider });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const artifact = result.artifacts[0];
+  assert.equal(artifact.type, 'recipe_proposal');
+  assert.deepEqual(artifact.actions, ['apply_proposal', 'brew_once', 'keep_current']);
+  assert.deepEqual(artifact.after.steps, before.steps);
+  assert.equal(artifact.after.waterGrams, before.waterGrams);
+  assert.equal(artifact.after.coffeeGrams, before.coffeeGrams);
+  assert.deepEqual(artifact.after.waterTemp, before.waterTemp);
+  store.seedProposal(repository.getProposal(uid, artifact.id));
+  const { request } = resolveRuphusActionRequest({ uid, mode: 'apply_proposal', artifact, storage: { getItem: () => null, setItem: () => {} }, idFactory: () => 'muted-apply' });
+  const applied = store.execute(request);
+  assert.equal(String(resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe.grindSize.setting), '5.2');
+  store.execute({ actionId: 'muted-undo', mode: 'undo_revision', coffeeId: 'bean-1', slotKey: 'kalita_hot', expectedRevisionId: applied.revision.id });
+  assert.deepEqual(resolveLegacyRecipe(store.getBean('bean-1'), 'kalita_hot').recipe, canonicalBefore);
+});
+
 test('Kalita update request produces a persisted card, then explicit Apply changes canonical recipe and Undo restores it', async () => {
   const uid = 'user-1';
   const store = createMemoryCommandStore({ uid });

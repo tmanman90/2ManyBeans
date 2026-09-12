@@ -8,6 +8,25 @@ import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 
 const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
+test('diagnosis exposes the exact selected canonical recipe, not only its brewer label', async () => {
+  const recipe = { ...generateKalitaRecipe({}, { dose: 13 }), slotKey: 'kalita_hot', coffeeGrams: 13, waterGrams: 215, waterTemp: { celsius: 94 }, grindSize: { setting: '5.6' }, id: 'private-revision', selectedPath: 'private-path', hash: 'private-hash' };
+  const context = { ...structuredClone(base), userText: 'I brewed jar 1 with the Kalita 155. It tasted muted.', __ruphusResolvedTargets: new Map(), proposalState: { target: null } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: {
+    readCoffee: async () => ({ name: 'El Vergel' }),
+    readRecipe: async () => [{ ...generateV60Recipe({}, { dose: 20 }), slotKey: 'v60_hot' }, recipe],
+    readBrews: async () => [], readTastings: async () => [],
+  } });
+  const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(result.method.slot, 'kalita_hot');
+  assert.equal(result.selectedRecipe?.coffeeGrams, 13);
+  assert.equal(result.selectedRecipe.waterGrams, 215);
+  assert.equal(result.selectedRecipe.waterTemp.celsius, 94);
+  assert.equal(result.selectedRecipe.grindSize.setting, '5.6');
+  assert.deepEqual(result.selectedRecipe.steps, recipe.steps);
+  assert.ok(result.selectedRecipe.steps.length > 0);
+  assert.doesNotMatch(JSON.stringify(result), /private-revision|private-path|private-hash/);
+  assert.doesNotMatch(JSON.stringify(context.ledger), /waterGrams|private-revision|private-path|private-hash/);
+});
 test('locked coffee is supplied directly instead of offering redundant model resolution', () => {
   const locked = createRuphusTools({ uid: 'owner', context: { ...structuredClone(base), turnBinding: { status: 'locked', coffeeRef: 'c1' } } });
   assert.equal(locked.definitions.some(({ name }) => name === 'resolve_coffee'), false);
@@ -344,6 +363,8 @@ test('a premature proposal becomes normal advice without dispatch or interruptio
     assert.equal(input.regeneration, true);
     assert.deepEqual(input.tools, []);
     assert.match(input.correctiveInstruction, /not authorized yet/i);
+    assert.match(input.correctiveInstruction, /If the symptom is only watery, weak, or watered down/);
+    assert.match(input.correctiveInstruction, /ask one short sensory question/);
     return { text: 'For this V60, try one small grind step finer first.' };
   } };
   const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: false, proposalIssued: false } };

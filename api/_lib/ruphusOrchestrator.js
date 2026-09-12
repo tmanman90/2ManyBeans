@@ -558,7 +558,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         response = await provider.runTurn({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
-          correctiveInstruction: 'The recipe change is not authorized yet. Reply with useful coffee advice only, make at most one concrete suggestion, and do not call another tool or claim a change was prepared.',
+          correctiveInstruction: 'The recipe change is not authorized yet. Do not call another tool or claim a change was prepared. If the symptom is only watery, weak, or watered down and the user has not clarified its taste, ask one short sensory question (thin but sweet/clean, or sour/sharp/muted?) and wait; do not choose a control or give conditional advice yet. Otherwise reply with useful coffee advice only, making at most one concrete suggestion supported by the established diagnosis.',
           signal,
         });
         throwIfCancelled();
