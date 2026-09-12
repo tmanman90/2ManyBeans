@@ -133,6 +133,7 @@ test('saved Aiden profiles cannot reuse a link to old settings, including after 
 test('an Aiden proposal survives the normal evidence → exact recipe → proposal runtime sequence', async () => {
   const { tools, context } = setup();
   context.proposalState.target = { coffeeRef: 'c1', slot: 'kalita_hot' };
+  context.methodBinding = { status: 'locked', slot: 'kalita_hot', source: 'M2' };
   let round=0;
   const frames=[];
   const requests=[
