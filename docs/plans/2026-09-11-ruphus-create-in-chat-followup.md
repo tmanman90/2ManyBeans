@@ -2,6 +2,23 @@
 
 Status: implemented and verified in the signed-in isolated Dev simulator. Owner subjective verdict remains separate; no phone or production release.
 
+## September 12 morning: authentication-resume regression
+
+The earlier bounded recipe-flow acceptance did not establish overnight session-resume reliability. Tal's first morning question, “Can you suggest a unique v60 recipe for jar 2,” failed before provider dispatch: the preview logged three POST 401s at 14:31 UTC. Native logs show Secure Token `QUOTA_EXCEEDED` and Firebase Auth `auth/quota-exceeded`; monitoring reports over 300 token exchanges around wake. The Dev account was not disabled or revoked, and no billing or quota configuration was changed.
+
+Client repair `6958edd` makes native initial loading and periodic polling use the existing single-flight refetch path. Previously the poll checked the in-flight ref but never claimed it, permitting suspended requests to accumulate. Token failures now stop the request instead of becoming anonymous requests; rejected credentials are not retried with identical headers; Chat surfaces the authentication-specific cause rather than claiming an AI connection failure. No sign-out, credential replacement, authentication bypass, or provider/prompt modification.
+
+Evidence and limits:
+
+- Executable production-hook test: initial load plus 360 stalled polling ticks produces only one beans/tastings fetch pair; later refresh still works and hidden ticks do not fetch. Auth tests cover quota failure with zero HTTP dispatch, same-user subsequent recovery, one-call 401/403/400, and retained transient 503 retries: 3/3 tests. This is a simulated backlog, not an actual second overnight wake cycle.
+- Stream parser checks and 4 protocol tests passed. Targeted source/test ESLint, mobile/desktop rendered harness, failed-turn retry/restore harness, Dev asset build, native build/install/launch, and diff-check passed. No newly manufactured live token expiration or destructive login reset was used.
+- Installed client SHA-256 `af658b7b18e91836497f81ab41e6b6609ff7ec15dc5fe51c0951e3f9fa97f491`; source and installed assets match. Bundle `com.talmeltzer.coffeehub.dev`, display `2manybeans Dev`, isolated Firebase, updater disabled, and dev channel verified. Backend remains the unchanged verified `qeas4wfu3` preview above; no Vercel/Capgo/production deployment in this repair.
+- Real signed-in native replay at 15:19 UTC: the exact Jar 2 question succeeded with a named Tetsu Kasuya 4:6 recommendation. One provider request, no failure code, cost $0.002915; cumulative $48.171978 of $55, reservation settled. Screenshot: `/var/folders/xx/hyp761n50hq2mw2ndtfrgs8c0000gn/T/screenshot_optimized_14f8239d-409d-4496-9a85-bc90e0fd2ea0.jpg`. This proves the authenticated conversational response, not a new full recipe-card/action journey.
+- Login preserved; read-only recipe comparison remains 57→57, restored=true, changedSlots=[]. The original failed morning bubble was not present after rehydration; its survival across the real failed-auth/relaunch boundary is not claimed by the local retry harness. The replay was entered again explicitly in the retained conversation.
+- Simulator automation itself required running the installed XcodeBuildMCP CLI through ARM64 Node on an isolated socket: its Homebrew launcher embeds an Intel Node runtime, which caused CoreSimulator architecture failures. No global Xcode selection, tool installation, or phone change. Temporary keyboard capture is released after testing.
+
+Do not extrapolate this repair into an all-conversations or overnight-resume completion claim. The exact failure is diagnosed and the ordinary request now succeeds; real overnight-resume and failed-auth transcript reconciliation remain distinct coverage gaps.
+
 ## Acceptance record
 
 Candidate `8053a6d` is deployed only to the isolated Dev preview `https://twomanybeans-ruphus-ibzgs7chy-tmanman90s-projects.vercel.app` and installed over the existing signed-in Dev simulator app. Built and installed web assets match SHA-256 `38325083373b8384793914f4837f6552495adf82c63e11b4bd9f7cd78ef92589`; Dev bundle/name, isolated Firebase, preview URL, dev channel, and updater disabled were checked. No phone, production, or Capgo upload.
