@@ -93,6 +93,19 @@ import { grinderSettingToMicrons, isOdeStep } from '../src/lib/brewMethods.js';
   assert.deepEqual(source, snapshot);
 }
 
+// A saved source label is display metadata, so a same-source dose regeneration
+// must keep it instead of replacing it with the generator's family label.
+{
+  const source = generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20, grinder: 'fellow-ode-gen2' }).recipe;
+  source.techniqueLabel = 'Tetsu Kasuya 4:6 method';
+  const snapshot = structuredClone(source);
+  const preview = createRecipePreview({ recipe: source, dose: 24, configuration: { grinder: 'fellow-ode-gen2' } });
+  assert.equal(preview.techniqueLabel, 'Tetsu Kasuya 4:6 method');
+  assert.equal(preview.technique, source.technique);
+  assert.deepEqual(preview.sourceLineage.sourceIds, source.sourceLineage.sourceIds);
+  assert.deepEqual(source, snapshot);
+}
+
 // Invalid persisted Ode values are repaired only in the derived preview. The
 // trusted grinder context is required; other grinders and qualitative/source
 // exact values stay untouched.

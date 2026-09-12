@@ -456,7 +456,18 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
       || regenerated.timerReady !== true)) {
       throw new RecipePreviewError('technique-conflict', 'The selected V60 source could not be preserved at this dose.');
     }
-    return annotate(regenerated, sourceRecipe, targetDose, targetRatioValue, route, true, normalized.normalization);
+    // A saved source may carry a user-facing technique label that is more
+    // specific than the generator's family label. Preserve it only after the
+    // recognized-source and regenerated identity checks above have established
+    // that this is the same trusted source/technique. The label is display
+    // metadata; it never selects a technique or grants save authority.
+    const sourceTechniqueLabel = typeof sourceRecipe.techniqueLabel === 'string'
+      ? sourceRecipe.techniqueLabel.trim()
+      : '';
+    const displayRecipe = recognizedSource && sourceTechniqueLabel
+      ? { ...regenerated, techniqueLabel: sourceTechniqueLabel }
+      : regenerated;
+    return annotate(displayRecipe, sourceRecipe, targetDose, targetRatioValue, route, true, normalized.normalization);
   }
   const baseWater = route.endsWith('iced') ? recipe.hotWaterGrams : recipe.waterGrams;
   const targetTotalWater = roundGrams(targetDose * targetRatioValue);
