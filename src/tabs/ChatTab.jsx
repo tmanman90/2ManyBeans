@@ -541,6 +541,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [recipePreview, setRecipePreview] = useState(null);
   const [recipePreviewPending, setRecipePreviewPending] = useState(false);
   const [recipePreviewError, setRecipePreviewError] = useState(null);
+  const [recipePreviewDoseError, setRecipePreviewDoseError] = useState(null);
   const [recipePreviewStale, setRecipePreviewStale] = useState(false);
   const [historicalProposal, setHistoricalProposal] = useState(null);
   const historicalOriginRef = useRef(null);
@@ -707,7 +708,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const savedDraft = readRecipePreviewDraft({ uid, proposalId: artifact.id });
     const validDraft = savedDraft?.coffeeId === artifact.coffeeId && savedDraft.slotKey === artifact.slotKey ? savedDraft : null;
     const dose = validDraft?.dose || baseRecipe?.coffeeGrams || baseRecipe?.dose;
-    const configuration = validDraft?.configuration || artifact.preview?.configuration?.configuration || artifact.preview?.configuration || {};
+    const configuration = { ...(validDraft?.configuration || artifact.preview?.configuration?.configuration || artifact.preview?.configuration || {}), ...(preferences?.grinder ? { grinder: preferences.grinder } : {}) };
     try {
       const preview = createRecipePreview({ recipe: baseRecipe, dose, configuration });
       const preparedProposal = restoreRecipePreviewAction({ draft: validDraft, sourceArtifact: artifact, preview });
@@ -716,12 +717,13 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       recipePreviewStaleRef.current = false;
       setRecipePreviewStale(false);
       setRecipePreviewError(null);
+      setRecipePreviewDoseError(null);
       setRecipePreview(next);
       writeRecipePreviewDraft({ uid, proposalId: artifact.id, coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, dose: preview.coffeeGrams, configuration, sourceRevisionId: artifact.sourceRevisionId, sourceHash: artifact.sourceHash, requestId: next.requestId, ...(preparedProposal ? { preparedProposalId: preparedProposal.id, preparedSourceRevisionId: preparedProposal.sourceRevisionId, preparedSourceHash: preparedProposal.sourceHash, pendingAction: preparedProposal.mode, actionId: preparedProposal.actionId } : {}) });
     } catch (error) {
       setToast(error.message || 'This recipe preview is unavailable.');
     }
-  }, [beans, uid]);
+  }, [beans, uid, preferences?.grinder]);
 
   // Historical cards have no action authority. Inspection keeps the exact
   // delivered artifact (including a source projection) and never enters the
@@ -748,6 +750,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     const proposalId = recipePreviewRef.current?.artifact?.id;
     setRecipePreview(null);
     setRecipePreviewError(null);
+    setRecipePreviewDoseError(null);
     recipePreviewStaleRef.current = false;
     setRecipePreviewStale(false);
     recipePreviewRef.current = null;
@@ -769,10 +772,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       recipePreviewStaleRef.current = false;
       setRecipePreviewStale(false);
       setRecipePreviewError(null);
+      setRecipePreviewDoseError(null);
       setRecipePreview(next);
       writeRecipePreviewDraft({ uid, proposalId: current.artifact.id, coffeeId: current.artifact.coffeeId, slotKey: current.artifact.slotKey, dose: preview.coffeeGrams, configuration: current.configuration, sourceRevisionId: current.artifact.sourceRevisionId, sourceHash: current.artifact.sourceHash });
     } catch (error) {
-      setRecipePreviewError(error.message || 'That dose is outside this recipe’s supported range.');
+      setRecipePreviewDoseError(error.message || 'That dose is outside this recipe’s supported range.');
     }
   }, [recipePreviewPending, uid]);
 
@@ -789,6 +793,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     setRecipePreview(requestState);
     setRecipePreviewPending(true);
     setRecipePreviewError(null);
+    setRecipePreviewDoseError(null);
     try {
       let preparedProposal = current.preparedProposal;
       if (!preparedProposal) {
@@ -1780,6 +1785,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         previewMode
         previewPending={recipePreviewPending}
         previewError={recipePreviewError}
+        previewDoseError={recipePreviewDoseError}
         previewStale={recipePreviewStale}
         onClose={closeRecipePreview}
         recipe={recipePreview?.recipe || null}

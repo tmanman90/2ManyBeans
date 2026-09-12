@@ -64,6 +64,7 @@ test('prompt uses held brew details and deterministic focus before asking', () =
   assert.match(RUPHUS_SYSTEM_PROMPT, /When TRUSTED_METHOD_BINDING says locked/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /A missing saved recipe does not make an explicitly named brewer ambiguous/);
   assert.match(RUPHUS_SYSTEM_PROMPT, /exact grounded diagnosis after reading the exact recipe.*typed intent recipe_preview/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /correction materially changes the method or technique.*brief explanation/);
 });
 test('locked turn binding is the final explicit developer target', () => {
   const block = buildDynamicEvidenceBlock({
@@ -103,6 +104,8 @@ test('tools expose reads, trial review, and proposal but no mutation', async () 
   const changeSchema = proposalSchema.properties.change.anyOf.find((schema) => schema.type === 'object');
   assert.deepEqual(changeSchema.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
   assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);
+  assert.deepEqual(proposalSchema.properties.explanation.anyOf, [{ type: 'string' }, { type: 'null' }]);
+  assert.ok(proposalSchema.required.includes('explanation'));
   assert.deepEqual(tools.definitions.find((definition) => definition.name === 'read_recipe').parameters.properties.slot.enum, ['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
   const assertStrictSchema = (schema) => {
     if (schema?.type === 'array') {
@@ -135,6 +138,7 @@ test('persisted proposals expose only server-enabled registered actions', async 
     await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
     const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'temperature', value: 93 } });
     assert.equal(result.ok, true);
+    assert.equal(result.artifact.explanation, null);
     assert.deepEqual(result.artifact.actions, enabled ? ['apply_proposal', 'brew_once', 'keep_current'] : []);
   }
 });
@@ -143,10 +147,13 @@ test('typed ordinary preview intent can prepare a card after an exact recipe rea
   const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. What should I try next?', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), sessionId: 'typed-preview', proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
   const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
   await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
-  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  const explanation = 'The selected source-backed method fits this brewer and the correction you described.';
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null, explanation });
   assert.equal(result.ok, true, result.code);
   assert.equal(result.artifact.type, 'recipe_proposal');
   assert.deepEqual(result.artifact.actions, []);
+  assert.equal(result.artifact.explanation, explanation);
+  assert.equal(result.artifact.after.explanation, undefined);
   assert.equal(context.proposalState.proposalIssued, true);
 });
 test('typed preview remains denied for information-only or unbound calls', async () => {
@@ -229,6 +236,34 @@ test('a successful recipe proposal ends with one truthful review handoff', async
   assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'Prepared: change the grind from 4.2 to 4.0. Dose, water, and temperature stay the same. Review it before applying.');
   assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
   assert.deepEqual(result.artifacts, frames.filter(frame => frame.type === 'artifact_ready').map(frame => frame.artifact), 'Server persistence receives the exact card delivered to the client');
+});
+test('a function-only proposal preserves its rationale before the deterministic handoff', async () => {
+  let providerCalls = 0; const frames = [];
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const explanation = 'The selected source-backed technique fits the brewer you just clarified.';
+  const result = await runRuphusTurn({ turnId: 'proposal-explanation', context: current, userText: 'Try that correction.', provider: { async runTurn() {
+    providerCalls += 1;
+    return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: null, change: { control: 'grind', value: '4.0' }, experiment: null, explanation } }] };
+  } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], explanation, before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0', temperature: 94 } } }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1);
+  assert.equal(result.ok, true);
+  assert.match(result.text, new RegExp(`${explanation} Prepared:`));
+  assert.ok(result.text.indexOf(explanation) < result.text.indexOf('Prepared:'));
+  assert.equal(result.artifacts[0].explanation, explanation);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+test('unsafe authority in an explanation still goes through the existing final response check', async () => {
+  let providerCalls = 0;
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const result = await runRuphusTurn({ turnId: 'unsafe-proposal-explanation', context: current, userText: 'Try that correction.', provider: { async runTurn(input) {
+    providerCalls += 1;
+    if (!input.regeneration) return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: '4.0' }, experiment: null, explanation: "I've saved this recipe already." } }] };
+    return { text: 'The recipe is ready for review; nothing is saved.' };
+  } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], explanation: "I've saved this recipe already.", before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } } }) } });
+  assert.equal(providerCalls, 2);
+  assert.match(result.text, /nothing is saved/i);
+  assert.doesNotMatch(result.text, /I've saved this recipe already/i);
+  assert.equal(result.artifacts[0].explanation, "I've saved this recipe already.");
 });
 test('two evidence rounds can finish with one eligible proposal without another model dispatch', async () => {
   const calls = []; let modelCalls = 0; const frames = [];
@@ -352,6 +387,7 @@ test('proposal handoff names the exact change and makes review authority explici
   assert.equal(proposalHandoff({ changedPaths: ['dose'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 16, waterGrams: 250, grind: '4.2', temperature: 94 } }), 'Try a 1:15.6 ratio instead of 1:16.7. That changes your dose from 15 g to 16 g for the same water. Open the recipe to choose your dose and review the pours; nothing is saved yet.');
   assert.equal(proposalHandoff({ changedPaths: ['water'], before: { coffeeGrams: 13, waterGrams: 215, ratio: '1:16.53846153846154', grind: '5.8', temperature: 96 }, after: { coffeeGrams: 13, waterGrams: 202, ratio: '1:15.538461538461538', grind: '5.8', temperature: 96 } }), "Try a 1:15.5 ratio instead of 1:16.5. At your current 13 g dose, that's 202 g of water. Open the recipe to choose your dose and review the pours; nothing is saved yet.");
   assert.match(proposalHandoff({ changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } }), /change the grind from 4\.2 to 4\.0/);
+  assert.match(proposalHandoff({ explanation: 'Your saved Switch recipe needs a valve.', changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } }), /^Your saved Switch recipe needs a valve\. Prepared:/);
 });
 test('the same recipe advice is idempotent within one session but distinct across chats', async () => {
   const before = generateV60Recipe({}, { dose: 15 });

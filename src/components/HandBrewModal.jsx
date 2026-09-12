@@ -122,7 +122,7 @@ const sourceEquipmentLabel = (projection) => {
 // projection/disclosure stored with the recipe.
 const readableSourceDisclosure = (value) => String(value || '').replace(/\bsourceSnapshot\b/g, 'the original source wording');
 
-const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
+const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewDoseError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
   const source = projection?.sourceSnapshot || projection?.sourceExecution || {};
   const stages = Array.isArray(projection?.stages)
     ? projection.stages
@@ -170,6 +170,8 @@ const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onP
           : <ParamCard label="Coffee" value={dose == null ? 'Source amount' : `${dose}g`} icon={Coffee} iconColor={C.accent} />}
         {water && <ParamCard label="Water" value={water} icon={Droplets} iconColor={C.blue} />}
       </div>
+
+      {previewMode && previewDoseError && <div role="alert" data-preview-dose-error style={{ ...type.body, color: C.red, background: C.redBg, borderRadius: radius.md, padding: '10px 12px', marginBottom: 14 }}>{previewDoseError}</div>}
 
       {(grindLabel || nativeGrindLabel) && (
         <div style={{ background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: radius.lg, padding: '12px 14px', marginBottom: 14, boxShadow: shadows.e1 }}>
@@ -633,7 +635,7 @@ export const HandBrewModal = ({
   extraFooter, bean, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onStartTasting, onOpenRuphus = null, onDismissAttempt = null,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
   deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
-  previewMode = false, previewPending = false, previewError = null, previewStale = false, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
+  previewMode = false, previewPending = false, previewError = null, previewDoseError = null, previewStale = false, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
   sourceTimerState = null, onSourceTimerStateChange = null, sourceTimerBinding = null,
 }) => {
   const { preferences } = usePreferences();
@@ -823,6 +825,7 @@ export const HandBrewModal = ({
           disabled={previewPending}
           previewPending={previewPending}
           previewError={previewError}
+          previewDoseError={previewDoseError}
           previewStale={previewStale}
           previewMode={previewMode}
           error={error}
@@ -893,6 +896,7 @@ export const HandBrewModal = ({
             <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
             <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
           </div>
+          {previewMode && previewDoseError && <div role="alert" data-preview-dose-error style={{ ...type.body, color: C.red, background: C.redBg, borderRadius: radius.md, padding: '10px 12px', marginBottom: 14 }}>{previewDoseError}</div>}
           {recipe.device === 'kalita' && (
             <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
               Wave {recipe.kalitaSize || '185'} · {recipe.doseProfile || 'legacy profile'}
@@ -951,6 +955,11 @@ export const HandBrewModal = ({
                 preferences={preferences}
                 accentColor={C.amber}
               />
+              {recipe.recipePreview?.grindNormalization?.grinder === 'fellow-ode-gen2' && (
+                <div data-grind-normalization style={{ ...type.body, color: C.textMuted, marginTop: 8 }}>
+                  The old setting {recipe.recipePreview.grindNormalization.from} falls between clicks. This preview uses the nearest Ode Gen 2 click, {recipe.recipePreview.grindNormalization.to}.
+                </div>
+              )}
             </div>
           )}
 

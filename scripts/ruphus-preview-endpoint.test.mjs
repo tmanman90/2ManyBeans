@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
-import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60Recipe, generateV60RecipeForTechnique } from '../src/lib/v60Adapter.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { validateRecipePreviewRequest } from '../src/lib/ruphus/contracts.js';
@@ -26,16 +26,18 @@ import { Firestore } from '@google-cloud/firestore';
 // the endpoint never accepts a client-supplied projection as authority.
 {
   const uid = 'source-preview-owner';
-  const baseRecipe = generateV60Recipe({}, { dose: 20 });
+  const baseRecipe = generateV60RecipeForTechnique('hoffmann-one-cup-v1', { targetRatio: 15 }, { dose: 20, grinder: 'fellow-ode-gen2' });
   const source = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, { dose: 36 }).recipe;
   const repository = createMemoryRuphusRepository();
   repository.seedBean(uid, { id: 'coffee', ownerId: uid, handBrewRecipes: { v60: baseRecipe } });
   const sourceProposal = repository.createProposal({ uid, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', after: source, proposalId: 'source-switch-proposal' });
+  const legacyDoseProposal = repository.createProposal({ uid, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'legacy-dose-session', after: baseRecipe, proposalId: 'legacy-dose-proposal' });
   const snapshot = repository.snapshot();
   const root = `users/${uid}`;
   const data = new Map([
     [`${root}/beans/coffee`, snapshot.beans[0]],
     [`${root}/proposals/${sourceProposal.id}`, sourceProposal],
+    [`${root}/proposals/${legacyDoseProposal.id}`, legacyDoseProposal],
   ]);
   const revision = snapshot.revisions.find((item) => item.id === sourceProposal.sourceRevisionId);
   data.set(`${root}/recipeRevisions/${revision.id}`, revision);
@@ -85,6 +87,21 @@ import { Firestore } from '@google-cloud/firestore';
   assert.equal(response.body.preview.sourceProjection.sourceId, source.sourceProjection.sourceId);
   assert.equal(response.body.preview.sourceProjection.adaptation.timingPolicy, 'ruphus-manual-source-checkpoint-v2');
   assert.equal(response.body.proposal.preview.ratio, null);
+  const doseResponse = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'legacy-dose-preview-30', proposalId: legacyDoseProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'legacy-dose-session', dose: 30 } }, doseResponse, { uid }, { db });
+  assert.equal(doseResponse.statusCode, 200);
+  assert.equal(doseResponse.body.preview.coffeeGrams, 30);
+  assert.equal(doseResponse.body.preview.waterGrams, 450);
+  assert.equal(doseResponse.body.preview.ratio, '1:15');
+  assert.equal(doseResponse.body.preview.technique, baseRecipe.technique);
+  assert.deepEqual(doseResponse.body.preview.sourceLineage.sourceIds, baseRecipe.sourceLineage.sourceIds);
+  assert.equal(doseResponse.body.preview.configurationKey, baseRecipe.configurationKey);
+  assert.equal(doseResponse.body.preview.grindSize.setting, baseRecipe.grindSize.setting);
+  const persistedSource = data.get(`${root}/recipeRevisions/${revision.id}`).snapshot;
+  assert.equal(persistedSource.coffeeGrams, baseRecipe.coffeeGrams);
+  assert.equal(persistedSource.waterGrams, baseRecipe.waterGrams);
+  assert.equal(persistedSource.grindSize.setting, baseRecipe.grindSize.setting);
+  assert.deepEqual(persistedSource.sourceLineage.sourceIds, baseRecipe.sourceLineage.sourceIds);
   const serializer = new Firestore({ projectId: 'ruphus-source-endpoint-regression' })._serializer;
   assert.doesNotThrow(() => serializer.encodeFields(response.body.proposal));
 
@@ -151,6 +168,13 @@ import { Firestore } from '@google-cloud/firestore';
   assert.equal(brew.attempt.snapshot.coffeeGrams, 16);
   assert.equal(brew.attempt.snapshot.waterMilliliters, 195.56);
   assert.equal(brew.attempt.snapshot.sourceProjection.stages[0].label, 'With the switch closed, pour approximately 195.56mL of hot water');
+  const appliedDose = await executeRecipeCommand({ db, uid, coffeeId: 'coffee', slotKey: 'v60_hot', actionId: 'legacy-dose-apply-30', mode: 'apply_proposal', proposalId: doseResponse.body.proposal.id, expectedRevisionId: revision.id });
+  assert.equal(appliedDose.revision.snapshot.coffeeGrams, 30);
+  assert.equal(appliedDose.revision.snapshot.waterGrams, 450);
+  assert.equal(appliedDose.revision.snapshot.ratio, '1:15');
+  assert.equal(appliedDose.revision.snapshot.technique, baseRecipe.technique);
+  assert.deepEqual(appliedDose.revision.snapshot.sourceLineage.sourceIds, baseRecipe.sourceLineage.sourceIds);
+  assert.equal(appliedDose.revision.snapshot.grindSize.setting, baseRecipe.grindSize.setting);
   delete process.env.RUPHUS_AGENT_V3_UIDS;
 }
 

@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ODE_GEN2_STEPS, isOdeStep, moveOdeClicks, nearestOdeStep, quantizeGrinderSetting, grinderSettingToMicrons } from '../src/lib/brewMethods.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
-import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60Recipe, generateV60RecipeForTechnique } from '../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
 import { createRuphusTools, diagnosticRecommendationReady } from '../api/_lib/ruphusTools.js';
+import { canonicalRecipeSnapshot } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { recentProposalReviews, isAlternativeRequest } from '../src/lib/ruphus/proposalContinuity.js';
 import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
@@ -99,6 +100,56 @@ test('full-patch inputs cannot bypass physical grinder validation; other grinder
   const other = await harness({ grinder: 'fellow-opus' });
   const allowed = await other.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 5.5 } });
   assert.equal(allowed.ok, true);
+});
+
+test('ratio preview repairs inherited Ode value consistently without rewriting source or source hash', async () => {
+  const recipe = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  recipe.grindSize = { ...recipe.grindSize, setting: '5.9', microns: 999, description: 'legacy decimal' };
+  const original = structuredClone(recipe);
+  const saved = [];
+  const context = {
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'Columbia', recipes: ['v60_hot'] }], refs: { c1: 'coffee' }, setup: { grinder: 'fellow-ode-gen2' } },
+    __ruphusRefs: { c1: 'coffee' }, userText: 'Make it a little stronger',
+    proposalState: { diagnosisReady: true, userAgreed: true },
+  };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => recipe }, proposalStore: async input => { saved.push(input); return input; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'ratio', value: 15 } });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.before.grindSize.setting, '5.9');
+  assert.equal(result.artifact.after.grindSize.setting, '6');
+  assert.equal(result.artifact.after.grindSize.microns, grinderSettingToMicrons(6, 'fellow-ode-gen2'));
+  assert.ok(result.artifact.changedPaths.includes('grindSize.setting'));
+  assert.ok(result.artifact.changedPaths.includes('grindSize.microns'));
+  assert.equal(result.artifact.after.recipePreview.grindNormalization.from, '5.9');
+  assert.equal(saved[0].after.grindSize.setting, '6');
+  assert.deepEqual(saved[0].after, result.artifact.after);
+  assert.equal(result.artifact.sourceHash, canonicalRecipeSnapshot(original, 'v60_hot').recipeHash);
+  assert.deepEqual(recipe, original);
+});
+
+test('dose preview keeps a recognized V60 family when crossing into the large profile', async () => {
+  const recipe = generateV60RecipeForTechnique('hoffmann-one-cup-v1', { targetRatio: 15 }, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const original = structuredClone(recipe);
+  const saved = [];
+  const context = {
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'Columbia', recipes: ['v60_hot'] }], refs: { c1: 'coffee' }, setup: { grinder: 'fellow-ode-gen2' } },
+    __ruphusRefs: { c1: 'coffee' }, userText: 'Make the brew larger',
+    proposalState: { diagnosisReady: true, userAgreed: true },
+  };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => recipe }, proposalStore: async input => { saved.push(input); return input; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'dose', value: 30 } });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.waterGrams, 450);
+  assert.equal(result.artifact.after.ratio, '1:15');
+  assert.equal(result.artifact.after.technique, recipe.technique);
+  assert.deepEqual(result.artifact.after.sourceLineage.sourceIds, recipe.sourceLineage.sourceIds);
+  assert.equal(result.artifact.after.configurationKey, recipe.configurationKey);
+  assert.equal(result.artifact.after.v60Size, recipe.v60Size);
+  assert.equal(saved[0].after.coffeeGrams, 30);
+  assert.deepEqual(recipe, original);
 });
 
 test('another recipe rejects repeated after-state but comparison is not an alternative request', async () => {

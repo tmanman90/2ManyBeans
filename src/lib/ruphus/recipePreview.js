@@ -20,6 +20,12 @@ import {
   projectManualSourceForApp,
   recipeFromManualSourceProjection,
 } from './techniqueOptions.js';
+import {
+  descriptorForMicrons,
+  grinderSettingToMicrons,
+  isOdeStep,
+  nearestOdeStep,
+} from '../brewMethods.js';
 
 export const RECIPE_PREVIEW_VERSION = 'ruphus-recipe-preview-v1';
 export const RECIPE_PREVIEW_TIMING_POLICY = 'preserve-source-timing-v1';
@@ -37,6 +43,41 @@ export class RecipePreviewError extends Error {
 
 const finitePositive = (value) => Number.isFinite(value) && value > 0;
 const roundGrams = (value) => Math.round(value);
+
+// A legacy recipe can contain a decimal-looking Ode value that was accepted
+// before the physical-click contract existed. Normalize that value only in
+// the derived preview. The caller must supply the trusted grinder identity;
+// a qualitative source grind or another grinder remains source-exact.
+export function normalizePreviewGrind(recipe, { grinder = null } = {}) {
+  const setting = recipe?.grindSize?.setting;
+  const numericSetting = typeof setting === 'number'
+    ? setting
+    : typeof setting === 'string' && setting.trim() !== '' ? Number(setting) : NaN;
+  if (grinder !== 'fellow-ode-gen2' || recipe?.grindSize?.sourceExact === true
+    || !Number.isFinite(numericSetting) || numericSetting <= 0 || numericSetting > 11 || isOdeStep(setting)) {
+    return { recipe, normalization: null };
+  }
+  const physicalSetting = nearestOdeStep(numericSetting);
+  const microns = grinderSettingToMicrons(physicalSetting, grinder);
+  return {
+    recipe: {
+      ...recipe,
+      grindSize: {
+        ...recipe.grindSize,
+        setting: String(physicalSetting),
+        microns,
+        description: descriptorForMicrons(microns),
+      },
+    },
+    normalization: {
+      grinder,
+      from: String(setting),
+      to: String(physicalSetting),
+      microns,
+      reason: 'nearest physical Ode Gen 2 click',
+    },
+  };
+}
 
 function ratioNumber(value) {
   if (typeof value === 'number') return finitePositive(value) ? value : null;
@@ -74,6 +115,60 @@ function profileFor(recipe, route, dose) {
   if (route === 'kalita-iced') return recipe.kalitaSize === '155' ? 'wave-155-12-20' : dose > 30 ? 'wave-185-31-36' : 'wave-185-15-30';
   if (route === 'v60-switch-hot') return 'switch-15-30';
   return 'v60-iced-12-30';
+}
+
+function recognizedV60Source(recipe) {
+  if (!recipe?.sourceLineage?.technique || !Array.isArray(recipe.sourceLineage.sourceIds) || !recipe.sourceLineage.sourceIds[0]) return null;
+  const techniqueId = recipe.sourceLineage.technique;
+  const sourceId = recipe.sourceLineage.sourceIds[0];
+  if (recipe.sourceLineage.configurationKey !== recipe.configurationKey
+    || recipe.sourceLineage.method !== 'v60'
+    || recipe.sourceLineage.mode !== 'hot') return null;
+  try {
+    const generated = generateV60RecipeForTechnique(techniqueId, {
+      targetRatio: ratioNumber(recipe.ratio),
+    }, {
+      dose: recipe.coffeeGrams,
+      configurationKey: recipe.configurationKey,
+      v60Size: recipe.v60Size,
+    });
+    const sameTimerContract = generated.timerReady === true
+      && (!recipe.timingProfile || recipe.timingProfile === generated.timingProfile);
+    if (generated.technique !== techniqueId
+      || generated.configurationKey !== recipe.configurationKey
+      || generated.v60Size !== recipe.v60Size
+      || generated.sourceLineage?.sourceIds?.[0] !== sourceId
+      || !sameTimerContract) return null;
+    // A prior same-profile ratio/dose preview legitimately rewrites the gram
+    // amounts in every step. Compare the executable shape and normalized
+    // water distribution, not those expected scale effects, while still
+    // rejecting a changed cadence, action, or materially different pour split.
+    const actionShape = (value) => typeof value === 'string'
+      ? value.replace(/\b\d+(?:\.\d+)?\s*(?:grams?|g)\b/gi, '<grams>')
+      : value;
+    const scheduleShape = (steps) => (Array.isArray(steps) ? steps : []).map((step) => ({
+      timeSeconds: step?.timeSeconds,
+      action: actionShape(step?.action),
+      name: step?.name,
+      phase: step?.phase,
+    }));
+    const scheduleWaterShape = (steps) => {
+      const values = (Array.isArray(steps) ? steps : []).map((step) => Number(step?.waterTotal));
+      const final = values.at(-1);
+      return finitePositive(final) ? values.map((value) => value / final) : [];
+    };
+    const actualShape = scheduleShape(recipe.steps);
+    const generatedShape = scheduleShape(generated.steps);
+    const actualWaterShape = scheduleWaterShape(recipe.steps);
+    const generatedWaterShape = scheduleWaterShape(generated.steps);
+    const sameWaterShape = actualWaterShape.length === generatedWaterShape.length
+      && actualWaterShape.length > 0
+      && actualWaterShape.every((value, index) => Math.abs(value - generatedWaterShape[index]) <= 0.015);
+    const customizedSchedule = JSON.stringify(actualShape) !== JSON.stringify(generatedShape) || !sameWaterShape;
+    return { techniqueId, sourceId, customizedSchedule };
+  } catch {
+    return null;
+  }
 }
 
 function actionGrams(action, doseFactor, waterFactor = doseFactor) {
@@ -237,7 +332,7 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
   }
   if (route === 'v60-hot') {
     const techniqueId = recipe.sourceLineage?.technique || recipe.technique;
-    if (!recipe.reasonCodes?.includes('EXPLICIT_TECHNIQUE_SELECTION') || !techniqueId) {
+    if (!techniqueId) {
       throw new RecipePreviewError('technique-conflict', 'This dose crosses the selected V60 profile boundary; review an explicit supported technique before continuing.');
     }
     const generated = generateV60RecipeForTechnique(techniqueId, intent, { ...configuration, dose, grindSize: recipe.grindSize });
@@ -265,7 +360,7 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
   return null;
 }
 
-function annotate(recipe, base, dose, ratio, route, regenerated = false) {
+function annotate(recipe, base, dose, ratio, route, regenerated = false, grindNormalization = null) {
   const baseRatioValue = baseRatio(base, route);
   const reasoning = route === 'v60-hot' && typeof recipe.reasoning === 'string' && dose !== base.coffeeGrams
     ? recipe.reasoning.replace(new RegExp(`\\b${base.coffeeGrams}g\\b`, 'i'), `${dose}g`)
@@ -297,6 +392,7 @@ function annotate(recipe, base, dose, ratio, route, regenerated = false) {
       route,
       regenerated,
       sourceLineage: base.sourceLineage || null,
+      ...(grindNormalization ? { grindNormalization } : {}),
     },
   };
 }
@@ -328,6 +424,9 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   }
   const route = routeFor(recipe);
   if (!allowIced && route?.endsWith('iced')) throw new RecipePreviewError('iced-preview-disabled', 'This iced route is kept read-only until its complete water and ice contract is enabled.');
+  const sourceRecipe = recipe;
+  const normalized = normalizePreviewGrind(sourceRecipe, { grinder: configuration?.grinder });
+  recipe = normalized.recipe;
   const checked = validateRecipePreview(recipe, { dose: requested, ratio, targetRatio });
   if (!checked.valid) throw new RecipePreviewError(checked.errors[0], `Recipe preview is unavailable: ${checked.errors.join(', ')}.`, checked);
   const targetDose = checked.dose;
@@ -335,16 +434,29 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   const sourceProfile = profileFor(recipe, route, recipe.coffeeGrams);
   const targetProfile = profileFor(recipe, route, targetDose);
   const profileChanged = sourceProfile !== targetProfile;
+  const recognizedSource = route === 'v60-hot' ? recognizedV60Source(sourceRecipe) : null;
+  const ratioChanged = route === 'v60-hot' && recognizedSource
+    && ratioNumber(targetRatioValue) !== ratioNumber(baseRatio(recipe, route));
   const canRegenerate = route === 'kalita-hot' || route === 'v60-switch-hot' || route.endsWith('iced')
-    || (route === 'v60-hot' && recipe.reasonCodes?.includes('EXPLICIT_TECHNIQUE_SELECTION'));
+    || (route === 'v60-hot' && (recipe.reasonCodes?.includes('EXPLICIT_TECHNIQUE_SELECTION') || recognizedSource));
   if (profileChanged && !canRegenerate) {
-    throw new RecipePreviewError('unsupported-dose-profile', 'This dose crosses a source profile boundary; the app needs an explicit recipe configuration before it can prepare a safe preview.', { sourceProfile, targetProfile });
+    throw new RecipePreviewError('unsupported-dose-profile', 'I cannot safely prepare that larger dose from this saved recipe yet. Choose the same source-backed V60 technique in recipe options, or keep the dose between 12 and 24g; nothing was saved.', { sourceProfile, targetProfile });
   }
-  if (profileChanged || (canRegenerate && optionsRequireRegeneration({ intent, configuration }))) {
+  if (profileChanged || ratioChanged || (canRegenerate && optionsRequireRegeneration({ intent, configuration }))) {
+    if (recognizedSource?.customizedSchedule) {
+      throw new RecipePreviewError('technique-conflict', 'This saved V60 has customized pours, so I cannot safely resize it without replacing that schedule. Keep the current dose or choose the saved source-backed technique explicitly.');
+    }
     const regenerated = regeneratedPreview(recipe, route, targetDose, targetRatioValue, { intent, configuration });
     const checkedGenerated = validateRecipePreview(regenerated, { dose: targetDose, targetRatio: targetRatioValue });
     if (!checkedGenerated.valid) throw new RecipePreviewError('invalid-derived-recipe', `Derived recipe preview is unavailable: ${checkedGenerated.errors.join(', ')}.`, checkedGenerated);
-    return annotate(regenerated, recipe, targetDose, targetRatioValue, route, true);
+    if (recognizedSource && (regenerated.technique !== recognizedSource.techniqueId
+      || regenerated.configurationKey !== sourceRecipe.configurationKey
+      || regenerated.v60Size !== sourceRecipe.v60Size
+      || regenerated.sourceLineage?.sourceIds?.[0] !== recognizedSource.sourceId
+      || regenerated.timerReady !== true)) {
+      throw new RecipePreviewError('technique-conflict', 'The selected V60 source could not be preserved at this dose.');
+    }
+    return annotate(regenerated, sourceRecipe, targetDose, targetRatioValue, route, true, normalized.normalization);
   }
   const baseWater = route.endsWith('iced') ? recipe.hotWaterGrams : recipe.waterGrams;
   const targetTotalWater = roundGrams(targetDose * targetRatioValue);
@@ -384,11 +496,14 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   delete preview._previewSourceTotalWater;
   const checkedPreview = validateRecipePreview(preview, { dose: targetDose, targetRatio: targetRatioValue });
   if (!checkedPreview.valid) throw new RecipePreviewError('invalid-derived-recipe', `Derived recipe preview is unavailable: ${checkedPreview.errors.join(', ')}.`, checkedPreview);
-  return annotate(preview, recipe, targetDose, targetRatioValue, route);
+  return annotate(preview, sourceRecipe, targetDose, targetRatioValue, route, false, normalized.normalization);
 }
 
 function optionsRequireRegeneration({ intent, configuration }) {
-  return Boolean(configuration && Object.keys(configuration).some((key) => key !== 'dose') || intent && Object.keys(intent).some((key) => key !== 'targetRatio'));
+  // Grinder identity is display/physical-normalization context. It must not
+  // by itself replace a same-profile source schedule with a new technique.
+  return Boolean(configuration && Object.keys(configuration).some((key) => !['dose', 'grinder'].includes(key))
+    || intent && Object.keys(intent).some((key) => key !== 'targetRatio'));
 }
 
 export const projectRecipePreview = createRecipePreview;

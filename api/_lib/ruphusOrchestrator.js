@@ -14,6 +14,12 @@ const SEVERE_SECOND_FAILURES = new Set([
 ]);
 const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
+const safeProposalExplanation = (value) => {
+  if (typeof value !== 'string') return null;
+  const text = value.trim().replace(/\s+/g, ' ');
+  if (!text || text.length > 280 || /[<>`]/.test(text)) return null;
+  return text;
+};
 const techniqueRequest = (value, context = null, target = null) => isTechniqueExplorationRequest(value || '')
   || isExplicitTechniqueReuseRequest(value || '')
   || isContextualTechniqueFollowupRequest(value || '', context, target || undefined)
@@ -137,16 +143,20 @@ function displayRatio(value) {
 }
 
 export function proposalHandoff(artifact = {}, { includeDifference = true } = {}) {
+  const withExplanation = (handoff) => {
+    const explanation = safeProposalExplanation(artifact.explanation);
+    return explanation ? `${explanation} ${handoff}` : handoff;
+  };
   const technique = artifact.techniqueExperiment;
   if (technique?.kind === 'v60_technique') {
     const name = String(technique.name || 'this V60 approach').trim();
     const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;
-    return `Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`;
+    return withExplanation(`Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`);
   }
   if (technique?.kind === 'manual_source_technique') {
     const name = String(technique.name || 'this coffee approach').trim();
     const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;
-    return `Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`;
+    return withExplanation(`Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`);
   }
   const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
   const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
@@ -156,7 +166,7 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
           : ['dose', 'water', 'grind', 'temperature', 'ratio'].includes(rawControl) ? rawControl : null;
   const before = control ? proposalValue(artifact.before, control) : null;
   const after = control ? proposalValue(artifact.after, control) : null;
-  if (!control || before == null || after == null) return 'I’ve prepared one recipe change for you to review. It has not been applied.';
+  if (!control || before == null || after == null) return withExplanation('I’ve prepared one recipe change for you to review. It has not been applied.');
   if (['dose', 'water', 'ratio'].includes(control)) {
     const beforeRatio = recipeRatio(artifact.before);
     const afterRatio = recipeRatio(artifact.after);
@@ -166,7 +176,7 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
         : control === 'water' && proposalValue(artifact.after, 'dose') != null
           ? ` At your current ${proposalValue(artifact.after, 'dose')} g dose, that's ${after} g of water.`
           : '';
-      return `Try a 1:${displayRatio(afterRatio)} ratio instead of 1:${displayRatio(beforeRatio)}.${detail} Open the recipe to choose your dose and review the pours; nothing is saved yet.`;
+      return withExplanation(`Try a 1:${displayRatio(afterRatio)} ratio instead of 1:${displayRatio(beforeRatio)}.${detail} Open the recipe to choose your dose and review the pours; nothing is saved yet.`);
     }
   }
   const unit = proposalUnit(control);
@@ -175,7 +185,7 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
     .slice(0, 3);
   const unchangedList = unchanged.length > 2 ? `${unchanged.slice(0, -1).join(', ')}, and ${unchanged.at(-1)}` : unchanged.join(' and ');
   const unchangedText = unchanged.length ? ` ${unchangedList[0].toUpperCase()}${unchangedList.slice(1)} stay${unchanged.length === 1 ? 's' : ''} the same.` : '';
-  return `Prepared: change the ${control} from ${before}${unit} to ${after}${unit}.${unchangedText} Review it before applying.`;
+  return withExplanation(`Prepared: change the ${control} from ${before}${unit} to ${after}${unit}.${unchangedText} Review it before applying.`);
 }
 
 function appendHandoff(current, handoff) {
@@ -287,18 +297,21 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const result = blockedResult || await tools.call(request.name, request.args || {});
       throwIfCancelled();
       pendingTools.delete(pending);
-      toolEvidence.push({ callId: request.callId, name: request.name, result });
+      const safeResult = result?.artifact && Object.hasOwn(result.artifact, 'explanation')
+        ? { ...result, artifact: { ...result.artifact, explanation: safeProposalExplanation(result.artifact.explanation) } }
+        : result;
+      toolEvidence.push({ callId: request.callId, name: request.name, result: safeResult });
       if (READS.has(request.name)) trace.reads.push({ name: request.name, at: new Date().toISOString() });
-      if (result?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== result.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: result.coffeeRef });
-      if (result?.proposal?.id) proposalIds.push(result.proposal.id);
-      send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result });
+      if (safeResult?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== safeResult.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: safeResult.coffeeRef });
+      if (safeResult?.proposal?.id) proposalIds.push(safeResult.proposal.id);
+      send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result: safeResult });
       throwIfCancelled();
-      if (result?.artifact) {
-        artifacts.push(JSON.parse(JSON.stringify(result.artifact)));
-        send('artifact_ready', { artifact: result.artifact });
+      if (safeResult?.artifact) {
+        artifacts.push(JSON.parse(JSON.stringify(safeResult.artifact)));
+        send('artifact_ready', { artifact: safeResult.artifact });
         pending.artifactEmitted = true;
       }
-      return { callId: request.callId, name: request.name, result };
+      return { callId: request.callId, name: request.name, result: safeResult };
     } catch (error) {
       if ((signal?.aborted || error?.code === 'turn_cancelled') && proposalStateBefore && !pending.artifactEmitted) {
         Object.assign(context.proposalState, proposalStateBefore);

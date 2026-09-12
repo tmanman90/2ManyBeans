@@ -16,7 +16,7 @@ import {
   listV60SwitchTechniqueReferences,
   listV60TechniqueOptions,
 } from '../../src/lib/ruphus/techniqueOptions.js';
-import { createRecipePreview } from '../../src/lib/ruphus/recipePreview.js';
+import { createRecipePreview, normalizePreviewGrind } from '../../src/lib/ruphus/recipePreview.js';
 import { appendLedger, ledgerEntryFromEvidence, MAX_LEDGER_BYTES, publicEvidence, readCoffeeEvidence } from './ruphusEvidence.js';
 import { answeredSensoryClarifier } from './ruphusSensoryAnswer.js';
 import { isAlternativeRequest, sameRecipeReview } from '../../src/lib/ruphus/proposalContinuity.js';
@@ -30,6 +30,12 @@ const strictObject = (properties) => ({ type: 'object', properties: Object.fromE
 const RECIPE_STEP = strictObject({ time: { type: 'string' }, timeSeconds: { type: 'number' }, action: { type: 'string' }, waterTotal: { type: 'number' }, name: { type: 'string' }, phase: { type: 'string' }, untimed: { type: 'boolean' } });
 const RECIPE_PROPERTIES = Object.freeze({ method: { type: 'string' }, device: { type: 'string' }, mode: { type: 'string' }, variant: { type: 'string' }, v60Variant: { type: 'string' }, v60Size: { type: 'string' }, kalitaSize: { type: 'string' }, configurationKey: { type: 'string' }, doseProfile: { type: 'string' }, coffeeGrams: { type: 'number' }, userCoffeeGrams: { type: 'number' }, dose: { type: 'number' }, waterGrams: { type: 'number' }, waterMilliliters: { type: 'number' }, water: { type: 'number' }, ratio: { anyOf: [{ type: 'number' }, { type: 'string' }] }, isIced: { type: 'boolean' }, hotWaterGrams: { type: 'number' }, recipeIceGrams: { type: 'number' }, iceGrams: { type: 'number' }, initialBrewIceGrams: { type: 'number' }, postBrewIceGrams: { type: 'number' }, finalBeverageWaterTargetGrams: { type: 'number' }, hotExtractionRatio: { anyOf: [{ type: 'number' }, { type: 'string' }] }, finalBeverageRatio: { anyOf: [{ type: 'number' }, { type: 'string' }] }, requiresCompleteMelt: { type: 'boolean' }, servingIceExcluded: { type: 'boolean' }, measuredMeltedIceGrams: { type: 'number' }, actualFinalBeverageMassGrams: { type: 'number' }, actualFinalTemperatureC: { type: 'number' }, icePlacement: { type: 'string' }, iceTiming: { type: 'string' }, temperature: { anyOf: [{ type: 'number' }, { type: 'object' }] }, temperatureC: { type: 'number' }, grind: { anyOf: [{ type: 'string' }, { type: 'object' }] }, technique: { type: 'string' }, techniqueLabel: { type: 'string' }, techniqueInstruction: { type: 'string' }, chillingMethod: { type: 'string' }, recommendedChillingMethod: { type: 'string' }, chillingMethodOverrideApplied: { type: 'boolean' }, steps: { type: 'array', items: RECIPE_STEP }, stages: { type: 'array', items: { type: 'object' } }, prepSteps: { type: 'array', items: RECIPE_STEP }, postBrewSteps: { type: 'array', items: RECIPE_STEP }, aftercare: { type: 'array', items: { type: 'string' } }, applicability: { type: 'object' }, finish: { type: 'object' }, sourceId: { type: 'string' }, sourceRevision: { type: 'number' }, sourceNativeWaterUnit: { type: 'string' }, sourceFormatVersion: { type: 'string' }, sourceConfiguration: { type: 'object' }, sourceLineage: { type: 'object' }, sourceProjection: { type: 'object' }, waterTemp: strictObject({ celsius: { type: 'number' }, fahrenheit: { type: 'number' } }), grindSize: strictObject({ setting: { anyOf: [{ type: 'number' }, { type: 'string' }] }, microns: { type: 'number' }, description: { type: 'string' }, grinderSpecific: { type: 'boolean' }, sourceExact: { type: 'boolean' } }), totalBrewTimeSeconds: { type: 'number' }, totalBrewTime: { type: 'string' }, guideTargetSeconds: { type: 'number' }, guideRangeSeconds: { type: 'array', items: { type: 'number' } }, timerReady: { type: 'boolean' }, phaseContractVersion: { type: 'number' }, candidate: { type: 'boolean' }, doseTimingPolicy: { type: 'string' }, timingProfile: { type: 'string' }, sourceRegistryVersion: { type: 'string' }, engineVersion: { type: 'string' }, rulesVersion: { type: 'string' }, reasonCodes: { type: 'array', items: { type: 'string' } }, fallback: { type: 'boolean' }, generationStatus: { type: 'string' }, reasoning: { type: 'string' }, tips: { type: 'string' }, title: { type: 'string' } });
 const PROPOSAL_CONTROLS = Object.freeze(['dose', 'water', 'grind', 'temperature', 'ratio']);
+const safeProposalExplanation = (value) => {
+  if (typeof value !== 'string') return null;
+  const text = value.trim().replace(/\s+/g, ' ');
+  if (!text || text.length > 280 || /[<>`]/.test(text)) return null;
+  return text;
+};
 const cleanInventory = (coffee) => Object.fromEntries(['refKey', 'name', 'roaster', 'origin', 'region', 'process', 'status', 'jarSlot', 'recipes'].filter((key) => Object.hasOwn(coffee || {}, key)).map((key) => [key, clone(coffee[key])]));
 const isCurrentCoffeeReference = (value) => /^(?:this|current)(?:\s+(?:coffee|bean|one))?$/i.test(String(value || '').trim());
 const displaySlot = (slot) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[slot] || slot);
@@ -138,6 +144,9 @@ function doseRecipeIntent(before, dose) {
     ...(Number.isFinite(before.waterTemp?.celsius) ? { targetTemperatureC: before.waterTemp.celsius } : {}),
   };
 }
+function v60DoseProfile(dose) {
+  return dose <= 18 ? 'small-12-18' : dose <= 24 ? 'medium-19-24' : 'large-25-30';
+}
 function scaleBrewWaterCopy(value, scale) {
   return String(value || '').replace(/\b(\d+(?:\.\d+)?)\s*g\b/gi, (_match, amount) => `${Math.round(Number(amount) * scale)}g`);
 }
@@ -195,6 +204,22 @@ function generatedDoseRecipe(before, slotKey, dose) {
       ...(typeof step.action === 'string' ? { action: scaleBrewWaterCopy(step.action, waterScale) } : {}),
     }));
   }
+  return result;
+}
+function completeDosePreview(before, preview, dose) {
+  const result = { ...clone(before), ...clone(preview) };
+  for (const key of ['coffeeGrams', 'userCoffeeGrams', 'dose']) if (Object.hasOwn(before, key)) result[key] = dose;
+  const waterAliases = {
+    waterGrams: preview.waterGrams,
+    water: preview.waterGrams,
+    hotWaterGrams: preview.hotWaterGrams,
+    recipeIceGrams: preview.recipeIceGrams,
+    iceGrams: preview.iceGrams,
+    initialBrewIceGrams: preview.initialBrewIceGrams,
+    postBrewIceGrams: preview.postBrewIceGrams,
+    finalBeverageWaterTargetGrams: preview.finalBeverageWaterTargetGrams,
+  };
+  for (const [key, value] of Object.entries(waterAliases)) if (Object.hasOwn(before, key) && value != null) result[key] = value;
   return result;
 }
 function conditionalSensoryClarification(state) {
@@ -943,7 +968,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       try {
         const beforeRecipe = target.before || {};
         const dose = Number(beforeRecipe.coffeeGrams ?? beforeRecipe.userCoffeeGrams ?? beforeRecipe.dose);
-        requestedPatch = createRecipePreview({ recipe: beforeRecipe, dose, ratio: args.change.value, allowIced: true });
+        requestedPatch = createRecipePreview({ recipe: beforeRecipe, dose, ratio: args.change.value, configuration: { grinder: snapshot.setup?.grinder }, allowIced: true });
       } catch (error) {
         return { ok: false, code: error.code || 'invalid_ratio_preview', message: error.message };
       }
@@ -1000,14 +1025,37 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       : mergeRecipePatch(before, requestedPatch);
     if (args.change?.control === 'dose') {
       try {
+        const requestedDose = Number(args.change.value);
+        const sourceDose = Number(before.coffeeGrams ?? before.userCoffeeGrams ?? before.dose);
+        const v60ProfileChanged = slotKey === 'v60_hot'
+          && String(before.variant || before.v60Variant || '').toLowerCase() !== 'switch'
+          && v60DoseProfile(sourceDose) !== v60DoseProfile(requestedDose);
         after = hasManualSourceProjection(before)
-          ? createRecipePreview({ recipe: before, dose: Number(args.change.value) })
-          : generatedDoseRecipe(before, slotKey, Number(args.change.value)) || after;
+          ? createRecipePreview({ recipe: before, dose: requestedDose })
+          : v60ProfileChanged
+            ? completeDosePreview(before, createRecipePreview({ recipe: before, dose: requestedDose, configuration: { grinder: snapshot.setup?.grinder } }), requestedDose)
+            : generatedDoseRecipe(before, slotKey, requestedDose) || after;
       } catch (error) {
         return { ok: false, code: error.code || 'invalid_dose_preview', message: error.message };
       }
     }
     const grinder = snapshot.setup?.grinder;
+    // An invalid setting supplied as the requested grind is a user control
+    // error and must remain rejected. Normalize only inherited legacy values
+    // on another control's derived preview.
+    const explicitGrindRequest = args.change?.control === 'grind'
+      || Object.hasOwn(args.afterRecipe || {}, 'grind')
+      || Object.hasOwn(args.afterRecipe?.grindSize || {}, 'setting');
+    const normalizedPreview = explicitGrindRequest
+      ? { recipe: after, normalization: null }
+      : normalizePreviewGrind(after, { grinder });
+    after = normalizedPreview.recipe;
+    if (normalizedPreview.normalization) {
+      after.recipePreview = {
+        ...(after.recipePreview || {}),
+        grindNormalization: normalizedPreview.normalization,
+      };
+    }
     const previousGrind = before?.grindSize?.setting ?? before?.grind;
     const nextGrind = after.grindSize?.setting ?? after.grind;
     // A source-backed manual experiment owns its native grind descriptor. It
@@ -1036,7 +1084,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (isAlternativeRequest(context.userText) && (context.__ruphusPriorProposals || []).some(item => item.coffeeId === coffeeId && item.slotKey === slotKey && sameRecipeReview(item.after, after))) {
       return { ok: false, code: 'duplicate_alternative', message: 'You already offered that recipe. Choose a genuinely different supported adjustment, or explain why no other supported option is appropriate. Do not present the same recipe as new.' };
     }
-    const paths = args.change?.control === 'dose' ? ['dose'] : changedPaths(before, after).filter(Boolean);
+    const allPaths = changedPaths(before, after)
+      .filter(Boolean)
+      .filter(path => !path.startsWith('recipePreview') && !path.startsWith('ratioIntent'));
+    const mechanicalPaths = allPaths.filter(path => ['grind', 'grindSize'].includes(String(path).split('.')[0]));
+    const paths = args.change?.control === 'dose'
+      ? [...new Set(['dose', ...mechanicalPaths])]
+      : allPaths;
     const controls = techniqueExperiment ? ['technique'] : args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
     if (recipeSourceHash(recipe, slotKey) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (!techniqueExperiment && (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0]))) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
@@ -1045,7 +1099,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
     const coffeeName = snapshot.coffees?.find((item) => item.refKey === args.coffeeRef)?.name
       || (context.turnBinding?.coffeeRef === args.coffeeRef ? context.turnBinding.coffeeName : null);
-    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: techniqueExperiment ? ['technique', ...paths] : paths, ...(experimentMetadata ? { techniqueExperiment: experimentMetadata } : {}), actions: [], recipeHash: canonicalHash(after), sourceHash: target.sourceHash });
+    const explanation = safeProposalExplanation(args.explanation);
+    const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: techniqueExperiment ? ['technique', ...paths] : paths, ...(experimentMetadata ? { techniqueExperiment: experimentMetadata } : {}), ...(explanation ? { explanation } : { explanation: null }), actions: [], recipeHash: canonicalHash(after), sourceHash: target.sourceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
     if (context.proposalState) {
       context.proposalState.proposalIssued = true;
@@ -1070,7 +1125,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
     if (name === 'read_recipe') return { type: 'function', name, description: 'Read one exact recipe slot when its source data is needed. read_coffee_evidence.selectedRecipe already supplies the resolved recipe numbers and full schedule; reuse it when present. If selectedRecipe is absent, read the requested slot before concluding its recipe is unavailable.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
     if (name === 'read_technique_options') return { type: 'function', name, description: 'Read source-backed hot V60, Kalita Wave, or ribbed Switch recipes for this coffee. Interpret the user’s conversational intent, not keywords: recipe_preview means they want something to brew, a recipe suggestion, an alternative, or a corrected-equipment recipe; information means explanation or comparison only. A preview does not save or start anything and needs no extra yes. For recipe_preview, select an exact executable option and call propose_recipe_change in this turn. Use the requested equipment; no matching saved recipe is required. Reference-only sources remain discussion-only.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot', 'kalita_hot'] }, intent: { type: 'string', enum: ['recipe_preview', 'information'] } }, required: ['coffeeRef', 'slot', 'intent'], additionalProperties: false } };
-    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, or one explicitly selected source-backed technique experiment. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: nullable({ type: 'string', enum: ['recipe_preview', 'information'] }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })) }, required: ['coffeeRef', 'slot', 'intent', 'change', 'experiment'], additionalProperties: false } };
+    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, or one explicitly selected source-backed technique experiment. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: nullable({ type: 'string', enum: ['recipe_preview', 'information'] }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'intent', 'change', 'experiment', 'explanation'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
 }

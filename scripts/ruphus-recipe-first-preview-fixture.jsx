@@ -18,7 +18,7 @@ const techniqueMode = new URLSearchParams(window.location.search).has('technique
 const sourceMode = new URLSearchParams(window.location.search).has('source');
 const sourceOriginalMode = new URLSearchParams(window.location.search).has('source-original');
 const sourceImmersionMode = sourceMode && new URLSearchParams(window.location.search).has('source-immersion');
-const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : sourceImmersionMode ? 'source-immersion-preview-fixture' : 'source-hario-preview-fixture') : 'changed-ratio-fixture';
+const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : sourceImmersionMode ? 'source-immersion-preview-fixture' : 'source-hario-preview-fixture') : new URLSearchParams(window.location.search).has('dose-error') ? 'dose-error-fixture' : 'changed-ratio-fixture';
 const runtimeTurn = window.__ruphusTechniqueTurn;
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
@@ -27,11 +27,15 @@ const sourceOption = sourceMode ? generateManualSourceTechniqueOption(sourceOrig
   ...(sourceImmersionMode ? { dose: 15 } : {}),
 }) : null;
 const proposed = sourceOption?.recipe || (selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 }));
+if (new URLSearchParams(window.location.search).has('grind-normalization')) {
+  proposed.grindSize = { ...proposed.grindSize, setting: '5.9' };
+}
 const artifact = sourceMode
   ? { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'v60_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, sourceRevisionId: String(sourceOption.recipe.sourceRevision), sourceHash: `${sourceOption.recipe.sourceId}-revision-${sourceOption.recipe.sourceRevision}`, techniqueExperiment: { name: sourceOption.recipe.techniqueLabel, kind: 'manual_source_technique', sourceId: sourceOption.recipe.sourceId } }
   : runtimeTurn?.frames?.find(frame => frame.type === 'artifact_ready')?.artifact || { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
+const forceDoseError = new URLSearchParams(window.location.search).has('dose-error');
 const historical = new URLSearchParams(window.location.search).has('historical');
 if (new URLSearchParams(window.location.search).has('empty-slot')) {
   artifact.before = null;
@@ -47,6 +51,7 @@ function Fixture() {
   const [sent, setSent] = useState(!runtimeTurn);
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
+  const [previewDoseError, setPreviewDoseError] = useState(null);
   const [previewStale, setPreviewStale] = useState(false);
   const [startCount, setStartCount] = useState(0);
   const [saveCount, setSaveCount] = useState(0);
@@ -57,16 +62,20 @@ function Fixture() {
     previewOriginRef.current = document.activeElement;
     const draft = readRecipePreviewDraft({ uid, proposalId });
     const dose = draft?.dose || proposed.coffeeGrams;
-    const recipe = createRecipePreview({ recipe: proposed, dose });
+    const recipe = createRecipePreview({ recipe: proposed, dose, configuration: { grinder: 'fellow-ode-gen2' } });
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
     setPreview({ recipe, dose });
   };
   const closePreview = () => {
-    setPreview(null); setPreviewError(null); setPreviewStale(false);
+    setPreview(null); setPreviewError(null); setPreviewDoseError(null); setPreviewStale(false);
     requestAnimationFrame(() => previewOriginRef.current?.focus());
   };
   const changeDose = (dose) => {
-    const recipe = createRecipePreview({ recipe: proposed, dose });
+    if (forceDoseError) {
+      setPreviewDoseError('This recipe supports 12–18 g. Choose a dose in that range, or ask for a larger recipe.');
+      return;
+    }
+    const recipe = createRecipePreview({ recipe: proposed, dose, configuration: { grinder: 'fellow-ode-gen2' } });
     writeRecipePreviewDraft({ uid, proposalId, coffeeId: bean.id, slotKey: artifact.slotKey, dose, sourceRevisionId: 'revision-1' });
     setPreview({ recipe, dose });
   };
@@ -107,6 +116,7 @@ function Fixture() {
         userCoffeeGrams={preview?.dose}
         onCoffeeGramsChange={changeDose}
         previewError={previewError}
+        previewDoseError={previewDoseError}
         previewStale={previewStale}
         onPreviewStart={() => {
           if (forceStartStale) {
