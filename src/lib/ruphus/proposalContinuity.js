@@ -83,9 +83,9 @@ function safeTextList(value, max = 180) {
   return result.length ? result : null;
 }
 
-function sourceWaterFromObject(value) {
+function sourceWaterFromObject(value, fallbackUnit = null) {
   if (!isObject(value)) return null;
-  const explicit = typedQuantity(value.value, value.unit);
+  const explicit = typedQuantity(value.value, value.unit || fallbackUnit);
   if (explicit) return explicit;
   const grams = typedQuantity(value.brewGrams, 'g');
   if (grams) return grams;
@@ -98,13 +98,28 @@ function recipeWater(recipe, projection) {
     // an unknown quantity; do not fall through to an adapted legacy field.
     return sourceWaterFromObject(projection.water);
   }
-  const executionWater = sourceWaterFromObject(recipe?.sourceExecution?.water);
+  // Some persisted source proposals retain the source-native unit marker but
+  // only have the older top-level waterGrams alias after serialization. The
+  // marker is an authenticated source field, so preserve that unit instead of
+  // presenting the alias as a mass to the provider.
+  const nativeUnit = NATIVE_WATER_UNITS.has(recipe?.sourceNativeWaterUnit)
+    ? recipe.sourceNativeWaterUnit
+    : null;
+  const executionWater = sourceWaterFromObject(recipe?.sourceExecution?.water, nativeUnit);
   if (executionWater) return executionWater;
-  const directWater = sourceWaterFromObject(recipe?.water);
+  const directWater = sourceWaterFromObject(recipe?.water, nativeUnit);
   if (directWater) return directWater;
+  if (nativeUnit === 'mL') {
+    if (recipe?.waterMilliliters != null) return typedQuantity(recipe.waterMilliliters, 'mL');
+    if (recipe?.waterGrams != null) return typedQuantity(recipe.waterGrams, 'mL');
+  }
+  if (nativeUnit === 'g') {
+    if (recipe?.waterGrams != null) return typedQuantity(recipe.waterGrams, 'g');
+    if (recipe?.waterMilliliters != null) return typedQuantity(recipe.waterMilliliters, 'mL');
+  }
   if (recipe?.waterMilliliters != null) return typedQuantity(recipe.waterMilliliters, 'mL');
   if (recipe?.waterGrams != null) return typedQuantity(recipe.waterGrams, 'g');
-  if (recipe?.water != null) return typedQuantity(recipe.water, recipe.waterUnit === 'mL' ? 'mL' : 'g');
+  if (recipe?.water != null) return typedQuantity(recipe.water, recipe.waterUnit === 'mL' ? 'mL' : nativeUnit || 'g');
   return null;
 }
 
@@ -407,7 +422,7 @@ export function recentProposalReviews(session, refs = {}, binding = {}) {
   let ordinal = 0;
   const reviews = messages
     .flatMap(message => Array.isArray(message?.artifacts) ? message.artifacts : [])
-    .filter(item => item?.type === 'recipe_proposal' && isObject(item.before) && isObject(item.after))
+    .filter(item => item?.type === 'recipe_proposal' && item?.historyOnly !== true && isObject(item.before) && isObject(item.after))
     .map(item => {
       const coffeeRef = ownerRefs.find(([, coffeeId]) => coffeeId === item.coffeeId)?.[0];
       if (!coffeeRef || (binding.coffeeRef && binding.coffeeRef !== coffeeRef) || (binding.slot && binding.slot !== item.slotKey)) return null;

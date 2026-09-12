@@ -171,6 +171,34 @@ test('Kalita 185 route preserves the 185 hardware boundary and selects a named s
   assert.ok(artifact.after.stages.every((stage) => stage.trigger));
 });
 
+test('missing or wrong-size Kalita correction offers the existing explicit generation entry', async () => {
+  const recipe155 = generateKalitaRecipe({}, { dose: 15, size: '155' });
+  const correctionContext = contextFor({ userText: 'Actually I mean the 185.', recipe: recipe155 });
+  const correction = await toolsFor(correctionContext, recipe155).call('read_technique_options', { coffeeRef: 'c1', slot: 'kalita_hot' });
+
+  assert.equal(correction.ok, true);
+  assert.equal(correction.actionable, false);
+  assert.deepEqual(correction.options, []);
+  assert.deepEqual(correction.recovery, { kind: 'existing_recipe_generation', slot: 'kalita_hot', kalitaSize: '185' });
+  assert.match(correction.message, /saved hot Kalita 155, not a 185 base/i);
+  assert.match(correction.message, /open Rotation, tap this coffee's Brew, choose Kalita 185/i);
+  assert.doesNotMatch(correction.message, /did you brew 185/i);
+
+  const missingContext = contextFor({ userText: 'Show me a different Kalita 185 technique.', recipe: null });
+  const missingTools = createRuphusTools({
+    uid: 'owner-1',
+    context: missingContext,
+    readers: { readRecipe: async () => null },
+  });
+  const missing = await missingTools.call('read_technique_options', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  assert.equal(missing.ok, true);
+  assert.equal(missing.actionable, false);
+  assert.deepEqual(missing.options, []);
+  assert.deepEqual(missing.recovery, { kind: 'existing_recipe_generation', slot: 'kalita_hot', kalitaSize: '185' });
+  assert.match(missing.message, /open Rotation, tap this coffee's Brew, choose Kalita 185/i);
+  assert.match(missing.message, /Nothing was saved/i);
+});
+
 test('Kalita source route fails closed for a mismatched size or filter instead of adapting hardware', async () => {
   const base = generateKalitaRecipe({}, { dose: 25, size: '185' });
   const wrongSize = { ...base, kalitaSize: '165', configurationKey: 'kalita:165:wave-paper:hot' };

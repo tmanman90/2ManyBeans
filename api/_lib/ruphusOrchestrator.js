@@ -1,6 +1,6 @@
 import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION } from '../../src/lib/ruphus/contracts.js';
 import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
-import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
+import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
@@ -35,6 +35,32 @@ function contextualTechniqueReadRequired({ userText = '', context = null, toolEv
     && item.result?.coffeeRef === target.coffeeRef
     && item.result?.method?.slot === target.slot);
   return Boolean(evidence);
+}
+
+function historicalTechniqueTarget(context) {
+  const target = proposalTarget(context?.proposalState);
+  if (target.coffeeRef && target.slot) return target;
+  const binding = context?.__ruphusTurnBinding;
+  return binding?.status === 'locked' && binding.coffeeRef && binding.techniqueSlot
+    ? { coffeeRef: binding.coffeeRef, slot: binding.techniqueSlot }
+    : null;
+}
+
+function historicalTechniqueReadRequired({ userText = '', context = null, toolEvidence = [] } = {}) {
+  if (!isHistoricalTechniqueInspectionRequest(userText || context?.userText || '')) return null;
+  const binding = context?.__ruphusTurnBinding;
+  const target = historicalTechniqueTarget(context);
+  if (binding?.status !== 'locked' || !binding.techniqueSlot || !target
+    || binding.coffeeRef !== target.coffeeRef || binding.techniqueSlot !== target.slot) return null;
+  const existingRead = [...toolEvidence].reverse().find((item) => item?.name === 'read_technique_options'
+    && item.result?.coffeeRef === target.coffeeRef
+    && item.result?.slot === target.slot);
+  if (existingRead) return null;
+  const review = (Array.isArray(context?.proposalReviews) ? context.proposalReviews : [])
+    .find((item) => item?.coffeeRef === target.coffeeRef && item?.slot === target.slot
+      && typeof item?.sourceId === 'string' && item.sourceId
+      && (item?.proposalId || item?.artifactId));
+  return review ? target : null;
 }
 
 function cancelledError() {
@@ -283,6 +309,25 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
       throwIfCancelled();
       if (!calls.length) {
+        // “Show me the first one again” is an inspection request, not a fresh
+        // technique experiment. If the provider answers with prose after the
+        // authenticated history binding, load the exact prior artifact once
+        // and finish the turn so the UI receives its existing read-only
+        // inspector affordance without another model round.
+        const historyTarget = historicalTechniqueReadRequired({ userText, context, toolEvidence });
+        if (historyTarget
+          && toolRounds < maxToolRounds
+          && readCalls < MAX_READS_PER_TURN
+          && toolCalls < maxToolCalls) {
+          const request = { callId: 'historical-technique-inspection', name: 'read_technique_options', args: { coffeeRef: historyTarget.coffeeRef, slot: historyTarget.slot } };
+          toolRounds += 1;
+          readCalls += 1;
+          toolCalls += 1;
+          text = '';
+          const historicalRead = await runTool(request);
+          text = historicalRead.result?.message || 'I reopened the earlier technique as a read-only recipe. Your saved recipe is unchanged.';
+          break;
+        }
         // A bare same-session technique follow-up has an authenticated target
         // from its delivered card, but the provider may answer after evidence
         // without asking for the option reader. Spend the existing second
@@ -451,6 +496,11 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
+      const historicalRead = results.find((item) => item.name === 'read_technique_options' && item.result?.historical === true);
+      if (historicalRead) {
+        text = historicalRead.result.message || 'I reopened the earlier technique as a read-only recipe. Your saved recipe is unchanged.';
+        break;
+      }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
       if (proposed) {
         const difference = proposed.result.artifact?.techniqueExperiment?.differences?.[0];

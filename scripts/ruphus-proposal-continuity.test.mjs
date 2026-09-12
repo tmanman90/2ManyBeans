@@ -75,6 +75,36 @@ test('review summary keeps author ranges and native Fahrenheit typed', () => {
   assert.deepEqual(summary.steps[0].waterTotal, { min: 40, max: 50 });
 });
 
+test('provider review serialization preserves a source-native mL marker over a legacy grams alias', () => {
+  const sourceCard = (id, name, water) => ({
+    id, type: 'recipe_proposal', status: 'proposed', coffeeId: 'coffee-1', slotKey: 'v60_hot',
+    before: { coffeeGrams: 15, waterGrams: 250 },
+    after: {
+      coffeeGrams: 15,
+      waterGrams: water,
+      sourceNativeWaterUnit: 'mL',
+      techniqueLabel: name,
+      sourceLineage: { sourceId: id, familyId: id },
+      steps: [{ action: `Pour to ${water}mL`, waterTotal: water }],
+    },
+    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: id, familyId: id, sourceId: id, name },
+  });
+  const reviews = recentProposalReviews({ boundaryIndex: 0, messages: [
+    { artifacts: [sourceCard('matt-winton-hybrid', 'Matt Winton hybrid', 225)] },
+    { artifacts: [sourceCard('hario-full-immersion', 'HARIO full immersion', 183)] },
+  ] }, { c1: 'coffee-1' }, { coffeeRef: 'c1', slot: 'v60_hot' });
+
+  assert.deepEqual(reviews.map((review) => review.proposed.water), [
+    { value: 225, unit: 'mL' },
+    { value: 183, unit: 'mL' },
+  ]);
+  assert.deepEqual(reviews.map((review) => review.proposed.steps[0].water), [
+    { value: 225, unit: 'mL' },
+    { value: 183, unit: 'mL' },
+  ]);
+  assert.equal(reviews.some((review) => review.proposed.steps[0].waterTotal), false);
+});
+
 test('reviews carry exact authenticated proposal refs and source projection while excluding foreign and archived history', () => {
   const first = {
     id: 'proposal-first', type: 'recipe_proposal', status: 'superseded', coffeeId: 'coffee-1', slotKey: 'v60_hot', sessionId: 'turn-1', sourceRevisionId: 'revision-first', sourceHash: 'source-first', recipeHash: 'recipe-first',
@@ -88,7 +118,7 @@ test('reviews carry exact authenticated proposal refs and source projection whil
   };
   const reviews = recentProposalReviews({ boundaryIndex: 0, messages: [
     { artifacts: [{ ...first, coffeeId: 'foreign-coffee' }, first] },
-    { artifacts: [second] },
+    { artifacts: [second, { ...first, status: 'superseded', historyOnly: true }] },
   ] }, { c1: 'coffee-1' });
   assert.deepEqual(reviews.map(review => review.proposalId), ['proposal-first', 'proposal-second']);
   assert.deepEqual(reviews.map(review => review.ordinal), [1, 2]);
@@ -108,6 +138,9 @@ test('new-chat boundary and explicit historical inspection do not create a comma
   assert.match(chat, /const handleHistoricalProposalInspect = useCallback/);
   assert.match(chat, /onInspect=\{handleHistoricalProposalInspect\}/);
   assert.match(chat, /data-historical-inspection="true"/);
+  const card = read('src/components/chat/artifacts/RecipeProposalCard.jsx');
+  assert.match(card, /const viewRecipe = status === 'proposed' \? onPreview : onInspect/);
+  assert.match(card, /const showActions = proposal\.status === 'proposed'/);
   const handler = chat.slice(chat.indexOf('const handleHistoricalProposalInspect'), chat.indexOf('const closeHistoricalProposal'));
   assert.doesNotMatch(handler, /handleRuphusAction|runRuphusAction|restoreRecipePreviewAction|writeRecipePreviewDraft/);
   assert.match(chat, /setHistoricalProposal\(null\)/);

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { createRuphusTools, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { addRuphusSourceFormatCapability, RUPHUS_SOURCE_FORMAT_CAPABILITY } from '../src/lib/ruphus/streamAgent.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
+import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
+import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 
 const refs = { c1: 'coffee-1' };
 
@@ -135,6 +137,98 @@ test('an explicit new Switch technique name is not mistaken for the prior HARIO 
   assert.equal(read.actionable, true);
   assert.deepEqual(read.options.map((option) => option.sourceId), ['hario-switch-03-instruction-manual-36-2023']);
   assert.notEqual(read.options[0].sourceId, priorSourceId);
+});
+
+test('ordinal historical Switch inspection re-emits the chronological card as a read-only frame', async () => {
+  const recipe = generateV60SwitchRecipe({}, { dose: 24, size: '03' });
+  const first = generateManualSourceTechniqueOption('hario-switch-03-matt-winton-hybrid-24-2022', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 15,
+  });
+  const second = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 15,
+  });
+  const firstSourceId = first.sourceId;
+  const secondSourceId = second.sourceId;
+  const card = (id, option) => ({
+    id, type: 'recipe_proposal', status: 'attempt_created', coffeeId: 'coffee-1', coffeeName: 'El Vergel', slotKey: 'v60_hot',
+    before: recipe, after: option.recipe,
+    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: option.id, familyId: option.familyId, sourceId: option.sourceId, name: option.name, differences: option.differences },
+    actions: [],
+  });
+  const firstCard = card('proposal-first', first);
+  const secondCard = card('proposal-second', second);
+  const context = contextFor({ userText: 'Show me the first one again.', recipe });
+  context.proposalReviews = [
+    { coffeeRef: 'c1', slot: 'v60_hot', sourceId: firstSourceId, familyId: first.familyId, name: first.name, proposalId: firstCard.id },
+    { coffeeRef: 'c1', slot: 'v60_hot', sourceId: secondSourceId, familyId: second.familyId, name: second.name, proposalId: secondCard.id },
+  ];
+  Object.defineProperty(context, '__ruphusTurnBinding', {
+    value: { status: 'locked', coffeeRef: 'c1', coffee: { id: 'coffee-1', name: 'El Vergel' }, techniqueSlot: 'v60_hot', techniqueKind: 'manual_source_technique' },
+    enumerable: false,
+  });
+  Object.defineProperty(context, '__ruphusPriorProposals', { value: [firstCard, secondCard], enumerable: false });
+
+  assert.equal(isHistoricalTechniqueInspectionRequest(context.userText), true);
+  assert.equal(isExplicitTechniqueReuseRequest(context.userText), false, 'ordinal show remains inspection, not fresh reuse');
+  const calls = [];
+  const rawTools = toolsFor(context, recipe);
+  const tools = { ...rawTools, call: async (...args) => { calls.push(args); return rawTools.call(...args); } };
+  const frames = [];
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'switch-history-inspection', context, userText: context.userText, tools,
+    emit: (frame) => frames.push(frame),
+    provider: { runTurn: async (input) => {
+      providerCalls += 1;
+      assert.equal(providerCalls, 1);
+      assert.deepEqual(input.context.proposalReviews.map((review) => review.sourceId), [firstSourceId, secondSourceId]);
+      assert.ok(Array.isArray(input.tools));
+      return { text: 'The first delivered technique is the hybrid.' };
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(providerCalls, 1);
+  assert.deepEqual(calls.map(([name]) => name), ['read_technique_options']);
+  assert.equal(result.text, `Here’s ${first.name} as a read-only recipe.`);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].id, firstCard.id);
+  assert.equal(result.artifacts[0].status, 'superseded');
+  assert.equal(result.artifacts[0].historyOnly, true);
+  assert.deepEqual(result.artifacts[0].actions, []);
+  assert.deepEqual(result.artifacts[0].after, firstCard.after);
+  assert.equal(result.artifacts[0].after.sourceProjection.water.unit, 'mL');
+  assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1);
+  assert.equal(context.proposalState.target, null, 'historical inspection does not create action target state');
+  assert.equal(context.proposalState.techniqueReady, undefined, 'historical inspection does not authorize a new proposal');
+});
+
+test('standard V60 historical inspection also retains the original non-source-projection card', async () => {
+  const recipe = generateV60Recipe({}, { dose: 20 });
+  const card = {
+    id: 'v60-original', type: 'recipe_proposal', status: 'proposed', coffeeId: 'coffee-1', slotKey: 'v60_hot',
+    before: recipe, after: recipe,
+    techniqueExperiment: { kind: 'v60_technique', techniqueId: 'hoffmann-one-cup', name: 'Hoffmann one-cup' },
+  };
+  const context = contextFor({ userText: 'Show me the first one again.', recipe });
+  context.proposalReviews = recentProposalReviews({ messages: [{ artifacts: [card] }] }, refs);
+  Object.defineProperty(context, '__ruphusPriorProposals', { value: [card], enumerable: false });
+  const frames = [];
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'v60-history', context, userText: context.userText, tools: toolsFor(context, recipe),
+    emit: (frame) => frames.push(frame),
+    provider: { runTurn: async () => {
+      providerCalls += 1;
+      assert.equal(providerCalls, 1, 'read-only history does not need another model round');
+      return { toolCalls: [{ callId: 'read-old-card', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+    } },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.artifacts[0]?.id, card.id);
+  assert.deepEqual(result.artifacts[0]?.after, recipe);
+  assert.equal(result.artifacts[0]?.historyOnly, true);
+  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
+  assert.equal(card.status, 'proposed', 'inspection does not mutate the original card');
 });
 
 test('Switch 03 immersion becomes a native mL timed proposal without generic Switch aliases', async () => {

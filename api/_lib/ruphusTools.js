@@ -32,9 +32,26 @@ const PROPOSAL_CONTROLS = Object.freeze(['dose', 'water', 'grind', 'temperature'
 const cleanInventory = (coffee) => Object.fromEntries(['refKey', 'name', 'roaster', 'origin', 'region', 'process', 'status', 'jarSlot', 'recipes'].filter((key) => Object.hasOwn(coffee || {}, key)).map((key) => [key, clone(coffee[key])]));
 const isCurrentCoffeeReference = (value) => /^(?:this|current)(?:\s+(?:coffee|bean|one))?$/i.test(String(value || '').trim());
 const displaySlot = (slot) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[slot] || slot);
+const requestedKalitaSize = (text) => {
+  const value = String(text || '');
+  // Keep the recovery bound to an explicit size in this turn. The second
+  // branch covers corrections such as “Actually I mean the 185”, where the
+  // brewer name is carried by the prior turn rather than repeated here.
+  return value.match(/\bkalita(?:\s+wave)?\s*(155|185)\b/i)?.[1]
+    || value.match(/\b(?:actually|mean|meant|want|use|for)\b[\s\S]{0,30}\b(155|185)\b/i)?.[1]
+    || null;
+};
+const kalitaGenerationRecovery = ({ requestedSize, savedSize = null } = {}) => {
+  const size = requestedSize || 'requested size';
+  const saved = savedSize ? ` This coffee has a saved hot Kalita ${savedSize}, not a ${size} base.` : '';
+  return `${saved} I won't replace it or prepare a ${size} experiment from the wrong base. To generate the exact ${size} recipe, open Rotation, tap this coffee's Brew, choose Kalita ${size}, and review the generated recipe there. Nothing was saved.`.trim();
+};
 const missingRecipeSummary = (slotKey, available = []) => {
   const otherSlots = available.filter((slot) => slot !== slotKey).map(displaySlot);
-  return `This coffee has no ${displaySlot(slotKey)} recipe${otherSlots.length ? `; it has ${otherSlots.join(' and ')}` : ''}.`;
+  const summary = `This coffee has no ${displaySlot(slotKey)} recipe${otherSlots.length ? `; it has ${otherSlots.join(' and ')}` : ''}.`;
+  return slotKey === 'kalita_hot'
+    ? `${summary} To generate the exact hot Kalita size, open Rotation, tap this coffee's Brew, choose the Wave size, and review the generated recipe there. Nothing was saved.`
+    : summary;
 };
 
 function forbidOwner(args) { if (args?.uid || args?.ownerId || args?.userId) throw Object.assign(new Error('owner identity is server-bound'), { code: 'forged_owner' }); }
@@ -404,6 +421,15 @@ const sourceReferenceOrdinal = (text) => {
   return null;
 };
 
+// Ordinal inspection is a read-only history affordance. Keep it separate from
+// explicit use/try/brew language, which may earn a fresh current-base proposal.
+const TECHNIQUE_HISTORY_INSPECTION = /^(?:(?:show|give|tell|describe|inspect|review|open)\s+(?:me\s+)?)*(?:the\s+)?(?:first|1st|second|2nd|third|3rd|last)\s+(?:one|option|technique|method|card|recipe)(?:\s+(?:again|back|repeat))?[.!?]?$/i;
+
+export function isHistoricalTechniqueInspectionRequest(value = '') {
+  const text = String(value || '').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+  return TECHNIQUE_HISTORY_INSPECTION.test(text);
+}
+
 const TECHNIQUE_REFERENCE_FILLERS = new Set(['a', 'an', 'the', 'try', 'use', 'brew', 'prepare', 'make', 'pick', 'choose', 'revisit', 'repeat', 'show', 'me', 'technique', 'method', 'recipe', 'source', 'for', 'with', 'on', 'using', 'switch', 'v60', 'kalita', 'hario', 'hot', 'iced', 'cold', 'full']);
 const techniqueReferenceTokens = (value) => String(value || '').toLocaleLowerCase().match(/[a-z0-9]+/g) || [];
 const reviewHasNamedTechniqueToken = (text, review) => {
@@ -455,6 +481,44 @@ function explicitSourceReference(context, slotKey, coffeeRef = null) {
     name: review.name || review.sourceId,
     coffeeRef: review.coffeeRef,
   } : { status: 'missing' };
+}
+
+function historicalInspectionArtifact(context, { coffeeRef, coffeeId, slotKey } = {}) {
+  if (!isHistoricalTechniqueInspectionRequest(context?.userText)
+    || !coffeeRef || !coffeeId || !['v60_hot', 'kalita_hot'].includes(slotKey)) return null;
+  const reviews = (Array.isArray(context?.proposalReviews) ? context.proposalReviews : [])
+    .filter((review) => review?.coffeeRef === coffeeRef
+      && review?.slot === slotKey
+      && (review?.sourceId || ['v60_technique', 'manual_source_technique'].includes(review?.techniqueExperiment?.kind))
+      && (review?.proposalId || review?.artifactId));
+  const ordinal = sourceReferenceOrdinal(context.userText);
+  const review = ordinal === -1 ? reviews.at(-1) : ordinal == null ? null : reviews[ordinal];
+  if (!review) return { status: 'missing' };
+  const proposalId = review.proposalId || review.artifactId;
+  const proposals = Array.isArray(context?.__ruphusPriorProposals) ? context.__ruphusPriorProposals : [];
+  const artifact = proposals.find((candidate) => candidate?.type === 'recipe_proposal'
+    && candidate.id === proposalId
+    && candidate.coffeeId === coffeeId
+    && candidate.slotKey === slotKey
+    && ['v60_technique', 'manual_source_technique'].includes(candidate.techniqueExperiment?.kind)
+    && candidate.before && typeof candidate.before === 'object' && !Array.isArray(candidate.before)
+    && candidate.after && typeof candidate.after === 'object' && !Array.isArray(candidate.after));
+  if (!artifact) return { status: 'missing' };
+  const sourceIds = [
+    artifact.techniqueExperiment?.sourceId,
+    artifact.after?.sourceId,
+    artifact.after?.sourceLineage?.sourceId,
+    artifact.after?.sourceProjection?.sourceId,
+  ].filter((value) => typeof value === 'string' && value);
+  if (review.sourceId && !sourceIds.includes(review.sourceId)) return { status: 'missing' };
+  return {
+    status: 'matched',
+    review,
+    // Re-emit the authenticated original by ID, but make this copy inert so
+    // the existing card renderer opens HistoricalRecipeInspector instead of a
+    // mutable preview. The persisted source artifact remains untouched.
+    artifact: { ...clone(artifact), status: 'superseded', historyOnly: true, actions: [] },
+  };
 }
 
 export function diagnosticRecommendationReady(text = '', conversation = []) {
@@ -632,10 +696,63 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const slotKey = args.slot || args.slotKey;
     if (name === 'read_technique_options') {
       if (!['v60_hot', 'kalita_hot'].includes(slotKey)) return { ok: false, actionable: false, code: 'unsupported_technique_brewer', message: 'Technique exploration is available for a saved hot V60, Kalita, or Switch recipe.' };
+      const historical = historicalInspectionArtifact(context, { coffeeRef: args.coffeeRef, coffeeId, slotKey });
+      if (historical?.status === 'matched') {
+        return {
+          ok: true,
+          actionable: false,
+          historical: true,
+          sourceOptions: true,
+          coffeeRef: args.coffeeRef,
+          slot: slotKey,
+          options: [],
+          artifact: historical.artifact,
+          message: `Here’s ${historical.review.name || 'that earlier technique'} as a read-only recipe.`,
+        };
+      }
+      if (historical?.status === 'missing') {
+        return {
+          ok: true,
+          actionable: false,
+          historical: true,
+          sourceOptions: true,
+          coffeeRef: args.coffeeRef,
+          slot: slotKey,
+          options: [],
+          message: 'I could not reopen that earlier technique from this conversation.',
+        };
+      }
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
       if (!recipe || recipe.code) {
-        if (slotKey === 'kalita_hot') return { ok: true, actionable: false, current: null, options: [], message: 'I need a saved hot Kalita recipe before I can prepare a source-backed technique experiment.' };
+        if (slotKey === 'kalita_hot') {
+          const size = requestedKalitaSize(context.userText);
+          return {
+            ok: true,
+            actionable: false,
+            current: null,
+            options: [],
+            ...(size ? { recovery: { kind: 'existing_recipe_generation', slot: slotKey, kalitaSize: size } } : {}),
+            message: size
+              ? kalitaGenerationRecovery({ requestedSize: size })
+              : 'I need a saved hot Kalita recipe before I can prepare a source-backed technique experiment. To generate one, open Rotation, tap this coffee\'s Brew, choose the Wave size, and review the generated recipe there. Nothing was saved.',
+          };
+        }
         return { ok: true, actionable: false, current: null, options: listV60TechniqueOptions().map((option) => ({ ...option, adaptation: safeTechniqueAdaptation(option.adaptation) })), message: 'I can compare these source-backed hot V60 techniques, but I need a saved hot V60 recipe before I can prepare an executable experiment.' };
+      }
+      if (slotKey === 'kalita_hot') {
+        const requestedSize = requestedKalitaSize(context.userText);
+        const savedSize = String(recipe.kalitaSize || recipe.size || '');
+        if (requestedSize && savedSize && requestedSize !== savedSize) {
+          return {
+            ok: true,
+            actionable: false,
+            sourceOptions: true,
+            current: { ...techniqueIdentity(recipe), configuration: clone(sourceConfigurationForRecipe(recipe)) },
+            options: [],
+            recovery: { kind: 'existing_recipe_generation', slot: slotKey, kalitaSize: requestedSize },
+            message: kalitaGenerationRecovery({ requestedSize, savedSize }),
+          };
+        }
       }
       hydrateTechniqueSelection(context, { coffeeRef: args.coffeeRef, coffeeId, slotKey });
       const requestedVariant = slotKey === 'v60_hot' ? explicitMethodVariantFromText(context.userText) : null;
