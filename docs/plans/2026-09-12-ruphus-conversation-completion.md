@@ -1,6 +1,6 @@
 # Ruphus conversational task completion
 
-Status: active. Authority: Tal's September 12 approval of the conversation-completion checklist. This is the current engineering acceptance contract, not a claim of universal perfection.
+Status: engineering acceptance complete, September 12. Authority: Tal's September 12 approval of the conversation-completion checklist. This is the current engineering acceptance contract, not a claim of universal perfection. See [observed acceptance and limitations](../qa/2026-09-12-ruphus-conversation-completion.md). Owner subjective verdict remains pending.
 
 ## Diagnosis and approach
 
