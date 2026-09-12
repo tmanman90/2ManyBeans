@@ -14,28 +14,48 @@ Use [`TECHNIQUE-EXPLORATION-ACCEPTANCE.md`](TECHNIQUE-EXPLORATION-ACCEPTANCE.md)
 for current source, runtime, rendering, live and native evidence. The older
 closeouts below do not prove this expansion or describe its current install.
 
-Current installed private candidate source is `ef9e184`, preview
-`https://twomanybeans-ruphus-14nnc2fzk-tmanman90s-projects.vercel.app`.
+Current installed private candidate source is `03d5045`, preview
+`https://twomanybeans-ruphus-5nu89ddmw-tmanman90s-projects.vercel.app`.
 Built and installed JS content SHA-256 is
-`0c6b70a747d2ab296b44deb5774cb78383a567118b66d00f5c837d972f2327bf`.
+`cf734fc485456d4ae2e9d40184bd205072f503e400cf068e1a8e4f00daea58ec`.
 Dev identity, isolated Firebase, matching preview, updater disabled and channel
 dev were independently verified. Native V60/Kalita paths and Switch hybrid
 card/dose/valve/relaunch paths passed as detailed in the acceptance record.
-Post-trial alternative recovery now delivers the distinct full-immersion card;
-its original36g/440mL guide and post-pour clock were exercised natively.
-The current candidate also fixes adapted-dose stepping and read-only comparison
-binding. Their native replays and remaining conversation/recovery sequences
+Hybrid16g/240mL and immersion16g/195.56mL preview/guide/relaunch,
+V60 comparison/read-only historical inspection, source later-Save/Undo and
+repeated exhaustion passed natively. The remaining recovery/reset sequences
 are still open; the expansion is not PASS.
+
+Latest source `5e5ff5ca719b6332f9722a652f8b10bb57124f87` includes
+`2eca89d` (durable retry metadata and provider-history filtering) and the exact
+post-Save/Undo trial selection correction. Its private preview
+`https://twomanybeans-ruphus-n4rjx5ysi-tmanman90s-projects.vercel.app`
+(`dpl_E9yTHg67WWvdZowEtjWdswpe6oo8`) is verified READY/non-production,
+correct isolated project and exact source SHA. Do not confuse preview readiness
+or build preparation with installation/native acceptance.
+Guarded assets and XcodeBuildMCP simulator build passed8.9s; built JS SHA256
+`e8e7bff18bde5aa3d70ef614eec7a274adde6042c5aa0aa016925895689a1294`.
+Built Dev identity/preview/Firebase/Ask/updater/channel checks pass. Install
+this already-built candidate in place after normal unlock/coordination; do
+not rebuild unnecessarily or mistake it for the older installed03d5045.
+Root42 focused tests pass. The actual rendered failed-turn persistence,
+second persistence, reload and retry journey passes. A zero-paid read-only
+production-tool call against the actual Dev session now returns the exact
+16g/195.56mL prior trial with no invalid repeat-save control.
 
 Tal explicitly authorized `resume simulator`. Use the existing signed-in
 simulator with mirror touch and accessible on-screen keyboard buttons; do not
 enable Send Keyboard Input to Device or reconnect the hardware keyboard.
-No phone or iPhone Mirroring is needed. Computer Use reported the Mac locked
-on September11 before the final interactive replay. Wait for the Mac to be
-unlocked; do not attempt to bypass it. Preserve login and data, install in
-place, and never seed or reset the owner account. Latest successful readback
-compares all 57 original/current snapshots unchanged. The operator credential
-was refreshed through Firebase CLI, independently of the app's login.
+No phone or iPhone Mirroring is needed. Computer Use again reported the Mac
+locked before the final interactive replay. Wait for normal unlock; do not
+bypass it. The simulator UI slot was released to GETUP task
+`01a08c3e-c6cd-76d2-863f-503b7a93b165`; coordinate before reacquiring it.
+Quiet heartbeat `finish-ruphus-simulator-acceptance` checks every10minutes and
+resumes after unlock/coordination. Preserve login and data, install in place,
+and never seed/reset the owner. All brewing content is restored;56 recipes
+match exact hashes, while the undone target differs only in its preexisting
+derived `recipeHash` behavior (see acceptance record). Do not claim57 raw
+hash matches. The operator credential was refreshed separately from app auth.
 
 Execute the eight scoped journeys in
 `scripts/fixtures/ruphus-techniques/conversation-cases.json`; do not restart
@@ -43,7 +63,12 @@ the historical model tournament below. Source-backed injected Save/Undo
 journeys remain separate from actual signed-in UI acceptance. Before each
 paid request, reread/reserve against the original `feat-ruphus-agent-v3`
 `docs/data/ruphus-agent-v3/conversation-eval/live-cost-ledger.json`.
-Last settled spend is $48.090546, reserved $0, of the unchanged $55 total cap.
+Last settled spend is $48.137603, reserved $0, of the unchanged $55 total cap.
+The last reservation was explicitly released because the Mac locked before
+typing/dispatch; the old operator process was stopped. Start a new guarded
+operator before another prompt; never zero an actually dispatched reservation.
+The temporary localhost3201 mirror stopped cleanly. Leave unrelated
+localhost3200 and other simulator services alone.
 Keep diagnostics, leave Capgo and production unchanged, and record live
 closure only after a named card actually persists and renders. Personal
 sensory verdicts remain separate and do not block engineering work.
