@@ -125,6 +125,8 @@ test('equipment answers are immediate, constrained, and do not reinterpret ordin
   assert.equal(equipmentClarificationAnswer("It's 03", question)?.size, '03');
   assert.equal(equipmentClarificationAnswer('02', question)?.size, '02');
   assert.equal(equipmentClarificationAnswer('03', [...question, { role: 'user', content: '03' }])?.size, '03');
+  assert.equal(equipmentClarificationAnswer('03', [{ role: 'assistant', content: 'Got it—Columbia, on the Switch. Which size do you have: 02 or 03?' }])?.size, '03');
+  assert.equal(equipmentClarificationAnswer('03', [{ role: 'user', content: 'Make a Switch recipe for jar one' }, { role: 'assistant', content: 'Which size do you have: 02 or 03?' }])?.size, '03');
   assert.equal(equipmentClarificationAnswer('03', [{ role: 'user', content: 'Make an iced Switch recipe' }, ...question]), null);
 });
 
