@@ -29,6 +29,17 @@ function optionFrom(toolResult) {
   return toolResult?.results?.find((item) => item.name === 'read_technique_options')?.result?.options?.[0] || null;
 }
 
+test('explicit named brewing approaches are actionable without the technique keyword', () => {
+  assert.equal(isTechniqueExplorationRequest('Try full immersion for El Vergel with the Switch'), true);
+  assert.equal(isTechniqueExplorationRequest('Use a hybrid approach for this coffee on the V60'), true);
+  assert.equal(isTechniqueExplorationRequest('Try pulse pours with the Kalita'), true);
+  assert.equal(isTechniqueExplorationRequest('How does full immersion work with the Switch?'), false);
+  assert.equal(isTechniqueExplorationRequest('Compare hybrid and pulse pours for the V60'), false);
+  assert.equal(isTechniqueExplorationRequest('Try full immersion for El Vergel'), false);
+  assert.equal(isTechniqueExplorationRequest('I like full immersion with the Switch'), false);
+  assert.equal(isTechniqueExplorationRequest("Don't try full immersion with the Switch"), false);
+});
+
 test('expanded and contracted recommendation questions prepare a same-turn card', async () => {
   const userText = 'What is an interesting different technique for jar one with the v60?';
   assert.equal(isTechniqueExplorationRequest(userText), true);

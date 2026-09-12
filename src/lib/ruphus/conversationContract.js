@@ -13,10 +13,20 @@ const PRIVATE_USE = /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u;
 // authorizing an executable alternative or a review card in this turn.
 export function isTechniqueExplorationRequest(value = '') {
   const text = textOf(value).replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
-  if (!text || !/\b(?:technique|method)\b/i.test(text)) return false;
+  if (!text) return false;
   const action = /\b(?:try|use|brew|prepare|make|test|show|give|recommend|suggest|explore|switch|choose|pick)\b/i.test(text);
   const alternative = /\b(?:different|another|alternative|new|interesting)\b/i.test(text);
   const informational = /^(?:how\s+(?:does|do|can|would|to)\b|what\s+(?:is|are)\b|tell\s+me\s+about\b|explain\b|compare\b|what's\s+the\s+difference\b)/i.test(text);
+  // Some users name an executable brewing approach rather than the abstract
+  // words “technique” or “method” (for example, “try full immersion with the
+  // Switch”). Admit only a known approach, an explicit action, and a named
+  // brewer; informational/how-to questions remain prose-only.
+  const namedApproach = /\b(?:full[\s-]?immersion|immersion|hybrid|pulse(?:s|d)?|continuous[\s-]+pour|percolation)\b/i.test(text);
+  const brewerContext = /\b(?:v60|kalita|switch|aiden|brewer|dripper)\b/i.test(text);
+  const approachAction = /\b(?:try|use|brew|prepare|make|test|show|give|recommend|suggest|explore|choose|pick)\b/i.test(text);
+  const declinedApproach = /\b(?:don't|do not|not ready to|without)\s+(?:try|use|brew|prepare|make|test|show|give|explore)\b/i.test(text);
+  if (!informational && !declinedApproach && approachAction && namedApproach && brewerContext) return true;
+  if (!/\b(?:technique|method)\b/i.test(text)) return false;
   // Expanded "what is" wording can be a recommendation request when it
   // names an interesting/alternative method for a concrete brewer or coffee.
   // Keep standalone explanations and comparisons informational-only.
