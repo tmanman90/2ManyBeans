@@ -1,13 +1,15 @@
 ---
 title: "feat: Natural Ruphus technique exploration across Kalita, V60 and Switch"
 type: feat
-status: in_progress
+status: completed
 date: 2026-09-10
 ---
 
 # Natural technique exploration
 
 ## Summary
+
+Engineering closeout: approved Dev-only expansion completed; see [layered acceptance and explicit limits](../data/ruphus-agent-v3/TECHNIQUE-EXPLORATION-ACCEPTANCE.md). Final product `5e5ff5c` is installed in the signed-in Dev simulator, not shipped to the phone or production. The final native recovery/size/reset journeys and production-rendered retry/cancellation tests are separate evidence. Undo restored original brewing content; one existing derived `recipeHash` cache changed, explicitly reported rather than asserted as raw-hash equality. Owner sensory verdict remains pending without blocking engineering completion.
 
 An explicit request for an interesting technique should receive a short, named recommendation and a compact recipe card together. “Another one,” “the first one,” changing dose, trying a brew and saving it should stay attached to the right coffee, brewer and recipe. Extend this experience to Kalita 155/185 and genuine Switch techniques using existing research before admitting new material.
 

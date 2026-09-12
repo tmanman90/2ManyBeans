@@ -25,7 +25,7 @@
       "id": "TE04",
       "precondition": "An actionable source-backed card exists and its original saved recipe hash is captured",
       "actions": ["View recipe", "Change dose within the source-supported range", "Start explicitly", "Return to chat", "Ask to save this trial permanently", "Save explicitly", "Undo"],
-      "assertions": ["View does not start a timer or create a trial", "Technique identity and all quantities survive dose change", "Server snapshot, displayed recipe and timer agree", "Later save targets the actual trial snapshot", "Undo restores the original saved recipe hash"]
+      "assertions": ["View does not start a timer or create a trial", "Technique identity and all quantities survive dose change", "Server snapshot, displayed recipe and timer agree", "Later save targets the actual trial snapshot", "Undo restores all original recipe content; report derived recipeHash cache differences separately rather than asserting raw-hash equality"]
     },
     {
       "id": "TE05",

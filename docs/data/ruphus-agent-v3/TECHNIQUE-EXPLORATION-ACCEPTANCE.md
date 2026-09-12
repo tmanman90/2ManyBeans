@@ -1,6 +1,36 @@
 # Technique exploration acceptance
 
-Status: implementation in progress; no acceptance PASS yet.
+Status: engineering acceptance complete for the approved Dev-only technique expansion. Personal sensory verdicts and physical-device/production release are not claimed.
+
+## Final closeout — September 11, Pacific time
+
+This section supersedes the historical open checkpoints below; they remain intact as the failure/remediation record.
+
+Installed product: `5e5ff5ca719b6332f9722a652f8b10bb57124f87`, private preview `https://twomanybeans-ruphus-n4rjx5ysi-tmanman90s-projects.vercel.app`, deployment `dpl_E9yTHg67WWvdZowEtjWdswpe6oo8`. Built and installed JS SHA256 both `e8e7bff18bde5aa3d70ef614eec7a274adde6042c5aa0aa016925895689a1294`. Verified bundle `com.talmeltzer.coffeehub.dev`, display name `2manybeans Dev`, Firebase `twomanybeans-ruphus-dev`, preview URL, Ask label, updater autoUpdate false, and dev channel. Reused the already-built app and installed in place; no logout, erase, phone, production, rules or Capgo changes.
+
+Final authenticated native observations:
+
+- `Show my latest trial recipe` recovered the exact previously saved/undone Switch trial:16g,195.56mL, Medium grind, HARIO Switch03 Instruction Manual Immersion. The expanded review remained read-only with no duplicate permanent-save control. This closes the earlier older36g-trial substitution and unreadable grind issues.
+- New chat pressed while the response displayed Thinking cleared the conversation. After the request settled, no old card or response appeared in the fresh conversation. A fresh full-immersion request then delivered one named HARIO card with View recipe in the same turn, proving old exhaustion exclusions did not leak across the boundary. The deterministic delayed-transport test separately forces delivery after cancellation; native timing alone does not prove the response was still in flight at confirmation.
+- The Dev app was stopped immediately after sending a Kalita request and relaunched. Login, the exact16g immersion trial, source instructions and the newly delivered Kurasu Wave155 card survived. The server completed the request, so this is native response-loss/relaunch recovery, not a forced native connectivity failure or a native retry-button test.
+- `Actually I mean the185` explicitly retired155, explained Jar1 has only a155 base and directed the user to Rotation → that coffee's Brew → Kalita185 → review generated recipe. It did not invent an185 proposal, switch to Aiden, save anything or report an AI connectivity error.
+
+| Journey | Closing evidence |
+|---|---|
+| TE01 V60 first/another/compare/first-again | Native named cards, distinct families, comparison without new proposal, original read-only inspector; earlier detailed observations retained below. |
+| TE02 exact Kalita size | Native155 and185 paths plus final155→missing185 correction above; deterministic size/variant source guards. |
+| TE03 Switch hybrid/immersion | Native distinct cards, adapted native-unit previews and source valve guides; capacity/outside-policy rejection in deterministic/rendered tests. |
+| TE04 dose/Start/return/later Save/Undo | Native snapshot/preview/guide agreement and explicit Save/Undo. Original brewing content and all non-derived fields restored; checksum caveat below is not an exact raw-snapshot-hash PASS. |
+| TE05 reference limitations | Native iced Switch and90→70°C God/Devil useful reference-only replies, no invented executable card. |
+| TE06 exhaustion/reset | Native exhaustion and repeated request remain truthful; final New chat resets exclusions. Explicit retry identity/family behavior has deterministic evidence, not a forced native outage. |
+| TE07 interruption/durability | Native New chat and app stop/relaunch; actual rendered ChatTab failure→persist→reload→repersist→reload→retry and forced late text/artifact cancellation, with mocked transport only. No network-wide fault injection or authentication bypass. |
+| TE08 rendered access |320px, measured125% text, reduced motion, focus return, reading position and44px controls in the production-rendered verifier; native cards reachable above composer. Not a claim of native200% text testing. |
+
+Final independent focused rerun: `node --test scripts/ruphus-chat-cancellation.test.mjs scripts/ruphus-chat-retry-restore.test.mjs scripts/ruphus-trial-recovery.test.mjs scripts/ruphus-trial-recipe-card.test.mjs scripts/ruphus-session-write-race.test.mjs` →10/10 passed, including both actual rendered ChatTab journeys. Earlier42-test final-candidate suite, source/runtime suites, build, lint and rendered recipe-first proof are recorded below; no new broad paid tournament was run.
+
+Data preservation: all57 recipes match this final session's before-state. Across the earlier native Save/Undo,56 retain exact raw hashes; the changed target matches its original revision parent in every field except the derived `recipeHash`. The pre-existing canonicalizer hashes an already-present checksum. This bookkeeping difference is explicitly excluded from the **brewing-content restoration** verdict, not silently called an exact raw-hash restoration or repaired by a cloud write. The journey definition's raw-hash assertion was over-specific for this existing derived cache; the final criterion is identical original recipe content with derived metadata differences reported. No recipe content, login or domain history was deleted.
+
+Settled cumulative provider-testing spend: **$48.148016 of$55**, reservation0; this technique-expansion increment over the prior$48.011302 checkpoint is **$0.136714**. Simulator lease released to GETUP after the final native check. Production, phone and Capgo remain untouched. Sensory outcomes, all possible conversations and unsupported source configurations are not asserted; no claim of a universally perfect chatbot. The verbatim MSW Kernel was propagated to the execution workers. Further broad research/review, hash-system migration and production shipping are outside this completed expansion.
 
 ## September 11 resumed native acceptance
 

@@ -4,7 +4,34 @@ This runbook governs the conversation-reset live gate and installed-app proof.
 It is Dev-only. A missing identity check, an ambiguous target, or a failed
 preflight stops the run; it never falls back to production.
 
-## Current continuation boundary
+## Current closeout — technique exploration
+
+Engineering acceptance is complete on `codex/ruphus-technique-exploration`.
+The detailed, layered verdict and known derived-checksum caveat are in
+[`TECHNIQUE-EXPLORATION-ACCEPTANCE.md`](TECHNIQUE-EXPLORATION-ACCEPTANCE.md).
+Installed product `5e5ff5ca719b6332f9722a652f8b10bb57124f87` uses private preview
+`https://twomanybeans-ruphus-n4rjx5ysi-tmanman90s-projects.vercel.app` and isolated
+Firebase `twomanybeans-ruphus-dev`. Built and installed JS SHA256 agree:
+`e8e7bff18bde5aa3d70ef614eec7a274adde6042c5aa0aa016925895689a1294`.
+Only `com.talmeltzer.coffeehub.dev` on the existing signed-in simulator was
+installed/relaunched. Login/data preserved; updater disabled, channel dev.
+
+Native final recovery returns the actual16g/195.56mL trial, New chat resets
+exclusions, Kalita155→185 correction gives useful existing generation guidance,
+and app response-loss/relaunch preserves the card and trial. Actual rendered
+failed-turn reload/retry and forced late-response cancellation passed separately;
+do not claim a forced native network outage or physical brew. Final57-recipe
+comparison is unchanged from the last session baseline. Earlier Undo restored
+all brewing content with one documented derived-cache checksum difference.
+Settled cumulative spend$48.148016, reserved0, cap$55. No paid check is pending.
+
+Stop unattended repair attempts; simulator released to GETUP. Do not reinstall,
+rebuild, reset authentication, touch the phone, upload Capgo or deploy production
+merely because an old checkpoint below says pending. Preserve the generated
+unstaged `ios/App/GoogleService-Info.plist` and all diagnostic ledgers/reports.
+Owner sensory verdict is pending, not an engineering blocker.
+
+## Historical continuation boundary (superseded by closeout above)
 
 ### September 10 technique-exploration implementation (open)
 
