@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { trialReceiptsForSession } from '../api/ruphus-agent.js';
+import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 
 test('current conversation selects its exact trial, not another trial or an old chat', async () => {
   const receipt = { id: 'receipt-new', type: 'action_receipt', mode: 'brew_once', attemptId: 'new', coffeeId: 'coffee', slotKey: 'kalita_hot' };
@@ -51,5 +52,54 @@ test('trial review recovers the stored recipe and confirmation without a model m
   assert.equal(selected.artifact.attemptId, 'second');
   assert.equal((await tools.call('review_trial_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', trialRef: 'made-up' })).artifact, undefined);
   await assert.rejects(tools.call('review_trial_recipe', { coffeeRef: 'foreign', slot: 'kalita_hot' }), /owner-scoped/);
+  assert.equal(writes, 0);
+});
+
+test('trial review keeps the exact promoted Switch attempt after Save then Undo', async () => {
+  const sourceConfiguration = { device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot' };
+  const sourceRecipe = (sourceId, dose) => generateManualSourceTechniqueOption(sourceId, {}, { ...sourceConfiguration, dose }).recipe;
+  const hybrid = sourceRecipe('hario-switch-03-matt-winton-hybrid-24-2022', 16);
+  const olderImmersion = sourceRecipe('hario-switch-03-instruction-manual-36-2023', 36);
+  const currentImmersion = sourceRecipe('hario-switch-03-instruction-manual-36-2023', 16);
+  const attempts = [
+    { id: 'trial-hybrid', ownerId: 'owner', coffeeId: 'coffee', slotKey: 'v60_hot', proposalId: 'proposal-hybrid', revisionId: 'revision-hybrid', sourceHash: 'hash-hybrid', status: 'completed', snapshot: hybrid },
+    { id: 'trial-old-immersion', ownerId: 'owner', coffeeId: 'coffee', slotKey: 'v60_hot', proposalId: 'proposal-old-immersion', revisionId: 'revision-old-immersion', sourceHash: 'hash-old-immersion', status: 'completed', snapshot: olderImmersion },
+    { id: 'trial-current-immersion', ownerId: 'owner', coffeeId: 'coffee', slotKey: 'v60_hot', proposalId: 'proposal-current-immersion', revisionId: 'revision-current-immersion', promotedRevisionId: 'revision-current-immersion', status: 'completed', snapshot: currentImmersion },
+  ];
+  const currentReceipt = { id: 'receipt-current-immersion', ownerId: 'owner', actionId: 'action-current-immersion', mode: 'brew_once', attemptId: 'trial-current-immersion', coffeeId: 'coffee', slotKey: 'v60_hot' };
+  const context = {
+    rotationSnapshot: { refs: { c1: 'coffee' }, coffees: [{ refKey: 'c1', name: 'El Vergel' }] },
+    __ruphusTrialReceipts: [{ id: currentReceipt.id, attemptId: currentReceipt.attemptId, coffeeId: currentReceipt.coffeeId, slotKey: currentReceipt.slotKey }],
+  };
+  let writes = 0;
+  const tools = createRuphusTools({ uid: 'owner', context, proposalActions: ['apply_proposal'], proposalStore: () => { writes += 1; }, readers: {
+    readAttempts: async () => attempts,
+    readTrialReceipt: async () => currentReceipt,
+  } });
+
+  const review = await tools.call('review_trial_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(review.ok, true);
+  assert.equal(review.artifact.attemptId, 'trial-current-immersion');
+  assert.equal(review.artifact.recipe.coffeeGrams, 16);
+  assert.equal(review.artifact.recipe.waterMilliliters, 195.56);
+  assert.equal(review.artifact.promoteAvailable, false);
+  assert.match(review.artifact.message, /previously saved/);
+  assert.equal(writes, 0);
+
+  const frames = [];
+  const turn = await runRuphusTurn({ turnId: 'review-promoted', context: {}, userText: 'Show my trial recipe', tools,
+    provider: { runTurn: async () => ({ toolCalls: [{ callId: 'review', name: 'review_trial_recipe', args: { coffeeRef: 'c1', slot: 'v60_hot', trialRef: null } }], usage: { input_tokens: 10, output_tokens: 10 } }) },
+    emit: frame => frames.push(frame),
+  });
+  assert.equal(turn.ok, true);
+  assert.doesNotMatch(turn.text, /Make this my recipe|to save it/);
+  assert.match(turn.text, /exact trial recipe for review/);
+  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
+
+  context.__ruphusTrialReceipts = [];
+  const ambiguous = await tools.call('review_trial_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(ambiguous.ok, false);
+  assert.equal(ambiguous.candidates.length, 3);
+  assert.ok(ambiguous.candidates.some((candidate) => candidate.recipe.waterMilliliters === 195.56));
   assert.equal(writes, 0);
 });

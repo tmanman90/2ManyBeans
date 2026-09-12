@@ -539,7 +539,12 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       }
       if (finalProposal) { text = 'I couldn’t prepare that change safely. Your saved recipe is unchanged.'; break; }
       const recoveredTrial = results.find(item => item.name === 'review_trial_recipe' && item.result?.ok === true && item.result?.artifact);
-      if (recoveredTrial) { text += 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'; break; }
+      if (recoveredTrial) {
+        text += recoveredTrial.result.artifact.promoteAvailable
+          ? 'Here’s the trial recipe you chose. Review it below, then choose “Make this my recipe” to save it.'
+          : 'Here’s the exact trial recipe for review. Your saved recipe is unchanged.';
+        break;
+      }
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
         if (techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))) techniqueContinuationUsed = true;
