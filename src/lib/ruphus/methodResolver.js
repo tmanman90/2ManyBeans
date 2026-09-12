@@ -56,9 +56,12 @@ export function explicitMethodVariantFromText(value) {
 // An answer to our immediately preceding equipment question is part of the
 // same request, not a new unqualified number or a saved-recipe preference.
 export function equipmentClarificationAnswer(userText, conversation = []) {
-  const latest = conversation.at(-1);
+  const last = conversation.at(-1);
+  const history = last?.role === 'user' && String(last.content || last.text || '').trim() === String(userText || '').trim()
+    ? conversation.slice(0, -1) : conversation;
+  const latest = history.at(-1);
   const question = latest?.role === 'assistant' ? String(latest.content || latest.text || '') : '';
-  if (conversation.slice(-2).some(item => /\b(?:iced|cold)\b/i.test(item.content || item.text || ''))) return null;
+  if (history.slice(-2).some(item => /\b(?:iced|cold)\b/i.test(item.content || item.text || ''))) return null;
   if (!/\b(?:which|what)\b[^?]*\b(?:switch|kalita|wave)\b[^?]*\?/i.test(question)) return null;
   const answer = String(userText || '').trim().match(/^(?:(?:the|a|an|it(?:'s| is)|i have(?: the)?|i(?:'m| am) using(?: the)?)\s+)?(0?[23]|155|185)[.!]?$/i)?.[1];
   if (!answer) return null;

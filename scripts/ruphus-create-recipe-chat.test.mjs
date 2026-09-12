@@ -93,7 +93,7 @@ test('native-shaped Switch answer loads source options before any model-selected
   const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'Columbia', status: 'ACTIVE', jarSlot: 1 }], readRecipe: async () => saved };
   const context = await buildRuphusContext({ uid: 'owner', contextRef: { surface: 'direct' }, evidenceByteCap: 10000,
     userText: '03', readers,
-    conversation: [{ role: 'user', content: 'Make a switch recipe for jar one' }, { role: 'assistant', content: 'Got it—jar one is Columbia. Which Switch size are you using: 02 or 03?' }],
+    conversation: [{ role: 'user', content: 'Make a switch recipe for jar one' }, { role: 'assistant', content: 'Got it—jar one is Columbia. Which Switch size are you using: 02 or 03?' }, { role: 'user', content: '03' }],
     ledger: { entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['Columbia'] }, { kind: 'method_focus', status: 'available', namedCoffees: ['Columbia'], methodFocus: { displayName: 'hot Kalita' } }] },
   });
   assert.equal(context.methodBinding.displayName, 'hot Switch 03');
@@ -124,6 +124,7 @@ test('equipment answers are immediate, constrained, and do not reinterpret ordin
   assert.equal(equipmentClarificationAnswer('185', question), null);
   assert.equal(equipmentClarificationAnswer("It's 03", question)?.size, '03');
   assert.equal(equipmentClarificationAnswer('02', question)?.size, '02');
+  assert.equal(equipmentClarificationAnswer('03', [...question, { role: 'user', content: '03' }])?.size, '03');
   assert.equal(equipmentClarificationAnswer('03', [{ role: 'user', content: 'Make an iced Switch recipe' }, ...question]), null);
 });
 
