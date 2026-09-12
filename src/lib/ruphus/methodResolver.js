@@ -62,7 +62,10 @@ export function equipmentClarificationAnswer(userText, conversation = []) {
   const latest = history.at(-1);
   const question = latest?.role === 'assistant' ? String(latest.content || latest.text || '') : '';
   if (history.slice(-2).some(item => /\b(?:iced|cold)\b/i.test(item.content || item.text || ''))) return null;
-  if (!/\b(?:which|what)\b[^?]*\b(?:size|155|185|02|03)\b[^?]*\?/i.test(question)) return null;
+  // Follow-up confirmation questions ("Do you mean the Switch 02 size?")
+  // carry the same equipment context as an initial "Which size?" question.
+  // The immediate-question and constrained-answer checks remain mandatory.
+  if (!/\b(?:size|155|185|02|03)\b[^?]*\?/i.test(question)) return null;
   const equipmentText = `${history.at(-2)?.role === 'user' ? history.at(-2).content || history.at(-2).text || '' : ''} ${question}`;
   const answer = String(userText || '').trim().match(/^(?:(?:the|a|an|it(?:'s| is)|i have(?: the)?|i(?:'m| am) using(?: the)?)\s+)?(0?[23]|155|185)[.!]?$/i)?.[1];
   if (!answer) return null;
