@@ -33,6 +33,10 @@ const artifact = sourceMode
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
 const forceStartStale = new URLSearchParams(window.location.search).has('start-stale');
 const historical = new URLSearchParams(window.location.search).has('historical');
+if (new URLSearchParams(window.location.search).has('empty-slot')) {
+  artifact.before = null;
+  artifact.sourceState = 'absent';
+}
 
 function Fixture() {
   const reducedMotion = useReducedMotion();

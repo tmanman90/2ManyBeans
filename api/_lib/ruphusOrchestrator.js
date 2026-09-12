@@ -16,7 +16,8 @@ const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique fo
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
 const techniqueRequest = (value, context = null, target = null) => isTechniqueExplorationRequest(value || '')
   || isExplicitTechniqueReuseRequest(value || '')
-  || isContextualTechniqueFollowupRequest(value || '', context, target || undefined);
+  || isContextualTechniqueFollowupRequest(value || '', context, target || undefined)
+  || Boolean(context?.proposalState?.techniqueReady?.optionIds?.length);
 
 function contextualTechniqueReadRequired({ userText = '', context = null, toolEvidence = [] } = {}) {
   const binding = context?.__ruphusTurnBinding;

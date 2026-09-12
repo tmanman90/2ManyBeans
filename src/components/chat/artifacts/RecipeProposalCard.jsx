@@ -66,13 +66,19 @@ function PreviewCard({ proposal, after, before, status, onPreview, onInspect }) 
         : null;
   const viewRecipe = status === 'proposed' ? onPreview : onInspect;
   const disabled = typeof viewRecipe !== 'function' || status === 'applying';
+  const differentBrewer = proposal.before && brewerName(proposal.slotKey, before) !== brewerName(proposal.slotKey, after);
+  const stateCopy = status === 'proposed' && proposal.sourceState === 'absent'
+    ? 'Try it first, or save it as your recipe.'
+    : status === 'proposed' && differentBrewer
+      ? `Your saved ${brewerName(proposal.slotKey, before)} stays unchanged. Save replaces it with this recipe.`
+      : previewCopy[status] || 'This suggestion is no longer open.';
 
   return <section aria-label={`${coffeeName} recipe preview`} data-artifact="recipe_proposal" data-preview="true" data-preview-card="true" data-preview-id={proposal.id || undefined} data-status={status} style={{ width: '100%', boxSizing: 'border-box', padding: 18, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={{ ...typeScale.h3, color: C.text }}>{coffeeName} <span aria-hidden="true" style={{ color: C.textLight }}>·</span> <span style={{ color: C.textMuted }}>{brewerName(proposal.slotKey, after)}</span></div>
     {primaryChange ? <div data-preview-change="true" style={{ marginTop: 12, color: C.text, fontVariantNumeric: 'tabular-nums' }}><span style={{ color: C.textMuted }}>{primaryChange.label}</span>{' '}<strong>{primaryChange.oldValue == null ? primaryChange.newValue : `${amount(primaryChange.oldValue, primaryChange.unit)} → ${amount(primaryChange.newValue, primaryChange.unit)}`}</strong></div> : <div data-preview-change="true" style={{ marginTop: 12, color: C.textMuted }}>Recipe updated</div>}
     {proposal.techniqueExperiment && <p style={{ color: C.textMuted, margin: '8px 0 0', lineHeight: 1.5 }}>{[metadata.adaptationLabel, metadata.sourceSummary || (ratio ? `Ratio ${ratio}` : null)].filter(Boolean).join(' · ')}</p>}
     <Btn variant="primary" onClick={() => viewRecipe?.(proposal)} disabled={disabled} aria-label="View recipe" style={{ minHeight: 44, width: '100%', marginTop: 16 }}>{status === 'applying' ? 'Working…' : 'View recipe'}</Btn>
-    <p aria-live="polite" style={{ color: C.textMuted, margin: '10px 0 0', lineHeight: 1.5 }}>{previewCopy[status] || 'This suggestion is no longer open.'}</p>
+    <p aria-live="polite" style={{ color: C.textMuted, margin: '10px 0 0', lineHeight: 1.5 }}>{stateCopy}</p>
   </section>;
 }
 

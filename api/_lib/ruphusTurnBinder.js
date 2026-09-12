@@ -80,7 +80,7 @@ function deliveredTechniqueProposal(proposal) {
     && ['v60_hot', 'kalita_hot'].includes(proposal?.slotKey)
     && TECHNIQUE_EXPERIMENT_KINDS.has(experiment?.kind)
     && hasSelection
-    && proposal?.before && typeof proposal.before === 'object' && !Array.isArray(proposal.before)
+    && ((proposal.sourceState === 'absent' && proposal.before === null) || (proposal?.before && typeof proposal.before === 'object' && !Array.isArray(proposal.before)))
     && proposal?.after && typeof proposal.after === 'object' && !Array.isArray(proposal.after)
     && (proposal.status == null || DELIVERED_PROPOSAL_STATUSES.has(proposal.status));
 }

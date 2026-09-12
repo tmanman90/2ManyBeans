@@ -422,7 +422,7 @@ export function recentProposalReviews(session, refs = {}, binding = {}) {
   let ordinal = 0;
   const reviews = messages
     .flatMap(message => Array.isArray(message?.artifacts) ? message.artifacts : [])
-    .filter(item => item?.type === 'recipe_proposal' && item?.historyOnly !== true && isObject(item.before) && isObject(item.after))
+    .filter(item => item?.type === 'recipe_proposal' && item?.historyOnly !== true && (isObject(item.before) || (item.sourceState === 'absent' && item.before === null)) && isObject(item.after))
     .map(item => {
       const coffeeRef = ownerRefs.find(([, coffeeId]) => coffeeId === item.coffeeId)?.[0];
       if (!coffeeRef || (binding.coffeeRef && binding.coffeeRef !== coffeeRef) || (binding.slot && binding.slot !== item.slotKey)) return null;
@@ -450,9 +450,10 @@ export function recentProposalReviews(session, refs = {}, binding = {}) {
         ...(timingVersion ? { timingVersion } : {}),
         ...(safeReference(item.sourceHash) ? { sourceHash: safeReference(item.sourceHash) } : {}),
         ...(safeReference(item.recipeHash) ? { recipeHash: safeReference(item.recipeHash) } : {}),
-        before: recipeSummary(item.before),
+        sourceState: item.sourceState || 'present',
+        before: item.before === null ? null : recipeSummary(item.before),
         proposed,
-        comparisonBasis: 'Saved recipe when this review was prepared; not proof of a save.',
+        comparisonBasis: item.before === null ? 'No saved recipe when this review was prepared; this is a new draft, not proof of a save.' : 'Saved recipe when this review was prepared; not proof of a save.',
       };
     })
     .filter(Boolean);

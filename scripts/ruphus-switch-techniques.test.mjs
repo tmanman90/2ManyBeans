@@ -326,7 +326,7 @@ test('Switch source route fails closed for size/filter mismatches and keeps stan
   assert.equal(standardRead.actionable, false);
   assert.equal(standardRead.sourceOptions, true);
   assert.deepEqual(standardRead.options, []);
-  assert.match(standardRead.message, /classic V60.*ribbed Switch|saved classic V60/i);
+  assert.match(standardRead.message, /Which Switch size.*02 or 03/i);
 
   const genericContext = contextFor({ userText: 'Show me a different V60 technique.', recipe: standard });
   const genericRead = await toolsFor(genericContext, standard).call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });

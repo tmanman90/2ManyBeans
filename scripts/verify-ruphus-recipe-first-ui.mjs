@@ -429,6 +429,15 @@ try {
     assert.deepEqual(sourceHistoricalWrites, []);
     assert.deepEqual(sourceHistoricalErrors, []);
     await sourceHistoricalPage.close();
+    const emptySlotPage = await context.newPage();
+    await emptySlotPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?technique=1&empty-slot=1`, { waitUntil: 'domcontentloaded' });
+    await emptySlotPage.getByText('Try it first, or save it as your recipe.', { exact: true }).waitFor();
+    await emptySlotPage.getByRole('button', { name: 'View recipe', exact: true }).click();
+    await waitForSettledModal(emptySlotPage);
+    assert.equal(await emptySlotPage.locator('[data-start-count]').innerText(), '0', 'An empty-slot draft opens review without starting a timer');
+    await emptySlotPage.getByRole('button', { name: 'Close', exact: true }).click();
+    await emptySlotPage.getByRole('button', { name: 'View recipe', exact: true }).waitFor();
+    await emptySlotPage.close();
     assert.deepEqual(blockedRequests, [], 'Rendered fixture must not request non-local or non-GET resources');
     console.log(JSON.stringify({
       sourceResponsive,

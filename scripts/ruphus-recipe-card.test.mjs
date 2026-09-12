@@ -10,7 +10,8 @@ const preview = card.slice(card.indexOf('function PreviewCard'), card.indexOf('e
 test('recipe preview renderer forwards the side-effect-free preview callback', () => {
   assert.match(renderer, /onPreview/);
   assert.match(renderer, /<RecipeProposalCard[\s\S]*onPreview=\{onPreview\}/);
-  assert.match(card, /onPreview\?\.\(proposal\)/);
+  assert.match(card, /status === 'proposed' \? onPreview : onInspect/);
+  assert.match(card, /viewRecipe\?\.\(proposal\)/);
 });
 
 test('hot manual preview cards are compact, ratio-first, and keep legacy actions out', () => {
@@ -23,8 +24,9 @@ test('hot manual preview cards are compact, ratio-first, and keep legacy actions
   assert.doesNotMatch(preview, /data-preview-supporting-values|recommendation|reasoning/);
 });
 
-test('preview status disables stale and superseded openings without changing status copy', () => {
-  assert.match(preview, /status === 'stale' \|\| status === 'superseded'/);
+test('non-proposed cards use only the read-only inspector and preserve status copy', () => {
+  assert.match(preview, /status === 'proposed' \? onPreview : onInspect/);
+  assert.match(preview, /typeof viewRecipe !== 'function'/);
   assert.match(card, /stale: 'This preview is out of date/);
   assert.match(card, /superseded: 'This preview was replaced/);
   assert.match(card, /attempt_created: 'Ready for one brew/);
