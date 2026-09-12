@@ -164,7 +164,13 @@ function getStreamingFetch() {
 }
 
 export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFrame, signal, maxRetries = 2 }) {
-  const token = await getAuthToken();
+  let token;
+  try {
+    token = await getAuthToken();
+  } catch (error) {
+    onError?.(signal?.aborted ? makeAbortError() : error);
+    return;
+  }
   if (signal?.aborted) {
     onError?.(makeAbortError());
     return;
@@ -200,6 +206,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFr
         const typed = parseTypedError(data, response.status);
         if (typed) throw typed;
         const err = errorFromStatus(data, response.status);
+        err.status = response.status;
         if ([429, 529, 503].includes(response.status) && attempt < maxRetries) {
           lastError = err;
           continue;
@@ -287,7 +294,11 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFr
         onError?.(makeAbortError());
         return;
       }
-      if (!sawByte && attempt < maxRetries) {
+      // A rejected credential or entitlement cannot recover by replaying the
+      // same headers. Only transient transport/server failures may retry.
+      const rejected = ['auth_session_unavailable', 'auth_temporarily_limited', 'reauth_required', 'subscription_required', 'free_tier_exhausted'].includes(err?.code)
+        || (err?.status >= 400 && err.status < 500 && err.status !== 429);
+      if (!rejected && !sawByte && attempt < maxRetries) {
         lastError = err;
         continue;
       }

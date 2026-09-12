@@ -118,7 +118,7 @@ export const useAppData = (uid) => {
       // Network fetch (updates cache on success)
       const fetchData = async () => {
         try {
-          await fetchAndCache(beansColl, tastingsColl, beansCacheKey, tastingsCacheKey);
+          await refetch();
         } catch (err) {
           console.error('Firestore fetch error:', err);
         }
@@ -130,17 +130,15 @@ export const useAppData = (uid) => {
       fetchData().finally(() => clearTimeout(fetchTimeout));
 
       // Poll every 60s to keep data fresh (replaces real-time listeners).
-      // Skip this tick if a mutation's refetch is already in flight -- the
-      // in-flight result will cover us and is at least as fresh.
+      // Initial load, polls and mutations all use the same single-flight.
+      // Merely checking the ref here without claiming it allowed suspended
+      // native requests to pile up and refresh expired credentials on wake.
       const startPoll = () => {
-        pollRef.current = setInterval(async () => {
-          if (inflightFetchRef.current) return;
-          try {
-            await fetchAndCache(beansColl, tastingsColl, beansCacheKey, tastingsCacheKey);
-          } catch { /* silent retry next interval */ }
+        pollRef.current = setInterval(() => {
+          if (!document.hidden) void refetch();
         }, 60000);
       };
-      startPoll();
+      if (!document.hidden) startPoll();
 
       // Pause polling when app is backgrounded (battery optimization)
       const handleVisibility = () => {
@@ -196,7 +194,7 @@ export const useAppData = (uid) => {
       unsubBeans();
       unsubTastings();
     };
-  }, [fetchAndCache, uid]);
+  }, [refetch, uid]);
 
   const addBean = useCallback(async (beanData, existingId = null) => {
     if (!uid) return;

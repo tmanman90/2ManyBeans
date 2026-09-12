@@ -11,6 +11,7 @@ import { getOnboardingPalate, palateSummaryLine } from '../lib/palateProfile';
 import { searchWeb } from '../lib/gemini';
 import { API_BASE, ruphusApiUrl } from '../lib/apiBase';
 import { streamWithAuth, resolveTerminal, holdBackScan } from '../lib/streamChat';
+import { chatErrorMessage } from '../lib/fetchWithRetry';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
 import { Toast } from '../components/Toast';
@@ -1400,7 +1401,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             const recipe = parseRecipeCard(scan.cleanText);
             const errorMessage = newMessage({
               role: 'assistant',
-              content: recipe.cleanText || "Couldn't reach the AI. Try again in a sec.",
+              content: recipe.cleanText || chatErrorMessage(err),
               recipeCard: recipe.recipeCard,
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
@@ -1415,7 +1416,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             // transient and retain their existing in-memory retry behavior.
             const errorMessage = newMessage({
               role: 'assistant',
-              content: "Couldn't reach the AI. Try again in a sec.",
+              content: chatErrorMessage(err),
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
               ...(attemptedAgent ? { retry: { kind: 'agent', text, contextRef: attemptedAgentContext } } : {}),
