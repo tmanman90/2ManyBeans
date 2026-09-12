@@ -573,6 +573,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   // calls can slip past it on rapid Enter+Send. This ref blocks the second
   // call immediately in the same event loop tick.
   const sendingRef = useRef(false);
+  const turnEpochRef = useRef(0);
+  const turnAbortRef = useRef(null);
   const handoffRef = useRef(false);
   const streamingBubbleRef = useRef(null);
   const streamRawRef = useRef('');
@@ -618,6 +620,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     apiMessages.current = [{ role: 'assistant', content: nextIntro.content }];
     setScannedBean(null);
     setStreamingSlot(null);
+    setThinkingCaptions(null);
     setLoading(false);
     sendingRef.current = false;
     userTouchedThreadRef.current = false;
@@ -897,6 +900,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   useEffect(() => {
     const trackedBlobUrls = blobUrlsRef.current;
     return () => {
+      turnEpochRef.current += 1;
+      turnAbortRef.current?.abort();
+      turnAbortRef.current = null;
       trackedBlobUrls.forEach(safeRevokeBlobUrl);
     };
   }, []);
@@ -1050,6 +1056,11 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
 
   const sendTurn = async ({ text, turnPhotos = [], appendUser = true, apiMsgOverride = null, retryTurn = null, agentContextOverride = null } = {}) => {
     if (sendingRef.current) return;
+    const turnEpoch = turnEpochRef.current;
+    const abortController = new AbortController();
+    turnAbortRef.current?.abort();
+    turnAbortRef.current = abortController;
+    const isCurrentTurn = () => turnEpochRef.current === turnEpoch && !abortController.signal.aborted;
     sendingRef.current = true;
     stickRef.current = true;
     setShowJumpLatest(false);
@@ -1066,6 +1077,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (appendUser) {
       userTouchedThreadRef.current = true;
       setMessages(prev => {
+        if (!isCurrentTurn()) return prev;
         const updated = [...prev, displayMsg];
         persist(threadForPersistence(updated), agentEnabled ? { protocolVersion: 1, contextRef: agentContextRef.current } : {});
         return updated;
@@ -1109,13 +1121,16 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     setStreamingSlot(null);
 
     const finishLoading = () => {
+      if (!isCurrentTurn()) return;
       setLoading(false);
       setThinkingCaptions(null);
       setStreamingSlot(null);
       sendingRef.current = false;
+      if (turnAbortRef.current === abortController) turnAbortRef.current = null;
     };
 
     const sendAgentTurn = async (contextOverride = null, userEvidence = text, conversation = previousApiMessages) => {
+      if (!isCurrentTurn()) return;
       const turnId = crypto.randomUUID();
       const startingContext = contextOverride || agentContextOverride || agentContextRef.current || agentContext;
       const sessionId = startingContext.sessionId || agentSessionIdRef.current || crypto.randomUUID();
@@ -1126,6 +1141,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
       setAgentText(''); agentTextRef.current = '';
       setAgentArtifacts([]); agentArtifactsRef.current = [];
       const onFrame = (frame) => {
+        if (!isCurrentTurn()) return;
         setAgentFrame(frame);
         const recovery = recoveryForAgentFrame(frame);
         if (recovery) setAgentRecovery(recovery);
@@ -1142,7 +1158,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         url: ruphusApiUrl('/api/ruphus-agent'),
         body: { turnId, contextRef, userText: userEvidence, conversation: conversation.filter(message => message?.role && typeof message.content === 'string').slice(-16), clientVersion: ruphusClientVersion(), commandCapabilities: RUPHUS_CLIENT_COMMAND_CAPABILITIES },
         onFrame,
+        signal: abortController.signal,
       });
+      if (!isCurrentTurn()) return;
       if (!result.ok) throw result.error || new Error('Agent turn failed');
       const assistant = newMessage({ role: 'assistant', content: agentTextRef.current || result.text || '', turnId, artifacts: agentArtifactsRef.current });
       commitAssistantMessage(assistant);
@@ -1197,8 +1215,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
               ? [...history, { role: 'user', content: extraContext }]
               : history;
             const prepared = await prepareChatMessagesForClaude(passHistory, {
-              onImageDescribeStart: () => setThinkingCaptions(['Reading your labels']),
+              onImageDescribeStart: () => { if (isCurrentTurn()) setThinkingCaptions(['Reading your labels']); },
             });
+            if (!isCurrentTurn()) return null;
 
             return new Promise((passResolve, passReject) => {
               streamWithAuth({
@@ -1210,7 +1229,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                   model: 'claude-sonnet-5',
                   feature: 'chat',
                 },
+                signal: abortController.signal,
                 onDelta: (delta) => {
+                  if (!isCurrentTurn()) return;
                   streamRawRef.current += delta || '';
                   // Open the bubble only once there is DISPLAYABLE text — a
                   // marker-only pass (NEEDS_SEARCH) stays fully held back, so
@@ -1224,6 +1245,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                   }
                 },
                 onDone: ({ stopReason } = {}) => {
+                  if (!isCurrentTurn()) {
+                    passReject(Object.assign(new Error('Chat turn was cancelled'), { code: 'turn_cancelled' }));
+                    return;
+                  }
                   const terminal = resolveTerminal(streamRawRef.current);
                   const rawText = terminal.text;
                   const search = parseNeedsSearch(rawText);
@@ -1244,6 +1269,10 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                   });
                 },
                 onError: (err) => {
+                  if (!isCurrentTurn()) {
+                    passReject(Object.assign(new Error('Chat turn was cancelled'), { code: 'turn_cancelled' }));
+                    return;
+                  }
                   const hadStreamText = streamRawRef.current.length > 0;
                   const terminal = resolveTerminal(streamRawRef.current);
                   passReject(Object.assign(err || new Error('stream failed'), {
@@ -1258,8 +1287,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           let agentUserEvidence = text || (turnPhotos.length > 0 ? 'I shared a coffee photo. Please help me understand it.' : '');
           if (turnPhotos.length > 0) {
             const described = await prepareChatMessagesForClaude([apiMsg], {
-              onImageDescribeStart: () => setThinkingCaptions(['Reading your labels']),
+              onImageDescribeStart: () => { if (isCurrentTurn()) setThinkingCaptions(['Reading your labels']); },
             });
+            if (!isCurrentTurn()) { complete(); return; }
             const describedTurn = described.messages[0]?.content;
             agentUserEvidence = typeof describedTurn === 'string' ? describedTurn : agentUserEvidence;
           }
@@ -1273,7 +1303,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           }
 
           let first = await runClaudePass();
+          if (!isCurrentTurn()) { complete(); return; }
           if (first.type === 'needsSearch' && first.query) {
+            if (!isCurrentTurn()) { complete(); return; }
             setStreamingSlot(null);
             setThinkingCaptions([`Searching the web: "${first.query}"`]);
 
@@ -1290,10 +1322,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
               searchUnavailable = true;
             }
             await captionDwell;
+            if (!isCurrentTurn()) { complete(); return; }
 
             const sources = searchUnavailable ? [] : filterSearchSources(searchResult?.chunks || []);
             const webContext = buildWebContext(searchResult, searchUnavailable);
             const second = await runClaudePass({ extraContext: webContext, passId: 'streaming-search' });
+            if (!isCurrentTurn()) { complete(); return; }
             if (second.scannedBean) setScannedBean(second.scannedBean);
 
             let assistantMsg;
@@ -1317,6 +1351,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             return;
           }
 
+          if (!isCurrentTurn()) { complete(); return; }
           if (first.scannedBean) setScannedBean(first.scannedBean);
           if (first.type === 'needsSearch') {
             first = {
@@ -1337,6 +1372,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           haptic.light();
           complete();
         } catch (err) {
+          if (!isCurrentTurn()) { complete(); return; }
     // Server-side gate: chat is Pro-only. If a free user somehow bypassed
           // the local check (race, stale context), surface the paywall and
           // strip the optimistic user message.
@@ -1457,12 +1493,20 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handleNewChat = () => {
     if (isDemo || messages.length <= 1) return;
     if (!window.confirm('Start a fresh conversation?')) return;
+    turnEpochRef.current += 1;
+    turnAbortRef.current?.abort();
+    turnAbortRef.current = null;
     clear(threadForPersistence(messages), agentContextRef.current);
     resetIntroThread();
     setHistoricalProposal(null);
     agentSessionIdRef.current = null;
     setLegacyChatOverride(false);
     setAgentRecovery(null);
+    setAgentFrame(null);
+    setAgentText('');
+    agentTextRef.current = '';
+    setAgentArtifacts([]);
+    agentArtifactsRef.current = [];
     haptic.light();
   };
 

@@ -118,6 +118,12 @@ function makeError(code, message) {
   return err;
 }
 
+function makeAbortError() {
+  const err = makeError('turn_cancelled', 'Chat turn was cancelled.');
+  err.name = 'AbortError';
+  return err;
+}
+
 async function parseErrorBody(response) {
   try {
     return await response.json();
@@ -157,8 +163,12 @@ function getStreamingFetch() {
   return webFetch || fetch;
 }
 
-export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFrame, maxRetries = 2 }) {
+export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFrame, signal, maxRetries = 2 }) {
   const token = await getAuthToken();
+  if (signal?.aborted) {
+    onError?.(makeAbortError());
+    return;
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -166,6 +176,10 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFr
   let lastError = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    if (signal?.aborted) {
+      onError?.(makeAbortError());
+      return;
+    }
     if (attempt > 0) {
       await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
@@ -178,6 +192,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFr
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
       });
 
       if (!response.ok) {
@@ -268,6 +283,10 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFr
         reader.cancel().catch(() => {});
       }
     } catch (err) {
+      if (signal?.aborted) {
+        onError?.(makeAbortError());
+        return;
+      }
       if (!sawByte && attempt < maxRetries) {
         lastError = err;
         continue;

@@ -71,10 +71,10 @@ export function addRuphusSourceFormatCapability(body = {}) {
   return { ...body, commandCapabilities: [...new Set([...existing, RUPHUS_SOURCE_FORMAT_CAPABILITY])] };
 }
 
-export async function streamAgentWithAuth({ url, body, onFrame, onError } = {}) {
+export async function streamAgentWithAuth({ url, body, onFrame, onError, signal } = {}) {
   const parser = createAgentFrameParser({ onFrame });
   let result;
-  await streamWithAuth({ url, body: addRuphusSourceFormatCapability(body), maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: false, transportError: error }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame } : resolved; if (!result.ok) onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: usage != null }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : resolved; } } });
+  await streamWithAuth({ url, body: addRuphusSourceFormatCapability(body), signal, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: false, transportError: error }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame } : resolved; if (!result.ok) onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: usage != null }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : resolved; } } });
   return result || { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') };
 }
 
