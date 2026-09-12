@@ -202,7 +202,7 @@ test('ordinal historical Switch inspection re-emits the chronological card as a 
   assert.equal(context.proposalState.techniqueReady, undefined, 'historical inspection does not authorize a new proposal');
 });
 
-test('standard V60 historical inspection also retains the original non-source-projection card', async () => {
+for (const modelChoice of ['prose', 'fresh-proposal', 'history-read']) test(`standard V60 historical inspection retains its original card despite ${modelChoice}`, async () => {
   const recipe = generateV60Recipe({}, { dose: 20 });
   const card = {
     id: 'v60-original', type: 'recipe_proposal', status: 'proposed', coffeeId: 'coffee-1', slotKey: 'v60_hot',
@@ -211,19 +211,27 @@ test('standard V60 historical inspection also retains the original non-source-pr
   };
   const context = contextFor({ userText: 'Show me the first one again.', recipe });
   context.proposalReviews = recentProposalReviews({ messages: [{ artifacts: [card] }] }, refs);
+  Object.defineProperty(context, '__ruphusTurnBinding', {
+    value: { status: 'locked', coffeeRef: 'c1', coffee: { id: 'coffee-1', name: 'El Vergel' }, techniqueSlot: 'v60_hot', techniqueKind: 'v60_technique' }, enumerable: false,
+  });
   Object.defineProperty(context, '__ruphusPriorProposals', { value: [card], enumerable: false });
+  const rawTools = toolsFor(context, recipe);
+  const dispatched = [];
+  const tools = { ...rawTools, call: async (...args) => { dispatched.push(args[0]); return rawTools.call(...args); } };
   const frames = [];
   let providerCalls = 0;
   const result = await runRuphusTurn({
-    turnId: 'v60-history', context, userText: context.userText, tools: toolsFor(context, recipe),
+    turnId: 'v60-history', context, userText: context.userText, tools,
     emit: (frame) => frames.push(frame),
     provider: { runTurn: async () => {
       providerCalls += 1;
       assert.equal(providerCalls, 1, 'read-only history does not need another model round');
-      return { toolCalls: [{ callId: 'read-old-card', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+      if (modelChoice === 'prose') return { text: 'The first technique was Hoffmann.' };
+      return { toolCalls: [{ callId: 'read-old-card', name: modelChoice === 'fresh-proposal' ? 'propose_recipe_change' : 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] };
     } },
   });
   assert.equal(result.ok, true);
+  assert.deepEqual(dispatched, ['read_technique_options'], 'inspection never dispatches a fresh proposal');
   assert.equal(result.artifacts[0]?.id, card.id);
   assert.deepEqual(result.artifacts[0]?.after, recipe);
   assert.equal(result.artifacts[0]?.historyOnly, true);

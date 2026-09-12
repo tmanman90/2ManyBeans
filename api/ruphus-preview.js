@@ -81,6 +81,38 @@ function sourceRequestFromBody(body, storedRecipe) {
   };
 }
 
+const LEGACY_SOURCE_PROJECTION_DISCLOSURE = 'App-calculated quantities are exposed in typed fields; source-native prose remains verbatim and source timing is not carried over.';
+const LEGACY_SOURCE_DOSE_POLICY_DISCLOSURE = 'App-scaled typed quantities preserve native units and the source checkpoint/event anchors. Timing is an unchanged source guide at the selected dose, not a new author claim.';
+
+// Before executable source labels were adapted, a stored projection carried
+// the original labels while its typed checkpoints had already been scaled.
+// Accept only that exact representation of the current trusted source revision;
+// all typed values, hardware, timing and owner-bound source identity remain in
+// the comparison. The corrected trusted projection is still returned below.
+function legacySourceProjectionWitness(projection) {
+  const legacy = structuredClone(projection);
+  const sourceLabels = legacy.sourceSnapshot?.stages || [];
+  if (!Array.isArray(legacy.sourceExecution?.stages) || !Array.isArray(legacy.stages)
+    || legacy.sourceExecution.stages.length !== sourceLabels.length
+    || legacy.stages.length !== sourceLabels.length) return null;
+  legacy.sourceExecution.stages = legacy.sourceExecution.stages.map((stage, index) => ({
+    ...stage,
+    label: sourceLabels[index]?.label,
+  }));
+  legacy.stages = legacy.stages.map((stage, index) => ({
+    ...stage,
+    label: sourceLabels[index]?.label,
+  }));
+  legacy.adaptation = {
+    ...legacy.adaptation,
+    changes: (legacy.adaptation?.changes || []).filter((change) => !/^stages\.\d+\.label$/.test(change.path || change.field || '')),
+    disclosure: legacy.adaptation?.timingPolicy
+      ? LEGACY_SOURCE_DOSE_POLICY_DISCLOSURE
+      : LEGACY_SOURCE_PROJECTION_DISCLOSURE,
+  };
+  return legacy;
+}
+
 function reconstructSourcePreview(base, body, sourceRequest) {
   const storedProjection = base.recipe.sourceProjection;
   const sourceDose = Number(base.recipe.coffeeGrams);
@@ -89,7 +121,11 @@ function reconstructSourcePreview(base, body, sourceRequest) {
     sourceRevision: sourceRequest.sourceRevision,
     dose: sourceDose,
   });
-  if (canonicalHash(trusted.recipe.sourceProjection) !== canonicalHash(storedProjection)) {
+  const trustedProjection = trusted.recipe.sourceProjection;
+  const currentMatches = canonicalHash(trustedProjection) === canonicalHash(storedProjection);
+  const legacyMatches = !currentMatches
+    && canonicalHash(legacySourceProjectionWitness(trustedProjection)) === canonicalHash(storedProjection);
+  if (!currentMatches && !legacyMatches) {
     throw Object.assign(new Error('The reviewed source projection no longer matches the trusted source record.'), { code: 'source_projection_mismatch' });
   }
   return createRecipePreview({

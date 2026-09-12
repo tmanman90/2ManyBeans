@@ -6,6 +6,7 @@ import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/technique
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { validateRecipePreviewRequest } from '../src/lib/ruphus/contracts.js';
 import { createMemoryRuphusRepository, persistRecipePreview } from '../api/_lib/ruphusRepository.js';
+import { executeRecipeCommand } from '../api/_lib/ruphusCommandService.js';
 import { isAgentAccessAllowed } from '../api/_lib/ruphusRollout.js';
 import { RATE_LIMIT } from '../api/_lib/claudeShared.js';
 import { handleRecipePreview } from '../api/ruphus-preview.js';
@@ -96,6 +97,60 @@ import { Firestore } from '@google-cloud/firestore';
   await handleRecipePreview({ method: 'POST', body: { requestId: 'source-preview-client-snapshot', proposalId: sourceProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 20, sourceProjection: {} } }, clientProjection, { uid }, { db });
   assert.equal(clientProjection.statusCode, 400);
   assert.equal(clientProjection.body.error, 'invalid_preview_request');
+
+  // Pre-label-fix owners may have a reviewed source projection whose typed
+  // checkpoints are adapted but whose executable labels still use the source
+  // wording. The endpoint accepts that exact legacy shape, then returns the
+  // corrected projection without mutating the historical proposal.
+  const sourceAt15 = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 15,
+  }).recipe;
+  const legacyProjection = structuredClone(sourceAt15.sourceProjection);
+  legacyProjection.sourceExecution.stages = legacyProjection.sourceExecution.stages.map((stage, index) => ({ ...stage, label: legacyProjection.sourceSnapshot.stages[index].label }));
+  legacyProjection.stages = legacyProjection.stages.map((stage, index) => ({ ...stage, label: legacyProjection.sourceSnapshot.stages[index].label }));
+  legacyProjection.adaptation = {
+    ...legacyProjection.adaptation,
+    changes: legacyProjection.adaptation.changes.filter((change) => !/^stages\.\d+\.label$/.test(change.path)),
+    disclosure: 'App-scaled typed quantities preserve native units and the source checkpoint/event anchors. Timing is an unchanged source guide at the selected dose, not a new author claim.',
+  };
+  const legacyRecipe = {
+    ...sourceAt15,
+    sourceProjection: legacyProjection,
+    stages: legacyProjection.stages,
+    sourceLineage: {
+      ...sourceAt15.sourceLineage,
+      adaptation: legacyProjection.adaptation.disclosure,
+      changedFields: sourceAt15.sourceLineage.changedFields.filter((path) => !/^stages\.\d+\.label$/.test(path)),
+    },
+  };
+  const legacyProposal = {
+    ...sourceProposal,
+    id: 'old-source-proposal',
+    after: legacyRecipe,
+  };
+  data.set(`${root}/proposals/${legacyProposal.id}`, legacyProposal);
+  const oldPreview = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'old-source-preview-16', proposalId: legacyProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 16 } }, oldPreview, { uid }, { db });
+  assert.equal(oldPreview.statusCode, 200);
+  assert.equal(oldPreview.body.preview.coffeeGrams, 16);
+  assert.equal(oldPreview.body.preview.waterMilliliters, 195.56);
+  assert.equal(oldPreview.body.preview.sourceProjection.stages[0].label, 'With the switch closed, pour approximately 195.56mL of hot water');
+  assert.equal(oldPreview.body.preview.sourceProjection.sourceSnapshot.stages[0].label, 'With the switch closed, pour approximately 440mL of hot water');
+  assert.equal(data.get(`${root}/proposals/${legacyProposal.id}`).after.sourceProjection.stages[0].label, 'With the switch closed, pour approximately 440mL of hot water');
+
+  const tamperedProposal = structuredClone(legacyProposal);
+  tamperedProposal.id = 'old-source-tampered';
+  tamperedProposal.after.sourceProjection.water.value += 1;
+  data.set(`${root}/proposals/${tamperedProposal.id}`, tamperedProposal);
+  const tamperedPreview = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'old-source-tampered-preview', proposalId: tamperedProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 16 } }, tamperedPreview, { uid }, { db });
+  assert.equal(tamperedPreview.statusCode, 400);
+  assert.equal(tamperedPreview.body.error, 'source_projection_mismatch');
+
+  const brew = await executeRecipeCommand({ db, uid, coffeeId: 'coffee', slotKey: 'v60_hot', actionId: 'old-source-brew-16', mode: 'brew_once', proposalId: oldPreview.body.proposal.id, expectedRevisionId: revision.id });
+  assert.equal(brew.attempt.snapshot.coffeeGrams, 16);
+  assert.equal(brew.attempt.snapshot.waterMilliliters, 195.56);
+  assert.equal(brew.attempt.snapshot.sourceProjection.stages[0].label, 'With the switch closed, pour approximately 195.56mL of hot water');
   delete process.env.RUPHUS_AGENT_V3_UIDS;
 }
 

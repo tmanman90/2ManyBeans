@@ -58,7 +58,7 @@ function historicalTechniqueReadRequired({ userText = '', context = null, toolEv
   if (existingRead) return null;
   const review = (Array.isArray(context?.proposalReviews) ? context.proposalReviews : [])
     .find((item) => item?.coffeeRef === target.coffeeRef && item?.slot === target.slot
-      && typeof item?.sourceId === 'string' && item.sourceId
+      && (item?.sourceId || ['v60_technique', 'manual_source_technique'].includes(item?.techniqueExperiment?.kind))
       && (item?.proposalId || item?.artifactId));
   return review ? target : null;
 }
@@ -308,26 +308,24 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
       throwIfCancelled();
+      // An authenticated ordinal inspection reopens its original card. Do
+      // this before dispatching provider calls: a model-selected fresh
+      // proposal or extra evidence read cannot consume the history budget.
+      const historyTarget = historicalTechniqueReadRequired({ userText, context, toolEvidence });
+      if (historyTarget
+        && toolRounds < maxToolRounds
+        && readCalls < MAX_READS_PER_TURN
+        && toolCalls < maxToolCalls) {
+        const request = { callId: 'historical-technique-inspection', name: 'read_technique_options', args: { coffeeRef: historyTarget.coffeeRef, slot: historyTarget.slot } };
+        toolRounds += 1;
+        readCalls += 1;
+        toolCalls += 1;
+        text = '';
+        const historicalRead = await runTool(request);
+        text = historicalRead.result?.message || 'I reopened the earlier technique as a read-only recipe. Your saved recipe is unchanged.';
+        break;
+      }
       if (!calls.length) {
-        // “Show me the first one again” is an inspection request, not a fresh
-        // technique experiment. If the provider answers with prose after the
-        // authenticated history binding, load the exact prior artifact once
-        // and finish the turn so the UI receives its existing read-only
-        // inspector affordance without another model round.
-        const historyTarget = historicalTechniqueReadRequired({ userText, context, toolEvidence });
-        if (historyTarget
-          && toolRounds < maxToolRounds
-          && readCalls < MAX_READS_PER_TURN
-          && toolCalls < maxToolCalls) {
-          const request = { callId: 'historical-technique-inspection', name: 'read_technique_options', args: { coffeeRef: historyTarget.coffeeRef, slot: historyTarget.slot } };
-          toolRounds += 1;
-          readCalls += 1;
-          toolCalls += 1;
-          text = '';
-          const historicalRead = await runTool(request);
-          text = historicalRead.result?.message || 'I reopened the earlier technique as a read-only recipe. Your saved recipe is unchanged.';
-          break;
-        }
         // A bare same-session technique follow-up has an authenticated target
         // from its delivered card, but the provider may answer after evidence
         // without asking for the option reader. Spend the existing second

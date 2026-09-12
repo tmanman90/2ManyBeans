@@ -58,6 +58,100 @@ function scaleQuantity(value, factor) {
   return value;
 }
 
+function formatQuantity(value) {
+  return finite(value) ? String(Math.round(value * 100) / 100) : null;
+}
+
+function quantityEndpoints(value) {
+  if (finite(value)) return [{ source: value, target: null }];
+  if (value && finite(value.min) && finite(value.max)) {
+    return [
+      { source: value.min, target: null },
+      { source: value.max, target: null },
+    ];
+  }
+  return [];
+}
+
+function subtractQuantity(value, previous) {
+  if (finite(value) && finite(previous)) return value - previous;
+  if (value && finite(value.min) && finite(value.max) && finite(previous)) {
+    return { min: value.min - previous, max: value.max - previous };
+  }
+  if (value && finite(value.min) && finite(value.max)
+    && previous && finite(previous.min) && finite(previous.max)) {
+    return { min: value.min - previous.min, max: value.max - previous.max };
+  }
+  return null;
+}
+
+function quantityEntries(source, target) {
+  const targetValues = quantityEndpoints(target).map(({ source: value }) => value);
+  return quantityEndpoints(source).map(({ source: value }, index) => ({
+    source: value,
+    target: targetValues[index] ?? targetValues[0] ?? null,
+  })).filter(({ target }) => finite(target));
+}
+
+// Source stage labels are executable copy in the preview/timer, not merely
+// decorative names. Replace only the exact water quantity owned by this stage;
+// this deliberately leaves temperatures, times, rates and unrelated numbers
+// alone. Incremental labels are supported only when their same-unit cumulative
+// typed water checkpoints establish the delta unambiguously.
+function scaledStageLabel(label, originalStage, originalValue, nextValue, previousOriginalValue = null, previousNextValue = null) {
+  if (typeof label !== 'string') return label;
+  const unitPattern = originalStage?.waterToGrams != null
+    ? '(?:grams?|g)'
+    : originalStage?.waterToMilliliters != null
+      ? '(?:mL|millilit(?:er|re)s?)'
+      : null;
+  if (!unitPattern) return label;
+  const cumulativeEntries = quantityEntries(originalValue, nextValue);
+  const originalDelta = previousOriginalValue == null ? null : subtractQuantity(originalValue, previousOriginalValue);
+  const nextDelta = previousNextValue == null ? null : subtractQuantity(nextValue, previousNextValue);
+  const deltaEntries = quantityEntries(originalDelta, nextDelta);
+  if (!cumulativeEntries.length && !deltaEntries.length) return label;
+
+  const candidates = [...deltaEntries.map((entry) => ({ ...entry, kind: 'delta' })), ...cumulativeEntries.map((entry) => ({ ...entry, kind: 'cumulative' }))];
+  const pickCandidate = (value, before, preferDelta = false) => {
+    const matching = candidates.filter((entry) => Math.abs(entry.source - value) < 0.000001);
+    if (!matching.length) return null;
+    const cumulativeContext = /\b(?:to|total|reaching|remaining(?: water)? to)\s*$/.test(before);
+    const deltaContext = /(?:\badd|\bwith|\bpour|\bbloom|\bfirst|\bpulse)\s*$/.test(before)
+      && !cumulativeContext;
+    return cumulativeContext
+      ? (matching.find((entry) => entry.kind === 'cumulative') || matching[0])
+      : (deltaContext || preferDelta)
+        ? (matching.find((entry) => entry.kind === 'delta') || matching[0])
+        : (matching.find((entry) => entry.kind === 'cumulative') || matching[0]);
+  };
+  const rangeMatcher = new RegExp(`(?<![\\w.])([0-9]+(?:\\.[0-9]+)?)(\\s*)([–-])(\\s*)([0-9]+(?:\\.[0-9]+)?)(\\s*)(${unitPattern})\\b`, 'gi');
+  const rangeReplacements = [];
+  let nextLabel = label.replace(rangeMatcher, (match, firstRaw, firstSpacing, dash, secondSpacing, secondRaw, unitSpacing, unit, offset, wholeLabel) => {
+    if (/^\s*(?:\/|per\s+(?:second|minute))/i.test(wholeLabel.slice(offset + match.length))) return match;
+    const before = wholeLabel.slice(Math.max(0, offset - 32), offset).toLowerCase();
+    const first = pickCandidate(Number(firstRaw), before);
+    const second = pickCandidate(Number(secondRaw), before);
+    if (!first || !second) return match;
+    const replacement = `${formatQuantity(first.target)}${firstSpacing}${dash}${secondSpacing}${formatQuantity(second.target)}${unitSpacing}${unit}`;
+    const placeholder = `\uE000${rangeReplacements.length}\uE001`;
+    rangeReplacements.push(replacement);
+    return placeholder;
+  });
+  const matcher = new RegExp(`(?<![\\w.])([0-9]+(?:\\.[0-9]+)?)(\\s*)(${unitPattern})\\b`, 'gi');
+  nextLabel = nextLabel.replace(matcher, (match, rawValue, spacing, unit, offset, wholeLabel) => {
+    const value = Number(rawValue);
+    const before = wholeLabel.slice(Math.max(0, offset - 32), offset).toLowerCase();
+    const after = wholeLabel.slice(offset + match.length, offset + match.length + 16).toLowerCase();
+    if (/^\s*(?:\/|per\s+(?:second|minute))/i.test(after)) return match;
+    const selected = pickCandidate(value, before, /^(?:\s*(?:total|cumulative)\b)/.test(after));
+    if (!selected) return match;
+    const formatted = formatQuantity(selected.target);
+    return formatted == null ? match : `${formatted}${spacing}${unit}`;
+  });
+  return nextLabel.replace(/\uE000(\d+)\uE001/g, (match, index) => rangeReplacements[Number(index)] || match);
+}
+
 function sourceBrewer(configuration = {}) {
   return configuration.device === 'v60' && configuration.variant === 'switch'
     ? 'switch'
@@ -243,7 +337,11 @@ function applyDoseAdaptation(execution, sourceDose, dose, changes, options = {})
     execution.water[key] = value;
   }
 
+  const previousByUnit = new Map();
   execution.stages.forEach((stage, index) => {
+    const originalStage = clone(stage);
+    const originalWater = stageWater(originalStage);
+    const previous = originalWater ? previousByUnit.get(originalWater.unit) : null;
     for (const key of ['waterToGrams', 'waterToMilliliters']) {
       if (stage[key] == null) continue;
       const original = stage[key];
@@ -251,6 +349,19 @@ function applyDoseAdaptation(execution, sourceDose, dose, changes, options = {})
       addChange(changes, `stages.${index}.${key}`, original, value, 'Scale the source stage quantity; do not convert its unit.');
       stage[key] = value;
     }
+    if (typeof stage.label === 'string' && originalWater) {
+      const nextWater = stageWater(stage);
+      const label = scaledStageLabel(stage.label, originalStage, originalWater.value, nextWater?.value,
+        previous?.value ?? null, previous?.nextValue ?? null);
+      if (label !== stage.label) {
+        addChange(changes, `stages.${index}.label`, stage.label, label, 'Keep executable source-stage copy aligned with the explicitly scaled typed quantity; preserve original wording in sourceSnapshot.');
+        stage.label = label;
+      }
+    }
+    if (originalWater) previousByUnit.set(originalWater.unit, {
+      value: originalWater.value,
+      nextValue: stageWater(stage)?.value,
+    });
     if (stage.durationSeconds != null) {
       addChange(changes, `stages.${index}.durationSeconds`, stage.durationSeconds, null, 'Source duration is not validated at the changed dose.');
       stage.durationSeconds = null;
@@ -263,7 +374,7 @@ function applyDoseAdaptation(execution, sourceDose, dose, changes, options = {})
     notes: [rangeSelection
       ? `Selected ${dose}g from the author's ${originalDose.min}–${originalDose.max}g source range; source timing still requires explicit validation.`
       : `Scaled from ${sourceDose}g to ${dose}g. Source timing requires explicit validation at this dose.`],
-    disclosure: 'App-calculated quantities are exposed in typed fields; source-native prose remains verbatim and source timing is not carried over.',
+    disclosure: 'App-calculated quantities and executable stage labels are exposed in typed fields; original source wording remains preserved in sourceSnapshot and source timing is not carried over.',
   };
 }
 

@@ -410,7 +410,7 @@ export function applyManualSourceDosePolicy(projection) {
       ...(projection.adaptation.notes || []),
       `The app keeps the source checkpoint/event anchors unchanged at ${projection.coffeeGrams}g; this is an app guide, not an author-timed validation.`,
     ],
-    disclosure: 'App-scaled typed quantities preserve native units and the source checkpoint/event anchors. Timing is an unchanged source guide at the selected dose, not a new author claim.',
+    disclosure: 'App-scaled typed quantities and executable stage labels preserve native units and the source checkpoint/event anchors. Original source wording remains available in sourceSnapshot. Timing is an unchanged source guide at the selected dose, not a new author claim.',
   };
   const next = {
     ...projection,

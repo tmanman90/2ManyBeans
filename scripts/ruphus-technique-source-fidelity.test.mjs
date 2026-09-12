@@ -132,14 +132,79 @@ test('dose adaptation is explicit and never silently restores timer readiness', 
   assert.equal(switchProjection.stages[2].water.unit, 'mL');
 });
 
-test('dose adaptation keeps source prose verbatim and discloses typed-field scaling', () => {
+test('dose adaptation keeps original source prose alongside aligned executable stage copy', () => {
   const source = record('kurasu-wave-155-2023');
   const projection = projectManualSource(source, configFor(source, { dose: 13, allowDoseAdaptation: true }));
-  assert.equal(projection.stages[0].label, source.stages[0].label);
+  assert.deepEqual(projection.sourceSnapshot.stages.map((stage) => stage.label), source.stages.map((stage) => stage.label));
+  assert.deepEqual(projection.stages.map((stage) => stage.label), [
+    'Pour to 27.86g',
+    'Pour aggressively across the bed to 55.71g',
+    'Pour to 185.71g in a thin stationary center stream; match drainage and remain below the second-pour coffee line',
+  ]);
+  assert.deepEqual(projection.sourceExecution.stages.map((stage) => stage.label), projection.stages.map((stage) => stage.label));
   assert.deepEqual(projection.preparation, source.preparation);
   assert.deepEqual(projection.sourceExecution.preparation, source.preparation);
-  assert.ok(projection.adaptation.disclosure.includes('verbatim'));
-  assert.equal(projection.adaptation.changes.some((change) => /label|preparation|aftercare/.test(change.path)), false);
+  assert.ok(projection.adaptation.disclosure.includes('sourceSnapshot'));
+  assert.ok(projection.adaptation.changes.some((change) => change.path === 'stages.0.label'));
+  assert.equal(projection.adaptation.changes.some((change) => /preparation|aftercare/.test(change.path)), false);
+});
+
+test('adapted executable source labels match typed quantities for Foundation Kalita and Switch 03', () => {
+  const foundation = projectManualSource(record('foundation-wave-155'), configFor(record('foundation-wave-155'), {
+    dose: 13,
+    allowDoseAdaptation: true,
+  }));
+  assert.deepEqual(foundation.stages.map((stage) => [stage.label, stage.water]), [
+    ['Pour 26g of water to bloom all grounds', { value: 26, unit: 'g' }],
+    ['After a 30-second bloom, gradually pour the remaining water to 211.25g', { value: 211.25, unit: 'g' }],
+    ['Finish around the 2:40 total-time target', null],
+  ]);
+  assert.equal(foundation.sourceSnapshot.stages[0].label, 'Pour 32g of water to bloom all grounds');
+  assert.equal(foundation.sourceSnapshot.stages[1].label, 'After a 30-second bloom, gradually pour the remaining water to 260g');
+
+  const switchSource = record('hario-switch-03-instruction-manual-36-2023');
+  for (const [dose, water] of [[15, 183.33], [16, 195.56]]) {
+    const projection = projectManualSource(switchSource, configFor(switchSource, {
+      dose,
+      allowDoseAdaptation: true,
+    }));
+    assert.equal(projection.stages[0].label, `With the switch closed, pour approximately ${water}mL of hot water`);
+    assert.deepEqual(projection.stages[0].water, { value: water, unit: 'mL' });
+    assert.equal(projection.stages[1].label, `Let it steep for approximately 2 minutes; stir as desired for a stronger brew`);
+    assert.deepEqual(projection.stages[1].water, { value: water, unit: 'mL' });
+    assert.equal(projection.sourceSnapshot.stages[0].label, 'With the switch closed, pour approximately 440mL of hot water');
+  }
+});
+
+test('adapted incremental source labels use typed checkpoint deltas and preserve ranges', () => {
+  const pulse = record('art-of-brew-wave-155-pulse-2024');
+  const projection = projectManualSource(pulse, configFor(pulse, {
+    dose: 13,
+    allowDoseAdaptation: true,
+  }));
+  assert.deepEqual(projection.stages.map((stage) => [stage.label, stage.water]), [
+    ['0:00–0:30 bloom with 39g', { value: 39, unit: 'g' }],
+    ['0:30–0:40 first pour with 39g', { value: 78, unit: 'g' }],
+    ['0:50–1:00 pulse 1 with 26g', { value: 104, unit: 'g' }],
+    ['1:10–1:20 pulse 2 with 26g', { value: 130, unit: 'g' }],
+    ['1:30–1:40 pulse 3 with 26g', { value: 156, unit: 'g' }],
+    ['1:50–2:05 final pour with 52g', { value: 208, unit: 'g' }],
+  ]);
+  assert.deepEqual(projection.sourceSnapshot.stages.map((stage) => stage.label), [
+    '0:00–0:30 bloom with 37.5g',
+    '0:30–0:40 first pour with 37.5g',
+    '0:50–1:00 pulse 1 with 25g',
+    '1:10–1:20 pulse 2 with 25g',
+    '1:30–1:40 pulse 3 with 25g',
+    '1:50–2:05 final pour with 50g',
+  ]);
+
+  const ranged = projectManualSource(record('drop-wave-155'), configFor(record('drop-wave-155'), {
+    dose: 13,
+    allowDoseAdaptation: true,
+  }));
+  assert.equal(ranged.stages[0].label, 'Wet all grounds with 32.5–40.63g');
+  assert.deepEqual(ranged.stages[0].water, { value: { min: 32.5, max: 40.63 }, unit: 'g' });
 });
 
 test('ranged source doses stay ranges unless an explicit sourceDoseSelection is supplied', () => {
