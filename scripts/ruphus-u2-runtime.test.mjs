@@ -69,7 +69,8 @@ test('locked method binding is injected after general setup and rejects another 
     methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' },
   });
   assert.match(block, /<AUTHORITATIVE_METHOD_TARGET>/);
-  assert.match(block, /user used hot Kalita/);
+  assert.match(block, /current request concerns hot Kalita/);
+  assert.doesNotMatch(block, /user used hot Kalita/, 'a recipe request is not proof of a past brew');
   assert.ok(block.lastIndexOf('<AUTHORITATIVE_METHOD_TARGET>') > block.lastIndexOf('<TRUSTED_METHOD_BINDING>'));
   assert.deepEqual(methodBindingTriggers({ reply: 'Use the Aiden recipe instead.', binding: { status: 'locked', slot: 'kalita_hot' } }).map((item) => item.code), ['RT6_METHOD_CONTRADICTION']);
   assert.deepEqual(methodBindingTriggers({ reply: 'For the Kalita, was it thin but clean or sour?', binding: { status: 'locked', slot: 'kalita_hot' } }), []);

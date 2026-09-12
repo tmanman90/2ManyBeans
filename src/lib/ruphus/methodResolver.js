@@ -5,7 +5,7 @@ const slot = (value) => {
   const valueText = String(value || '').toLowerCase().replace(/\s+/g, '_');
   if (SLOT_KEYS.includes(valueText)) return valueText;
   if (valueText === 'aiden') return 'aiden';
-  if (valueText === 'switch' || /^switch_0?[23]$/.test(valueText)) return 'v60_hot';
+  if (/^(?:(?:hot|iced)_)?switch(?:_0?[23])?$/.test(valueText)) return valueText.startsWith('iced_') ? 'v60_iced' : 'v60_hot';
   if (valueText.includes('kalita')) return valueText.includes('iced') ? 'kalita_iced' : 'kalita_hot';
   if (valueText.includes('v60') || valueText === 'v60') return valueText.includes('iced') ? 'v60_iced' : 'v60_hot';
   return null;
@@ -113,7 +113,14 @@ function latestRecipeSlot(recipes, records) {
 export function resolveMethod(input = {}) {
   const requestText = input.userText || input.request || '';
   const explicit = slot(input.explicitMethod || input.explicitSlot) || explicitMethodFromText(requestText);
-  if (explicit) return methodResult(explicit, 'M1');
+  if (explicit) {
+    const result = methodResult(explicit, 'M1');
+    if (explicitMethodVariantFromText(requestText) === 'switch') {
+      const size = String(requestText).match(/\bswitch\s*(0?[23])\b/i)?.[1];
+      result.displayName = `${explicit.endsWith('_iced') ? 'iced' : 'hot'} Switch${size ? ` ${size.padStart(2, '0')}` : ''}`;
+    }
+    return result;
+  }
   const mode = explicitMode(requestText);
   const launch = input.launchItem?.method || input.launchMethod;
   const launchCoffee = input.launchCoffeeRef || input.launchItem?.coffeeRef;
@@ -122,7 +129,12 @@ export function resolveMethod(input = {}) {
   if (launch && !input.launchHintConsumed && (!launchCoffee || !focus || launchCoffee === focus) && !input.methodCorrected && !input.focusChanged) return methodResult(slot(launch), 'M1b');
   const methodFocus = slot(input.methodFocus?.displayName || input.methodFocus?.slot || input.methodFocus);
   const sameFocusedCoffee = !input.methodFocusCoffeeRef || !input.coffeeRef || input.methodFocusCoffeeRef === input.coffeeRef;
-  if (methodFocus && sameFocusedCoffee && !input.methodCorrected && !input.focusChanged) return methodResult(applyMode(methodFocus, mode), 'M2');
+  if (methodFocus && sameFocusedCoffee && !input.methodCorrected && !input.focusChanged) {
+    const result = methodResult(applyMode(methodFocus, mode), 'M2');
+    const display = input.methodFocus?.displayName;
+    if (typeof display === 'string' && /\bswitch\b/i.test(display)) result.displayName = mode ? display.replace(/^(?:hot|iced)\b/i, mode) : display;
+    return result;
+  }
 
   const now = input.now == null ? Date.now() : (input.now instanceof Date ? input.now.getTime() : Number(input.now));
   const days = Number(input.historyDays || 14);

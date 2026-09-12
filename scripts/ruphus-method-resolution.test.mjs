@@ -30,7 +30,7 @@ test('explicit Switch equipment wins across multiple saved slots while switch-to
   };
   assert.equal(explicitMethodVariantFromText('Try a different Switch technique for El Vergel'), 'switch');
   assert.equal(explicitMethodFromText('Try a different Switch technique for El Vergel'), 'v60_hot');
-  assert.deepEqual(resolveMethod({ ...multiRecipeInput, userText: 'Try a different Switch technique for El Vergel' }), { slot: 'v60_hot', displayName: 'hot V60', tier: 'M1' });
+  assert.deepEqual(resolveMethod({ ...multiRecipeInput, userText: 'Try a different Switch technique for El Vergel' }), { slot: 'v60_hot', displayName: 'hot Switch', tier: 'M1' });
   assert.equal(explicitMethodFromText('Show me an iced Switch recipe'), 'v60_iced');
 
   assert.equal(explicitMethodVariantFromText('Switch to Jar 2'), null);
@@ -72,4 +72,15 @@ test('trusted method focus carries same-coffee continuity but yields to correcti
   assert.notEqual(corrected.slot, 'kalita_hot');
   const switched = resolveMethod({ methodFocus: { displayName: 'hot Kalita' }, methodFocusCoffeeRef: 'a', coffeeRef: 'b', launchHintConsumed: true, recipes: ['v60_hot'] });
   assert.notEqual(switched.slot, 'kalita_hot');
+});
+
+test('Switch equipment identity survives the shared V60 slot and the next turn', () => {
+  const explicit = resolveMethod({ userText: 'What about jar 1 on my Switch 03', recipes: ['v60_hot', 'kalita_hot'] });
+  assert.equal(explicit.slot, 'v60_hot');
+  assert.equal(explicit.displayName, 'hot Switch 03');
+  const carried = resolveMethod({ userText: 'Why that one?', methodFocus: { displayName: explicit.displayName }, methodFocusCoffeeRef: 'a', coffeeRef: 'a' });
+  assert.equal(carried.slot, 'v60_hot');
+  assert.equal(carried.displayName, 'hot Switch 03');
+  assert.equal(resolveMethod({ userText: 'Actually classic V60', methodFocus: { displayName: explicit.displayName } }).displayName, 'hot V60');
+  assert.equal(resolveMethod({ userText: 'make it iced', methodFocus: { displayName: explicit.displayName } }).displayName, 'iced Switch 03');
 });
