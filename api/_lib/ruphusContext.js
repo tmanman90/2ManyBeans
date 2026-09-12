@@ -2,7 +2,7 @@ import { canonicalHash, clone, validateLaunchContext } from '../../src/lib/ruphu
 import { sanitizeEvidence } from '../../src/lib/ruphus/sanitizeEvidence.js';
 import { appendLedger, boundLedger, buildRotationSnapshot, MAX_LEDGER_BYTES, shouldWidenHistory } from './ruphusEvidence.js';
 import { bindRuphusTurn } from './ruphusTurnBinder.js';
-import { explicitMethodFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
+import { equipmentClarificationAnswer, explicitMethodFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 
 function safeDynamic({ userText, launchContext, conversation, ledger }, maxBytes) {
   // The transcript is durable; only its provider projection is windowed. A
@@ -111,7 +111,8 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   const launchCoffee = launchCoffeeRef(contextRef, snapshot) || addOwnerLaunchRef(contextRef?.coffeeRef, coffees, snapshot);
   if (contextRef?.coffeeRef && !launchCoffee) throw Object.assign(new Error('launch coffee is outside the owner-scoped context'), { code: 'cross_owner_or_context' });
   const normalizedInternalLaunch = { ...clone(contextRef), ...(launchCoffee && launchCoffee !== contextRef.coffeeRef ? { coffeeRef: launchCoffee } : {}) };
-  const turnBinding = bindRuphusTurn({ userText, coffees, ledger: currentLedger, launchContext: normalizedInternalLaunch, refs: snapshot.refs, evidenceByteCap, priorTechniqueProposals });
+  const equipmentAnswer = equipmentClarificationAnswer(userText, conversation);
+  const turnBinding = bindRuphusTurn({ userText: equipmentAnswer ? 'this coffee' : userText, coffees, ledger: currentLedger, launchContext: normalizedInternalLaunch, refs: snapshot.refs, evidenceByteCap, priorTechniqueProposals });
   Object.assign(snapshot.refs, turnBinding.refs || {});
   const launchHintConsumed = sessionState?.launchHintConsumed === true || turnBinding.launchHintConsumed === true;
   const launchForTurn = launchHintConsumed && normalizedInternalLaunch.launchItem
@@ -126,6 +127,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     || (turnBinding.status === 'locked' && turnBinding.techniqueSlot ? { displayName: displayMethod(turnBinding.techniqueSlot) } : null);
   let resolvedMethod = resolveMethod({
     userText,
+    explicitSlot: equipmentAnswer?.slot,
     launchItem: launchForTurn.launchItem,
     launchCoffeeRef: launchCoffee,
     coffeeRef: boundCoffeeRef,
@@ -138,6 +140,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   let methodBinding = resolvedMethod?.slot && ['M1', 'M1b', 'M2'].includes(resolvedMethod.tier)
     ? { status: 'locked', slot: resolvedMethod.slot, displayName: resolvedMethod.displayName, source: resolvedMethod.tier }
     : null;
+  if (methodBinding && equipmentAnswer) methodBinding = { ...methodBinding, displayName: equipmentAnswer.variant === 'switch' ? `hot Switch ${equipmentAnswer.size}` : `hot Kalita ${equipmentAnswer.size}`, source: 'equipment-answer' };
   if (!methodBinding && /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not)\b[\s\S]*\b(?:aiden|v\s*60|kalita)\b/i.test(userText)) {
     const prior = priorExplicitMethod(Array.isArray(conversation) ? conversation : []);
     if (prior) {
@@ -164,7 +167,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
       : { status: 'ambiguous', candidates: turnBinding.candidates.map(({ coffeeRef, coffeeName }) => ({ coffeeRef, coffeeName })) };
   const trace = { focusChanges: [], reads: [], regenerations: [] };
   if (publicBinding?.status === 'locked') trace.focusChanges.push({ from: launchCoffee || ledgerCoffeeRef(currentLedger, coffees, snapshot) || null, to: publicBinding.coffeeRef, source: 'turn_binding' });
-  const evidence = { launchContext: normalizedLaunch, rotationSnapshot: safeSnapshot, ledger: turnLedger, turnBinding: publicBinding || null, methodBinding, conversation: dynamic.conversation || [], userText: dynamic.userText || '', historyWidened: widened };
+  const evidence = { launchContext: normalizedLaunch, rotationSnapshot: safeSnapshot, ledger: turnLedger, turnBinding: publicBinding || null, methodBinding, equipmentAnswer, conversation: dynamic.conversation || [], userText: dynamic.userText || '', historyWidened: widened };
   const result = {
     version: 2,
     context: normalizedLaunch,
@@ -177,6 +180,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     historyWidened: widened,
     ...(publicBinding ? { turnBinding: publicBinding } : {}),
     ...(methodBinding ? { methodBinding } : {}),
+    ...(equipmentAnswer ? { equipmentAnswer } : {}),
     sessionState: { lastActivityAt: Number.isFinite(Number(sessionState?.lastActivityAt)) ? Number(sessionState.lastActivityAt) : null, boundaryIndex: Number.isInteger(sessionState?.boundaryIndex) ? Math.max(0, sessionState.boundaryIndex) : 0, launchHintConsumed },
   };
   installServerField(result, '__ruphusRefs', clone(snapshot.refs));

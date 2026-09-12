@@ -10,9 +10,9 @@ export function ActionReceiptCard({ artifact = {}, onAction, actionPending = fal
   const completedCopy = status === 'undone' ? ['Recipe update undone', 'This update is no longer your saved recipe.'] : status === 'succeeded' ? {
     apply_proposal: ['Recipe updated', 'Your saved recipe is ready for your next brew.'],
     promote_attempt: ['Recipe updated', 'This trial is now your saved recipe.'],
-    undo_revision: ['Change undone', 'Your previous recipe is restored.'],
+    undo_revision: ['Change undone', artifact.restoredSourceState === 'absent' ? 'The new recipe was removed. No recipe is saved for this brewer.' : 'Your previous recipe is restored.'],
     keep_current: ['Recipe kept', 'Your saved recipe is unchanged.'],
-    brew_once: ['Ready to try', 'Use this version for one brew. Your saved recipe is unchanged.'],
+    brew_once: ['Ready to try', artifact.sourceState === 'absent' ? 'Use this version for one brew. Nothing has been saved.' : 'Use this version for one brew. Your saved recipe is unchanged.'],
   }[artifact.mode] : null;
   return <div data-artifact="action_receipt" data-status={status} style={{ width: '100%', padding: 14, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={typeScale.h3}>{status === 'undone' ? completedCopy[0] : artifact.title || completedCopy?.[0] || 'Recipe change'}</div>

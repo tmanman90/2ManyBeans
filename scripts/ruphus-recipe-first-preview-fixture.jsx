@@ -37,6 +37,10 @@ if (new URLSearchParams(window.location.search).has('empty-slot')) {
   artifact.before = null;
   artifact.sourceState = 'absent';
 }
+const emptyReceipt = new URLSearchParams(window.location.search).get('empty-receipt');
+if (['brew_once', 'undo_revision'].includes(emptyReceipt)) {
+  Object.assign(artifact, { type: 'action_receipt', mode: emptyReceipt, status: 'succeeded', sourceState: 'absent', restoredSourceState: 'absent' });
+}
 
 function Fixture() {
   const reducedMotion = useReducedMotion();

@@ -41,13 +41,17 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
         ? []
         : [{ role: 'user', content: userText }];
       const correction = correctiveInstruction ? [{ role: 'developer', content: correctiveInstruction }] : [];
-      const priorInput = inputSequences.get(turnId) || [];
+      const priorInput = inputSequences.get(turnId) || [
+        { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },
+        ...recentConversation,
+        ...currentUserTurn,
+      ];
       const knownToolCalls = new Set(priorInput.filter((item) => item?.type === 'function_call_output').map((item) => item.call_id));
       const missingEvidence = results.filter((item) => !knownToolCalls.has(item.call_id));
       const input = (regeneration || correctiveInstruction)
         ? [...priorInput, ...(previous?.outputItems || []), ...missingEvidence, ...correction]
         : previous && toolResult
-        ? [...(inputSequences.get(turnId) || []), ...(previous.outputItems || []), ...results]
+        ? [...priorInput, ...(previous.outputItems || []), ...results]
         : [
             { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },
             ...recentConversation,

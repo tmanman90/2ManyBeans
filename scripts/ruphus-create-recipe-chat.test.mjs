@@ -6,6 +6,8 @@ import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 import { bindRuphusTurn } from '../api/_lib/ruphusTurnBinder.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
+import { equipmentClarificationAnswer } from '../src/lib/ruphus/methodResolver.js';
 
 function harness(recipe, userText, prior = []) {
   const context = {
@@ -84,6 +86,54 @@ test('a short Switch size answer completes the in-chat clarification instead of 
   assert.equal(result.ok, true, result.code);
   assert.equal(result.artifact.after.variant, 'switch');
   assert.equal(result.artifact.after.v60Size, '03');
+});
+
+test('native-shaped Switch answer loads source options before any model-selected history read', async () => {
+  const saved = generateV60Recipe({}, { dose: 20 });
+  const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'Columbia', status: 'ACTIVE', jarSlot: 1 }], readRecipe: async () => saved };
+  const context = await buildRuphusContext({ uid: 'owner', contextRef: { surface: 'direct' }, evidenceByteCap: 10000,
+    userText: '03', readers,
+    conversation: [{ role: 'user', content: 'Make a switch recipe for jar one' }, { role: 'assistant', content: 'Got it—jar one is Columbia. Which Switch size are you using: 02 or 03?' }],
+    ledger: { entries: [{ kind: 'coffee_focus', status: 'available', namedCoffees: ['Columbia'] }, { kind: 'method_focus', status: 'available', namedCoffees: ['Columbia'], methodFocus: { displayName: 'hot Kalita' } }] },
+  });
+  assert.equal(context.methodBinding.displayName, 'hot Switch 03');
+  const tools = createRuphusTools({ uid: 'owner', context, readers });
+  const frames = [];
+  let calls = 0;
+  const result = await runRuphusTurn({ turnId: 'native-switch-answer', context, userText: '03', tools, emit: f => frames.push(f), provider: { runTurn: async input => {
+    calls++;
+    assert.equal(calls, 1, 'the answer needs one model dispatch after its trusted option read');
+    const read = input.toolResult.results[0];
+    assert.equal(read.name, 'read_technique_options');
+    assert.equal(read.result.actionable, true);
+    const selected = read.result.options.find(item => item.executable);
+    return { toolCalls: [{ callId: 'prepare-switch', name: 'propose_recipe_change', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot', experiment: { kind: 'manual_source_technique', techniqueId: selected.id } } }] };
+  } } });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const card = frames.find(f => f.type === 'artifact_ready')?.artifact;
+  assert.equal(card?.after.variant, 'switch');
+  assert.equal(card?.after.v60Size, '03');
+  assert.equal(card?.before.v60Size, '02');
+});
+
+test('equipment answers are immediate, constrained, and do not reinterpret ordinary numbers', () => {
+  const question = [{ role: 'assistant', content: 'Which Switch size are you using—02 or 03?' }];
+  assert.equal(equipmentClarificationAnswer('03', []) , null);
+  assert.equal(equipmentClarificationAnswer('03', [...question, { role: 'user', content: 'Something else' }]), null);
+  assert.equal(equipmentClarificationAnswer('03', [{ role: 'assistant', content: 'Your Switch size is 03.' }]), null);
+  assert.equal(equipmentClarificationAnswer('185', question), null);
+  assert.equal(equipmentClarificationAnswer("It's 03", question)?.size, '03');
+  assert.equal(equipmentClarificationAnswer('02', question)?.size, '02');
+  assert.equal(equipmentClarificationAnswer('03', [{ role: 'user', content: 'Make an iced Switch recipe' }, ...question]), null);
+});
+
+test('a clarified Switch02 stays reference-only and never borrows the 03 schedule', async () => {
+  const { tools, context } = harness(generateV60Recipe({}, { dose: 20 }), '02');
+  context.conversation = [{ role: 'assistant', content: 'Which Switch size are you using—02 or 03?' }];
+  const options = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(options.actionable, false);
+  assert.ok(!(options.options || []).some(item => item.executable));
+  assert.equal(context.proposalState.techniqueReady, undefined);
 });
 
 test('recipe_missing is absence but unavailable evidence never creates a draft', async () => {

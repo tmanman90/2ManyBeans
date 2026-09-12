@@ -3,7 +3,7 @@ import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { canonicalRecipeSnapshot, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { absentRecipeSourceHash } from '../../src/lib/ruphus/recipeSourceState.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
-import { explicitMethodVariantFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
+import { equipmentClarificationAnswer, explicitMethodVariantFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 import { generateV60Recipe } from '../../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../../src/lib/v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
@@ -562,6 +562,7 @@ function setPreviewReadiness(context, { coffeeRef, slotKey, recipe } = {}) {
 
 function setTechniqueReadiness(context, { coffeeRef, slotKey, recipe, sourceRecipe = recipe, configurationRequested = false, options = [], kind = 'v60_technique' } = {}) {
   const techniqueIntent = isTechniqueExplorationRequest(context?.userText)
+    || Boolean(context?.equipmentAnswer?.slot === slotKey)
     || isExplicitTechniqueReuseRequest(context?.userText)
     || isContextualTechniqueFollowupRequest(context?.userText, context, { coffeeRef, slot: slotKey })
     || (configurationRequested && /\b(?:try|show|give|make|prepare|brew|use|instead|actually|mean|meant|want)\b|^\s*(?:155|185|0?[23])[.!]?\s*$/i.test(context?.userText || ''));
@@ -578,14 +579,14 @@ function setTechniqueReadiness(context, { coffeeRef, slotKey, recipe, sourceReci
 // brewer may use a complete audited source without rewriting the before-state.
 function techniqueDraftRecipe(context, saved, slotKey, coffeeId) {
   const text = String(context.userText || '');
-  const lastQuestion = [...(context.conversation || [])].reverse().find(item => item.role === 'assistant')?.content || '';
-  const sizeAnswer = /^\s*0?[23][.!]?\s*$/.test(text) && /which switch size/i.test(lastQuestion);
+  const equipmentAnswer = context.equipmentAnswer || equipmentClarificationAnswer(text, context.conversation || []);
+  const sizeAnswer = equipmentAnswer?.variant === 'switch';
   const prior = (context.__ruphusPriorProposals || []).filter(item => item.coffeeId === coffeeId && item.slotKey === slotKey && item.after && item.techniqueExperiment).at(-1)?.after;
   const followup = isAlternativeRequest(text) || isContextualTechniqueFollowupRequest(text, context, { slot: slotKey });
   const current = followup && prior ? prior : saved;
   const explicitDose = text.match(/\b(\d+(?:\.\d+)?)\s*(?:g|grams)\s+(?:of\s+)?coffee\b/i)?.[1];
   if (slotKey === 'kalita_hot') {
-    const requestedSize = requestedKalitaSize(text);
+    const requestedSize = equipmentAnswer?.slot === 'kalita_hot' ? equipmentAnswer.size : requestedKalitaSize(text);
     const size = requestedSize || current?.kalitaSize || current?.size;
     if (!size) return { message: 'Which Kalita Wave are you using—the 155 or the 185?' };
     if (current && String(current.kalitaSize || current.size) === String(size)) return { recipe: current, configurationRequested: Boolean(requestedSize) };
@@ -594,7 +595,7 @@ function techniqueDraftRecipe(context, saved, slotKey, coffeeId) {
   const requestedVariant = sizeAnswer ? 'switch' : explicitMethodVariantFromText(text);
   const variant = requestedVariant || (current?.variant === 'switch' || current?.v60Variant === 'switch' ? 'switch' : 'classic');
   const currentVariant = current?.variant === 'switch' || current?.v60Variant === 'switch' ? 'switch' : 'classic';
-  const namedSize = sizeAnswer ? text.match(/\d+/)[0] : text.match(/\b(?:switch|v60)\s*(0?[123])\b/i)?.[1];
+  const namedSize = sizeAnswer ? equipmentAnswer.size : text.match(/\b(?:switch|v60)\s*(0?[123])\b/i)?.[1];
   const size = namedSize ? namedSize.padStart(2, '0') : current && currentVariant === variant ? current.v60Size || '02' : variant === 'classic' ? '02' : null;
   if (!size) return { message: 'Which Switch size are you using—02 or 03? I can prepare the recipe here once I know.' };
   if (current && currentVariant === variant && String(current.v60Size || '02') === size) return { recipe: current, configurationRequested: Boolean(requestedVariant || namedSize) };
@@ -693,6 +694,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const methodFocus = methodFocusForCoffee(context.ledger, snapshot, args.coffeeRef, evidence.coffee?.coffee?.name);
       const method = resolveMethod({
         userText: context.userText || '',
+        explicitSlot: context.equipmentAnswer?.slot,
         launchItem,
         launchCoffeeRef: context.launchCoffeeId,
         coffeeRef: args.coffeeRef,

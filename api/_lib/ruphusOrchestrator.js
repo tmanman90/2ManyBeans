@@ -304,7 +304,12 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   };
   try {
     throwIfCancelled();
-    response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, signal }); throwIfCancelled(); rememberUsage(response);
+    if (context?.equipmentAnswer?.slot && context?.turnBinding?.status === 'locked') {
+      const request = { callId: 'answered-equipment-options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: context.equipmentAnswer.slot } };
+      response = { toolCalls: [request], outputItems: [{ type: 'function_call', call_id: request.callId, name: request.name, arguments: JSON.stringify(request.args) }] };
+    } else {
+      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, signal }); throwIfCancelled(); rememberUsage(response);
+    }
     while (response) {
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];

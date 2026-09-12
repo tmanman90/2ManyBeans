@@ -438,6 +438,16 @@ try {
     await emptySlotPage.getByRole('button', { name: 'Close', exact: true }).click();
     await emptySlotPage.getByRole('button', { name: 'View recipe', exact: true }).waitFor();
     await emptySlotPage.close();
+    for (const [mode, message] of [
+      ['brew_once', 'Use this version for one brew. Nothing has been saved.'],
+      ['undo_revision', 'The new recipe was removed. No recipe is saved for this brewer.'],
+    ]) {
+      const receiptPage = await context.newPage();
+      await receiptPage.goto(`${baseUrl}/scripts/ruphus-recipe-first-preview-fixture.html?empty-receipt=${mode}`, { waitUntil: 'domcontentloaded' });
+      await receiptPage.getByText(message, { exact: true }).waitFor();
+      assert.equal(await receiptPage.getByText('Your previous recipe is restored.', { exact: true }).count(), 0);
+      await receiptPage.close();
+    }
     assert.deepEqual(blockedRequests, [], 'Rendered fixture must not request non-local or non-GET resources');
     console.log(JSON.stringify({
       sourceResponsive,

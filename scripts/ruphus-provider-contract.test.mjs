@@ -50,7 +50,9 @@ test('OpenAI continuation replays prior response items alongside every tool resu
   const requests = [];
   const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output_text: '', output: [] }; } } } });
   await provider.runTurn({ context: {}, userText: 'coffee', tools: [], previous: { outputItems: [{ type: 'reasoning', id: 'reasoning-1' }] }, toolResult: { results: [{ callId: 'call-1', result: { ok: true } }, { callId: 'call-2', result: { ok: true } }] } });
-  assert.deepEqual(requests[0].input, [{ type: 'reasoning', id: 'reasoning-1' }, { type: 'function_call_output', call_id: 'call-1', output: '{"ok":true}' }, { type: 'function_call_output', call_id: 'call-2', output: '{"ok":true}' }]);
+  assert.equal(requests[0].input[0].role, 'developer');
+  assert.deepEqual(requests[0].input[1], { role: 'user', content: 'coffee' });
+  assert.deepEqual(requests[0].input.slice(2), [{ type: 'reasoning', id: 'reasoning-1' }, { type: 'function_call_output', call_id: 'call-1', output: '{"ok":true}' }, { type: 'function_call_output', call_id: 'call-2', output: '{"ok":true}' }]);
 });
 
 test('provider adapter keeps app-initiated technique continuation outputs paired', async () => {
@@ -83,6 +85,8 @@ test('provider adapter keeps app-initiated technique continuation outputs paired
     regeneration: true,
   });
   const input = requests[0].input;
+  assert.equal(input[0].role, 'developer', 'an app-initiated first read keeps the starting context');
+  assert.ok(input.some(item => item.role === 'user' && item.content === 'Show me another one'));
   const call = input.find((item) => item.type === 'function_call' && item.call_id === callId);
   const output = input.find((item) => item.type === 'function_call_output' && item.call_id === callId);
   assert.equal(call?.name, 'read_technique_options');
