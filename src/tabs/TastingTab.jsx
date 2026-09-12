@@ -47,7 +47,7 @@ const formatDateRelative = (iso) => {
 };
 
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onRuphusAttemptCompleted, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
+export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onRuphusAttemptCompleted, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -57,7 +57,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [sel, setSel] = useState(active[0]?.id || sealed[0]?.id || '');
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
-  const agentV3Enabled = isRuphusAgentV3Enabled({ isDemo });
+  const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const { errorMsg, showError, hideError } = useErrorToast();
   // Background tasting score conversion for spider chart overlay
   const convertScoresInBackground = (tastingId, tastingData) => {

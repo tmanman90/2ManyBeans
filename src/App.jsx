@@ -357,6 +357,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
         {tab === 'tasting' && (
           <Suspense fallback={<TabFallback />}>
             <TastingTab
+              uid={uid}
               beans={beans}
               tastings={tastings}
               onAddTasting={addTasting}

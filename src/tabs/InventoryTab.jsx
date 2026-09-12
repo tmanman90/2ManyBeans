@@ -68,7 +68,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const { preferences } = usePreferences();
   const isHandBrew = preferences.brewMethod !== 'aiden';
   const canisterCount = preferences.canisterCount || 3;
-  const agentV3Enabled = isRuphusAgentV3Enabled({ isDemo });
+  const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const sealed = beans.filter(b => b.status === 'SEALED');
   const slotNumbers = Array.from({ length: canisterCount }, (_, i) => i + 1);
   const emptySlots = slotNumbers.filter(n => !beans.find(b => b.status === 'ACTIVE' && b.jarSlot === n));

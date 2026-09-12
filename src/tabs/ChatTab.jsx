@@ -496,7 +496,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const { hydratedMessages, hydratedContext, hydratedArtifacts, hydratedSession, hydrationState, persist, clear } = useChatSession({ uid, isDemo, adapter: chatSessionAdapter });
   const restoringThread = !isDemo && Boolean(uid) && isIntroState
     && (hydrationState === 'loading' || (hydrationState === 'local' && hydratedMessages.length === 0));
-  const agentEnabled = isRuphusAgentV3Enabled({ isDemo });
+  const agentEnabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const mutationEnabled = isRuphusMutationEnabled({ uid, isDemo });
   const { pending: ruphusActionPending, run: runRuphusAction } = useRuphusAction({ uid, onReceipt: (result) => {
     if (!result?.receipt) return;

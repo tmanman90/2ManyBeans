@@ -73,7 +73,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
-  const agentV3Enabled = isRuphusAgentV3Enabled({ isDemo });
+  const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
