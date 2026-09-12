@@ -255,6 +255,19 @@ function recipeWaterSummary(recipe = {}) {
   return grams == null ? '?' : `${grams}g`;
 }
 
+function trialDisplaySlot(slotKey, recipe = {}) {
+  const projection = recipe.sourceProjection;
+  const configuration = projection?.sourceConfiguration || projection?.equipment || {};
+  const size = configuration.size || recipe.v60Size || recipe.kalitaSize || null;
+  const switchRecipe = configuration.brewer === 'switch'
+    || (configuration.device === 'v60' && configuration.variant === 'switch')
+    || recipe.variant === 'switch';
+  if (switchRecipe) return `Switch${size ? ` ${size}` : ''}`;
+  if (configuration.brewer === 'kalita' || recipe.device === 'kalita') return `Kalita${size ? ` ${size}` : ''}`;
+  if (configuration.brewer === 'v60' || recipe.device === 'v60') return `V60${size ? ` ${size}` : ''}`;
+  return displaySlot(slotKey);
+}
+
 function techniqueIdentity(recipe = {}) {
   return {
     currentFamilyId: recipe.sourceLineage?.familyId || recipe.sourceLineage?.technique || recipe.technique || null,
@@ -885,7 +898,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!args.trialRef && conversationReceipt && savedReceipt?.id !== conversationReceipt.id) return { ok: false, message: 'I could not verify the trial from this conversation.' };
       if (!savedReceipt || savedReceipt.ownerId !== uid || savedReceipt.mode !== 'brew_once' || savedReceipt.attemptId !== attempt.id || savedReceipt.coffeeId !== coffeeId || savedReceipt.slotKey !== slotKey) return { ok: false, message: 'I could not recover the confirmation for this trial.' };
       const coffeeName = snapshot.coffees?.find(item => item.refKey === args.coffeeRef)?.name || context.turnBinding?.coffeeName || 'This coffee';
-      const artifact = makeArtifact('action_receipt', { id: savedReceipt.id, status: 'ready', mode: 'brew_once', actionId: savedReceipt.actionId, attemptId: attempt.id, proposalId: attempt.proposalId, coffeeId, slotKey, revisionId: attempt.revisionId, sourceHash: attempt.sourceHash, promoteAvailable: proposalActions.includes('apply_proposal'), title: `${coffeeName} · ${displaySlot(slotKey)}`, message: 'Review your trial recipe below. Recovering this card does not change your saved recipe.', recipe: modelRecipe(attempt.snapshot) });
+      const artifact = makeArtifact('action_receipt', { id: savedReceipt.id, status: 'ready', mode: 'brew_once', actionId: savedReceipt.actionId, attemptId: attempt.id, proposalId: attempt.proposalId, coffeeId, slotKey, revisionId: attempt.revisionId, sourceHash: attempt.sourceHash, promoteAvailable: proposalActions.includes('apply_proposal'), title: `${coffeeName} · ${trialDisplaySlot(slotKey, attempt.snapshot)}`, message: 'Review your trial recipe below. Recovering this card does not change your saved recipe.', recipe: modelRecipe(attempt.snapshot) });
       return { ok: true, summary: 'Recovered the existing trial. The save button requires the user’s tap; no recipe was changed.', artifact };
     }
     if (name === 'read_recipe') {

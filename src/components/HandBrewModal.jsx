@@ -117,6 +117,11 @@ const sourceEquipmentLabel = (projection) => {
   return `${brewer}${configuration.size ? ` ${configuration.size}` : ''}`;
 };
 
+// Projection field names are useful for source validation but are not user
+// language. Keep this presentation-only copy separate from the hashed
+// projection/disclosure stored with the recipe.
+const readableSourceDisclosure = (value) => String(value || '').replace(/\bsourceSnapshot\b/g, 'the original source wording');
+
 const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
   const source = projection?.sourceSnapshot || projection?.sourceExecution || {};
   const stages = Array.isArray(projection?.stages)
@@ -207,7 +212,7 @@ const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onP
 
       {projection?.adaptation?.disclosure && (
         <div role="note" style={{ ...type.caption, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
-          {projection.adaptation.disclosure}
+          {readableSourceDisclosure(projection.adaptation.disclosure)}
         </div>
       )}
 
