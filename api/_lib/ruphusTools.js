@@ -939,7 +939,15 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
       if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: recipe?.code && recipe.code !== 'recipe_missing' ? `I could not load the saved ${displaySlot(slotKey)} recipe right now. Your recipe is unchanged; try again to review it.` : missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
-      if (context.proposalState && !context.proposalState.target) context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
+      // Evidence may select a recent/default brewer before the agent asks for
+      // the exact recipe needed by the conversation. That fallback must not
+      // cage a later verified read. An explicit trusted brewer remains locked.
+      const lockedMethod = context.methodBinding?.status === 'locked' ? context.methodBinding.slot : null;
+      if (context.proposalState && !context.proposalState.proposalIssued && (!lockedMethod || lockedMethod === slotKey)) {
+        context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
+        const coffeeName = snapshot.coffees?.find(coffee => coffee.refKey === args.coffeeRef)?.name;
+        if (coffeeName) context.ledger = appendLedger(withoutMethodFocus(context.ledger), { kind: 'method_focus', status: 'available', namedCoffees: [coffeeName], methodFocus: { displayName: displaySlot(slotKey) } }, { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
+      }
       setPreviewReadiness(context, { coffeeRef: args.coffeeRef, slotKey, recipe });
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displaySlot(slotKey)} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
     }

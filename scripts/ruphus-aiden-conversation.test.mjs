@@ -132,6 +132,7 @@ test('saved Aiden profiles cannot reuse a link to old settings, including after 
 
 test('an Aiden proposal survives the normal evidence → exact recipe → proposal runtime sequence', async () => {
   const { tools, context } = setup();
+  context.proposalState.target = { coffeeRef: 'c1', slot: 'kalita_hot' };
   let round=0;
   const frames=[];
   const requests=[
@@ -143,6 +144,15 @@ test('an Aiden proposal survives the normal evidence → exact recipe → propos
   assert.equal(result.ok,true,JSON.stringify(result));
   assert.equal(frames.filter(f=>f.type==='artifact_ready').length,1);
   assert.match(frames.filter(f=>f.type==='text_delta').map(f=>f.text).join(''),/Aiden profile/);
+  assert.equal(context.proposalState.target.slot,'aiden','an exact read supersedes a fallback brewer');
+});
+
+test('an exact read cannot override an explicitly locked user brewer', async () => {
+  const {tools,context}=setup();
+  context.methodBinding={status:'locked',slot:'kalita_hot'};
+  context.proposalState.target={coffeeRef:'c1',slot:'kalita_hot'};
+  await tools.call('read_recipe',{coffeeRef:'c1',slot:'aiden'});
+  assert.equal(context.proposalState.target.slot,'kalita_hot');
 });
 
 test('a verified missing Aiden profile is explained instead of failing at the tool-round limit', async () => {
