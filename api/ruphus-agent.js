@@ -26,7 +26,20 @@ async function readActiveSession(db, uid) {
 async function writeActiveSession(db, uid, session, options = {}) {
   if (!db || !uid || !session) return;
   const normalized = normalizeAgentSession(session, options);
-  await activeSessionRef(db, uid).set(normalized, { merge: true });
+  const ref = activeSessionRef(db, uid);
+  if (Number.isInteger(options.expectedBoundaryIndex)) {
+    // New chat archives the active suffix transactionally. An older response
+    // must not rewind that boundary when it finishes after the reset.
+    return db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.exists ? normalizeAgentSession(snapshot.data()) : null;
+      if ((current?.boundaryIndex || 0) !== options.expectedBoundaryIndex) return false;
+      transaction.set(ref, normalized, { merge: true });
+      return true;
+    });
+  }
+  await ref.set(normalized, { merge: true });
+  return true;
 }
 export function hasUnavailableEvidence(session) {
   return Boolean(session?.ledger?.entries?.some((entry) => entry.status === 'partial' && entry.evidence?.some((item) => item.status === 'unavailable')));
@@ -227,14 +240,16 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
   if (!uid || typeof turnId !== 'string' || !contextRef || typeof userText !== 'string') return res.status(400).json({ error: 'turnId, contextRef, and userText are required' });
   const startedAt = Date.now();
   let firstFrameAt = null;
-  let db; let context; let activeSession; let effectiveContextRef = contextRef;
+  let db; let context; let activeSession; let expectedBoundaryIndex = 0; let effectiveContextRef = contextRef;
   try {
     db = getDb();
     let readers = firestoreReaders(db);
     if (devReadFaultForRequest({ uid, header: req.headers?.['x-ruphus-dev-read-fault'] })) {
       readers = { ...readers, readTastings: async () => { throw Object.assign(new Error('Dev fixture tasting timeout'), { code: 'read_timeout' }); } };
     }
-    activeSession = prepareSession(await readActiveSession(db, uid), { now: startedAt });
+    const storedSession = await readActiveSession(db, uid);
+    expectedBoundaryIndex = storedSession?.boundaryIndex || 0;
+    activeSession = prepareSession(storedSession, { now: startedAt });
     const replay = sessionReplayInputs({ session: activeSession, conversation, ledger, continuePrevious, now: startedAt });
     const suppliedConversation = replay.conversation;
     const replayLedger = replay.ledger;
@@ -264,7 +279,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const suppliedMessages = (replay.resumed || priorMessages.length ? [] : suppliedConversation).filter((message) => message?.role === 'user' || message?.role === 'assistant').map((message) => ({ id: message.id || `replay-${priorMessages.length}`, role: message.role, text: String(message.content || message.text || ''), createdAt: Number(message.createdAt) || startedAt })).filter((message) => message.text);
     const nextMessages = [...priorMessages, ...suppliedMessages, { id: `${turnId}-user`, role: 'user', text: context.userText, createdAt: startedAt, turnId }, ...(turnResult.text ? [{ id: `${turnId}-assistant`, role: 'assistant', text: turnResult.text, createdAt: Date.now(), turnId, artifacts: turnResult.artifacts || [] }] : [])];
     const ledgerBytes = Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES);
-    await writeActiveSession(db, uid, { protocolVersion: 1, messages: nextMessages, turns: [...(activeSession?.turns || []), { id: turnId, status: turnResult.ok ? 'completed' : 'interrupted' }], contextRef: effectiveContextRef, launchContext: context.launchContext, ledger: boundLedger(context.ledger, { maxBytes: ledgerBytes }), boundaryIndex: activeSession?.boundaryIndex || 0, lastActivityAt: Date.now(), launchHintConsumed: context.__ruphusLaunchHintConsumed === true, historyWidened: context.historyWidened === true, updatedAt: Date.now() }, { maxBytes: ledgerBytes });
+    await writeActiveSession(db, uid, { protocolVersion: 1, messages: nextMessages, turns: [...(activeSession?.turns || []), { id: turnId, status: turnResult.ok ? 'completed' : 'interrupted' }], contextRef: effectiveContextRef, launchContext: context.launchContext, ledger: boundLedger(context.ledger, { maxBytes: ledgerBytes }), boundaryIndex: activeSession?.boundaryIndex || 0, lastActivityAt: Date.now(), launchHintConsumed: context.__ruphusLaunchHintConsumed === true, historyWidened: context.historyWidened === true, updatedAt: Date.now() }, { maxBytes: ledgerBytes, expectedBoundaryIndex });
     logApiUsage({ uid, provider: 'openai', model: turnResult.model || RUPHUS_OPENAI_MODEL, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', usage: turnResult.usage });
     const model = turnResult.model || RUPHUS_OPENAI_MODEL;
     await persistRuphusTrace({ db, uid, event: { provider: 'openai', model, contextHash: context.evidenceHash, requestId: turnResult.requestId, proposalIds: turnResult.proposalIds, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', toolNames: turnResult.toolNames, trace: { reads: context.trace.reads, focusChanges: context.trace.focusChanges.map((item) => ({ from: item.from, to: item.to })), regenerations: context.trace.regenerations.map((item) => ({ triggers: item.triggers, secondFailure: item.secondFailure })) }, totalMs: Date.now() - startedAt, ttffMs: firstFrameAt ? firstFrameAt - startedAt : undefined, retryCount: turnResult.retryCount, ...normalizeTelemetryUsage('openai', model, turnResult.usage), failureCode: turnResult.ok ? undefined : turnResult.code, recovered: false }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
@@ -273,7 +288,7 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     writeFrame(res, { type: 'usage', usage: turnResult.usage || null });
     res.end();
   } catch (error) {
-    if (db && context) await writeActiveSession(db, uid, { protocolVersion: 1, messages: [{ id: `${turnId}-user`, role: 'user', text: context.userText, createdAt: startedAt, turnId }], contextRef: effectiveContextRef, launchContext: context.launchContext, ledger: boundLedger(context.ledger), boundaryIndex: context.sessionState?.boundaryIndex || 0, lastActivityAt: Date.now(), launchHintConsumed: context.__ruphusLaunchHintConsumed === true, updatedAt: Date.now() }).catch(() => {});
+    if (db && context) await writeActiveSession(db, uid, { protocolVersion: 1, messages: [...(activeSession?.messages || []), { id: `${turnId}-user`, role: 'user', text: context.userText, createdAt: startedAt, turnId }], contextRef: effectiveContextRef, launchContext: context.launchContext, ledger: boundLedger(context.ledger), boundaryIndex: context.sessionState?.boundaryIndex || 0, lastActivityAt: Date.now(), launchHintConsumed: context.__ruphusLaunchHintConsumed === true, updatedAt: Date.now() }, { expectedBoundaryIndex }).catch(() => {});
     await persistRuphusTrace({ db, uid, event: { provider: 'openai', model: RUPHUS_OPENAI_MODEL, contextHash: contextRef?.evidenceHash, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', totalMs: Date.now() - startedAt, failureCode: error.code || 'agent_v3_failed' }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
     if (!res.headersSent) return res.status(error.code === 'not_found' ? 404 : 400).json({ error: error.code || 'agent_v3_failed', message: error.message });
     writeFrame(res, { version: 1, protocol: 'ruphus-agent-v3', type: 'turn_failed', turnId, code: error.code || 'agent_v3_failed', message: error.message }); res.end();
