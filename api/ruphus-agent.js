@@ -70,7 +70,7 @@ export async function retryUnavailableEvidence({ session, context, tools, force 
 }
 export function sessionConversationForProvider(session, { now = Date.now(), includeStale = false } = {}) {
   if (!session || (!includeStale && sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale')) return [];
-  return (session.messages || []).slice(session.boundaryIndex || 0).map((message) => ({ role: message.role, content: message.text })).filter((message) => message.role === 'user' || message.role === 'assistant');
+  return (session.messages || []).slice(session.boundaryIndex || 0).filter((message) => !message.errored).map((message) => ({ role: message.role, content: message.text })).filter((message) => message.role === 'user' || message.role === 'assistant');
 }
 export function trialReceiptsForSession(session, { now = Date.now() } = {}) {
   if (!session || sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale') return [];

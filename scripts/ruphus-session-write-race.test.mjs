@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { writeActiveSession } from '../api/ruphus-agent.js';
+import { sessionConversationForProvider, writeActiveSession } from '../api/ruphus-agent.js';
 import { clientSessionWrite, startNewChat } from '../src/lib/ruphus/session.js';
 
 const message = (id, role = 'user') => ({ id, role, text: id, createdAt: 1000 });
+
+test('durable retry bubbles remain UI state rather than model conversation', () => {
+  const session = { lastActivityAt: 1000, boundaryIndex: 0, messages: [
+    message('question'),
+    { ...message('transport failed', 'assistant'), errored: true, retry: { kind: 'agent', text: 'question' } },
+    message('useful answer', 'assistant'),
+  ] };
+  assert.deepEqual(sessionConversationForProvider(session, { now: 1001 }), [
+    { role: 'user', content: 'question' },
+    { role: 'assistant', content: 'useful answer' },
+  ]);
+});
 function store(initial) {
   let data = structuredClone(initial);
   let writes = 0;

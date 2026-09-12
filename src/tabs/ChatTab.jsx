@@ -109,7 +109,7 @@ function getStarterPrompts(beans, isDemo) {
 }
 
 const messagesForApi = (thread) => thread
-  .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+  .filter(msg => (msg.role === 'user' || msg.role === 'assistant') && !msg.errored)
   .map(msg => ({ role: msg.role, content: String(msg.content || '') }))
   .filter(msg => msg.content.trim());
 
@@ -1404,18 +1404,21 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
               recipeCard: recipe.recipeCard,
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
+              ...(attemptedAgent ? { retry: { kind: 'agent', text, contextRef: attemptedAgentContext } } : {}),
             });
             commitAssistantMessage(errorMessage);
             if (attemptedAgent) setAgentRecovery(prev => ({ ...(prev || { reason: 'failed' }), retryTurn: { text, displayMsg, apiMsg, agentContextOverride: attemptedAgentContext }, erroredMessageId: errorMessage.id }));
           } else {
-            // errored: a transient failure must not persist into the session
-            // doc (a durable "Couldn't reach the AI" haunts every resume) —
-            // and the flag buys the tap-to-retry affordance for free.
+            // An explicit Agent retry record is safe to persist: session
+            // normalization keeps only its bounded text/context, never the
+            // request body or private tool state. Legacy failures remain
+            // transient and retain their existing in-memory retry behavior.
             const errorMessage = newMessage({
               role: 'assistant',
               content: "Couldn't reach the AI. Try again in a sec.",
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
+              ...(attemptedAgent ? { retry: { kind: 'agent', text, contextRef: attemptedAgentContext } } : {}),
             });
             commitAssistantMessage(errorMessage);
             if (attemptedAgent) setAgentRecovery(prev => ({ ...(prev || { reason: 'failed' }), retryTurn: { text, displayMsg, apiMsg, agentContextOverride: attemptedAgentContext }, erroredMessageId: errorMessage.id }));

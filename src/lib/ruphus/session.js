@@ -4,8 +4,36 @@ const MAX_LEDGER_BYTES = 4096;
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
 const textValue = (value) => String(value || '').trim();
 
+// Failed Agent turns may be retried after relaunch, but the persisted retry
+// record must never carry the request body, image data, auth state, or server
+// tool context. The explicit kind is the retryability proof; prose alone is
+// never treated as a retry instruction.
+function safeAgentRetry(retry) {
+  if (!retry || retry.kind !== 'agent') return null;
+  // The Agent endpoint does not impose a smaller user-text cap than the
+  // chat input, so do not silently alter a retry's requested text here.
+  const text = textValue(retry.text);
+  if (!text) return null;
+  const source = retry.contextRef;
+  const contextRef = {};
+  if (source && typeof source === 'object') {
+    for (const key of ['surface', 'coffeeRef', 'sessionId']) {
+      if (typeof source[key] === 'string' && source[key].trim()) contextRef[key] = source[key].trim().slice(0, 180);
+    }
+    if (source.launchItem && typeof source.launchItem === 'object') {
+      const launchItem = {};
+      for (const key of ['kind', 'ref', 'method']) {
+        if (typeof source.launchItem[key] === 'string' && source.launchItem[key].trim()) launchItem[key] = source.launchItem[key].trim().slice(0, 180);
+      }
+      if (Object.keys(launchItem).length > 0) contextRef.launchItem = launchItem;
+    }
+  }
+  return { kind: 'agent', text, ...(Object.keys(contextRef).length > 0 ? { contextRef } : {}) };
+}
+
 // Keep native cards attached when persisted messages enter the Chat display.
 export function restoreChatMessage(message) {
+  const retry = message?.errored ? safeAgentRetry(message.retry) : null;
   return {
     id: message.id || crypto.randomUUID(),
     role: message.role,
@@ -15,6 +43,15 @@ export function restoreChatMessage(message) {
     disclaimer: message.disclaimer,
     ...(message.turnId ? { turnId: message.turnId } : {}),
     ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}),
+    ...(retry ? {
+      errored: true,
+      retry,
+      retryTurn: {
+        text: retry.text,
+        apiMsg: { role: 'user', content: retry.text },
+        ...(retry.contextRef ? { agentContextOverride: retry.contextRef } : {}),
+      },
+    } : {}),
   };
 }
 const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
@@ -100,7 +137,15 @@ const boundedLedger = (ledger, { maxBytes = MAX_LEDGER_BYTES, maxEntries = MAX_L
 export function normalizeAgentSession(session, options = {}) {
   if (!session || typeof session !== 'object') return null;
   session = { ...session, messages: settleUndoneReceipts((Array.isArray(session.messages) ? session.messages : []).filter(Boolean)) };
-  const messages = (Array.isArray(session.messages) ? session.messages : []).filter(Boolean).map((message) => ({ id: textValue(message.id), role: message.role, text: textValue(message.text || message.content), createdAt: Number.isFinite(Number(message.createdAt)) ? Number(message.createdAt) : Date.now(), ...(message.turnId ? { turnId: textValue(message.turnId) } : {}), ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}) })).filter((message) => (message.role === 'user' || message.role === 'assistant') && message.text);
+  const messages = (Array.isArray(session.messages) ? session.messages : []).filter(Boolean).map((message) => {
+    const retry = message.errored ? safeAgentRetry(message.retry) : null;
+    return {
+      id: textValue(message.id), role: message.role, text: textValue(message.text || message.content), createdAt: Number.isFinite(Number(message.createdAt)) ? Number(message.createdAt) : Date.now(),
+      ...(message.turnId ? { turnId: textValue(message.turnId) } : {}),
+      ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}),
+      ...(retry ? { errored: true, retry } : {}),
+    };
+  }).filter((message) => (message.role === 'user' || message.role === 'assistant') && message.text);
   const timestamp = Number(session.lastActivityAt || session.updatedAt);
   const lastActivityAt = Number.isFinite(timestamp) && timestamp >= 0 ? Math.min(timestamp, Date.now()) : Date.now();
   const updatedAtValue = Number(session.updatedAt);
@@ -111,7 +156,15 @@ export function normalizeAgentSession(session, options = {}) {
 export function inflateAgentSession(session, options = {}) {
   if (!session || session.protocolVersion !== AGENT_PROTOCOL_VERSION) return null;
   session = { ...session, messages: settleUndoneReceipts(session.messages) };
-  return { ...session, messages: session.messages.map((message) => ({ id: textValue(message.id), role: message.role, content: textValue(message.text), createdAt: Number(message.createdAt) || Date.now(), ...(message.turnId ? { turnId: textValue(message.turnId) } : {}), ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}) })), ledger: boundedLedger(session.ledger, options), boundaryIndex: Math.max(0, Math.min(session.messages.length, Number.isInteger(session.boundaryIndex) ? session.boundaryIndex : 0)), lastActivityAt: Number(session.lastActivityAt || session.updatedAt) || Date.now(), launchHintConsumed: session.launchHintConsumed === true, historyWidened: session.historyWidened === true };
+  return { ...session, messages: session.messages.map((message) => {
+    const retry = message.errored ? safeAgentRetry(message.retry) : null;
+    return {
+      id: textValue(message.id), role: message.role, content: textValue(message.text), createdAt: Number(message.createdAt) || Date.now(),
+      ...(message.turnId ? { turnId: textValue(message.turnId) } : {}),
+      ...(Array.isArray(message.artifacts) ? { artifacts: message.artifacts.slice() } : {}),
+      ...(retry ? { errored: true, retry } : {}),
+    };
+  }), ledger: boundedLedger(session.ledger, options), boundaryIndex: Math.max(0, Math.min(session.messages.length, Number.isInteger(session.boundaryIndex) ? session.boundaryIndex : 0)), lastActivityAt: Number(session.lastActivityAt || session.updatedAt) || Date.now(), launchHintConsumed: session.launchHintConsumed === true, historyWidened: session.historyWidened === true };
 }
 
 export function sessionAge({ lastActivityAt, now = Date.now() } = {}) {
