@@ -2,6 +2,9 @@ import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const variantName = process.argv[2];
+// A release operator may preserve a separate, pre-existing root plist while
+// still configuring the actual app-bundled Firebase resource below.
+const preserveRootFirebase = process.argv.includes('--preserve-root-firebase');
 
 const variants = {
   prod: {
@@ -240,7 +243,7 @@ const patchCapacitorConfig = () => {
 
 const copyFirebaseConfig = () => {
   copyFileSync(firebaseConfigPath, appFirebaseConfigPath);
-  copyFileSync(firebaseConfigPath, iosFirebaseConfigPath);
+  if (!preserveRootFirebase) copyFileSync(firebaseConfigPath, iosFirebaseConfigPath);
 };
 
 ensureSceneLifecycle();
