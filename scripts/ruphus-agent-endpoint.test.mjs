@@ -4,7 +4,8 @@ import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
-import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation, techniqueProposalsFromSession } from '../api/ruphus-agent.js';
+import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
+import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation, techniqueProposalsFromSession, trialReceiptsForSession } from '../api/ruphus-agent.js';
 import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 
 test('New chat excludes archived Aiden conversation from provider replay', () => {
@@ -16,6 +17,23 @@ test('New chat excludes archived Aiden conversation from provider replay', () =>
 });
 
 const recipe = () => generateV60Recipe({}, { dose: 15 });
+const SWITCH_HYBRID_SOURCE_ID = 'hario-switch-03-matt-winton-hybrid-24-2022';
+const SWITCH_IMMERSION_SOURCE_ID = 'hario-switch-03-instruction-manual-36-2023';
+const switchSourceOption = (sourceId, dose = 15) => generateManualSourceTechniqueOption(sourceId, {}, {
+  device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose,
+});
+const sourceCard = ({ id, option, coffeeId, coffeeName, before }) => ({
+  id, type: 'recipe_proposal', status: 'proposed', coffeeId, coffeeName, slotKey: 'v60_hot',
+  before,
+  after: option.recipe,
+  techniqueExperiment: {
+    kind: 'manual_source_technique', techniqueId: option.id, familyId: option.familyId, sourceId: option.sourceId,
+    name: option.name, differences: option.differences, adaptation: option.adaptation,
+    sourceRevision: option.sourceRevision, sourceOptionsVersion: option.sourceOptionsVersion,
+    sourceNativeWaterUnit: option.sourceWater?.unit || null, sourceDoseGrams: option.sourceDoseGrams,
+    attribution: option.attribution,
+  },
+});
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
 
 test('orchestrator emits buffered checked text and no read artifact', async () => {
@@ -84,15 +102,11 @@ test('endpoint context binds the sole other coffee before provider dispatch', as
 });
 
 test('endpoint comparison binds delivered off-rotation technique cards before provider review', async () => {
-  const coffee = { id: 'finished-bean', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: generateV60Recipe({}, { dose: 15 }) } };
-  const card = (id, sourceId, name) => ({
-    id, type: 'recipe_proposal', status: 'proposed', coffeeId: coffee.id, slotKey: 'v60_hot',
-    before: { method: 'pour-over', device: 'v60', mode: 'hot', coffeeGrams: 15, waterGrams: 250 },
-    after: { method: 'pour-over', device: 'v60', mode: 'hot', coffeeGrams: 15, waterGrams: 250, techniqueLabel: name, sourceId, sourceLineage: { sourceId, familyId: sourceId } },
-    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: sourceId, familyId: sourceId, sourceId, name },
-  });
-  const first = card('hybrid-card', 'matt-winton-hybrid', 'Matt Winton hybrid');
-  const second = card('immersion-card', 'hario-full-immersion', 'HARIO full immersion');
+  const hybrid = switchSourceOption(SWITCH_HYBRID_SOURCE_ID);
+  const immersion = switchSourceOption(SWITCH_IMMERSION_SOURCE_ID);
+  const coffee = { id: 'finished-bean', name: 'El Vergel', status: 'FINISHED', handBrewRecipes: { v60: hybrid.recipe } };
+  const first = sourceCard({ id: 'hybrid-card', option: hybrid, coffeeId: coffee.id, coffeeName: coffee.name, before: hybrid.recipe });
+  const second = sourceCard({ id: 'immersion-card', option: immersion, coffeeId: coffee.id, coffeeName: coffee.name, before: hybrid.recipe });
   const session = { boundaryIndex: 0, messages: [{ artifacts: [first] }, { artifacts: [second] }] };
   const build = (userText, prior = techniqueProposalsFromSession(session)) => buildRuphusContext({
     uid: 'user-1', contextRef: { surface: 'direct' }, userText,
@@ -104,14 +118,14 @@ test('endpoint comparison binds delivered off-rotation technique cards before pr
   assert.equal(compare.turnBinding.status, 'locked');
   assert.equal(compare.methodBinding.slot, 'v60_hot');
   const reviews = recentProposalReviews(session, compare.__ruphusRefs, { coffeeRef: compare.turnBinding.coffeeRef, slot: compare.methodBinding.slot });
-  assert.deepEqual(reviews.map((review) => review.sourceId), ['matt-winton-hybrid', 'hario-full-immersion']);
+  assert.deepEqual(reviews.map((review) => review.sourceId), [SWITCH_HYBRID_SOURCE_ID, SWITCH_IMMERSION_SOURCE_ID]);
   compare.proposalReviews = reviews;
   const compareResult = await runRuphusTurn({
     turnId: 'endpoint-compare-cards', context: compare, userText: 'Compare those two',
     tools: createRuphusTools({ uid: 'user-1', context: compare }),
     provider: { runTurn: async ({ context }) => {
-      assert.deepEqual(context.proposalReviews.map((review) => review.sourceId), ['matt-winton-hybrid', 'hario-full-immersion']);
-      return { text: 'Matt Winton uses a hybrid bloom and immersion structure; HARIO full immersion keeps the bed closed until release.' };
+      assert.deepEqual(context.proposalReviews.map((review) => review.sourceId), [SWITCH_HYBRID_SOURCE_ID, SWITCH_IMMERSION_SOURCE_ID]);
+      return { text: 'Matt Winton uses a hybrid bloom and immersion structure; the HARIO instruction-manual source keeps the bed closed until release.' };
     } },
   });
   assert.equal(compareResult.ok, true, compareResult.code);
@@ -168,6 +182,79 @@ test('trial reference is bound before the provider and cannot resolve to a diffe
   const resolved = await tools.call('resolve_coffee', { reference: 'that Kalita trial recipe' });
   assert.equal(resolved.coffeeRef, context.turnBinding.coffeeRef);
   assert.equal(resolved.match, 'turn_binding');
+});
+
+test('off-rotation technique trial clarification carries its owner-bound coffee into review', async () => {
+  const hybrid = switchSourceOption(SWITCH_HYBRID_SOURCE_ID);
+  const immersion = switchSourceOption(SWITCH_IMMERSION_SOURCE_ID);
+  const coffee = {
+    id: 'finished-bean', name: 'El Vergel', status: 'FINISHED',
+    aidenRecipe: { method: 'aiden', device: 'aiden', mode: 'hot', dose: 20, water: 320 },
+    handBrewRecipes: {
+      v60: hybrid.recipe,
+      kalita: { method: 'kalita', device: 'kalita', mode: 'hot', kalitaSize: '155', coffeeGrams: 15, waterGrams: 240 },
+    },
+    handBrewIcedRecipes: { kalita: { method: 'kalita', device: 'kalita', mode: 'iced', isIced: true, kalitaSize: '155', coffeeGrams: 15, waterGrams: 180 } },
+  };
+  const base = coffee.handBrewRecipes.v60;
+  const hybridCard = sourceCard({ id: 'hybrid-card', option: hybrid, coffeeId: coffee.id, coffeeName: coffee.name, before: base });
+  const immersionCard = sourceCard({ id: 'immersion-card', option: immersion, coffeeId: coffee.id, coffeeName: coffee.name, before: base });
+  const session = {
+    lastActivityAt: 1000,
+    boundaryIndex: 0,
+    messages: [
+      { role: 'assistant', artifacts: [hybridCard, { id: 'hybrid-receipt', type: 'action_receipt', mode: 'brew_once', status: 'succeeded', attemptId: 'attempt-hybrid', coffeeId: coffee.id, slotKey: 'v60_hot' }] },
+      { role: 'assistant', artifacts: [immersionCard, { id: 'immersion-receipt', type: 'action_receipt', mode: 'brew_once', status: 'succeeded', attemptId: 'attempt-immersion', coffeeId: coffee.id, slotKey: 'v60_hot' }] },
+    ],
+  };
+  const userText = 'Full immersion';
+  const context = await buildRuphusContext({
+    uid: 'user-1', contextRef: { surface: 'direct' }, userText,
+    ledger: { version: 1, entries: [], namedCoffees: [] }, evidenceByteCap: 10000,
+    priorTechniqueProposals: techniqueProposalsFromSession(session),
+    readers: { listCoffees: async () => [coffee], readSetup: async () => ({ defaultMethod: 'aiden' }) },
+  });
+  Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(session, { now: 1001 }), enumerable: false });
+
+  assert.equal(context.rotationSnapshot.coffees.length, 0, 'finished coffee remains off rotation');
+  assert.equal(context.turnBinding.status, 'locked');
+  assert.equal(context.turnBinding.coffeeName, coffee.name);
+  assert.equal(context.methodBinding.slot, 'v60_hot');
+  assert.equal(context.__ruphusRefs[context.turnBinding.coffeeRef], coffee.id);
+
+  const attempts = [
+    { id: 'attempt-hybrid', ownerId: 'user-1', coffeeId: coffee.id, slotKey: 'v60_hot', proposalId: hybridCard.id, status: 'completed', snapshot: hybridCard.after },
+    { id: 'attempt-immersion', ownerId: 'user-1', coffeeId: coffee.id, slotKey: 'v60_hot', proposalId: immersionCard.id, status: 'completed', snapshot: immersionCard.after },
+  ];
+  const tools = createRuphusTools({
+    uid: 'user-1', context,
+    readers: {
+      readAttempts: async () => attempts,
+      readTrialReceipt: async ({ attemptId }) => ({
+        id: attemptId === 'attempt-immersion' ? 'immersion-receipt' : 'hybrid-receipt',
+        ownerId: 'user-1', mode: 'brew_once', attemptId, coffeeId: coffee.id, slotKey: 'v60_hot',
+      }),
+    },
+  });
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'off-rotation-trial-clarification', context, userText, tools,
+    provider: { runTurn: async (input) => {
+      providerCalls += 1;
+      assert.equal(providerCalls, 1);
+      assert.equal(input.context.turnBinding.coffeeRef, context.turnBinding.coffeeRef);
+      assert.equal(input.context.methodBinding.slot, 'v60_hot');
+      return { toolCalls: [{ callId: 'review-selected-trial', name: 'review_trial_recipe', args: { coffeeRef: context.turnBinding.coffeeRef, slot: 'v60_hot', trialRef: null } }] };
+    } },
+  });
+
+  assert.equal(result.ok, true, result.code);
+  assert.equal(providerCalls, 1);
+  assert.deepEqual(result.toolNames, ['review_trial_recipe']);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].type, 'action_receipt');
+  assert.equal(result.artifacts[0].attemptId, 'attempt-immersion');
+  assert.equal(result.artifacts[0].coffeeId, coffee.id);
 });
 
 test('server allowlist is exact and empty by default', () => {

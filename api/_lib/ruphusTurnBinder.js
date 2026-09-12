@@ -13,6 +13,21 @@ const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
 const CONTEXTUAL_TECHNIQUE_FOLLOWUP = /^(?:show|give)\s+me\s+(?:another|a\s+different)\s+(?:one|option)[.!?]?$/i;
 const TECHNIQUE_COMPARISON_REFERENCE = /^(?:(?:compare|contrast)\s+(?:(?:those|these|the)\s+)?(?:two|both)(?:\s+(?:source\s+)?(?:techniques?|methods?|options?|cards?))?|(?:what(?:'s|\s+is)\s+the\s+difference\s+between)\s+(?:those|these|the\s+two)(?:\s+(?:source\s+)?(?:techniques?|methods?|options?|cards?))?)[.!?]?$/i;
 const TECHNIQUE_HISTORY_REFERENCE = /^(?:(?:show|give|tell|describe|inspect|review|open|use|try|brew|prepare|make|pick|choose|revisit|repeat)\s+(?:me\s+)?)*(?:the\s+)?(?:first|1st|second|2nd|third|3rd|last|previous|earlier)\s+(?:one|option|technique|method|card|recipe)(?:\s+(?:again|back|repeat))?[.!?]?$/i;
+// A short noun-phrase answer can select one of the source choices named in a
+// prior clarification (for example, “Full immersion”). It is only useful
+// below when every meaningful token matches exactly one delivered card, so a
+// bare phrase never becomes a coffee reference without authenticated history.
+const TECHNIQUE_CHOICE_REFERENCE = /^(?:the\s+)?[a-z][a-z0-9' -]{1,48}(?:\s+(?:one|option|technique|method|recipe|trial))?[.!?]?$/i;
+const TECHNIQUE_CHOICE_FILLERS = new Set(['a', 'an', 'the', 'one', 'option', 'technique', 'method', 'recipe', 'trial']);
+// This is the registry identity for the HARIO Switch 03 instruction-manual
+// schedule. Its source label says "instruction-manual immersion" while the
+// source stage contract is the full closed immersion, so users may answer a
+// clarification with the shorter, source-faithful "full immersion" alias.
+// Keep aliases tied to audited source IDs; never manufacture them from chat
+// prose or from an arbitrary proposal name.
+const TRUSTED_TECHNIQUE_ALIASES = Object.freeze({
+  'hario-switch-03-instruction-manual-36-2023': ['full', 'immersion'],
+});
 const TECHNIQUE_EXPERIMENT_KINDS = new Set(['v60_technique', 'manual_source_technique']);
 const DELIVERED_PROPOSAL_STATUSES = new Set(['ready', 'proposed', 'applying', 'applied', 'kept', 'attempt_created', 'prepared']);
 const FOCUS_ENTRY = 'coffee_focus';
@@ -77,12 +92,51 @@ function techniqueOrdinal(value) {
   return { first: 0, '1st': 0, second: 1, '2nd': 1, third: 2, '3rd': 2 }[match[1].toLocaleLowerCase()] ?? null;
 }
 
+function techniqueChoiceMatches(userText, proposal) {
+  const requested = normalize(userText).split(/\s+/).filter((token) => token && !TECHNIQUE_CHOICE_FILLERS.has(token));
+  if (!requested.length) return false;
+  const experiment = proposal?.techniqueExperiment || {};
+  const sourceIds = [
+    experiment.sourceId,
+    proposal?.after?.sourceProjection?.sourceId,
+    proposal?.after?.sourceLineage?.sourceId,
+    proposal?.after?.sourceId,
+  ].filter((value) => typeof value === 'string' && value.trim());
+  const reviewed = new Set(normalize([
+    experiment.name,
+    experiment.techniqueId,
+    experiment.familyId,
+    experiment.sourceId,
+    experiment.differences,
+    proposal?.after?.techniqueLabel,
+  ].filter(Boolean).join(' ')).split(/\s+/).filter(Boolean));
+  sourceIds.forEach((sourceId) => {
+    const alias = TRUSTED_TECHNIQUE_ALIASES[sourceId.trim()];
+    if (alias) alias.forEach((token) => reviewed.add(token));
+  });
+  return requested.every((token) => reviewed.has(token));
+}
+
+function techniqueProposalIdentity(proposal) {
+  const experiment = proposal?.techniqueExperiment || {};
+  const sourceId = [
+    experiment.sourceId,
+    proposal?.after?.sourceProjection?.sourceId,
+    proposal?.after?.sourceLineage?.sourceId,
+    proposal?.after?.sourceId,
+    experiment.familyId,
+    experiment.techniqueId,
+  ].find((value) => typeof value === 'string' && value.trim());
+  return [proposal?.coffeeId, proposal?.slotKey, sourceId?.trim() || 'unknown'].join(':');
+}
+
 function contextualTechniqueReference(userText, coffees, ledger, launchContext, refs, priorTechniqueProposals = []) {
   const value = text(userText).replace(/[.!?]+$/, '').trim();
   const contextualAlternative = CONTEXTUAL_TECHNIQUE_FOLLOWUP.test(value);
   const comparison = TECHNIQUE_COMPARISON_REFERENCE.test(value);
   const historical = TECHNIQUE_HISTORY_REFERENCE.test(value);
-  if (!contextualAlternative && !comparison && !historical) return null;
+  const techniqueChoice = !contextualAlternative && !comparison && !historical && TECHNIQUE_CHOICE_REFERENCE.test(value);
+  if (!contextualAlternative && !comparison && !historical && !techniqueChoice) return null;
   const proposals = (Array.isArray(priorTechniqueProposals) ? priorTechniqueProposals : [])
     .filter(deliveredTechniqueProposal)
     .map((proposal) => ({ proposal, coffee: coffees.find((item) => item?.id === proposal.coffeeId) }))
@@ -107,6 +161,21 @@ function contextualTechniqueReference(userText, coffees, ledger, launchContext, 
     const ordinal = techniqueOrdinal(value);
     selected = ordinal === -1 ? scoped.at(-1) : ordinal == null ? null : scoped[ordinal];
     if (!selected) return null;
+  } else if (techniqueChoice) {
+    // A session may retain several preview revisions of the same source
+    // card. They are one contextual choice, not separate coffee candidates;
+    // retain the newest representative while keeping distinct coffees,
+    // slots, and source identities ambiguous.
+    const matches = [];
+    const seen = new Set();
+    for (const item of scoped.filter(({ proposal }) => techniqueChoiceMatches(value, proposal)).reverse()) {
+      const identity = techniqueProposalIdentity(item.proposal);
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      matches.unshift(item);
+    }
+    if (matches.length !== 1) return null;
+    selected = matches[0];
   } else {
     selected = scoped.at(-1);
   }

@@ -2,11 +2,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bindRuphusTurn } from '../api/_lib/ruphusTurnBinder.js';
 import { resolveCoffeeReference } from '../src/lib/ruphus/referenceResolver.js';
+import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 
 const coffees = [
   { id: 'a', refKey: 'c-a', name: 'El Vergel', roaster: 'Good Medicine', origin: 'Colombia', process: 'washed', jarSlot: 1 },
   { id: 'b', refKey: 'c-b', name: 'Colombia La Esperanza', roaster: 'Good Medicine', origin: 'Colombia', process: 'natural', jarSlot: 2 },
 ];
+const SWITCH_HYBRID_SOURCE_ID = 'hario-switch-03-matt-winton-hybrid-24-2022';
+const SWITCH_IMMERSION_SOURCE_ID = 'hario-switch-03-instruction-manual-36-2023';
+const switchSourceOption = (sourceId, dose = 15) => generateManualSourceTechniqueOption(sourceId, {}, {
+  device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose,
+});
+const sourceCard = (id, coffeeId, option, before) => ({
+  id, type: 'recipe_proposal', status: 'proposed', coffeeId, slotKey: 'v60_hot', before, after: option.recipe,
+  techniqueExperiment: {
+    kind: 'manual_source_technique', techniqueId: option.id, familyId: option.familyId, sourceId: option.sourceId,
+    name: option.name, differences: option.differences, adaptation: option.adaptation,
+    sourceRevision: option.sourceRevision, sourceOptionsVersion: option.sourceOptionsVersion,
+    sourceNativeWaterUnit: option.sourceWater?.unit || null, sourceDoseGrams: option.sourceDoseGrams, attribution: option.attribution,
+  },
+});
 test('current recipe update follows established coffee without capturing a new target', () => {
   const context = { coffees, refs: { 'c-a': 'a', 'c-b': 'b' }, ledger: { namedCoffees: ['Colombia La Esperanza'] }, launchContext: { coffeeRef: 'c-a' } };
   for (const userText of ['Ok update the recipe', 'Please save my recipe.', 'Can we update the recipe?']) {
@@ -122,6 +137,28 @@ test('bare technique follow-up binds only to a delivered current-session proposa
   assert.equal(proseOnly.status, 'none');
 });
 
+test('a named technique clarification binds only to one delivered source card', () => {
+  const hybridOption = switchSourceOption(SWITCH_HYBRID_SOURCE_ID);
+  const immersionOption = switchSourceOption(SWITCH_IMMERSION_SOURCE_ID);
+  const hybrid = sourceCard('hybrid', 'a', hybridOption, hybridOption.recipe);
+  const immersion = sourceCard('immersion', 'a', immersionOption, hybridOption.recipe);
+  const bound = bindRuphusTurn({ userText: 'Full immersion', coffees, refs: {}, priorTechniqueProposals: [hybrid, immersion] });
+  assert.equal(bound.status, 'locked');
+  assert.equal(bound.coffeeRef, 'c-a');
+  assert.equal(bound.techniqueSlot, 'v60_hot');
+  assert.equal(bound.techniqueKind, 'manual_source_technique');
+
+  const noHistory = bindRuphusTurn({ userText: 'Full immersion', coffees, refs: {} });
+  assert.equal(noHistory.status, 'none');
+  const duplicate = sourceCard('immersion-preview-revision', 'a', immersionOption, hybridOption.recipe);
+  const duplicateBound = bindRuphusTurn({ userText: 'Full immersion', coffees, refs: {}, priorTechniqueProposals: [hybrid, immersion, duplicate] });
+  assert.equal(duplicateBound.status, 'locked', 'preview revisions of one source/coffee/slot remain one contextual choice');
+  assert.equal(duplicateBound.coffeeRef, 'c-a');
+  const foreign = sourceCard('foreign-immersion', 'b', immersionOption, hybridOption.recipe);
+  const mixed = bindRuphusTurn({ userText: 'Full immersion', coffees, refs: {}, priorTechniqueProposals: [immersion, foreign] });
+  assert.equal(mixed.status, 'none', 'an ambiguous source choice cannot guess a coffee');
+});
+
 test('bare technique follow-up stays unbound when retained proposals point at multiple coffees', () => {
   const proposal = (id, coffeeId) => ({
     id, type: 'recipe_proposal', status: 'proposed', coffeeId, slotKey: 'v60_hot',
@@ -136,12 +173,12 @@ test('bare technique follow-up stays unbound when retained proposals point at mu
 });
 
 test('read-only comparison and historical technique references bind only to delivered same-session cards', () => {
-  const proposal = (id, coffeeId, sourceId) => ({
-    id, type: 'recipe_proposal', status: 'proposed', coffeeId, slotKey: 'v60_hot',
-    before: { coffeeGrams: 15 }, after: { coffeeGrams: 15 },
-    techniqueExperiment: { kind: 'manual_source_technique', techniqueId: sourceId, familyId: sourceId, sourceId },
-  });
-  const retained = [proposal('hybrid-card', 'a', 'matt-winton-hybrid'), proposal('immersion-card', 'a', 'hario-full-immersion')];
+  const hybridOption = switchSourceOption(SWITCH_HYBRID_SOURCE_ID);
+  const immersionOption = switchSourceOption(SWITCH_IMMERSION_SOURCE_ID);
+  const retained = [
+    sourceCard('hybrid-card', 'a', hybridOption, hybridOption.recipe),
+    sourceCard('immersion-card', 'a', immersionOption, hybridOption.recipe),
+  ];
   const compare = bindRuphusTurn({ userText: 'Compare those two', coffees, refs: {}, priorTechniqueProposals: retained });
   assert.equal(compare.status, 'locked');
   assert.equal(compare.coffeeRef && compare.refs[compare.coffeeRef], 'a');
@@ -156,7 +193,7 @@ test('read-only comparison and historical technique references bind only to deli
   assert.equal(noHistory.status, 'none');
   const mixed = bindRuphusTurn({
     userText: 'Compare those two', coffees, refs: {},
-    priorTechniqueProposals: [retained[0], proposal('foreign-card', 'b', 'foreign-source')],
+    priorTechniqueProposals: [retained[0], sourceCard('foreign-card', 'b', immersionOption, hybridOption.recipe)],
   });
   assert.equal(mixed.status, 'none');
 });
