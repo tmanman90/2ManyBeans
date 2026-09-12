@@ -1,6 +1,6 @@
 # Ruphus conversation completion — observed acceptance
 
-Engineering acceptance: complete for the September 12 bounded plan. This does not assert universal conversational correctness, superiority to another product, production release, or the owner's personal approval.
+The original completion verdict below was **reopened after subsequent owner failures**. These observations remain historical, not fresh acceptance. The current source `b52abb2` engineering verdict, independent native consumer journeys, failed attempts and verified fixes are in [the current acceptance log](2026-09-12-ruphus-independent-consumers.md). Phone/production release and owner subjective acceptance are not claimed here.
 
 ## Delivery identity
 
