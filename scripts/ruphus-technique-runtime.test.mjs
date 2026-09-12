@@ -130,11 +130,13 @@ test('technique reader returns executable alternatives and preserves another-sel
   assert.ok(!first.options.some((option) => ['rao-two-stage-v1', 'kurasu-controlled-pulses-v1'].includes(option.sourceId)));
 
   const selected = first.options.find((option) => option.id === 'kasuya-coarse-pulses');
+  const explanation = 'The Kasuya source-backed technique fits the regular V60 you selected.';
   const proposal = await tools.call('propose_recipe_change', {
     coffeeRef: 'c1',
     slot: 'v60_hot',
     change: null,
     experiment: { kind: 'v60_technique', techniqueId: selected.id },
+    explanation,
   });
   assert.equal(proposal.ok, true);
   assert.equal(proposal.artifact.techniqueExperiment.protocolVersion, 1);
@@ -143,10 +145,11 @@ test('technique reader returns executable alternatives and preserves another-sel
   assert.equal(proposal.artifact.after.sourceLineage.sourceIds[0], selected.sourceId);
   assert.equal(proposal.artifact.after.sourceLineage.technique, selected.familyId);
   assert.equal(proposal.artifact.after.ratio, '1:15');
+  assert.equal(proposal.artifact.explanation, explanation);
   assert.notEqual(proposal.artifact.after.grindSize.setting, recipe.grindSize.setting);
   assert.equal(proposal.artifact.after.steps.at(-1).waterTotal, proposal.artifact.after.waterGrams);
   assert.equal(validateV60Candidate(proposal.artifact.after).valid, true);
-  assert.equal(proposalHandoff(proposal.artifact), `Try ${selected.name}. Source recipe: five centered pulses using the 4:6 method. Here’s the recipe to review.`);
+  assert.equal(proposalHandoff(proposal.artifact), `${explanation} Try ${selected.name}. Source recipe: five centered pulses using the 4:6 method. Here’s the recipe to review.`);
 
   const another = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
   assert.equal(another.ok, true);

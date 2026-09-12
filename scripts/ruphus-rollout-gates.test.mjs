@@ -185,7 +185,7 @@ test('failed/interrupted Agent frames offer explicit legacy recovery without rep
   assert.deepEqual(recoveryForAgentFrame({ type: 'turn_interrupted', turnId: 'turn-2' }), { turnId: 'turn-2', reason: 'interrupted' });
   assert.equal(recoveryForAgentFrame({ type: 'turn_completed', turnId: 'turn-3' }), null);
   const source = fs.readFileSync(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
-  assert.match(source, /Professor Ruphus lost the thread/);
+  assert.match(source, /That response didn’t finish/);
   assert.match(source, /Try again/);
   assert.doesNotMatch(source, /Continue in standard chat/);
 });

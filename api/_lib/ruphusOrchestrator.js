@@ -12,6 +12,14 @@ const SEVERE_SECOND_FAILURES = new Set([
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
   'RT6_METHOD_CONTRADICTION',
 ]);
+// These are expected proposal-validation outcomes. They may be corrected once
+// from the same exact evidence; owner, target, stale, timing, and transport
+// failures remain terminal and must never earn a second proposal attempt.
+const PROPOSAL_RECOVERABLE_FAILURES = new Set([
+  'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal',
+  'invalid_proposal_intent', 'invalid_ratio_preview', 'no_recipe_change',
+  'one_change_required', 'technique-conflict', 'unsupported-dose-profile',
+]);
 const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
 const safeProposalExplanation = (value) => {
@@ -248,6 +256,18 @@ export function proposalEligibleForTarget(context, request = {}) {
   );
 }
 
+function isRecoverableProposalFailure(result) {
+  return result?.name === 'propose_recipe_change'
+    && result?.result?.ok !== true
+    && PROPOSAL_RECOVERABLE_FAILURES.has(result?.result?.code);
+}
+
+function isBoundedProposalRequest(request) {
+  const args = request?.args || {};
+  return args.intent === 'recipe_preview'
+    || ['dose', 'water', 'grind', 'temperature', 'ratio'].includes(args.change?.control);
+}
+
 export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, signal, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
   if (!turnId || !provider?.runTurn || !tools?.call) throw new Error('turn requires identity, provider, and tools');
   const turnStartedAt = performance.now(); let firstFrameAt = null; let readRoundMs = 0;
@@ -261,6 +281,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   let roundLimitRecovered = false;
   const toolNames = []; const proposalIds = []; const artifacts = []; const toolEvidence = []; const usageSamples = []; const providerRetrySamples = [];
   let proposalClaimed = false;
+  let proposalRecoveryAttempted = false;
+  let proposalRetryAvailable = false;
   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
   const rememberUsage = (value) => { usageSamples.push(value?.usage ?? null); const retryCount = value?.retryCount ?? value?.retry_count; if (typeof retryCount === 'number' && Number.isFinite(retryCount) && retryCount >= 0) providerRetrySamples.push({ retryCount }); };
   const accounting = () => { const retryCount = aggregateProviderRetryCount(providerRetrySamples); return { usage: aggregateProviderUsage('openai', usageSamples), ...(retryCount === undefined ? {} : { retryCount }) }; };
@@ -435,9 +457,10 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       // recipe. Deliver the one eligible proposal requested by that final
       // model response; this neither adds a read nor another model call.
       const proposalRoundException = toolRounds === maxToolRounds + 1
-        || (techniqueRoundRecoveryUsed && toolRounds === maxToolRounds + 2);
+        || (techniqueRoundRecoveryUsed && toolRounds === maxToolRounds + 2)
+        || (proposalRecoveryAttempted && toolRounds <= maxToolRounds + 2);
       const finalProposal = proposalRoundException && readCalls > 0
-        && !roundLimitRecovered && !proposalClaimed && calls.length === 1
+        && !roundLimitRecovered && (!proposalClaimed || proposalRetryAvailable) && calls.length === 1
         && calls[0].name === 'propose_recipe_change'
         && proposalEligibleForTarget(context, calls[0].args || {});
       if (toolRounds > maxToolRounds && !finalProposal) {
@@ -506,14 +529,19 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const blockedProposalCalls = new Set();
       // Validate the whole round before dispatching any tool. This keeps the
       // one-proposal rule atomic while independent reads remain concurrent.
-      if (proposalRequests.length > 1 || (proposalClaimed && proposalRequests.length > 0)) throw Object.assign(new Error('at most one proposal is allowed per turn'), { code: 'proposal_timing' });
+      if (proposalRequests.length > 1 || (proposalClaimed && !proposalRetryAvailable && proposalRequests.length > 0)) throw Object.assign(new Error('at most one proposal is allowed per turn'), { code: 'proposal_timing' });
       for (const request of calls) {
         if (!tools.names?.includes(request.name) || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
         if (READS.has(request.name) && readCalls + 1 > MAX_READS_PER_TURN) throw Object.assign(new Error('maximum evidence reads exceeded'), { code: 'read_budget_exceeded' });
         if (request.name === 'propose_recipe_change' && !proposalEligibleForTarget(context, request.args || {})) blockedProposalCalls.add(request.callId || request);
         if (READS.has(request.name)) readCalls += 1;
       }
-      if (proposalRequests.length) proposalClaimed = true;
+      if (proposalRequests.length) {
+        proposalClaimed = true;
+        // A failed proposal earns at most one replacement call, and consuming
+        // it here prevents a second model-selected retry after another error.
+        if (proposalRetryAvailable) proposalRetryAvailable = false;
+      }
       toolCalls += calls.length;
       const readRoundStartedAt = performance.now();
       const results = await Promise.all(calls.map((request) => runTool(request, {
@@ -560,6 +588,29 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         }
         text = 'That suggested grind isn’t a physical click on your Ode. I haven’t prepared or saved a change.';
         break;
+      }
+      const failedProposal = results.find((result) => {
+        if (!isRecoverableProposalFailure(result)) return false;
+        const request = calls.find((candidate) => candidate.callId === result.callId);
+        return isBoundedProposalRequest(request);
+      });
+      if (failedProposal) {
+        if (proposalRecoveryAttempted) {
+          text = 'I couldn’t prepare that recipe change safely. Your saved recipe is unchanged.';
+          break;
+        }
+        proposalRecoveryAttempted = true;
+        proposalRetryAvailable = true;
+        response = await provider.runTurn({
+          turnId, context, userText, conversation: context?.conversation || [],
+          tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+          previous: response, toolResult: { results }, regeneration: true,
+          correctiveInstruction: 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, answer plainly that no card was prepared and the saved recipe is unchanged.',
+          signal,
+        });
+        throwIfCancelled();
+        rememberUsage(response);
+        continue;
       }
       if (results.some(item => item.name === 'propose_recipe_change' && ['duplicate_alternative', 'no_recipe_change'].includes(item.result?.code))) {
         response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.', signal });

@@ -35,10 +35,12 @@ export function authSessionError(error) {
   return err;
 }
 
-export function chatErrorMessage(error) {
+export function chatErrorMessage(error, { agent = false } = {}) {
   return ['auth_temporarily_limited', 'auth_session_unavailable'].includes(error?.code)
     ? error.message
-    : "Couldn't reach the AI. Try again in a sec.";
+    : agent
+      ? 'I couldn’t finish that response. Your message is kept—try again.'
+      : "Couldn't reach the AI. Try again in a sec.";
 }
 
 export async function getAuthToken() {

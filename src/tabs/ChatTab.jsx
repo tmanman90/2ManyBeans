@@ -638,7 +638,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           ...restored,
           newMessage({
             role: 'assistant',
-            content: "Couldn't reach the AI. Try again in a sec.",
+            content: 'That response did not finish. Your message is kept—try again.',
             errored: true,
             retryTurn: {
               text: last.content,
@@ -1406,7 +1406,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             const recipe = parseRecipeCard(scan.cleanText);
             const errorMessage = newMessage({
               role: 'assistant',
-              content: recipe.cleanText || chatErrorMessage(err),
+              content: recipe.cleanText || chatErrorMessage(err, { agent: attemptedAgent }),
               recipeCard: recipe.recipeCard,
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
@@ -1421,7 +1421,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             // transient and retain their existing in-memory retry behavior.
             const errorMessage = newMessage({
               role: 'assistant',
-              content: chatErrorMessage(err),
+              content: chatErrorMessage(err, { agent: attemptedAgent }),
               errored: true,
               retryTurn: { text, displayMsg, apiMsg },
               ...(attemptedAgent ? { retry: { kind: 'agent', text, contextRef: attemptedAgentContext } } : {}),
@@ -1644,7 +1644,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         {agentEnabled && agentFrame && loading && <RuphusLifecycleCaption frame={agentFrame} />}
         {agentEnabled && agentRecovery && !loading && (
           <div role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', border: `1px solid ${C.hairline}`, borderRadius: radius.lg, background: C.cream }}>
-            <span style={{ ...typeScale.caption, color: C.textMuted }}>Professor Ruphus lost the thread. Try again.</span>
+            <span style={{ ...typeScale.caption, color: C.textMuted }}>That response didn’t finish. You can retry it.</span>
             <Btn variant="small" onClick={handleAgentRecovery}>Try again</Btn>
           </div>
         )}

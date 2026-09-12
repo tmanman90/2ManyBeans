@@ -55,6 +55,18 @@ test('rejected credentials are reported once, while transient errors can retry',
   }
 });
 
+test('agent execution failures preserve truthful retry copy without leaking internal errors', async () => {
+  const api = await transport({ getIdToken: async () => 'test-token' });
+  for (const code of ['tool_round_limit', 'provider_error', 'unknown']) {
+    const copy = api.chatErrorMessage({ code, message: 'private internal details' }, { agent: true });
+    assert.equal(copy, 'I couldn’t finish that response. Your message is kept—try again.');
+    assert.doesNotMatch(copy, /network|connection|private internal/);
+  }
+  const authError = { code: 'auth_session_unavailable', message: 'Please sign in again.' };
+  assert.equal(api.chatErrorMessage(authError, { agent: true }), authError.message);
+  assert.equal(api.chatErrorMessage({}), "Couldn't reach the AI. Try again in a sec.");
+});
+
 test('native initial load and 360 suspended polling ticks share one pending fetch', async () => {
   const source = await readFile('src/hooks/useAppData.js', 'utf8');
   const { code } = await transform(source, { format: 'cjs' });

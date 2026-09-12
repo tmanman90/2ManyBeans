@@ -952,6 +952,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       return { ok: false, code: 'technique_option_required', message: 'Choose one of the supported techniques I just showed you.' };
     }
     const typedPreview = args.intent === 'recipe_preview';
+    const servingDose = args.servingDoseGrams;
+    if (servingDose != null && (!Number.isFinite(servingDose) || servingDose <= 0)) {
+      return { ok: false, code: 'invalid_serving_dose', message: 'The serving dose must be a positive number within this brewer’s supported range.' };
+    }
+    if (servingDose != null && args.change?.control === 'dose') {
+      return { ok: false, code: 'invalid_proposal_intent', message: 'Use either the dose control or servingDoseGrams, not both.' };
+    }
     if (!techniqueExperiment && args.intent === 'information') {
       throw Object.assign(new Error('information turns do not prepare recipe cards'), { code: 'proposal_timing' });
     }
@@ -964,13 +971,28 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     }
     let experimentMetadata = null;
     let requestedPatch = args.change ? patchForChange(target.before || {}, args.change) : args.afterRecipe;
+    if (servingDose != null && !techniqueExperiment && !['ratio', 'water', 'grind', 'temperature'].includes(args.change?.control)) {
+      return { ok: false, code: 'invalid_proposal_intent', message: 'A serving dose can accompany one recipe control or technique experiment, not a second dose control.' };
+    }
     if (args.change?.control === 'ratio') {
       try {
         const beforeRecipe = target.before || {};
-        const dose = Number(beforeRecipe.coffeeGrams ?? beforeRecipe.userCoffeeGrams ?? beforeRecipe.dose);
+        const dose = servingDose ?? Number(beforeRecipe.coffeeGrams ?? beforeRecipe.userCoffeeGrams ?? beforeRecipe.dose);
         requestedPatch = createRecipePreview({ recipe: beforeRecipe, dose, ratio: args.change.value, configuration: { grinder: snapshot.setup?.grinder }, allowIced: true });
       } catch (error) {
         return { ok: false, code: error.code || 'invalid_ratio_preview', message: error.message };
+      }
+    }
+    if (servingDose != null && !techniqueExperiment && args.change?.control !== 'ratio') {
+      try {
+        // Resize the complete executable recipe first, then apply the one
+        // requested diagnostic control to that derived serving. This keeps
+        // pours, aliases, and timing coherent without treating serving size
+        // as a second diagnostic control.
+        const resized = createRecipePreview({ recipe: target.before || {}, dose: servingDose, configuration: { grinder: snapshot.setup?.grinder }, allowIced: true });
+        requestedPatch = mergeRecipePatch(resized, patchForChange(resized, args.change));
+      } catch (error) {
+        return { ok: false, code: error.code || 'invalid_serving_dose', message: error.message };
       }
     }
     if (techniqueExperiment) {
@@ -982,18 +1004,18 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         const before = target.before || {};
         const discovery = target.discoveryRecipe || before;
         const dose = Number(discovery.coffeeGrams ?? discovery.userCoffeeGrams ?? discovery.dose ?? selected.sourceDoseGrams);
-        const selectedDose = manualSourceExperiment && Number.isFinite(selected.targetDoseGrams) ? selected.targetDoseGrams : dose;
+        const selectedDose = servingDose ?? (manualSourceExperiment && Number.isFinite(selected.targetDoseGrams) ? selected.targetDoseGrams : dose);
         try {
         // The first selection is a complete source-backed experiment. Do not
         // copy the current family's controls into it; later dose previews use
         // this selected recipe as their reviewed source of truth.
         const generated = manualSourceExperiment
           ? generateManualSourceTechniqueOption(selected.sourceId, {}, { ...(selected.sourceConfiguration || {}), sourceRevision: selected.sourceRevision, dose: selectedDose })
-          : generateV60TechniqueOption(selected.id, {}, { dose, grinder: snapshot.setup?.grinder });
+          : generateV60TechniqueOption(selected.id, {}, { dose: selectedDose, grinder: snapshot.setup?.grinder });
         generated.recipe.techniqueLabel = selected.name;
         const preview = manualSourceExperiment
           ? createRecipePreview({ recipe: generated.recipe, dose: selectedDose })
-          : createRecipePreview({ recipe: generated.recipe, dose, ratio: recipeRatio(generated.recipe) });
+          : createRecipePreview({ recipe: generated.recipe, dose: selectedDose, ratio: recipeRatio(generated.recipe) });
         requestedPatch = preview;
         experimentMetadata = {
           protocolVersion: RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION,
@@ -1090,7 +1112,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const mechanicalPaths = allPaths.filter(path => ['grind', 'grindSize'].includes(String(path).split('.')[0]));
     const paths = args.change?.control === 'dose'
       ? [...new Set(['dose', ...mechanicalPaths])]
-      : allPaths;
+      : args.change?.control === 'ratio'
+        ? [...new Set(['ratio', ...allPaths])]
+        : allPaths;
     const controls = techniqueExperiment ? ['technique'] : args.change ? [args.change.control] : [...new Set(paths.map(recipeControl))];
     if (recipeSourceHash(recipe, slotKey) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (!techniqueExperiment && (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0]))) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
@@ -1125,7 +1149,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }) }, required: ['coffeeRef', 'windowDays'], additionalProperties: false } };
     if (name === 'read_recipe') return { type: 'function', name, description: 'Read one exact recipe slot when its source data is needed. read_coffee_evidence.selectedRecipe already supplies the resolved recipe numbers and full schedule; reuse it when present. If selectedRecipe is absent, read the requested slot before concluding its recipe is unavailable.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
     if (name === 'read_technique_options') return { type: 'function', name, description: 'Read source-backed hot V60, Kalita Wave, or ribbed Switch recipes for this coffee. Interpret the user’s conversational intent, not keywords: recipe_preview means they want something to brew, a recipe suggestion, an alternative, or a corrected-equipment recipe; information means explanation or comparison only. A preview does not save or start anything and needs no extra yes. For recipe_preview, select an exact executable option and call propose_recipe_change in this turn. Use the requested equipment; no matching saved recipe is required. Reference-only sources remain discussion-only.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot', 'kalita_hot'] }, intent: { type: 'string', enum: ['recipe_preview', 'information'] } }, required: ['coffeeRef', 'slot', 'intent'], additionalProperties: false } };
-    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, or one explicitly selected source-backed technique experiment. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: nullable({ type: 'string', enum: ['recipe_preview', 'information'] }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'intent', 'change', 'experiment', 'explanation'], additionalProperties: false } };
+    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, or one explicitly selected source-backed technique experiment. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: nullable({ type: 'string', enum: ['recipe_preview', 'information'] }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'intent', 'change', 'servingDoseGrams', 'experiment', 'explanation'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
 }

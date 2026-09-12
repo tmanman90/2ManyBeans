@@ -8,7 +8,7 @@ export const RUPHUS_CAPTIONS = Object.freeze({
   propose_recipe_change: 'Working out one change…',
   regeneration: 'Let me put that more simply…',
   turn_interrupted: 'Professor Ruphus got cut off.',
-  turn_failed: 'Professor Ruphus lost the thread.',
+  turn_failed: 'That response didn’t finish.',
 });
 
 export function ruphusCaption(frame = {}) {

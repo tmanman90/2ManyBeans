@@ -103,6 +103,8 @@ test('tools expose reads, trial review, and proposal but no mutation', async () 
   const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
   const changeSchema = proposalSchema.properties.change.anyOf.find((schema) => schema.type === 'object');
   assert.deepEqual(changeSchema.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
+  assert.deepEqual(proposalSchema.properties.servingDoseGrams.anyOf, [{ type: 'number' }, { type: 'null' }]);
+  assert.ok(proposalSchema.required.includes('servingDoseGrams'));
   assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);
   assert.deepEqual(proposalSchema.properties.explanation.anyOf, [{ type: 'string' }, { type: 'null' }]);
   assert.ok(proposalSchema.required.includes('explanation'));
@@ -178,6 +180,61 @@ test('typed preview rejects a stale exact recipe after it changes', async () => 
   const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
   assert.equal(result.code, 'proposal_target_stale');
   assert.equal(context.proposalState.proposalIssued, false);
+});
+
+test('ratio preview can carry a validated serving dose without dropping water or timing', async () => {
+  const before = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const context = { ...structuredClone(base), userText: 'Prepare this at 1:15 for two mugs.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'ratio', value: '1:15' }, servingDoseGrams: 30, experiment: null, explanation: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.before.coffeeGrams, 20);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.waterGrams, 450);
+  assert.equal(result.artifact.after.steps.at(-1).waterTotal, 450);
+  assert.equal(result.artifact.after.ratio, '1:15');
+  assert.notDeepEqual(result.artifact.before, result.artifact.after);
+  assert.equal(context.proposalState.proposalIssued, true);
+});
+
+test('serving dose is bounded by the selected brewer and cannot be paired with dose control', async () => {
+  const before = generateV60Recipe({}, { dose: 20 });
+  const context = { ...structuredClone(base), userText: 'Prepare a larger V60.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const tooLarge = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'ratio', value: '1:15' }, servingDoseGrams: 31, experiment: null, explanation: null });
+  assert.equal(tooLarge.ok, false);
+  assert.equal(tooLarge.code, 'unsupported-dose');
+  const bothControls = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, servingDoseGrams: 30, experiment: null, explanation: null });
+  assert.equal(bothControls.ok, false);
+  assert.equal(bothControls.code, 'invalid_proposal_intent');
+});
+
+test('V60 technique previews honor a distinct serving dose', async () => {
+  const before = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const context = { ...structuredClone(base), userText: 'Try a different V60 technique for two mugs.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  const options = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' });
+  const selected = options.options.find((option) => option.executable);
+  assert.ok(selected);
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: null, servingDoseGrams: 30, experiment: { kind: 'v60_technique', techniqueId: selected.id }, explanation: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.steps.at(-1).waterTotal, result.artifact.after.waterGrams);
+  assert.notEqual(result.artifact.after.technique, before.technique);
+});
+
+test('serving dose can accompany one non-ratio diagnostic control', async () => {
+  const before = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const context = { ...structuredClone(base), userText: 'Try a coarser V60 grind for two mugs.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '5.6' }, servingDoseGrams: 30, experiment: null, explanation: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.grindSize.setting, '5.6');
+  assert.equal(result.artifact.after.steps.at(-1).waterTotal, result.artifact.after.waterGrams);
 });
 test('orchestrator completes an exact-read typed preview with one inert artifact', async () => {
   const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. Try a small adjustment.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
@@ -660,4 +717,99 @@ test('a redundant read beyond the tool-round budget recovers to prose without di
   assert.equal(result.text, 'Try one small grind step finer and keep everything else the same.');
   assert.deepEqual(dispatched, ['resolve_coffee', 'read_coffee_evidence']);
   assert.equal(frames.some((frame) => frame.type === 'turn_interrupted'), false);
+});
+
+test('one expected proposal validation failure gets one bounded correction and card', async () => {
+  const context = {
+    ...structuredClone(base),
+    userText: 'Make the dose 30g for this V60.',
+    __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0;
+  let proposalCalls = 0;
+  const artifact = {
+    type: 'recipe_proposal', id: 'proposal-1', before: { coffeeGrams: 20, waterGrams: 300 },
+    after: { coffeeGrams: 30, waterGrams: 450 }, changedPaths: ['dose'], actions: [],
+  };
+  const tools = {
+    names: ['read_coffee_evidence', 'read_technique_options', 'propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }],
+    call: async (name) => {
+      if (name !== 'propose_recipe_change') return { ok: true };
+      proposalCalls += 1;
+      return proposalCalls === 1
+        ? { ok: false, code: 'unsupported-dose-profile', message: 'The first derived profile needs one bounded correction.' }
+        : { ok: true, artifact };
+    },
+  };
+  const result = await runRuphusTurn({
+    turnId: 'proposal-correction', context, userText: context.userText, tools,
+    provider: { async runTurn(input) {
+      providerCalls += 1;
+      if (providerCalls === 1) return { toolCalls: [
+        { callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } },
+        { callId: 'options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' } },
+      ] };
+      if (providerCalls === 2) return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+      assert.equal(input.regeneration, true);
+      assert.deepEqual(input.tools.map((definition) => definition.name), ['propose_recipe_change']);
+      assert.match(input.correctiveInstruction, /one corrected proposal/i);
+      return { toolCalls: [{ callId: 'proposal-2', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(providerCalls, 3);
+  assert.equal(proposalCalls, 2);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].id, 'proposal-1');
+});
+
+test('a repeated expected proposal failure stops after one replacement attempt', async () => {
+  const context = {
+    ...structuredClone(base),
+    userText: 'Make the dose 30g for this V60.',
+    __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0;
+  let proposalCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'proposal-correction-limit', context, userText: context.userText,
+    provider: { async runTurn(input) {
+      providerCalls += 1;
+      if (providerCalls > 1) assert.equal(input.regeneration, true);
+      return { toolCalls: [{ callId: `proposal-${providerCalls}`, name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+    } },
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => {
+      proposalCalls += 1;
+      return { ok: false, code: 'unsupported-dose-profile', message: 'No bounded correction exists.' };
+    } },
+    emit: () => {},
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.text, /saved recipe is unchanged/);
+  assert.equal(providerCalls, 2);
+  assert.equal(proposalCalls, 2);
+  assert.equal(result.artifacts.length, 0);
+});
+
+test('proposal transport failure does not enter the business correction path', async () => {
+  const context = {
+    ...structuredClone(base),
+    __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'proposal-transport-failure', context, userText: 'Make the dose 30g for this V60.',
+    provider: { async runTurn() {
+      providerCalls += 1;
+      return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+    } },
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => { throw Object.assign(new Error('provider unavailable'), { code: 'provider_unavailable' }); } },
+    emit: () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'provider_unavailable');
+  assert.equal(providerCalls, 1);
 });

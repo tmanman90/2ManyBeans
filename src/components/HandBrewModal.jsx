@@ -751,6 +751,23 @@ export const HandBrewModal = ({
     setTimerOpen(true);
   }, [icedRecipe]);
 
+  // A deliberate close is a durable dismissal for both the source-backed and
+  // generated timer. Keep this separate from tasting, which advances the
+  // attempt and must not dismiss its recovery receipt.
+  const handleTimerClose = useCallback(() => {
+    setTimerOpen(false);
+    setTimerRecipeOverride(null);
+    onDismissAttempt?.(attemptId);
+  }, [attemptId, onDismissAttempt]);
+
+  // Recipe-sheet dismissal is distinct from the programmatic close used when
+  // handing the attempt into tasting. Preserve the receipt until the user
+  // explicitly closes this sheet, including the source preview's back action.
+  const handleDismiss = useCallback(() => {
+    handleClose();
+    onDismissAttempt?.(attemptId);
+  }, [attemptId, handleClose, onDismissAttempt]);
+
   useEffect(() => {
     if (!open || previewMode || !autoStartAttempt || autoStartConsumedRef.current || !attemptId || !effectiveTimerReady) return;
     autoStartConsumedRef.current = true;
@@ -781,7 +798,7 @@ export const HandBrewModal = ({
     <>
     <Modal
       open={open && !timerOpen}
-      onClose={handleClose}
+      onClose={handleDismiss}
       title={icedMode ? (icedRecipe?.icedModeLabel || (device === 'kalita' ? 'Iced Kalita' : 'Iced Flash Brew')) : 'Hand Brew Recipe'}
     >
       {/* Loading state */}
@@ -829,7 +846,7 @@ export const HandBrewModal = ({
           previewStale={previewStale}
           previewMode={previewMode}
           error={error}
-          onClose={onClose}
+          onClose={handleDismiss}
           attemptId={attemptId}
           extraFooter={extraFooter}
         />
@@ -1409,7 +1426,7 @@ export const HandBrewModal = ({
         attemptId={attemptId}
         revisionId={revisionId}
         onSaveTimingEvent={onSaveTimingEvent}
-        onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
+        onClose={handleTimerClose}
         onStartTasting={(beanId) => {
           setTimerOpen(false);
           setTimerRecipeOverride(null);
@@ -1426,7 +1443,7 @@ export const HandBrewModal = ({
         attemptId={attemptId}
         revisionId={revisionId}
         onSaveTimingEvent={onSaveTimingEvent}
-        onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); onDismissAttempt?.(attemptId); }}
+        onClose={handleTimerClose}
         onStartTasting={(beanId) => {
           setTimerOpen(false);
           setTimerRecipeOverride(null);
