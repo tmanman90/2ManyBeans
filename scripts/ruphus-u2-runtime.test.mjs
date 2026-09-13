@@ -473,7 +473,7 @@ test('orchestrator regenerates a reply that contradicts the user-locked brewer',
   const provider = { async runTurn(input) {
     runs += 1;
     if (runs === 1) return { text: 'Use the Aiden recipe instead.' };
-    assert.match(input.correctiveInstruction, /explicitly used hot Kalita/);
+    assert.match(input.correctiveInstruction, /current request is bound to hot Kalita/);
     return { text: 'For that Kalita cup, was it thin but clean, or sour and sharp?' };
   } };
   const result = await runRuphusTurn({ turnId: 'locked-method', context, userText: 'I used the Kalita 155 and it tasted watery.', provider, tools: createRuphusTools({ uid: 'u1', context }) });
@@ -628,10 +628,12 @@ test('short credential-shaped secrets trigger RT2 and replace a severe second fa
   const frames = []; let runs = 0;
   const provider = { async runTurn() { runs += 1; return { text: runs === 1 ? 'sk-short' : 'pk-worse' }; } };
   const result = await runRuphusTurn({ turnId: 'secret-short', context: base, userText: 'Help', provider, tools: createRuphusTools({ uid: 'u1', context: base }), emit: (frame) => frames.push(frame) });
-  assert.equal(result.text, 'I lost my train of thought there. Ask me that again and I’ll keep it short.');
-  assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 1);
+  assert.equal(result.text, '');
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'response_validation_failed');
+  assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 0);
   assert.deepEqual(result.trace.regenerations[0].secondFailure, ['CF5_SECRET']);
-  assert.equal(result.trace.regenerations[0].delivered, 'replacement');
+  assert.equal(result.trace.regenerations[0].delivered, 'failed');
 });
 
 test('internal drafting notes trigger RT2 and replace a severe second failure', async () => {
@@ -639,7 +641,9 @@ test('internal drafting notes trigger RT2 and replace a severe second failure', 
   const context = { ...base, trace: { focusChanges: [], reads: [], regenerations: [] }, proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
   const provider = { runTurn: async ({ regeneration }) => ({ text: regeneration ? 'No tool until agreement. final.' : 'Snapshot says Ode 4.2. Need no generic question. final.', toolCalls: [], usage: { input_tokens: 10, output_tokens: 10 } }) };
   const result = await runRuphusTurn({ turnId: 'draft-leak', context, userText: 'What should I change?', provider, tools: { definitions: [], call: async () => ({}) }, send: () => {} });
-  assert.equal(result.text, 'I lost my train of thought there. Ask me that again and I’ll keep it short.');
+  assert.equal(result.text, '');
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'response_validation_failed');
   assert.deepEqual(result.trace.regenerations[0].secondFailure, ['CF5_DRAFT_LEAK']);
 });
 

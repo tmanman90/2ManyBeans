@@ -56,7 +56,9 @@ export function buildDynamicEvidenceBlock(evidence = {}) {
     ? `\n<AUTHORITATIVE_TURN_TARGET>\nThe user's current message resolves to ${turnBinding.coffeeName}. Answer about ${turnBinding.coffeeName} only, and use ${turnBinding.coffeeRef} for any read. Do not answer from the prior coffee focus.\n</AUTHORITATIVE_TURN_TARGET>`
     : '';
   const lockedMethod = methodBinding?.status === 'locked'
-    ? `\n<AUTHORITATIVE_METHOD_TARGET>\n${methodBinding.source === 'M1b'
+    ? methodBinding.source === 'M2'
+      ? `\n<REMEMBERED_METHOD>\nThe previous recipe focus was ${methodBinding.displayName}. This is memory, not a restriction on the current request. Follow the user's latest brewer request, including ordinary spelling variations; read the exact requested recipe before preparing its review card.\n</REMEMBERED_METHOD>`
+      : `\n<AUTHORITATIVE_METHOD_TARGET>\n${methodBinding.source === 'M1b'
       ? `The user opened the ${methodBinding.displayName} recipe. Name ${methodBinding.displayName} once in this opening reply so the clue is visible and easy to correct; it is not independent proof of what they brewed.`
       : `The current request concerns ${methodBinding.displayName}.`} Do not substitute, suggest, or ask about another brewer.\n</AUTHORITATIVE_METHOD_TARGET>`
     : '';

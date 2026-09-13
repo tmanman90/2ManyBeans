@@ -31,7 +31,9 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
   const inputSequences = new Map();
   return Object.freeze({
     async runTurn({ turnId = 'default', context, userText, conversation = [], tools, previous, toolResult, correctiveInstruction, regeneration = false }) {
-      const results = (toolResult?.results || (toolResult ? [toolResult] : [])).map((item) => ({ type: 'function_call_output', call_id: item.callId || item.name, output: JSON.stringify(item.result) }));
+      const evidence = toolResult?.results || (toolResult ? [toolResult] : []);
+      const results = evidence.filter(item => item.callId).map((item) => ({ type: 'function_call_output', call_id: item.callId, output: JSON.stringify(item.result) }));
+      const appEvidence = evidence.filter(item => !item.callId);
       const launchContext = context?.launchContext || context?.context || {};
       const evidenceBlock = buildDynamicEvidenceBlock(context || {});
       const recentConversation = (Array.isArray(conversation) ? conversation : [])
@@ -40,9 +42,14 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
       const currentUserTurn = latest?.role === 'user' && latest.content === userText
         ? []
         : [{ role: 'user', content: userText }];
-      const correction = correctiveInstruction ? [{ role: 'developer', content: correctiveInstruction }] : [];
-      const priorInput = inputSequences.get(turnId) || [
-        { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },
+      const correction = [
+        ...(appEvidence.length ? [{ role: 'developer', content: `App-verified evidence (not a provider tool call):\n${JSON.stringify(appEvidence)}` }] : []),
+        ...(correctiveInstruction ? [{ role: 'developer', content: correctiveInstruction }] : []),
+      ];
+      const currentContext = { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` };
+      const storedInput = inputSequences.get(turnId);
+      const priorInput = storedInput ? [currentContext, ...storedInput.slice(1)] : [
+        currentContext,
         ...recentConversation,
         ...currentUserTurn,
       ];
@@ -51,9 +58,9 @@ export function createOpenAIProvider({ client, instructions = '', maxOutputToken
       const input = (regeneration || correctiveInstruction)
         ? [...priorInput, ...(previous?.outputItems || []), ...missingEvidence, ...correction]
         : previous && toolResult
-        ? [...priorInput, ...(previous.outputItems || []), ...results]
+        ? [...priorInput, ...(previous.outputItems || []), ...results, ...correction]
         : [
-            { role: 'developer', content: `Starting Coffee context (live tool results and the user's latest corrections supersede this):\n${JSON.stringify(launchContext)}${evidenceBlock}` },
+            currentContext,
             ...recentConversation,
             ...currentUserTurn,
           ];

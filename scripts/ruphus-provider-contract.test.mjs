@@ -46,6 +46,31 @@ test('provider appends the newest user turn after authoritative history', async 
   ]);
 });
 
+test('continuation refreshes trusted brewer context without losing paired tool history', async () => {
+  const requests = [];
+  const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async request => {
+    requests.push(request); return { output_text: 'Which taste?', output: [] };
+  } } } });
+  const context = { methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M2' } };
+  await provider.runTurn({ turnId: 'fresh-binding', context, userText: 'How about the Aidan?', tools: [] });
+  context.methodBinding = { status: 'locked', slot: 'aiden', displayName: 'Aiden', source: 'M2' };
+  await provider.runTurn({ turnId: 'fresh-binding', context, userText: 'How about the Aidan?', tools: [],
+    previous: { outputItems: [{ type: 'function_call', call_id: 'read-aiden', name: 'read_recipe', arguments: '{}' }] },
+    toolResult: { results: [{ callId: 'read-aiden', result: { slot: 'aiden', recipe: { ratio: 16 } } }] } });
+  assert.match(requests[1].input[0].content, /previous recipe focus was Aiden/);
+  assert.doesNotMatch(requests[1].input[0].content, /hot Kalita/);
+  assert.equal(requests[1].input.filter(item => item.type === 'function_call_output').length, 1);
+});
+
+test('app-side evidence without a provider call id is not sent as an orphan function output', async () => {
+  const requests=[];
+  const provider=createOpenAIProvider({maxOutputTokens:1,client:{responses:{create:async request=>{requests.push(request);return {output_text:'Ready',output:[]};}}}});
+  await provider.runTurn({context:{},userText:'Review it',tools:[],regeneration:true,previous:{outputItems:[]},
+    toolResult:{results:[{name:'propose_recipe_change',result:{ok:true,summary:'Review ready'}}]}});
+  assert.equal(requests[0].input.some(item=>item.type==='function_call_output'),false);
+  assert.ok(requests[0].input.some(item=>item.role==='developer'&&item.content.includes('Review ready')));
+});
+
 test('OpenAI continuation replays prior response items alongside every tool result', async () => {
   const requests = [];
   const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output_text: '', output: [] }; } } } });

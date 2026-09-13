@@ -5,7 +5,6 @@ import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRol
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
 
-const REPLACEMENT = 'I lost my train of thought there. Ask me that again and I’ll keep it short.';
 const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
   'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
@@ -84,6 +83,9 @@ function cancelledError() {
 
 export function methodBindingTriggers({ reply = '', binding = null } = {}) {
   if (binding?.status !== 'locked' || !binding.slot) return [];
+  // Memory is a starting point, not an instruction in the current message.
+  // Exact recipe reads and proposal validation still bind all action targets.
+  if (binding.source === 'M2') return [];
   const incompatible = mentionedMethodSlots(reply, { ignoreExplicitlyRejected: true }).filter((slot) => slot !== binding.slot);
   return incompatible.length ? [{ code: 'RT6_METHOD_CONTRADICTION', severity: 'catastrophic', methods: incompatible }] : [];
 }
@@ -363,6 +365,10 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     } else {
       response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, signal }); throwIfCancelled(); rememberUsage(response);
     }
+    // A corrected response is still an agent turn: its reads/proposals must
+    // pass the same dispatch, owner, budget and one-proposal checks as before.
+    // Never extract only its text and silently discard its tool calls.
+    for (let checkAttempt = 0; checkAttempt < 2; checkAttempt += 1) {
     while (response) {
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
@@ -663,21 +669,25 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))
       && PREPARATION_CLAIM.test(checked)) checked = TECHNIQUE_RECOVERY;
     const checkedEvidence = runtimeEvidence(toolEvidence);
-    let triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
-    if (triggers.length) {
+    const triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
+    if (!checked) triggers.push({ code: 'RESPONSE_EMPTY' });
+    if (checkAttempt > 0) {
+      trace.regenerations.at(-1).secondFailure = triggers.map(trigger => trigger.code);
+      trace.regenerations.at(-1).delivered = triggers.some(trigger => SEVERE_SECOND_FAILURES.has(trigger.code) || trigger.code === 'RESPONSE_EMPTY') ? 'failed' : 'regenerated';
+      if (trace.regenerations.at(-1).delivered === 'failed') throw Object.assign(new Error('I couldn’t finish a reliable answer. Your message is kept.'), { code: 'response_validation_failed' });
+    } else if (triggers.length) {
       trace.regenerations.push({ triggers: triggers.map((trigger) => trigger.code), at: new Date().toISOString() });
-      const methodCorrection = context?.methodBinding?.status === 'locked'
-        ? ` The user explicitly used ${context.methodBinding.displayName}; do not mention, suggest, or ask about another brewer.`
+      const methodCorrection = context?.methodBinding?.status === 'locked' && context.methodBinding.source !== 'M2'
+        ? ` The current request is bound to ${context.methodBinding.displayName}; do not substitute another brewer.`
+        : context?.methodBinding?.source === 'M2'
+          ? ` ${context.methodBinding.displayName} is remembered context, not a new user instruction. If the user requests a different brewer, read that exact recipe before advising a change.`
         : '';
       const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}`;
-      const regenerated = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
+      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
       throwIfCancelled();
-      rememberUsage(regenerated); const regeneratedText = String(regenerated?.text || '').trim();
-      const second = checkedTriggers({ reply: regeneratedText, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
-      if (!second.length) { checked = regeneratedText; triggers = []; } else if (second.some((trigger) => SEVERE_SECOND_FAILURES.has(trigger.code))) { checked = REPLACEMENT; }
-      else checked = regeneratedText;
-      trace.regenerations.at(-1).secondFailure = second.map((trigger) => trigger.code);
-      trace.regenerations.at(-1).delivered = checked === REPLACEMENT ? 'replacement' : 'regenerated';
+      rememberUsage(response);
+      text = '';
+      continue;
     }
     throwIfCancelled();
     if (checked) send('text_delta', { text: checked });
@@ -685,6 +695,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     send('turn_completed', { text: checked, timing });
     const emittedArtifacts = artifacts.map((artifact) => ({ type: 'artifact_ready', artifact }));
     return { ok: true, turnId, text: checked, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace, frames: emittedArtifacts, previewReady: context?.proposalState?.previewReady === true }) };
+    }
   } catch (error) {
     const cancelled = signal?.aborted === true || error?.code === 'turn_cancelled';
     if (cancelled) {

@@ -937,12 +937,20 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'read_recipe') {
       if (!SLOT_KEYS.includes(slotKey)) throw Object.assign(new Error('resolved recipe slot is required'), { code: 'slot_required' });
       const recipe = await readRecipe(coffeeId, slotKey, args.coffeeRef);
+      // Resolving the requested brewer and finding a saved recipe are separate
+      // facts. A missing profile must not leave follow-ups on the prior brewer.
+      const lockedMethod = context.methodBinding?.status === 'locked' && context.methodBinding.source !== 'M2' ? context.methodBinding.slot : null;
+      if (!lockedMethod && !context.proposalState?.proposalIssued) {
+        context.methodBinding = { status: 'locked', slot: slotKey, displayName: displaySlot(slotKey), source: 'M2' };
+        const coffeeName = snapshot.coffees?.find(coffee => coffee.refKey === args.coffeeRef)?.name;
+        if (coffeeName) context.ledger = appendLedger(withoutMethodFocus(context.ledger), { kind: 'method_focus', status: 'available', namedCoffees: [coffeeName], methodFocus: { displayName: displaySlot(slotKey) } }, { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
+        if ((!recipe || recipe.code) && context.proposalState) Object.assign(context.proposalState, { target: null, previewReady: false, diagnosisReady: false, userAgreed: false });
+      }
       if (!recipe || recipe.code) return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName: displaySlot(slotKey), summary: recipe?.code && recipe.code !== 'recipe_missing' ? `I could not load the saved ${displaySlot(slotKey)} recipe right now. Your recipe is unchanged; try again to review it.` : missingRecipeSummary(slotKey, snapshot.coffees?.find((coffee) => coffee.refKey === args.coffeeRef)?.recipes || []), recipe: null };
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
       // Evidence may select a recent/default brewer before the agent asks for
       // the exact recipe needed by the conversation. That fallback must not
       // cage a later verified read. An explicit trusted brewer remains locked.
-      const lockedMethod = context.methodBinding?.status === 'locked' && context.methodBinding.source !== 'M2' ? context.methodBinding.slot : null;
       if (context.proposalState && !context.proposalState.proposalIssued && (!lockedMethod || lockedMethod === slotKey)) {
         context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
         if (!lockedMethod) context.methodBinding = { status: 'locked', slot: slotKey, displayName: displaySlot(slotKey), source: 'M2' };
