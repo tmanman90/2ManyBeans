@@ -192,7 +192,14 @@ function firestoreReaders(db) {
           if (!data || data.coffeeId !== coffeeId || data.slotKey !== candidate) return null;
           return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${id}`, selectedHash: data.snapshotHash || null, slotKey: candidate };
         }));
-        if (active.some(Boolean)) return active.filter(Boolean);
+        // A revision for one brewer must not hide legacy recipes for the
+        // other brewers. Never fall back beneath a broken active revision.
+        const revisedSlots = new Set(Object.keys(bean.activeRevisionIds || {}).filter(candidate => SLOT_KEYS.includes(candidate) && bean.activeRevisionIds[candidate]));
+        const legacy = SLOT_KEYS.filter(candidate => !revisedSlots.has(candidate)).map(candidate => {
+          const result = resolveLegacyRecipe(bean, candidate);
+          return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null;
+        }).filter(Boolean);
+        return [...active.filter(Boolean), ...legacy];
       }
       if (requested) { const result = resolveLegacyRecipe(bean, requested); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested } : { code: result.code }; }
       return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);

@@ -3,9 +3,37 @@ import test from 'node:test';
 import { runRuphusTurn, methodBindingTriggers } from '../api/_lib/ruphusOrchestrator.js';
 import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { firestoreReaders } from '../api/ruphus-agent.js';
+
+const profile = { title: 'Aiden', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 95, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 20, ssPulseTemperatures: [96, 95], batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: [95, 94] };
 
 const inherited = () => ({ methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M2' }, trace: { reads: [], focusChanges: [], regenerations: [] } });
 const usage = { input_tokens: 10, output_tokens: 10 };
+
+test('one active revision cannot hide another brewer legacy recipe in composite evidence', async () => {
+  const bean = { name: 'Colombia', aidenRecipe: profile, activeRevisionIds: { kalita_hot: 'r1' } };
+  const revision = { coffeeId: 'bean-1', slotKey: 'kalita_hot', snapshot: { dose: 20, water: 320 }, snapshotHash: 'hash' };
+  const db = { collection: () => ({ doc: () => ({ collection: child => ({ doc: () => ({ get: async () => ({ exists: true, data: () => child === 'beans' ? bean : revision }) }) }) }) }) };
+  const recipes = await firestoreReaders(db).readRecipe({ uid: 'owner', coffeeId: 'bean-1' });
+  assert.deepEqual(recipes.map(recipe => recipe.slotKey).sort(), ['aiden', 'kalita_hot']);
+  assert.equal(recipes.find(recipe => recipe.slotKey === 'aiden').ratio, 16);
+  revision.coffeeId = 'another-owner-coffee';
+  assert.deepEqual((await firestoreReaders(db).readRecipe({ uid: 'owner', coffeeId: 'bean-1' })).map(recipe => recipe.slotKey), ['aiden']);
+});
+
+test('semantic evidence selection replaces remembered focus but cannot override explicit brewer authority', async () => {
+  for (const source of ['M2', 'M1']) {
+    const context = { ...inherited(), userText: 'The machine instead', rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'Colombia', recipes: ['aiden', 'kalita_hot'] }], refs: { c1: 'bean-1' } }, ledger: { entries: [] }, proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' } }, __ruphusResolvedTargets: new Map() };
+    context.methodBinding.source = source;
+    const tools = createRuphusTools({ uid: 'owner', context, readers: { readCoffee: async () => ({ name: 'Colombia' }), readRecipe: async () => [{ ...profile, slotKey: 'aiden' }, { dose: 20, water: 320, slotKey: 'kalita_hot' }], readBrews: async () => [], readTastings: async () => [] } });
+    const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', slot: 'aiden' });
+    if (source === 'M2') {
+      assert.equal(result.method.slot, 'aiden');
+      assert.equal(result.selectedRecipe.ratio, 16);
+      assert.equal(context.proposalState.target.slot, 'aiden');
+    } else assert.equal(context.methodBinding.slot, 'kalita_hot');
+  }
+});
 
 test('a missing requested recipe retires remembered brewer focus without creating a proposal target', async () => {
   const context = { ...inherited(), userText: 'What about the Aidan recipe?',
