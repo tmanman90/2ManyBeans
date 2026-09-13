@@ -86,7 +86,13 @@ export function methodBindingTriggers({ reply = '', binding = null } = {}) {
   // Memory is a starting point, not an instruction in the current message.
   // Exact recipe reads and proposal validation still bind all action targets.
   if (binding.source === 'M2') return [];
-  const incompatible = mentionedMethodSlots(reply, { ignoreExplicitlyRejected: true }).filter((slot) => slot !== binding.slot);
+  const mentioned = mentionedMethodSlots(reply, { ignoreExplicitlyRejected: true });
+  // Mentioning another brewer while discussing the bound one is not proof of
+  // substitution (comparisons and explanations routinely require both). Only
+  // an exclusive off-target answer earns this prose check. Action authority is
+  // enforced independently by exact read/proposal targets.
+  if (mentioned.includes(binding.slot)) return [];
+  const incompatible = mentioned.filter((slot) => slot !== binding.slot);
   return incompatible.length ? [{ code: 'RT6_METHOD_CONTRADICTION', severity: 'catastrophic', methods: incompatible }] : [];
 }
 

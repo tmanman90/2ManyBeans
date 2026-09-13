@@ -26,6 +26,11 @@ test('remembered brewer cannot censor a new brewer clarification or comparison',
   }
   assert.equal(methodBindingTriggers({ reply: 'Use the Aiden instead.', binding: { ...inherited().methodBinding, source: 'M1' } })[0].code, 'RT6_METHOD_CONTRADICTION');
   assert.doesNotMatch(buildDynamicEvidenceBlock(inherited()), /Do not substitute, suggest, or ask about another brewer/);
+  for (const [slot, reply] of [
+    ['aiden', 'The Aiden change uses a stronger ratio. The Kalita change uses a finer grind.'],
+    ['kalita_hot', 'The V60 and Kalita have different filter shapes.'],
+    ['v60_hot', 'Unlike the Aiden, the V60 requires you to pour by hand.'],
+  ]) assert.deepEqual(methodBindingTriggers({ reply, binding: { status: 'locked', slot, source: 'M1' } }), []);
 });
 
 test('a transient recipe read preserves the active brewer and proposal readiness', async () => {
