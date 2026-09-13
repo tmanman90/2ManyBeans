@@ -526,6 +526,7 @@ test('method correction permanently drops the launch hint before evidence resolu
 });
 
 test('same-coffee evidence carries the verified method focus until correction or switch', async () => {
+  const evidenceWindow = { windowDays: 14, now: Date.parse('2026-09-01T00:00:00Z') };
   const current = {
     ...base,
     launchCoffeeId: 'c1',
@@ -551,21 +552,21 @@ test('same-coffee evidence carries the verified method focus until correction or
   };
   const tools = createRuphusTools({ uid: 'u1', context: current, readers });
   current.userText = 'Tell me about this coffee.';
-  const first = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  const first = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', ...evidenceWindow });
   assert.equal(first.method.slot, 'kalita_hot'); assert.equal(first.method.tier, 'M1b');
   assert.deepEqual(current.ledger.entries.at(-1).methodFocus, { displayName: 'hot Kalita' });
   current.userText = 'What should I change?';
-  const continued = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  const continued = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', ...evidenceWindow });
   assert.equal(continued.method.slot, 'kalita_hot'); assert.equal(continued.method.tier, 'M2');
   current.proposalState.target = { coffeeRef: 'c1', slot: 'kalita_hot' };
   const proposal = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 4 } });
   assert.equal(proposal.ok, true);
   current.userText = 'Actually, I used the V60 this morning.';
-  const corrected = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  const corrected = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', ...evidenceWindow });
   assert.equal(corrected.method.slot, 'v60_hot');
   assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.methodFocus?.displayName === 'hot Kalita'), false);
   current.userText = 'Now the other coffee.';
-  const switched = await tools.call('read_coffee_evidence', { coffeeRef: 'c2', windowDays: 14 });
+  const switched = await tools.call('read_coffee_evidence', { coffeeRef: 'c2', ...evidenceWindow });
   assert.notEqual(switched.method.slot, 'kalita_hot');
   assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.namedCoffees?.includes('El Vergel')), false);
 });
