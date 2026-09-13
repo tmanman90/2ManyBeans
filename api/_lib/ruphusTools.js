@@ -940,7 +940,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       // Resolving the requested brewer and finding a saved recipe are separate
       // facts. A missing profile must not leave follow-ups on the prior brewer.
       const lockedMethod = context.methodBinding?.status === 'locked' && context.methodBinding.source !== 'M2' ? context.methodBinding.slot : null;
-      if (!lockedMethod && !context.proposalState?.proposalIssued) {
+      if (!lockedMethod && !context.proposalState?.proposalIssued && (!recipe?.code || recipe.code === 'recipe_missing')) {
         context.methodBinding = { status: 'locked', slot: slotKey, displayName: displaySlot(slotKey), source: 'M2' };
         const coffeeName = snapshot.coffees?.find(coffee => coffee.refKey === args.coffeeRef)?.name;
         if (coffeeName) context.ledger = appendLedger(withoutMethodFocus(context.ledger), { kind: 'method_focus', status: 'available', namedCoffees: [coffeeName], methodFocus: { displayName: displaySlot(slotKey) } }, { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });

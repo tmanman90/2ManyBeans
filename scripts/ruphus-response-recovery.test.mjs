@@ -28,6 +28,30 @@ test('remembered brewer cannot censor a new brewer clarification or comparison',
   assert.doesNotMatch(buildDynamicEvidenceBlock(inherited()), /Do not substitute, suggest, or ask about another brewer/);
 });
 
+test('a transient recipe read preserves the active brewer and proposal readiness', async () => {
+  const context = { ...inherited(), rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'Colombia' }], refs: { c1: 'bean-1' } }, ledger: { entries: [] }, proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true } };
+  const before = structuredClone(context);
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => ({ code: 'unavailable' }) } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'aiden' });
+  assert.deepEqual(context.methodBinding, before.methodBinding);
+  assert.deepEqual(context.proposalState, before.proposalState);
+});
+
+test('invalid prose accompanying a validated card cannot create a competing recovery card', async () => {
+  let runs = 0; const frames = [];
+  const context = { ...inherited(), proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true } };
+  context.__ruphusResolvedTargets = new Map([['c1:kalita_hot', { coffeeRef: 'c1', coffeeId: 'bean-1', sourceHash: 'verified-source' }]]);
+  const artifact = { type: 'recipe_proposal', id: 'p1', slotKey: 'kalita_hot', before: { dose: 20, water: 320, grind: 5.6 }, after: { dose: 20, water: 320, grind: 5.2 }, changedPaths: ['grind'] };
+  const result = await runRuphusTurn({ turnId: 'card-recovery', context, userText: 'Make it finer', emit: frame => frames.push(frame),
+    provider: { runTurn: async () => { runs++; return { text: 'Snapshot says unknown. Need no generic question. final.', toolCalls: [{ callId: 'p', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview' } }], usage }; } },
+    tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, artifact }) } });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(runs, 1);
+  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
+  assert.doesNotMatch(result.text, /Snapshot|generic/);
+  assert.match(result.text, /5.6.*5.2/);
+});
+
 test('a response correction executes an exact read before continuing with the corrected brewer', async () => {
   const context = inherited(); const inputs = []; const calls = []; const frames = [];
   const provider = { runTurn: async input => {
@@ -69,6 +93,6 @@ test('recovery cannot execute an unknown mutation or bypass explicit method auth
   const result = await runRuphusTurn({ turnId: 'forbidden-recovery', context: inherited(), userText: 'Help',
     provider: { runTurn: async () => ++runs === 1 ? { text: 'Snapshot says unknown. Need no generic question. final.', usage }
       : { toolCalls: [{ name: 'save_recipe', callId: 'bad', args: {} }], usage } },
-    tools: { names: ['read_recipe'], definitions: [], call: async () => { calls++; } } });
+    tools: { names: ['read_recipe', 'save_recipe'], definitions: [], call: async () => { calls++; } } });
   assert.equal(result.ok, false); assert.equal(result.code, 'forbidden_tool'); assert.equal(calls, 0);
 });

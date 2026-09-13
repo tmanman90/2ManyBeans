@@ -553,7 +553,8 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       // one-proposal rule atomic while independent reads remain concurrent.
       if (proposalRequests.length > 1 || (proposalClaimed && !proposalRetryAvailable && proposalRequests.length > 0)) throw Object.assign(new Error('at most one proposal is allowed per turn'), { code: 'proposal_timing' });
       for (const request of calls) {
-        if (!tools.names?.includes(request.name) || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
+        if (!tools.names?.includes(request.name) || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)
+          || (!READS.has(request.name) && request.name !== 'propose_recipe_change')) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
         if (READS.has(request.name) && readCalls + 1 > MAX_READS_PER_TURN) throw Object.assign(new Error('maximum evidence reads exceeded'), { code: 'read_budget_exceeded' });
         if (request.name === 'propose_recipe_change' && !proposalEligibleForTarget(context, request.args || {})) blockedProposalCalls.add(request.callId || request);
         if (READS.has(request.name)) readCalls += 1;
@@ -669,6 +670,13 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))
       && PREPARATION_CLAIM.test(checked)) checked = TECHNIQUE_RECOVERY;
     const checkedEvidence = runtimeEvidence(toolEvidence);
+    // A validated card is already a published preview, not a rejected model
+    // draft. Keep that exact card and use its app-owned handoff if surrounding
+    // prose fails; never regenerate a competing proposal after publication.
+    const preparedRecipe = artifacts.find(artifact => artifact?.type === 'recipe_proposal');
+    if (preparedRecipe && checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding }).length) {
+      checked = proposalHandoff(preparedRecipe);
+    }
     const triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
     if (!checked) triggers.push({ code: 'RESPONSE_EMPTY' });
     if (checkAttempt > 0) {
