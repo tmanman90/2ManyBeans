@@ -328,6 +328,44 @@ test('every ordinary manual family can generate a first recipe from a verified a
   }
 });
 
+test('explicit supported equipment replacement keeps present source lineage and generates the requested configuration', async () => {
+  for (const [slot, saved, display, text, expectedSize, expectedVariant] of [
+    ['kalita_iced', generateKalitaIcedRecipe({}, { size: '155', dose: 15 }), 'iced Kalita 185', 'Make an iced Kalita 185 with 18 grams.', '185'],
+    ['kalita_hot', generateKalitaRecipe({}, { size: '185', dose: 20 }), 'hot Kalita 155', 'Actually the 155, 18 grams please.', '155'],
+    ['v60_hot', generateV60Recipe({}, { dose: 20 }), 'hot Switch 03', 'Use my Switch 03, 18 grams.', '03', 'switch'],
+  ]) {
+    const context = { userText: text, sessionId: 'configuration-replacement', conversation: [],
+      methodBinding: { status: 'locked', slot, displayName: display, source: 'M1' },
+      rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: 'Jar one', recipes: [slot] }], setup: { grinder: 'fellow-ode-gen2' } },
+      proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+    const tools = createRuphusTools({ uid, context, readers: { readRecipe: async () => saved } });
+    const read = await tools.call('read_recipe', { coffeeRef: 'coffee', slot });
+    assert.equal(read.preparingNewConfiguration, true);
+    assert.equal(read.sourceState, 'present');
+    assert.equal(read.creation.available, true);
+    const result = await tools.call('propose_recipe_change', { coffeeRef: 'coffee', slot, intent: 'recipe_preview', change: null, servingDoseGrams: 18 });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.artifact.sourceState, 'present');
+    assert.equal(result.artifact.sourceHash, recipeSourceHash(saved, slot));
+    assert.equal(result.artifact.before.kalitaSize ?? result.artifact.before.v60Size, saved.kalitaSize ?? saved.v60Size);
+    assert.equal(result.artifact.after.kalitaSize ?? result.artifact.after.v60Size, expectedSize);
+    if (expectedVariant) assert.equal(result.artifact.after.variant, expectedVariant);
+    assert.equal(result.artifact.after.coffeeGrams, 18);
+    assert.equal(result.artifact.after.timerReady, true);
+    assert.equal(result.artifact.changedPaths[0], 'configuration');
+  }
+});
+
+test('generic fallback binding does not authorize equipment replacement', async () => {
+  const recipe = generateKalitaIcedRecipe({}, { size: '155', dose: 15 });
+  const context = { userText: 'Tell me about it.', methodBinding: { status: 'locked', slot: 'kalita_iced', displayName: 'iced Kalita', source: 'M2' },
+    rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: 'Jar one' }] } };
+  const tools = createRuphusTools({ uid, context, readers: { readRecipe: async () => recipe } });
+  const read = await tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'kalita_iced' });
+  assert.equal(read.creation, undefined);
+  assert.equal(read.preparingNewConfiguration, undefined);
+});
+
 test('typed equipment binding survives a short dose follow-up without switching variant or size', async () => {
   const cases = [
     { slot: 'v60_hot', displayName: 'hot Switch 03', expectedVariant: 'switch' },

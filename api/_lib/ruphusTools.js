@@ -494,6 +494,16 @@ function validRecipeConfiguration(recipe, slotKey) {
   if (slotKey?.startsWith('kalita')) return ['155', '185'].includes(identity.size);
   return slotKey === 'aiden';
 }
+function needsConfigurationDraft(context, recipe, slotKey) {
+  if (slotKey === 'aiden' || !validRecipeConfiguration(recipe, slotKey)) return false;
+  const binding = context.methodBinding?.slot === slotKey ? context.methodBinding : null;
+  const answer = context.equipmentAnswer?.slot === slotKey ? context.equipmentAnswer : null;
+  const size = slotKey.startsWith('kalita') ? requestedKalitaSize(context.userText) : null;
+  if (!answer && binding?.source !== 'M1' && !size) return false;
+  const display = size ? `${slotKey.endsWith('_iced') ? 'iced' : 'hot'} Kalita ${size}` : answer?.displayName || binding?.displayName;
+  const supported = firstRecipeCreation(slotKey)?.configurations.some(config => methodBindingMatchesRecipe(slotKey, display, { variant: config.variant, v60Size: config.size, kalitaSize: config.size }));
+  return Boolean(display && supported && !methodBindingMatchesRecipe(slotKey, display, recipe));
+}
 function publicCurrentReview(review) {
   if (!review) return null;
   const identity = recipeConfigurationIdentity(review.after, review.slotKey);
@@ -1484,6 +1494,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const availableSourceControls = editableReviewControlAvailability(recipe);
       const displayName = methodDisplayForContext(context, slotKey, recipe);
       const grinderGuidance = sourceGrinderGuidance(currentReview?.after || recipe, snapshot.setup);
+      if (!currentReview && needsConfigurationDraft(context, recipe, slotKey)) {
+        return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, sourceState: 'present', recipe: modelRecipe(recipe), creation: firstRecipeCreation(slotKey), preparingNewConfiguration: true,
+          summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. Prepare the requested ${displayName} here with propose_recipe_change using intent recipe_preview and the requested servingDoseGrams. The existing generator supports this configuration; the saved recipe remains unchanged until confirmation.` };
+      }
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
     }
     const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
@@ -1538,11 +1552,12 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     }
     let experimentMetadata = null;
     const firstRecipe = target.before === null && target.sourceState === 'absent' && !techniqueExperiment;
+    const configurationDraft = !techniqueExperiment && !compatibleReview && needsConfigurationDraft(context, target.before, slotKey);
     let requestedPatch = firstRecipe ? null : args.change ? patchForChange(target.before || {}, args.change) : args.afterRecipe;
     if (servingDose != null && !techniqueExperiment && !firstRecipe && args.change && !['ratio', 'water', 'grind', 'temperature'].includes(args.change.control)) {
       return { ok: false, code: 'invalid_proposal_intent', message: 'A serving dose can stand alone or accompany one recipe control or technique experiment; do not send a second dose control.' };
     }
-    if (firstRecipe) {
+    if (firstRecipe || configurationDraft) {
       try {
         const draftBase = target.draftRecipe && { after: target.draftRecipe };
         requestedPatch = slotKey === 'aiden'
@@ -1571,7 +1586,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       }
     }
     if (hasManualSourceProjection(target.before || {})
-      && !techniqueExperiment
+      && !techniqueExperiment && !configurationDraft
       && args.change
       && ['temperature', 'grind'].includes(args.change.control)) {
       try {
@@ -1589,7 +1604,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       }
     }
     if (servingDose != null && !techniqueExperiment && args.change?.control !== 'ratio'
-      && !firstRecipe
+      && !firstRecipe && !configurationDraft
       && !(hasManualSourceProjection(target.before || {}) && ['temperature', 'grind'].includes(args.change?.control))) {
       try {
         // Resize the complete executable recipe first, then apply the one
@@ -1659,10 +1674,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     // would let the generic preview shape erase the source contract.
     let after = techniqueExperiment
       ? clone(requestedPatch)
-      : firstRecipe
+      : firstRecipe || configurationDraft
         ? clone(requestedPatch)
         : mergeRecipePatch(before, requestedPatch);
-    if (args.change?.control === 'dose') {
+    if (args.change?.control === 'dose' && !configurationDraft) {
       try {
         const requestedDose = Number(args.change.value);
         const sourceDose = Number(before.coffeeGrams ?? before.userCoffeeGrams ?? before.dose);
@@ -1743,21 +1758,21 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       .filter(Boolean)
       .filter(path => !path.startsWith('recipePreview') && !path.startsWith('ratioIntent'));
     const mechanicalPaths = allPaths.filter(path => ['grind', 'grindSize'].includes(String(path).split('.')[0]));
-    const paths = firstRecipe
+    const paths = configurationDraft ? ['configuration', ...allPaths] : firstRecipe
       ? [args.change?.control || 'recipe']
       : args.change?.control === 'dose'
       ? [...new Set(['dose', ...mechanicalPaths])]
       : args.change?.control === 'ratio'
         ? [...new Set(['ratio', ...allPaths])]
         : allPaths;
-    const controls = firstRecipe
+    const controls = configurationDraft ? ['configuration'] : firstRecipe
       ? [args.change?.control || 'recipe']
       : techniqueExperiment ? ['technique'] : args.change ? [args.change.control]
         : servingDose != null ? ['dose']
           : [...new Set(paths.map(recipeControl))];
     if (recipeSourceHash(recipe, slotKey) !== target.sourceHash) return { ok: false, code: 'proposal_target_stale', message: 'That recipe changed; read it again before suggesting a change.' };
     if (!firstRecipe && !techniqueExperiment && (controls.length !== 1 || ['method', 'device', 'mode'].includes(controls[0]))) return { ok: false, code: 'one_change_required', message: 'A proposal must change exactly one supported control.' };
-    const validationRecipe = after.sourceLineage ? after : recipe?.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
+    const validationRecipe = after.sourceLineage || configurationDraft ? after : recipe?.sourceLineage ? { ...after, sourceLineage: clone(recipe.sourceLineage) } : after;
     const validation = validateExecutableRecipe(validationRecipe, slotKey);
     if (!validation.valid) return { ok: false, code: 'invalid_recipe', errors: validation.errors };
     const coffeeName = snapshot.coffees?.find((item) => item.refKey === args.coffeeRef)?.name
