@@ -854,7 +854,11 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         continue;
       }
       if (results.some(item => item.name === 'propose_recipe_change' && ['duplicate_alternative', 'no_recipe_change'].includes(item.result?.code))) {
-        response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'The requested values already match the current recipe or existing suggestion. This is a successful no-change outcome, not a blocked response or validation failure. Return an information response explaining that it already matches; distinguish the existing preview from the saved recipe. Do not invent a different adjustment, call another tool, claim a new card or claim a save.', signal });
+        const unchanged = results.some(item => item.result?.code === 'no_recipe_change');
+        const correctiveInstruction = unchanged
+          ? 'The requested values already match the current recipe or existing suggestion. This is a successful no-change outcome, not a blocked response or validation failure. Return an information response explaining that it already matches; distinguish the existing preview from the saved recipe. Do not invent a different adjustment, call another tool, claim a new card or claim a save.'
+          : 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.';
+        response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction, signal });
         throwIfCancelled();
         continue;
       }

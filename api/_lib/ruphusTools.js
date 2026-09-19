@@ -1039,6 +1039,8 @@ function techniqueDraftRecipe(context, saved, slotKey, coffeeId) {
     if (current && String(current.kalitaSize || current.size) === String(size)) return { recipe: current, configurationRequested: Boolean(requestedSize) };
     return { recipe: { device: 'kalita', method: 'kalita', mode: 'hot', isIced: false, kalitaSize: String(size), configurationKey: `kalita:${size}:wave-paper:hot`, ...(explicitDose ? { coffeeGrams: Number(explicitDose) } : {}) }, configurationRequested: Boolean(requestedSize) };
   }
+  // This is methodResolver's fixed protocol label, not localized UI copy.
+  // Context and source-discovery regressions pin the explicit classic binding.
   const explicitClassic = context.methodBinding?.source === 'M1'
     && context.methodBinding.slot === slotKey && context.methodBinding.displayName === 'hot V60'
     && explicitMethodFromText(text) === slotKey;
