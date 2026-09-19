@@ -100,7 +100,8 @@ export const mergeUndoneProposalCanonical = (artifact, canonical) => {
   // draft. Keep that display base only for the identical immutable proposal.
   if (artifact?.id === canonical.id && artifact?.coffeeId === canonical.coffeeId
     && artifact?.slotKey === canonical.slotKey && artifact?.recipeHash
-    && artifact.recipeHash === canonical.recipeHash && Object.hasOwn(artifact, 'before')) {
+    && artifact.recipeHash === canonical.recipeHash
+    && (artifact.before != null || (artifact.before === null && canonical.sourceState === 'absent'))) {
     merged.before = artifact.before;
   }
   return artifact?.status === 'undone'

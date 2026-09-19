@@ -176,6 +176,7 @@ function proposalTarget(state) {
 function proposalValue(recipe = {}, control) {
   const typed = recipe[control];
   if (typed && typeof typed === 'object' && 'value' in typed) {
+    if (!['C', 'F', 'g', 'mL', 'ml', 'µm', 'microns'].includes(typed.unit)) return null;
     return ['number', 'string'].includes(typeof typed.value) ? typed.value : null;
   }
   if (control === 'dose') return recipe.coffeeGrams ?? recipe.userCoffeeGrams ?? recipe.dose ?? null;
@@ -258,7 +259,8 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
   const beforeUnit = proposalUnit(control, artifact.before);
   const afterUnit = proposalUnit(control, artifact.after);
   const unchanged = ['dose', 'water', 'grind', 'temperature']
-    .filter((item) => item !== control && proposalValue(artifact.before, item) != null && proposalValue(artifact.before, item) === proposalValue(artifact.after, item))
+    .filter((item) => item !== control && proposalValue(artifact.before, item) != null && proposalValue(artifact.before, item) === proposalValue(artifact.after, item)
+      && proposalUnit(item, artifact.before) === proposalUnit(item, artifact.after))
     .slice(0, 3);
   const unchangedList = unchanged.length > 2 ? `${unchanged.slice(0, -1).join(', ')}, and ${unchanged.at(-1)}` : unchanged.join(' and ');
   const unchangedText = unchanged.length ? ` ${unchangedList[0].toUpperCase()}${unchangedList.slice(1)} stay${unchanged.length === 1 ? 's' : ''} the same.` : '';
@@ -313,7 +315,7 @@ export function proposalEligibleForTarget(context, request = {}) {
     const selectedId = request.experiment.techniqueId || request.experiment.familyId || request.experiment.sourceId;
     return Boolean(target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot
       && ready?.coffeeRef === target.coffeeRef && ready?.slot === target.slot
-      && (!ready.kind || ready.kind === techniqueKind)
+      && (ready.kind === techniqueKind || (!ready.kind && request.intent == null))
       && (!resolvedTarget?.sourceHash || !ready.sourceHash || resolvedTarget.sourceHash === ready.sourceHash)
       && Array.isArray(ready.optionIds) && ready.optionIds.includes(selectedId)
       && request.intent !== 'information'

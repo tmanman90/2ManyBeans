@@ -23,6 +23,8 @@ test('typed technique preview survives a short equipment answer without keyword 
   assert.equal(proposalEligibleForTarget(context, {...request,intent:'information'}), false);
   assert.equal(proposalEligibleForTarget(context, {...request,coffeeRef:'c2'}), false);
   assert.equal(proposalEligibleForTarget(context, {...request,experiment:{...request.experiment,techniqueId:'not-read'}}), false);
+  delete context.proposalState.techniqueReady.kind;
+  assert.equal(proposalEligibleForTarget(context, request), false);
 });
 
 test('source quantity handoffs preserve native units and never stringify structured values', () => {
@@ -36,6 +38,10 @@ test('source quantity handoffs preserve native units and never stringify structu
   const range = proposalHandoff({ changedPaths: ['temperature'], before: { temperature: { value: { min: 195, max: 205 }, unit: 'F' } }, after: { temperature: { value: 205, unit: 'F' } } });
   assert.match(range, /one recipe change.*review/);
   assert.doesNotMatch(range, /\[object Object\]/);
+  const unknown = proposalHandoff({changedPaths:['water'],before:{water:{value:10,unit:'oz'}},after:{water:{value:11,unit:'oz'}}});
+  assert.doesNotMatch(unknown, /10g|11g/);
+  const mixed = proposalHandoff({changedPaths:['grind'],before:{grind:'4.6',temperature:96},after:{grind:'4.2',temperature:{value:96,unit:'F'}}});
+  assert.doesNotMatch(mixed, /temperature stays the same/);
 });
 
 test('named technique handoff uses one rationale instead of repeating the source difference', () => {
