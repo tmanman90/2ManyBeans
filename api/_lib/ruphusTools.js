@@ -1471,7 +1471,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       // cage a later verified read. An explicit trusted brewer remains locked.
       if (context.proposalState && !context.proposalState.proposalIssued && (!lockedMethod || lockedMethod === slotKey)) {
         context.proposalState.target = { coffeeRef: args.coffeeRef, slot: slotKey };
-        if (!lockedMethod) context.methodBinding = { status: 'locked', slot: slotKey, displayName: displaySlot(slotKey), source: 'M2' };
+        if (!lockedMethod && !preservesDetailedMethod) context.methodBinding = { status: 'locked', slot: slotKey, displayName: displaySlot(slotKey), source: 'M2' };
         const coffeeName = snapshot.coffees?.find(coffee => coffee.refKey === args.coffeeRef)?.name;
         if (coffeeName) context.ledger = appendLedger(withoutMethodFocus(context.ledger), { kind: 'method_focus', status: 'available', namedCoffees: [coffeeName], methodFocus: { displayName: methodDisplayForContext(context, slotKey, recipe) } }, { maxBytes: Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES) });
       }

@@ -6,7 +6,7 @@ import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { createMemoryRuphusRepository } from '../api/_lib/ruphusRepository.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { readCoffeeEvidence } from '../api/_lib/ruphusEvidence.js';
-import { absentRecipeSourceHash } from '../src/lib/ruphus/recipeSourceState.js';
+import { absentRecipeSourceHash, recipeSourceHash } from '../src/lib/ruphus/recipeSourceState.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
@@ -463,6 +463,33 @@ test('generic M2 Switch binding keeps trusted 03 review while explicit classic V
   const classicRead = await explicitClassic.call('read_recipe', { coffeeRef: 'coffee', slot: 'v60_hot' });
   assert.equal(classicRead.currentReview, undefined);
   assert.ok(classicRead.creation, 'an incompatible explicit classic binding must not borrow the Switch review');
+});
+
+test('reading a saved classic V60 preserves the active Switch draft through dose proposal', async () => {
+  const saved = generateV60Recipe({}, { dose: 20 });
+  const draft = generateManualSourceTechniqueOption('hario-switch-03-matt-winton-hybrid-24-2022', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 24,
+  }).recipe;
+  const context = {
+    userText: 'Only 20 grams please', sessionId: 'switch-dose-followup', conversation: [],
+    methodBinding: { status: 'locked', slot: 'v60_hot', displayName: 'hot Switch 03', source: 'M2' },
+    rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: 'Jar one', recipes: ['v60_hot'] }], setup: {} },
+    proposalState: { target: null, previewReady: true, proposalIssued: false },
+    __ruphusPriorProposals: [{ id: 'switch-draft', type: 'recipe_proposal', status: 'proposed', coffeeId: 'coffee-1', slotKey: 'v60_hot', before: saved, after: draft, sourceState: 'present', sourceHash: recipeSourceHash(saved, 'v60_hot') }],
+  };
+  const tools = createRuphusTools({ uid, context, readers: { readRecipe: async () => saved } });
+  const read = await tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'v60_hot' });
+  assert.equal(read.currentReview.variant, 'switch');
+  assert.equal(context.methodBinding.displayName, 'hot Switch 03');
+  assert.equal(context.ledger.entries.findLast(entry => entry.kind === 'method_focus').methodFocus.displayName, 'hot Switch 03');
+  const resized = await tools.call('propose_recipe_change', {
+    coffeeRef: 'coffee', slot: 'v60_hot', intent: 'recipe_preview', change: null,
+    servingDoseGrams: 20, aidenProfile: null, experiment: null, explanation: null,
+  });
+  assert.equal(resized.ok, true, JSON.stringify(resized));
+  assert.equal(resized.artifact.after.variant, 'switch');
+  assert.equal(resized.artifact.after.coffeeGrams, 20);
+  assert.equal(resized.artifact.after.sourceProjection.sourceId, draft.sourceProjection.sourceId);
 });
 
 test('legacy V60 review capabilities expose finite dose bounds and ratio control', async () => {
