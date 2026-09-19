@@ -136,7 +136,7 @@ for (const path of ['src/tabs/ChatTab.jsx', 'src/lib/recipeCommands.js', 'src/li
 }
 const aidenSource = readFileSync('src/lib/aiden.js', 'utf8');
 assert.equal((aidenSource.match(/ruphusApiUrl\('\/api\/aiden'\)/g) || []).length, 2, 'both legacy and attempt Aiden preparation must use preview-aware routing');
-assert.match(aidenSource, /const PROXY_URL = `\$\{API_BASE\}\/api\/openai`/, 'Aiden generation must retain the existing OpenAI route');
+assert.match(aidenSource, /const PROXY_URL = ruphusApiUrl\('\/api\/openai'\)/, 'Aiden generation retains the OpenAI endpoint but must use the matching Dev Firebase backend');
 
 // Evaluate only the small URL module with its two build-time dependencies
 // replaced. This keeps the routing contract test offline and exercises the
@@ -161,6 +161,7 @@ assert.equal(nativeDevUrl.origin, 'https://ruphus-preview.vercel.app');
 assert.equal(nativeDevUrl.pathname, '/api/ruphus-agent');
 assert.deepEqual(nativeDevUrl.searchParams.getAll('x-vercel-protection-bypass'), ['preview-token', 'preview-token-2']);
 assert.equal(nativeDevUrl.searchParams.get('turn'), '1');
+assert.equal(new URL(nativeDev.ruphusApiUrl('/api/openai')).origin, 'https://ruphus-preview.vercel.app');
 
 const nativeProd = await loadApiBase({
   native: true,
@@ -171,6 +172,7 @@ assert.equal(nativeProd.API_BASE, 'https://2manybeans.vercel.app');
 assert.equal(nativeProd.RUPHUS_API_BASE, nativeProd.API_BASE);
 assert.equal(new URL(nativeProd.ruphusApiUrl('/api/ruphus-agent')).origin, 'https://2manybeans.vercel.app');
 assert.equal(new URL(nativeProd.ruphusApiUrl('/api/ruphus-agent')).search, '');
+assert.equal(nativeProd.ruphusApiUrl('/api/openai'), 'https://2manybeans.vercel.app/api/openai');
 
 const web = await loadApiBase({ native: false, variant: 'dev', previewBase: 'https://ruphus-preview.vercel.app/?x-vercel-protection-bypass=preview-token' });
 assert.equal(web.API_BASE, '');

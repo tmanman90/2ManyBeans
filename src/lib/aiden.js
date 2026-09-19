@@ -2,14 +2,14 @@
 // Phase 1: GPT-5.4 generates recipe JSON from bean details
 // Phase 2: Push profile to Fellow via /api/aiden proxy
 
-import { API_BASE, ruphusApiUrl } from './apiBase';
+import { ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { assertValidAidenProfile, toAidenProfile } from './aidenProfileValidation';
 import { AIDEN_SYSTEM_PROMPT, repairAidenProfile } from './aidenCore.js';
 export { buildAidenTitle } from './aidenProfileValidation';
 
-const PROXY_URL = `${API_BASE}/api/openai`;
+const PROXY_URL = ruphusApiUrl('/api/openai');
 
 // buildBeanDescription and researchBean moved to beanResearch.js
 
