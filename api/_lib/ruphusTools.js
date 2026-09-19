@@ -498,10 +498,10 @@ function needsConfigurationDraft(context, recipe, slotKey) {
   if (slotKey === 'aiden' || !validRecipeConfiguration(recipe, slotKey)) return false;
   const binding = context.methodBinding?.slot === slotKey ? context.methodBinding : null;
   const answer = context.equipmentAnswer?.slot === slotKey ? context.equipmentAnswer : null;
-  const size = slotKey.startsWith('kalita') ? requestedKalitaSize(context.userText) : null;
-  if (!answer && binding?.source !== 'M1' && !size) return false;
-  const display = size ? `${slotKey.endsWith('_iced') ? 'iced' : 'hot'} Kalita ${size}` : answer?.displayName || binding?.displayName;
-  const supported = firstRecipeCreation(slotKey)?.configurations.some(config => methodBindingMatchesRecipe(slotKey, display, { variant: config.variant, v60Size: config.size, kalitaSize: config.size }));
+  if (!answer && binding?.source !== 'M1' && !methodBindingCarriesIdentity(binding?.displayName)) return false;
+  const display = answer?.displayName || binding?.displayName;
+  const creation = firstRecipeCreation(slotKey);
+  const supported = creation?.available && creation.configurations?.some(config => methodBindingMatchesRecipe(slotKey, display, { variant: config.variant, v60Size: config.size, kalitaSize: config.size }));
   return Boolean(display && supported && !methodBindingMatchesRecipe(slotKey, display, recipe));
 }
 function publicCurrentReview(review) {
@@ -1496,7 +1496,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const grinderGuidance = sourceGrinderGuidance(currentReview?.after || recipe, snapshot.setup);
       if (!currentReview && needsConfigurationDraft(context, recipe, slotKey)) {
         return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, sourceState: 'present', recipe: modelRecipe(recipe), creation: firstRecipeCreation(slotKey), preparingNewConfiguration: true,
-          summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. Prepare the requested ${displayName} here with propose_recipe_change using intent recipe_preview and the requested servingDoseGrams. The existing generator supports this configuration; the saved recipe remains unchanged until confirmation.` };
+          summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. If the user wants a recipe, the requested ${displayName} can be prepared here with propose_recipe_change, intent recipe_preview and servingDoseGrams. For an informational question, answer without proposing. The saved recipe remains unchanged until confirmation.` };
       }
       return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
     }

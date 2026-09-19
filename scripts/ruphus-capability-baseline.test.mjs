@@ -366,6 +366,23 @@ test('generic fallback binding does not authorize equipment replacement', async 
   assert.equal(read.preparingNewConfiguration, undefined);
 });
 
+test('iced size binding survives a new turn and can replace a saved smaller configuration', async () => {
+  const saved = generateKalitaIcedRecipe({}, { size: '155', dose: 15 });
+  const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'Jar one', jarSlot: 1, status: 'ACTIVE', recipes: ['kalita_iced'] }], readSetup: async () => ({}), readRecipe: async () => saved };
+  const initial = await buildRuphusContext({ uid, contextRef: { surface: 'direct', coffeeRef: 'coffee-1' }, userText: 'Make an iced Kalita 185 recipe for jar 1.', evidenceByteCap: 4096, readers });
+  assert.equal(initial.methodBinding.displayName, 'iced Kalita 185');
+  const context = await buildRuphusContext({ uid, contextRef: { surface: 'direct', coffeeRef: 'coffee-1' }, userText: '18 grams please.', ledger: initial.ledger, evidenceByteCap: 4096, readers });
+  assert.equal(context.methodBinding.displayName, 'iced Kalita 185');
+  const tools = createRuphusTools({ uid, context, readers });
+  const read = await tools.call('read_recipe', { coffeeRef: context.launchCoffeeId, slot: 'kalita_iced' });
+  assert.equal(read.preparingNewConfiguration, true);
+  await assert.rejects(tools.call('propose_recipe_change', { coffeeRef: context.launchCoffeeId, slot: 'kalita_iced', intent: 'information', servingDoseGrams: 18 }), { code: 'proposal_timing' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: context.launchCoffeeId, slot: 'kalita_iced', intent: 'recipe_preview', change: null, servingDoseGrams: 18 });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.artifact.after.kalitaSize, '185');
+  assert.equal(result.artifact.sourceHash, recipeSourceHash(saved, 'kalita_iced'));
+});
+
 test('typed equipment binding survives a short dose follow-up without switching variant or size', async () => {
   const cases = [
     { slot: 'v60_hot', displayName: 'hot Switch 03', expectedVariant: 'switch' },

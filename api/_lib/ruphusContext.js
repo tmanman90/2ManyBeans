@@ -211,12 +211,12 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   let methodBinding = resolvedMethod?.slot && ['M1', 'M1b', 'M2'].includes(resolvedMethod.tier)
     ? { status: 'locked', slot: resolvedMethod.slot, displayName: resolvedMethod.displayName, source: resolvedMethod.tier }
     : null;
-  if (methodBinding && carriedMethod?.displayName && /^(?:hot|iced) Kalita (?:155|185)$/.test(carriedMethod.displayName)
+  if (methodBinding?.source === 'M2' && carriedMethod?.displayName && /^(?:hot|iced) Kalita (?:155|185)$/.test(carriedMethod.displayName)
     && methodBinding.slot?.startsWith('kalita')) methodBinding = { ...methodBinding, displayName: carriedMethod.displayName };
   if (methodBinding && equipmentAnswer) methodBinding = { ...methodBinding, displayName: equipmentAnswer.variant === 'switch' ? `hot Switch ${equipmentAnswer.size}` : `hot Kalita ${equipmentAnswer.size}`, source: 'equipment-answer' };
-  if (methodBinding?.slot === 'kalita_hot') {
+  if (methodBinding?.slot?.startsWith('kalita')) {
     const explicitKalitaSize = String(userText || '').match(/\b(?:kalita|wave)\s*(155|185)\b/i)?.[1];
-    if (explicitKalitaSize && !equipmentAnswer) methodBinding = { ...methodBinding, displayName: `hot Kalita ${explicitKalitaSize}` };
+    if (explicitKalitaSize && !equipmentAnswer) methodBinding = { ...methodBinding, displayName: `${methodBinding.slot.endsWith('_iced') ? 'iced' : 'hot'} Kalita ${explicitKalitaSize}` };
   }
   const currentReviewArtifact = currentReviewContext({ proposals: priorTechniqueProposals, coffeeId: boundCoffeeRef ? snapshot.refs?.[boundCoffeeRef] : null, methodBinding });
   const currentReview = publicCurrentReview(currentReviewArtifact);
