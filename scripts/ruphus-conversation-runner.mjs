@@ -333,13 +333,13 @@ export function configuredCallMaximum({ model = RUPHUS_OPENAI_MODEL, provider = 
 }
 
 // The endpoint may make its initial call, one continuation for each exported
-// tool round, and one replacement call after a failed/empty turn. Keep the
+// tool round, and up to four bounded recovery calls (the runtime's cap). Keep the
 // reservation tied to those production constants rather than a runner cap.
 export const endpointCallMultiplier = Object.freeze({
   initial: 1,
   continuations: MAX_TOOL_ROUNDS,
-  regeneration: 1,
-  total: 1 + MAX_TOOL_ROUNDS + 1,
+  regeneration: 4,
+  total: 1 + MAX_TOOL_ROUNDS + 4,
 });
 
 async function dispatchMetered(adapter, packet, guard) {

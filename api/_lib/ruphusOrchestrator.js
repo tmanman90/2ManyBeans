@@ -174,6 +174,10 @@ function proposalTarget(state) {
 }
 
 function proposalValue(recipe = {}, control) {
+  const typed = recipe[control];
+  if (typed && typeof typed === 'object' && 'value' in typed) {
+    return ['number', 'string'].includes(typeof typed.value) ? typed.value : null;
+  }
   if (control === 'dose') return recipe.coffeeGrams ?? recipe.userCoffeeGrams ?? recipe.dose ?? null;
   if (control === 'water') return recipe.waterGrams ?? recipe.water ?? null;
   if (control === 'grind') return recipe.grindSize?.setting ?? recipe.grind ?? null;
@@ -182,7 +186,10 @@ function proposalValue(recipe = {}, control) {
   return null;
 }
 
-function proposalUnit(control) {
+function proposalUnit(control, recipe = {}) {
+  const nativeUnit = recipe[control]?.unit;
+  if (nativeUnit === 'C' || nativeUnit === 'F') return `°${nativeUnit}`;
+  if (['g', 'mL', 'ml', 'µm', 'microns'].includes(nativeUnit)) return nativeUnit;
   if (control === 'dose' || control === 'water') return 'g';
   if (control === 'temperature') return '°C';
   return '';
@@ -248,13 +255,14 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
       return withExplanation(`Try a 1:${displayRatio(afterRatio)} ratio instead of 1:${displayRatio(beforeRatio)}.${detail} Open the recipe to choose your dose and review the pours; nothing is saved yet.`);
     }
   }
-  const unit = proposalUnit(control);
+  const beforeUnit = proposalUnit(control, artifact.before);
+  const afterUnit = proposalUnit(control, artifact.after);
   const unchanged = ['dose', 'water', 'grind', 'temperature']
     .filter((item) => item !== control && proposalValue(artifact.before, item) != null && proposalValue(artifact.before, item) === proposalValue(artifact.after, item))
     .slice(0, 3);
   const unchangedList = unchanged.length > 2 ? `${unchanged.slice(0, -1).join(', ')}, and ${unchanged.at(-1)}` : unchanged.join(' and ');
   const unchangedText = unchanged.length ? ` ${unchangedList[0].toUpperCase()}${unchangedList.slice(1)} stay${unchanged.length === 1 ? 's' : ''} the same.` : '';
-  return withExplanation(`Prepared: change the ${control} from ${before}${unit} to ${after}${unit}.${unchangedText} Review it before applying.`);
+  return withExplanation(`Prepared: change the ${control} from ${before}${beforeUnit} to ${after}${afterUnit}.${unchangedText} Review it before applying.`);
 }
 
 function appendHandoff(current, handoff) {

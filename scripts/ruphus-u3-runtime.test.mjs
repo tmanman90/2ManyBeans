@@ -16,6 +16,19 @@ const contextFor = (extra = {}) => ({
   ...extra,
 });
 
+test('source quantity handoffs preserve native units and never stringify structured values', () => {
+  for (const unit of ['F', 'C']) {
+    const before = unit === 'F' ? 200 : 93;
+    const after = unit === 'F' ? 205 : 96;
+    const text = proposalHandoff({ changedPaths: ['temperature'], before: { temperature: { value: before, unit } }, after: { temperature: { value: after, unit } } });
+    assert.ok(text.includes(`${before}°${unit} to ${after}°${unit}`));
+    assert.doesNotMatch(text, /\[object Object\]/);
+  }
+  const range = proposalHandoff({ changedPaths: ['temperature'], before: { temperature: { value: { min: 195, max: 205 }, unit: 'F' } }, after: { temperature: { value: 205, unit: 'F' } } });
+  assert.match(range, /one recipe change.*review/);
+  assert.doesNotMatch(range, /\[object Object\]/);
+});
+
 test('named technique handoff uses one rationale instead of repeating the source difference', () => {
   const techniqueExperiment = { kind: 'manual_source_technique', name: 'Switch bloom hybrid', differences: ['An open bloom is followed by immersion.'] };
   const explained = proposalHandoff({ techniqueExperiment, explanation: 'The open bloom then closed steep gives you a different experiment.' });
