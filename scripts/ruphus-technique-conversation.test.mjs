@@ -369,12 +369,16 @@ test('a prepared claim without an artifact is replaced by honest recovery', asyn
   const userText = 'Show me a different V60 technique.';
   const context = contextFor(userText);
   const tools = toolsFor(context);
+  const frames = [];
   const result = await runRuphusTurn({
     turnId: 'technique-unbacked-prepared', context, userText, tools,
+    emit: frame => frames.push(frame),
     provider: { runTurn: async () => ({ text: 'Prepared for review.' }) },
   });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false, 'an unfulfilled recipe request is not a successful turn');
   assert.equal(result.artifacts.length, 0);
-  assert.match(result.text, /couldn’t prepare its review recipe safely/i);
-  assert.doesNotMatch(result.text, /\bprepared\b|ready to review/i);
+  assert.match(result.text, /haven’t prepared a recipe card yet/i);
+  assert.match(result.text, /saved recipe is unchanged/i);
+  assert.equal(frames.some(frame => frame.type === 'turn_completed'), false);
+  assert.equal(frames.at(-1).type, 'turn_interrupted');
 });

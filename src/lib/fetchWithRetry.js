@@ -39,7 +39,17 @@ export function chatErrorMessage(error, { agent = false } = {}) {
   return ['auth_temporarily_limited', 'auth_session_unavailable'].includes(error?.code)
     ? error.message
     : agent
-      ? 'I couldn’t finish that response. Your message is kept—try again.'
+      ? ({
+        provider_timeout: 'The coffee coach took too long to finish. Your message is kept—tap retry.',
+        provider_transport: 'The coffee coach is temporarily unavailable. Your message is kept—tap retry.',
+        provider_unavailable: 'The coffee coach is temporarily unavailable. Your message is kept—tap retry.',
+        provider_rate_limited: 'The coffee coach is busy right now. Your message is kept—try again in a moment.',
+        stream_incomplete: 'The coffee coach stopped before finishing. Your message is kept—tap retry.',
+        malformed_stream: 'The coffee coach returned an incomplete answer. Your message is kept—tap retry.',
+        recipe_artifact_required: 'I couldn’t finish the recipe card. Your message is kept—tap retry.',
+        proposal_target_stale: 'That recipe changed while I was checking it. Your message is kept—tap retry to refresh.',
+        read_timeout: 'I couldn’t check that coffee’s records right now. Your message is kept—tap retry.',
+      }[error?.code] || 'I couldn’t finish that response. Your message is kept—try again.')
       : "Couldn't reach the AI. Try again in a sec.";
 }
 

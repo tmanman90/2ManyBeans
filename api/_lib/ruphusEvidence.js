@@ -18,6 +18,13 @@ const slotDisplay = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced
 const LEDGER_FIELDS = Object.freeze(['kind', 'status', 'summary', 'windowDays', 'count', 'at', 'namedCoffees', 'coffee', 'evidence', 'methodFocus']);
 const COFFEE_FIELDS = Object.freeze(['name', 'roaster', 'origin', 'process']);
 const METHOD_FOCUS_NAMES = new Set(['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita']);
+const methodFocusName = (value) => {
+  const displayName = text(value);
+  return METHOD_FOCUS_NAMES.has(displayName)
+    || /^(?:hot|iced) Switch (?:02|03)$/.test(displayName)
+    || /^(?:hot|iced) Kalita (?:155|185)$/.test(displayName)
+    ? displayName : null;
+};
 const RECIPE_CONFIGURATION_FIELDS = Object.freeze(['method', 'device', 'mode', 'variant', 'v60Variant', 'v60Size', 'kalitaSize', 'size']);
 const SOURCE_CONFIGURATION_FIELDS = Object.freeze(['device', 'variant', 'mode', 'size', 'model', 'filter', 'material']);
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
@@ -45,8 +52,8 @@ export function sanitizeLedgerEntry(entry = {}) {
       continue;
     }
     if (key === 'methodFocus') {
-      const displayName = text(entry.methodFocus?.displayName);
-      if (METHOD_FOCUS_NAMES.has(displayName)) result.methodFocus = { displayName };
+      const displayName = methodFocusName(entry.methodFocus?.displayName);
+      if (displayName) result.methodFocus = { displayName };
       continue;
     }
     const clean = safeLedgerValue(entry[key]);
@@ -90,6 +97,20 @@ export function publicEvidence(evidence = {}) {
     if (kind === 'recipe' && Array.isArray(value.records)) {
       const configurations = value.records.map(publicRecipeConfiguration).filter(Boolean);
       if (configurations.length) result[kind].configurations = configurations;
+      if (Array.isArray(value.unavailableSlots) && value.unavailableSlots.length) {
+        const unavailableSlots = value.unavailableSlots.map((item) => {
+          const slot = slotDisplay[text(item?.slotKey || item?.slot)];
+          return slot ? { slot, status: 'unavailable' } : null;
+        }).filter(Boolean);
+        if (unavailableSlots.length) result[kind].unavailableSlots = unavailableSlots;
+      }
+      if (Array.isArray(value.invalidSlots) && value.invalidSlots.length) {
+        const invalidSlots = value.invalidSlots.map((item) => {
+          const slot = slotDisplay[text(item?.slotKey || item?.slot)];
+          return slot ? { slot, status: 'invalid' } : null;
+        }).filter(Boolean);
+        if (invalidSlots.length) result[kind].invalidSlots = invalidSlots;
+      }
     }
   }
   return { ...result, windowDays: evidence.windowDays, readAt: evidence.readAt, unavailable: Array.isArray(evidence.unavailable) ? evidence.unavailable.slice() : [] };
@@ -105,7 +126,31 @@ export function ledgerEntryFromEvidence(evidence = {}, { coffee = null } = {}) {
 }
 
 function safeCoffee(coffee, refKey) {
-  return { refKey, name: text(coffee?.name || coffee?.coffeeName), roaster: text(coffee?.roaster), origin: text(coffee?.origin), process: text(coffee?.process), jarSlot: coffee?.jarSlot ?? null, status: coffee?.status || null, daysOffRoast: daysAgo(coffee?.roastDate), recipes: (coffee?.recipes || coffee?.recipeSlots || []).map((item) => slotDisplay[item] || text(item)).filter(Boolean), lastBrewDate: coffee?.lastBrewDate || null };
+  // Keep the descriptor fields needed for deterministic Aiden family
+  // selection, while continuing to omit owner IDs, raw records, and private
+  // fields from the provider-facing rotation snapshot.
+  const notes = text(coffee?.notes || coffee?.bagNotes);
+  const region = text(coffee?.region);
+  const variety = text(coffee?.variety);
+  const roastLevel = text(coffee?.roastLevel);
+  const altitude = text(coffee?.altitude);
+  return {
+    refKey,
+    name: text(coffee?.name || coffee?.coffeeName),
+    roaster: text(coffee?.roaster),
+    origin: text(coffee?.origin),
+    process: text(coffee?.process),
+    ...(region ? { region } : {}),
+    ...(variety ? { variety } : {}),
+    ...(roastLevel ? { roastLevel } : {}),
+    ...(notes ? { notes, bagNotes: notes } : {}),
+    ...(altitude ? { altitude } : {}),
+    jarSlot: coffee?.jarSlot ?? null,
+    status: coffee?.status || null,
+    daysOffRoast: daysAgo(coffee?.roastDate),
+    recipes: (coffee?.recipes || coffee?.recipeSlots || []).map((item) => slotDisplay[item] || text(item)).filter(Boolean),
+    lastBrewDate: coffee?.lastBrewDate || null,
+  };
 }
 
 export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
@@ -130,11 +175,60 @@ export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
   return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric' }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
 }
 
-export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HISTORY_DAYS, now = Date.now(), unavailable = false } = {}) {
+function recipeFailureMarker(record, launchItem = null) {
+  const code = text(record?.code);
+  if (record?.validationStatus === 'invalid') {
+    const slotKey = text(record?.slotKey || record?.slot || launchItem?.method || launchItem?.slot);
+    return { ...(slotKey ? { slotKey } : {}), state: 'invalid', code: 'recipe_invalid' };
+  }
+  if (!code || code === 'recipe_missing') return null;
+  const slotKey = text(record?.slotKey || record?.slot || launchItem?.method || launchItem?.slot);
+  const state = code === 'legacy_recipe_ambiguous' ? 'invalid' : 'unavailable';
+  return { ...(slotKey ? { slotKey } : {}), state, code };
+}
+
+export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HISTORY_DAYS, now = Date.now(), unavailable = false, launchItem = null } = {}) {
   const scope = windowDays == null ? 'available history' : `last ${windowDays} days`;
   if (unavailable) return { kind, status: 'unavailable', summary: `I couldn't check ${kind} in the ${scope} right now.`, windowDays };
-  const values = Array.isArray(records) ? records : records && typeof records === 'object' ? [records] : [];
-  if (!values.length || values.every((value) => value && typeof value === 'object' && value.code)) return { kind, status: 'empty', summary: `No ${kind} in the ${scope}.`, windowDays };
+  const envelope = kind === 'recipe' && records && typeof records === 'object'
+    && ((Array.isArray(records) && (Array.isArray(records.unavailableSlots) || Array.isArray(records.invalidSlots)))
+      || (!Array.isArray(records) && Array.isArray(records.records)));
+  const rawValues = !Array.isArray(records) && envelope ? records.records : Array.isArray(records) ? records : records && typeof records === 'object' ? [records] : [];
+  const values = rawValues.filter((value) => !(kind === 'recipe' && value && typeof value === 'object' && (value.code || value.validationStatus === 'invalid')));
+  const unavailableSlots = envelope && Array.isArray(records.unavailableSlots)
+    ? records.unavailableSlots.filter((item) => item && typeof item === 'object' && (item.slotKey || item.slot)).map((item) => ({ slotKey: text(item.slotKey || item.slot), state: 'unavailable' }))
+    : [];
+  const invalidSlots = envelope && Array.isArray(records.invalidSlots)
+    ? records.invalidSlots.filter((item) => item && typeof item === 'object' && (item.slotKey || item.slot)).map((item) => ({ slotKey: text(item.slotKey || item.slot), state: 'invalid' }))
+    : [];
+  if (kind === 'recipe') {
+    for (const marker of rawValues.map((value) => recipeFailureMarker(value, launchItem)).filter(Boolean)) {
+      const destination = marker.state === 'invalid' ? invalidSlots : unavailableSlots;
+      if (!destination.some((item) => item.slotKey && marker.slotKey && item.slotKey === marker.slotKey && item.state === marker.state)) destination.push(marker);
+    }
+  }
+  if (!values.length) {
+    if (unavailableSlots.length) return {
+      kind,
+      status: 'unavailable',
+      summary: `I couldn't verify every saved recipe in the ${scope} right now.`,
+      windowDays,
+      count: 0,
+      records: [],
+      unavailableSlots,
+      ...(invalidSlots.length ? { invalidSlots } : {}),
+    };
+    if (invalidSlots.length) return {
+      kind,
+      status: 'invalid',
+      summary: `I couldn't validate every saved recipe in the ${scope} right now.`,
+      windowDays,
+      count: 0,
+      records: [],
+      invalidSlots,
+    };
+    return { kind, status: 'empty', summary: `No ${kind} in the ${scope}.`, windowDays };
+  }
   const summary = values.slice(0, 4).map((record) => {
     const method = slotDisplay[record.slotKey || record.slot || record.method] || record.method || record.device || '';
     const date = daysAgo(record.date || record.createdAt || record.updatedAt, now);
@@ -144,6 +238,29 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
     if (kind === 'tastings') return ['TASTING', age, 'not linked to a specific brew', numbers].filter(Boolean).join(' — ');
     return [method, numbers, age].filter(Boolean).join(': ');
   }).join(' | ');
+  if (unavailableSlots.length) {
+    return {
+      kind,
+      status: 'unavailable',
+      summary: `${summary} I couldn't verify every saved recipe right now.`,
+      windowDays,
+      count: values.length,
+      records: clone(values.slice(0, 4)),
+      unavailableSlots,
+      ...(invalidSlots.length ? { invalidSlots } : {}),
+    };
+  }
+  if (invalidSlots.length) {
+    return {
+      kind,
+      status: 'invalid',
+      summary: `${summary} I couldn't validate every saved recipe right now.`,
+      windowDays,
+      count: values.length,
+      records: clone(values.slice(0, 4)),
+      invalidSlots,
+    };
+  }
   return { kind, status: 'available', summary, windowDays, count: values.length, records: clone(values.slice(0, 4)) };
 }
 
@@ -188,10 +305,10 @@ export async function readCoffeeEvidence({ uid, coffeeId, launchItem = null, rea
   windowDays = windowDays === null ? null : Number.isFinite(Number(windowDays)) && Number(windowDays) > 0 ? Number(windowDays) : DEFAULT_HISTORY_DAYS;
   timeoutMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0 ? Number(timeoutMs) : READ_TIMEOUT_MS;
   const read = async (kind, reader, fallback = []) => {
-    if (typeof reader !== 'function') return summarizeEvidence(kind, fallback, { windowDays, now });
+    if (typeof reader !== 'function') return summarizeEvidence(kind, fallback, { windowDays, now, launchItem });
     try {
       const value = await withTimeout(reader({ uid, coffeeId, windowDays, launchItem, slotKey: launchItem?.method || launchItem?.slot || null }), timeoutMs);
-      return summarizeEvidence(kind, scopeHistory(kind, value, windowDays, now, launchItem), { windowDays, now });
+      return summarizeEvidence(kind, scopeHistory(kind, value, windowDays, now, launchItem), { windowDays, now, launchItem });
     } catch (error) {
       return { kind, status: 'unavailable', summary: `I couldn't check ${kind} in the ${windowDays == null ? 'available history' : `last ${windowDays} days`} right now.`, windowDays, errorCode: error.code || 'read_failed' };
     }

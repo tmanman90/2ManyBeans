@@ -149,7 +149,7 @@ test('technique reader returns executable alternatives and preserves another-sel
   assert.notEqual(proposal.artifact.after.grindSize.setting, recipe.grindSize.setting);
   assert.equal(proposal.artifact.after.steps.at(-1).waterTotal, proposal.artifact.after.waterGrams);
   assert.equal(validateV60Candidate(proposal.artifact.after).valid, true);
-  assert.equal(proposalHandoff(proposal.artifact), `${explanation} Try ${selected.name}. Source recipe: five centered pulses using the 4:6 method. Here’s the recipe to review.`);
+  assert.equal(proposalHandoff(proposal.artifact), `Try ${selected.name}. ${explanation} Here’s the recipe to review.`);
 
   const another = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot' });
   assert.equal(another.ok, true);

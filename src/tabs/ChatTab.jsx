@@ -42,6 +42,7 @@ import { RuphusLifecycleCaption } from '../components/chat/RuphusLifecycleCaptio
 import { RuphusOpening } from '../components/chat/RuphusOpening';
 import { RuphusContinuePrevious } from '../components/chat/RuphusContinuePrevious';
 import { ArtifactRenderer } from '../components/chat/ArtifactRenderer';
+import { reconcileUndoneProposalArtifacts, reconcileUndoneProposalMessages, reconcileUndoneProposalHistory, mergeUndoneProposalCanonical } from '../components/chat/artifacts/RecipeProposalCard';
 import { recoveryForAgentFrame } from '../lib/ruphus/recovery';
 import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from '../lib/ruphus/census';
 import { continuePrevious, restoreChatMessage, sessionPresentation, retainActionReceipt } from '../lib/ruphus/session';
@@ -502,11 +503,18 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!result?.receipt) return;
     const artifact = { id: result.receipt.id, type: result.receipt.mode === 'undo_revision' ? 'undo_receipt' : result.receipt.mode === 'prepare_attempt' ? 'fellow_handoff_result' : 'action_receipt', ...result.receipt, title: result.receipt.mode === 'brew_once' ? 'Brew once ready' : undefined, state: result.receipt.preparation || undefined };
     if (!artifact.proposalId && result.proposal?.id) artifact.proposalId = result.proposal.id;
-    const settledProposalStatus = result.proposal?.status || (['apply_proposal', 'promote_attempt'].includes(result.receipt.mode) ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
-    const updated = retainActionReceipt(messages, artifact, settledProposalStatus);
+    const settledProposalStatus = result.receipt.mode === 'undo_revision' && result.receipt.status === 'succeeded'
+      ? 'undone'
+      : result.proposal?.status || (['apply_proposal', 'promote_attempt'].includes(result.receipt.mode) ? 'applied' : result.receipt.mode === 'keep_current' ? 'kept' : result.receipt.mode === 'brew_once' ? 'attempt_created' : null);
+    const updated = reconcileUndoneProposalMessages(retainActionReceipt(messages, artifact, settledProposalStatus), artifact);
     // Persist before navigation can unmount Chat; React updaters must stay pure.
     persist(threadForPersistence(updated), { protocolVersion: 1 });
     setMessages(updated);
+    const reconciledAgentArtifacts = reconcileUndoneProposalArtifacts(agentArtifactsRef.current, artifact);
+    if (reconciledAgentArtifacts !== agentArtifactsRef.current) {
+      agentArtifactsRef.current = reconciledAgentArtifacts;
+      setAgentArtifacts(reconciledAgentArtifacts);
+    }
     if (result.attempt) {
       const startImmediately = previewStartRef.current?.proposalId === (result.proposal?.id || artifact.proposalId);
       previewStartRef.current = null;
@@ -601,10 +609,13 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   useEffect(() => {
     if (!agentEnabled || !hydratedArtifacts?.length) return;
     const canonical = new Map(hydratedArtifacts.map(artifact => [artifact.id, artifact]));
-    setMessages(previous => previous.map(message => ({
+    setMessages(previous => reconcileUndoneProposalHistory(previous).map(message => ({
       ...message,
       artifacts: Array.isArray(message.artifacts)
-        ? message.artifacts.map(artifact => canonical.get(artifact.id) ? { ...artifact, ...canonical.get(artifact.id) } : artifact)
+        ? message.artifacts.map(artifact => {
+          const canonicalArtifact = canonical.get(artifact.id);
+          return mergeUndoneProposalCanonical(artifact, canonicalArtifact);
+        })
         : message.artifacts,
     })));
   }, [agentEnabled, hydratedArtifacts]);
@@ -698,7 +709,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
 
   const openRecipePreview = useCallback((artifact) => {
-    if (!artifact || !['v60_hot', 'kalita_hot'].includes(artifact.slotKey)) return;
+    if (!artifact || !['v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced'].includes(artifact.slotKey)) return;
     const bean = beans.find((item) => item.id === artifact.coffeeId);
     if (!bean) {
       setToast('That coffee is no longer in your rotation.');

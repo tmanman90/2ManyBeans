@@ -1,9 +1,10 @@
-import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION } from '../../src/lib/ruphus/contracts.js';
+import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
 import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
+import { isOdeStep } from '../../src/lib/brewMethods.js';
 
 const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
@@ -17,10 +18,33 @@ const SEVERE_SECOND_FAILURES = new Set([
 const PROPOSAL_RECOVERABLE_FAILURES = new Set([
   'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal',
   'invalid_proposal_intent', 'invalid_ratio_preview', 'no_recipe_change',
-  'one_change_required', 'technique-conflict', 'unsupported-dose-profile', 'invalid_aiden_change',
+  'one_change_required', 'technique-conflict', 'unsupported-dose-profile', 'invalid_aiden_change', 'invalid_aiden_candidate',
 ]);
 const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
+const CARD_RECOVERY = 'I haven’t prepared a recipe card yet. Your saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
+const SAFE_FAILURE_MESSAGES = Object.freeze({
+  provider_schema: 'I couldn’t finish a reliable answer from the response. Your message is kept.',
+  provider_refusal: 'I couldn’t finish a reliable answer from the response. Your message is kept.',
+  provider_incomplete: 'I couldn’t finish a reliable answer from the response. Your message is kept.',
+  provider_transport: 'The coffee coach is temporarily unavailable. Your message is kept—tap retry when you’re ready.',
+  provider_timeout: 'The coffee coach took too long to finish. Your message is kept—tap retry.',
+  provider_unavailable: 'The coffee coach is temporarily unavailable. Your message is kept—tap retry.',
+  provider_rate_limited: 'The coffee coach is busy right now. Your message is kept—try again in a moment.',
+  provider_call_limit: 'I couldn’t finish that recipe within this turn. Your message is kept—tap retry.',
+  response_validation_failed: 'I couldn’t finish a reliable answer. Your message is kept.',
+  proposal_target_stale: 'That recipe changed while I was checking it. Your message is kept—tap retry to refresh it.',
+  read_timeout: 'I couldn’t check that coffee’s records right now. Your message is kept—tap retry.',
+});
+const safeFailureMessage = (error, fallback = 'I couldn’t complete that safely. Your saved recipe is unchanged.') => SAFE_FAILURE_MESSAGES[error?.code]
+  || (error?.code === 'tool_round_limit' ? 'I couldn’t complete that within the safe read limit. Your saved recipe is unchanged.' : fallback);
+const safeRecoveryText = (value, fallback = CARD_RECOVERY) => {
+  const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+  if (!text || text.length > 280 || /[{}[\]<>`]/.test(text)
+    || runtimeTriggers({ reply: text, userTurn: '' }).length
+    || /\b(?:internal|debug|provider|tool|function|credential|secret|stack|trace|hash)\b/i.test(text)) return fallback;
+  return text;
+};
 const safeProposalExplanation = (value) => {
   if (typeof value !== 'string') return null;
   const text = value.trim().replace(/\s+/g, ' ');
@@ -96,8 +120,25 @@ export function methodBindingTriggers({ reply = '', binding = null } = {}) {
   return incompatible.length ? [{ code: 'RT6_METHOD_CONTRADICTION', severity: 'catastrophic', methods: incompatible }] : [];
 }
 
-function checkedTriggers({ reply, userTurn, trace, evidence, methodBinding }) {
-  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding })];
+function groundedClaimTriggers({ reply = '', context = null } = {}) {
+  const grinder = context?.rotationSnapshot?.setup?.grinder
+    || context?.__ruphusServerSnapshot?.setup?.grinder
+    || context?.setup?.grinder;
+  if (grinder !== 'fellow-ode-gen2') return [];
+  const invalid = String(reply || '').split(/[!?]+|\.(?=\s|$)/).some((sentence) => {
+    if (!/\b(?:grind|grinder|ode|setting|clicks?|notches?)\b/i.test(sentence)) return false;
+    const values = [];
+    for (const match of sentence.matchAll(/\b(?:grind(?:er)?(?:\s+(?:setting|at|to|from|of))?|setting|ode(?:\s+gen\s*2)?)\s*(?:at|to|from|of|:)?\s*(\d+(?:\.\d+)?)/gi)) {
+      const suffix = sentence.slice(match.index + match[0].length);
+      if (!/^\s*(?:microns?\b|µm\b|°|[cfg]\b|ml\b|:|clicks?\b|notches?\b)/i.test(suffix)) values.push(Number(match[1]));
+    }
+    return values.some((value) => !isOdeStep(value));
+  });
+  return invalid ? [{ code: 'RT7_UNGROUNDED_GRINDER_STEP', severity: 'catastrophic' }] : [];
+}
+
+function checkedTriggers({ reply, userTurn, trace, evidence, methodBinding, context }) {
+  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding }), ...groundedClaimTriggers({ reply, context })];
 }
 
 function runtimeEvidence(toolEvidence = []) {
@@ -165,6 +206,9 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
   };
   const technique = artifact.techniqueExperiment;
   if (artifact.slotKey === 'aiden') {
+    if (artifact.sourceState === 'absent' && artifact.before == null) {
+      return withExplanation('Here’s a new Aiden profile to review. Nothing has been saved; saving it and preparing it in Fellow are separate choices.');
+    }
     const before = artifact.before || {};
     const after = artifact.after || {};
     const change = before.ratio !== after.ratio
@@ -172,15 +216,16 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
       : 'temperature curve, keeping the ratio and pulse timing unchanged';
     return withExplanation(`Here’s the Aiden profile with the adjusted ${change}. Review it below; saving it and preparing it in Fellow are separate choices.`);
   }
-  if (technique?.kind === 'v60_technique') {
-    const name = String(technique.name || 'this V60 approach').trim();
-    const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;
-    return withExplanation(`Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`);
-  }
-  if (technique?.kind === 'manual_source_technique') {
+  if (['v60_technique', 'manual_source_technique'].includes(technique?.kind)) {
     const name = String(technique.name || 'this coffee approach').trim();
-    const difference = includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null;
-    return withExplanation(`Try ${name}.${difference ? ` ${difference}` : ''} Here’s the recipe to review.`);
+    // One explanation source per handoff: model rationale and registry
+    // difference often describe the same technique in slightly different words.
+    const rationale = safeProposalExplanation(artifact.explanation)
+      || (includeDifference && Array.isArray(technique.differences) ? technique.differences[0] : null);
+    return `Try ${name}.${rationale ? ` ${rationale}` : ''} Here’s the recipe to review.`;
+  }
+  if (artifact.sourceState === 'absent' && artifact.before == null) {
+    return withExplanation('Here’s your recipe draft to review. Nothing has been saved.');
   }
   const rawControl = String(artifact.changedPaths?.[0] || '').split('.')[0];
   const control = rawControl === 'coffeeGrams' || rawControl === 'userCoffeeGrams' ? 'dose'
@@ -243,7 +288,8 @@ export function proposalEligibleForTarget(context, request = {}) {
   const techniqueKind = request?.experiment?.kind;
   const technique = techniqueKind === 'v60_technique' || techniqueKind === 'manual_source_technique';
   if (!technique && request?.intent === 'information') return false;
-  const typedPreview = !technique && request?.intent === 'recipe_preview';
+  const typedPreview = !technique && (request?.intent === 'recipe_preview'
+    || (request?.intent == null && (request?.servingDoseGrams != null || request?.change?.control === 'dose')));
   const resolvedTarget = context?.__ruphusResolvedTargets instanceof Map
     ? context.__ruphusResolvedTargets.get(`${target.coffeeRef}:${target.slot}`)
     : null;
@@ -280,8 +326,61 @@ function isRecoverableProposalFailure(result) {
 
 function isBoundedProposalRequest(request) {
   const args = request?.args || {};
-  return args.intent === 'recipe_preview'
+  return args.intent === 'recipe_preview' || (args.intent == null && (args.servingDoseGrams != null || args.change?.control === 'dose'))
     || ['dose', 'water', 'grind', 'temperature', 'ratio'].includes(args.change?.control);
+}
+
+// A provider can occasionally select the proposal tool immediately after
+// resolving a coffee, before it has emitted an exact recipe read. For a
+// typed preview only, spend one existing tool slot on that exact owner-bound
+// read, then re-evaluate the normal proposal gate. This is deliberately not
+// a general readiness bypass: explicit coffee/method conflicts, unsupported
+// slots, missing owner refs, and exhausted budgets remain blocked.
+function justInTimeRecipeReadRequest(context, calls, { readCalls, toolCalls, maxToolCalls } = {}) {
+  if (!Array.isArray(calls) || calls.length !== 1) return null;
+  const request = calls[0];
+  const args = request?.args || {};
+  if (request.name !== 'propose_recipe_change'
+    || !(args.intent === 'recipe_preview'
+      || (args.intent == null && (args.servingDoseGrams != null || args.change?.control === 'dose')))
+    || args.experiment) return null;
+  const coffeeRef = typeof args.coffeeRef === 'string' ? args.coffeeRef.trim() : '';
+  const slot = args.slot || args.slotKey;
+  if (!coffeeRef || !SLOT_KEYS.includes(slot)) return null;
+  if (context?.__ruphusRefs?.[coffeeRef] == null) return null;
+  const turnBinding = context?.__ruphusTurnBinding;
+  if (turnBinding?.status === 'locked' && turnBinding.coffeeRef && turnBinding.coffeeRef !== coffeeRef) return null;
+  const methodBinding = context?.methodBinding;
+  if (methodBinding?.slot && methodBinding.slot !== slot) return null;
+  const equipmentAnswer = context?.equipmentAnswer;
+  if (equipmentAnswer?.slot && equipmentAnswer.slot !== slot) return null;
+  const target = proposalTarget(context?.proposalState);
+  const resolved = context?.__ruphusResolvedTargets instanceof Map
+    ? context.__ruphusResolvedTargets.get(`${coffeeRef}:${slot}`)
+    : null;
+  if (resolved?.coffeeId && resolved.sourceHash) return null;
+  if (readCalls >= MAX_READS_PER_TURN || toolCalls + calls.length + 1 > maxToolCalls) return null;
+  if (target.coffeeRef && (target.coffeeRef !== coffeeRef || (target.slot && target.slot !== slot))) return null;
+  return { callId: 'jit-exact-recipe', name: 'read_recipe', args: { coffeeRef, slot } };
+}
+
+function envelopeArtifactIssue(envelope, artifacts, context) {
+  if (!envelope || envelope.intent !== 'recipe_preview' || envelope.state !== 'answered') return null;
+  // An answered preview must positively bind both dimensions. Null identity
+  // fields are appropriate for information/clarification turns, never for a
+  // recipe card that could be rendered or acted on.
+  if (typeof envelope.coffeeRef !== 'string' || !envelope.coffeeRef.trim() || typeof envelope.slot !== 'string' || !envelope.slot.trim()) return 'recipe_subject_required';
+  const expectedCoffeeId = envelope.coffeeRef && context?.__ruphusRefs?.[envelope.coffeeRef];
+  const candidates = artifacts.filter((candidate) => ['recipe_proposal', 'action_receipt'].includes(candidate?.type)
+    && candidate?.slotKey === envelope.slot);
+  const artifact = candidates.find((candidate) =>
+    ((expectedCoffeeId && candidate?.coffeeId === expectedCoffeeId)
+      || (!expectedCoffeeId && candidate?.coffeeRef === envelope.coffeeRef)));
+  if (!artifact) return candidates.length ? 'recipe_subject_mismatch' : 'recipe_artifact_required';
+  const binding = context?.__ruphusTurnBinding;
+  if (binding?.status === 'locked' && (envelope.coffeeRef !== binding.coffeeRef
+    || (binding.techniqueSlot && envelope.slot !== binding.techniqueSlot))) return 'recipe_subject_mismatch';
+  return null;
 }
 
 export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, signal, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
@@ -293,22 +392,40 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   };
   send('turn_accepted', { protocolVersion: RUPHUS_CONTRACT_VERSION });
   send('context_loading', { evidenceHash: context?.evidenceHash || null });
-  let response; let toolCalls = 0; let readCalls = 0; let toolRounds = 0; let text = '';
+  let response; let responseEnvelope = null; let toolCalls = 0; let readCalls = 0; let toolRounds = 0; let text = '';
   let roundLimitRecovered = false;
   const toolNames = []; const proposalIds = []; const artifacts = []; const toolEvidence = []; const usageSamples = []; const providerRetrySamples = [];
   let proposalClaimed = false;
   let proposalRecoveryAttempted = false;
   let proposalRetryAvailable = false;
+  let preparationClaimRecoveryAttempted = false;
   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
+  if (!Array.isArray(trace.toolEvents)) trace.toolEvents = [];
   const rememberUsage = (value) => { usageSamples.push(value?.usage ?? null); const retryCount = value?.retryCount ?? value?.retry_count; if (typeof retryCount === 'number' && Number.isFinite(retryCount) && retryCount >= 0) providerRetrySamples.push({ retryCount }); };
   const accounting = () => { const retryCount = aggregateProviderRetryCount(providerRetrySamples); return { usage: aggregateProviderUsage('openai', usageSamples), ...(retryCount === undefined ? {} : { retryCount }) }; };
   const pendingTools = new Set();
+  let providerCalls = 0;
+  let envelopeRecoveryAttempted = false;
   const throwIfCancelled = () => { if (signal?.aborted) throw cancelledError(); };
+  const runProvider = async (input) => {
+    const providerLimit = 1 + Math.max(0, Number(maxToolRounds) || 0) + 4;
+    if (providerCalls >= providerLimit) throw Object.assign(new Error('provider call limit exceeded'), { code: 'provider_call_limit' });
+    providerCalls += 1;
+    try {
+      const result = await provider.runTurn(input);
+      rememberUsage(result);
+      return result;
+    } catch (error) {
+      rememberUsage(error);
+      throw error;
+    }
+  };
   let techniqueContinuationUsed = false;
   let techniqueRoundRecoveryUsed = false;
+  let aidenContinuationUsed = false;
   const runTool = async (request, { blockedResult = null } = {}) => {
     throwIfCancelled();
-    const pending = { callId: request.callId || null, name: request.name };
+    const pending = { callId: request.callId || null, name: request.name, started: false, resultEmitted: false };
     const proposalStateBefore = request.name === 'propose_recipe_change' && context?.proposalState
       ? {
         proposalIssued: context.proposalState.proposalIssued,
@@ -330,18 +447,21 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     pendingTools.add(pending);
     try {
       send('tool_started', { name: request.name, ...(request.callId ? { callId: request.callId } : {}) });
+      pending.started = true;
       throwIfCancelled();
       toolNames.push(request.name);
       const result = blockedResult || await tools.call(request.name, request.args || {});
       throwIfCancelled();
-      pendingTools.delete(pending);
       const safeResult = result?.artifact && Object.hasOwn(result.artifact, 'explanation')
         ? { ...result, artifact: { ...result.artifact, explanation: safeProposalExplanation(result.artifact.explanation) } }
         : result;
+      trace.toolEvents.push({ name: request.name, outcome: safeResult?.ok === false ? 'failed' : 'succeeded', ...(safeResult?.code ? { code: safeResult.code } : {}), ...(request.args?.slot || request.args?.slotKey ? { slot: request.args.slot || request.args.slotKey } : {}), ...(request.args?.coffeeRef ? { target: request.args.coffeeRef } : {}) });
       toolEvidence.push({ callId: request.callId, name: request.name, result: safeResult });
       if (READS.has(request.name)) trace.reads.push({ name: request.name, at: new Date().toISOString() });
       if (safeResult?.coffeeRef && context?.launchCoffeeId && context.launchCoffeeId !== safeResult.coffeeRef) trace.focusChanges.push({ from: context.launchCoffeeId, to: safeResult.coffeeRef });
       if (safeResult?.proposal?.id) proposalIds.push(safeResult.proposal.id);
+      pending.resultEmitted = true;
+      pendingTools.delete(pending);
       send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result: safeResult });
       throwIfCancelled();
       if (safeResult?.artifact) {
@@ -359,7 +479,15 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         const current = context.__ruphusTechniqueSelections.get(techniqueSelectionKey);
         if (current) current.selectedIds = [...selectedIdsBefore];
       }
-      if (!signal?.aborted && error?.code !== 'turn_cancelled') pendingTools.delete(pending);
+      const cancelled = signal?.aborted === true || error?.code === 'turn_cancelled';
+      if (!cancelled && pending.started && !pending.resultEmitted) {
+        const failure = { ok: false, code: error?.code || 'tool_failed', message: safeFailureMessage(error) };
+        trace.toolEvents.push({ name: request.name, outcome: 'failed', code: failure.code, ...(request.args?.slot || request.args?.slotKey ? { slot: request.args.slot || request.args.slotKey } : {}), ...(request.args?.coffeeRef ? { target: request.args.coffeeRef } : {}) });
+        pending.resultEmitted = true;
+        pendingTools.delete(pending);
+        toolEvidence.push({ callId: request.callId, name: request.name, result: failure });
+        send('tool_result', { name: request.name, ...(request.callId ? { callId: request.callId } : {}), result: failure });
+      } else if (!cancelled) pendingTools.delete(pending);
       throw error;
     }
   };
@@ -369,13 +497,14 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const request = { callId: 'answered-equipment-options', name: 'read_technique_options', args: { coffeeRef: context.turnBinding.coffeeRef, slot: context.equipmentAnswer.slot } };
       response = { toolCalls: [request], outputItems: [{ type: 'function_call', call_id: request.callId, name: request.name, arguments: JSON.stringify(request.args) }] };
     } else {
-      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, signal }); throwIfCancelled(); rememberUsage(response);
+      response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, signal }); throwIfCancelled();
     }
     // A corrected response is still an agent turn: its reads/proposals must
     // pass the same dispatch, owner, budget and one-proposal checks as before.
     // Never extract only its text and silently discard its tool calls.
     for (let checkAttempt = 0; checkAttempt < 2; checkAttempt += 1) {
     while (response) {
+      responseEnvelope = response?.envelope || null;
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
       throwIfCancelled();
@@ -431,7 +560,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
               },
             ],
           };
-          response = await provider.runTurn({
+          response = await runProvider({
             turnId, context, userText, conversation: context?.conversation || [],
             tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
             previous: pairedPrevious, toolResult: { results: [techniqueRead] }, regeneration: true,
@@ -439,7 +568,6 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
             signal,
           });
           throwIfCancelled();
-          rememberUsage(response);
           continue;
         }
         const techniqueRead = [...toolEvidence].reverse().find((item) => item.name === 'read_technique_options'
@@ -453,7 +581,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
           }
           if (!techniqueContinuationUsed) {
             techniqueContinuationUsed = true;
-            response = await provider.runTurn({
+            response = await runProvider({
               turnId, context, userText, conversation: context?.conversation || [],
               tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
               previous: response, toolResult: { results: [techniqueRead] }, regeneration: true,
@@ -461,7 +589,6 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
               signal,
             });
             throwIfCancelled();
-            rememberUsage(response);
             continue;
           }
           text = TECHNIQUE_RECOVERY;
@@ -491,6 +618,31 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
           ? [...toolEvidence].reverse().find(item => item.name === 'read_recipe' && item.result?.ok === true
             && item.result.slot === 'aiden' && item.result.coffeeRef === calls[0].args.coffeeRef && item.result.recipe === null)
           : null;
+        if (missingAiden
+          && !aidenContinuationUsed
+          && tools.names?.includes('propose_recipe_change')
+          && (tools.definitions || []).some((definition) => definition?.name === 'propose_recipe_change')
+          && toolCalls < maxToolCalls) {
+          // A missing Aiden slot is a capability boundary, not a reason to
+          // strand the conversation. Give the provider one continuation with
+          // the verified bean context and require a complete, review-only
+          // profile draft. The tool still validates every field and persists
+          // nothing until the user explicitly chooses an action.
+          aidenContinuationUsed = true;
+          if (toolCalls < maxToolCalls) toolCalls += 1;
+          text = '';
+          response = await runProvider({
+            turnId, context, userText, conversation: context?.conversation || [],
+            tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+            previous: response,
+            toolResult: { results: [missingAiden] },
+            regeneration: true,
+            correctiveInstruction: 'The verified Aiden slot is empty, but this request asks for a useful Aiden recipe change. Generate a complete profile candidate from the bean context and call propose_recipe_change with intent recipe_preview, the exact coffeeRef and slot aiden, and all required aidenProfile fields. Do not ask the user to leave chat or claim a saved profile; return a review card only when the proposal tool returns its artifact.',
+            signal,
+          });
+          throwIfCancelled();
+          continue;
+        }
         if (missingAiden) { text = missingAiden.result.summary; break; }
         if (techniqueRoundRecoveryUsed) {
           text = TECHNIQUE_RECOVERY;
@@ -524,7 +676,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
               techniqueOptions: techniqueRead.result,
             },
           }));
-          response = await provider.runTurn({
+          response = await runProvider({
             turnId, context, userText, conversation: context?.conversation || [],
             tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
             previous: response, toolResult: { results }, regeneration: true,
@@ -532,7 +684,6 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
             signal,
           });
           throwIfCancelled();
-          rememberUsage(response);
           continue;
         }
         const unreadyReview = calls.length === 1 && calls[0].name === 'propose_recipe_change'
@@ -542,19 +693,17 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         if (roundLimitRecovered || (!unreadyReview && !calls.every((request) => READS.has(request.name)))) throw Object.assign(new Error('maximum tool rounds exceeded'), { code: 'tool_round_limit' });
         roundLimitRecovered = true;
         const results = calls.map((request) => ({ callId: request.callId, name: request.name, result: { ok: false, code: 'read_budget_complete', message: 'Use the coffee evidence already provided and answer without another read.' } }));
-        response = await provider.runTurn({
+        response = await runProvider({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
           toolResult: { results }, regeneration: true,
           correctiveInstruction: 'The useful coffee and recipe evidence is already in this turn. A recipe card has not been prepared and no change has been saved. Answer the user naturally from that evidence, make at most one concrete suggestion, and do not call another tool or claim a card is ready. If the user is uncertain, help them without forcing a recipe change.',
           signal,
         });
         throwIfCancelled();
-        rememberUsage(response);
         continue;
       }
       if (toolCalls + calls.length > maxToolCalls) throw Object.assign(new Error('model requested too many actions'), { code: 'forbidden_tool' });
       const proposalRequests = calls.filter((request) => request.name === 'propose_recipe_change');
-      const blockedProposalCalls = new Set();
       // Validate the whole round before dispatching any tool. This keeps the
       // one-proposal rule atomic while independent reads remain concurrent.
       if (proposalRequests.length > 1 || (proposalClaimed && !proposalRetryAvailable && proposalRequests.length > 0)) throw Object.assign(new Error('at most one proposal is allowed per turn'), { code: 'proposal_timing' });
@@ -562,6 +711,32 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         if (!tools.names?.includes(request.name) || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)
           || (!READS.has(request.name) && request.name !== 'propose_recipe_change')) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
         if (READS.has(request.name) && readCalls + 1 > MAX_READS_PER_TURN) throw Object.assign(new Error('maximum evidence reads exceeded'), { code: 'read_budget_exceeded' });
+      }
+      // If the only requested action is a typed recipe preview and its exact
+      // target has not been server-resolved yet, perform one bounded exact
+      // read before deciding whether to dispatch the proposal. The read is
+      // synthetic but uses the real tool path and target authority, so an
+      // unavailable/invalid/mismatched result can never be proposed around.
+      let justInTimeRead = null;
+      const justInTimeRequest = justInTimeRecipeReadRequest(context, calls, { readCalls, toolCalls, maxToolCalls });
+      if (justInTimeRequest && tools.names?.includes('read_recipe')) {
+        readCalls += 1;
+        toolCalls += 1;
+        justInTimeRead = await runTool(justInTimeRequest);
+        // The read was initiated by the runtime rather than the provider.
+        // Keep its synthetic function call paired in any later Responses
+        // continuation (for example, when the proposal needs one bounded
+        // validation correction).
+        response = {
+          ...response,
+          outputItems: [
+            ...(Array.isArray(response?.outputItems) ? response.outputItems : []),
+            { type: 'function_call', call_id: justInTimeRequest.callId, name: justInTimeRequest.name, arguments: JSON.stringify(justInTimeRequest.args) },
+          ],
+        };
+      }
+      const blockedProposalCalls = new Set();
+      for (const request of calls) {
         if (request.name === 'propose_recipe_change' && !proposalEligibleForTarget(context, request.args || {})) blockedProposalCalls.add(request.callId || request);
         if (READS.has(request.name)) readCalls += 1;
       }
@@ -573,18 +748,46 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       }
       toolCalls += calls.length;
       const readRoundStartedAt = performance.now();
-      const results = await Promise.all(calls.map((request) => runTool(request, {
+      const settled = await Promise.allSettled(calls.map((request) => runTool(request, {
         blockedResult: blockedProposalCalls.has(request.callId || request)
           ? { ok: false, code: 'proposal_timing', message: 'Resolve the coffee and recipe, then give the bounded recommendation before preparing its review card.' }
           : null,
       })));
       readRoundMs = Math.max(readRoundMs, performance.now() - readRoundStartedAt);
+      const rejected = settled.find((item) => item.status === 'rejected');
+      if (rejected) throw rejected.reason;
+      const results = [...(justInTimeRead ? [justInTimeRead] : []), ...settled.map((item) => item.value)];
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
       const historicalRead = results.find((item) => item.name === 'read_technique_options' && item.result?.historical === true);
       if (historicalRead) {
         text = historicalRead.result.message || 'I reopened the earlier technique as a read-only recipe. Your saved recipe is unchanged.';
         break;
+      }
+      const missingAidenRead = results.find((item) => item.name === 'read_recipe'
+        && item.result?.ok === true && item.result?.slot === 'aiden'
+        && item.result?.recipe === null && item.result?.sourceState === 'absent');
+      const missingAidenProposal = calls.find((request) => request.name === 'propose_recipe_change'
+        && request.args?.slot === 'aiden'
+        && request.args?.intent === 'recipe_preview');
+      if (missingAidenRead && missingAidenProposal
+        && !results.some((item) => item.name === 'propose_recipe_change' && item.result?.ok === true)
+        && !aidenContinuationUsed
+        && tools.names?.includes('propose_recipe_change')
+        && (tools.definitions || []).some((definition) => definition?.name === 'propose_recipe_change')
+        && toolCalls < maxToolCalls) {
+        aidenContinuationUsed = true;
+        toolCalls += 1;
+        text = '';
+        response = await runProvider({
+          turnId, context, userText, conversation: context?.conversation || [],
+          tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+          previous: response, toolResult: { results }, regeneration: true,
+          correctiveInstruction: 'The verified Aiden slot is empty, but this request asks for a useful Aiden recipe change. Generate a complete profile candidate from the bean context and call propose_recipe_change with intent recipe_preview, the exact coffeeRef and slot aiden, and all required aidenProfile fields. Do not ask the user to leave chat or claim a saved profile; return a review card only when the proposal tool returns its artifact.',
+          signal,
+        });
+        throwIfCancelled();
+        continue;
       }
       const proposed = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok === true && item.result?.artifact?.type === 'recipe_proposal');
       if (proposed) {
@@ -625,29 +828,29 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       });
       if (failedProposal) {
         if (proposalRecoveryAttempted) {
-          text = 'I couldn’t prepare that recipe change safely. Your saved recipe is unchanged.';
-          break;
+          throw Object.assign(new Error('bounded proposal correction failed'), { code: failedProposal.result.code, responseText: 'I couldn’t prepare that recipe change safely. Your saved recipe is unchanged.' });
         }
         proposalRecoveryAttempted = true;
         proposalRetryAvailable = true;
-        response = await provider.runTurn({
+        response = await runProvider({
           turnId, context, userText, conversation: context?.conversation || [],
           tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
           previous: response, toolResult: { results }, regeneration: true,
-          correctiveInstruction: 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, answer plainly that no card was prepared and the saved recipe is unchanged.',
+          correctiveInstruction: 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, return a typed blocked response, or clarification only when a specific missing user choice would allow completion.',
           signal,
         });
         throwIfCancelled();
-        rememberUsage(response);
         continue;
       }
       if (results.some(item => item.name === 'propose_recipe_change' && ['duplicate_alternative', 'no_recipe_change'].includes(item.result?.code))) {
-        response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.', signal });
+        response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response, toolResult: { results }, regeneration: true, correctiveInstruction: 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.', signal });
         throwIfCancelled();
-        rememberUsage(response);
         continue;
       }
-      if (finalProposal) { text = 'I couldn’t prepare that change safely. Your saved recipe is unchanged.'; break; }
+      if (finalProposal) {
+        const proposalFailure = results.find((item) => item.name === 'propose_recipe_change' && item.result?.ok !== true);
+        throw Object.assign(new Error('proposal could not be prepared safely'), { code: proposalFailure?.result?.code || 'proposal_failed' });
+      }
       const recoveredTrial = results.find(item => item.name === 'review_trial_recipe' && item.result?.ok === true && item.result?.artifact);
       if (recoveredTrial) {
         text += recoveredTrial.result.artifact.promoteAvailable
@@ -658,32 +861,87 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const prematureProposal = results.some((item) => item.name === 'propose_recipe_change' && item.result?.code === 'proposal_timing');
       if (prematureProposal) {
         if (techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))) techniqueContinuationUsed = true;
-        response = await provider.runTurn({
+        const typedPreviewProposal = calls.some((request) => request.name === 'propose_recipe_change'
+          && request.args?.intent === 'recipe_preview' && !request.args?.experiment);
+        const correctiveInstruction = typedPreviewProposal
+          ? 'The typed recipe preview could not be prepared because its exact target is not currently verified. Explain the actual read or target failure above in a truthful typed blocked response, or ask for a specific missing user choice only when it would resolve the target. No card was prepared and the saved recipe is unchanged. Do not call another tool, ask an unrelated sensory question, switch brewers, or claim a card without a returned artifact.'
+          : 'The recipe change is not authorized yet. Do not call another tool or claim a change was prepared. If the symptom is only watery, weak, or watered down, ask one short sensory question; otherwise ask one short unanswered sensory distinction and wait. Do not repeat an answered distinction, choose a control, or give conditional advice. Otherwise reply with useful coffee advice only, making at most one concrete suggestion supported by the established diagnosis.';
+        response = await runProvider({
           turnId, context, userText, conversation: context?.conversation || [], tools: [], previous: response,
-          toolResult: { results }, regeneration: true,
-          correctiveInstruction: 'The recipe change is not authorized yet. Do not call another tool or claim a change was prepared. If the symptom is only watery, weak, or watered down and the user has not clarified its taste, ask one short sensory question (thin but sweet/clean, or sour/sharp/muted?) and wait; do not choose a control or give conditional advice yet. Otherwise reply with useful coffee advice only, making at most one concrete suggestion supported by the established diagnosis.',
+          toolResult: { results }, regeneration: true, correctiveInstruction,
           signal,
         });
         throwIfCancelled();
-        rememberUsage(response);
         continue;
       }
-      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results }, signal }); throwIfCancelled(); rememberUsage(response);
+      response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, toolResult: { results }, signal }); throwIfCancelled();
     }
     throwIfCancelled();
+    // The typed request intent and actual tool outcomes govern fulfillment.
+    // Verbs such as "suggest" also occur in informational questions and must
+    // not override a valid information response or manufacture recipe intent.
+    // Failed proposals are already corrected above; missing preview artifacts
+    // use the single envelope recovery below, with exact-read tools available.
+    if (responseEnvelope?.state === 'blocked') {
+      throw Object.assign(new Error('provider marked the turn blocked'), { code: 'response_blocked', responseText: safeRecoveryText(text) });
+    }
+    const artifactIssue = envelopeArtifactIssue(responseEnvelope, artifacts, context);
+    if (artifactIssue) {
+      if (!envelopeRecoveryAttempted) {
+        envelopeRecoveryAttempted = true;
+        response = await runProvider({
+          turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions,
+          previous: response, toolResult: { results: toolEvidence }, regeneration: true,
+          correctiveInstruction: 'The final response must use the exact current coffee and brewer. A recipe_preview answer is valid only when the proposal tool has returned a matching review card for this turn. If the card is missing or the target is wrong, call the exact proposal tool or answer with clarification/blocked state; do not claim a card is ready.',
+          signal,
+        });
+        throwIfCancelled();
+        text = '';
+        checkAttempt -= 1;
+        continue;
+      }
+      throw Object.assign(new Error('recipe response did not match a current review card'), { code: artifactIssue });
+    }
+    const hasCurrentCard = artifacts.some((artifact) => ['recipe_proposal', 'action_receipt'].includes(artifact?.type));
+    if (proposalRecoveryAttempted && !hasCurrentCard && responseEnvelope?.state !== 'clarification') {
+      throw Object.assign(new Error('proposal recovery did not fulfill the recipe request'), { code: 'proposal_failed', responseText: safeRecoveryText(text) });
+    }
+    if (!hasCurrentCard && PREPARATION_CLAIM.test(text)) {
+      if (!preparationClaimRecoveryAttempted) {
+        preparationClaimRecoveryAttempted = true;
+        trace.regenerations.push({ triggers: ['PREPARATION_CLAIM'], at: new Date().toISOString() });
+        response = await runProvider({
+          turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions,
+          previous: response, toolResult: { results: toolEvidence }, regeneration: true,
+          correctiveInstruction: 'The previous response claimed a recipe was prepared without a current proposal or trial-review artifact. Do not claim a card, save, or ready-to-review schedule without that artifact. Return a typed clarification or blocked response, or provide information only without preparation language; preserve the user’s useful information.',
+          signal,
+        });
+        throwIfCancelled();
+        text = '';
+        checkAttempt -= 1;
+        continue;
+      }
+      throw Object.assign(new Error('response claimed an unbacked recipe card'), { code: 'response_validation_failed', responseText: CARD_RECOVERY });
+    }
+    // Once the bounded preparation-claim recovery has been used, an ordinary
+    // answered information envelope cannot quietly turn the correction into a
+    // successful recipe turn. The provider must explicitly classify the
+    // non-fulfillment as clarification or blocked; unrelated information
+    // turns never enter this branch because the flag is turn-local.
+    if (preparationClaimRecoveryAttempted && !hasCurrentCard
+      && responseEnvelope?.intent === 'information' && responseEnvelope?.state === 'answered') {
+      throw Object.assign(new Error('response did not classify the missing recipe card'), { code: 'response_validation_failed', responseText: safeRecoveryText(text) });
+    }
     let checked = text.trim();
-    if (!artifacts.some((artifact) => artifact?.type === 'recipe_proposal')
-      && techniqueRequest(userText || context?.userText || '', context, proposalTarget(context?.proposalState))
-      && PREPARATION_CLAIM.test(checked)) checked = TECHNIQUE_RECOVERY;
     const checkedEvidence = runtimeEvidence(toolEvidence);
     // A validated card is already a published preview, not a rejected model
     // draft. Keep that exact card and use its app-owned handoff if surrounding
     // prose fails; never regenerate a competing proposal after publication.
     const preparedRecipe = artifacts.find(artifact => artifact?.type === 'recipe_proposal');
-    if (preparedRecipe && checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding }).length) {
+    if (preparedRecipe && checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding, context }).length) {
       checked = proposalHandoff(preparedRecipe);
     }
-    const triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding });
+    const triggers = checkedTriggers({ reply: checked, userTurn: userText, trace, evidence: checkedEvidence, methodBinding: context?.methodBinding, context });
     if (!checked) triggers.push({ code: 'RESPONSE_EMPTY' });
     if (checkAttempt > 0) {
       trace.regenerations.at(-1).secondFailure = triggers.map(trigger => trigger.code);
@@ -696,19 +954,21 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         : context?.methodBinding?.source === 'M2'
           ? ` ${context.methodBinding.displayName} is remembered context, not a new user instruction. If the user requests a different brewer, read that exact recipe before advising a change.`
         : '';
-      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}`;
-      response = await provider.runTurn({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
+      const groundedCorrection = triggers.some((trigger) => trigger.code === 'RT7_UNGROUNDED_GRINDER_STEP')
+        ? ' The user has a Fellow Ode Gen 2: use only its physical labels (whole number, .2, or .6). Replace any unsupported decimal with the nearest real click and explain the exact click change.'
+        : '';
+      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}${groundedCorrection}`;
+      response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
       throwIfCancelled();
-      rememberUsage(response);
       text = '';
       continue;
     }
     throwIfCancelled();
     if (checked) send('text_delta', { text: checked });
     const timing = { firstFrameMs: firstFrameAt == null ? null : firstFrameAt - turnStartedAt, checkedReplyMs: performance.now() - turnStartedAt, readRoundMs: readRoundMs || null, regenerationCount: trace.regenerations.length };
-    send('turn_completed', { text: checked, timing });
+    send('turn_completed', { text: checked, ...(responseEnvelope?.state ? { state: responseEnvelope.state } : {}), timing });
     const emittedArtifacts = artifacts.map((artifact) => ({ type: 'artifact_ready', artifact }));
-    return { ok: true, turnId, text: checked, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace, frames: emittedArtifacts, previewReady: context?.proposalState?.previewReady === true }) };
+    return { ok: true, turnId, text: checked, state: responseEnvelope?.state || null, intent: responseEnvelope?.intent || null, artifacts, toolCalls, toolNames, proposalIds, trace, timing, requestId: response?.requestId || null, model: response?.model || null, ...accounting(), grader: gradeReply({ reply: checked, userTurn: userText, trace, frames: emittedArtifacts, previewReady: context?.proposalState?.previewReady === true }) };
     }
   } catch (error) {
     const cancelled = signal?.aborted === true || error?.code === 'turn_cancelled';
@@ -719,7 +979,9 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       pendingTools.clear();
     }
     const code = cancelled ? 'turn_cancelled' : error.code || 'turn_failed';
-    send(code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code, message: error.message });
-    return { ok: false, turnId, code, text: '', artifacts, toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };
+    const responseText = typeof error?.responseText === 'string' ? error.responseText.trim() : '';
+    if (responseText && !cancelled) send('text_delta', { text: responseText });
+    send(code === 'forbidden_tool' ? 'turn_failed' : 'turn_interrupted', { code, message: cancelled ? 'Turn cancelled.' : safeFailureMessage(error, 'I couldn’t complete that safely. Your saved recipe is unchanged.') });
+    return { ok: false, turnId, code, text: responseText, state: code === 'response_blocked' ? 'blocked' : null, artifacts, toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };
   }
 }

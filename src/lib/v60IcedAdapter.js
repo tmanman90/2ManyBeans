@@ -137,7 +137,7 @@ function buildRecipe(config, intent, technique, { fallback = false } = {}) {
   const temperatureAdapted = usesIntentTemperature && temperatureC !== source.temperatureC;
   const grindAdapted = !exactStructured && clamp(Number(intent?.grindAdjustmentMicrons) || 0, -45, 45) !== 0;
   const sourceLineage = {
-    method: 'v60', mode: 'iced', configurationKey: V60_ICED_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.structuredSource), canonicalUrls: technique.sourceRecipe ? [technique.sourceRecipe.canonicalUrl] : undefined,
+    method: 'v60', mode: 'iced', configurationKey: V60_ICED_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.structuredSource), ...(technique.sourceRecipe ? { canonicalUrls: [technique.sourceRecipe.canonicalUrl] } : {}),
     sourceIds: [sourceId], sourceRegistryVersion: V60_ICED_SOURCE_REGISTRY_VERSION, status: sourceRequiresAdaptation || temperatureAdapted || grindAdapted ? 'adapted' : exactSourceDose ? 'original' : 'scaled',
     adaptation: `Independent iced profile based on ${source.author}; hot candidate is not used.`,
     changedFields: [

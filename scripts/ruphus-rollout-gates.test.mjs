@@ -15,7 +15,7 @@ import {
   persistRuphusTrace,
   redactRuphusTelemetry,
 } from '../api/_lib/ruphusRollout.js';
-import { recoveryForAgentFrame } from '../src/lib/ruphus/recovery.js';
+import { recoveryForAgentFrame, recipePreviewErrorMessage } from '../src/lib/ruphus/recovery.js';
 import { createAgentFrameParser, resolveAgentStreamResult } from '../src/lib/ruphus/streamAgent.js';
 import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createOpenAIProvider } from '../api/_lib/ruphusProviders/openai.js';
@@ -81,6 +81,23 @@ test('trace redaction preserves bounded read, focus, and regeneration signals wi
   assert.doesNotMatch(JSON.stringify(event), /c-private|private prose|private_reader/);
 });
 
+test('trace redaction keeps only allowlisted tool outcome metadata and hashes targets', () => {
+  const event = redactRuphusTelemetry({ trace: { toolEvents: [
+    { name: 'read_recipe', outcome: 'succeeded', code: 'recipe_invalid', slot: 'v60_hot', target: 'coffee-private' },
+    { name: 'private_tool', outcome: 'succeeded', target: 'private-target' },
+    { name: 'propose_recipe_change', outcome: 'failed', code: 'proposal_target_mismatch', slot: 'kalita_hot', target: 'coffee-private' },
+    { name: 'read_recipe', outcome: 'failed', code: 'raw error with secret', slot: 'private-slot', target: 'coffee-private' },
+  ] } });
+  assert.deepEqual(event.trace.toolEvents[0], {
+    name: 'read_recipe', outcome: 'succeeded', code: 'recipe_invalid', slot: 'v60_hot', targetHash: event.trace.toolEvents[0].targetHash,
+  });
+  assert.equal(event.trace.toolEvents[0].targetHash.length, 16);
+  assert.deepEqual(event.trace.toolEvents[1], { name: 'propose_recipe_change', outcome: 'failed', code: 'proposal_target_mismatch', slot: 'kalita_hot', targetHash: event.trace.toolEvents[1].targetHash });
+  assert.equal(event.trace.toolEvents[2].code, 'read_failed');
+  assert.equal(event.trace.toolEvents.length, 3);
+  assert.doesNotMatch(JSON.stringify(event), /coffee-private|private-target|secret|private-slot/);
+});
+
 test('provider usage aggregates across tool rounds while retries remain provider-reported only', () => {
   const usage = aggregateProviderUsage('openai', [{ input_tokens: 100, output_tokens: 10 }, { input_tokens: 40, output_tokens: 4 }]);
   assert.deepEqual(normalizeTelemetryUsage('openai', 'gpt-5.6-luna', usage), { inputTokens: 140, outputTokens: 14, totalTokens: 154, estimatedCost: 0.000045 });
@@ -110,7 +127,7 @@ test('orchestrator aggregates two provider rounds and rejects unknown names befo
 test('provider adapter reports disabled SDK retries and incomplete usage stays unknown', async () => {
   const providerSource = fs.readFileSync(new URL('../api/_lib/ruphusProviders/openai.js', import.meta.url), 'utf8');
   assert.match(providerSource, /maxRetries: 0/);
-  const provider = createOpenAIProvider({ client: { responses: { create: async () => ({ id: 'req-1', model: 'gpt-5.6-luna', output_text: 'done', output: [], usage: { input_tokens: 10, output_tokens: 2 } }) } }, maxOutputTokens: 100 });
+  const provider = createOpenAIProvider({ client: { responses: { create: async () => ({ id: 'req-1', model: 'gpt-5.6-luna', output_text: JSON.stringify({ intent: 'information', state: 'answered', text: 'done', coffeeRef: null, slot: null }), output: [], usage: { input_tokens: 10, output_tokens: 2 } }) } }, maxOutputTokens: 100 });
   const result = await provider.runTurn({ turnId: 'adapter-1', context: {}, userText: 'test', tools: [] });
   assert.equal(result.retryCount, 0);
 });
@@ -181,13 +198,24 @@ test('bean census reads only the exact 14-day window across users', async () => 
 });
 
 test('failed/interrupted Agent frames offer explicit legacy recovery without replay', () => {
-  assert.deepEqual(recoveryForAgentFrame({ type: 'turn_failed', turnId: 'turn-1' }), { turnId: 'turn-1', reason: 'failed' });
-  assert.deepEqual(recoveryForAgentFrame({ type: 'turn_interrupted', turnId: 'turn-2' }), { turnId: 'turn-2', reason: 'interrupted' });
+  assert.deepEqual(recoveryForAgentFrame({ type: 'turn_failed', turnId: 'turn-1', code: 'provider_schema' }), { turnId: 'turn-1', reason: 'failed', code: 'provider_schema' });
+  assert.deepEqual(recoveryForAgentFrame({ type: 'turn_interrupted', turnId: 'turn-2', code: 'response_blocked' }), { turnId: 'turn-2', reason: 'interrupted', code: 'response_blocked' });
   assert.equal(recoveryForAgentFrame({ type: 'turn_completed', turnId: 'turn-3' }), null);
   const source = fs.readFileSync(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
   assert.match(source, /That response didn’t finish/);
   assert.match(source, /Try again/);
   assert.doesNotMatch(source, /Continue in standard chat/);
+});
+
+test('preview failures offer recovery without exposing internal validation codes as connection errors', () => {
+  const rejected = recipePreviewErrorMessage({ code: 'unsupported_preview_configuration', status: 400 });
+  assert.match(rejected, /saved recipe is unchanged/);
+  assert.match(rejected, /reopening|fresh preview/);
+  assert.doesNotMatch(rejected, /unsupported_preview_configuration|connect|network/i);
+  assert.match(recipePreviewErrorMessage({ code: 'stale' }), /saved recipe changed/);
+  assert.match(recipePreviewErrorMessage({ code: 'network_error' }), /could not be reached/);
+  assert.match(recipePreviewErrorMessage({ status: 401 }), /session/);
+  assert.match(recipePreviewErrorMessage({ status: 429 }), /Wait/);
 });
 
 test('completed frame survives transport loss without replay while failed frames remain failures', () => {
@@ -197,6 +225,7 @@ test('completed frame survives transport loss without replay while failed frames
   }
   assert.equal(resolveAgentStreamResult({ terminalType: 'turn_failed', usageSeen: false }).ok, false);
   assert.equal(resolveAgentStreamResult({ terminalType: 'turn_interrupted', usageSeen: false }).ok, false);
+  assert.equal(resolveAgentStreamResult({ terminalType: 'turn_interrupted', terminalCode: 'response_blocked', usageSeen: false }).error.code, 'response_blocked');
 });
 
 test('client accepts another read tool after an artifact before turn completion', () => {
@@ -221,6 +250,7 @@ test('Agent traces bind canonical evidence/request hashes and pricing-normalized
   const source = fs.readFileSync(new URL('../api/ruphus-agent.js', import.meta.url), 'utf8');
   assert.match(source, /contextHash: context\.evidenceHash/);
   assert.match(source, /requestId: turnResult\.requestId/);
+  assert.match(source, /toolEvents: context\.trace\.toolEvents/);
   assert.match(source, /normalizeTelemetryUsage\('openai', model, turnResult\.usage\)/);
 });
 

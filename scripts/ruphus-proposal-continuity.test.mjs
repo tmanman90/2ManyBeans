@@ -139,7 +139,8 @@ test('new-chat boundary and explicit historical inspection do not create a comma
   assert.match(chat, /onInspect=\{handleHistoricalProposalInspect\}/);
   assert.match(chat, /data-historical-inspection="true"/);
   const card = read('src/components/chat/artifacts/RecipeProposalCard.jsx');
-  assert.match(card, /const viewRecipe = status === 'proposed' \? onPreview : onInspect/);
+  // Proposed/saved/undone callback behavior is exercised by the rendered
+  // card test; historical inspection must remain a separate read-only path.
   assert.match(card, /const showActions = proposal\.status === 'proposed'/);
   const handler = chat.slice(chat.indexOf('const handleHistoricalProposalInspect'), chat.indexOf('const closeHistoricalProposal'));
   assert.doesNotMatch(handler, /handleRuphusAction|runRuphusAction|restoreRecipePreviewAction|writeRecipePreviewDraft/);

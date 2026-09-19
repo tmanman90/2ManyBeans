@@ -10,15 +10,22 @@ const SOURCE_CONFIGURATION_KEYS = Object.freeze([
   'device', 'brewer', 'variant', 'v60Variant', 'size', 'v60Size', 'kalitaSize',
   'model', 'filter', 'material', 'mode', 'sourceDoseSelection',
 ]);
+// The recipe page carries the user's grinder identity so the shared preview
+// calculation can normalize legacy Ode settings without changing source
+// identity or selecting a different technique. Every other draft control is
+// server-bound until it is represented by an explicit source request.
+const PREVIEW_CONFIGURATION_KEYS = Object.freeze(['grinder']);
 
 const pick = (value, keys) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return Object.fromEntries(keys.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]));
 };
-// U2 exposes dose-only drafts. Technique, grinder, temperature, size, and
-// chilling controls remain immutable until a server-issued technique identity
-// exists in the later exploration unit.
-const safeConfiguration = (value) => pick(value, []);
+const safeConfiguration = (value) => pick(value, PREVIEW_CONFIGURATION_KEYS);
+const previewConfigurationKeysAreSafe = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return true;
+  return Object.keys(value).every((key) => PREVIEW_CONFIGURATION_KEYS.includes(key))
+    && (value.grinder == null || typeof value.grinder === 'string');
+};
 const safeSourceConfiguration = (value) => pick(value, SOURCE_CONFIGURATION_KEYS);
 const sourceConfigurationKeysAreSafe = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return true;
@@ -120,6 +127,7 @@ function reconstructSourcePreview(base, body, sourceRequest) {
     ...sourceRequest.sourceConfiguration,
     sourceRevision: sourceRequest.sourceRevision,
     dose: sourceDose,
+    ...(storedProjection.adaptation?.controls ? { sourceControls: storedProjection.adaptation.controls } : {}),
   });
   const trustedProjection = trusted.recipe.sourceProjection;
   const currentMatches = canonicalHash(trustedProjection) === canonicalHash(storedProjection);
@@ -144,7 +152,7 @@ export async function handleRecipePreview(req, res, decodedToken, { db = getDb()
   if (!uid || !shape.valid) return res.status(400).json({ error: 'invalid_preview_request', details: shape.errors });
   if (!isAgentAccessAllowed({ uid, rawUids: process.env.RUPHUS_AGENT_V3_UIDS })) return res.status(404).json({ error: 'recipe_preview_unavailable' });
   if (Object.hasOwn(body, 'recipe') || Object.hasOwn(body, 'after') || Object.hasOwn(body, 'snapshot') || Object.hasOwn(body, 'ownerId') || Object.hasOwn(body, 'uid') || Object.hasOwn(body, 'intent') || Object.hasOwn(body, 'ratio') || Object.hasOwn(body, 'targetRatio')) return res.status(400).json({ error: 'preview_recipe_is_server_bound' });
-  if (body.configuration && Object.keys(body.configuration).length) return res.status(400).json({ error: 'unsupported_preview_configuration' });
+  if (!previewConfigurationKeysAreSafe(body.configuration)) return res.status(400).json({ error: 'unsupported_preview_configuration' });
   try {
     const base = await readRecipeForPreview({ db, uid, coffeeId: body.coffeeId, slotKey: body.slotKey, proposalId: body.proposalId, sessionId: body.sessionId });
     const sourceRequest = sourceRequestFromBody(body, base.recipe);

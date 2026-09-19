@@ -3,6 +3,7 @@ import { sanitizeEvidence } from '../../src/lib/ruphus/sanitizeEvidence.js';
 import { appendLedger, boundLedger, buildRotationSnapshot, MAX_LEDGER_BYTES, shouldWidenHistory } from './ruphusEvidence.js';
 import { bindRuphusTurn } from './ruphusTurnBinder.js';
 import { equipmentClarificationAnswer, explicitMethodFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
+import { absentRecipeSourceHash } from '../../src/lib/ruphus/recipeSourceState.js';
 
 function safeDynamic({ userText, launchContext, conversation, ledger }, maxBytes) {
   // The transcript is durable; only its provider projection is windowed. A
@@ -70,6 +71,72 @@ function priorExplicitMethod(conversation = []) {
 }
 
 const displayMethod = (value) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[value] || value || null);
+const EDITABLE_REVIEW_STATUSES = new Set(['proposed', 'ready', 'prepared']);
+function reviewIdentity(recipe, slot) {
+  const mode = recipe?.mode || (slot?.endsWith('_iced') ? 'iced' : 'hot');
+  const variant = slot?.startsWith('v60') ? String(recipe?.variant || recipe?.v60Variant || 'classic').toLowerCase() : null;
+  const size = slot?.startsWith('v60')
+    ? String(recipe?.v60Size || recipe?.size || (variant === 'switch' ? '03' : '02'))
+    : slot?.startsWith('kalita') ? String(recipe?.kalitaSize || recipe?.size || '') : null;
+  return { mode, variant, size };
+}
+function reviewDisplayName(item) {
+  const slot = item?.slotKey;
+  const identity = reviewIdentity(item?.after, slot);
+  if (slot?.startsWith('v60') && identity.variant === 'switch') {
+    return slot === 'v60_hot' && identity.size === '03' ? 'hot Switch 03' : null;
+  }
+  if (slot?.startsWith('v60') && identity.variant === 'classic' && identity.size === '02') return displayMethod(slot);
+  if (slot?.startsWith('kalita') && ['155', '185'].includes(identity.size)) {
+    return `${slot.endsWith('_iced') ? 'iced' : 'hot'} Kalita ${identity.size}`;
+  }
+  return null;
+}
+function methodBindingMatchesReview(displayName, expectedDisplay, slot) {
+  const bound = String(displayName || '').trim();
+  if (!bound || !expectedDisplay) return false;
+  if (bound === expectedDisplay) return true;
+  // Context reconstruction often has only the M2 family/mode binding. Let a
+  // trusted review refine that binding with its authenticated size; detailed
+  // equipment bindings remain exact and cannot cross 155/185 or Switch/classic.
+  return bound === displayMethod(slot) && expectedDisplay.startsWith(`${bound} `);
+}
+function currentReviewContext({ proposals = [], coffeeId, methodBinding } = {}) {
+  if (!coffeeId || !methodBinding?.slot) return null;
+  return proposals.slice().reverse().find((item) => {
+    if (item?.type !== 'recipe_proposal' || item.coffeeId !== coffeeId || item.slotKey !== methodBinding.slot
+      || !EDITABLE_REVIEW_STATUSES.has(item.status) || !item.after || typeof item.after !== 'object' || Array.isArray(item.after)) return false;
+    if (item.sourceState === 'absent' && (item.before !== null || item.sourceHash !== absentRecipeSourceHash(item.slotKey))) return false;
+    if (item.sourceState !== 'absent' && (!item.before || typeof item.before !== 'object' || Array.isArray(item.before))) return false;
+    const expectedDisplay = reviewDisplayName(item);
+    return reviewIdentity(item.after, item.slotKey).mode === (item.slotKey.endsWith('_iced') ? 'iced' : 'hot')
+      && methodBindingMatchesReview(methodBinding.displayName, expectedDisplay, item.slotKey);
+  }) || null;
+}
+function carriedReviewMethod({ proposals = [], coffeeId } = {}) {
+  if (!coffeeId) return null;
+  const item = proposals.slice().reverse().find((candidate) => {
+    if (candidate?.type !== 'recipe_proposal' || candidate.coffeeId !== coffeeId
+      || !EDITABLE_REVIEW_STATUSES.has(candidate.status) || !candidate.after || typeof candidate.after !== 'object' || Array.isArray(candidate.after)) return false;
+    if (candidate.sourceState === 'absent' && (candidate.before !== null || candidate.sourceHash !== absentRecipeSourceHash(candidate.slotKey))) return false;
+    if (candidate.sourceState !== 'absent' && (!candidate.before || typeof candidate.before !== 'object' || Array.isArray(candidate.before))) return false;
+    return Boolean(reviewDisplayName(candidate));
+  });
+  return item ? { slot: item.slotKey, displayName: reviewDisplayName(item), proposalId: item.id } : null;
+}
+function publicCurrentReview(item) {
+  if (!item) return null;
+  const identity = reviewIdentity(item.after, item.slotKey);
+  return {
+    editable: true,
+    status: item.status,
+    sourceState: item.sourceState || 'present',
+    slot: item.slotKey,
+    mode: identity.mode,
+    ...(identity.variant ? { variant: identity.variant } : {}),
+    ...(identity.size ? { size: identity.size } : {}),
+  };
+}
 function publicSnapshot(snapshot) {
   return {
     version: snapshot.version,
@@ -122,8 +189,12 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   const boundCoffeeRef = turnBinding.status === 'locked' ? turnBinding.coffeeRef : launchCoffee || ledgerCoffeeRef(currentLedger, coffees, snapshot);
   const boundCoffee = (snapshot.coffees || []).find((coffee) => coffee.refKey === boundCoffeeRef)
     || (turnBinding.status === 'locked' && turnBinding.coffee?.id && snapshot.refs?.[boundCoffeeRef] === turnBinding.coffee.id ? turnBinding.coffee : null);
-  const boundCoffeeName = boundCoffee?.name || turnBinding.coffeeName || null;
-  const carriedMethod = methodFocusForCoffee(turnBinding.ledger, boundCoffeeName)
+  // A conditional candidate is useful for clarification, but must not become
+  // the active coffee merely because it is the only resolver match.
+  const boundCoffeeName = boundCoffee?.name || (turnBinding.status === 'locked' ? turnBinding.coffeeName : null);
+  const carriedReview = carriedReviewMethod({ proposals: priorTechniqueProposals, coffeeId: boundCoffeeRef ? snapshot.refs?.[boundCoffeeRef] : null });
+  const carriedMethod = carriedReview
+    || methodFocusForCoffee(turnBinding.ledger, boundCoffeeName)
     || (turnBinding.status === 'locked' && turnBinding.techniqueSlot ? { displayName: displayMethod(turnBinding.techniqueSlot) } : null);
   let resolvedMethod = resolveMethod({
     userText,
@@ -140,7 +211,15 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   let methodBinding = resolvedMethod?.slot && ['M1', 'M1b', 'M2'].includes(resolvedMethod.tier)
     ? { status: 'locked', slot: resolvedMethod.slot, displayName: resolvedMethod.displayName, source: resolvedMethod.tier }
     : null;
+  if (methodBinding && carriedMethod?.displayName && /^(?:hot|iced) Kalita (?:155|185)$/.test(carriedMethod.displayName)
+    && methodBinding.slot?.startsWith('kalita')) methodBinding = { ...methodBinding, displayName: carriedMethod.displayName };
   if (methodBinding && equipmentAnswer) methodBinding = { ...methodBinding, displayName: equipmentAnswer.variant === 'switch' ? `hot Switch ${equipmentAnswer.size}` : `hot Kalita ${equipmentAnswer.size}`, source: 'equipment-answer' };
+  if (methodBinding?.slot === 'kalita_hot') {
+    const explicitKalitaSize = String(userText || '').match(/\b(?:kalita|wave)\s*(155|185)\b/i)?.[1];
+    if (explicitKalitaSize && !equipmentAnswer) methodBinding = { ...methodBinding, displayName: `hot Kalita ${explicitKalitaSize}` };
+  }
+  const currentReviewArtifact = currentReviewContext({ proposals: priorTechniqueProposals, coffeeId: boundCoffeeRef ? snapshot.refs?.[boundCoffeeRef] : null, methodBinding });
+  const currentReview = publicCurrentReview(currentReviewArtifact);
   if (!methodBinding && /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not)\b[\s\S]*\b(?:aiden|v\s*60|kalita)\b/i.test(userText)) {
     const prior = priorExplicitMethod(Array.isArray(conversation) ? conversation : []);
     if (prior) {
@@ -164,10 +243,10 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     ? undefined
     : turnBinding.status === 'locked'
       ? { status: 'locked', coffeeRef: turnBinding.coffeeRef, coffeeName: turnBinding.coffeeName }
-      : { status: 'ambiguous', candidates: turnBinding.candidates.map(({ coffeeRef, coffeeName }) => ({ coffeeRef, coffeeName })) };
+      : { status: 'ambiguous', ...(turnBinding.certainty ? { certainty: turnBinding.certainty } : {}), candidates: turnBinding.candidates.map(({ coffeeRef, coffeeName }) => ({ coffeeRef, coffeeName })) };
   const trace = { focusChanges: [], reads: [], regenerations: [] };
   if (publicBinding?.status === 'locked') trace.focusChanges.push({ from: launchCoffee || ledgerCoffeeRef(currentLedger, coffees, snapshot) || null, to: publicBinding.coffeeRef, source: 'turn_binding' });
-  const evidence = { launchContext: normalizedLaunch, rotationSnapshot: safeSnapshot, ledger: turnLedger, turnBinding: publicBinding || null, methodBinding, equipmentAnswer, conversation: dynamic.conversation || [], userText: dynamic.userText || '', historyWidened: widened };
+  const evidence = { launchContext: normalizedLaunch, rotationSnapshot: safeSnapshot, ledger: turnLedger, turnBinding: publicBinding || null, methodBinding, equipmentAnswer, ...(currentReview ? { currentReview } : {}), conversation: dynamic.conversation || [], userText: dynamic.userText || '', historyWidened: widened };
   const result = {
     version: 2,
     context: normalizedLaunch,
@@ -181,6 +260,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     ...(publicBinding ? { turnBinding: publicBinding } : {}),
     ...(methodBinding ? { methodBinding } : {}),
     ...(equipmentAnswer ? { equipmentAnswer } : {}),
+    ...(currentReview ? { currentReview } : {}),
     sessionState: { lastActivityAt: Number.isFinite(Number(sessionState?.lastActivityAt)) ? Number(sessionState.lastActivityAt) : null, boundaryIndex: Number.isInteger(sessionState?.boundaryIndex) ? Math.max(0, sessionState.boundaryIndex) : 0, launchHintConsumed },
   };
   installServerField(result, '__ruphusRefs', clone(snapshot.refs));
@@ -194,7 +274,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
   installServerField(result, '__ruphusMethodBinding', methodBinding);
   installServerField(result, 'launchCoffeeId', launchCoffee);
   installServerField(result, 'trace', trace);
-  installServerField(result, 'proposalState', { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false });
+  installServerField(result, 'proposalState', { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false, ...(currentReview ? { currentReview } : {}) });
   result.evidenceHash = canonicalHash(evidence);
   return result;
 }

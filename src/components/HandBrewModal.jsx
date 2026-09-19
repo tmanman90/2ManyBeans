@@ -22,6 +22,7 @@ import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
 import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
 import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';
 import { adaptedDoseBounds } from '../lib/ruphus/techniqueOptions.js';
+import { manualSourceDisplay, manualSourceGrindGuidance } from '../lib/manualSourceProjection.js';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
@@ -122,12 +123,24 @@ const sourceEquipmentLabel = (projection) => {
 // projection/disclosure stored with the recipe.
 const readableSourceDisclosure = (value) => String(value || '').replace(/\bsourceSnapshot\b/g, 'the original source wording');
 
-const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewDoseError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
+const sourceFinishGuidance = (finish, clockOrigin) => {
+  if (!Number.isFinite(finish?.minSeconds) || !Number.isFinite(finish?.maxSeconds)) return null;
+  const target = formatTimingMs(finish.minSeconds * 1000);
+  const range = finish.maxSeconds === finish.minSeconds
+    ? target
+    : `${target}–${formatTimingMs(finish.maxSeconds * 1000)}`;
+  const origin = clockOrigin === 'first-water' ? 'from first water' : clockOrigin ? `from ${clockOrigin.replaceAll('-', ' ')}` : 'on the source clock';
+  return `Finish the drawdown around ${range} ${origin}. Confirm the bed has drained; this is a source target, not an automatic stop.`;
+};
+
+const SourceProjectionPreview = ({ projection, grinderKey, grinderName, preferences, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewDoseError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
   const source = projection?.sourceSnapshot || projection?.sourceExecution || {};
-  const stages = Array.isArray(projection?.stages)
-    ? projection.stages
-    : Array.isArray(projection?.sourceExecution?.stages) ? projection.sourceExecution.stages : [];
-  const water = projection?.water?.value == null ? null : `${projection.water.value}${projection.water.unit}`;
+  const display = manualSourceDisplay(projection);
+  const stages = display.stages?.length
+    ? display.stages
+    : Array.isArray(projection?.stages) ? projection.stages : [];
+  const displayWater = display.water || projection?.water;
+  const water = displayWater?.value == null ? null : `${displayWater.value}${displayWater.unit}`;
   const ready = projection?.timerReady === true && Boolean(projection?.sourceExecution);
   const sourceDose = Number.isFinite(source?.coffeeGrams) ? source.coffeeGrams : null;
   const dose = Number.isFinite(projection?.coffeeGrams) ? projection.coffeeGrams : sourceDose;
@@ -150,7 +163,17 @@ const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onP
   const nativeGrindLabel = nativeGrind && typeof nativeGrind === 'object'
     ? [nativeGrind.grinder, nativeGrind.setting, nativeGrind.generation].filter(Boolean).join(': ')
     : typeof nativeGrind === 'string' ? nativeGrind : null;
-  const grindLabel = grind?.description || (Number.isFinite(grind?.microns) ? `~${grind.microns}µm` : null);
+  const grindGuidance = manualSourceGrindGuidance(grind, { ...preferences, grinder: grinderKey, grinderCustomName: grinderName });
+  const grindLabel = grindGuidance.displayMode === 'setting' && grindGuidance.setting
+    ? `${grindGuidance.grinderName || grinderName}: ${grindGuidance.setting}`
+    : grindGuidance.displayMode === 'microns' && Number.isFinite(grindGuidance.sourceMicrons)
+      ? `~${grindGuidance.sourceMicrons}µm`
+      : grindGuidance.sourceDescription || (Number.isFinite(grind?.microns) ? `~${grind.microns}µm` : null);
+  const sourceMicronLabel = Number.isFinite(grindGuidance.sourceMicrons) ? `Source reference: ~${grindGuidance.sourceMicrons}µm` : null;
+  const approximateSettingLabel = grindGuidance.displayMode === 'microns' && grindGuidance.setting
+    ? `Approximate ${grindGuidance.grinderName || grinderName} setting: ${grindGuidance.setting}`
+    : null;
+  const finishGuidance = sourceFinishGuidance(projection?.finish, projection?.clock?.origin);
   return (
     <m.div {...fadeUp}>
       <div style={{ marginBottom: 16 }}>
@@ -175,8 +198,13 @@ const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onP
 
       {(grindLabel || nativeGrindLabel) && (
         <div style={{ background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: radius.lg, padding: '12px 14px', marginBottom: 14, boxShadow: shadows.e1 }}>
-          <SectionLabel style={{ marginBottom: 5 }}>Source grind</SectionLabel>
+          <SectionLabel style={{ marginBottom: 5 }}>Grind · {grindGuidance.grinderName || grinderName || 'your grinder'}</SectionLabel>
           {grindLabel && <div style={{ ...type.body, color: C.text, lineHeight: 1.45 }}>{grindLabel}</div>}
+          {grindGuidance.approximate && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>Approximate starting point from the source micron note; adjust by taste.</div>}
+          {approximateSettingLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>{approximateSettingLabel}</div>}
+          {!grindGuidance.approximate && grindGuidance.status === 'source-microns-only' && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>No calibration is available for this grinder, so use the source micron reference without an invented dial setting.</div>}
+          {!grindGuidance.approximate && grindGuidance.status === 'qualitative' && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>The source gives a qualitative grind only; no numeric setting is invented.</div>}
+          {sourceMicronLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>{sourceMicronLabel}</div>}
           {nativeGrindLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: grindLabel ? 3 : 0 }}>Source setting: {nativeGrindLabel}</div>}
         </div>
       )}
@@ -205,6 +233,12 @@ const SourceProjectionPreview = ({ projection, onStart, onCoffeeGramsChange, onP
           ))}
         </ol>
       </div>
+
+      {finishGuidance && (
+        <div role="note" data-source-finish-guidance style={{ ...type.body, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          {finishGuidance}
+        </div>
+      )}
 
       {projection?.temperature && (
         <div style={{ ...type.body, color: C.textMuted, margin: '-2px 4px 12px' }}>
@@ -673,6 +707,20 @@ export const HandBrewModal = ({
     [recipe, attemptId, effectiveDose, sourceProjection]
   );
   const displayRecipe = useMemo(() => normalizeRecipePhases(scaledRecipe), [scaledRecipe]);
+  // Chat and persisted attempts open their exact recipe directly, including
+  // iced recipes. They do not enter the optional hot-to-iced browsing flow.
+  const directIcedRecipe = displayRecipe?.mode === 'iced' || displayRecipe?.isIced === true;
+  const displayedTechniqueReasoning = useMemo(() => {
+    const reasoning = displayRecipe?.reasoning;
+    if (!directIcedRecipe || recipe?.device !== 'v60' || typeof reasoning !== 'string') return reasoning;
+    // Iced dose previews preserve the source cadence and lineage while their
+    // quantities are scaled. Keep the recipe immutable, but do not leave the
+    // source's single-cup profile label attached to a displayed larger dose.
+    if (displayRecipe.coffeeGrams > 20 && /single cup\s+12\s+20 dose/i.test(reasoning)) {
+      return reasoning.replace(/single cup\s+12\s+20 dose/i, 'larger dose (21–30g)');
+    }
+    return reasoning;
+  }, [directIcedRecipe, displayRecipe, recipe?.device]);
   const hotGuideRange = useMemo(() => renderGuideRange(displayRecipe), [displayRecipe]);
   const hotTimerSteps = useMemo(() => buildTimerSteps(displayRecipe), [displayRecipe]);
   const timerReady = Boolean(hotTimerSteps);
@@ -836,6 +884,9 @@ export const HandBrewModal = ({
       {recipe && !icedMode && sourceProjection && (
         <SourceProjectionPreview
           projection={sourceProjection}
+          grinderKey={grinderKey}
+          grinderName={grinderName}
+          preferences={preferences}
           onStart={handleStartBrew}
           onCoffeeGramsChange={onCoffeeGramsChange}
           onPreviewSave={onPreviewSave}
@@ -859,8 +910,12 @@ export const HandBrewModal = ({
           <div style={{ marginBottom: 16 }}>
             <SectionLabel style={{ marginBottom: 6 }}>
               {recipe.device === 'v60'
-                ? (recipe.variant === 'switch' ? 'V60 03 Switch · Hot' : 'V60 02 · Hot')
-                : 'Hand brew recipe'}
+                ? (directIcedRecipe
+                  ? `V60 ${recipe.v60Size || '02'} · Iced`
+                  : (recipe.variant === 'switch' ? 'V60 03 Switch · Hot' : 'V60 02 · Hot'))
+                : (directIcedRecipe && recipe.device === 'kalita'
+                  ? `Wave ${recipe.kalitaSize || '185'} · Iced`
+                  : 'Hand brew recipe')}
             </SectionLabel>
             <div style={{
               fontFamily: fonts.heading,
@@ -878,8 +933,8 @@ export const HandBrewModal = ({
               </div>
             )}
           </div>
-          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_hot` } : (recipeProvenance || {})} />
-          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext('hot', recipe, recipeProvenance), 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
+          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_${directIcedRecipe ? 'iced' : 'hot'}` } : (recipeProvenance || {})} />
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext(directIcedRecipe ? 'iced' : 'hot', recipe, recipeProvenance), 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           {recipe.device === 'kalita' && !previewMode && !attemptId && (
             <KalitaSizeSwitch
@@ -897,7 +952,7 @@ export const HandBrewModal = ({
           )}
 
           {/* Param tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: directIcedRecipe ? '1fr 1fr' : '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
             {attemptId ? <ParamCard label="Coffee" value={`${displayRecipe.coffeeGrams}g`} icon={Coffee} iconColor={C.accent} /> : <DoseStepperCard
               dose={displayRecipe.coffeeGrams}
               onChange={previewPending ? () => {} : onCoffeeGramsChange}
@@ -910,9 +965,13 @@ export const HandBrewModal = ({
                 max: V60_SWITCH_DOSE_BOUNDS.maxDose,
               } : {})}
             />}
-            <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
-            <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
+            <ParamCard label={directIcedRecipe ? 'Brew water' : 'Water'} value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
+            {directIcedRecipe && <ParamCard label="Recipe ice" value={`${displayRecipe.iceGrams}g`} icon={Snowflake} iconColor={C.frost} />}
+            <ParamCard label={directIcedRecipe ? (displayRecipe.ratio ? 'Total ratio' : 'Hot extraction ratio') : 'Ratio'} value={displayRecipe.ratio || displayRecipe.hotExtractionRatio} icon={Scale} />
           </div>
+          {directIcedRecipe && <div style={{ ...type.caption, color: C.textMuted, marginBottom: 14 }}>
+            Brew water + recipe ice: {displayRecipe.waterGrams + displayRecipe.iceGrams}g input. {displayRecipe.ratio ? '' : 'Final strength depends on ice melt; a total beverage ratio is not assumed. '}Serving ice is separate; follow the chilling instructions below.
+          </div>}
           {previewMode && previewDoseError && <div role="alert" data-preview-dose-error style={{ ...type.body, color: C.red, background: C.redBg, borderRadius: radius.md, padding: '10px 12px', marginBottom: 14 }}>{previewDoseError}</div>}
           {recipe.device === 'kalita' && (
             <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
@@ -945,10 +1004,10 @@ export const HandBrewModal = ({
             </div>
           )}
 
-          {recipe.candidate && recipe.reasoning && (
+          {recipe.candidate && displayedTechniqueReasoning && (
             <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
               <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Why this technique</SectionLabel>
-              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.reasoning}</div>
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{displayedTechniqueReasoning}</div>
               {recipe.sourceLineage?.adaptation && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{recipe.sourceLineage.adaptation}</div>}
             </div>
           )}
@@ -1029,6 +1088,13 @@ export const HandBrewModal = ({
             timelineColor={C.borderLight}
             accentColor={C.accent}
           />
+
+          {directIcedRecipe && displayRecipe.postBrewSteps?.length > 0 && <section aria-label="After brewing" style={{ marginBottom: 14 }}>
+            <SectionLabel>After brewing</SectionLabel>
+            <ol style={{ margin: 0, paddingLeft: 20, color: C.text, lineHeight: 1.5 }}>
+              {displayRecipe.postBrewSteps.map((step, index) => <li key={index}>{step.action}</li>)}
+            </ol>
+          </section>}
 
           {/* Total brew time */}
           {displayRecipe.totalBrewTime && (
@@ -1133,7 +1199,7 @@ export const HandBrewModal = ({
               Iced isn't available yet for the Switch — switch to classic V60 for an iced recipe.
             </div>
           )}
-          {!previewMode && !attemptId && effectiveTimerReady && !icedUnsupported && (
+          {!previewMode && !attemptId && !directIcedRecipe && effectiveTimerReady && !icedUnsupported && (
             <m.button
               onClick={handleEnterIced}
               whileTap={{ scale: 0.97 }}

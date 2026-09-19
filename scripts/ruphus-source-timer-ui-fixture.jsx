@@ -4,19 +4,23 @@ import '../src/styles/global.css';
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
 import { UserPreferencesProvider } from '../src/hooks/useUserProfile.jsx';
 import { SWITCH_SOURCES } from '../src/data/manualSources/switch.js';
+import { KALITA_SOURCES } from '../src/data/manualSources/kalita.js';
 import { projectManualSource } from '../src/lib/manualSourceProjection.js';
+import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 
-const source = SWITCH_SOURCES.find((record) => record.id === 'hario-switch-03-matt-winton-hybrid-24-2022');
-const projection = projectManualSource(source, {
-  device: 'v60',
-  variant: 'switch',
-  size: '03',
-  model: 'V60 Switch',
-  filter: 'v60-03-paper',
-  material: 'glass',
-  mode: 'hot',
-});
-const unsupported = new URLSearchParams(window.location.search).has('unsupported');
+const params = new URLSearchParams(window.location.search);
+const onyx23 = params.has('onyx23');
+const source = onyx23
+  ? KALITA_SOURCES.find((record) => record.id === 'onyx-monarch-wave-185')
+  : SWITCH_SOURCES.find((record) => record.id === 'hario-switch-03-matt-winton-hybrid-24-2022');
+const projection = onyx23
+  ? generateManualSourceTechniqueOption('onyx-monarch-wave-185', {}, {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 23,
+  }).recipe.sourceProjection
+  : projectManualSource(source, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot',
+  });
+const unsupported = params.has('unsupported');
 const fixtureProjection = unsupported
   ? {
     ...projection,

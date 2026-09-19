@@ -16,6 +16,11 @@ test('source timer UI routes canonical projections without invoking the legacy t
   assert.match(modal, /sourceProjection \? \(/);
   assert.match(modal, /ManualSourceBrewTimer/);
   assert.match(modal, /!sourceProjection/);
+  assert.match(modal, /manualSourceDisplay/);
+  assert.match(modal, /manualSourceGrindGuidance/);
+  assert.match(modal, /Approximate starting point from the source micron note/);
+  assert.match(modal, /data-source-finish-guidance/);
+  assert.match(modal, /source target, not an automatic stop/);
   assert.match(timer, /projection\.sourceExecution/);
   assert.match(timer, /sourceTimerIdentity/);
   assert.match(timer, /sourceEvents/);

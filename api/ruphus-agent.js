@@ -7,7 +7,7 @@ import { runRuphusTurn } from './_lib/ruphusOrchestrator.js';
 import { createOpenAIProvider, RUPHUS_OPENAI_MODEL } from './_lib/ruphusProviders/openai.js';
 import { persistProposal } from './_lib/ruphusRepository.js';
 import { RUPHUS_SYSTEM_PROMPT } from './_lib/ruphusPrompt.js';
-import { resolveLegacyRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
+import { resolveLegacyRecipe, validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import { SLOT_KEYS } from '../src/lib/ruphus/contracts.js';
 import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 import { isAgentAccessAllowed, isMutationAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
@@ -40,6 +40,29 @@ async function writeActiveSession(db, uid, session, options = {}) {
   }
   await ref.set(normalized, { merge: true });
   return true;
+}
+
+const ARTIFACT_FAILURE_MESSAGE = 'I couldn’t complete that safely. Your saved recipe is unchanged.';
+
+// Persist the app-owned artifact even when a runtime validation error has no
+// final prose. A failed assistant message is kept out of provider replay, but
+// its artifact and safe retry record remain available to the relaunched chat.
+export function persistedMessagesForTurn({ priorMessages = [], suppliedMessages = [], turnId, userText, contextRef, startedAt = Date.now(), turnResult } = {}) {
+  const artifacts = Array.isArray(turnResult?.artifacts) ? turnResult.artifacts : [];
+  const text = typeof turnResult?.text === 'string' && turnResult.text.trim()
+    ? turnResult.text.trim()
+    : artifacts.length ? ARTIFACT_FAILURE_MESSAGE : '';
+  const assistant = text ? {
+    id: `${turnId}-assistant`, role: 'assistant', text, createdAt: Date.now(), turnId,
+    ...(Array.isArray(turnResult?.artifacts) ? { artifacts } : {}),
+    ...(!turnResult?.ok ? { errored: true, retry: { kind: 'agent', text: userText, contextRef } } : {}),
+  } : null;
+  return [
+    ...priorMessages,
+    ...suppliedMessages,
+    { id: `${turnId}-user`, role: 'user', text: userText, createdAt: startedAt, turnId },
+    ...(assistant ? [assistant] : []),
+  ];
 }
 export function hasUnavailableEvidence(session) {
   return Boolean(session?.ledger?.entries?.some((entry) => entry.status === 'partial' && entry.evidence?.some((item) => item.status === 'unavailable')));
@@ -164,6 +187,22 @@ export function devReadFaultForRequest({ uid, header, env = process.env } = {}) 
   } catch { return null; }
 }
 function firestoreReaders(db) {
+  // Keep a malformed owner snapshot present for lineage (it is not an empty
+  // slot), while carrying a server-only validity state for evidence/tools to
+  // fail closed. Missing or mismatched refs remain the only reader-level
+  // `{ code }` failures.
+  const withRecipeValidity = (recipe, slotKey) => {
+    const validation = validateExecutableRecipe(recipe, slotKey);
+    // Keep the reader backward-compatible with older partial snapshots that
+    // still carry the core dose/water shape. An empty or core-field-malformed
+    // snapshot is the dangerous case: it can otherwise look like an
+    // executable recipe while authorizing a target. The full validator still
+    // runs here; only its required-core signal is promoted to the private
+    // evidence validity annotation.
+    const missingCore = validation.errors.some((error) => /^recipe (?:dose|water) is required$/i.test(String(error)));
+    return validation.valid || !missingCore ? recipe : { ...recipe, validationStatus: 'invalid' };
+  };
+  const invalidRecipeMarker = (slotKey) => ({ slotKey, state: 'invalid', code: 'recipe_invalid' });
   const readCoffee = async ({ uid, coffeeId }) => {
     const snap = await db.collection('users').doc(uid).collection('beans').doc(coffeeId).get();
     return snap.exists ? { id: coffeeId, ...snap.data() } : null;
@@ -183,25 +222,41 @@ function firestoreReaders(db) {
         const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(revisionId).get();
         if (!revision?.exists || revision.data()?.coffeeId !== coffeeId || revision.data()?.slotKey !== requested) return { code: launchItem ? 'launch_item_not_found' : 'active_revision_not_found' };
         const data = revision.data() || {};
-        return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${revisionId}`, selectedHash: data.snapshotHash || null, slotKey: requested };
+        const recipe = { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${revisionId}`, selectedHash: data.snapshotHash || null, slotKey: requested };
+        return withRecipeValidity(recipe, requested);
       }
       if (!requested) {
-        const active = await Promise.all(Object.entries(bean.activeRevisionIds || {}).filter(([candidate, id]) => SLOT_KEYS.includes(candidate) && typeof id === 'string' && id).map(async ([candidate, id]) => {
+        const activeEntries = await Promise.all(Object.entries(bean.activeRevisionIds || {}).filter(([candidate, id]) => SLOT_KEYS.includes(candidate) && typeof id === 'string' && id).map(async ([candidate, id]) => {
           const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(id).get();
           const data = revision?.exists ? revision.data() || {} : null;
-          if (!data || data.coffeeId !== coffeeId || data.slotKey !== candidate) return null;
-          return { ...(data.snapshot || {}), selectedPath: `recipeRevisions/${id}`, selectedHash: data.snapshotHash || null, slotKey: candidate };
+          if (!data || data.coffeeId !== coffeeId || data.slotKey !== candidate) return { unavailable: { slotKey: candidate, state: 'unavailable', code: 'active_revision_not_found' } };
+          const recipe = withRecipeValidity({ ...(data.snapshot || {}), selectedPath: `recipeRevisions/${id}`, selectedHash: data.snapshotHash || null, slotKey: candidate }, candidate);
+          return recipe.validationStatus === 'invalid' ? { invalid: invalidRecipeMarker(candidate) } : { recipe };
         }));
         // A revision for one brewer must not hide legacy recipes for the
         // other brewers. Never fall back beneath a broken active revision.
         const revisedSlots = new Set(Object.keys(bean.activeRevisionIds || {}).filter(candidate => SLOT_KEYS.includes(candidate) && bean.activeRevisionIds[candidate]));
         const legacy = SLOT_KEYS.filter(candidate => !revisedSlots.has(candidate)).map(candidate => {
           const result = resolveLegacyRecipe(bean, candidate);
-          return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null;
-        }).filter(Boolean);
-        return [...active.filter(Boolean), ...legacy];
+          if (result.ok) {
+            const recipe = withRecipeValidity({ ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate }, candidate);
+            return recipe.validationStatus === 'invalid' ? { invalid: invalidRecipeMarker(candidate) } : { recipe };
+          }
+          if (result.code === 'legacy_recipe_ambiguous') return { invalid: { slotKey: candidate, state: 'invalid', code: result.code } };
+          return {};
+        }).filter((entry) => entry.recipe || entry.invalid);
+        const records = [...activeEntries.map((entry) => entry.recipe).filter(Boolean), ...legacy.map((entry) => entry.recipe).filter(Boolean)];
+        const unavailableSlots = activeEntries.filter((entry) => entry.unavailable).map((entry) => entry.unavailable);
+        const invalidSlots = [...activeEntries, ...legacy].filter((entry) => entry.invalid).map((entry) => entry.invalid);
+        if (unavailableSlots.length) Object.defineProperty(records, 'unavailableSlots', { value: unavailableSlots, enumerable: false });
+        if (invalidSlots.length) Object.defineProperty(records, 'invalidSlots', { value: invalidSlots, enumerable: false });
+        return records;
       }
-      if (requested) { const result = resolveLegacyRecipe(bean, requested); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested } : { code: result.code }; }
+      if (requested) {
+        const result = resolveLegacyRecipe(bean, requested);
+        if (!result.ok) return { code: result.code };
+        return withRecipeValidity({ ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: requested }, requested);
+      }
       return SLOT_KEYS.map((candidate) => { const result = resolveLegacyRecipe(bean, candidate); return result.ok ? { ...result.recipe, selectedPath: result.source, selectedHash: result.hash, slotKey: candidate } : null; }).filter(Boolean);
     },
     async readTastings({ uid, coffeeId }) { const snap = await db.collection('users').doc(uid).collection('tastings').where('beanId', '==', coffeeId).get(); return snap.docs.map((item) => ({ id: item.id, ...item.data() })); },
@@ -284,12 +339,12 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     const turnResult = await runRuphusTurn({ turnId, context, userText: context.userText, tools, provider: createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: Number(process.env.RUPHUS_AGENT_MAX_OUTPUT_TOKENS) }), signal: req.signal, emit: (frame) => { if (!firstFrameAt) firstFrameAt = Date.now(); writeFrame(res, frame); } });
     const priorMessages = activeSession?.messages || [];
     const suppliedMessages = (replay.resumed || priorMessages.length ? [] : suppliedConversation).filter((message) => message?.role === 'user' || message?.role === 'assistant').map((message) => ({ id: message.id || `replay-${priorMessages.length}`, role: message.role, text: String(message.content || message.text || ''), createdAt: Number(message.createdAt) || startedAt })).filter((message) => message.text);
-    const nextMessages = [...priorMessages, ...suppliedMessages, { id: `${turnId}-user`, role: 'user', text: context.userText, createdAt: startedAt, turnId }, ...(turnResult.text ? [{ id: `${turnId}-assistant`, role: 'assistant', text: turnResult.text, createdAt: Date.now(), turnId, artifacts: turnResult.artifacts || [] }] : [])];
+    const nextMessages = persistedMessagesForTurn({ priorMessages, suppliedMessages, turnId, userText: context.userText, contextRef: effectiveContextRef, startedAt, turnResult });
     const ledgerBytes = Math.min(context.__ruphusEvidenceByteCap || MAX_LEDGER_BYTES, MAX_LEDGER_BYTES);
     await writeActiveSession(db, uid, { protocolVersion: 1, messages: nextMessages, turns: [...(activeSession?.turns || []), { id: turnId, status: turnResult.ok ? 'completed' : 'interrupted' }], contextRef: effectiveContextRef, launchContext: context.launchContext, ledger: boundLedger(context.ledger, { maxBytes: ledgerBytes }), boundaryIndex: activeSession?.boundaryIndex || 0, lastActivityAt: Date.now(), launchHintConsumed: context.__ruphusLaunchHintConsumed === true, historyWidened: context.historyWidened === true, updatedAt: Date.now() }, { maxBytes: ledgerBytes, expectedBoundaryIndex });
     logApiUsage({ uid, provider: 'openai', model: turnResult.model || RUPHUS_OPENAI_MODEL, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', usage: turnResult.usage });
     const model = turnResult.model || RUPHUS_OPENAI_MODEL;
-    await persistRuphusTrace({ db, uid, event: { provider: 'openai', model, contextHash: context.evidenceHash, requestId: turnResult.requestId, proposalIds: turnResult.proposalIds, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', toolNames: turnResult.toolNames, trace: { reads: context.trace.reads, focusChanges: context.trace.focusChanges.map((item) => ({ from: item.from, to: item.to })), regenerations: context.trace.regenerations.map((item) => ({ triggers: item.triggers, secondFailure: item.secondFailure })) }, totalMs: Date.now() - startedAt, ttffMs: firstFrameAt ? firstFrameAt - startedAt : undefined, retryCount: turnResult.retryCount, ...normalizeTelemetryUsage('openai', model, turnResult.usage), failureCode: turnResult.ok ? undefined : turnResult.code, recovered: false }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
+    await persistRuphusTrace({ db, uid, event: { provider: 'openai', model, contextHash: context.evidenceHash, requestId: turnResult.requestId, proposalIds: turnResult.proposalIds, feature: 'ruphus-agent-v3', endpoint: '/api/ruphus-agent', toolNames: turnResult.toolNames, trace: { reads: context.trace.reads, toolEvents: context.trace.toolEvents, focusChanges: context.trace.focusChanges.map((item) => ({ from: item.from, to: item.to })), regenerations: context.trace.regenerations.map((item) => ({ triggers: item.triggers, secondFailure: item.secondFailure })) }, totalMs: Date.now() - startedAt, ttffMs: firstFrameAt ? firstFrameAt - startedAt : undefined, retryCount: turnResult.retryCount, ...normalizeTelemetryUsage('openai', model, turnResult.usage), failureCode: turnResult.ok ? undefined : turnResult.code, recovered: false }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
     // streamWithAuth uses the shipped terminal usage envelope for retry and
     // completion semantics; transport usage is not a lifecycle frame.
     writeFrame(res, { type: 'usage', usage: turnResult.usage || null });

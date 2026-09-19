@@ -1,24 +1,31 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
+import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { generateV60Recipe, generateV60RecipeForTechnique } from '../src/lib/v60Adapter.js';
-import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
+import { generateManualSourceTechniqueOption, generateV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { validateRecipePreviewRequest } from '../src/lib/ruphus/contracts.js';
 import { createMemoryRuphusRepository, persistRecipePreview } from '../api/_lib/ruphusRepository.js';
 import { executeRecipeCommand } from '../api/_lib/ruphusCommandService.js';
 import { isAgentAccessAllowed } from '../api/_lib/ruphusRollout.js';
 import { RATE_LIMIT } from '../api/_lib/claudeShared.js';
-import { handleRecipePreview } from '../api/ruphus-preview.js';
+import { handleRecipePreview, safeConfiguration } from '../api/ruphus-preview.js';
 import { Firestore } from '@google-cloud/firestore';
 
-// The request carries configuration only. A recipe snapshot, owner identity,
-// or arbitrary action payload is never accepted as preview input.
+// The request carries only the supported grinder context. A recipe snapshot,
+// owner identity, or arbitrary action payload is never accepted as preview
+// input.
 {
   const shape = validateRecipePreviewRequest({ requestId: 'r1', proposalId: 'p1', coffeeId: 'coffee', slotKey: 'kalita_hot', sessionId: 's', dose: 20, intent: {}, recipe: {} });
   assert.equal(shape.valid, false);
   assert.ok(shape.errors.some((error) => /server-bound/.test(error)));
   assert.equal(validateRecipePreviewRequest({ requestId: 'r1', proposalId: 'p1', coffeeId: 'coffee', slotKey: 'kalita_hot', sessionId: 's', dose: 20, ratio: '1:16' }).valid, false);
+  assert.equal(validateRecipePreviewRequest({ requestId: 'r1', proposalId: 'p1', coffeeId: 'coffee', slotKey: 'kalita_hot', sessionId: 's', dose: 20, configuration: [] }).valid, false);
+  assert.equal(validateRecipePreviewRequest({ requestId: 'r1', proposalId: 'p1', coffeeId: 'coffee', slotKey: 'kalita_hot', sessionId: 's', dose: 20, configuration: 'fellow-ode-gen2' }).valid, false);
+  assert.deepEqual(safeConfiguration({ grinder: 'fellow-ode-gen2' }), { grinder: 'fellow-ode-gen2' });
+  assert.deepEqual(safeConfiguration({ grinder: 'fellow-ode-gen2', technique: 'kasuya' }), { grinder: 'fellow-ode-gen2' });
 }
 
 // A versioned source proposal is reconstructed from its trusted source
@@ -32,12 +39,15 @@ import { Firestore } from '@google-cloud/firestore';
   repository.seedBean(uid, { id: 'coffee', ownerId: uid, handBrewRecipes: { v60: baseRecipe } });
   const sourceProposal = repository.createProposal({ uid, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', after: source, proposalId: 'source-switch-proposal' });
   const legacyDoseProposal = repository.createProposal({ uid, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'legacy-dose-session', after: baseRecipe, proposalId: 'legacy-dose-proposal' });
+  const selectedV60 = generateV60TechniqueOption('kasuya-46-v1', {}, { dose: 20, grinder: 'fellow-ode-gen2' }).recipe;
+  const selectedV60Proposal = repository.createProposal({ uid, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'selected-v60-session', after: selectedV60, proposalId: 'selected-v60-proposal' });
   const snapshot = repository.snapshot();
   const root = `users/${uid}`;
   const data = new Map([
     [`${root}/beans/coffee`, snapshot.beans[0]],
     [`${root}/proposals/${sourceProposal.id}`, sourceProposal],
     [`${root}/proposals/${legacyDoseProposal.id}`, legacyDoseProposal],
+    [`${root}/proposals/${selectedV60Proposal.id}`, selectedV60Proposal],
   ]);
   const revision = snapshot.revisions.find((item) => item.id === sourceProposal.sourceRevisionId);
   data.set(`${root}/recipeRevisions/${revision.id}`, revision);
@@ -97,6 +107,35 @@ import { Firestore } from '@google-cloud/firestore';
   assert.deepEqual(doseResponse.body.preview.sourceLineage.sourceIds, baseRecipe.sourceLineage.sourceIds);
   assert.equal(doseResponse.body.preview.configurationKey, baseRecipe.configurationKey);
   assert.equal(doseResponse.body.preview.grindSize.setting, baseRecipe.grindSize.setting);
+
+  // This is the exact producer payload from ChatTab: opening a selected V60
+  // card carries the signed-in grinder preference as configuration. It must
+  // reach the canonical preview calculation rather than being rejected as an
+  // unsupported configuration before the trusted proposal is read.
+  const selectedV60Response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'selected-v60-preview-20', proposalId: selectedV60Proposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'selected-v60-session', dose: 20, configuration: { grinder: 'fellow-ode-gen2' } } }, selectedV60Response, { uid }, { db });
+  assert.equal(selectedV60Response.statusCode, 200, JSON.stringify(selectedV60Response.body));
+  assert.equal(selectedV60Response.body.preview.technique, selectedV60.technique);
+  assert.equal(selectedV60Response.body.preview.coffeeGrams, 20);
+  assert.equal(selectedV60Response.body.preview.waterGrams, 300);
+  assert.equal(selectedV60Response.body.preview.steps.at(-1).waterTotal, 300);
+  assert.equal(selectedV60Response.body.preview.grindSize.setting, selectedV60.grindSize.setting);
+  assert.deepEqual(selectedV60Response.body.proposal.preview.configuration, { configuration: { grinder: 'fellow-ode-gen2' } });
+
+  // Reported production journey: named Kalita185 source, selected grinder,
+  // scaled23g. Preview acceptance must not depend on using the ordinary path.
+  const onyx = generateManualSourceTechniqueOption('onyx-monarch-wave-185', {}, { device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25 }).recipe;
+  repository.seedBean(uid, { id: 'onyx-coffee', ownerId: uid, name: 'Jar one' });
+  const onyxProposal = repository.createProposal({ uid, coffeeId: 'onyx-coffee', slotKey: 'kalita_hot', sessionId: 'onyx-session', after: onyx, proposalId: 'onyx-proposal' });
+  data.set(`${root}/beans/onyx-coffee`, repository.snapshot().beans.find(bean => bean.id === 'onyx-coffee'));
+  data.set(`${root}/proposals/${onyxProposal.id}`, onyxProposal);
+  const onyxResponse = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+  await handleRecipePreview({ method: 'POST', body: { requestId: 'onyx23', proposalId: onyxProposal.id, coffeeId: 'onyx-coffee', slotKey: 'kalita_hot', sessionId: 'onyx-session', dose: 23, configuration: { grinder: 'fellow-ode-gen2' } } }, onyxResponse, { uid }, { db });
+  assert.equal(onyxResponse.statusCode, 200, JSON.stringify(onyxResponse.body));
+  assert.equal(onyxResponse.body.preview.coffeeGrams, 23);
+  assert.equal(onyxResponse.body.preview.waterGrams, 368);
+  assert.equal(onyxResponse.body.saved, false);
+  assert.equal(onyxResponse.body.preview.sourceProjection.sourceId, onyx.sourceProjection.sourceId);
   const persistedSource = data.get(`${root}/recipeRevisions/${revision.id}`).snapshot;
   assert.equal(persistedSource.coffeeGrams, baseRecipe.coffeeGrams);
   assert.equal(persistedSource.waterGrams, baseRecipe.waterGrams);
@@ -104,6 +143,36 @@ import { Firestore } from '@google-cloud/firestore';
   assert.deepEqual(persistedSource.sourceLineage.sourceIds, baseRecipe.sourceLineage.sourceIds);
   const serializer = new Firestore({ projectId: 'ruphus-source-endpoint-regression' })._serializer;
   assert.doesNotThrow(() => serializer.encodeFields(response.body.proposal));
+
+  // Ordinary first iced drafts cross the actual preview endpoint too: a
+  // ratio-less Kalita source is not merely a renderable local fixture.
+  for (const [slotKey, original] of [
+    ['v60_iced', generateV60IcedRecipe({}, { dose: 20 })],
+    ['kalita_iced', generateKalitaIcedRecipe({}, { size: '185', dose: 20 })],
+  ]) {
+    const coffeeId = `first-${slotKey}`;
+    repository.seedBean(uid, { id: coffeeId, ownerId: uid, name: 'Iced preview fixture' });
+    const proposal = repository.createProposal({ uid, coffeeId, slotKey, sessionId: 'iced-session', after: original, proposalId: `${coffeeId}-proposal` });
+    const beforeBean = repository.snapshot().beans.find(bean => bean.id === coffeeId);
+    data.set(`${root}/beans/${coffeeId}`, structuredClone(beforeBean));
+    data.set(`${root}/proposals/${proposal.id}`, proposal);
+    const icedResponse = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
+    await handleRecipePreview({ method: 'POST', body: { requestId: `${coffeeId}-21`, proposalId: proposal.id, coffeeId, slotKey, sessionId: 'iced-session', dose: 21 } }, icedResponse, { uid }, { db });
+    assert.equal(icedResponse.statusCode, 200, `${slotKey}: ${JSON.stringify(icedResponse.body)}`);
+    const expected = createRecipePreview({ recipe: original, dose: 21 });
+    assert.equal(icedResponse.body.preview.mode, 'iced');
+    assert.equal(icedResponse.body.preview.coffeeGrams, 21);
+    assert.equal(icedResponse.body.preview.hotWaterGrams, expected.hotWaterGrams);
+    assert.equal(icedResponse.body.preview.iceGrams, expected.iceGrams);
+    assert.equal(icedResponse.body.preview.ratio, expected.ratio);
+    assert.deepEqual(icedResponse.body.preview.postBrewSteps, expected.postBrewSteps);
+    assert.equal(icedResponse.body.proposal.sourceState, 'absent');
+    const undefinedPaths = (value, path = '') => value === undefined ? [path]
+      : value && typeof value === 'object' ? Object.entries(value).flatMap(([key, item]) => undefinedPaths(item, `${path}.${key}`)) : [];
+    assert.deepEqual(undefinedPaths(icedResponse.body.proposal), []);
+    assert.doesNotThrow(() => serializer.encodeFields(icedResponse.body.proposal));
+    assert.deepEqual(data.get(`${root}/beans/${coffeeId}`), beforeBean, 'Preview must not save the first iced recipe');
+  }
 
   const wrongHardware = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return value; } };
   await handleRecipePreview({ method: 'POST', body: { requestId: 'source-preview-wrong-size', proposalId: sourceProposal.id, coffeeId: 'coffee', slotKey: 'v60_hot', sessionId: 'source-session', dose: 20, sourceId: source.sourceProjection.sourceId, sourceRevision: source.sourceProjection.sourceRevision, sourceConfiguration: { size: '02' } } }, wrongHardware, { uid }, { db });
@@ -296,6 +365,7 @@ assert.equal(isAgentAccessAllowed({ uid: 'u1', rawUids: 'u1' }), true);
 assert.equal(isAgentAccessAllowed({ uid: 'u2', rawUids: 'u1' }), false);
 
 const endpoint = await readFile(new URL('../api/ruphus-preview.js', import.meta.url), 'utf8');
+const chatTab = await readFile(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
 assert.match(endpoint, /createRecipePreview\(/);
 assert.match(endpoint, /persistRecipePreview\(/);
 assert.match(endpoint, /handleRecipePreview/);
@@ -304,5 +374,6 @@ assert.match(endpoint, /rateLimit: RATE_LIMIT/);
 assert.deepEqual(RATE_LIMIT, { key: 'claude', limit: 120, windowMs: 60 * 60 * 1000 });
 assert.match(endpoint, /saved: false/);
 assert.match(endpoint, /preview_recipe_is_server_bound/);
+assert.match(chatTab, /prepareRecipePreview\(\{[\s\S]*configuration: current\.configuration/);
 
 console.log('Ruphus preview endpoint contract passed');

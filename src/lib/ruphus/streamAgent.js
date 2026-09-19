@@ -12,14 +12,19 @@ const TRANSITIONS = {
 
 function frameError(code, message) { return Object.assign(new Error(message), { code }); }
 
-export function resolveAgentStreamResult({ terminalType, usageSeen = true, transportError = null } = {}) {
+export function resolveAgentStreamResult({ terminalType, terminalCode = null, usageSeen = true, transportError = null } = {}) {
   const missingUsageTransport = transportError == null || transportError.code === 'stream_incomplete';
   if (terminalType === 'turn_completed' && missingUsageTransport) return { ok: true, usageMissing: !usageSeen || transportError?.code === 'stream_incomplete' };
-  return { ok: false, error: transportError || frameError(terminalType || 'stream_incomplete', `The Agent turn ended with ${terminalType || 'an incomplete stream'}.`) };
+  // The lifecycle failure was already received. A missing accounting trailer
+  // cannot turn that known cause into an unrelated connection failure.
+  if (terminalCode && TERMINAL.has(terminalType) && missingUsageTransport) {
+    return { ok: false, error: frameError(terminalCode, `The Agent turn ended with ${terminalType}.`) };
+  }
+  return { ok: false, error: transportError || frameError(terminalCode || terminalType || 'stream_incomplete', `The Agent turn ended with ${terminalType || 'an incomplete stream'}.`) };
 }
 
 export function createAgentFrameParser({ onFrame } = {}) {
-  let pending = ''; let previous = 'start'; let turnId = null; let sawFrame = false;
+  let pending = ''; let previous = 'start'; let turnId = null; let sawFrame = false; let terminalCode = null;
   const pendingTools = [];
   const rememberToolStart = (frame) => pendingTools.push({ callId: frame.callId || null, name: frame.name || null });
   const consumeToolResult = (frame) => {
@@ -50,14 +55,14 @@ export function createAgentFrameParser({ onFrame } = {}) {
       if (!hasPendingTools) throw frameError('out_of_order', 'tool_result has no pending tool');
       consumeToolResult(frame);
     }
-    previous = frame.type; sawFrame = true; onFrame?.(frame); return frame;
+    previous = frame.type; sawFrame = true; if (TERMINAL.has(frame.type)) terminalCode = frame.code || null; onFrame?.(frame); return frame;
   };
   const parseLine = (line) => { if (!line.trim()) return null; let frame; try { frame = JSON.parse(line); } catch { throw frameError('malformed_stream', 'The Agent stream returned malformed JSON.'); } return accept(frame); };
   return {
     accept(frame) { return accept(frame); },
     push(chunk) { pending += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk, { stream: true }); const lines = pending.split('\n'); pending = lines.pop() || ''; return lines.map(parseLine).filter(Boolean); },
     flush() { const tail = pending.trim(); pending = ''; return tail ? [parseLine(tail)] : []; },
-    get sawFrame() { return sawFrame; }, get terminal() { return TERMINAL.has(previous); }, get terminalType() { return previous; }, get turnId() { return turnId; },
+    get sawFrame() { return sawFrame; }, get terminal() { return TERMINAL.has(previous); }, get terminalType() { return previous; }, get terminalCode() { return terminalCode; }, get turnId() { return turnId; },
   };
 }
 
@@ -74,7 +79,7 @@ export function addRuphusSourceFormatCapability(body = {}) {
 export async function streamAgentWithAuth({ url, body, onFrame, onError, signal } = {}) {
   const parser = createAgentFrameParser({ onFrame });
   let result;
-  await streamWithAuth({ url, body: addRuphusSourceFormatCapability(body), signal, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: false, transportError: error }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame } : resolved; if (!result.ok) onError?.(error); }, onDone: ({ usage } = {}) => { if (!result) { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, usageSeen: usage != null }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : resolved; } } });
+  await streamWithAuth({ url, body: addRuphusSourceFormatCapability(body), signal, maxRetries: 2, onFrame: (frame) => { if (LIFECYCLE_TYPES.includes(frame.type)) parser.accept(frame); }, onError: (error) => { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, terminalCode: parser.terminalCode, usageSeen: false, transportError: error }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame } : resolved; if (!result.ok) onError?.(result.error); }, onDone: ({ usage } = {}) => { if (!result) { const resolved = resolveAgentStreamResult({ terminalType: parser.terminalType, terminalCode: parser.terminalCode, usageSeen: usage != null }); result = resolved.ok ? { ...resolved, turnId: parser.turnId, sawFrame: parser.sawFrame, usage } : resolved; } } });
   return result || { ok: false, error: frameError('stream_incomplete', 'The Agent stream ended before completion.') };
 }
 

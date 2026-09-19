@@ -86,6 +86,39 @@ test('trusted turn binding admits exact discourse references but leaves fuzzy an
   assert.equal(bindRuphusTurn({ userText: 'jar one', coffees, refs }).coffeeRef, 'c-a');
 });
 
+test('qualified references keep hedged identity conditional while imperatives stay authoritative', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const hedged = bindRuphusTurn({ userText: 'It might have been jar 2.', coffees, refs });
+  assert.equal(hedged.status, 'ambiguous');
+  assert.equal(hedged.certainty, 'conditional');
+  assert.deepEqual(hedged.candidates.map(({ coffeeRef, coffeeName }) => ({ coffeeRef, coffeeName })), [{ coffeeRef: 'c-b', coffeeName: 'Colombia La Esperanza' }]);
+  assert.equal(hedged.ledger.entries?.length || 0, 0);
+
+  const politeImperative = bindRuphusTurn({ userText: 'Could you make jar 2?', coffees, refs });
+  assert.deepEqual({ status: politeImperative.status, coffeeRef: politeImperative.coffeeRef }, { status: 'locked', coffeeRef: 'c-b' });
+
+  const modalAction = bindRuphusTurn({ userText: 'Maybe we can use jar 2.', coffees, refs });
+  assert.equal(modalAction.status, 'ambiguous');
+  assert.equal(modalAction.certainty, 'conditional');
+
+  const sensoryHedge = bindRuphusTurn({ userText: 'Jar 2 tastes muted, I guess.', coffees, refs });
+  assert.deepEqual({ status: sensoryHedge.status, coffeeRef: sensoryHedge.coffeeRef }, { status: 'locked', coffeeRef: 'c-b' });
+
+  const corrected = bindRuphusTurn({ userText: 'I might have used jar 2, but use jar 1 now.', coffees, refs });
+  assert.deepEqual({ status: corrected.status, coffeeRef: corrected.coffeeRef }, { status: 'locked', coffeeRef: 'c-a' });
+
+  const namedHedge = bindRuphusTurn({ userText: 'It might have been El Vergel.', coffees, refs });
+  assert.equal(namedHedge.status, 'ambiguous');
+  assert.equal(namedHedge.certainty, 'conditional');
+  const namedImperative = bindRuphusTurn({ userText: 'Could you make El Vergel?', coffees, refs });
+  assert.deepEqual({ status: namedImperative.status, coffeeRef: namedImperative.coffeeRef }, { status: 'locked', coffeeRef: 'c-a' });
+  const separatedHedge = bindRuphusTurn({ userText: 'Show jar 1, maybe it was jar 2.', coffees, refs });
+  assert.deepEqual({ status: separatedHedge.status, coffeeRef: separatedHedge.coffeeRef }, { status: 'locked', coffeeRef: 'c-a' });
+  const namedHedgeAction = bindRuphusTurn({ userText: 'Maybe use Colombia La Esperanza.', coffees, refs });
+  assert.equal(namedHedgeAction.status, 'ambiguous');
+  assert.equal(namedHedgeAction.certainty, 'conditional');
+});
+
 test('trusted binding exposes genuine bounded ambiguity without guessing', () => {
   const result = bindRuphusTurn({ userText: 'the Colombian one', coffees, refs: { 'c-a': 'a', 'c-b': 'b' } });
   assert.equal(result.status, 'ambiguous');

@@ -54,6 +54,36 @@ try {
   assert.doesNotMatch(events, /close:start/);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: '/tmp/ruphus-source-timer-mobile.png', fullPage: false });
+
+  const onyxPage = await context.newPage();
+  const onyxErrors = [];
+  onyxPage.on('pageerror', (error) => onyxErrors.push(error.message));
+  onyxPage.on('console', (message) => { if (message.type() === 'error') onyxErrors.push(message.text()); });
+  await onyxPage.goto(`${baseUrl}/scripts/ruphus-source-timer-ui-fixture.html?onyx23`, { waitUntil: 'domcontentloaded' });
+  await onyxPage.getByText('Onyx Monarch Wave 185', { exact: true }).waitFor();
+  const onyxPreview = await onyxPage.locator('body').innerText();
+  assert.match(onyxPreview, /23g/);
+  assert.match(onyxPreview, /368g/);
+  assert.match(onyxPreview, /Ode Gen 2:\s*4\.6/);
+  assert.match(onyxPreview, /Approximate starting point from the source micron note/);
+  assert.match(onyxPreview, /3:30/);
+  assert.doesNotMatch(onyxPreview, /147\.2g/);
+  const onyxTargets = ['46g', '147g', '202g', '258g', '313g', '368g'];
+  onyxTargets.forEach((target) => assert.match(onyxPreview, new RegExp(`\\b${target}\\b`)));
+  const onyxSourceGuideButton = onyxPage.locator('button[aria-label="Start source brew guide"]');
+  await onyxSourceGuideButton.waitFor({ state: 'attached' });
+  await onyxSourceGuideButton.scrollIntoViewIfNeeded();
+  assert.equal(await onyxSourceGuideButton.count(), 1);
+  await onyxSourceGuideButton.click();
+  await onyxPage.getByRole('heading', { name: 'Onyx Monarch Wave 185' }).waitFor();
+  const onyxTimer = await onyxPage.locator('body').innerText();
+  onyxTargets.forEach((target) => assert.match(onyxTimer, new RegExp(`\\b${target}\\b`)));
+  assert.match(onyxTimer, /3:30/);
+  assert.doesNotMatch(onyxTimer, /147\.2g/);
+  assert.deepEqual(onyxErrors, []);
+  await onyxPage.screenshot({ path: '/tmp/ruphus-source-timer-onyx23-mobile.png', fullPage: false });
+  await onyxPage.close();
+
   const unsupportedPage = await context.newPage();
   const unsupportedErrors = [];
   unsupportedPage.on('pageerror', (error) => unsupportedErrors.push(error.message));
@@ -64,7 +94,7 @@ try {
   assert.equal(await unsupportedPage.locator('button[aria-label="Start source brew guide"]').count(), 0);
   assert.deepEqual(unsupportedErrors, []);
   await unsupportedPage.close();
-  console.log(JSON.stringify({ flow: 'passed', source: 'HARIO Switch 03 Matt Winton bloom hybrid', nativeUnits: ['50g', '360mL'], automaticEvents: false, unsupportedReadableNoStart: true, errors, screenshot: '/tmp/ruphus-source-timer-mobile.png' }));
+  console.log(JSON.stringify({ flow: 'passed', source: 'HARIO Switch 03 Matt Winton bloom hybrid', nativeUnits: ['50g', '360mL'], automaticEvents: false, unsupportedReadableNoStart: true, onyx23: { source: 'Onyx Monarch Wave 185', dose: '23g', targets: onyxTargets, previewAndTimerMatch: true, grind: 'Ode Gen 2: 4.6 (approximate)', finish: '3:30', screenshot: '/tmp/ruphus-source-timer-onyx23-mobile.png' }, errors, screenshot: '/tmp/ruphus-source-timer-mobile.png' }));
   await context.close();
 } finally {
   await browser.close();

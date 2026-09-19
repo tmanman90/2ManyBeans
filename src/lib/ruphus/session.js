@@ -54,7 +54,13 @@ export function restoreChatMessage(message) {
     } : {}),
   };
 }
-const methodFocusName = (value) => ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(value) ? value : null;
+const methodFocusName = (value) => {
+  const displayName = textValue(value);
+  return ['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita'].includes(displayName)
+    || /^(?:hot|iced) Switch (?:02|03)$/.test(displayName)
+    || /^(?:hot|iced) Kalita (?:155|185)$/.test(displayName)
+    ? displayName : null;
+};
 const emptyLedger = () => ({ version: 1, entries: [], namedCoffees: [], bytes: 0 });
 
 function settleUndoneReceipts(messages) {

@@ -43,12 +43,15 @@ export function createAidenProfilePreview(recipe, change, { servingDoseGrams = n
 
 export function aidenProfileRows(recipe = {}) {
   const pulses = (prefix) => recipe[`${prefix}PulsesEnabled`]
-    ? `${recipe[`${prefix}PulsesNumber`]} pulses · ${recipe[`${prefix}PulsesInterval`]}s interval · ${(recipe[`${prefix}PulseTemperatures`] || []).join(' → ')}°C`
+    ? `${recipe[`${prefix}PulsesNumber`] ?? '?'} pulses · ${recipe[`${prefix}PulsesInterval`] ?? '?'}s interval · ${(recipe[`${prefix}PulseTemperatures`] || []).join(' → ') || '?'}°C`
     : 'Disabled';
+  const grind = recipe.grindRecommendation || {};
   return [
-    ['Ratio', `1:${recipe.ratio}`],
-    ['Bloom', recipe.bloomEnabled ? `1:${recipe.bloomRatio} · ${recipe.bloomDuration}s · ${recipe.bloomTemperature}°C` : 'Disabled'],
+    ['Ratio', recipe.ratio == null ? 'Not set' : `1:${recipe.ratio}`],
+    ['Bloom', recipe.bloomEnabled ? `1:${recipe.bloomRatio ?? '?'} · ${recipe.bloomDuration ?? '?'}s · ${recipe.bloomTemperature ?? '?'}°C` : 'Disabled'],
     ['Single serve', pulses('ss')],
     ['Batch', pulses('batch')],
+    ['Single-serve grind (Ode Gen 2)', grind.singleServe == null ? 'Not set' : String(grind.singleServe)],
+    ['Batch grind (Ode Gen 2)', grind.batch == null ? 'Not set' : String(grind.batch)],
   ];
 }

@@ -8,6 +8,10 @@ export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
 export const V60_SCALING_RULE_ID = 'v60-dose-scaling-v1';
+export const V60_REVIEWED_RATIO_BOUNDS = Object.freeze([...(V60_RULES[V60_ADAPTATION_RULE_ID]?.bounds?.ratio || [15, 18.5])]);
+export const V60_EXPLICIT_RATIO_RULE_ID = 'v60-explicit-ratio-adaptation-v1';
+export const V60_EXPLICIT_RATIO_BOUNDS = Object.freeze([...(V60_RULES[V60_EXPLICIT_RATIO_RULE_ID]?.bounds?.ratio || [10, 25])]);
+export const V60_REVIEWED_TEMPERATURE_BOUNDS = Object.freeze([92, 100]);
 const MIN_DOSE = 12;
 const MAX_DOSE = 30;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -355,18 +359,93 @@ function validateExplicitIntent(intent = {}) {
   const ratioValue = intentValue(intent, 'targetRatio', null);
   if (ratioValue != null) {
     const ratio = Number(ratioValue);
-    const bounds = V60_RULES[V60_ADAPTATION_RULE_ID]?.bounds?.ratio || [15, 18.5];
+    const bounds = V60_REVIEWED_RATIO_BOUNDS;
     if (!Number.isFinite(ratio) || ratio < bounds[0] || ratio > bounds[1]) {
-      throw new Error(`Explicit V60 reviewed ratio must be between ${bounds[0]} and ${bounds[1]}`);
+      throw Object.assign(new Error(`Explicit V60 reviewed ratio must be between ${bounds[0]} and ${bounds[1]}`), { code: 'invalid_ratio_preview', bounds: { ratio: [...bounds] } });
     }
   }
   const temperatureValue = intentValue(intent, 'targetTemperatureC', null);
   if (temperatureValue != null) {
     const temperature = Number(temperatureValue);
-    if (!Number.isFinite(temperature) || temperature < 92 || temperature > 100) {
-      throw new Error('Explicit V60 reviewed temperature must be between 92C and 100C');
+    if (!Number.isFinite(temperature) || temperature < V60_REVIEWED_TEMPERATURE_BOUNDS[0] || temperature > V60_REVIEWED_TEMPERATURE_BOUNDS[1]) {
+      throw Object.assign(new Error(`Explicit V60 reviewed temperature must be between ${V60_REVIEWED_TEMPERATURE_BOUNDS[0]}C and ${V60_REVIEWED_TEMPERATURE_BOUNDS[1]}C`), { code: 'invalid_temperature_preview', bounds: { temperatureC: [...V60_REVIEWED_TEMPERATURE_BOUNDS] } });
     }
   }
+}
+
+function ratioNumber(value) {
+  if (Number.isFinite(Number(value))) return Number(value);
+  const match = String(value || '').match(/(?:1\s*[:/]\s*)?([0-9]+(?:\.[0-9]+)?)/);
+  return match ? Number(match[1]) : null;
+}
+
+function scaleRatioSteps(steps, targetWater, sourceWater) {
+  if (!Array.isArray(steps) || !steps.length || !Number.isFinite(sourceWater) || sourceWater <= 0) return [];
+  const factor = targetWater / sourceWater;
+  let previous = 0;
+  return steps.map((step, index) => {
+    const originalWater = Number(step?.waterTotal);
+    if (!Number.isFinite(originalWater)) return structuredClone(step);
+    const scaledWater = index === steps.length - 1
+      ? targetWater
+      : Math.max(previous, Math.round(originalWater * factor));
+    previous = scaledWater;
+    const action = typeof step.action === 'string'
+      ? step.action.replace(/(?<![\w.])(\d+(?:\.\d+)?)\s*(grams?|g)\b/gi, (match, amount, unit) => Number(amount) === originalWater ? `${scaledWater}${unit}` : match)
+      : step.action;
+    return { ...structuredClone(step), waterTotal: scaledWater, ...(action !== undefined ? { action } : {}) };
+  });
+}
+
+/**
+ * Scale one verified executable V60 source to an explicitly requested ratio.
+ * This is separate from normal technique generation: source ratio bounds stay
+ * 15–18.5, while this app-authored preview experiment uses 10–25 and records
+ * the changed cumulative water schedule.
+ */
+export function createV60RatioExperiment(recipe, requestedRatio) {
+  const ratio = ratioNumber(requestedRatio);
+  if (!Number.isFinite(ratio) || ratio < V60_EXPLICIT_RATIO_BOUNDS[0] || ratio > V60_EXPLICIT_RATIO_BOUNDS[1]) {
+    throw Object.assign(new Error(`Explicit V60 ratio experiment must be between ${V60_EXPLICIT_RATIO_BOUNDS[0]} and ${V60_EXPLICIT_RATIO_BOUNDS[1]}`), { code: 'invalid_ratio_experiment', bounds: { ratio: [...V60_EXPLICIT_RATIO_BOUNDS] } });
+  }
+  const sourceId = recipe?.sourceLineage?.sourceIds?.[0];
+  const source = sourceById(sourceId);
+  const baseRatio = ratioNumber(recipe?.ratio);
+  if (!source || recipe?.sourceLineage?.method !== 'v60' || recipe?.sourceLineage?.mode !== 'hot'
+    || recipe?.configurationKey !== V60_CONFIGURATION_KEY || recipe?.v60Size !== '02'
+    || !Number.isFinite(recipe?.coffeeGrams) || !Number.isFinite(recipe?.waterGrams)
+    || !Array.isArray(recipe?.steps) || !recipe.steps.length
+    || recipe.sourceLineage?.sourceRegistryVersion == null
+    || (recipe.sourceLineage?.status === 'original'
+      && (!Number.isFinite(baseRatio) || Math.abs(baseRatio - Number(source.ratio)) > 0.051
+        || recipe.sourceLineage?.parameterSources?.ratio !== sourceId))) {
+    throw Object.assign(new Error('The selected V60 source cannot safely support an explicit ratio experiment.'), { code: 'ratio_experiment_unsupported' });
+  }
+  const targetWater = Math.round(recipe.coffeeGrams * ratio);
+  const steps = scaleRatioSteps(recipe.steps, targetWater, recipe.waterGrams);
+  if (!steps.length || steps.at(-1).waterTotal !== targetWater
+    || steps.some((step, index) => index > 0 && Number(step.waterTotal) < Number(steps[index - 1].waterTotal))) {
+    throw Object.assign(new Error('The V60 source schedule could not be scaled monotonically.'), { code: 'ratio_experiment_invalid_schedule' });
+  }
+  const sourceLineage = structuredClone(recipe.sourceLineage);
+  sourceLineage.status = 'adapted';
+  sourceLineage.adaptationRuleId = V60_EXPLICIT_RATIO_RULE_ID;
+  sourceLineage.adaptationRuleVersion = V60_EXPLICIT_RATIO_RULE_ID;
+  sourceLineage.changedFields = [...new Set([...(sourceLineage.changedFields || []), 'ratio', 'water', 'bloom'])];
+  sourceLineage.parameterSources = {
+    ...(sourceLineage.parameterSources || {}),
+    ratio: V60_EXPLICIT_RATIO_RULE_ID,
+    water: V60_EXPLICIT_RATIO_RULE_ID,
+    bloom: V60_EXPLICIT_RATIO_RULE_ID,
+  };
+  sourceLineage.adaptation = `${sourceLineage.adaptation || `Published method: ${source.author} — ${source.publication}.`} App-authored explicit ratio experiment at 1:${ratio}; cumulative source pours are scaled in place.`;
+  return {
+    ...structuredClone(recipe),
+    waterGrams: targetWater,
+    ratio: `1:${ratio}`,
+    steps,
+    sourceLineage,
+  };
 }
 
 function explicitTechnique(techniqueId) {

@@ -350,7 +350,7 @@ test('the final proposal slot cannot bypass agreement, target binding, or the ca
     assert.equal(modelCalls, scenario === 'no agreement' ? 4 : 3);
     assert.equal(proposalCalls, scenario === 'invalid proposal' ? 1 : 0);
     assert.equal(result.artifacts?.length || 0, 0);
-    if (scenario === 'invalid proposal') { assert.equal(result.ok, true); assert.match(result.text, /saved recipe is unchanged/); }
+    if (scenario === 'invalid proposal') { assert.equal(result.ok, false); assert.equal(result.code, 'one_change_required'); assert.equal(result.text, ''); }
     else assert.equal(result.ok, scenario === 'no agreement');
   }
 });
@@ -385,7 +385,7 @@ test('proposal tool maps one explicit control into a complete executable recipe'
   const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: 'Ode 4.0' } });
   assert.equal(result.ok, true);
   assert.equal(saved[0].after.grindSize.setting, '4.0');
-  assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
+  assert.deepEqual(result.artifact.changedPaths, ['sourceLineage.status', 'sourceLineage.adaptation', 'sourceLineage.changedFields', 'sourceLineage.parameterSources.grind', 'grindSize.setting']);
 });
 test('dose proposal regenerates every executable alias and timed instruction from the new dose', async () => {
   const source = generateV60Recipe({}, { dose: 15 });
@@ -791,7 +791,8 @@ test('a repeated expected proposal failure stops after one replacement attempt',
     } },
     emit: () => {},
   });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'unsupported-dose-profile');
   assert.match(result.text, /saved recipe is unchanged/);
   assert.equal(providerCalls, 2);
   assert.equal(proposalCalls, 2);

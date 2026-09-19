@@ -35,7 +35,7 @@ test('semantic evidence selection replaces remembered focus but cannot override 
   }
 });
 
-test('a missing requested recipe retires remembered brewer focus without creating a proposal target', async () => {
+test('a verified absent requested recipe retires remembered focus and permits a first draft without inventing a saved recipe', async () => {
   const context = { ...inherited(), userText: 'What about the Aidan recipe?',
     rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'Colombia' }], refs: { c1: 'bean-1' } },
     ledger: { entries: [] }, proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true } };
@@ -43,8 +43,10 @@ test('a missing requested recipe retires remembered brewer focus without creatin
   const result = await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'aiden' });
   assert.equal(result.recipe, null);
   assert.equal(context.methodBinding.slot, 'aiden');
-  assert.equal(context.proposalState.target, null);
-  assert.equal(context.proposalState.previewReady, false);
+  assert.deepEqual(context.proposalState.target, { coffeeRef: 'c1', slot: 'aiden' });
+  assert.equal(context.proposalState.previewReady, true, 'verified absence supports preparing a first profile');
+  assert.equal(context.__ruphusResolvedTargets.get('c1:aiden').before, null);
+  assert.equal(context.__ruphusResolvedTargets.get('c1:aiden').sourceState, 'absent');
   assert.equal(context.ledger.entries.at(-1).methodFocus.displayName, 'Aiden');
 });
 

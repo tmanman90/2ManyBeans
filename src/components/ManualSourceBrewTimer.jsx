@@ -8,7 +8,7 @@ import { Check, Clock3, Droplets, Info, Play, RotateCcw, X } from 'lucide-react'
 import { C, fonts, glass, radius, shadows, type } from '../styles/theme';
 import { formatTimingMs } from '../lib/brewTimingMemory';
 import { useManualSourceBrewTimer, sourceTimerIdentity } from '../hooks/useManualSourceBrewTimer';
-import { validateManualSourceProjection } from '../lib/manualSourceProjection.js';
+import { manualSourceDisplay, validateManualSourceProjection } from '../lib/manualSourceProjection.js';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 
 const buttonStyle = {
@@ -49,6 +49,7 @@ const titleForProjection = (projection) => projection?.sourceSnapshot?.title
   || 'Source brew guide';
 
 const quantityForStage = (stage) => {
+  if (stage?.water?.value != null && stage?.water?.unit) return { value: stage.water.value, unit: stage.water.unit };
   if (stage?.waterToGrams != null) return { value: stage.waterToGrams, unit: 'g' };
   if (stage?.waterToMilliliters != null) return { value: stage.waterToMilliliters, unit: 'mL' };
   return null;
@@ -116,12 +117,14 @@ const stageStatus = (record, state, stage, index) => {
   return 'next';
 };
 
-function SourceStageTimeline({ record, state, activeStageId }) {
+function SourceStageTimeline({ record, state, activeStageId, displayStages }) {
+  const displayById = new Map((displayStages || []).map((stage) => [stage.id, stage]));
   return (
     <ol aria-label="Source brew stages" style={{ display: 'grid', gap: 8, padding: 0, margin: 0, listStyle: 'none' }}>
       {record.stages.map((stage, index) => {
         const status = stageStatus(record, state, stage, index);
-        const quantity = quantityForStage(stage);
+        const displayStage = displayById.get(stage.id) || stage;
+        const quantity = quantityForStage(displayStage);
         return (
           <li
             key={stage.id}
@@ -159,7 +162,7 @@ function SourceStageTimeline({ record, state, activeStageId }) {
             </span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-                <strong style={{ ...type.body, color: C.text }}>{stage.label}</strong>
+                <strong style={{ ...type.body, color: C.text }}>{displayStage.label}</strong>
                 <span style={{ ...type.caption, color: C.textMuted, whiteSpace: 'nowrap' }}>{stageKindLabel(stage)}</span>
               </div>
               {(quantity || stage.valve) && (
@@ -241,10 +244,14 @@ function SourceTimerSession({ projection, sourceTimerBinding, initialState, onSt
   const dialogRef = useRef(null);
 
   const { stage, readiness, active, elapsedMs, sourceElapsedMs, events, corrections, canUndo, running, done, state, restoration, act } = timer;
+  const display = useMemo(() => manualSourceDisplay(projection), [projection]);
+  const displayStages = display.stages;
+  const displayById = useMemo(() => new Map(displayStages.map((displayStage) => [displayStage.id, displayStage])), [displayStages]);
+  const displayStage = stage ? (displayById.get(stage.id) || stage) : null;
   const stageIndex = stage ? record.stages.indexOf(stage) : record.stages.length;
   const totalStageCount = record.stages.length;
-  const stageQuantity = quantityForStage(stage);
-  const sourceWater = quantityForProjection(projection);
+  const stageQuantity = quantityForStage(displayStage);
+  const sourceWater = quantityForProjection({ ...projection, water: display.water });
   const sourceFinishTargetMs = Number.isFinite(projection.finish?.maxSeconds) && projection.finish.maxSeconds > 0
     ? projection.finish.maxSeconds * 1000
     : null;
@@ -482,9 +489,9 @@ function SourceTimerSession({ projection, sourceTimerBinding, initialState, onSt
               <section aria-label={`Current source stage ${stageIndex + 1} of ${totalStageCount}`} style={{ display: 'grid', gap: 12, background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, padding: 18, boxShadow: shadows.e1 }}>
                 <div style={{ ...type.label, color: C.textMuted }}>Step {stageIndex + 1} of {totalStageCount}</div>
                 <div>
-                  <h2 style={{ ...type.h2, margin: 0 }}>{stage.label}</h2>
-                  {stage.geometry && <div style={{ ...type.body, color: C.textMuted, marginTop: 8 }}>{stage.geometry}</div>}
-                  {stage.agitation && stage.agitation !== stage.geometry && <div style={{ ...type.body, color: C.textMuted, marginTop: 5 }}>{stage.agitation}</div>}
+                  <h2 style={{ ...type.h2, margin: 0 }}>{displayStage.label}</h2>
+                  {displayStage.geometry && <div style={{ ...type.body, color: C.textMuted, marginTop: 8 }}>{displayStage.geometry}</div>}
+                  {displayStage.agitation && displayStage.agitation !== displayStage.geometry && <div style={{ ...type.body, color: C.textMuted, marginTop: 5 }}>{displayStage.agitation}</div>}
                 </div>
                 {(stageQuantity || stage.valve) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -513,7 +520,7 @@ function SourceTimerSession({ projection, sourceTimerBinding, initialState, onSt
 
             {!done && canUndo && <button type="button" onClick={() => act('undo')} style={buttonStyle}><RotateCcw size={16} aria-hidden="true" /> Undo last finish confirmation</button>}
 
-            <SourceStageTimeline record={record} state={state} activeStageId={stage?.id || null} />
+            <SourceStageTimeline record={record} state={state} activeStageId={stage?.id || null} displayStages={displayStages} />
           </>
         )}
 

@@ -12,6 +12,14 @@ import {
   validateManualSourceRecord,
 } from './manualRecipeContract.js';
 import { manualGuidanceReadiness } from './manualGuidance.js';
+import {
+  GRINDER_LABELS,
+  GRINDER_MICRON_SCALES,
+  descriptorForMicrons,
+  grinderSettingToMicrons,
+  odeStepToGrinderSetting,
+  quantizeGrinderSetting,
+} from './brewMethods.js';
 
 export const MANUAL_SOURCE_PROJECTION_VERSION = 'ruphus-manual-source-projection-v1';
 export const MANUAL_SOURCE_ADAPTATION_VERSION = 1;
@@ -20,6 +28,68 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const positive = (value) => finite(value) && value > 0;
 const clone = (value) => structuredClone(value);
 const unique = (values) => [...new Set(values.filter(Boolean))];
+
+/**
+ * Resolve a source micron note into a useful physical setting for the
+ * selected grinder. The source measurement is intentionally retained as an
+ * approximate secondary detail: its measurement protocol and equivalence to
+ * another grinder are not author-verified. A grinder without one of the
+ * app's calibrated scales receives qualitative/source guidance only.
+ */
+export function manualSourceGrindGuidance(grind, preferences = {}) {
+  const sourceMicrons = finite(grind?.microns) ? grind.microns : null;
+  const sourceDescription = grind?.description || (sourceMicrons == null ? null : descriptorForMicrons(sourceMicrons));
+  const grinderKey = preferences?.grinder || null;
+  const grinderName = GRINDER_LABELS[grinderKey] || preferences?.grinderCustomName || null;
+  const scale = grinderKey ? GRINDER_MICRON_SCALES[grinderKey] : null;
+
+  if (sourceMicrons == null) {
+    return {
+      status: sourceDescription ? 'qualitative' : 'unknown',
+      sourceMicrons: null,
+      sourceDescription,
+      grinderKey,
+      grinderName,
+      setting: null,
+      settingMicrons: null,
+      approximate: false,
+      displayMode: preferences?.grindSizeDisplay === 'microns' ? 'microns' : 'qualitative',
+    };
+  }
+
+  if (!scale) {
+    return {
+      status: 'source-microns-only',
+      sourceMicrons,
+      sourceDescription,
+      grinderKey,
+      grinderName,
+      setting: null,
+      settingMicrons: null,
+      approximate: false,
+      displayMode: 'microns',
+    };
+  }
+
+  // Use the existing Ode calibration as the common coordinate bridge, then
+  // quantize through the existing grinder adapter so Ode labels stay physical
+  // whole/.2/.6 steps and click grinders keep their native notation.
+  const odeScale = GRINDER_MICRON_SCALES['fellow-ode-gen2'];
+  const odeCoordinate = 1 + ((sourceMicrons - odeScale.base) / odeScale.perStep);
+  const odeStep = quantizeGrinderSetting(odeCoordinate, 'fellow-ode-gen2');
+  const translated = odeStepToGrinderSetting(odeStep, grinderKey);
+  return {
+    status: 'approximate',
+    sourceMicrons,
+    sourceDescription,
+    grinderKey,
+    grinderName: grinderName || translated.label || null,
+    setting: translated.setting == null ? null : String(translated.setting),
+    settingMicrons: translated.microns ?? grinderSettingToMicrons(translated.setting, grinderKey) ?? sourceMicrons,
+    approximate: true,
+    displayMode: preferences?.grindSizeDisplay === 'microns' ? 'microns' : 'setting',
+  };
+}
 
 // Firestore may return map keys in a different order. Projection arrays keep
 // their order, but their object members are semantic maps, not ordered data.
@@ -285,6 +355,25 @@ function recordWater(record) {
   return null;
 }
 
+/**
+ * Derive the consumer-facing source checkpoints without changing the trusted
+ * projection or its source hash. Older persisted projections simply derive
+ * the same view on demand, so this remains backwards compatible.
+ */
+export function manualSourceDisplay(projection) {
+  const execution = projection?.sourceExecution || projection;
+  const changes = projection?.adaptation?.changes || [];
+  const waterChanged = changes.some((change) => /^water\.|^stages\.\d+\.waterTo/.test(change.path));
+  const water = recordWater(execution);
+  const displayWater = waterChanged && water
+    ? { ...water, value: roundedConsumerQuantity(water.value) }
+    : water;
+  return {
+    water: displayWater,
+    stages: consumerDisplayStages(execution, waterChanged),
+  };
+}
+
 function stageWater(stage) {
   if (stage?.waterToGrams != null) return { value: clone(stage.waterToGrams), unit: 'g' };
   if (stage?.waterToMilliliters != null) return { value: clone(stage.waterToMilliliters), unit: 'mL' };
@@ -303,6 +392,53 @@ function typedStages(execution) {
     agitation: stage.agitation ?? null,
     valve: stage.valve ?? null,
   }));
+}
+
+const roundedConsumerQuantity = (value) => {
+  if (finite(value)) return Math.round(value);
+  if (value && finite(value.min) && finite(value.max)) {
+    return { min: Math.round(value.min), max: Math.round(value.max) };
+  }
+  return value;
+};
+
+// Source projections retain their precise adapted values for lineage and
+// replay. Consumer guidance uses one rounded cumulative checkpoint sequence,
+// with the last checkpoint forced to the rounded displayed total so the card
+// and timer can never disagree about the target. Each checkpoint is derived
+// from the original source value and adaptation factor; no rounded checkpoint
+// is reused as the next input.
+function consumerDisplayStages(execution, shouldRound) {
+  const stages = typedStages(execution);
+  if (!shouldRound) return stages;
+  const total = recordWater(execution);
+  const lastByUnit = new Map();
+  stages.forEach((stage, index) => {
+    if (stage.water?.unit) lastByUnit.set(stage.water.unit, index);
+  });
+  const previousRawByUnit = new Map();
+  const previousDisplayByUnit = new Map();
+  return stages.map((stage, index) => {
+    if (!stage.water?.unit) return stage;
+    const unit = stage.water.unit;
+    const raw = stage.water.value;
+    const previousRaw = previousRawByUnit.get(unit) ?? null;
+    const previousDisplay = previousDisplayByUnit.get(unit) ?? null;
+    const rounded = index === lastByUnit.get(unit) && total?.unit === unit
+      ? roundedConsumerQuantity(total.value)
+      : roundedConsumerQuantity(raw);
+    const nextLabel = scaledStageLabel(stage.label, {
+      waterToGrams: unit === 'g' ? raw : null,
+      waterToMilliliters: unit === 'mL' ? raw : null,
+    }, raw, rounded, previousRaw, previousDisplay);
+    previousRawByUnit.set(unit, raw);
+    previousDisplayByUnit.set(unit, rounded);
+    return {
+      ...stage,
+      label: nextLabel,
+      water: { ...stage.water, value: rounded },
+    };
+  });
 }
 
 function addChange(changes, path, original, value, reason) {
@@ -374,8 +510,114 @@ function applyDoseAdaptation(execution, sourceDose, dose, changes, options = {})
     notes: [rangeSelection
       ? `Selected ${dose}g from the author's ${originalDose.min}–${originalDose.max}g source range; source timing still requires explicit validation.`
       : `Scaled from ${sourceDose}g to ${dose}g. Source timing requires explicit validation at this dose.`],
-    disclosure: 'App-calculated quantities and executable stage labels are exposed in typed fields; original source wording remains preserved in sourceSnapshot and source timing is not carried over.',
+    disclosure: 'Water amounts and step wording are adjusted for this coffee dose while preserving the source units and event anchors. The original recipe wording remains available for comparison; this is an app adaptation, not an author-validated timing claim.',
   };
+}
+
+function sourceTemperatureCelsius(temperature) {
+  if (!temperature || typeof temperature !== 'object') return null;
+  const value = temperature.value;
+  if (finite(value)) return String(temperature.unit || '').toUpperCase() === 'F' ? (value - 32) * 5 / 9 : value;
+  return null;
+}
+
+function sourceControlNumber(value) {
+  if (finite(value)) return value;
+  const match = String(value ?? '').match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function sourceRatioNumber(value) {
+  const ratio = String(value ?? '').match(/(?:1\s*[:/]\s*)?(\d+(?:\.\d+)?)/);
+  return ratio ? Number(ratio[1]) : null;
+}
+
+// Apply only controls whose semantics are present in the source record. This
+// deliberately keeps sourceSnapshot untouched and never derives a mass from
+// a volume-native source. A volume-native ratio changes the authored mL
+// checkpoints in mL (never by adding a grams alias), while mixed-unit stages
+// retain their own native units.
+function applySourceControls(execution, dose, changes, controls = {}, options = {}) {
+  const accepted = {};
+  const requestedRatio = sourceRatioNumber(controls.ratio);
+  if (controls.ratio != null) {
+    if (!positive(requestedRatio) || requestedRatio < 10 || requestedRatio > 25) {
+      throw new ManualSourceProjectionError('invalid-source-ratio', 'Choose a source ratio between 1:10 and 1:25.');
+    }
+    accepted.ratio = requestedRatio;
+    const nativeWater = recordWater(execution);
+    if (!['g', 'mL'].includes(nativeWater?.unit) || !finite(dose) || dose <= 0) {
+      throw new ManualSourceProjectionError('source-ratio-adaptation-unsupported', 'This source does not publish an exact native water total and dose that can be safely adapted to that ratio.');
+    }
+    const targetWater = Math.round(dose * requestedRatio * 100) / 100;
+    const currentWater = Number(nativeWater.value);
+    if (!finite(currentWater) || currentWater <= 0) {
+      throw new ManualSourceProjectionError('source-ratio-adaptation-unsupported', 'This source does not publish an exact native water total that can be safely adapted to that ratio.');
+    }
+    const originalNativeWater = options.sourceWater?.unit === nativeWater.unit ? Number(options.sourceWater.value) : null;
+    if (nativeWater.unit === 'mL' && finite(originalNativeWater) && targetWater > originalNativeWater) {
+      throw new ManualSourceProjectionError('source-capacity-exceeded', 'That ratio would exceed the source’s original native water load; choose a lower ratio or dose.');
+    }
+    const factor = targetWater / currentWater;
+    const waterKey = nativeWater.unit === 'g' ? 'brewGrams' : 'brewMilliliters';
+    const stageKey = nativeWater.unit === 'g' ? 'waterToGrams' : 'waterToMilliliters';
+    execution.water[waterKey] = targetWater;
+    addChange(changes, `water.${waterKey}`, currentWater, targetWater, `Apply the explicit ratio control while preserving the source native ${nativeWater.unit} unit.`);
+    const previousByUnit = new Map();
+    execution.stages.forEach((stage, index) => {
+      const originalStage = clone(stage);
+      const originalWater = stageWater(originalStage);
+      if (originalWater?.unit !== nativeWater.unit) return;
+      const previous = previousByUnit.get(nativeWater.unit) || null;
+      const nextValue = scaleQuantity(originalWater.value, factor);
+      if (stage[stageKey] != null) {
+        stage[stageKey] = nextValue;
+        addChange(changes, `stages.${index}.${stageKey}`, originalWater.value, nextValue, `Apply the explicit ratio control without changing stage timing or units.`);
+      }
+      if (typeof stage.label === 'string') {
+        const label = scaledStageLabel(stage.label, originalStage, originalWater.value, nextValue, previous?.value ?? null, previous?.nextValue ?? null);
+        if (label !== stage.label) {
+          addChange(changes, `stages.${index}.label`, stage.label, label, 'Keep the executable source-stage copy aligned with the ratio-adjusted typed quantity.');
+          stage.label = label;
+        }
+      }
+      previousByUnit.set(nativeWater.unit, { value: originalWater.value, nextValue });
+    });
+    addChange(changes, 'controls.ratio', null, requestedRatio, `Explicit requested ratio; source water remains native ${nativeWater?.unit || 'source'} units.`);
+  }
+
+  if (controls.temperatureC != null || controls.temperature != null) {
+    if (execution.stages.some((stage) => stage?.temperature != null || stage?.temperatureC != null)) {
+      throw new ManualSourceProjectionError('source-temperature-adaptation-unsupported', 'This source publishes per-stage temperatures that this control cannot safely adapt yet.');
+    }
+    const targetC = sourceControlNumber(controls.temperatureC ?? controls.temperature);
+    const originalC = sourceTemperatureCelsius(execution.temperature);
+    if (!positive(targetC) || targetC < 90 || targetC > 100 || originalC == null) {
+      throw new ManualSourceProjectionError('source-temperature-adaptation-unsupported', 'This source does not publish a numeric temperature that can be safely adapted.');
+    }
+    const unit = String(execution.temperature.unit || 'C').toUpperCase();
+    const originalValue = execution.temperature.value;
+    const target = unit === 'F' ? Math.round((targetC * 9 / 5 + 32) * 10) / 10 : targetC;
+    execution.temperature = { ...execution.temperature, value: target };
+    accepted.temperatureC = targetC;
+    addChange(changes, 'temperature.value', originalValue, target, 'Explicit temperature control expressed in the source native unit.');
+  }
+
+  if (controls.grind != null || controls.grindMicrons != null) {
+    if (execution.stages.some((stage) => stage?.grind != null || stage?.grindMicrons != null)) {
+      throw new ManualSourceProjectionError('source-grind-adaptation-unsupported', 'This source publishes per-stage grind settings that this control cannot safely adapt yet.');
+    }
+    const originalMicrons = finite(execution.grind?.microns) ? execution.grind.microns : null;
+    const targetMicrons = sourceControlNumber(controls.grindMicrons ?? controls.grind);
+    if (originalMicrons == null || !finite(targetMicrons) || targetMicrons < 300 || targetMicrons > 1200) {
+      throw new ManualSourceProjectionError('source-grind-adaptation-unsupported', 'This source provides a qualitative grind only; it cannot be converted into a numeric grinder setting.');
+    }
+    execution.grind = { ...execution.grind, microns: targetMicrons };
+    accepted.grindMicrons = targetMicrons;
+    addChange(changes, 'grind.microns', originalMicrons, targetMicrons, 'Explicit physical grind control retains micron units; no grinder calibration is invented.');
+  }
+
+  return accepted;
 }
 
 function resolveDose(record, configuration) {
@@ -475,6 +717,8 @@ export function projectManualSource(record, configuration = {}) {
     originalDose: sourceDose,
     rangeSelection: dose.rangeSelection,
   });
+  const controls = applySourceControls(execution, requestedDose, changes, configuration.sourceControls, { sourceWater: recordWater(sourceSnapshot) });
+  const projectedWater = recordWater(execution);
   const sourceReadiness = manualSourceReadiness(record);
   const readiness = {
     ...sourceReadiness,
@@ -498,6 +742,7 @@ export function projectManualSource(record, configuration = {}) {
     notes: adaptation.notes,
     disclosure: adaptation.disclosure,
     timing: adaptation.timingReady ? 'source' : 'requires-explicit-validation',
+    ...(Object.keys(controls).length ? { controls } : {}),
   };
   const resolvedConfiguration = {
     device: configuration.device ?? record.equipment.brewer,
@@ -521,7 +766,7 @@ export function projectManualSource(record, configuration = {}) {
     equipment: freezeManualSources(clone(execution.equipment)),
     mode: execution.mode,
     coffeeGrams: clone(requestedDose),
-    water: recordWater(execution),
+    water: projectedWater,
     temperature: execution.temperature == null ? null : clone(execution.temperature),
     grind: clone(execution.grind),
     clock: clone(execution.clock),

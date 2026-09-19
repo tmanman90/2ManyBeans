@@ -6,7 +6,7 @@
 // and fails closed when the route cannot preserve its timing contract.
 
 import { generateKalitaRecipe } from '../kalitaAdapter.js';
-import { generateV60RecipeForTechnique } from '../v60Adapter.js';
+import { createV60RatioExperiment, generateV60RecipeForTechnique } from '../v60Adapter.js';
 import { generateV60SwitchRecipe } from '../v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../v60IcedAdapter.js';
 import { generateKalitaIcedRecipe } from '../kalitaIcedAdapter.js';
@@ -125,9 +125,7 @@ function recognizedV60Source(recipe) {
     || recipe.sourceLineage.method !== 'v60'
     || recipe.sourceLineage.mode !== 'hot') return null;
   try {
-    const generated = generateV60RecipeForTechnique(techniqueId, {
-      targetRatio: ratioNumber(recipe.ratio),
-    }, {
+    const generated = generateV60RecipeForTechnique(techniqueId, {}, {
       dose: recipe.coffeeGrams,
       configurationKey: recipe.configurationKey,
       v60Size: recipe.v60Size,
@@ -219,7 +217,8 @@ function validateSource(recipe, route) {
   if (!recipe || typeof recipe !== 'object') errors.push('missing-recipe');
   if (!route) errors.push('unsupported-route');
   if (!finitePositive(recipe?.coffeeGrams)) errors.push('invalid-base-dose');
-  if (ratioNumber(recipe?.ratio) == null && ratioNumber(recipe?.finalBeverageRatio) == null) errors.push('missing-ratio');
+  const ratiolessKalitaIced = route === 'kalita-iced' && recipe?.requiresCompleteMelt !== true;
+  if (ratioNumber(recipe?.ratio) == null && ratioNumber(recipe?.finalBeverageRatio) == null && !ratiolessKalitaIced) errors.push('missing-ratio');
   if (recipe?.timerReady !== true) errors.push('not-timer-ready');
   if (!Array.isArray(recipe?.steps) || recipe.steps.length === 0) errors.push('missing-timed-steps');
   let lastTime = -1;
@@ -258,7 +257,9 @@ function validateManualSourcePreview(recipe, options = {}) {
   const sourceDose = recipe?.sourceProjection?.adaptation?.sourceDose;
   const bounds = adaptedDoseBounds(recipe?.sourceProjection?.sourceSnapshot);
   if (bounds && finitePositive(dose) && dose !== sourceDose && (dose < bounds[0] || dose > bounds[1])) errors.push('unsupported-dose-adaptation');
-  if (options.targetRatio != null || options.ratio != null) errors.push('source-ratio-adaptation-unsupported');
+  const requestedRatio = options.targetRatio ?? options.ratio;
+  const requestedRatioNumber = requestedRatio == null ? null : ratioNumber(requestedRatio);
+  if (requestedRatio != null && (!finitePositive(requestedRatioNumber) || requestedRatioNumber < 10 || requestedRatioNumber > 25)) errors.push('invalid-source-ratio');
   return { valid: errors.length === 0, errors: [...new Set(errors)], route, dose, ratio: null, bounds, sourceDose };
 }
 
@@ -267,6 +268,7 @@ function sourceConfigurationFromRecipe(recipe) {
   return {
     ...(projection?.sourceConfiguration || {}),
     sourceRevision: projection?.sourceRevision,
+    ...(projection?.adaptation?.controls ? { sourceControls: structuredClone(projection.adaptation.controls) } : {}),
   };
 }
 
@@ -275,10 +277,16 @@ function createManualSourcePreview({ recipe, dose, ratio, targetRatio, configura
   if (!allowIced && checked.route?.endsWith('iced')) throw new RecipePreviewError('iced-preview-disabled', 'This iced source route is kept read-only until its complete water and ice contract is enabled.');
   if (!checked.valid) throw new RecipePreviewError(checked.errors[0], `Source recipe preview is unavailable: ${checked.errors.join(', ')}.`, checked);
   const projection = recipe.sourceProjection;
+  const sourceControls = {
+    ...(projection.adaptation?.controls || {}),
+    ...(ratio != null || targetRatio != null ? { ratio: ratio ?? targetRatio } : {}),
+    ...(configuration?.sourceControls && typeof configuration.sourceControls === 'object' ? configuration.sourceControls : {}),
+  };
   const targetProjection = projectManualSourceForApp(projection.sourceId, {
     ...sourceConfigurationFromRecipe(recipe),
     ...configuration,
     dose: checked.dose,
+    ...(Object.keys(sourceControls).length ? { sourceControls } : {}),
   });
   const target = recipeFromManualSourceProjection(targetProjection, {
     techniqueId: recipe.technique || projection.sourceId,
@@ -331,6 +339,31 @@ function regeneratedPreview(recipe, route, dose, ratio, options) {
     return reconcileGeneratedRatio(generated, ratio);
   }
   if (route === 'v60-hot') {
+    // A reviewed ratio experiment remains the user's selected source
+    // contract when a later serving-dose change crosses the generator's
+    // ordinary profile boundary. Regenerate the source technique at the new
+    // dose, then replay the explicit 10–25 experiment instead of silently
+    // snapping back to the default 15–18.5 generation envelope.
+    if (ratio != null && recipe.sourceLineage?.adaptationRuleId === 'v60-explicit-ratio-adaptation-v1') {
+      const techniqueId = recipe.sourceLineage?.technique || recipe.technique;
+      const sourceIntent = { ...intent };
+      delete sourceIntent.targetRatio;
+      const generated = generateV60RecipeForTechnique(techniqueId, sourceIntent, { ...configuration, dose, grindSize: recipe.grindSize });
+      return createV60RatioExperiment(generated, ratio);
+    }
+    if (ratio != null && ratioNumber(ratio) !== ratioNumber(baseRatio(recipe, route))) {
+      // Build the same source-backed dose first when both controls are
+      // requested, then apply the explicit app-authored ratio experiment to
+      // that executable schedule. Do not discard a requested serving dose.
+      if (dose !== recipe.coffeeGrams) {
+        const techniqueId = recipe.sourceLineage?.technique || recipe.technique;
+        const sourceIntent = { ...intent };
+        delete sourceIntent.targetRatio;
+        const generated = generateV60RecipeForTechnique(techniqueId, sourceIntent, { ...configuration, dose, grindSize: recipe.grindSize });
+        return createV60RatioExperiment(generated, ratio);
+      }
+      return createV60RatioExperiment(recipe, ratio);
+    }
     const techniqueId = recipe.sourceLineage?.technique || recipe.technique;
     if (!techniqueId) {
       throw new RecipePreviewError('technique-conflict', 'This dose crosses the selected V60 profile boundary; review an explicit supported technique before continuing.');
@@ -411,7 +444,9 @@ export function validateRecipePreview(recipe, options = {}) {
   if (bounds && finitePositive(dose) && (dose < bounds.minDose || dose > bounds.maxDose)) errors.push('unsupported-dose');
   const suppliedRatio = options.targetRatio ?? options.ratio;
   const ratio = suppliedRatio == null ? baseRatio(recipe, route || '') : ratioNumber(suppliedRatio);
-  if (ratio == null) errors.push('invalid-target-ratio');
+  const ratiolessKalitaIced = route === 'kalita-iced' && recipe?.requiresCompleteMelt !== true && suppliedRatio == null;
+  if (route === 'kalita-iced' && recipe?.requiresCompleteMelt !== true && suppliedRatio != null) errors.push('ratio-unsupported-for-iced-kalita');
+  if (ratio == null && !ratiolessKalitaIced) errors.push('invalid-target-ratio');
   if (route === 'v60-switch-hot' && finitePositive(dose) && finitePositive(ratio) && dose * ratio > V60_SWITCH_WATER_CAP_GRAMS) errors.push('water-cap-conflict');
   return { valid: errors.length === 0, errors, route, dose, ratio, bounds };
 }
@@ -435,14 +470,18 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
   const targetProfile = profileFor(recipe, route, targetDose);
   const profileChanged = sourceProfile !== targetProfile;
   const recognizedSource = route === 'v60-hot' ? recognizedV60Source(sourceRecipe) : null;
-  const ratioChanged = route === 'v60-hot' && recognizedSource
+  const ratioChanged = route === 'v60-hot'
     && ratioNumber(targetRatioValue) !== ratioNumber(baseRatio(recipe, route));
+  if (ratioChanged && !recognizedSource) {
+    throw new RecipePreviewError('ratio-adaptation-unsupported', 'This V60 schedule is not a recognized executable source, so I cannot safely run an explicit ratio experiment.');
+  }
   const canRegenerate = route === 'kalita-hot' || route === 'v60-switch-hot' || route.endsWith('iced')
     || (route === 'v60-hot' && (recipe.reasonCodes?.includes('EXPLICIT_TECHNIQUE_SELECTION') || recognizedSource));
   if (profileChanged && !canRegenerate) {
     throw new RecipePreviewError('unsupported-dose-profile', 'I cannot safely prepare that larger dose from this saved recipe yet. Choose the same source-backed V60 technique in recipe options, or keep the dose between 12 and 24g; nothing was saved.', { sourceProfile, targetProfile });
   }
-  if (profileChanged || ratioChanged || (canRegenerate && optionsRequireRegeneration({ intent, configuration }))) {
+  const ratiolessIcedDoseChange = route === 'kalita-iced' && targetRatioValue == null && targetDose !== recipe.coffeeGrams;
+  if (profileChanged || ratioChanged || ratiolessIcedDoseChange || (canRegenerate && optionsRequireRegeneration({ intent, configuration }))) {
     if (recognizedSource?.customizedSchedule) {
       throw new RecipePreviewError('technique-conflict', 'This saved V60 has customized pours, so I cannot safely resize it without replacing that schedule. Keep the current dose or choose the saved source-backed technique explicitly.');
     }
@@ -469,6 +508,13 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
       : regenerated;
     return annotate(displayRecipe, sourceRecipe, targetDose, targetRatioValue, route, true, normalized.normalization);
   }
+  // Some published iced Kalita sources intentionally do not claim a final
+  // beverage ratio because the source does not require complete ice melt.
+  // Preserve that semantics for an unchanged-dose review; do not invent a
+  // ratio from hot water plus ice.
+  if (route === 'kalita-iced' && targetRatioValue == null) {
+    return annotate(recipe, sourceRecipe, targetDose, targetRatioValue, route, false, normalized.normalization);
+  }
   const baseWater = route.endsWith('iced') ? recipe.hotWaterGrams : recipe.waterGrams;
   const targetTotalWater = roundGrams(targetDose * targetRatioValue);
   const doseFactor = targetDose / recipe.coffeeGrams;
@@ -494,7 +540,7 @@ export function createRecipePreview({ recipe, dose, requestedDose, ratio, target
       ...preview,
       hotWaterGrams: preview.waterGrams,
       initialBrewIceGrams: recipe.initialBrewIceGrams == null ? null : targetIce,
-      recipeIceGrams: recipe.recipeIceGrams == null ? undefined : targetIce,
+      ...(recipe.recipeIceGrams == null ? {} : { recipeIceGrams: targetIce }),
       iceGrams: targetIce,
       postBrewIceGrams: recipe.postBrewIceGrams == null ? null : targetIce,
       finalBeverageWaterTargetGrams: targetTotalWater,

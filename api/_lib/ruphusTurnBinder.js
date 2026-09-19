@@ -8,6 +8,13 @@ const PRONOUN_PHRASE = /\b(?:this|that|current|earlier|previous)\s+(?:coffee|bea
 const RECIPE_PRONOUN = /\b(this|that|current)\s+(?:(?:hot|iced)\s+)?(?:(?:kalita(?:\s+(?:155|185))?|v60|aiden)\s+)?(?:trial(?:\s+recipe)?|recipe)\b/i;
 const CURRENT_RECIPE_ACTION = /^(?:(?:ok(?:ay)?|yes|sure|please)[, ]+)*(?:(?:can|could)\s+(?:we|you)\s+)?(?:update|change|save|apply)\s+(?:my|the|our)\s+recipe(?:\s+please)?$/i;
 const ORDINAL = /\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/i;
+const ORDINAL_GLOBAL = /\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/gi;
+// Keep reference qualification in the binder, where the owner-scoped
+// candidate is already known. This is deliberately an intent-level action
+// list, not a collection of holdout phrases: an imperative target wins over
+// an earlier hedged mention in the same turn.
+const EXPLICIT_REFERENCE_ACTION = /\b(?:use|make|brew|try|pick|choose|switch\s+to|tell\s+me\s+about|update|change|save|apply|open|show)\b/gi;
+const IDENTITY_HEDGE = /\b(?:maybe|perhaps|possibly|might|may|probably|likely|think|guess|unsure|unclear)\b/i;
 const OTHER = /\bother\b/i;
 const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
 const CONTEXTUAL_TECHNIQUE_FOLLOWUP = /^(?:show|give)\s+me\s+(?:another|a\s+different)\s+(?:one|option)[.!?]?$/i;
@@ -54,6 +61,41 @@ function exactNameReference(userText, coffees = []) {
   if (!matches.length) return null;
   const longest = matches.filter((item) => item.normalized.split(' ').length === matches[0].normalized.split(' ').length);
   return longest.length === 1 ? longest[0].name : null;
+}
+
+function explicitOrdinalReference(value) {
+  const actions = [...String(value || '').matchAll(EXPLICIT_REFERENCE_ACTION)];
+  const matches = [...String(value || '').matchAll(ORDINAL_GLOBAL)];
+  if (!actions.length || !matches.length) return null;
+  const target = matches.filter((match) => actions.some((action) => {
+    if (action.index > match.index) return false;
+    const between = String(value || '').slice(action.index + action[0].length, match.index);
+    // An earlier target or hedge in the same clause belongs to a different
+    // reference. Do not let “show jar 1, maybe jar 3” promote jar 3 merely
+    // because the first action precedes both ordinals.
+    if (/\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/i.test(between) || IDENTITY_HEDGE.test(between)) return false;
+    // A modal attached to the action ("might use jar 3", "maybe we can
+    // make jar 3") is still conditional. A new clause after a correction
+    // ("..., but use jar 1") gets its own explicit reading.
+    const clause = String(value || '').slice(Math.max(0, action.index - 48), action.index).split(/[,.!?;]/).at(-1) || '';
+    return !IDENTITY_HEDGE.test(clause);
+  })).at(-1);
+  return target?.[0] || null;
+}
+
+function referenceCertainty(value, reference) {
+  const normalizedValue = normalize(value);
+  const normalizedReference = normalize(reference);
+  const start = normalizedValue.indexOf(normalizedReference);
+  if (start < 0) return 'explicit';
+  // A target in an imperative clause is explicit even when the sentence is
+  // politely phrased ("Could you make jar 3 ..."). Suffix hedges describe
+  // the report, not the identity ("jar 3 tasted muted, I guess").
+  const prefix = normalizedValue.slice(0, start);
+  if (IDENTITY_HEDGE.test(prefix)) return 'conditional';
+  if (explicitOrdinalReference(value)
+    || /\b(?:use|make|brew|try|pick|choose|switch\s+to|tell\s+me\s+about|update|change|save|apply|open|show)\b(?:\s+[a-z0-9]+){0,4}$/i.test(prefix)) return 'explicit';
+  return 'explicit';
 }
 
 function currentName({ coffees, ledger, launchContext, refs }) {
@@ -186,14 +228,20 @@ function contextualTechniqueReference(userText, coffees, ledger, launchContext, 
 
 function isSupportedReference(userText, coffees, ledger, launchContext, refs, priorTechniqueProposals = []) {
   const value = text(userText).replace(/[.!?]+$/, '').trim();
-  if (exactNameReference(value, coffees)) return { reference: exactNameReference(value, coffees) };
-  if (ORDINAL.test(value)) return { reference: value.match(ORDINAL)[0] };
+  const namedReference = exactNameReference(value, coffees);
+  if (namedReference) return { reference: namedReference, certainty: referenceCertainty(value, namedReference) };
+  const explicitOrdinal = explicitOrdinalReference(value);
+  if (explicitOrdinal) return { reference: explicitOrdinal, certainty: 'explicit' };
+  if (ORDINAL.test(value)) {
+    const ordinal = value.match(ORDINAL)[0];
+    return { reference: ordinal, certainty: referenceCertainty(value, ordinal) };
+  }
   if (CURRENT_RECIPE_ACTION.test(value)) {
     const current = currentName({ coffees, ledger, launchContext, refs });
     return current ? { reference: 'current coffee', current } : null;
   }
   const phrase = value.match(PRONOUN_PHRASE)?.[0];
-  if (phrase) return { reference: phrase, current: currentName({ coffees, ledger, launchContext, refs }) };
+  if (phrase) return { reference: phrase, current: currentName({ coffees, ledger, launchContext, refs }), certainty: referenceCertainty(value, phrase) };
   const recipePronoun = value.match(RECIPE_PRONOUN);
   if (recipePronoun) return { reference: `${recipePronoun[1]} coffee`, current: currentName({ coffees, ledger, launchContext, refs }) };
   if (SUPPORTED_PRONOUN.test(value) || OTHER.test(value) || DESCRIPTOR.test(value)) {
@@ -259,6 +307,21 @@ export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launc
       ? appendReferenceConstraint(retireReferenceConstraints(ledger), constrainedReference, evidenceByteCap)
       : ledger;
     return { ...binding, ledger: nextLedger, refs: {}, launchHintConsumed: false };
+  }
+  // The snapshot can identify a likely candidate without making a hedged
+  // statement authoritative. Reuse the existing ambiguity/public-candidate
+  // shape so downstream readers can clarify or answer identity-independent
+  // questions without a new dispatch or an evidence-read gate.
+  if (supported.certainty === 'conditional' && binding.status === 'locked') {
+    return {
+      ...binding,
+      status: 'ambiguous',
+      certainty: 'conditional',
+      candidates: [{ coffeeRef: binding.coffeeRef, coffeeName: binding.coffeeName, coffee: binding.coffee }],
+      ledger,
+      refs: {},
+      launchHintConsumed: false,
+    };
   }
   if (supported.techniqueSlot && binding.status === 'locked') {
     binding.techniqueSlot = supported.techniqueSlot;

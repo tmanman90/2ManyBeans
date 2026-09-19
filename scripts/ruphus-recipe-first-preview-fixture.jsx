@@ -7,6 +7,8 @@ import { ArtifactRenderer } from '../src/components/chat/ArtifactRenderer.jsx';
 import { HistoricalRecipeInspector } from '../src/tabs/ChatTab.jsx';
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
+import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { generateV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
@@ -21,13 +23,15 @@ const sourceImmersionMode = sourceMode && new URLSearchParams(window.location.se
 const proposalId = sourceMode ? (sourceOriginalMode ? 'source-original-preview-fixture' : sourceImmersionMode ? 'source-immersion-preview-fixture' : 'source-hario-preview-fixture') : new URLSearchParams(window.location.search).has('dose-error') ? 'dose-error-fixture' : 'changed-ratio-fixture';
 const runtimeTurn = window.__ruphusTechniqueTurn;
 const aidenMode = new URLSearchParams(window.location.search).has('aiden');
+const icedFamily = new URLSearchParams(window.location.search).get('iced');
+const icedOption = icedFamily === 'v60' ? generateV60IcedRecipe({}, { dose: 20 }) : icedFamily === 'kalita' ? generateKalitaIcedRecipe({}, { size: '185', dose: 20 }) : null;
 const canonical = generateKalitaRecipe({}, { size: '155', dose: 13 });
 const selected = techniqueMode ? generateV60TechniqueOption('kasuya-coarse-pulses', {}, { dose: 20 }) : null;
 const sourceOption = sourceMode ? generateManualSourceTechniqueOption(sourceOriginalMode || sourceImmersionMode ? 'hario-switch-03-instruction-manual-36-2023' : 'hario-switch-03-matt-winton-hybrid-24-2022', {}, {
   device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot',
   ...(sourceImmersionMode ? { dose: 15 } : {}),
 }) : null;
-const proposed = sourceOption?.recipe || (selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 }));
+const proposed = icedOption || sourceOption?.recipe || (selected ? { ...selected.recipe, techniqueLabel: 'Tetsu Kasuya 4:6' } : createRecipePreview({ recipe: canonical, dose: 13, targetRatio: 15 }));
 if (new URLSearchParams(window.location.search).has('grind-normalization')) {
   proposed.grindSize = { ...proposed.grindSize, setting: '5.9' };
 }
@@ -35,6 +39,7 @@ const artifact = sourceMode
   ? { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: 'v60_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, sourceRevisionId: String(sourceOption.recipe.sourceRevision), sourceHash: `${sourceOption.recipe.sourceId}-revision-${sourceOption.recipe.sourceRevision}`, techniqueExperiment: { name: sourceOption.recipe.techniqueLabel, kind: 'manual_source_technique', sourceId: sourceOption.recipe.sourceId } }
   : runtimeTurn?.frames?.find(frame => frame.type === 'artifact_ready')?.artifact || { id: proposalId, type: 'recipe_proposal', status: 'proposed', slotKey: techniqueMode ? 'v60_hot' : 'kalita_hot', coffeeId: bean.id, coffeeName: bean.name, before: canonical, after: proposed, ...(techniqueMode ? { techniqueExperiment: { name: 'Tetsu Kasuya 4:6', kind: 'v60_technique' } } : {}) };
 const forceStartError = new URLSearchParams(window.location.search).has('start-error');
+if (icedOption) Object.assign(artifact, { slotKey: `${icedFamily}_iced`, before: null, sourceState: 'absent' });
 if (aidenMode) {
   const profile = { title: 'Colombia Aiden', profileType: 0, ratio: 16, bloomEnabled: true, bloomRatio: 2, bloomDuration: 30, bloomTemperature: 95, ssPulsesEnabled: true, ssPulsesNumber: 2, ssPulsesInterval: 20, ssPulseTemperatures: [96, 95], batchPulsesEnabled: true, batchPulsesNumber: 2, batchPulsesInterval: 30, batchPulseTemperatures: [95, 94] };
   Object.assign(artifact, { slotKey: 'aiden', before: profile, after: { ...profile, ratio: 15.5 }, actions: ['apply_proposal', 'brew_once', 'keep_current'] });
@@ -119,7 +124,7 @@ function Fixture() {
         onClose={closePreview}
         recipe={preview?.recipe}
         bean={bean}
-        deviceKey={techniqueMode ? 'v60' : 'kalita'}
+        deviceKey={preview?.recipe?.device || (techniqueMode ? 'v60' : 'kalita')}
         userCoffeeGrams={preview?.dose}
         onCoffeeGramsChange={changeDose}
         previewError={previewError}

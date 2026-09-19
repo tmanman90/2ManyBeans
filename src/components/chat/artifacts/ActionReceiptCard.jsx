@@ -2,6 +2,12 @@ import { C, radius, shadows, type as typeScale } from '../../../styles/theme';
 import { ArtifactAction } from './ArtifactAction';
 import { CurrentRecipeCard } from './CurrentRecipeCard';
 
+const isIcedRecipe = (recipe) => recipe?.mode === 'iced' || recipe?.isIced === true;
+const receiptTitle = (artifact, fallback) => {
+  const title = artifact.title || fallback;
+  return isIcedRecipe(artifact.recipe) && !/\biced\b/i.test(title) ? `${title} · Iced` : title;
+};
+
 export function ActionReceiptCard({ artifact = {}, onAction, actionPending = false }) {
   const status = artifact.status || 'succeeded';
   const canUndo = status === 'succeeded' && artifact.undoAvailable === true;
@@ -15,7 +21,7 @@ export function ActionReceiptCard({ artifact = {}, onAction, actionPending = fal
     brew_once: ['Ready to try', artifact.sourceState === 'absent' ? 'Use this version for one brew. Nothing has been saved.' : 'Use this version for one brew. Your saved recipe is unchanged.'],
   }[artifact.mode] : null;
   return <div data-artifact="action_receipt" data-status={status} style={{ width: '100%', padding: 14, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
-    <div style={typeScale.h3}>{status === 'undone' ? completedCopy[0] : artifact.title || completedCopy?.[0] || 'Recipe change'}</div>
+    <div style={typeScale.h3}>{status === 'undone' ? completedCopy[0] : receiptTitle(artifact, completedCopy?.[0] || 'Recipe change')}</div>
     <div style={{ color: C.textMuted, marginTop: 6 }}>{status === 'undone' ? completedCopy[1] : artifact.message || completedCopy?.[1] || 'Check the result before continuing.'}</div>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
       {canUndo && <ArtifactAction action="undo_revision" label="Undo" status={status} onClick={() => onAction?.({ mode: 'undo_revision', artifact })} />}

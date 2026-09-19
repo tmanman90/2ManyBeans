@@ -68,6 +68,22 @@ test('invalid decimal from the model recovers to one real click and emits a card
   assert.equal(h.writes(), 1);
 });
 
+test('grounded response check regenerates unsupported Ode decimals before they reach the user', async () => {
+  const h = await harness();
+  h.context.userText = 'What grind should I use next?';
+  const responses = [
+    { text: 'Set the Ode to 5.5 for more extraction.', envelope: { intent: 'information', state: 'answered', text: 'Set the Ode to 5.5 for more extraction.', coffeeRef: null, slot: null }, toolCalls: [] },
+    { text: 'Use the physical 5.2 click for more extraction.', envelope: { intent: 'information', state: 'answered', text: 'Use the physical 5.2 click for more extraction.', coffeeRef: null, slot: null }, toolCalls: [] },
+  ];
+  let calls = 0;
+  const result = await runRuphusTurn({ turnId: 'grounded-ode', context: h.context, userText: h.context.userText, tools: h.tools,
+    provider: { runTurn: async (input) => { calls += 1; if (calls === 2) assert.match(input.correctiveInstruction, /physical labels/); return responses.shift(); } } });
+  assert.equal(result.ok, true);
+  assert.equal(calls, 2);
+  assert.match(result.text, /5\.2/);
+  assert.doesNotMatch(result.text, /5\.5/);
+});
+
 test('direct recipe read grounds the review follow-up before proposal dispatch', async () => {
   const h = await harness({ text: 'Show recipe' });
   h.context.conversation = [{ role: 'assistant', content: 'Go one click finer: 5.6 to 5.2.' }];

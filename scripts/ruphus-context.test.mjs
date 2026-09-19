@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { sanitizeEvidence } from '../src/lib/ruphus/sanitizeEvidence.js';
+import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
+import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
+import { absentRecipeSourceHash } from '../src/lib/ruphus/recipeSourceState.js';
 
 test('long restored conversations fit the provider budget without deleting transcript or latest exchange', async () => {
   const conversation = Array.from({ length: 20 }, (_, i) => [
@@ -65,8 +68,8 @@ test('direct chat locks an explicitly named brewer ahead of the saved default an
     readers,
   });
   assert.equal(first.turnBinding.coffeeName, 'Colombia La Esperanza');
-  assert.deepEqual(first.methodBinding, { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' });
-  assert.equal(first.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.methodFocus?.displayName === 'hot Kalita'), true);
+  assert.deepEqual(first.methodBinding, { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita 155', source: 'M1' });
+  assert.equal(first.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.methodFocus?.displayName === 'hot Kalita 155'), true);
 
   const correction = await buildRuphusContext({
     uid: 'u1',
@@ -78,4 +81,54 @@ test('direct chat locks an explicitly named brewer ahead of the saved default an
     readers,
   });
   assert.equal(correction.methodBinding.slot, 'kalita_hot');
+});
+
+test('context preserves a hedged candidate without changing active focus or forcing a read', async () => {
+  const context = await buildRuphusContext({
+    uid: 'u1',
+    contextRef: { surface: 'direct', coffeeRef: 'coffee-1' },
+    userText: 'It might have been jar 2.',
+    evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [
+        { id: 'coffee-1', name: 'El Vergel', jarSlot: 1, status: 'ACTIVE', recipes: ['v60_hot'] },
+        { id: 'coffee-2', name: 'Colombia La Esperanza', jarSlot: 2, status: 'ACTIVE', recipes: ['v60_hot'] },
+      ],
+      readSetup: async () => ({ defaultMethod: 'v60_hot' }),
+    },
+  });
+  assert.deepEqual(context.turnBinding, {
+    status: 'ambiguous',
+    certainty: 'conditional',
+    candidates: [{ coffeeRef: context.turnBinding.candidates[0].coffeeRef, coffeeName: 'Colombia La Esperanza' }],
+  });
+  assert.equal(context.__ruphusTurnBinding.status, 'ambiguous');
+  assert.equal(context.__ruphusTurnBinding.certainty, 'conditional');
+  assert.equal(context.ledger.entries.some((entry) => entry.kind === 'coffee_focus'), false);
+  assert.equal(context.__ruphusRefs[context.launchCoffeeId], 'coffee-1');
+  const evidenceBlock = buildDynamicEvidenceBlock({ turnBinding: context.turnBinding });
+  assert.match(evidenceBlock, /CONDITIONAL_TURN_TARGET/);
+  assert.match(evidenceBlock, /not an authoritative identity selection/);
+  assert.doesNotMatch(evidenceBlock, /AUTHORITATIVE_TURN_TARGET/);
+});
+
+test('context exposes only the exact editable review as typed current recipe context', async () => {
+  const after = generateV60IcedRecipe({}, { dose: 20 });
+  const proposal = {
+    type: 'recipe_proposal', id: 'p-iced', status: 'proposed', coffeeId: 'coffee-1', slotKey: 'v60_iced',
+    sourceState: 'absent', sourceHash: absentRecipeSourceHash('v60_iced'), before: null, after,
+  };
+  const context = await buildRuphusContext({
+    uid: 'u1', contextRef: { surface: 'direct' }, userText: 'Make it 25 grams instead',
+    ledger: { entries: [
+      { kind: 'coffee_focus', status: 'available', namedCoffees: ['Jar one'] },
+      { kind: 'method_focus', status: 'available', namedCoffees: ['Jar one'], methodFocus: { displayName: 'iced V60' } },
+    ] }, priorTechniqueProposals: [proposal], evidenceByteCap: 10000,
+    readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'Jar one', jarSlot: 1, status: 'ACTIVE' }] },
+  });
+  assert.deepEqual(context.currentReview, { editable: true, status: 'proposed', sourceState: 'absent', slot: 'v60_iced', mode: 'iced', variant: 'classic', size: '02' });
+  const block = buildDynamicEvidenceBlock(context);
+  assert.match(block, /CURRENT_RECIPE_REVIEW/);
+  assert.match(block, /read_recipe.*propose_recipe_change/);
+  assert.match(block, /serving-dose-only follow-up/);
 });

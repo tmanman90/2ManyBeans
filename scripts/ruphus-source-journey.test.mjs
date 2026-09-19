@@ -9,8 +9,9 @@ import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { validateManualSourceRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
+import { canonicalRecipeSnapshot } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
-test('chat opening and dose edits preserve source ratios rather than requesting a ratio adaptation', () => {
+test('chat opening and dose edits preserve source lineage while replaying ratio adaptations', () => {
   const chat = readFileSync(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
   const calls = chat.match(/createRecipePreview\(\{[^;]+?\}\)/g);
   assert.equal(calls.length, 2);
@@ -19,7 +20,10 @@ test('chat opening and dose edits preserve source ratios rather than requesting 
     device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 13,
   }).recipe;
   assert.ok(source.ratio);
-  assert.throws(() => createRecipePreview({ recipe: source, dose: 13, ratio: source.ratio }), /source-ratio-adaptation-unsupported/);
+  const ratioPreview = createRecipePreview({ recipe: source, dose: 13, ratio: '1:15' });
+  assert.equal(ratioPreview.sourceProjection.adaptation.controls.ratio, 15);
+  assert.equal(ratioPreview.sourceProjection.sourceSnapshot.water.brewGrams, source.sourceProjection.sourceSnapshot.water.brewGrams);
+  assert.equal(ratioPreview.ratio, '1:15');
   for (const dose of [12, 13, 14, 20]) {
     const preview = createRecipePreview({ recipe: source, dose, configuration: {} });
     assert.equal(preview.coffeeGrams, dose);
@@ -55,6 +59,201 @@ test('source projection validation tolerates Firestore map key reordering', () =
   const stageResult = validateManualSourceRecipeSnapshot(stageTampered);
   assert.equal(stageResult.valid, false);
   assert.ok(stageResult.errors.includes('source-stages-mismatch'));
+});
+
+test('ratio and temperature adaptations replay through serialized dose reload without changing source identity', () => {
+  const source = generateManualSourceTechniqueOption('kurasu-wave-155-2023', {}, {
+    device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 14,
+  }).recipe;
+  const sourceSnapshot = structuredClone(source.sourceProjection.sourceSnapshot);
+  const originalTimes = source.sourceProjection.stages.map((stage) => stage.trigger);
+  const adapted = createRecipePreview({ recipe: source, dose: 14, ratio: '1:15', configuration: { sourceControls: { temperatureC: 94 } } });
+  assert.equal(adapted.ratio, '1:15');
+  assert.equal(adapted.temperature.value, 94);
+  assert.deepEqual(adapted.sourceProjection.adaptation.controls, { ratio: 15, temperatureC: 94 });
+
+  // A Firestore round trip reorders/clones maps; the next dose preview must
+  // replay accepted controls instead of rebuilding from the original source.
+  const reloaded = JSON.parse(JSON.stringify(adapted));
+  const resized = createRecipePreview({ recipe: reloaded, dose: 20 });
+  assert.equal(resized.coffeeGrams, 20);
+  assert.equal(resized.ratio, '1:15');
+  assert.equal(resized.temperature.value, 94);
+  assert.equal(resized.waterGrams, 300);
+  assert.deepEqual(resized.sourceProjection.adaptation.controls, { ratio: 15, temperatureC: 94 });
+  assert.deepEqual(resized.sourceProjection.sourceSnapshot, sourceSnapshot);
+  assert.deepEqual(resized.sourceProjection.stages.map((stage) => stage.trigger), originalTimes);
+  assert.equal(resized.sourceProjection.water.unit, 'g');
+  assert.equal(resized.sourceProjection.stages.at(-1).water.value, 300);
+});
+
+test('manual temperature controls honor the exact source-native unit across an active review', async () => {
+  const canonical = generateManualSourceTechniqueOption('kurasu-wave-155-2023', {}, {
+    device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 14,
+  }).recipe;
+  const activeReview = generateManualSourceTechniqueOption('onyx-monarch-wave-185', {}, {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25,
+  }).recipe;
+  const sourceHash = canonicalRecipeSnapshot(canonical, 'kalita_hot').recipeHash;
+  const priorProposal = {
+    type: 'recipe_proposal', id: 'review-onyx-185', status: 'proposed', coffeeId: 'coffee-1', slotKey: 'kalita_hot',
+    sourceState: 'present', sourceHash, before: canonical, after: activeReview,
+  };
+  const makeTools = ({ recipe = canonical, prior = [priorProposal], displayName = 'hot Kalita 185' } = {}) => {
+    const context = {
+      userText: 'Make the water 2 degrees cooler.', sessionId: 'native-temperature-review', conversation: [],
+      rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: 'Jar one', recipes: ['kalita_hot'] }], setup: {} },
+      proposalState: { target: null, diagnosisReady: true, userAgreed: true, previewReady: true, proposalIssued: false },
+      methodBinding: { status: 'locked', slot: 'kalita_hot', displayName, source: 'equipment-answer' },
+      __ruphusPriorProposals: prior,
+    };
+    const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => recipe } });
+    return { context, tools };
+  };
+
+  const native = makeTools();
+  const read = await native.tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'kalita_hot' });
+  assert.equal(read.recipe.temperature.value, canonical.temperature.value, 'canonical read remains independent from the active Onyx review');
+  assert.equal(read.recipe.temperature.unit, 'C');
+  assert.deepEqual(read.sourceControls, { allowedControls: ['ratio', 'temperature', 'servingDoseGrams'], servingDoseGrams: [12, 20] });
+  assert.equal(read.currentReview.editable, true);
+  assert.equal(read.currentReview.size, '185');
+  assert.deepEqual(read.currentReview.recipe.temperature, activeReview.temperature, 'the provider sees the editable review temperature, not only canonical saved state');
+  assert.deepEqual(read.currentReview.sourceControls, { allowedControls: ['ratio', 'temperature', 'grind', 'servingDoseGrams'], servingDoseGrams: [15, 36], temperatureUnit: 'F' });
+  assert.deepEqual(read.currentReview.bounds, { ratio: [10, 25], temperature: [194, 212], temperatureC: [90, 100], grindMicrons: [300, 1200], servingDoseGrams: [15, 36] });
+
+  const proposal = await native.tools.call('propose_recipe_change', {
+    coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview',
+    change: { control: 'temperature', value: 198 }, servingDoseGrams: null,
+    aidenProfile: null, experiment: null, explanation: null,
+  });
+  assert.equal(proposal.ok, true, JSON.stringify(proposal));
+  assert.deepEqual(proposal.artifact.after.temperature, { value: 198, unit: 'F' });
+  assert.equal(proposal.artifact.after.sourceProjection.adaptation.controls.temperatureC, 92.22);
+  assert.deepEqual(proposal.artifact.after.sourceProjection.sourceSnapshot, activeReview.sourceProjection.sourceSnapshot);
+  assert.deepEqual(proposal.artifact.after.sourceProjection.stages.map((stage) => stage.trigger), activeReview.sourceProjection.stages.map((stage) => stage.trigger));
+  assert.deepEqual(proposal.artifact.after.sourceProjection.stages.map((stage) => stage.water.value), activeReview.sourceProjection.stages.map((stage) => stage.water.value));
+
+  // The projection primitive remains canonical-Celsius internally; this
+  // equivalence check proves the tool's native 198°F input reaches the same
+  // adapter result without treating 198 as Celsius.
+  const equivalent = createRecipePreview({
+    recipe: activeReview, dose: 25, configuration: { sourceControls: { temperatureC: 92.22 } }, allowIced: true,
+  });
+  assert.deepEqual(equivalent.temperature, { value: 198, unit: 'F' });
+  assert.equal(equivalent.sourceProjection.adaptation.controls.temperatureC, 92.22);
+});
+
+test('source grind reads and edits agree on physical Ode clicks, not tiny micron changes', async () => {
+  const recipe = generateManualSourceTechniqueOption('onyx-monarch-wave-185', {}, {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 23,
+  }).recipe;
+  const context = {
+    userText: 'One click finer please', sessionId: 'source-click', conversation: [],
+    rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: 'Jar one', recipes: ['kalita_hot'] }], setup: { grinder: 'fellow-ode-gen2' } },
+    proposalState: { target: null, diagnosisReady: true, userAgreed: true, previewReady: true, proposalIssued: false },
+    methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita 185', source: 'equipment-answer' },
+  };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => recipe } });
+  const read = await tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'kalita_hot' });
+  assert.equal(read.grinderGuidance.setting, '4.6');
+  assert.equal(read.grinderGuidance.oneClickFiner, 4.2);
+  const propose = (value) => tools.call('propose_recipe_change', {
+    coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview',
+    change: { control: 'grind', value }, servingDoseGrams: null,
+    aidenProfile: null, experiment: null, explanation: null,
+  });
+  assert.equal((await propose(4.3)).code, 'invalid_grind_step');
+  assert.equal((await propose(599)).code, 'unchanged_grind_step');
+  const result = await propose(4.2);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.artifact.after.sourceProjection.grind.microns, 570);
+  assert.deepEqual(result.artifact.after.sourceProjection.sourceSnapshot, recipe.sourceProjection.sourceSnapshot);
+  assert.deepEqual(result.artifact.after.sourceProjection.stages, recipe.sourceProjection.stages);
+});
+
+test('volume-native Switch ratio adaptation changes only native mL checkpoints and keeps valve events', () => {
+  const source = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 36,
+  }).recipe;
+  const sourceSnapshot = structuredClone(source.sourceProjection.sourceSnapshot);
+  const adapted = createRecipePreview({ recipe: source, dose: 20, ratio: '1:15' });
+  assert.equal(adapted.waterMilliliters, 300);
+  assert.equal(adapted.waterGrams, undefined);
+  assert.equal(adapted.sourceProjection.water.unit, 'mL');
+  assert.equal(adapted.sourceProjection.stages[0].water.value, 300);
+  assert.equal(adapted.sourceProjection.stages[0].water.unit, 'mL');
+  assert.match(adapted.sourceProjection.stages[0].label, /300mL/);
+  assert.deepEqual(adapted.sourceProjection.stages.map((stage) => stage.valve), source.sourceProjection.stages.map((stage) => stage.valve));
+  assert.deepEqual(adapted.sourceProjection.sourceSnapshot, sourceSnapshot);
+  const reloaded = createRecipePreview({ recipe: JSON.parse(JSON.stringify(adapted)), dose: 15 });
+  assert.equal(reloaded.waterMilliliters, 225);
+  assert.equal(reloaded.waterGrams, undefined);
+  assert.equal(reloaded.sourceProjection.adaptation.controls.ratio, 15);
+  assert.deepEqual(reloaded.sourceProjection.sourceSnapshot, sourceSnapshot);
+});
+
+test('volume-native ratio adaptation cannot exceed its verified source input load', () => {
+  const source = generateManualSourceTechniqueOption('hario-switch-03-instruction-manual-36-2023', {}, {
+    device: 'v60', variant: 'switch', size: '03', model: 'V60 Switch', filter: 'v60-03-paper', material: 'glass', mode: 'hot', dose: 36,
+  }).recipe;
+  assert.throws(
+    () => createRecipePreview({ recipe: source, dose: 20, ratio: 25 }),
+    (error) => error.code === 'source-capacity-exceeded',
+  );
+});
+
+test('qualitative source grind stays source-native and cannot invent Ode calibration', () => {
+  const source = generateManualSourceTechniqueOption('kurasu-wave-155-2023', {}, {
+    device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 14,
+  }).recipe;
+  assert.throws(
+    () => createRecipePreview({ recipe: source, dose: 14, configuration: { sourceControls: { grind: 6 } } }),
+    (error) => error.code === 'source-grind-adaptation-unsupported',
+  );
+});
+
+test('preview endpoint reconstructs accepted source controls before applying a later dose', async () => {
+  const owner = 'source-endpoint-adaptation-owner';
+  const coffeeId = 'source-endpoint-adaptation-coffee';
+  const source = generateManualSourceTechniqueOption('kurasu-wave-155-2023', {}, {
+    device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 14,
+  }).recipe;
+  const repository = createMemoryRuphusRepository({ clock: () => 1_789_000_000_000 });
+  repository.seedBean(owner, { id: coffeeId, ownerId: owner, name: 'Endpoint Bean', handBrewRecipes: { kalita: source } });
+  const context = {
+    userText: 'Make this stronger.', sessionId: 'source-endpoint-adaptation', conversation: [],
+    rotationSnapshot: { refs: { coffee: coffeeId }, coffees: [{ refKey: 'coffee', name: 'Endpoint Bean', recipes: ['kalita_hot'] }], setup: {} },
+    proposalState: { target: null, diagnosisReady: true, userAgreed: true, previewReady: true, proposalIssued: false },
+  };
+  const tools = createRuphusTools({
+    uid: owner, context, readers: { readRecipe: async () => source },
+    proposalStore: (input) => repository.createProposal(input), proposalActions: ['apply_proposal', 'brew_once', 'keep_current'],
+  });
+  await tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'kalita_hot' });
+  const proposalResult = await tools.call('propose_recipe_change', {
+    coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'ratio', value: 15 },
+    servingDoseGrams: null, experiment: null, explanation: null,
+  });
+  assert.equal(proposalResult.ok, true, JSON.stringify(proposalResult));
+  const firestore = firestoreFromSnapshot(repository.snapshot(), owner);
+  const previousAllowlist = process.env.RUPHUS_AGENT_V3_UIDS;
+  process.env.RUPHUS_AGENT_V3_UIDS = owner;
+  try {
+    const result = response();
+    await handleRecipePreview({ method: 'POST', body: {
+      requestId: 'source-endpoint-dose-20', proposalId: proposalResult.proposal.id, coffeeId, slotKey: 'kalita_hot', sessionId: context.sessionId, dose: 20,
+    } }, result, { uid: owner }, { db: firestore.db });
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    assert.equal(result.body.preview.sourceProjection.adaptation.controls.ratio, 15);
+    assert.equal(result.body.preview.coffeeGrams, 20);
+    assert.equal(result.body.preview.waterGrams, 300);
+    assert.equal(result.body.preview.temperature.value, source.temperature.value);
+    assert.deepEqual(result.body.preview.sourceProjection.sourceSnapshot, source.sourceProjection.sourceSnapshot);
+  } finally {
+    if (previousAllowlist == null) delete process.env.RUPHUS_AGENT_V3_UIDS;
+    else process.env.RUPHUS_AGENT_V3_UIDS = previousAllowlist;
+  }
 });
 
 const CASES = [

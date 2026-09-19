@@ -1,6 +1,7 @@
 import { getAuth } from 'firebase/auth';
 import { ruphusApiUrl } from './apiBase.js';
 import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from './ruphus/census.js';
+import { recipePreviewErrorMessage } from './ruphus/recovery.js';
 
 const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'aidenLinkProfileHash', 'aidenIcedLinkProfileHash', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
 
@@ -48,9 +49,12 @@ export async function prepareRecipePreview({ requestId = crypto.randomUUID(), ..
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ ...request, requestId, clientVersion: ruphusClientVersion() }),
-  });
+  }).catch(() => { throw Object.assign(new Error(recipePreviewErrorMessage({ code: 'network_error' })), { code: 'network_error' }); });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(result.message || result.error || 'Recipe preview failed.'), { code: result.error || 'preview_failed', details: result.details });
+  if (!response.ok) {
+    const failure = { code: result.error || 'preview_failed', status: response.status, details: result.details };
+    throw Object.assign(new Error(recipePreviewErrorMessage(failure)), failure);
+  }
   return result;
 }
 

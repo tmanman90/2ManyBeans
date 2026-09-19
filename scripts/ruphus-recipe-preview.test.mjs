@@ -4,6 +4,7 @@ import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
+import { generateKalitaIcedRecipe } from '../src/lib/kalitaIcedAdapter.js';
 import {
   createRecipePreview,
   RecipePreviewError,
@@ -212,6 +213,32 @@ import { grinderSettingToMicrons, isOdeStep } from '../src/lib/brewMethods.js';
   assert.equal(preview.steps.at(-1).waterTotal, preview.hotWaterGrams);
   assert.deepEqual(preview.steps.map((step) => step.waterTotal), [54, 108, 180]);
   assert.equal(preview.finalBeverageRatio, '1:15');
+}
+
+// Some iced Kalita sources intentionally do not claim a final beverage ratio:
+// their ice is added after brewing and complete melt is not assumed. Dose
+// review must preserve that source contract, while an explicit ratio remains
+// unsupported rather than being invented from hot water plus ice.
+{
+  const source = generateKalitaIcedRecipe({}, { size: '185', dose: 20 });
+  const preview = createRecipePreview({ recipe: source, dose: 20 });
+  const resized = createRecipePreview({ recipe: source, dose: 22 });
+
+  assert.equal(source.finalBeverageRatio, null);
+  assert.equal(source.ratio, null);
+  assert.equal(preview.ratio, null);
+  assert.equal(preview.finalBeverageRatio, null);
+  assert.equal(preview.hotWaterGrams, 160);
+  assert.equal(preview.recipePreview.regenerated, false);
+  assert.equal(resized.ratio, null);
+  assert.equal(resized.finalBeverageRatio, null);
+  assert.equal(resized.hotWaterGrams, 176);
+  assert.equal(resized.recipeIceGrams, 176);
+  assert.equal(validateRecipePreview(source, { dose: 20 }).valid, true);
+  assert.throws(
+    () => createRecipePreview({ recipe: source, dose: 20, targetRatio: 15 }),
+    /ratio-unsupported-for-iced-kalita/,
+  );
 }
 
 console.log('Ruphus recipe preview passed');

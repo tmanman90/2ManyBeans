@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Exercise the production ChatTab in its local-only harness with a deliberately
 // delayed Agent response. This does not authenticate or call a live provider.
@@ -14,7 +17,9 @@ Object.assign(process.env, {
   VITE_FIREBASE_APP_ID: '1:000000000000:web:local-cancellation-probe',
 });
 
+const cacheDir = mkdtempSync(join(tmpdir(), 'ruphus-cancellation-cache-'));
 const server = await createServer({
+  cacheDir,
   server: { host: '127.0.0.1', port: 0 },
   // Pin the compile-time gate in this local-only harness; runtime env alone
   // must not accidentally turn this into a legacy-path test.
@@ -107,4 +112,5 @@ try {
 } finally {
   await browser.close();
   await server.close();
+  rmSync(cacheDir, { recursive: true, force: true });
 }

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { calculateCost, normalizeUsage } from './modelPricing.js';
 import { RUPHUS_READ_TOOL_NAMES } from './ruphusTools.js';
+import { SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 
 // These are rollout controls, not client feature flags. A missing or malformed
 // server value must leave the capability unavailable.
@@ -23,6 +24,26 @@ export const MUTATION_ROLLOUT_MODES = new Set([
   'prepare_attempt',
   'promote_attempt',
 ]);
+const TRACE_TOOL_NAMES = new Set([...RUPHUS_READ_TOOL_NAMES, 'propose_recipe_change']);
+const TRACE_OUTCOMES = new Set(['started', 'succeeded', 'failed']);
+// Telemetry carries diagnostic categories only. Keep this closed so a
+// provider/tool supplied identifier (or credential-shaped string) can never
+// become a persisted "code" field.
+const TRACE_CODES = new Set([
+  'active_revision_not_found', 'legacy_recipe_ambiguous', 'recipe_invalid', 'recipe_missing', 'recipe_slot_mismatch',
+  'read_timeout', 'read_failed', 'tool_failed', 'tool_unavailable', 'coffee_required', 'slot_required', 'invalid_tool_input',
+  'cross_owner_or_context', 'invalid_launch_item', 'launch_item_not_found', 'unsupported_technique_brewer', 'source_format_unsupported',
+  'invalid_recipe_intent', 'proposal_timing', 'proposal_target_required', 'proposal_target_mismatch',
+  'proposal_target_stale', 'proposal_failed', 'proposal_validation_failed', 'invalid_proposal', 'invalid_proposal_intent',
+  'invalid_dose_preview', 'invalid_ratio_preview', 'invalid_aiden_change', 'invalid_recipe', 'one_change_required', 'no_recipe_change',
+  'duplicate_alternative', 'physical_grind_required', 'technique_option_required', 'source_recipe_control_unsupported',
+  'source-ratio-adaptation-unsupported', 'read_budget_complete', 'read_budget_exceeded', 'tool_round_limit',
+]);
+const traceCode = (item) => {
+  if (typeof item?.code === 'string' && TRACE_CODES.has(item.code)) return item.code;
+  if (item?.outcome === 'failed') return typeof item?.name === 'string' && item.name.startsWith('read_') ? 'read_failed' : 'tool_failed';
+  return undefined;
+};
 
 export function parseUidAllowlist(raw) {
   if (typeof raw !== 'string' || !raw.trim()) return new Set();
@@ -200,6 +221,17 @@ export function redactRuphusTelemetry(input = {}) {
       ...(Array.isArray(item?.secondFailure) ? { secondFailure: item.secondFailure.filter((value) => typeof value === 'string' && /^[A-Z0-9_]+$/.test(value)) } : {}),
       ...(typeof item?.at === 'string' ? { at: item.at } : {}),
     }));
+    if (Array.isArray(input.trace.toolEvents)) {
+      trace.toolEvents = input.trace.toolEvents.filter((item) => TRACE_TOOL_NAMES.has(item?.name))
+        .map((item) => ({
+          name: item.name,
+          ...(TRACE_OUTCOMES.has(item?.outcome) ? { outcome: item.outcome } : {}),
+          ...(traceCode(item) ? { code: traceCode(item) } : {}),
+          ...(SLOT_KEYS.includes(item?.slot) ? { slot: item.slot } : {}),
+          ...(hashTelemetryId(item?.target) ? { targetHash: hashTelemetryId(item.target) } : {}),
+        }));
+      if (!trace.toolEvents.length) delete trace.toolEvents;
+    }
     if (Object.keys(trace).length) output.trace = trace;
   }
   if (typeof input.proposalValid === 'boolean') output.proposalValid = input.proposalValid;

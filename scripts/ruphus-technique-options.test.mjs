@@ -6,6 +6,7 @@ import {
   listV60TechniqueReferences,
 } from '../src/lib/ruphus/techniqueOptions.js';
 import {
+  createV60RatioExperiment,
   generateV60Recipe,
   generateV60RecipeForTechnique,
   validateV60Candidate,
@@ -81,6 +82,43 @@ assert.equal(kasuyaReviewedRatio.sourceLineage.status, 'adapted');
 assert.equal(kasuyaReviewedRatio.sourceLineage.parameterSources.ratio, 'v60-adaptation-bounded-v1');
 assert.equal(validateV60Candidate(kasuyaReviewedRatio).valid, true);
 assert.ok(buildTimerSteps(kasuyaReviewedRatio).length > 0);
+
+// Ratio 10–25 is an explicit app-authored experiment envelope, distinct from
+// normal source-family selection (which remains bounded at 15–18.5).
+const kasuyaSource = generateV60RecipeForTechnique('kasuya-46-v1', {}, { dose: 20, grinder: 'fellow-ode-gen2' });
+const kasuyaSnapshot = structuredClone(kasuyaSource);
+const strongerRatio = createV60RatioExperiment(kasuyaSource, 14);
+assert.equal(strongerRatio.ratio, '1:14');
+assert.equal(strongerRatio.waterGrams, 280);
+assert.equal(strongerRatio.steps.at(-1).waterTotal, 280);
+assert.ok(strongerRatio.steps.every((step, index) => index === 0 || step.waterTotal >= strongerRatio.steps[index - 1].waterTotal));
+assert.deepEqual(strongerRatio.steps.map((step) => step.timeSeconds), kasuyaSource.steps.map((step) => step.timeSeconds));
+assert.deepEqual(strongerRatio.grindSize, kasuyaSource.grindSize);
+assert.deepEqual(strongerRatio.waterTemp, kasuyaSource.waterTemp);
+assert.equal(strongerRatio.sourceLineage.adaptationRuleId, 'v60-explicit-ratio-adaptation-v1');
+assert.equal(strongerRatio.sourceLineage.parameterSources.ratio, 'v60-explicit-ratio-adaptation-v1');
+assert.equal(strongerRatio.sourceLineage.parameterSources.water, 'v60-explicit-ratio-adaptation-v1');
+assert.equal(strongerRatio.sourceLineage.parameterSources.bloom, 'v60-explicit-ratio-adaptation-v1');
+assert.ok(strongerRatio.sourceLineage.changedFields.includes('ratio'));
+assert.ok(strongerRatio.sourceLineage.changedFields.includes('water'));
+assert.ok(strongerRatio.sourceLineage.changedFields.includes('bloom'));
+assert.equal(strongerRatio.sourceLineage.sourceIds[0], 'kasuya-46-v1');
+assert.equal(strongerRatio.sourceLineage.status, 'adapted');
+assert.equal(validateV60Candidate(strongerRatio).valid, true);
+assert.deepEqual(kasuyaSource, kasuyaSnapshot, 'ratio experiments do not mutate the original source recipe');
+assert.throws(() => createV60RatioExperiment({ ...kasuyaSource, ratio: '1:14' }, 14), /cannot safely support/);
+const alternateRatio = createRecipePreview({ recipe: kasuyaSource, dose: 20, targetRatio: 14.5 });
+assert.equal(alternateRatio.ratio, '1:14.5');
+assert.equal(alternateRatio.waterGrams, 290);
+assert.equal(alternateRatio.sourceLineage.adaptationRuleId, 'v60-explicit-ratio-adaptation-v1');
+const resizedExperiment = createRecipePreview({ recipe: strongerRatio, dose: 25 });
+assert.equal(resizedExperiment.ratio, '1:14');
+assert.equal(resizedExperiment.coffeeGrams, 25);
+assert.equal(resizedExperiment.waterGrams, 350);
+assert.equal(resizedExperiment.steps.at(-1).waterTotal, 350);
+assert.equal(resizedExperiment.sourceLineage.adaptationRuleId, 'v60-explicit-ratio-adaptation-v1');
+assert.throws(() => createV60RatioExperiment(kasuyaSource, 9), /between 10 and 25/);
+assert.throws(() => createV60RatioExperiment(kasuyaSource, 26), /between 10 and 25/);
 
 // The Admin Firestore serializer rejects undefined values even though the
 // recipe/proposal contracts otherwise permit optional fields. Keep the

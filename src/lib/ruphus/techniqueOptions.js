@@ -410,7 +410,7 @@ export function applyManualSourceDosePolicy(projection) {
       ...(projection.adaptation.notes || []),
       `The app keeps the source checkpoint/event anchors unchanged at ${projection.coffeeGrams}g; this is an app guide, not an author-timed validation.`,
     ],
-    disclosure: 'App-scaled typed quantities and executable stage labels preserve native units and the source checkpoint/event anchors. Original source wording remains available in sourceSnapshot. Timing is an unchanged source guide at the selected dose, not a new author claim.',
+    disclosure: 'Water amounts and step wording are adjusted for this coffee dose while preserving the source units and checkpoint/event anchors. The original recipe wording remains available for comparison; this is an app adaptation, not an author-validated timing claim.',
   };
   const next = {
     ...projection,
@@ -463,6 +463,8 @@ export function projectManualSourceForApp(sourceIdOrRequest, configuration = {})
     ...resolvedConfiguration,
     ...(requestedDose != null ? { dose: Number(requestedDose) } : {}),
     ...(requestedConfiguration.sourceDoseSelection != null ? { sourceDoseSelection: Number(requestedConfiguration.sourceDoseSelection) } : {}),
+    ...(requestedConfiguration.sourceControls && typeof requestedConfiguration.sourceControls === 'object'
+      ? { sourceControls: structuredClone(requestedConfiguration.sourceControls) } : {}),
     // This helper is the named app policy boundary. Direct pure projections
     // still require callers to opt into adaptation explicitly.
     ...(requestedDose != null ? { allowDoseAdaptation: requestedConfiguration.allowDoseAdaptation !== false } : {}),

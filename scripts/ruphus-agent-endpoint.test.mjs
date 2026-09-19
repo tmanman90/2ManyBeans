@@ -5,7 +5,8 @@ import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
-import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation, techniqueProposalsFromSession, trialReceiptsForSession } from '../api/ruphus-agent.js';
+import { allowedAgentUids, deriveProposalReadiness, devReadFaultForRequest, enabledProposalActions, firestoreReaders, hasUnavailableEvidence, persistedMessagesForTurn, readActiveSession, replayFocusLedger, resolveLedgerCoffeeRef, retryUnavailableEvidence, sessionConversationForProvider, sessionReplayInputs, staleReplayConversation, techniqueProposalsFromSession, trialReceiptsForSession, writeActiveSession } from '../api/ruphus-agent.js';
+import { inflateAgentSession } from '../src/lib/ruphus/session.js';
 import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 
 test('New chat excludes archived Aiden conversation from provider replay', () => {
@@ -35,6 +36,44 @@ const sourceCard = ({ id, option, coffeeId, coffeeName, before }) => ({
   },
 });
 const context = () => ({ version: 2, launchContext: { surface: 'direct' }, context: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'bean-1' } }, ledger: { entries: [], namedCoffees: [] }, conversation: [], evidenceHash: 'evidence-1', trace: { reads: [], focusChanges: [], regenerations: [] } });
+
+test('artifact-bearing runtime errors survive session persistence and replay without becoming success', async () => {
+  const userText = 'Use the iced V60 recipe for Jar 2';
+  const artifact = { id: 'iced-card', type: 'recipe_proposal', coffeeId: 'bean-2', slotKey: 'v60_iced', status: 'proposed', actions: ['apply_proposal', 'brew_once'] };
+  const turnId = 'iced-artifact-error';
+  const now = Date.now();
+  const messages = persistedMessagesForTurn({
+    turnId,
+    userText,
+    contextRef: { surface: 'direct', sessionId: 'agent-session' },
+    startedAt: now,
+    turnResult: { ok: false, code: 'response_validation_failed', text: '', artifacts: [artifact] },
+  });
+  assert.equal(messages.filter((message) => message.role === 'assistant').length, 1);
+  assert.equal(messages[1].errored, true);
+  assert.equal(messages[1].retry.kind, 'agent');
+  assert.deepEqual(messages[1].artifacts, [artifact]);
+  const values = new Map();
+  const ref = (path) => ({
+    collection: (name) => ref(`${path}/${name}`),
+    doc: (id) => ref(`${path}/${id}`),
+    get: async () => ({ exists: values.has(path), data: () => structuredClone(values.get(path)) }),
+    set: async (value) => { values.set(path, structuredClone(value)); },
+  });
+  const db = { collection: (name) => ref(name) };
+  await writeActiveSession(db, 'user-1', { protocolVersion: 1, messages, turns: [{ id: turnId, status: 'interrupted' }], boundaryIndex: 0, lastActivityAt: now });
+  const persisted = await readActiveSession(db, 'user-1');
+  assert.equal(persisted.turns.at(-1).status, 'interrupted');
+  const replayed = inflateAgentSession(persisted);
+  const restoredAssistant = replayed.messages.find((message) => message.role === 'assistant');
+  assert.equal(restoredAssistant.content, 'I couldn’t complete that safely. Your saved recipe is unchanged.');
+  assert.deepEqual(restoredAssistant.artifacts, [artifact]);
+  assert.equal(restoredAssistant.retry.kind, 'agent');
+  assert.deepEqual(sessionReplayInputs({ session: persisted, conversation: [], ledger: null, now }).conversation, [{ role: 'user', content: userText }]);
+  assert.equal(trialReceiptsForSession(persisted).length, 0, 'failed card persistence must not create an action receipt');
+  const successful = persistedMessagesForTurn({ turnId: 'ordinary-success', userText: 'hello', turnResult: { ok: true, text: 'done', artifacts: [] } });
+  assert.deepEqual(successful[1].artifacts, [], 'successful text turns retain the existing empty artifact envelope');
+});
 
 test('orchestrator emits buffered checked text and no read artifact', async () => {
   const current = context(); const frames = [];

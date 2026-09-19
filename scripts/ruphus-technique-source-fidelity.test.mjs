@@ -12,7 +12,9 @@ import {
 import {
   listManualSourceRecords,
   manualSourceCompatibility,
+  manualSourceDisplay,
   manualSourceReadiness,
+  manualSourceGrindGuidance,
   projectManualSource,
   validateManualSourceProjection,
 } from '../src/lib/manualSourceProjection.js';
@@ -110,6 +112,49 @@ test('source projections preserve identity, typed native units and readiness', (
   assert.equal(ozoneProjection.adaptation.status, 'adapted');
 });
 
+test('source grind guidance quantizes calibrated settings and stays honest for unknown grinders', () => {
+  const onyx = record('onyx-monarch-wave-185');
+  const projection = projectManualSource(onyx, configFor(onyx));
+  const ode = manualSourceGrindGuidance(projection.grind, { grinder: 'fellow-ode-gen2' });
+  assert.deepEqual({ status: ode.status, setting: ode.setting, settingMicrons: ode.settingMicrons, approximate: ode.approximate }, {
+    status: 'approximate', setting: '4.6', settingMicrons: 600, approximate: true,
+  });
+  assert.equal(ode.grinderName, 'Ode Gen 2');
+  const comandante = manualSourceGrindGuidance(projection.grind, { grinder: 'comandante-c40' });
+  assert.equal(comandante.setting, '20 clicks');
+  assert.equal(comandante.approximate, true);
+
+  const qualitative = manualSourceGrindGuidance({ description: 'Medium grind', microns: null }, { grinder: 'unlisted-grinder' });
+  assert.equal(qualitative.status, 'qualitative');
+  assert.equal(qualitative.setting, null);
+  assert.equal(qualitative.approximate, false);
+  const uncalibrated = manualSourceGrindGuidance({ description: 'Medium', microns: 600 }, { grinder: 'unlisted-grinder' });
+  assert.equal(uncalibrated.status, 'source-microns-only');
+  assert.equal(uncalibrated.setting, null);
+  assert.equal(uncalibrated.sourceMicrons, 600);
+});
+
+test('Onyx source projection preserves cumulative checkpoints and exact 3:30 finish target', () => {
+  const source = record('onyx-monarch-wave-185');
+  const projection = projectManualSource(source, configFor(source, { dose: 23, allowDoseAdaptation: true }));
+  assert.deepEqual(projection.stages.map((stage) => stage.water.value), [46, 147.2, 202.4, 257.6, 312.8, 368]);
+  const display = manualSourceDisplay(projection);
+  assert.deepEqual(display.stages.map((stage) => stage.water.value), [46, 147, 202, 258, 313, 368]);
+  assert.deepEqual(display.stages.map((stage) => stage.label), [
+    'Bloom to 46g',
+    'Heavy spiral pour to 147g',
+    'Spiral pour to 202g',
+    'Spiral pour to 258g',
+    'Spiral pour to 313g',
+    'Spiral pour to 368g',
+  ]);
+  assert.deepEqual(display.water, { value: 368, unit: 'g' });
+  assert.equal(projection.water.value, projection.stages.at(-1).water.value);
+  assert.deepEqual(projection.sourceSnapshot.stages.map((stage) => stage.waterToGrams), [50, 160, 220, 280, 340, 400]);
+  assert.deepEqual(projection.sourceSnapshot.finish, { minSeconds: 210, maxSeconds: 210 });
+  assert.deepEqual(projection.stages.map((stage) => stage.trigger.seconds), [0, 30, 45, 65, 90, 120]);
+});
+
 test('dose adaptation is explicit and never silently restores timer readiness', () => {
   const source = record('kurasu-wave-155-2023');
   assert.throws(
@@ -144,7 +189,8 @@ test('dose adaptation keeps original source prose alongside aligned executable s
   assert.deepEqual(projection.sourceExecution.stages.map((stage) => stage.label), projection.stages.map((stage) => stage.label));
   assert.deepEqual(projection.preparation, source.preparation);
   assert.deepEqual(projection.sourceExecution.preparation, source.preparation);
-  assert.ok(projection.adaptation.disclosure.includes('sourceSnapshot'));
+  assert.match(projection.adaptation.disclosure, /water amounts and step wording are adjusted/i);
+  assert.doesNotMatch(projection.adaptation.disclosure, /sourceSnapshot|typed fields/i);
   assert.ok(projection.adaptation.changes.some((change) => change.path === 'stages.0.label'));
   assert.equal(projection.adaptation.changes.some((change) => /preparation|aftercare/.test(change.path)), false);
 });

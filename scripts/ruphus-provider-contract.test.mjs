@@ -3,6 +3,8 @@ import test from 'node:test';
 import { buildOpenAIRequest, createOpenAIProvider, outputParts, RUPHUS_OPENAI_MODEL } from '../api/_lib/ruphusProviders/openai.js';
 import { RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
 
+const responseEnvelope = (text, intent = 'information', state = 'answered', coffeeRef = null, slot = null) => JSON.stringify({ intent, state, text, coffeeRef, slot });
+
 test('provider instructions preserve partial sensory answers and evidence-backed brewer choices', async () => {
   const requests = [];
   const provider = createOpenAIProvider({ instructions: RUPHUS_SYSTEM_PROMPT, maxOutputTokens: 1, client: { responses: { create: async (request) => {
@@ -25,16 +27,56 @@ test('OpenAI adapter is pinned, stateless, and provider-neutral', () => {
   const request = buildOpenAIRequest({ instructions: 'coach', input: [{ role: 'user', content: 'coffee' }], tools: [], maxOutputTokens: 1 });
   assert.equal(request.model, RUPHUS_OPENAI_MODEL); assert.equal(request.store, false); assert.equal(request.tools.length, 0);
   assert.equal(request.reasoning.effort, 'medium');
+  assert.equal(request.text.format.type, 'json_schema');
+  assert.equal(request.text.format.strict, true);
+  assert.deepEqual(request.text.format.schema.required, ['intent', 'state', 'text', 'coffeeRef', 'slot']);
   assert.throws(() => buildOpenAIRequest({ instructions: '', input: [], tools: [], model: 'gpt-4o' }), /unsupported/);
 });
 test('provider output rejects malformed tool arguments and preserves attribution', () => {
-  assert.deepEqual(outputParts({ id: 'resp-1', model: RUPHUS_OPENAI_MODEL, output_text: 'hi', output: [] }), { text: 'hi', toolCalls: [], outputItems: [], requestId: 'resp-1', usage: null, retryCount: 0, model: RUPHUS_OPENAI_MODEL });
+  assert.deepEqual(outputParts({ id: 'resp-1', model: RUPHUS_OPENAI_MODEL, output_text: responseEnvelope('hi'), output: [] }), { text: 'hi', envelope: { intent: 'information', state: 'answered', text: 'hi', coffeeRef: null, slot: null }, toolCalls: [], outputItems: [], requestId: 'resp-1', usage: null, retryCount: 0, model: RUPHUS_OPENAI_MODEL });
   assert.throws(() => outputParts({ output: [{ type: 'function_call', name: 'read_coffee', arguments: '{' }] }), /malformed/);
+});
+
+test('provider output rejects truncated, partial, and unknown final envelopes while retaining usage on errors', () => {
+  const usage = { input_tokens: 7, output_tokens: 3 };
+  for (const output_text of ['{"intent":"information"}', '{"intent":"other","state":"answered","text":"x","coffeeRef":null,"slot":null}', '{"intent":"information","state":"answered","text":"x","coffeeRef":null,"slot":"bad"']) {
+    assert.throws(() => outputParts({ id: 'bad-envelope', model: RUPHUS_OPENAI_MODEL, output_text, output: [], usage }), (error) => {
+      assert.equal(error.code, 'provider_schema');
+      assert.deepEqual(error.usage, usage);
+      return true;
+    });
+  }
+  assert.throws(() => outputParts({ id: 'truncated', model: RUPHUS_OPENAI_MODEL, status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output_text: '', output: [], usage }), (error) => {
+    assert.equal(error.code, 'provider_incomplete');
+    assert.deepEqual(error.usage, usage);
+    return true;
+  });
+  assert.throws(() => outputParts({ id: 'refusal', model: RUPHUS_OPENAI_MODEL, output_text: '', output: [{ type: 'refusal' }], usage }), (error) => {
+    assert.equal(error.code, 'provider_refusal');
+    assert.deepEqual(error.usage, usage);
+    return true;
+  });
+});
+
+test('provider transport failures are typed without leaking SDK details', async () => {
+  for (const [error, code] of [
+    [Object.assign(new Error('socket timeout with secret-bearing request'), { code: 'ETIMEDOUT' }), 'provider_timeout'],
+    [Object.assign(new Error('upstream overloaded'), { status: 503 }), 'provider_unavailable'],
+    [Object.assign(new Error('too many requests'), { status: 429 }), 'provider_rate_limited'],
+    [new Error('socket closed'), 'provider_transport'],
+  ]) {
+    const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async () => { throw error; } } } });
+    await assert.rejects(() => provider.runTurn({ context: {}, userText: 'coffee', tools: [] }), (failure) => {
+      assert.equal(failure.code, code);
+      assert.doesNotMatch(failure.message, /secret|socket|overloaded|requests|closed/i);
+      return true;
+    });
+  }
 });
 
 test('provider appends the newest user turn after authoritative history', async () => {
   const requests = [];
-  const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return { id: 'r-history', model: RUPHUS_OPENAI_MODEL, output_text: 'done', output: [] }; } } } });
+  const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return { id: 'r-history', model: RUPHUS_OPENAI_MODEL, output_text: responseEnvelope('done'), output: [] }; } } } });
   await provider.runTurn({ turnId: 'history-turn', context: {}, userText: 'Now tell me about El Vergel.', conversation: [
     { role: 'user', content: 'It tasted watery.' },
     { role: 'assistant', content: 'Try one step finer.' },
@@ -49,7 +91,7 @@ test('provider appends the newest user turn after authoritative history', async 
 test('continuation refreshes trusted brewer context without losing paired tool history', async () => {
   const requests = [];
   const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async request => {
-    requests.push(request); return { output_text: 'Which taste?', output: [] };
+    requests.push(request); return { output_text: responseEnvelope('Which taste?'), output: [] };
   } } } });
   const context = { methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M2' } };
   await provider.runTurn({ turnId: 'fresh-binding', context, userText: 'How about the Aidan?', tools: [] });
@@ -64,7 +106,7 @@ test('continuation refreshes trusted brewer context without losing paired tool h
 
 test('app-side evidence without a provider call id is not sent as an orphan function output', async () => {
   const requests=[];
-  const provider=createOpenAIProvider({maxOutputTokens:1,client:{responses:{create:async request=>{requests.push(request);return {output_text:'Ready',output:[]};}}}});
+  const provider=createOpenAIProvider({maxOutputTokens:1,client:{responses:{create:async request=>{requests.push(request);return {output_text:responseEnvelope('Ready'),output:[]};}}}});
   await provider.runTurn({context:{},userText:'Review it',tools:[],regeneration:true,previous:{outputItems:[]},
     toolResult:{results:[{name:'propose_recipe_change',result:{ok:true,summary:'Review ready'}}]}});
   assert.equal(requests[0].input.some(item=>item.type==='function_call_output'),false);
@@ -127,7 +169,7 @@ test('stateless continuation accumulates the complete multi-round input sequence
   const responses = [
     { id: 'r-1', model: RUPHUS_OPENAI_MODEL, output: [{ type: 'function_call', call_id: 'call-1', name: 'read_coffee', arguments: '{}' }] },
     { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output: [{ type: 'function_call', call_id: 'call-2', name: 'read_recipe', arguments: '{}' }] },
-    { id: 'r-3', model: RUPHUS_OPENAI_MODEL, output_text: 'done', output: [] },
+    { id: 'r-3', model: RUPHUS_OPENAI_MODEL, output_text: responseEnvelope('done'), output: [] },
   ];
   const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return responses.shift(); } } } });
   const first = await provider.runTurn({ turnId: 'turn-1', context: { coffeeId: 'bean-1' }, userText: 'diagnose', tools: [] });
@@ -147,8 +189,8 @@ test('regeneration replays every prior tool result and includes corrective instr
   const requests = [];
   const responses = [
     { id: 'r-1', model: RUPHUS_OPENAI_MODEL, output: [{ type: 'function_call', call_id: 'call-1', name: 'read_coffee', arguments: '{}' }] },
-    { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output_text: 'bad {"dose":16}', output: [] },
-    { id: 'r-3', model: RUPHUS_OPENAI_MODEL, output_text: 'fresh coffee reply', output: [] },
+    { id: 'r-2', model: RUPHUS_OPENAI_MODEL, output_text: responseEnvelope('bad {"dose":16}'), output: [] },
+    { id: 'r-3', model: RUPHUS_OPENAI_MODEL, output_text: responseEnvelope('fresh coffee reply'), output: [] },
   ];
   const provider = createOpenAIProvider({ maxOutputTokens: 1, client: { responses: { create: async (request) => { requests.push(request); return responses.shift(); } } } });
   const first = await provider.runTurn({ turnId: 'regen-1', context: {}, userText: 'diagnose', tools: [] });
