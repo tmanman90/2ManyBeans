@@ -724,6 +724,27 @@ test('a redundant read beyond the tool-round budget recovers to prose without di
   assert.equal(frames.some((frame) => frame.type === 'turn_interrupted'), false);
 });
 
+test('already matching recipe values produce information without a corrective proposal', async () => {
+  const context = { ...structuredClone(base), conversation: [],
+    __ruphusResolvedTargets: new Map([['c1:kalita_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let calls = 0;
+  const result = await runRuphusTurn({ turnId: 'no-change-information', context, userText: 'Use 205 F', emit: () => {},
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => ({ ok: false, code: 'no_recipe_change' }) },
+    provider: { async runTurn(input) {
+      calls += 1;
+      if (calls === 1) return { toolCalls: [{ callId: 'same-temperature', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'temperature', value: 96.1 } } }] };
+      assert.deepEqual(input.tools, []);
+      assert.match(input.correctiveInstruction, /successful no-change outcome/);
+      return { text: 'The preview already uses 205°F. Your saved recipe is unchanged.' };
+    } },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(calls, 2);
+  assert.deepEqual(result.artifacts, []);
+});
+
 test('one expected proposal validation failure gets one bounded correction and card', async () => {
   const context = {
     ...structuredClone(base),
