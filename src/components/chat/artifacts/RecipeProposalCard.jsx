@@ -120,6 +120,7 @@ function PreviewCard({ proposal, after, before, status, onPreview, onInspect }) 
   const technique = techniqueDisplayName(proposal, after);
   const techniqueChanged = technique && String(techniqueValue(before)) !== String(techniqueValue(after));
   const derivativeChange = changedValue(before, after, [
+    { label: 'Coffee dose', selector: recipe => recipe.coffeeGrams ?? recipe.dose, unit: 'g' },
     { label: 'Temperature', selector: temperature, unit: '°C' },
     { label: 'Grind', selector: grind, unit: '' },
   ]);

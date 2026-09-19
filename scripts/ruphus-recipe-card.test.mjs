@@ -18,9 +18,10 @@ test('rendered recipe cards route proposed to preview, saved to inspection, and 
       import { createRoot } from 'react-dom/client';
       import { RecipeProposalCard } from './src/components/chat/artifacts/RecipeProposalCard.jsx';
       window.calls = [];
-      const after = { device:'v60', mode:'hot', coffeeGrams:20, waterGrams:300, ratio:15 };
+      const before = { device:'v60', mode:'hot', coffeeGrams:20, waterGrams:300, ratio:15, grind:'5.5' };
+      const after = { device:'v60', mode:'hot', coffeeGrams:18, waterGrams:270, ratio:15, grind:'5.6' };
       createRoot(document.getElementById('root')).render(<>{['proposed','applied','undone','applying'].map(status =>
-        <div key={status} data-state={status}><RecipeProposalCard proposal={{id:status,type:'recipe_proposal',slotKey:'v60_hot',status,after}}
+        <div key={status} data-state={status}><RecipeProposalCard proposal={{id:status,type:'recipe_proposal',slotKey:'v60_hot',status,before,after}}
           onPreview={p=>window.calls.push('preview:'+p.id)} onInspect={p=>window.calls.push('inspect:'+p.id)} /></div>)}</>);
     `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
     bundle: true, write: false, format: 'iife', jsx: 'automatic',
@@ -36,6 +37,7 @@ test('rendered recipe cards route proposed to preview, saved to inspection, and 
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}`);
+    assert.match(await page.locator('[data-state="proposed"] [data-preview-change]').innerText(), /Coffee dose 20g → 18g/);
     await page.locator('[data-state="proposed"]').getByRole('button', { name: 'View recipe' }).click();
     await page.locator('[data-state="applied"]').getByRole('button', { name: 'View recipe' }).click();
     assert.deepEqual(await page.evaluate(() => window.calls), ['preview:proposed', 'inspect:applied']);

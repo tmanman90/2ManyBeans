@@ -248,6 +248,9 @@ export function proposalHandoff(artifact = {}, { includeDifference = true } = {}
     const beforeRatio = recipeRatio(artifact.before);
     const afterRatio = recipeRatio(artifact.after);
     if (beforeRatio != null && afterRatio != null) {
+      if (control === 'dose' && Math.abs(beforeRatio - afterRatio) < 0.01) {
+        return withExplanation(`Scaled to ${after} g coffee at the same 1:${displayRatio(afterRatio)} ratio. Water and any recipe ice scale with the dose. Review the recipe below; nothing is saved yet.`);
+      }
       const detail = control === 'dose'
         ? ` That changes your dose from ${before} g to ${after} g for the same water.`
         : control === 'water' && proposalValue(artifact.after, 'dose') != null

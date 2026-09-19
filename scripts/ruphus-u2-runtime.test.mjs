@@ -724,6 +724,12 @@ test('a redundant read beyond the tool-round budget recovers to prose without di
   assert.equal(frames.some((frame) => frame.type === 'turn_interrupted'), false);
 });
 
+test('serving resize handoff does not claim an unchanged ratio changed or water stayed fixed', () => {
+  const text = proposalHandoff({ changedPaths: ['coffeeGrams'], before: { coffeeGrams: 20, waterGrams: 200, iceGrams: 100, ratio: 15 }, after: { coffeeGrams: 18, waterGrams: 180, iceGrams: 90, ratio: 15 } });
+  assert.match(text, /Scaled to 18 g coffee at the same 1:15 ratio/);
+  assert.doesNotMatch(text, /instead of|same water/);
+});
+
 test('already matching recipe values produce information without a corrective proposal', async () => {
   const context = { ...structuredClone(base), conversation: [],
     __ruphusResolvedTargets: new Map([['c1:kalita_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'hash' }]]),
