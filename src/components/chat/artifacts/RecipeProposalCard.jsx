@@ -95,6 +95,14 @@ export const reconcileUndoneProposalHistory = (messages) => {
 export const mergeUndoneProposalCanonical = (artifact, canonical) => {
   if (!canonical) return artifact;
   const merged = { ...artifact, ...canonical };
+  // The server's before-state is the saved revision for commit/undo authority.
+  // A conversation edit may instead compare against the preceding unsaved
+  // draft. Keep that display base only for the identical immutable proposal.
+  if (artifact?.id === canonical.id && artifact?.coffeeId === canonical.coffeeId
+    && artifact?.slotKey === canonical.slotKey && artifact?.recipeHash
+    && artifact.recipeHash === canonical.recipeHash && Object.hasOwn(artifact, 'before')) {
+    merged.before = artifact.before;
+  }
   return artifact?.status === 'undone'
     ? { ...merged, status: 'undone', undoAvailable: false, executionAvailable: false, promoteAvailable: false }
     : merged;

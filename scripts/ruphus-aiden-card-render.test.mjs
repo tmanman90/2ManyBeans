@@ -89,7 +89,11 @@ test('Save then Undo receipt revokes the original proposal card', async () => {
     const history = reconcileUndoneProposalHistory([{ id:'history', artifacts:[sibling, revisionUndo] }]);
     const canonicalApplied = { ...byId[0], status:'applied', undoAvailable:true, executionAvailable:true, promoteAvailable:true };
     const canonicalMerge = mergeUndoneProposalCanonical(byId[0], canonicalApplied);
-    window.__undoProbe = { byId, byRevision, history, canonicalMerge };
+    const displayed = { ...proposal, recipeHash:'immutable', before:{temperature:{value:200,unit:'F'}} };
+    const stored = { ...displayed, before:{temperature:{value:94,unit:'C'}}, sourceHash:'server-authority' };
+    const reviewMerge = mergeUndoneProposalCanonical(displayed, stored);
+    const mismatchedMerge = mergeUndoneProposalCanonical(displayed, {...stored,recipeHash:'different'});
+    window.__undoProbe = { byId, byRevision, history, canonicalMerge, reviewMerge, mismatchedMerge };
     function App() { return <><RecipeProposalCard proposal={byId[0]} onInspect={() => {}} /><RecipeProposalCard proposal={aiden} onAction={() => {}} /></>; }
     createRoot(document.getElementById('root')).render(<App/>);`;
   const compiled = await build({
@@ -116,6 +120,9 @@ test('Save then Undo receipt revokes the original proposal card', async () => {
     assert.equal(probe.byRevision.find(item => item.id === 'proposal-1').status, 'applied');
     assert.equal(probe.history[0].artifacts.find(item => item.id === 'proposal-other').status, 'undone');
     assert.equal(probe.canonicalMerge.status, 'undone');
+    assert.deepEqual(probe.reviewMerge.before, {temperature:{value:200,unit:'F'}});
+    assert.equal(probe.reviewMerge.sourceHash, 'server-authority');
+    assert.deepEqual(probe.mismatchedMerge.before, {temperature:{value:94,unit:'C'}});
     const card = page.locator('[data-preview-card]');
     const text = await card.innerText();
     assert.deepEqual(errors, []);

@@ -316,7 +316,8 @@ export function proposalEligibleForTarget(context, request = {}) {
       && (!ready.kind || ready.kind === techniqueKind)
       && (!resolvedTarget?.sourceHash || !ready.sourceHash || resolvedTarget.sourceHash === ready.sourceHash)
       && Array.isArray(ready.optionIds) && ready.optionIds.includes(selectedId)
-      && techniqueRequest(context?.userText || '', context, target));
+      && request.intent !== 'information'
+      && (request.intent === 'recipe_preview' || techniqueRequest(context?.userText || '', context, target)));
   }
   return Boolean(
     target.coffeeRef && target.slot && requestCoffeeRef === target.coffeeRef && requestSlot === target.slot

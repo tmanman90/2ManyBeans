@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { proposalEligibleForTarget, proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { absentRecipeSourceHash } from '../src/lib/ruphus/recipeSourceState.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
@@ -14,6 +14,15 @@ const contextFor = (extra = {}) => ({
   proposalState: {},
   __ruphusRefs: { c1: 'bean-1' },
   ...extra,
+});
+
+test('typed technique preview survives a short equipment answer without keyword gating', () => {
+  const context = contextFor({ userText: '03', proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, techniqueReady: { coffeeRef: 'c1', slot: 'v60_hot', kind: 'manual_source_technique', sourceHash: 'saved', optionIds: ['switch-bloom'] } }, __ruphusResolvedTargets: new Map([['c1:v60_hot', {coffeeRef:'c1',coffeeId:'bean-1',sourceHash:'saved'}]]) });
+  const request = { coffeeRef:'c1',slot:'v60_hot',intent:'recipe_preview',experiment:{kind:'manual_source_technique',techniqueId:'switch-bloom'} };
+  assert.equal(proposalEligibleForTarget(context, request), true);
+  assert.equal(proposalEligibleForTarget(context, {...request,intent:'information'}), false);
+  assert.equal(proposalEligibleForTarget(context, {...request,coffeeRef:'c2'}), false);
+  assert.equal(proposalEligibleForTarget(context, {...request,experiment:{...request.experiment,techniqueId:'not-read'}}), false);
 });
 
 test('source quantity handoffs preserve native units and never stringify structured values', () => {
