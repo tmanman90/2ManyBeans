@@ -1,12 +1,14 @@
 ---
 title: Finish Ruphus's existing recipe journeys
 type: fix
-status: proposed
+status: completed
 date: 2026-09-19
 origin: docs/plans/2026-09-13-001-fix-ruphus-capability-completion-plan.md
 ---
 
 # Finish Ruphus's existing recipe journeys
+
+Completed for the approved Dev engineering scope on2026-09-19. Code candidate7892b4e; evidence and explicit exclusions: `docs/qa/2026-09-19-ruphus-final-candidate.md`. Production publication remains a separate decision. Historical non-green frozen evaluation disagreements are documented, not claimed resolved.
 
 ## Decision and scope
 
