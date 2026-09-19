@@ -12,6 +12,23 @@ const sourceRecipe = () => generateManualSourceTechniqueOption(
   { dose: 24 },
 ).recipe;
 
+test('explicit classic V60 binding overrides a previous Switch technique during discovery', async () => {
+  const recipe = sourceRecipe();
+  const context = {
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', recipes: ['v60_hot'] }], refs: { c1: 'coffee-1' } },
+    userText: 'Give me a different hot V60 technique for jar 1 at 20 grams.', sessionId: 'classic-after-switch',
+    methodBinding: { status: 'locked', slot: 'v60_hot', displayName: 'hot V60', source: 'M1' },
+    __ruphusPriorProposals: [{ coffeeId: 'coffee-1', slotKey: 'v60_hot', after: recipe, techniqueExperiment: { kind: 'manual_source_technique' } }],
+    proposalState: { target: null, proposalIssued: false },
+  };
+  const tools = createRuphusTools({ uid: 'owner-1', context, readers: { readRecipe: async () => recipe } });
+  const result = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' });
+  assert.equal(result.ok, true);
+  assert.ok(result.options.length);
+  assert.ok(result.options.every(option => !String(option.sourceId || option.id).includes('switch')));
+  assert.equal(result.preparingNewConfiguration, true);
+});
+
 test('source runtime keeps exact Switch identity, native units, valves, and summary', async () => {
   const recipe = sourceRecipe();
   const context = {

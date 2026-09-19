@@ -3,7 +3,7 @@ import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { canonicalRecipeSnapshot, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
 import { absentRecipeSourceHash } from '../../src/lib/ruphus/recipeSourceState.js';
 import { resolveCoffeeReference } from '../../src/lib/ruphus/referenceResolver.js';
-import { equipmentClarificationAnswer, explicitMethodVariantFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
+import { equipmentClarificationAnswer, explicitMethodFromText, explicitMethodVariantFromText, resolveMethod } from '../../src/lib/ruphus/methodResolver.js';
 import { generateV60Recipe, V60_ADAPTATION_RULE_ID, V60_REVIEWED_RATIO_BOUNDS, V60_REVIEWED_TEMPERATURE_BOUNDS } from '../../src/lib/v60Adapter.js';
 import { generateV60SwitchRecipe } from '../../src/lib/v60SwitchAdapter.js';
 import { generateV60IcedRecipe } from '../../src/lib/v60IcedAdapter.js';
@@ -1039,7 +1039,10 @@ function techniqueDraftRecipe(context, saved, slotKey, coffeeId) {
     if (current && String(current.kalitaSize || current.size) === String(size)) return { recipe: current, configurationRequested: Boolean(requestedSize) };
     return { recipe: { device: 'kalita', method: 'kalita', mode: 'hot', isIced: false, kalitaSize: String(size), configurationKey: `kalita:${size}:wave-paper:hot`, ...(explicitDose ? { coffeeGrams: Number(explicitDose) } : {}) }, configurationRequested: Boolean(requestedSize) };
   }
-  const requestedVariant = sizeAnswer ? 'switch' : explicitMethodVariantFromText(text);
+  const explicitClassic = context.methodBinding?.source === 'M1'
+    && context.methodBinding.slot === slotKey && context.methodBinding.displayName === 'hot V60'
+    && explicitMethodFromText(text) === slotKey;
+  const requestedVariant = sizeAnswer ? 'switch' : explicitMethodVariantFromText(text) || (explicitClassic ? 'classic' : null);
   const variant = requestedVariant || (current?.variant === 'switch' || current?.v60Variant === 'switch' ? 'switch' : 'classic');
   const currentVariant = current?.variant === 'switch' || current?.v60Variant === 'switch' ? 'switch' : 'classic';
   const namedSize = sizeAnswer ? equipmentAnswer.size : text.match(/\b(?:switch|v60)\s*(0?[123])\b/i)?.[1];
