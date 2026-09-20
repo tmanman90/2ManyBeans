@@ -30,6 +30,20 @@ function buildGrind(grinder, targetMicrons) {
   return { setting: String(setting), microns, description: descriptorForMicrons(microns) };
 }
 
+// Keep the bean-driven part of Kalita grind selection separate from the
+// method baseline. Source-backed techniques can reuse this exact adjustment
+// around their own published/compatible baseline instead of being reset to
+// the generic 700/735µm Kalita starting point.
+export function kalitaGrindAdjustmentMicrons(intent = {}) {
+  return (intent.finesRisk === 'high' ? 55 : 0)
+    + (intent.solubilityRisk === 'high' ? 30 : 0)
+    + (Number(intent.grindAdjustmentMicrons) || 0);
+}
+
+export function kalitaGrindBaselineMicrons(size) {
+  return 700 + (String(size) === '185' ? 35 : 0);
+}
+
 function techniqueFor(intent) {
   if (['low-agitation-center', 'bloom-led-pulse', 'center-to-spiral-pulse', 'low-agitation-no-swirl'].includes(intent.techniquePreference)) {
     return {
@@ -91,7 +105,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const temperature = clamp(Number.isFinite(intent.targetTemperatureC)
     ? intent.targetTemperatureC
     : intent.energyTendency === 'lower' ? 93 : intent.energyTendency === 'higher' ? 97 : 96, 93, 100);
-  const targetMicrons = 700 + (config.size === '185' ? 35 : 0) + (intent.finesRisk === 'high' ? 55 : 0) + (intent.solubilityRisk === 'high' ? 30 : 0) + (intent.grindAdjustmentMicrons || 0);
+  const targetMicrons = kalitaGrindBaselineMicrons(config.size) + kalitaGrindAdjustmentMicrons(intent);
   const bloom = Math.round(config.dose * 3);
   const first = Math.round(waterGrams * 0.45);
   const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '155-extended' || config.doseProfile === '185-standard' ? 120 : 150;

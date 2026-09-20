@@ -82,6 +82,18 @@ export function selectV60Technique(intent = {}, configuration = {}, evidence = n
   return { ...V60_TECHNIQUES.smallPulse, reasonCode: 'BALANCED_SMALL_DOSE_PROFILE' };
 }
 
+export function v60TechniqueGrindBaselineMicrons(techniqueOrId) {
+  const id = typeof techniqueOrId === 'string' ? techniqueOrId : techniqueOrId?.id;
+  return id === 'hoffmann-large-batch' ? 760
+    : id === 'kasuya-coarse-pulses' ? 850
+      : id === 'rao-two-stage' ? 610
+        : id === 'gentle-main-pour' ? 720 : 660;
+}
+
+export function v60GrindAdjustmentMicrons(intent = {}) {
+  return clamp(Number(intentValue(intent, 'grindAdjustmentMicrons', 0)) || 0, -45, 45);
+}
+
 function grindFor(grinder, technique, intent, override = null) {
   if (override && typeof override === 'object') {
     return {
@@ -91,13 +103,8 @@ function grindFor(grinder, technique, intent, override = null) {
       grinderSpecific: override.grinderSpecific ?? Boolean(grinder),
     };
   }
-  const targetMicrons = clamp(
-    technique.id === 'hoffmann-large-batch' ? 760
-      : technique.id === 'kasuya-coarse-pulses' ? 850
-        : technique.id === 'rao-two-stage' ? 610
-          : technique.id === 'gentle-main-pour' ? 720 : 660,
-    380, 1050,
-  ) + clamp(Number(intentValue(intent, 'grindAdjustmentMicrons', 0)) || 0, -45, 45);
+  const targetMicrons = clamp(v60TechniqueGrindBaselineMicrons(technique), 380, 1050)
+    + v60GrindAdjustmentMicrons(intent);
   const scale = GRINDER_MICRON_SCALES[grinder];
   if (!scale) {
     return {

@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { generateManualSourceTechniqueOption, listManualSourceTechniqueOptions } from '../src/lib/ruphus/techniqueOptions.js';
-import { validateManualSourceRecipeSnapshot, validateRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
+import { canonicalHash, validateManualSourceRecipeSnapshot, validateRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { resolveRequestedRecipe, validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
+import { isOdeStep } from '../src/lib/brewMethods.js';
 
 const sourceRecipe = () => generateManualSourceTechniqueOption(
   'hario-switch-03-matt-winton-hybrid-24-2022',
@@ -154,6 +155,90 @@ test('source dose guides preserve pour duration, size boundaries and conservativ
   const unsupported = listManualSourceTechniqueOptions({ device: 'kalita', size: '155', mode: 'hot', dose: 21 }, { includeReferenceOnly: true });
   assert.ok(unsupported.length > 0);
   assert.ok(unsupported.every(option => !option.executable && option.referenceOnly));
+});
+
+test('source grind keeps its technique baseline, applies the existing bean delta, then quantizes', () => {
+  const intent = {
+    grindAdjustmentMicrons: -20,
+    finesRisk: 'unknown',
+    solubilityRisk: 'unknown',
+    evidenceHash: 'trusted-evidence-high-density',
+    reasonCodes: ['HIGH_DENSITY_TEST'],
+  };
+  const configuration = {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25,
+    grinder: 'fellow-ode-gen2',
+  };
+  const originalProjectionHash = canonicalHash(generateManualSourceTechniqueOption('onyx-monarch-wave-185', {}, configuration).recipe.sourceProjection);
+  const option = generateManualSourceTechniqueOption('onyx-monarch-wave-185', intent, configuration);
+  const recipe = option.recipe;
+
+  assert.equal(recipe.sourceProjection.grind.microns, 600);
+  assert.equal(canonicalHash(recipe.sourceProjection), originalProjectionHash);
+  assert.equal(recipe.sourceLineage.grindAdaptation.baselineMicrons, 600);
+  assert.equal(recipe.sourceLineage.grindAdaptation.adjustmentMicrons, -20);
+  assert.equal(recipe.sourceLineage.grindAdaptation.targetMicrons, 580);
+  assert.equal(recipe.sourceLineage.grindAdaptation.evidenceHash, 'trusted-evidence-high-density');
+  assert.ok(isOdeStep(recipe.grindSize.setting));
+  assert.notEqual(recipe.sourceLineage.grindAdaptation.baselineMicrons, 735);
+
+  const unknown = generateManualSourceTechniqueOption('onyx-monarch-wave-185', intent, {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25,
+    grinder: 'unknown-grinder',
+  }).recipe;
+  assert.equal(unknown.grindSize.setting, null);
+  assert.equal(unknown.grindSize.grinderSpecific, false);
+  assert.doesNotMatch(unknown.grindSize.description, /Ode/i);
+});
+
+test('qualitative source grind does not invent calibration when the existing method estimate conflicts', () => {
+  const configuration = {
+    device: 'kalita', variant: 'wave', size: '155', model: 'Wave', filter: 'wave-155', mode: 'hot', dose: 13,
+    grinder: 'fellow-ode-gen2',
+  };
+  const originalProjectionHash = canonicalHash(generateManualSourceTechniqueOption('kurasu-wave-155-2023', {}, configuration).recipe.sourceProjection);
+  const recipe = generateManualSourceTechniqueOption('kurasu-wave-155-2023', {
+    grindAdjustmentMicrons: -20,
+    evidenceHash: 'trusted-evidence',
+  }, configuration).recipe;
+
+  assert.equal(canonicalHash(recipe.sourceProjection), originalProjectionHash);
+  assert.equal(recipe.sourceProjection.grind.description, 'Coarse');
+  assert.equal(recipe.grindSize, undefined);
+  assert.equal(recipe.sourceLineage.grindAdaptation, undefined);
+});
+
+test('server source preparation builds trusted extraction intent instead of using an empty intent', async () => {
+  const current = generateManualSourceTechniqueOption('onyx-eu-la-soledad-sidra-wave-185', {}, {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25,
+  }).recipe;
+  const bean = {
+    id: 'coffee-1', name: 'Dense washed coffee', process: 'washed', roastLevel: 'light', roastDate: '2026-09-10',
+    beanResearch: { densityEstimate: 'high', cupStructureFamily: 'washed-floral-clarity' },
+  };
+  const context = {
+    userText: 'Show me another hot Kalita 185 technique.', sessionId: 'trusted-source-intent', conversation: [],
+    __ruphusSourceFormatCapability: true,
+    rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: bean.name, process: bean.process, roastLevel: bean.roastLevel, recipes: ['kalita_hot'] }], setup: { grinder: 'fellow-ode-gen2' } },
+    proposalState: { target: null, proposalIssued: false },
+    methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita 185', source: 'equipment-answer' },
+  };
+  const tools = createRuphusTools({
+    uid: 'owner', context,
+    readers: { readCoffee: async () => bean, readRecipe: async () => current },
+  });
+  const options = await tools.call('read_technique_options', { coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview' });
+  const selected = options.options.find((option) => option.sourceId === 'onyx-monarch-wave-185');
+  assert.ok(selected);
+  const result = await tools.call('propose_recipe_change', {
+    coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview', change: null, servingDoseGrams: 25,
+    aidenProfile: null, experiment: { kind: 'manual_source_technique', sourceId: selected.sourceId }, explanation: null,
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.artifact.after.sourceLineage.grindAdaptation.adjustmentMicrons, -20);
+  assert.ok(result.artifact.after.sourceLineage.grindAdaptation.evidenceHash);
+  assert.ok(isOdeStep(result.artifact.after.grindSize.setting));
+  assert.deepEqual(result.artifact.after.sourceProjection.sourceSnapshot.grind, { description: null, microns: 600, native: null });
 });
 
 console.log('Ruphus source backend contract passed');

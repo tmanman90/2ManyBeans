@@ -23,6 +23,7 @@ import {
 
 export const MANUAL_SOURCE_PROJECTION_VERSION = 'ruphus-manual-source-projection-v1';
 export const MANUAL_SOURCE_ADAPTATION_VERSION = 1;
+export const MANUAL_SOURCE_GRIND_ENVELOPE_VERSION = 'ruphus-source-grind-envelope-v1';
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const positive = (value) => finite(value) && value > 0;
@@ -88,6 +89,61 @@ export function manualSourceGrindGuidance(grind, preferences = {}) {
     settingMicrons: translated.microns ?? grinderSettingToMicrons(translated.setting, grinderKey) ?? sourceMicrons,
     approximate: true,
     displayMode: preferences?.grindSizeDisplay === 'microns' ? 'microns' : 'setting',
+  };
+}
+
+/**
+ * Quantize an already-resolved physical micron target for the selected
+ * grinder. Baseline selection and bean adjustment stay with the recipe
+ * adapters; this helper only owns the existing source/grinder conversion.
+ */
+export function manualSourceGrindSize(targetMicrons, preferences = {}) {
+  if (!finite(targetMicrons)) return null;
+  const guidance = manualSourceGrindGuidance({
+    microns: targetMicrons,
+    description: descriptorForMicrons(targetMicrons),
+  }, preferences);
+  const resolvedMicrons = guidance.settingMicrons ?? targetMicrons;
+  return {
+    setting: guidance.setting,
+    microns: resolvedMicrons,
+    description: descriptorForMicrons(resolvedMicrons),
+    grinderSpecific: guidance.setting != null,
+    sourceExact: false,
+  };
+}
+
+/**
+ * Build the mutable recipe-envelope grind while leaving the immutable source
+ * projection untouched. The caller supplies a technique-appropriate baseline
+ * and an adjustment from the existing method adapter.
+ */
+export function buildManualSourceGrindEnvelope({
+  baselineMicrons,
+  adjustmentMicrons = 0,
+  baselineKind,
+  baselineLabel = null,
+  grinder = null,
+  intent = {},
+} = {}) {
+  if (!finite(baselineMicrons)) return null;
+  const adjustment = finite(Number(adjustmentMicrons)) ? Number(adjustmentMicrons) : 0;
+  const targetMicrons = Math.max(300, Math.min(1200, baselineMicrons + adjustment));
+  return {
+    grindSize: manualSourceGrindSize(targetMicrons, { grinder }),
+    grindAdaptation: {
+      version: MANUAL_SOURCE_GRIND_ENVELOPE_VERSION,
+      baselineKind: baselineKind || 'source-microns',
+      baselineMicrons,
+      ...(baselineLabel ? { baselineLabel } : {}),
+      adjustmentMicrons: adjustment,
+      targetMicrons,
+      grinder: grinder || null,
+      evidenceHash: intent?.evidenceHash || null,
+      reasonCodes: Array.isArray(intent?.reasonCodes) ? [...intent.reasonCodes] : [],
+      approximate: true,
+      disclosure: 'App starting point: the named technique baseline plus the existing bean adjustment, converted approximately for the selected grinder.',
+    },
   };
 }
 

@@ -5,7 +5,13 @@ import {
   V60_TECHNIQUES,
   sourceById,
 } from '../../data/v60SourceRegistry.js';
-import { generateV60RecipeForTechnique } from '../v60Adapter.js';
+import {
+  generateV60RecipeForTechnique,
+  v60GrindAdjustmentMicrons,
+  v60TechniqueGrindBaselineMicrons,
+} from '../v60Adapter.js';
+import { kalitaGrindAdjustmentMicrons, kalitaGrindBaselineMicrons } from '../kalitaAdapter.js';
+import { descriptorForMicrons } from '../brewMethods.js';
 import { KALITA_SOURCES } from '../../data/manualSources/kalita.js';
 import { SWITCH_SOURCES } from '../../data/manualSources/switch.js';
 import { V60_SOURCES as MANUAL_V60_SOURCES } from '../../data/manualSources/v60.js';
@@ -18,6 +24,7 @@ import {
 import {
   MANUAL_SOURCE_PROJECTION_VERSION,
   ManualSourceProjectionError,
+  buildManualSourceGrindEnvelope,
   projectManualSource,
   validateManualSourceProjection,
 } from '../manualSourceProjection.js';
@@ -40,6 +47,11 @@ const MANUAL_SOURCE_FAMILY_BY_ID = Object.freeze({
   'vibrant-wave-155': 'kalita-155-drainage-triggered-v1',
   'onyx-monarch-wave-185': 'kalita-185-six-pulse-v1',
   'ozone-wave-185-2026': 'kalita-185-six-pulse-v1',
+});
+const MANUAL_V60_GRIND_TECHNIQUE_BY_ID = Object.freeze({
+  'hoffmann-v60-30-hario': 'hoffmann-large-batch',
+  'kasuya-v60-20-hario': 'kasuya-coarse-pulses',
+  'rao-v60-20-hario-2022': 'rao-two-stage',
 });
 
 const DOSE_BOUNDS = Object.freeze([...V60_RULES['v60-dose-scaling-v1'].bounds.dose]);
@@ -339,6 +351,57 @@ function sourceRecord(id, revision = null) {
 
 function manualSourceFamilyId(record) {
   return record?.familyId || MANUAL_SOURCE_FAMILY_BY_ID[record?.id] || record?.id || null;
+}
+
+function qualitativeGrindBand(value) {
+  const text = String(value || '').toLowerCase();
+  if (/medium[ -]?coarse/.test(text)) return 'Medium-Coarse';
+  if (/medium[ -]?fine/.test(text)) return 'Medium-Fine';
+  if (/\bcoarse\b/.test(text)) return 'Coarse';
+  if (/\bfine\b/.test(text)) return 'Fine';
+  if (/\bmedium\b/.test(text)) return 'Medium';
+  return null;
+}
+
+function compatibleMethodEstimate(record) {
+  const sourceBand = qualitativeGrindBand(record?.grind?.description);
+  if (!sourceBand) return null;
+  let baselineMicrons = null;
+  if (record.equipment?.brewer === 'kalita') baselineMicrons = kalitaGrindBaselineMicrons(record.equipment?.size);
+  else if (record.equipment?.brewer === 'v60') baselineMicrons = v60TechniqueGrindBaselineMicrons(null);
+  if (!Number.isFinite(baselineMicrons) || descriptorForMicrons(baselineMicrons) !== sourceBand) return null;
+  return { baselineMicrons, baselineKind: 'compatible-method-estimate', baselineLabel: `${record.equipment.brewer} ${record.equipment.size || ''}`.trim() };
+}
+
+function manualSourceGrindBaseline(record) {
+  if (Number.isFinite(record?.grind?.microns)) {
+    return { baselineMicrons: record.grind.microns, baselineKind: 'source-microns', baselineLabel: record.title };
+  }
+  const techniqueId = MANUAL_V60_GRIND_TECHNIQUE_BY_ID[record?.id];
+  if (techniqueId) {
+    return {
+      baselineMicrons: v60TechniqueGrindBaselineMicrons(techniqueId),
+      baselineKind: 'compatible-technique-baseline',
+      baselineLabel: techniqueId,
+    };
+  }
+  return compatibleMethodEstimate(record);
+}
+
+function manualSourceGrindAdjustment(record, intent) {
+  if (record?.equipment?.brewer === 'kalita') return kalitaGrindAdjustmentMicrons(intent);
+  return v60GrindAdjustmentMicrons(intent);
+}
+
+function personalizedManualSourceGrind(record, intent, configuration) {
+  const baseline = manualSourceGrindBaseline(record);
+  if (!baseline) return null;
+  return buildManualSourceGrindEnvelope({
+    ...baseline,
+    adjustmentMicrons: manualSourceGrindAdjustment(record, intent),
+    grinder: configuration?.grinder || null,
+    intent,
+  });
 }
 
 export function adaptedDoseBounds(record) {
@@ -750,11 +813,18 @@ export function generateManualSourceTechniqueOption(idOrRequest, intent = {}, co
     ...mergedConfiguration,
     ...(request.sourceRevision != null ? { sourceRevision: request.sourceRevision } : {}),
   });
-  const option = sourceOption(sourceRecord(sourceId, request.sourceRevision ?? null), projection);
+  const record = sourceRecord(sourceId, request.sourceRevision ?? null);
+  const option = sourceOption(record, projection);
   if (!option.executable) throw sourceProjectionError('source-not-timer-ready', `Source ${sourceId} is readable but not ready for a guided recipe.`, { option });
+  const grindEnvelope = personalizedManualSourceGrind(record, intent, mergedConfiguration);
+  const recipe = recipeFromManualSourceProjection(projection, { techniqueId: option.familyId, techniqueLabel: option.name });
+  if (grindEnvelope) {
+    recipe.grindSize = grindEnvelope.grindSize;
+    recipe.sourceLineage = { ...recipe.sourceLineage, grindAdaptation: grindEnvelope.grindAdaptation };
+  }
   return {
     ...option,
-    recipe: recipeFromManualSourceProjection(projection, { techniqueId: option.familyId, techniqueLabel: option.name }),
+    recipe,
     ...(intent && Object.keys(intent).length ? { reviewedIntent: structuredClone(intent) } : {}),
     ...(evidence ? { evidence: structuredClone(evidence) } : {}),
   };

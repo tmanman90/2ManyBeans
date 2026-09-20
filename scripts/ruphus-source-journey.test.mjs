@@ -7,7 +7,7 @@ import { executeRecipeCommand } from '../api/_lib/ruphusCommandService.js';
 import { createMemoryRuphusRepository } from '../api/_lib/ruphusRepository.js';
 import { createRuphusTools } from '../api/_lib/ruphusTools.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
-import { validateManualSourceRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
+import { canonicalHash, validateManualSourceRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
 import { createRecipePreview } from '../src/lib/ruphus/recipePreview.js';
 import { canonicalRecipeSnapshot } from '../src/lib/ruphus/legacyRecipeResolver.js';
 
@@ -145,9 +145,15 @@ test('manual temperature controls honor the exact source-native unit across an a
 });
 
 test('source grind reads and edits agree on physical Ode clicks, not tiny micron changes', async () => {
-  const recipe = generateManualSourceTechniqueOption('onyx-monarch-wave-185', {}, {
+  const recipe = generateManualSourceTechniqueOption('onyx-monarch-wave-185', {
+    grindAdjustmentMicrons: -20,
+    evidenceHash: 'journey-density-evidence',
+    reasonCodes: ['HIGH_DENSITY_TEST'],
+  }, {
     device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 23,
+    grinder: 'fellow-ode-gen2',
   }).recipe;
+  const sourceProjectionHash = canonicalHash(recipe.sourceProjection);
   const context = {
     userText: 'One click finer please', sessionId: 'source-click', conversation: [],
     rotationSnapshot: { refs: { coffee: 'coffee-1' }, coffees: [{ refKey: 'coffee', name: 'Jar one', recipes: ['kalita_hot'] }], setup: { grinder: 'fellow-ode-gen2' } },
@@ -156,20 +162,28 @@ test('source grind reads and edits agree on physical Ode clicks, not tiny micron
   };
   const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => recipe } });
   const read = await tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'kalita_hot' });
-  assert.equal(read.grinderGuidance.setting, '4.6');
-  assert.equal(read.grinderGuidance.oneClickFiner, 4.2);
+  assert.equal(read.grinderGuidance.setting, recipe.grindSize.setting);
+  assert.equal(read.grinderGuidance.oneClickFiner, 4);
   const propose = (value) => tools.call('propose_recipe_change', {
     coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview',
     change: { control: 'grind', value }, servingDoseGrams: null,
     aidenProfile: null, experiment: null, explanation: null,
   });
   assert.equal((await propose(4.3)).code, 'invalid_grind_step');
-  assert.equal((await propose(599)).code, 'unchanged_grind_step');
-  const result = await propose(4.2);
+  assert.equal((await propose(recipe.grindSize.microns)).code, 'unchanged_grind_step');
+  const result = await propose(4);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.equal(result.artifact.after.sourceProjection.grind.microns, 570);
+  assert.equal(result.artifact.after.sourceProjection.grind.microns, 541);
+  assert.equal(result.artifact.after.grindSize.setting, '4');
+  assert.equal(result.artifact.after.sourceLineage.grindAdaptation.targetMicrons, 541);
   assert.deepEqual(result.artifact.after.sourceProjection.sourceSnapshot, recipe.sourceProjection.sourceSnapshot);
   assert.deepEqual(result.artifact.after.sourceProjection.stages, recipe.sourceProjection.stages);
+  assert.equal(canonicalHash(recipe.sourceProjection), sourceProjectionHash);
+
+  const resized = createRecipePreview({ recipe: result.artifact.after, dose: 25, configuration: { grinder: 'fellow-ode-gen2' } });
+  assert.equal(resized.grindSize.setting, '4');
+  assert.equal(resized.sourceLineage.grindAdaptation.targetMicrons, 541);
+  assert.deepEqual(resized.sourceProjection.sourceSnapshot, recipe.sourceProjection.sourceSnapshot);
 });
 
 test('volume-native Switch ratio adaptation changes only native mL checkpoints and keeps valve events', () => {
@@ -249,6 +263,64 @@ test('preview endpoint reconstructs accepted source controls before applying a l
     assert.equal(result.body.preview.coffeeGrams, 20);
     assert.equal(result.body.preview.waterGrams, 300);
     assert.equal(result.body.preview.temperature.value, source.temperature.value);
+    assert.deepEqual(result.body.preview.sourceProjection.sourceSnapshot, source.sourceProjection.sourceSnapshot);
+    const brewed = await executeRecipeCommand({
+      db: firestore.db, uid: owner, coffeeId, slotKey: 'kalita_hot',
+      actionId: 'personalized-grinder-brew', mode: 'brew_once',
+      proposalId: result.body.proposal.id,
+      expectedRevisionId: result.body.proposal.sourceRevisionId,
+    });
+    assert.deepEqual(brewed.attempt.snapshot.grindSize, result.body.preview.grindSize);
+    assert.deepEqual(brewed.attempt.snapshot.sourceLineage.grindAdaptation, result.body.preview.sourceLineage.grindAdaptation);
+    assert.deepEqual(brewed.attempt.snapshot.sourceProjection, result.body.preview.sourceProjection);
+    assert.deepEqual(firestore.data.get(`${firestore.root}/beans/${coffeeId}`).handBrewRecipes.kalita, source);
+  } finally {
+    if (previousAllowlist == null) delete process.env.RUPHUS_AGENT_V3_UIDS;
+    else process.env.RUPHUS_AGENT_V3_UIDS = previousAllowlist;
+  }
+});
+
+test('preview endpoint preserves the reviewed source grind target while changing grinder quantization', async () => {
+  const owner = 'source-endpoint-grinder-owner';
+  const coffeeId = 'source-endpoint-grinder-coffee';
+  const source = generateManualSourceTechniqueOption('onyx-monarch-wave-185', {
+    grindAdjustmentMicrons: -20,
+    evidenceHash: 'endpoint-grinder-evidence',
+    reasonCodes: ['HIGH_DENSITY_TEST'],
+  }, {
+    device: 'kalita', variant: 'wave', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25,
+    grinder: 'fellow-ode-gen2',
+  }).recipe;
+  const repository = createMemoryRuphusRepository({ clock: () => 1_789_000_000_100 });
+  repository.seedBean(owner, { id: coffeeId, ownerId: owner, name: 'Endpoint Grinder Bean', handBrewRecipes: { kalita: source } });
+  const context = {
+    userText: 'Make this stronger.', sessionId: 'source-endpoint-grinder', conversation: [],
+    rotationSnapshot: { refs: { coffee: coffeeId }, coffees: [{ refKey: 'coffee', name: 'Endpoint Grinder Bean', recipes: ['kalita_hot'] }], setup: { grinder: 'fellow-ode-gen2' } },
+    proposalState: { target: null, diagnosisReady: true, userAgreed: true, previewReady: true, proposalIssued: false },
+  };
+  const tools = createRuphusTools({
+    uid: owner, context, readers: { readRecipe: async () => source },
+    proposalStore: (input) => repository.createProposal(input), proposalActions: ['apply_proposal', 'brew_once', 'keep_current'],
+  });
+  await tools.call('read_recipe', { coffeeRef: 'coffee', slot: 'kalita_hot' });
+  const proposalResult = await tools.call('propose_recipe_change', {
+    coffeeRef: 'coffee', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'ratio', value: 15 },
+    servingDoseGrams: null, experiment: null, explanation: null,
+  });
+  assert.equal(proposalResult.ok, true, JSON.stringify(proposalResult));
+  const firestore = firestoreFromSnapshot(repository.snapshot(), owner);
+  const previousAllowlist = process.env.RUPHUS_AGENT_V3_UIDS;
+  process.env.RUPHUS_AGENT_V3_UIDS = owner;
+  try {
+    const result = response();
+    await handleRecipePreview({ method: 'POST', body: {
+      requestId: 'source-endpoint-grinder-opus', proposalId: proposalResult.proposal.id, coffeeId, slotKey: 'kalita_hot',
+      sessionId: context.sessionId, dose: 25, configuration: { grinder: 'fellow-opus' },
+    } }, result, { uid: owner }, { db: firestore.db });
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    assert.equal(result.body.preview.sourceLineage.grindAdaptation.targetMicrons, 580);
+    assert.equal(result.body.preview.sourceLineage.grindAdaptation.grinder, 'fellow-opus');
+    assert.notEqual(result.body.preview.grindSize.setting, source.grindSize.setting);
     assert.deepEqual(result.body.preview.sourceProjection.sourceSnapshot, source.sourceProjection.sourceSnapshot);
   } finally {
     if (previousAllowlist == null) delete process.env.RUPHUS_AGENT_V3_UIDS;

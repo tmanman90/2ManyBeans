@@ -120,11 +120,11 @@ function legacySourceProjectionWitness(projection) {
   return legacy;
 }
 
-function reconstructSourcePreview(base, body, sourceRequest) {
+function reconstructSourcePreview(base, body, sourceRequest, configuration) {
   const storedProjection = base.recipe.sourceProjection;
   const sourceDose = Number(base.recipe.coffeeGrams);
   const trusted = generateManualSourceTechniqueOption({ sourceId: sourceRequest.sourceId, sourceRevision: sourceRequest.sourceRevision }, {}, {
-    ...sourceRequest.sourceConfiguration,
+    ...configuration,
     sourceRevision: sourceRequest.sourceRevision,
     dose: sourceDose,
     ...(storedProjection.adaptation?.controls ? { sourceControls: storedProjection.adaptation.controls } : {}),
@@ -136,10 +136,23 @@ function reconstructSourcePreview(base, body, sourceRequest) {
   if (!currentMatches && !legacyMatches) {
     throw Object.assign(new Error('The reviewed source projection no longer matches the trusted source record.'), { code: 'source_projection_mismatch' });
   }
+  // The projection comparison above authenticates the immutable source. Grind
+  // personalization is deliberately stored beside it in the reviewed recipe
+  // envelope, so carry only those bounded fields into the derived preview.
+  const trustedRecipe = {
+    ...trusted.recipe,
+    ...(base.recipe.grindSize ? { grindSize: structuredClone(base.recipe.grindSize) } : {}),
+    sourceLineage: {
+      ...trusted.recipe.sourceLineage,
+      ...(base.recipe.sourceLineage?.grindAdaptation
+        ? { grindAdaptation: structuredClone(base.recipe.sourceLineage.grindAdaptation) }
+        : {}),
+    },
+  };
   return createRecipePreview({
-    recipe: trusted.recipe,
+    recipe: trustedRecipe,
     dose: body.dose,
-    configuration: sourceRequest.sourceConfiguration,
+    configuration,
     allowIced: true,
   });
 }
@@ -158,9 +171,11 @@ export async function handleRecipePreview(req, res, decodedToken, { db = getDb()
     const sourceRequest = sourceRequestFromBody(body, base.recipe);
     const sourceConfiguration = sourceRequest?.sourceConfiguration || {};
     if (!sourceRequest && body.sourceConfiguration) throw Object.assign(new Error('A source-backed proposal is required for source preview.'), { code: 'source_proposal_required' });
-    const configuration = sourceRequest ? sourceConfiguration : safeConfiguration(body.configuration);
+    const configuration = sourceRequest
+      ? { ...sourceConfiguration, ...safeConfiguration(body.configuration) }
+      : safeConfiguration(body.configuration);
     const preview = sourceRequest
-      ? reconstructSourcePreview(base, body, sourceRequest)
+      ? reconstructSourcePreview(base, body, sourceRequest, configuration)
       : createRecipePreview({ recipe: base.recipe, dose: body.dose, configuration, allowIced: true });
     const key = requestKey({ ...body, configuration, sourceId: sourceRequest?.sourceId, sourceRevision: sourceRequest?.sourceRevision, sourceConfiguration });
     const proposal = await persistRecipePreview({

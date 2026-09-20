@@ -30,10 +30,16 @@ import { RUPHUS_OPENAI_MODEL } from './ruphusProviders/openai.js';
 import { V60_ICED_RULES } from '../../src/data/v60IcedSourceRegistry.js';
 import { KALITA_ICED_RULES } from '../../src/data/kalitaIcedSourceRegistry.js';
 import { manualSourceGrindGuidance } from '../../src/lib/manualSourceProjection.js';
+import { normalizeRecipeEvidence } from '../../src/lib/recipeEvidence.js';
+import { buildExtractionIntent } from '../../src/lib/extractionIntent.js';
 
 function sourceGrinderGuidance(recipe, setup) {
   if (!hasManualSourceProjection(recipe)) return null;
-  const guidance = manualSourceGrindGuidance(recipe.sourceProjection.grind, setup);
+  const rawPersonalizedMicrons = recipe.sourceLineage?.grindAdaptation?.targetMicrons;
+  const personalizedMicrons = rawPersonalizedMicrons == null ? null : Number(rawPersonalizedMicrons);
+  const guidance = manualSourceGrindGuidance(Number.isFinite(personalizedMicrons)
+    ? { microns: personalizedMicrons, description: recipe.grindSize?.description || recipe.sourceProjection.grind?.description }
+    : recipe.sourceProjection.grind, setup);
   if (guidance.grinderKey !== 'fellow-ode-gen2' || !isOdeStep(guidance.setting)) return guidance;
   const index = ODE_GEN2_STEPS.indexOf(Number(guidance.setting));
   return { ...guidance, controlUnit: 'physical_setting',
@@ -1113,6 +1119,15 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     }
     return null;
   };
+  const trustedExtraction = async (coffeeId, coffeeRef) => {
+    const fallback = snapshot.coffees?.find((coffee) => coffee.refKey === coffeeRef) || {};
+    const coffee = typeof readers.readCoffee === 'function'
+      ? await readers.readCoffee({ uid, coffeeId })
+      : fallback;
+    const bean = coffee && typeof coffee === 'object' && !Array.isArray(coffee) ? coffee : fallback;
+    const evidence = normalizeRecipeEvidence(bean, bean.beanResearch || null);
+    return { evidence, intent: buildExtractionIntent(evidence) };
+  };
   const call = async (name, args = {}) => {
     if (!RUPHUS_READ_TOOL_NAMES.includes(name)) throw Object.assign(new Error(`tool unavailable: ${name}`), { code: 'tool_unavailable' });
     forbidOwner(args);
@@ -1628,25 +1643,26 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         const dose = Number(discovery.coffeeGrams ?? discovery.userCoffeeGrams ?? discovery.dose ?? selected.sourceDoseGrams);
         const selectedDose = servingDose ?? (manualSourceExperiment && Number.isFinite(selected.targetDoseGrams) ? selected.targetDoseGrams : dose);
         try {
-        // The first selection is a complete source-backed experiment. Do not
-        // copy the current family's controls into it; later dose previews use
-        // this selected recipe as their reviewed source of truth.
-        const generated = manualSourceExperiment
-          ? generateManualSourceTechniqueOption(selected.sourceId, {}, { ...(selected.sourceConfiguration || {}), sourceRevision: selected.sourceRevision, dose: selectedDose })
-          : generateV60TechniqueOption(selected.id, {}, { dose: selectedDose, grinder: snapshot.setup?.grinder });
-        generated.recipe.techniqueLabel = selected.name;
-        const preview = manualSourceExperiment
-          ? createRecipePreview({ recipe: generated.recipe, dose: selectedDose })
-          : createRecipePreview({ recipe: generated.recipe, dose: selectedDose, ratio: recipeRatio(generated.recipe) });
-        requestedPatch = preview;
-        experimentMetadata = {
-          protocolVersion: RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION,
-          kind: manualSourceExperiment ? 'manual_source_technique' : 'v60_technique', techniqueId: selected.id, familyId: selected.familyId, sourceId: selected.sourceId,
-          name: selected.name, differences: clone(selected.differences), adaptation: safeTechniqueAdaptation(selected.adaptation),
-          attribution: clone(selected.attribution), sourceRegistryVersion: selected.sourceRegistryVersion,
-          ...(manualSourceExperiment ? { sourceRevision: selected.sourceRevision, sourceOptionsVersion: selected.sourceOptionsVersion, sourceNativeWaterUnit: selected.sourceWater?.unit || null, sourceDoseGrams: selected.sourceDoseGrams, targetDoseGrams: selectedDose } : {}),
-          currentTechnique: before.technique || before.sourceLineage?.technique || null,
-        };
+          const extraction = await trustedExtraction(coffeeId, args.coffeeRef);
+          // The first selection is a complete source-backed experiment. Do not
+          // copy the current family's controls into it; later dose previews use
+          // this selected recipe as their reviewed source of truth.
+          const generated = manualSourceExperiment
+            ? generateManualSourceTechniqueOption(selected.sourceId, extraction.intent, { ...(selected.sourceConfiguration || {}), sourceRevision: selected.sourceRevision, dose: selectedDose, grinder: snapshot.setup?.grinder }, extraction.evidence)
+            : generateV60TechniqueOption(selected.id, extraction.intent, { dose: selectedDose, grinder: snapshot.setup?.grinder }, extraction.evidence);
+          generated.recipe.techniqueLabel = selected.name;
+          const preview = manualSourceExperiment
+            ? createRecipePreview({ recipe: generated.recipe, dose: selectedDose })
+            : createRecipePreview({ recipe: generated.recipe, dose: selectedDose, ratio: recipeRatio(generated.recipe) });
+          requestedPatch = preview;
+          experimentMetadata = {
+            protocolVersion: RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION,
+            kind: manualSourceExperiment ? 'manual_source_technique' : 'v60_technique', techniqueId: selected.id, familyId: selected.familyId, sourceId: selected.sourceId,
+            name: selected.name, differences: clone(selected.differences), adaptation: safeTechniqueAdaptation(selected.adaptation),
+            attribution: clone(selected.attribution), sourceRegistryVersion: selected.sourceRegistryVersion,
+            ...(manualSourceExperiment ? { sourceRevision: selected.sourceRevision, sourceOptionsVersion: selected.sourceOptionsVersion, sourceNativeWaterUnit: selected.sourceWater?.unit || null, sourceDoseGrams: selected.sourceDoseGrams, targetDoseGrams: selectedDose } : {}),
+            currentTechnique: before.technique || before.sourceLineage?.technique || null,
+          };
       } catch (error) {
         return { ok: false, code: error.code || 'technique_generation_failed', message: error.message };
       }

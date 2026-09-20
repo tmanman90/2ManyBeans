@@ -13,7 +13,7 @@ import { generateKalitaIcedRecipe } from '../kalitaIcedAdapter.js';
 import { kalitaDoseBounds } from '../../data/kalitaConfiguration.js';
 import { V60_SWITCH_DOSE_BOUNDS, V60_SWITCH_WATER_CAP_GRAMS } from '../../data/v60SwitchConfiguration.js';
 import { hasManualSourceProjection, isManualSourceRecipe, validateManualSourceRecipeSnapshot } from './contracts.js';
-import { MANUAL_SOURCE_PROJECTION_VERSION } from '../manualSourceProjection.js';
+import { MANUAL_SOURCE_PROJECTION_VERSION, manualSourceGrindSize } from '../manualSourceProjection.js';
 import {
   MANUAL_SOURCE_DOSE_POLICY_VERSION,
   adaptedDoseBounds,
@@ -272,6 +272,36 @@ function sourceConfigurationFromRecipe(recipe) {
   };
 }
 
+function sourceGrindEnvelopeForPreview(recipe, targetProjection, configuration = {}) {
+  const adaptation = recipe?.sourceLineage?.grindAdaptation;
+  const rawControlledMicrons = targetProjection?.adaptation?.controls?.grindMicrons;
+  const controlledMicrons = rawControlledMicrons == null ? null : Number(rawControlledMicrons);
+  const hasControlledMicrons = rawControlledMicrons != null && Number.isFinite(controlledMicrons);
+  const rawAdaptationTarget = adaptation?.targetMicrons;
+  const adaptationTarget = rawAdaptationTarget == null ? null : Number(rawAdaptationTarget);
+  const targetMicrons = hasControlledMicrons ? controlledMicrons : adaptationTarget;
+  if (!Number.isFinite(targetMicrons)) {
+    return recipe?.grindSize ? { grindSize: structuredClone(recipe.grindSize), grindAdaptation: null } : null;
+  }
+  const grinder = Object.hasOwn(configuration || {}, 'grinder')
+    ? configuration.grinder
+    : adaptation?.grinder || null;
+  const grindSize = manualSourceGrindSize(targetMicrons, { grinder });
+  if (!adaptation) return { grindSize, grindAdaptation: null };
+  return {
+    grindSize,
+    grindAdaptation: {
+      ...structuredClone(adaptation),
+      targetMicrons,
+      grinder: grinder || null,
+      ...(hasControlledMicrons ? {
+        adjustmentMicrons: Number.isFinite(adaptation.baselineMicrons) ? targetMicrons - adaptation.baselineMicrons : adaptation.adjustmentMicrons,
+        userAdjusted: targetMicrons !== adaptation.targetMicrons,
+      } : {}),
+    },
+  };
+}
+
 function createManualSourcePreview({ recipe, dose, ratio, targetRatio, configuration = {}, allowIced = true } = {}) {
   const checked = validateManualSourcePreview(recipe, { dose, ratio, targetRatio });
   if (!allowIced && checked.route?.endsWith('iced')) throw new RecipePreviewError('iced-preview-disabled', 'This iced source route is kept read-only until its complete water and ice contract is enabled.');
@@ -292,6 +322,11 @@ function createManualSourcePreview({ recipe, dose, ratio, targetRatio, configura
     techniqueId: recipe.technique || projection.sourceId,
     techniqueLabel: recipe.techniqueLabel || projection.sourceLineage?.title || projection.sourceId,
   });
+  const grindEnvelope = sourceGrindEnvelopeForPreview(recipe, targetProjection, configuration);
+  if (grindEnvelope?.grindSize) target.grindSize = grindEnvelope.grindSize;
+  if (grindEnvelope?.grindAdaptation) {
+    target.sourceLineage = { ...target.sourceLineage, grindAdaptation: grindEnvelope.grindAdaptation };
+  }
   const result = {
     ...target,
     recipePreview: {
