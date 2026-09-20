@@ -1,8 +1,119 @@
+import { manualSourceDisplay, validateManualSourceProjection } from './manualSourceProjection.js';
+import { validateManualBrewState } from './ruphus/sourceTimerState.js';
+
 export const PHASE_CONTRACT_VERSION = 1;
 
 const WATER_ACTION = /\b(?:bloom|pour|pouring|water|hot water|pulse|finish)\b/i;
 const PREP_ACTION = /\b(?:rinse|preheat|load|add\s+\d+(?:\.\d+)?\s*g\s*coffee|level the bed|server ice|brew ice|discard rinse)\b/i;
 const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+const sourceProjectionFor = (recipe) => recipe?.sourceProjection && typeof recipe.sourceProjection === 'object'
+  ? recipe.sourceProjection
+  : null;
+
+export function sourceTimerMode(recipe) {
+  const projection = sourceProjectionFor(recipe);
+  const record = projection?.sourceExecution;
+  if (projection?.timerReady !== true || !record || !Array.isArray(record.stages) || record.stages.length === 0) return null;
+  if (projection.projectionVersion && !validateManualSourceProjection(projection).valid) return null;
+  const automatic = record.clock?.origin === 'first-water'
+    && record.stages.every((stage) => stage?.trigger?.type === 'elapsed' && Number.isFinite(stage.trigger.seconds));
+  return automatic ? 'automatic' : 'confirmed';
+}
+
+export function sourceTimerTotalSeconds(recipe) {
+  const projection = sourceProjectionFor(recipe);
+  const maxSeconds = projection?.finish?.maxSeconds;
+  return Number.isFinite(maxSeconds) && maxSeconds > 0 ? maxSeconds : null;
+}
+
+export function sourceTimerDisplayStages(recipe) {
+  const projection = sourceProjectionFor(recipe);
+  return projection ? manualSourceDisplay(projection).stages : [];
+}
+
+export function resumeSourceTimerState(state, resumedAtMs) {
+  const pausedAtMs = state?.sharedTimerPauseStartedAtMs;
+  if (!state || !Number.isFinite(pausedAtMs) || !Number.isFinite(resumedAtMs) || resumedAtMs < pausedAtMs) return null;
+  const pausedForMs = resumedAtMs - pausedAtMs;
+  const shifted = {
+    ...state,
+    events: Object.fromEntries(Object.entries(state.events || {}).map(([name, atMs]) => [name, atMs + pausedForMs])),
+    corrections: (state.corrections || []).map((correction) => ({
+      ...correction,
+      withdrawnAtMs: correction.withdrawnAtMs + pausedForMs,
+      correctedAtMs: correction.correctedAtMs + pausedForMs,
+    })),
+  };
+  delete shifted.sharedTimerPauseStartedAtMs;
+  return shifted;
+}
+
+export function sourceRestoreStartedAt(recipe, sourceTimerState, sourceTimerBinding = null) {
+  const projection = recipe?.sourceProjection;
+  const record = projection?.sourceExecution;
+  if (sourceTimerMode(recipe) !== 'automatic' || !record || !sourceTimerState) return null;
+  const binding = {
+    sourceId: projection.sourceId,
+    sourceRevision: projection.sourceRevision,
+    sourceConfiguration: projection.sourceConfiguration,
+    configurationKey: projection.configurationKey,
+    fingerprint: projection.sourceFingerprint || null,
+    dose: projection.coffeeGrams,
+    ...(sourceTimerBinding || {}),
+  };
+  const validation = validateManualBrewState(record, sourceTimerState, binding);
+  const firstWater = sourceTimerState.events?.['first-water'];
+  if (!validation.valid || !Number.isFinite(firstWater)
+    || Number.isFinite(sourceTimerState.events?.['extraction:complete'])) return null;
+  return firstWater;
+}
+
+export async function saveBrewTimingEvent(onSaveTimingEvent, event) {
+  if (typeof onSaveTimingEvent !== 'function') return 'ephemeral';
+  try {
+    const result = await onSaveTimingEvent(event);
+    return result?.status || 'ephemeral';
+  } catch {
+    return 'failed';
+  }
+}
+
+function buildSourceTimerSteps(recipe) {
+  if (sourceTimerMode(recipe) !== 'automatic') return null;
+  const stages = sourceTimerDisplayStages(recipe);
+  const total = sourceTimerTotalSeconds(recipe);
+  const out = [];
+  for (let index = 0; index < stages.length; index += 1) {
+    const stage = stages[index];
+    const start = stage?.trigger?.seconds;
+    const nextStart = index + 1 < stages.length ? stages[index + 1]?.trigger?.seconds : total;
+    if (!Number.isFinite(start) || start < 0 || (index > 0 && start <= out[index - 1].startSeconds)) return null;
+    if (index + 1 < stages.length && (!Number.isFinite(nextStart) || nextStart <= start)) return null;
+    if (index + 1 === stages.length && Number.isFinite(nextStart)
+      && (nextStart < start || (nextStart === start && stage.kind !== 'finish'))) return null;
+    const water = stage?.water && Number.isFinite(stage.water.value)
+      ? stage.water
+      : Number.isFinite(stage?.waterToGrams)
+        ? { value: stage.waterToGrams, unit: 'g' }
+        : Number.isFinite(stage?.waterToMilliliters)
+          ? { value: stage.waterToMilliliters, unit: 'mL' }
+          : null;
+    out.push({
+      index,
+      startSeconds: start,
+      durationSeconds: Number.isFinite(nextStart) && nextStart > start ? nextStart - start : null,
+      openEnded: !Number.isFinite(nextStart) || nextStart === start,
+      step: {
+        ...stage,
+        name: stage.kind === 'pour' ? 'Pour' : stage.kind === 'valve' ? 'Valve' : 'Step',
+        action: stage.label,
+        ...(water ? { water, waterTotal: water.value, waterUnit: water.unit } : {}),
+      },
+    });
+  }
+  return out;
+}
 
 // Read-time phase interpretation. It never mutates or persists legacy data.
 // Ambiguous records remain viewable but are deliberately timer-disabled.
@@ -65,6 +176,7 @@ export function normalizeRecipePhases(recipe) {
 // A timer may only start when every step has a strict interval and the total
 // duration follows the final instruction.
 export function buildTimerSteps(recipe) {
+  if (sourceProjectionFor(recipe)) return buildSourceTimerSteps(recipe);
   const effective = normalizeRecipePhases(recipe);
   if (!effective?.timerReady) return null;
   const steps = Array.isArray(effective.steps) ? effective.steps : [];

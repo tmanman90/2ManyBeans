@@ -1804,6 +1804,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         deviceKey={recipePreview?.recipe?.device || null}
         userCoffeeGrams={recipePreview?.dose}
         onCoffeeGramsChange={handleRecipePreviewDoseChange}
+        onSourceCoffeeGramsChange={handleRecipePreviewDoseChange}
         onPreviewStart={() => handleRecipePreviewAction('brew_once')}
         onPreviewSave={() => handleRecipePreviewAction('apply_proposal')}
       />

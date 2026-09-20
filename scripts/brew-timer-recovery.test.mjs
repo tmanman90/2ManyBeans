@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
 
-assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId\)/);
+assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId, \{ sourceTimerState, sourceTimerBinding \}\)/);
 assert.ok(/const handleConfirmClose = \(\) => \{\s*reset\(\);/.test(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8')), 'Stop clears the checkpoint before the attempt modal unmounts');
-assert.match(readFileSync(new URL('../src/components/HandBrewModal.jsx', import.meta.url), 'utf8'), /key=\{attemptId \|\| 'standard-brew'\}/);
+assert.match(readFileSync(new URL('../src/components/HandBrewModal.jsx', import.meta.url), 'utf8'), /key=\{attemptId \|\| \(sourceProjection \? `\$\{sourceProjection\.sourceId\}:\$\{sourceProjection\.sourceRevision\}` : 'standard-brew'\)\}/);
 
 // Exercise the real hook across page/process lifetimes, not a replica of its
 // clock arithmetic. This isolated page never loads Firebase or makes API calls.

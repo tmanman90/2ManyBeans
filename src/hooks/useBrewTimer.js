@@ -16,7 +16,14 @@
 // brief highlight); the hook does not need a separate phase for it.
 
 import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { advanceStepClock, buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
+import {
+  advanceStepClock,
+  buildTimerSteps,
+  normalizeRecipePhases,
+  sourceRestoreStartedAt,
+  sourceTimerMode,
+  sourceTimerTotalSeconds,
+} from '../lib/brewTimerSteps';
 export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
@@ -76,13 +83,14 @@ const initialState = { phase: 'idle', stepIndex: 0 };
 // entries suitable for the timer. Requires that every step has a numeric
 // `timeSeconds` (populated by repairHandBrewRecipe) and that totalBrewTimeSeconds
 // is > last step's timeSeconds.
-export function useBrewTimer(recipe, sessionId = null) {
+export function useBrewTimer(recipe, sessionId = null, options = {}) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Recompute when recipe changes (regenerate, different bean, etc.).
   // Wrapped in useMemo so it's stable within a single recipe identity.
   const effectiveRecipe = useMemo(() => normalizeRecipePhases(recipe), [recipe]);
   const timerSteps = useMemo(() => buildTimerSteps(effectiveRecipe), [effectiveRecipe]);
+  const resolvedSourceMode = useMemo(() => sourceTimerMode(recipe), [recipe]);
 
   // Refs — source of truth for time math. Never trigger re-renders.
   // Exposed on the return value so the component's rAF loop can read them
@@ -101,14 +109,17 @@ export function useBrewTimer(recipe, sessionId = null) {
   const [stepElapsedMs, setStepElapsedMs] = useState(0);
   const [completion, setCompletion] = useState(null);
 
-  const totalMs = effectiveRecipe?.totalBrewTimeSeconds != null
-    ? effectiveRecipe.totalBrewTimeSeconds * 1000
-    : 0;
+  const sourceTotalSeconds = sourceTimerTotalSeconds(recipe);
+  const totalMs = sourceTotalSeconds != null
+    ? sourceTotalSeconds * 1000
+    : effectiveRecipe?.totalBrewTimeSeconds != null
+      ? effectiveRecipe.totalBrewTimeSeconds * 1000
+      : 0;
 
   const currentStep = timerSteps && state.stepIndex < timerSteps.length
     ? timerSteps[state.stepIndex]
     : null;
-  const currentStepDurationMs = currentStep
+  const currentStepDurationMs = currentStep && Number.isFinite(currentStep.durationSeconds)
     ? currentStep.durationSeconds * 1000
     : 0;
 
@@ -143,7 +154,7 @@ export function useBrewTimer(recipe, sessionId = null) {
     if (state.phase !== 'running' && state.phase !== 'paused') return null;
     if (completionRef.current) return completionRef.current.elapsedMs;
     const elapsed = readGlobalMs();
-    const nextCompletion = { kind: completionKind, elapsedMs: elapsed };
+    const nextCompletion = { kind: completionKind, elapsedMs: elapsed, atMs: Date.now() };
     completionRef.current = nextCompletion;
     clearCheckpoint(checkpointRef.current?.id);
     setCompletion(nextCompletion);
@@ -242,8 +253,27 @@ export function useBrewTimer(recipe, sessionId = null) {
       dispatch({ type: 'RESTORE', phase: saved.phase, stepIndex: saved.stepIndex });
       return;
     }
+    const sourceStartedAt = resolvedSourceMode === 'automatic'
+      ? sourceRestoreStartedAt(recipe, options.sourceTimerState, options.sourceTimerBinding)
+      : null;
+    if (sourceStartedAt != null && sourceStartedAt <= Date.now()) {
+      const elapsedMs = Math.max(0, Date.now() - sourceStartedAt);
+      let restoredStepIndex = 0;
+      for (let index = 1; index < timerSteps.length; index += 1) {
+        if (timerSteps[index].startSeconds * 1000 <= elapsedMs) restoredStepIndex = index;
+      }
+      startedAtRef.current = sourceStartedAt;
+      stepStartedAtRef.current = sourceStartedAt + timerSteps[restoredStepIndex].startSeconds * 1000;
+      pauseStartedAtRef.current = null;
+      pausedAccumMsRef.current = 0;
+      stepPausedAccumMsRef.current = 0;
+      setGlobalElapsedMs(elapsedMs);
+      setStepElapsedMs(Math.max(0, elapsedMs - timerSteps[restoredStepIndex].startSeconds * 1000));
+      dispatch({ type: 'RESTORE', phase: 'running', stepIndex: restoredStepIndex });
+      return;
+    }
     dispatch({ type: 'START' });
-  }, [timerSteps, sessionId]);
+  }, [timerSteps, sessionId, options.sourceTimerBinding, options.sourceTimerState, recipe, resolvedSourceMode]);
 
   // Called by the 3-2-1 countdown overlay when it reaches 0.
   const beginRunning = useCallback(() => {
@@ -340,10 +370,12 @@ export function useBrewTimer(recipe, sessionId = null) {
     finish,
     completionKind: completion?.kind || null,
     completionElapsedMs: completion?.elapsedMs ?? null,
+    completionAtMs: completion?.atMs ?? null,
     skipForward,
     rewind,
     reset,
     isReady: !!timerSteps,
+    sourceMode: resolvedSourceMode,
   };
 }
 

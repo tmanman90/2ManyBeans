@@ -10,7 +10,7 @@
 // for 60fps updates. The numeric MM:SS readout uses React state and updates at
 // ~10Hz via the hook's setInterval.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { assetUrl } from "../lib/assetUrl";
 import { createPortal } from 'react-dom';
 import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
@@ -18,9 +18,22 @@ import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/t
 import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
+import {
+  initialManualBrewState,
+  manualBrewView,
+  useManualSourceBrewTimer,
+} from '../hooks/useManualSourceBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
-import { resolveGuideState, resolveStepTiming } from '../lib/brewTimerSteps';
+import {
+  resolveGuideState,
+  resolveStepTiming,
+  resumeSourceTimerState,
+  saveBrewTimingEvent,
+  sourceTimerDisplayStages,
+  sourceTimerMode,
+  sourceTimerTotalSeconds,
+} from '../lib/brewTimerSteps';
 
 const RING_SIZE = 280;
 const RING_STROKE = 10;
@@ -294,15 +307,209 @@ function ControlButton({ onClick, children, ariaLabel, primary, disabled }) {
   );
 }
 
-export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = null, onClose, onStartTasting, onSaveTimingEvent }) => {
-  const timer = useBrewTimer(recipe, attemptId);
+const sourceStageActionLabel = (stage, active) => {
+  if (!stage) return 'Finish Brew';
+  if (!active) {
+    if (stage.kind === 'valve') return `Begin ${stage.valve === 'open' ? 'opening' : 'closing'} valve`;
+    if (stage.kind === 'finish') return 'Begin drawdown check';
+    if (stage.kind === 'pour') return 'Begin pour';
+    return 'Begin action';
+  }
+  if (stage.kind === 'valve') return `Confirm valve ${stage.valve || 'position'}`;
+  if (stage.kind === 'finish') return 'Drawdown complete';
+  if (stage.kind === 'pour') return 'Pour finished';
+  return 'Action finished';
+};
+
+const sourceStepName = (stage) => ({
+  pour: 'Pour', valve: 'Valve', agitate: 'Action', press: 'Press', dilute: 'Dilute', finish: 'Finish',
+}[stage?.kind] || 'Action');
+
+const sourceTriggerLabel = (stage) => {
+  const trigger = stage?.trigger;
+  if (trigger?.type === 'elapsed') return `@${formatMMSS(trigger.seconds * 1000)}`;
+  if (trigger?.type === 'after') return trigger.seconds > 0
+    ? `${formatMMSS(trigger.seconds * 1000)} after confirmation`
+    : 'after confirmation';
+  if (trigger?.type === 'condition') return 'confirm condition';
+  return 'when ready';
+};
+
+function useConfirmedSourceTimer(recipe, {
+  sourceTimerState = null,
+  onSourceTimerStateChange,
+  sourceTimerBinding = null,
+  onReplaceSourceTimerState,
+} = {}) {
+  const projection = recipe.sourceProjection;
+  const record = projection.sourceExecution;
+  const binding = useMemo(() => ({
+    sourceId: projection.sourceId,
+    sourceRevision: projection.sourceRevision,
+    sourceConfiguration: projection.sourceConfiguration,
+    configurationKey: projection.configurationKey,
+    fingerprint: projection.sourceFingerprint || null,
+    dose: projection.coffeeGrams,
+    ...(sourceTimerBinding || {}),
+  }), [projection, sourceTimerBinding]);
+  const source = useManualSourceBrewTimer(record, {
+    initialState: sourceTimerState,
+    onStateChange: onSourceTimerStateChange,
+    sourceIdentity: binding,
+  });
+  const restoredPauseStartedAtMs = Number.isFinite(sourceTimerState?.sharedTimerPauseStartedAtMs)
+    ? sourceTimerState.sharedTimerPauseStartedAtMs : null;
+  const [phase, setPhase] = useState(() => source.done
+    ? 'done'
+    : restoredPauseStartedAtMs != null && source.running
+      ? 'paused'
+      : source.running ? 'running' : 'idle');
+  const [pauseStartedAtMs, setPauseStartedAtMs] = useState(restoredPauseStartedAtMs);
+
+  useEffect(() => {
+    if (source.done) setPhase('done');
+    else if (source.running && phase === 'idle') setPhase('running');
+  }, [source.done, source.running, phase]);
+
+  const pausedView = phase === 'paused' && Number.isFinite(pauseStartedAtMs)
+    ? manualBrewView(record, source.state, pauseStartedAtMs, binding)
+    : null;
+  const timerView = pausedView || source;
+  const timerStage = timerView.stage;
+  const stageIndex = timerStage ? record.stages.indexOf(timerStage) : Math.max(0, record.stages.length - 1);
+  const timerSteps = useMemo(() => {
+    const displayById = new Map(sourceTimerDisplayStages(recipe).map((stage) => [stage.id, stage]));
+    return record.stages.map((stage, index) => {
+      const displayStage = displayById.get(stage.id) || stage;
+      const water = displayStage.water && Number.isFinite(displayStage.water.value)
+        ? displayStage.water
+        : Number.isFinite(displayStage.waterToGrams)
+          ? { value: displayStage.waterToGrams, unit: 'g' }
+          : Number.isFinite(displayStage.waterToMilliliters)
+            ? { value: displayStage.waterToMilliliters, unit: 'mL' }
+            : null;
+      return {
+        index,
+        startSeconds: stage.trigger?.type === 'elapsed' && Number.isFinite(stage.trigger.seconds)
+          ? stage.trigger.seconds : 0,
+        durationSeconds: Number.isFinite(stage.durationSeconds) ? stage.durationSeconds : null,
+        openEnded: !Number.isFinite(stage.durationSeconds),
+        step: {
+          ...stage,
+          ...displayStage,
+          name: sourceStepName(stage),
+          action: displayStage.label,
+          ...(water ? { water, waterTotal: water.value, waterUnit: water.unit } : {}),
+        },
+      };
+    });
+  }, [recipe, record]);
+  const currentStep = timerStage ? (timerSteps[stageIndex] || null) : null;
+  const activeStartedAt = timerStage ? source.events[`${timerStage.id}:start`] : null;
+  const firstWaterAt = source.events['first-water'];
+  const countdownDurationMs = timerStage?.trigger?.type === 'elapsed'
+    ? timerStage.trigger.seconds * 1000 : 0;
+  const stepElapsedMs = timerView.active && Number.isFinite(activeStartedAt) && Number.isFinite(firstWaterAt)
+    ? Math.max(0, timerView.elapsedMs - (activeStartedAt - firstWaterAt))
+    : timerView.readiness?.status === 'countdown' && Number.isFinite(timerView.readiness.remainingMs)
+      ? Math.max(0, countdownDurationMs - timerView.readiness.remainingMs)
+      : 0;
+  const currentStepDurationMs = Number.isFinite(timerStage?.durationSeconds)
+    ? timerStage.durationSeconds * 1000
+    : timerView.readiness?.status === 'countdown' && countdownDurationMs > 0
+      ? countdownDurationMs
+      : 0;
+  const globalElapsedMs = phase === 'paused' ? timerView.elapsedMs : source.elapsedMs;
+  const totalSeconds = sourceTimerTotalSeconds(recipe);
+  const totalMs = totalSeconds == null ? 0 : totalSeconds * 1000;
+  const canAct = timerView.active || ['ready', 'checkpoint-passed', 'awaiting-observation'].includes(timerView.readiness?.status);
+
+  const start = useCallback(() => {
+    if (source.running) setPhase('running');
+    else setPhase('countdown');
+  }, [source.running]);
+  const beginRunning = useCallback(() => {
+    source.act('start');
+    setPhase('running');
+  }, [source]);
+  const pause = useCallback(() => {
+    if (phase !== 'running') return;
+    const pausedAtMs = Date.now();
+    setPauseStartedAtMs(pausedAtMs);
+    onSourceTimerStateChange?.({ ...source.state, sharedTimerPauseStartedAtMs: pausedAtMs });
+    setPhase('paused');
+  }, [onSourceTimerStateChange, phase, source.state]);
+  const resume = useCallback(() => {
+    if (phase !== 'paused' || !Number.isFinite(pauseStartedAtMs)) return;
+    const shifted = resumeSourceTimerState({ ...source.state, sharedTimerPauseStartedAtMs: pauseStartedAtMs }, Date.now());
+    if (shifted) onReplaceSourceTimerState?.(shifted);
+  }, [onReplaceSourceTimerState, pauseStartedAtMs, phase, source.state]);
+  const advance = useCallback(() => {
+    if (!canAct) return;
+    source.act(timerView.active ? 'complete' : 'start');
+  }, [canAct, source, timerView.active]);
+  const finish = useCallback(() => {
+    if (source.stage) return null;
+    const next = source.act('finish');
+    return next?.events?.['extraction:complete'] == null ? null : source.elapsedMs;
+  }, [source]);
+  const rewind = useCallback(() => source.act('undo'), [source]);
+  const reset = useCallback(() => {
+    onReplaceSourceTimerState?.(initialManualBrewState(record, binding));
+  }, [binding, onReplaceSourceTimerState, record]);
+  const readGlobalMs = useCallback(() => globalElapsedMs, [globalElapsedMs]);
+  const readStepMs = useCallback(() => stepElapsedMs, [stepElapsedMs]);
+  const completionAtMs = source.events['extraction:complete'] ?? null;
+
+  return {
+    phase,
+    stepIndex: stageIndex,
+    timerSteps,
+    currentStep,
+    currentStepDurationMs,
+    globalElapsedMs,
+    stepElapsedMs,
+    totalMs,
+    readGlobalMs,
+    readStepMs,
+    start,
+    beginRunning,
+    pause,
+    resume,
+    finish,
+    skipForward: advance,
+    rewind,
+    reset,
+    completionKind: source.done ? 'userFinished' : null,
+    completionElapsedMs: source.done ? source.elapsedMs : null,
+    completionAtMs,
+    isReady: source.restoration.accepted,
+    sourceMode: 'confirmed',
+    sourceReadiness: timerView.readiness,
+    sourceActive: timerView.active,
+    sourceCanUndo: source.canUndo,
+    sourceActionLabel: sourceStageActionLabel(timerStage, timerView.active),
+    sourceActionDisabled: !canAct,
+    sourceEvents: source.events,
+    sourceCorrections: source.corrections,
+  };
+}
+
+const BrewTimerShell = ({
+  open, recipe, bean, attemptId = null, revisionId = null, onClose, onStartTasting, onSaveTimingEvent,
+  sourceTimerState = null, sourceTimerBinding = null, timerOverride = null,
+}) => {
+  const standardTimer = useBrewTimer(recipe, attemptId, { sourceTimerState, sourceTimerBinding });
+  const timer = timerOverride || standardTimer;
   const {
     phase, stepIndex, timerSteps, currentStep, currentStepDurationMs,
     globalElapsedMs, stepElapsedMs, totalMs,
     readGlobalMs, readStepMs,
-    start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs,
+    start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs, completionAtMs,
     isReady,
   } = timer;
+  const sourceProjection = recipe?.sourceProjection || null;
+  const isConfirmedSource = timer.sourceMode === 'confirmed';
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
@@ -318,12 +525,13 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
     && recipe.guideRangeSeconds.every(Number.isFinite)
     ? recipe.guideRangeSeconds
     : null;
-  const guideWindowMs = guideRangeSeconds?.map((seconds) => seconds * 1000) || [totalMs, totalMs];
-  const guideWindowStarted = globalElapsedMs >= guideWindowMs[0];
-  const guideWindowPassed = globalElapsedMs > guideWindowMs[1];
+  const hasGuideWindow = Boolean(guideRangeSeconds || totalMs > 0);
+  const guideWindowMs = guideRangeSeconds?.map((seconds) => seconds * 1000) || (totalMs > 0 ? [totalMs, totalMs] : [0, 0]);
+  const guideWindowStarted = hasGuideWindow && globalElapsedMs >= guideWindowMs[0];
+  const guideWindowPassed = hasGuideWindow && globalElapsedMs > guideWindowMs[1];
   const guideWindowText = guideRangeSeconds
     ? `${formatMMSS(guideWindowMs[0])}–${formatMMSS(guideWindowMs[1])}`
-    : formatMMSS(totalMs);
+    : totalMs > 0 ? formatMMSS(totalMs) : null;
 
   // Freeze the effective render-time recipe as the session opens. This is
   // after HandBrewModal's dose scaling/iced transform and cannot be polluted
@@ -355,13 +563,33 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
       return;
     }
     setSaveState('saving');
-    const result = await onSaveTimingEvent?.({
+    const measuredElapsedMs = completionElapsedMs ?? readGlobalMs();
+    const sourceFinishAtMs = sourceProjection ? Math.round(completionAtMs ?? Date.now()) : completionAtMs;
+    const sourceActualElapsedMs = sourceProjection ? Math.max(0, Math.round(measuredElapsedMs)) : measuredElapsedMs;
+    const sourceEvents = isConfirmedSource
+      ? timer.sourceEvents
+      : sourceProjection
+        ? {
+            'first-water': Math.max(0, sourceFinishAtMs - sourceActualElapsedMs),
+            'extraction:complete': Math.max(0, sourceFinishAtMs),
+          }
+        : null;
+    const status = await saveBrewTimingEvent(onSaveTimingEvent, {
       ...session,
-      actualElapsedMs: completionElapsedMs ?? readGlobalMs(),
+      actualElapsedMs: sourceActualElapsedMs,
       completionKind,
-    }) || { status: 'ephemeral' };
-    setSaveState(result.status);
-  }, [completionElapsedMs, completionKind, onSaveTimingEvent, readGlobalMs]);
+      ...(sourceProjection ? {
+        timingRecordVersion: 2,
+        sourceId: sourceProjection.sourceId,
+        sourceRevision: sourceProjection.sourceRevision,
+        sourceConfiguration: sourceProjection.sourceConfiguration,
+        clockOrigin: sourceProjection.clock?.origin || null,
+        sourceEvents,
+        sourceCorrections: isConfirmedSource ? timer.sourceCorrections : [],
+      } : {}),
+    });
+    setSaveState(status);
+  }, [completionAtMs, completionElapsedMs, completionKind, isConfirmedSource, onSaveTimingEvent, readGlobalMs, sourceProjection, timer.sourceCorrections, timer.sourceEvents]);
 
   useEffect(() => {
     if (phase !== 'done' || reportedRef.current) return;
@@ -372,7 +600,7 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
   // Auto-start countdown when the timer opens with a valid recipe.
   useEffect(() => {
     if (!open) {
-      reset();
+      if (phase !== 'idle') reset();
       return;
     }
     if (!isReady) return;
@@ -524,6 +752,11 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
   const handleFinishBrew = () => {
     haptic.success().catch(() => {});
     finish('userFinished');
+  };
+
+  const handleSourceAction = () => {
+    haptic.medium().catch(() => {});
+    skipForward();
   };
 
   const handleRewind = () => {
@@ -754,7 +987,11 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
               marginTop: 4,
               letterSpacing: '0.01em',
             }}>
-              {guideWindowPassed
+              {!hasGuideWindow
+                ? isConfirmedSource && timer.sourceReadiness?.status === 'awaiting-observation'
+                  ? 'waiting for your confirmation'
+                  : 'finish on the source condition'
+                : guideWindowPassed
                 ? `past expected window · +${formatMMSS(globalElapsedMs - guideWindowMs[1])}`
                 : guideWindowStarted
                   ? 'in expected window · finish on drawdown'
@@ -765,11 +1002,14 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
 
         {(phase === 'running' || phase === 'paused') && (
           <button
-            onClick={handleFinishBrew}
-            aria-label="Finish brew"
-            style={{ minHeight: 44, padding: '10px 18px', borderRadius: radius.pill, border: `1px solid ${C.accentLight}`, background: C.amberBg, color: C.accent, fontFamily: fonts.body, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            onClick={isConfirmedSource && currentStep ? handleSourceAction : handleFinishBrew}
+            disabled={isConfirmedSource && currentStep ? timer.sourceActionDisabled || phase === 'paused' : false}
+            aria-label={isConfirmedSource && currentStep ? timer.sourceActionLabel : 'Finish brew'}
+            style={{ minHeight: 44, padding: '10px 18px', borderRadius: radius.pill, border: `1px solid ${C.accentLight}`, background: C.amberBg, color: C.accent, fontFamily: fonts.body, fontSize: 14, fontWeight: 700, cursor: isConfirmedSource && currentStep && (timer.sourceActionDisabled || phase === 'paused') ? 'default' : 'pointer', opacity: isConfirmedSource && currentStep && (timer.sourceActionDisabled || phase === 'paused') ? 0.5 : 1 }}
           >
-            {guideWindowStarted ? 'Finish When Drawdown Ends' : 'Finish Brew'}
+            {isConfirmedSource && currentStep
+              ? timer.sourceActionLabel
+              : guideWindowStarted ? 'Finish When Drawdown Ends' : 'Finish Brew'}
           </button>
         )}
 
@@ -811,7 +1051,17 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
               color: C.accent,
               letterSpacing: '0.01em',
             }}>
-              {currentStep.step.waterTotal}g total
+              {currentStep.step.waterTotal}{currentStep.step.waterUnit || 'g'} total
+            </div>
+          )}
+          {isConfirmedSource && timer.sourceReadiness?.status === 'countdown' && (
+            <div style={{ ...typeScale.caption, color: C.accent, marginTop: 8 }}>
+              {formatMMSS(timer.sourceReadiness.remainingMs)} until the source checkpoint
+            </div>
+          )}
+          {isConfirmedSource && timer.sourceReadiness?.status === 'awaiting-observation' && (
+            <div style={{ ...typeScale.caption, color: C.accent, marginTop: 8 }}>
+              Confirm only when you observe: {timer.sourceReadiness.condition}
             </div>
           )}
         </div>
@@ -838,7 +1088,15 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
               globalElapsedMs,
               stepElapsedMs,
             }).remainingMs;
-            const timeLabel = status === 'current'
+            const timeLabel = isConfirmedSource && status !== 'current'
+              ? status === 'done' ? 'confirmed' : sourceTriggerLabel(ts.step)
+              : isConfirmedSource && status === 'current'
+                ? timer.sourceActive
+                  ? 'confirm when finished'
+                  : timer.sourceReadiness?.status === 'countdown'
+                    ? `${formatMMSS(timer.sourceReadiness.remainingMs)} left`
+                    : sourceTriggerLabel(ts.step)
+                : status === 'current'
               ? (isFinalStep && guideRangeSeconds
                   ? guideWindowPassed
                     ? `+${formatMMSS(globalElapsedMs - guideWindowMs[1])} past window`
@@ -875,7 +1133,7 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
           <ControlButton
             onClick={handleRewind}
             ariaLabel="Previous step"
-            disabled={stepIndex === 0 || phase === 'countdown'}
+            disabled={isConfirmedSource ? !timer.sourceCanUndo || phase === 'countdown' : stepIndex === 0 || phase === 'countdown'}
           >
             <SkipBack size={20} strokeWidth={2.5} />
           </ControlButton>
@@ -892,7 +1150,7 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
           <ControlButton
             onClick={handleSkipForward}
             ariaLabel="Next step"
-            disabled={phase === 'countdown' || isFinalStep}
+            disabled={isConfirmedSource || phase === 'countdown' || isFinalStep}
           >
             <SkipForward size={20} strokeWidth={2.5} />
           </ControlButton>
@@ -1006,3 +1264,40 @@ export const BrewTimer = ({ open, recipe, bean, attemptId = null, revisionId = n
     document.body
   );
 };
+
+function ConfirmedSourceBrewTimerSession({ onReplaceSourceTimerState, ...props }) {
+  const timer = useConfirmedSourceTimer(props.recipe, {
+    sourceTimerState: props.sourceTimerState,
+    onSourceTimerStateChange: props.onSourceTimerStateChange,
+    sourceTimerBinding: props.sourceTimerBinding,
+    onReplaceSourceTimerState,
+  });
+  return <BrewTimerShell {...props} timerOverride={timer} />;
+}
+
+function ConfirmedSourceBrewTimer({ onSourceTimerStateChange, ...props }) {
+  const [sessionState, setSessionState] = useState(props.sourceTimerState);
+  const [generation, setGeneration] = useState(0);
+  const publishState = useCallback((next) => {
+    setSessionState(next);
+    onSourceTimerStateChange?.(next);
+  }, [onSourceTimerStateChange]);
+  const replaceState = useCallback((next) => {
+    publishState(next);
+    setGeneration((value) => value + 1);
+  }, [publishState]);
+  return (
+    <ConfirmedSourceBrewTimerSession
+      key={generation}
+      {...props}
+      sourceTimerState={sessionState}
+      onSourceTimerStateChange={publishState}
+      onReplaceSourceTimerState={replaceState}
+    />
+  );
+}
+
+export function BrewTimer(props) {
+  if (sourceTimerMode(props.recipe) === 'confirmed') return <ConfirmedSourceBrewTimer {...props} />;
+  return <BrewTimerShell {...props} />;
+}

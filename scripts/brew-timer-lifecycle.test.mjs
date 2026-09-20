@@ -23,7 +23,7 @@ assert.match(timer, /in expected window/);
 assert.match(timer, /past expected window/);
 assert.match(timer, /phase === 'countdown' \|\| phase === 'running' \|\| phase === 'paused'/);
 assert.match(timer, /reportedRef\.current = true/);
-assert.match(timer, /actualElapsedMs: completionElapsedMs \?\? readGlobalMs\(\)/);
+assert.match(timer, /const measuredElapsedMs = completionElapsedMs \?\? readGlobalMs\(\)/);
 assert.match(timer, /Try Again/);
 
 // A pause in an earlier step must move the next step's wall-clock anchor

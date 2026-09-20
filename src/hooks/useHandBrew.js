@@ -29,6 +29,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
 import { createKeyedLatestWriteQueue } from '../lib/latestWriteQueue';
 import { canUseCachedHotRecipe, kalitaDefaultDose, v60SwitchDefaultDose, resolveIcedRetryConfiguration } from '../lib/handBrewCachePolicy';
+import { hydrateSavedSourceDose, previewSavedSourceDose, savedSourceDosePersistence } from '../lib/savedSourceDose';
 
 export function useHandBrew(updateBean, saveHandBrewTiming) {
   const mountedRef = useRef(true);
@@ -71,7 +72,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
   const [userCoffeeGrams, setUserCoffeeGrams] = useState(undefined);
   useEffect(() => {
     if (handBrewRecipe == null) return;
-    setUserCoffeeGrams(handBrewRecipe.userCoffeeGrams);
+    // A source preview retains its prior userCoffeeGrams as the explicit-save
+    // marker while coffeeGrams is the currently reviewed projection.
+    setUserCoffeeGrams(handBrewRecipe.sourceProjection
+      ? handBrewRecipe.coffeeGrams
+      : handBrewRecipe.userCoffeeGrams);
   }, [handBrewRecipe]);
 
   const isActive = (rid) => mountedRef.current && activeRequestRef.current === rid;
@@ -247,6 +252,37 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       : ['brew-over-ice', 'chill-after'].includes(candidateIced?.chillingMethod)
         ? candidateIced.chillingMethod
         : undefined;
+    if (!forceRegenerate && cachedCandidate?.sourceProjection) {
+      const rid = Symbol('handbrew-source');
+      activeRequestRef.current = rid;
+      setHandBrewBean(bean);
+      setHandBrewModal(true);
+      setHandBrewLoading(false);
+      setHandBrewPhase(null);
+      const sourceIsSwitch = cachedCandidate.device === 'v60' && cachedCandidate.variant === 'switch';
+      setHandBrewIcedUnsupported(sourceIsSwitch);
+      try {
+        setHandBrewRecipe(hydrateSavedSourceDose(cachedCandidate));
+        setHandBrewError(null);
+      } catch (sourceError) {
+        setHandBrewRecipe(null);
+        setHandBrewError(`Could not open this source recipe: ${sourceError.message || sourceError}`);
+      }
+      if (!sourceIsSwitch && candidateIced?.sourceProjection) {
+        try {
+          setHandBrewIcedRecipe(hydrateSavedSourceDose(candidateIced));
+          setHandBrewIcedError(null);
+        } catch (sourceIcedError) {
+          setHandBrewIcedRecipe(null);
+          setHandBrewIcedError(`Could not open this iced source recipe: ${sourceIcedError.message || sourceIcedError}`);
+        }
+      } else {
+        setHandBrewIcedRecipe(!sourceIsSwitch && candidateIcedValid ? candidateIced : null);
+        setHandBrewIcedError(null);
+      }
+      setHandBrewIcedLoading(false);
+      return;
+    }
     if (canUseCachedHotRecipe({
       forceRegenerate,
       cachedRecipe: cached,
@@ -638,25 +674,50 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
 
   const persistDose = useCallback(async (newDose) => {
     if (typeof newDose !== 'number' || newDose <= 0) return;
-    setHandBrewRecipe((prev) =>
-      prev ? { ...prev, userCoffeeGrams: newDose } : prev
-    );
+    let sourcePersistence = null;
+    if (handBrewRecipe?.sourceProjection) {
+      try {
+        sourcePersistence = savedSourceDosePersistence(handBrewRecipe, newDose);
+      } catch (err) {
+        console.warn('[handBrew] source persistDose rejected:', err?.message || err);
+        return;
+      }
+    }
+    setHandBrewRecipe((prev) => sourcePersistence?.persistedRecipe
+      || (prev ? { ...prev, userCoffeeGrams: newDose } : prev));
     if (!handBrewBean?.id) return;
     try {
       const dev = handBrewRecipe?.device || 'v60';
-      await updateBean(handBrewBean.id, {
+      await updateBean(handBrewBean.id, sourcePersistence?.update || {
         'handBrewRecipe.userCoffeeGrams': newDose,
         [`handBrewRecipes.${dev}.userCoffeeGrams`]: newDose,
       });
-      if (mountedRef.current) {
-        setHandBrewRecipe((prev) =>
-          prev ? { ...prev, userCoffeeGrams: newDose } : prev
-        );
-      }
     } catch (err) {
       console.warn('[handBrew] persistDose failed:', err?.message || err);
     }
   }, [handBrewBean, handBrewRecipe, updateBean]);
+
+  const handleSourceCoffeeGramsChange = useCallback((newDose) => {
+    if (typeof newDose !== 'number' || newDose <= 0
+      || !handBrewRecipe?.sourceProjection || attemptContext?.id) return;
+    if (doseDebounceRef.current) {
+      clearTimeout(doseDebounceRef.current);
+      doseDebounceRef.current = null;
+    }
+    activeRequestRef.current = null;
+    requestedFingerprintRef.current = null;
+    try {
+      const preview = previewSavedSourceDose(handBrewRecipe, newDose);
+      setUserCoffeeGrams(preview.coffeeGrams);
+      setHandBrewRecipe(preview);
+      setHandBrewIcedRecipe(null);
+      setHandBrewIcedError(null);
+      setHandBrewIcedLoading(false);
+      setHandBrewError(null);
+    } catch (err) {
+      setHandBrewError(err?.message || 'Could not resize this source recipe.');
+    }
+  }, [attemptContext?.id, handBrewRecipe]);
 
   const handleCoffeeGramsChange = (newDose) => {
     if (typeof newDose !== 'number' || newDose <= 0) return;
@@ -706,6 +767,7 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     userCoffeeGrams,
     setUserCoffeeGrams,
     handleCoffeeGramsChange,
+    handleSourceCoffeeGramsChange,
     persistDose,
     saveTimingEvent,
     onRetryIced: regenerateIced,
