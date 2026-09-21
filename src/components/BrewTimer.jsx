@@ -17,6 +17,7 @@ import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
 import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
 import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
+import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
@@ -303,6 +304,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
     start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs,
     isReady,
   } = timer;
+  const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex);
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
@@ -514,6 +516,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   };
 
   const handleSkipForward = () => {
+    suppressStepAlert();
     haptic.heavy().catch(() => {});
     skipForward();
   };
@@ -524,6 +527,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
   };
 
   const handleRewind = () => {
+    suppressStepAlert();
     haptic.medium().catch(() => {});
     rewind();
   };
