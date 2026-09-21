@@ -17,6 +17,7 @@ import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
 import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
 import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
+import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import {
   initialManualBrewState,
@@ -510,6 +511,7 @@ const BrewTimerShell = ({
   } = timer;
   const sourceProjection = recipe?.sourceProjection || null;
   const isConfirmedSource = timer.sourceMode === 'confirmed';
+  const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex);
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
@@ -745,6 +747,7 @@ const BrewTimerShell = ({
   };
 
   const handleSkipForward = () => {
+    suppressStepAlert();
     haptic.heavy().catch(() => {});
     skipForward();
   };
@@ -760,6 +763,7 @@ const BrewTimerShell = ({
   };
 
   const handleRewind = () => {
+    suppressStepAlert();
     haptic.medium().catch(() => {});
     rewind();
   };

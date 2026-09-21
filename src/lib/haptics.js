@@ -2,6 +2,12 @@ import { Capacitor } from '@capacitor/core';
 
 // Haptic feedback helpers — no-op on web, native haptics on iOS
 export const haptic = {
+  // An attention cue for hands-off brewing, stronger than a control's tap.
+  async timerStep() {
+    if (!Capacitor.isNativePlatform()) return;
+    const { Haptics } = await import('@capacitor/haptics');
+    await Haptics.vibrate();
+  },
   async light() {
     if (!Capacitor.isNativePlatform()) return;
     const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
