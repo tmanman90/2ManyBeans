@@ -3,11 +3,13 @@ export function createTimerStepAlertTracker() {
   let previous = null;
   return {
     reset() { previous = null; },
-    update({ open, phase, stepIndex }) {
+    update({ open, phase, stepIndex, readiness }) {
       const alert = Boolean(open && phase === 'running'
         && previous?.open && previous.phase === 'running'
-        && stepIndex > previous.stepIndex);
-      previous = { open, phase, stepIndex };
+        && (stepIndex > previous.stepIndex
+          || (stepIndex === previous.stepIndex && previous.readiness === 'countdown'
+            && ['ready', 'checkpoint-passed'].includes(readiness))));
+      previous = { open, phase, stepIndex, readiness };
       return alert;
     },
   };

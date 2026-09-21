@@ -509,9 +509,13 @@ const BrewTimerShell = ({
     start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs, completionAtMs,
     isReady,
   } = timer;
+<<<<<<< HEAD
   const sourceProjection = recipe?.sourceProjection || null;
   const isConfirmedSource = timer.sourceMode === 'confirmed';
   const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex);
+=======
+  const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex, timer.sourceReadiness?.status);
+>>>>>>> 2b0ad18 (fix: alert when confirmed recipe checkpoints become ready)
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
@@ -758,6 +762,7 @@ const BrewTimerShell = ({
   };
 
   const handleSourceAction = () => {
+    suppressStepAlert();
     haptic.medium().catch(() => {});
     skipForward();
   };
