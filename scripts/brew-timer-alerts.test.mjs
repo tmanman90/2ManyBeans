@@ -16,4 +16,9 @@ assert.equal(update(3, 'done'), false);
 assert.equal(update(0, 'idle', false), false);
 assert.equal(update(2), false); // restore/open midway does not alert
 assert.equal(update(5), true); // catch-up gives one cue, not a backlog
-console.log('brew timer alerts: 13 assertions passed');
+tracker.reset();
+const checkpoint = readiness => tracker.update({open: true, phase: 'running', stepIndex: 1, readiness});
+assert.equal(checkpoint('countdown'), false);
+assert.equal(checkpoint('ready'), true); // timed checkpoint awaiting confirmation
+assert.equal(checkpoint('ready'), false);
+console.log('brew timer alerts: 16 assertions passed');

@@ -304,7 +304,7 @@ export const BrewTimer = ({ open, recipe, bean, onClose, onStartTasting, onSaveT
     start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs,
     isReady,
   } = timer;
-  const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex);
+  const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex, timer.sourceReadiness?.status);
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
