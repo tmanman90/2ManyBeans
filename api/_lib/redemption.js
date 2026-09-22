@@ -2,12 +2,14 @@
 //
 // Three independent abuse locks, all enforced inside a single Firestore
 // transaction:
-//   1. Per-uid lock   → users/{uid}.redeemedCode (set forever)
-//   2. Email ledger   → redemptionLedger/{hmacHash} (survives account delete)
+//   1. Per-uid/code   → users/{uid}/redemptions/{code}
+//   2. Per-email/code → redemptionLedger/{hmacHash}_{code} (survives deletion)
 //   3. Per-code cap   → redemptionCodes/{code}.useCount < maxUses
+// Legacy redeemedCode and email-only ledger rows still block their original
+// code. Keep them intact: other codes are now allowed, old codes stay spent.
 //
 // Gmail normalization folds dots, plus-tags, and googlemail.com → gmail.com
-// so the same Google account can't get two grants via aliasing. The email
+// so the same Google account can't reuse a code via aliasing. The email
 // hash uses HMAC-SHA256 with a server-side pepper (REDEMPTION_EMAIL_PEPPER)
 // so a Firestore dump can't be rainbow-tabled, per EDPS/AEPD 2025 guidance.
 //
@@ -60,9 +62,8 @@ export function normalizeEmail(raw) {
 // redemptionLedger collection first. Every existing ledger entry was hashed
 // with the current pepper. A new pepper produces different hashes, so the
 // lookup misses old entries and every past redeemer could redeem again.
-// Migration steps: read each ledger entry's uid, look up the email from
-// users/{uid}, re-hash with the new pepper, write new ledger docs, delete
-// old ones, then swap the env var. Generate the pepper with:
+// Any migration must preserve both legacy hash-only IDs and new hash_code
+// IDs, including rows whose account was deleted. Generate the pepper with:
 //   openssl rand -base64 48
 export function hmacEmailHash(normalizedEmail) {
   const pepper = process.env.REDEMPTION_EMAIL_PEPPER;
@@ -83,13 +84,17 @@ export async function runRedemption({ db, uid, email, code }) {
 
   const codeRef = db.doc(`redemptionCodes/${code}`);
   const userRef = db.doc(`users/${uid}`);
-  const ledgerRef = db.doc(`redemptionLedger/${emailHash}`);
+  const legacyLedgerRef = db.doc(`redemptionLedger/${emailHash}`);
+  const ledgerRef = db.doc(`redemptionLedger/${emailHash}_${code}`);
+  const userCodeRef = db.doc(`users/${uid}/redemptions/${code}`);
 
   return db.runTransaction(async (tx) => {
-    const [codeSnap, userSnap, ledgerSnap] = await Promise.all([
+    const [codeSnap, userSnap, legacyLedgerSnap, ledgerSnap, userCodeSnap] = await Promise.all([
       tx.get(codeRef),
       tx.get(userRef),
+      tx.get(legacyLedgerRef),
       tx.get(ledgerRef),
+      tx.get(userCodeRef),
     ]);
 
     if (!codeSnap.exists) throw new RedeemError('invalid_code');
@@ -118,33 +123,35 @@ export async function runRedemption({ db, uid, email, code }) {
       throw new RedeemError('code_exhausted');
     }
 
-    if (userSnap.exists && userSnap.data().redeemedCode) {
-      throw new RedeemError('already_redeemed');
-    }
-    if (ledgerSnap.exists) {
+    const user = userSnap.exists ? userSnap.data() : {};
+    if (user.redeemedCode === code || legacyLedgerSnap.data()?.code === code
+        || ledgerSnap.exists || userCodeSnap.exists) {
       throw new RedeemError('already_redeemed');
     }
 
-    // Block stacking on top of any still-valid subscription, including a
-    // prior redemption grant. The per-uid `redeemedCode` lock above already
-    // catches re-redemption by the same user, so this branch only fires on
-    // a first-time redeemer who's also an active RC purchaser.
-    //
-    // Stale-status guard: if a webhook missed firing, the user doc could
-    // hold status:'active' with a past expiresAt. Mirror the expiry check
-    // in api/_lib/checkEntitlement.js so a legitimate redeemer with a
-    // genuinely-expired sub is NOT permanently locked out.
-    const existingSub = userSnap.exists ? userSnap.data()?.subscription : null;
+    // Extend a finite promotional grant of the same tier. Keep paid/trial
+    // subscriptions, lifetime access, and tier changes protected from being
+    // overwritten. Expired subscriptions can redeem any valid new code.
+    const now = new Date();
+    let startsAt = now;
+    const existingSub = user.subscription;
     if (existingSub?.status === 'active' || existingSub?.status === 'trial') {
       const expDate = existingSub.expiresAt ? new Date(existingSub.expiresAt) : null;
-      const stillValid = !expDate || isNaN(expDate.getTime()) || expDate > new Date();
+      const stillValid = !expDate || isNaN(expDate.getTime()) || expDate > now;
       if (stillValid) {
-        throw new RedeemError('has_active_subscription');
+        const sameTier = ['pro', 'ultra'].some(tier =>
+          typeof existingSub.plan === 'string' && existingSub.plan.toLowerCase().startsWith(tier)
+          && c.plan.toLowerCase().startsWith(tier)
+        );
+        if (existingSub.lastEventType !== 'REDEMPTION_CODE' || !sameTier
+            || !expDate || isNaN(expDate.getTime())) {
+          throw new RedeemError('has_active_subscription');
+        }
+        startsAt = expDate;
       }
     }
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + c.durationDays * 86400 * 1000);
+    const expiresAt = new Date(startsAt.getTime() + c.durationDays * 86400 * 1000);
 
     tx.update(codeRef, { useCount: c.useCount + 1 });
 
@@ -155,12 +162,14 @@ export async function runRedemption({ db, uid, email, code }) {
     // No `normalizedEmail` field in the body: storing the plaintext next to
     // the HMAC hash would defeat the pseudonymization the hash exists for.
     // Audit/refund workflows can join through `uid` → users/{uid}.email.
-    tx.create(ledgerRef, {
+    const redemption = {
       uid,
       code,
       plan: c.plan,
       redeemedAt: now.toISOString(),
-    });
+    };
+    tx.create(ledgerRef, redemption);
+    tx.create(userCodeRef, redemption);
 
     // Explicit field set on `subscription` (no merge) so any stale residue
     // from a prior RC sub -- cancelAtPeriodEnd, store, originalPurchaseDate,
@@ -177,8 +186,10 @@ export async function runRedemption({ db, uid, email, code }) {
     tx.set(
       userRef,
       {
-        redeemedCode: code,
-        redeemedAt: now.toISOString(),
+        // Preserve the first code, including legacy grants that predate
+        // the per-code records. The latest code lives in subscription.
+        redeemedCode: user.redeemedCode || code,
+        redeemedAt: user.redeemedAt || now.toISOString(),
         subscription: {
           status: 'active',
           plan: c.plan,

@@ -23,8 +23,8 @@ import { scrollOnFocus } from '../../../lib/formHelpers';
 const ERROR_COPY = {
   invalid_input: "That code doesn't look right. Check it and try again.",
   invalid_code: "That code doesn't look right. Check it and try again.",
-  already_redeemed: "That code's already been used.",
-  has_active_subscription: 'You already have full access. Nothing to redeem.',
+  already_redeemed: "You've already redeemed this code.",
+  has_active_subscription: "This code can't replace your active subscription.",
   email_not_verified: 'Please verify your email address first.',
   rate_limited: 'Too many attempts. Wait a bit and try again.',
 };
