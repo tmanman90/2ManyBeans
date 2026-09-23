@@ -84,7 +84,10 @@ const initialState = { phase: 'idle', stepIndex: 0 };
 // `timeSeconds` (populated by repairHandBrewRecipe) and that totalBrewTimeSeconds
 // is > last step's timeSeconds.
 export function useBrewTimer(recipe, sessionId = null, options = {}) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const restoredSession = options.restoredSession || null;
+  const [state, dispatch] = useReducer(reducer, restoredSession, (restored) => restored
+    ? { phase: restored.phase, stepIndex: restored.stepIndex }
+    : initialState);
 
   // Recompute when recipe changes (regenerate, different bean, etc.).
   // Wrapped in useMemo so it's stable within a single recipe identity.
@@ -95,19 +98,36 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
   // Refs — source of truth for time math. Never trigger re-renders.
   // Exposed on the return value so the component's rAF loop can read them
   // directly every frame instead of going through React state.
-  const startedAtRef = useRef(null);        // wall clock when brew began (after countdown)
-  const stepStartedAtRef = useRef(null);    // wall clock when current step began
-  const pauseStartedAtRef = useRef(null);   // wall clock when current pause began
-  const pausedAccumMsRef = useRef(0);       // total ms spent paused (global)
-  const stepPausedAccumMsRef = useRef(0);   // ms paused within current step
-  const completionRef = useRef(null);
+  const startedAtRef = useRef(restoredSession?.startedAt ?? null);        // wall clock when brew began (after countdown)
+  const stepStartedAtRef = useRef(restoredSession?.stepStartedAt ?? null);    // wall clock when current step began
+  const pauseStartedAtRef = useRef(restoredSession?.pauseStartedAt ?? null);   // wall clock when current pause began
+  const pausedAccumMsRef = useRef(restoredSession?.pausedAccumMs ?? 0);       // total ms spent paused (global)
+  const stepPausedAccumMsRef = useRef(restoredSession?.stepPausedAccumMs ?? 0);   // ms paused within current step
+  const completionRef = useRef(restoredSession?.completion ?? null);
   const checkpointRef = useRef(null);
 
   // Display state — 10Hz MM:SS readout. Ring animation does NOT come from here;
   // the component reads refs directly via requestAnimationFrame.
-  const [globalElapsedMs, setGlobalElapsedMs] = useState(0);
-  const [stepElapsedMs, setStepElapsedMs] = useState(0);
-  const [completion, setCompletion] = useState(null);
+  const [globalElapsedMs, setGlobalElapsedMs] = useState(() => restoredSession
+    ? restoredSession.phase === 'done'
+      ? restoredSession.completion.elapsedMs
+      : Math.max(0, (restoredSession.pauseStartedAt ?? Date.now()) - restoredSession.startedAt - restoredSession.pausedAccumMs)
+    : 0);
+  const [stepElapsedMs, setStepElapsedMs] = useState(() => restoredSession
+    ? Math.max(0, (restoredSession.pauseStartedAt ?? Date.now()) - restoredSession.stepStartedAt - restoredSession.stepPausedAccumMs)
+    : 0);
+  const [completion, setCompletion] = useState(restoredSession?.completion ?? null);
+
+  const getClockSnapshot = useCallback(() => ({
+    phase: state.phase,
+    stepIndex: state.stepIndex,
+    startedAt: startedAtRef.current,
+    stepStartedAt: stepStartedAtRef.current,
+    pauseStartedAt: pauseStartedAtRef.current,
+    pausedAccumMs: pausedAccumMsRef.current,
+    stepPausedAccumMs: stepPausedAccumMsRef.current,
+    completion: completionRef.current,
+  }), [state.phase, state.stepIndex]);
 
   const sourceTotalSeconds = sourceTimerTotalSeconds(recipe);
   const totalMs = sourceTotalSeconds != null
@@ -363,6 +383,7 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     // every frame so animations stay 60fps without React state churn.
     readGlobalMs,
     readStepMs,
+    getClockSnapshot,
     start,
     beginRunning,
     pause,

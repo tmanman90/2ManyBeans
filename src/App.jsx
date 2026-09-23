@@ -24,6 +24,8 @@ import { TourOverlay } from './components/TourOverlay';
 import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
 import { Modal } from './components/Modal';
+import { BrewTimer } from './components/BrewTimer';
+import { clearBrewTimerSession, readBrewTimerSession } from './lib/brewTimerSession';
 import { useRuphusAttemptOutbox } from './hooks/useRuphusAttemptOutbox';
 import { validateLaunchContext } from './lib/ruphus/conversationContract.js';
 
@@ -46,6 +48,8 @@ const tabs = [
 export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTiming, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, dataLoaded = true, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
+  const [recoveringTimer, setRecoveringTimer] = useState(() => readBrewTimerSession(uid));
+  useEffect(() => { setRecoveringTimer(readBrewTimerSession(uid)); }, [uid]);
   // Onboarding palate seam (null for every pre-onboarding-100x profile).
   const onboardingPalate = useMemo(() => getOnboardingPalate(profile), [profile]);
   const [openModal, setOpenModal] = useState(false);
@@ -542,6 +546,29 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
           </div>
         </div>
       </Modal>
+
+      {recoveringTimer && (
+        <BrewTimer
+          open
+          recipe={recoveringTimer.recipe}
+          bean={recoveringTimer.bean}
+          attemptId={recoveringTimer.timingContext?.attemptId || null}
+          revisionId={recoveringTimer.timingContext?.revisionId || null}
+          restoredSession={recoveringTimer}
+          onSaveTimingEvent={recoveringTimer.bean?.id && saveHandBrewTiming
+            ? (snapshot) => saveHandBrewTiming(recoveringTimer.bean.id, snapshot)
+            : undefined}
+          onStartTasting={recoveringTimer.bean?.id ? (beanId) => {
+            clearBrewTimerSession(uid);
+            setRecoveringTimer(null);
+            handleStartTastingSession(beanId, recoveringTimer.timingContext?.attemptId || null);
+          } : undefined}
+          onClose={() => {
+            clearBrewTimerSession(uid);
+            setRecoveringTimer(null);
+          }}
+        />
+      )}
     </div>
   );
 };
