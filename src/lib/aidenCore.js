@@ -495,3 +495,16 @@ export function repairAidenProfile(bean, candidate, research = null) {
   if (!final.valid) throw Object.assign(new Error(`Aiden profile repair failed: ${final.errors.join('; ')}`), { code: 'invalid_aiden_profile', details: final });
   return repaired;
 }
+
+// The direct generator's grind and title are advisory: the app owns both.
+// Replace those model fields before strict validation; Ruphus proposals still
+// use repairAidenProfile unchanged.
+export function repairGeneratedAidenProfile(bean, candidate, research = null) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return repairAidenProfile(bean, candidate, research);
+  }
+  const generated = structuredClone(candidate);
+  generated.title = buildAidenTitle(bean, '');
+  enforceDeterministicGrind(generated, bean, research);
+  return repairAidenProfile(bean, generated, research);
+}

@@ -20,6 +20,7 @@ import { aidenLinkMatchesProfile } from '../lib/ruphus/aidenProfilePreview';
 export function useAidenBrew(updateBean) {
   const mountedRef = useRef(true);
   const activeRequestRef = useRef(null);
+  const wasHiddenRef = useRef(false);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const { hasPro, hasUltra } = useSubscription();
@@ -37,6 +38,22 @@ export function useAidenBrew(updateBean) {
   const [icedResult, setIcedResult] = useState(null);
   const [icedLoading, setIcedLoading] = useState(false);
   const [icedError, setIcedError] = useState(null);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        wasHiddenRef.current = true;
+      } else if (wasHiddenRef.current) {
+        wasHiddenRef.current = false;
+        // iOS retains the open sheet while its WebView is in the background.
+        activeRequestRef.current = null;
+        setAidenModal(false);
+        setAttemptContext(null);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   const openAttempt = useCallback((bean, attempt) => {
     if (!bean?.id || !attempt?.snapshot) return;
