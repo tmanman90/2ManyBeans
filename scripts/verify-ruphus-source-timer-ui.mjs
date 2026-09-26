@@ -228,6 +228,17 @@ try {
   assert.deepEqual(unsupportedErrors, []);
   await unsupportedPage.close();
   await unsupportedContext.close();
+  const recoveryContext = await createHarnessContext();
+  const recoveryPage = await recoveryContext.newPage();
+  await recoveryPage.goto(`${baseUrl}/scripts/ruphus-source-timer-ui-fixture.html?onyx23&recovery-overlay`, { waitUntil: 'domcontentloaded' });
+  await recoveryPage.getByText('BREWING', { exact: true }).waitFor();
+  assert.equal(await recoveryPage.evaluate(() => Boolean(document.elementFromPoint(195, 500)?.closest('[data-brew-timer-overlay]'))), true,
+    'restored timer must stay above a reopened recipe sheet');
+  await recoveryPage.evaluate(() => { document.querySelector('[data-brew-timer-overlay]').style.zIndex = '1000'; });
+  assert.equal(await recoveryPage.evaluate(() => Boolean(document.elementFromPoint(195, 500)?.closest('[data-brew-timer-overlay]'))), false,
+    'the recipe sheet would cover a timer at the old shared overlay level');
+  await recoveryPage.close();
+  await recoveryContext.close();
   console.log(JSON.stringify({
     flow: 'passed', localHarnessOnly: true,
     source: 'HARIO Switch 03 Matt Winton bloom hybrid', nativeUnits: ['50g', '360mL'], automaticEvents: false,

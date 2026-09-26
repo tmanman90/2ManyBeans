@@ -738,7 +738,7 @@ const BrewTimerShell = ({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 32,
-        zIndex: 1000,
+        zIndex: 1001,
       }}>
         <div style={{ fontSize: 16, color: C.text, textAlign: 'center', marginBottom: 16, fontFamily: fonts.body }}>
           This recipe is missing timer data.
@@ -819,6 +819,7 @@ const BrewTimerShell = ({
 
   return createPortal(
     <div
+      data-brew-timer-overlay
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
@@ -826,7 +827,7 @@ const BrewTimerShell = ({
         background: C.bg,
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 1000,
+        zIndex: 1001,
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         fontFamily: fonts.body,
