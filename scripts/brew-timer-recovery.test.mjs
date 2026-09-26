@@ -2,8 +2,30 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
+import { MAX_BREW_TIMER_AGE_MS, restorableSourceTimerState, sourceRestoreStartedAt } from '../src/lib/brewTimerSteps.js';
+import { KALITA_SOURCES } from '../src/data/manualSources/kalita.js';
+import { projectManualSource } from '../src/lib/manualSourceProjection.js';
+import { initialManualBrewState } from '../src/lib/ruphus/sourceTimerState.js';
 
-assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId, \{ sourceTimerState, sourceTimerBinding \}\)/);
+const now = 200_000_000;
+assert.ok(restorableSourceTimerState({ events: { 'first-water': now - 20_000 } }, now), 'recent source timer remains recoverable');
+assert.equal(restorableSourceTimerState({ events: { 'first-water': now - MAX_BREW_TIMER_AGE_MS } }, now), null, 'stale source timer cannot reopen a brew');
+assert.equal(restorableSourceTimerState({ events: { 'first-water': now + 1 } }, now), null, 'future source timer cannot reopen a brew');
+const onyx = KALITA_SOURCES.find(source => source.id === 'onyx-monarch-wave-185');
+const projection = projectManualSource(onyx, { device: 'kalita', size: '185', model: 'Wave', filter: 'wave-185', mode: 'hot', dose: 25 });
+const sourceRecipe = { sourceProjection: projection };
+const binding = {
+  sourceId: projection.sourceId, sourceRevision: projection.sourceRevision,
+  sourceConfiguration: projection.sourceConfiguration, configurationKey: projection.configurationKey,
+  fingerprint: projection.sourceFingerprint || null, dose: projection.coffeeGrams,
+};
+const sourceState = initialManualBrewState(projection.sourceExecution, binding);
+sourceState.events['first-water'] = now - 20_000;
+assert.equal(sourceRestoreStartedAt(sourceRecipe, sourceState, binding, now), now - 20_000, 'recent Onyx source timer resumes');
+sourceState.events['first-water'] = now - MAX_BREW_TIMER_AGE_MS;
+assert.equal(sourceRestoreStartedAt(sourceRecipe, sourceState, binding, now), null, 'stale Onyx source timer starts fresh');
+
+assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId, \{ sourceTimerState, sourceTimerBinding, restoredSession \}\)/);
 assert.ok(/const handleConfirmClose = \(\) => \{\s*reset\(\);/.test(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8')), 'Stop clears the checkpoint before the attempt modal unmounts');
 assert.match(readFileSync(new URL('../src/components/HandBrewModal.jsx', import.meta.url), 'utf8'), /key=\{attemptId \|\| \(sourceProjection \? `\$\{sourceProjection\.sourceId\}:\$\{sourceProjection\.sourceRevision\}` : 'standard-brew'\)\}/);
 
@@ -85,6 +107,16 @@ try {
   await page.evaluate(() => window.timer.finish('userFinished'));
   await page.waitForFunction(() => window.timer.phase === 'done');
   await page.reload();
+  await page.waitForFunction(() => window.timer?.phase === 'countdown');
+  await page.evaluate(() => {
+    const startedAt = 30000000 - 6 * 60 * 60 * 1000;
+    localStorage.setItem('ruphus-timer-v1:trial-two', JSON.stringify({
+      signature: JSON.stringify(window.timer.timerSteps.map(step => [step.startSeconds, step.durationSeconds])),
+      phase: 'running', stepIndex: 2, startedAt, stepStartedAt: startedAt + 60000,
+      pauseStartedAt: null, pausedAccumMs: 0, stepPausedAccumMs: 0,
+    }));
+  });
+  await page.goto(`${origin}/__timer-recovery?attempt=trial-two&now=30000000`);
   await page.waitForFunction(() => window.timer?.phase === 'countdown');
   await page.evaluate(() => localStorage.setItem('ruphus-timer-v1:trial-two', '{broken'));
   await page.reload();

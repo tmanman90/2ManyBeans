@@ -19,6 +19,7 @@ import { useReducer, useRef, useState, useEffect, useCallback, useMemo } from 'r
 import {
   advanceStepClock,
   buildTimerSteps,
+  MAX_BREW_TIMER_AGE_MS,
   normalizeRecipePhases,
   sourceRestoreStartedAt,
   sourceTimerMode,
@@ -37,7 +38,7 @@ function readCheckpoint(id, signature, stepCount) {
     if (!saved || saved.signature !== signature || !['running', 'paused'].includes(saved.phase)) return null;
     if (!Number.isInteger(saved.stepIndex) || saved.stepIndex < 0 || saved.stepIndex >= stepCount) return null;
     if (![saved.startedAt, saved.stepStartedAt, saved.pausedAccumMs, saved.stepPausedAccumMs].every(Number.isFinite)) return null;
-    if (saved.startedAt <= 0 || saved.stepStartedAt < saved.startedAt || saved.stepStartedAt > now) return null;
+    if (saved.startedAt <= 0 || now - saved.startedAt >= MAX_BREW_TIMER_AGE_MS || saved.stepStartedAt < saved.startedAt || saved.stepStartedAt > now) return null;
     if (saved.pausedAccumMs < 0 || saved.pausedAccumMs > now - saved.startedAt || saved.stepPausedAccumMs < 0 || saved.stepPausedAccumMs > saved.pausedAccumMs) return null;
     if (saved.phase === 'paused' && (!Number.isFinite(saved.pauseStartedAt) || saved.pauseStartedAt < saved.stepStartedAt || saved.pauseStartedAt > now)) return null;
     if (saved.phase === 'running' && saved.pauseStartedAt !== null) return null;

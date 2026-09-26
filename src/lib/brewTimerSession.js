@@ -1,7 +1,6 @@
-import { buildTimerSteps } from './brewTimerSteps.js';
+import { buildTimerSteps, MAX_BREW_TIMER_AGE_MS } from './brewTimerSteps.js';
 
 const KEY_PREFIX = 'active-brew-timer-v1:';
-const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 const keyFor = (uid) => `${KEY_PREFIX}${uid || 'demo'}`;
 
@@ -15,7 +14,7 @@ export function readBrewTimerSession(uid, storage, now = Date.now()) {
       && ['running', 'paused', 'done'].includes(session.phase)
       && Number.isFinite(session.startedAt)
       && session.startedAt <= now
-      && now - session.startedAt < MAX_AGE_MS
+      && now - session.startedAt < MAX_BREW_TIMER_AGE_MS
       && Number.isInteger(session.stepIndex)
       && session.stepIndex >= 0
       && Number.isFinite(session.stepStartedAt)

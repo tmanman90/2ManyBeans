@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'framer-motion';
+import { AuthContext } from '../src/contexts/AuthContext.jsx';
 import '../src/styles/global.css';
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
 import { UserPreferencesProvider } from '../src/hooks/useUserProfile.jsx';
@@ -113,4 +114,4 @@ function Fixture() {
   );
 }
 
-createRoot(document.getElementById('root')).render(<MotionConfig reducedMotion="user"><Fixture /></MotionConfig>);
+createRoot(document.getElementById('root')).render(<AuthContext.Provider value={{ user: null }}><MotionConfig reducedMotion="user"><Fixture /></MotionConfig></AuthContext.Provider>);

@@ -31,6 +31,7 @@ import { timingContextFromRecipe } from '../lib/brewTimingMemory';
 import {
   resolveGuideState,
   resolveStepTiming,
+  restorableSourceTimerState,
   resumeSourceTimerState,
   saveBrewTimingEvent,
   sourceTimerDisplayStages,
@@ -1311,7 +1312,7 @@ function ConfirmedSourceBrewTimerSession({ onReplaceSourceTimerState, ...props }
 }
 
 function ConfirmedSourceBrewTimer({ onSourceTimerStateChange, ...props }) {
-  const [sessionState, setSessionState] = useState(props.sourceTimerState);
+  const [sessionState, setSessionState] = useState(() => restorableSourceTimerState(props.sourceTimerState));
   const [generation, setGeneration] = useState(0);
   const publishState = useCallback((next) => {
     setSessionState(next);
