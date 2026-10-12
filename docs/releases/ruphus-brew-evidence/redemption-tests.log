@@ -1,0 +1,155 @@
+
+> coffee-hub@1.1.255 test:onboarding-redemption
+> node scripts/onboarding-redemption-regression.test.mjs && node --test scripts/redemption-codes.test.mjs
+
+Onboarding redemption regression passed.
+(node:51842) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+TAP version 13
+# Subtest: first redemption grants finite access and preserves unrelated profile fields
+ok 1 - first redemption grants finite access and preserves unrelated profile fields
+  ---
+  duration_ms: 2.968417
+  type: 'test'
+  ...
+# Subtest: different codes extend remaining promotional time; every old code stays spent
+ok 2 - different codes extend remaining promotional time; every old code stays spent
+  ---
+  duration_ms: 1.608917
+  type: 'test'
+  ...
+# Subtest: legacy profile and email history allow a different code without erasing the first
+ok 3 - legacy profile and email history allow a different code without erasing the first
+  ---
+  duration_ms: 0.469459
+  type: 'test'
+  ...
+# Subtest: legacy uid lock survives an email change even without an email ledger
+ok 4 - legacy uid lock survives an email change even without an email ledger
+  ---
+  duration_ms: 0.180375
+  type: 'test'
+  ...
+# Subtest: legacy email-only history blocks the same code after account recreation, not different codes
+ok 5 - legacy email-only history blocks the same code after account recreation, not different codes
+  ---
+  duration_ms: 0.155375
+  type: 'test'
+  ...
+# Subtest: email ledger prevents reuse through Gmail aliases and a recreated account
+ok 6 - email ledger prevents reuse through Gmail aliases and a recreated account
+  ---
+  duration_ms: 0.191375
+  type: 'test'
+  ...
+# Subtest: uid history prevents reuse of a later code after changing email
+ok 7 - uid history prevents reuse of a later code after changing email
+  ---
+  duration_ms: 0.268417
+  type: 'test'
+  ...
+# Subtest: expired grants start the new duration now, rather than at the old expiry
+ok 8 - expired grants start the new duration now, rather than at the old expiry
+  ---
+  duration_ms: 0.096958
+  type: 'test'
+  ...
+# Subtest: does not overwrite paid subscription or consume the code
+ok 9 - does not overwrite paid subscription or consume the code
+  ---
+  duration_ms: 0.430209
+  type: 'test'
+  ...
+# Subtest: does not overwrite paid trial or consume the code
+ok 10 - does not overwrite paid trial or consume the code
+  ---
+  duration_ms: 0.3355
+  type: 'test'
+  ...
+# Subtest: does not overwrite paid subscription with a leftover grantedCode or consume the code
+ok 11 - does not overwrite paid subscription with a leftover grantedCode or consume the code
+  ---
+  duration_ms: 0.158
+  type: 'test'
+  ...
+# Subtest: does not overwrite different promotional tier or consume the code
+ok 12 - does not overwrite different promotional tier or consume the code
+  ---
+  duration_ms: 0.472875
+  type: 'test'
+  ...
+# Subtest: does not overwrite lifetime promotional access or consume the code
+ok 13 - does not overwrite lifetime promotional access or consume the code
+  ---
+  duration_ms: 0.189458
+  type: 'test'
+  ...
+# Subtest: does not overwrite invalid promotional expiry or consume the code
+ok 14 - does not overwrite invalid promotional expiry or consume the code
+  ---
+  duration_ms: 0.112166
+  type: 'test'
+  ...
+# Subtest: does not overwrite invalid existing plan or consume the code
+ok 15 - does not overwrite invalid existing plan or consume the code
+  ---
+  duration_ms: 0.082583
+  type: 'test'
+  ...
+# Subtest: exhausted codes do not mutate subscription or history
+ok 16 - exhausted codes do not mutate subscription or history
+  ---
+  duration_ms: 0.083709
+  type: 'test'
+  ...
+# Subtest: disabled codes do not mutate subscription or history
+ok 17 - disabled codes do not mutate subscription or history
+  ---
+  duration_ms: 0.0625
+  type: 'test'
+  ...
+# Subtest: expired codes do not mutate subscription or history
+ok 18 - expired codes do not mutate subscription or history
+  ---
+  duration_ms: 0.068541
+  type: 'test'
+  ...
+# Subtest: invalid duration codes do not mutate subscription or history
+ok 19 - invalid duration codes do not mutate subscription or history
+  ---
+  duration_ms: 0.192417
+  type: 'test'
+  ...
+# Subtest: parallel requests for the same account/code grant once
+ok 20 - parallel requests for the same account/code grant once
+  ---
+  duration_ms: 0.164375
+  type: 'test'
+  ...
+# Subtest: parallel different codes accumulate both durations without losing a grant
+ok 21 - parallel different codes accumulate both durations without losing a grant
+  ---
+  duration_ms: 0.251209
+  type: 'test'
+  ...
+# Subtest: parallel requests from two accounts cannot exceed a code cap
+ok 22 - parallel requests from two accounts cannot exceed a code cap
+  ---
+  duration_ms: 0.15725
+  type: 'test'
+  ...
+# Subtest: parallel Gmail aliases on different accounts cannot reuse a code
+ok 23 - parallel Gmail aliases on different accounts cannot reuse a code
+  ---
+  duration_ms: 0.136541
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 59.075958

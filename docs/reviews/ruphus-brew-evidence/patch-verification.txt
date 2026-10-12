@@ -1,0 +1,15 @@
+Base: 5ce7f2d3b53479e49259097b191e0b5d4eabd9c4
+SHA-256: 42ecd4d782f7bf2e29cd3a0bd5f001f985423600a9ac9ca70c347505bff6350c
+git apply --check: PASS against temporary reconstruction of changed tracked files at base; no repository files modified.
+Patch includes:
+api/_lib/ruphusEvidence.js
+api/_lib/ruphusOrchestrator.js
+api/_lib/ruphusPrompt.js
+api/_lib/ruphusTools.js
+scripts/ruphus-source-completion.test.mjs
+api/_lib/ruphusBrewEvidence.js
+api/_lib/ruphusSensoryConsistency.js
+scripts/fixtures/ruphus-frukt-brew.mjs
+scripts/ruphus-brew-counterfactual.mjs
+scripts/ruphus-brew-evidence.test.mjs
+scripts/ruphus-sensory-consistency.test.mjs

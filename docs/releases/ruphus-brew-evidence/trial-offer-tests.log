@@ -1,0 +1,5 @@
+
+> coffee-hub@1.1.255 test:trial-offer
+> node scripts/trial-offer.test.mjs
+
+trial-offer.test.mjs: all assertions passed

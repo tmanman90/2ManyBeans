@@ -1,0 +1,416 @@
+{
+  "baselineCommit": "5ce7f2d3b53479e49259097b191e0b5d4eabd9c4",
+  "model": "gpt-5.6-luna",
+  "reasoning": "medium",
+  "maxOutputTokens": 900,
+  "evidenceByteCap": 4096,
+  "limits": {
+    "providerCalls": 4,
+    "maxRequestBytes": 200000,
+    "estimatedCostUSD": 0.5
+  },
+  "cases": [
+    {
+      "scenario": "ambiguous_cup",
+      "arm": "corrected",
+      "userText": "One of my Kalita cups was still thin, but I’m not sure which recipe I used. What should I change?",
+      "result": {
+        "ok": true,
+        "turnId": "ambiguous_cup-corrected",
+        "text": "Which cup was thin: the 24g/396g brew at 1:16.5, or the 18g/279g brew at 1:15.5 that finished in 3:24?",
+        "state": "clarification",
+        "intent": "recipe_preview",
+        "artifacts": [],
+        "toolCalls": 1,
+        "toolNames": [
+          "read_coffee_evidence"
+        ],
+        "proposalIds": [],
+        "trace": {
+          "focusChanges": [],
+          "reads": [
+            {
+              "name": "read_coffee_evidence",
+              "at": "2026-10-12T00:54:19.171Z"
+            }
+          ],
+          "regenerations": [],
+          "toolEvents": [
+            {
+              "name": "read_coffee_evidence",
+              "outcome": "succeeded",
+              "slot": "kalita_hot",
+              "target": "cb7fcf546"
+            }
+          ]
+        },
+        "timing": {
+          "firstFrameMs": 5423.0313750000005,
+          "checkedReplyMs": 5423.039458,
+          "readRoundMs": 5.355167000000165,
+          "regenerationCount": 0
+        },
+        "requestId": "resp_0bb2821cdcfd4b9c016acc2fbb564887d0a001fb32dcc9c9d5",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input_tokens": 14144,
+          "output_tokens": 318,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 194
+          }
+        },
+        "retryCount": 0,
+        "grader": {
+          "version": "conversation-contract-v2-recipe-first",
+          "passed": false,
+          "violations": [
+            {
+              "code": "CF3_SILENT_CORRECTION",
+              "category": "catastrophic",
+              "message": "reply uses corrected state without acknowledging the correction"
+            }
+          ],
+          "catastrophic": [
+            {
+              "code": "CF3_SILENT_CORRECTION",
+              "category": "catastrophic",
+              "message": "reply uses corrected state without acknowledging the correction"
+            }
+          ],
+          "ordinary": [],
+          "runtimeTriggers": []
+        }
+      },
+      "toolLog": [
+        {
+          "name": "read_coffee_evidence",
+          "args": {
+            "coffeeRef": "cb7fcf546",
+            "windowDays": null,
+            "slot": "kalita_hot"
+          },
+          "result": {
+            "coffee": {
+              "kind": "coffee",
+              "status": "available",
+              "summary": "Casa Almeida Barreto is in your rotation.",
+              "coffee": {
+                "name": "Casa Almeida Barreto",
+                "roaster": "FRUKT",
+                "origin": "Brazil",
+                "process": "Natural"
+              }
+            },
+            "recipe": {
+              "kind": "recipe",
+              "status": "available",
+              "summary": "hot Kalita",
+              "windowDays": null,
+              "count": 1,
+              "configurations": [
+                {
+                  "method": "pour-over",
+                  "device": "kalita",
+                  "mode": "hot",
+                  "kalitaSize": "185",
+                  "slot": "hot Kalita"
+                }
+              ]
+            },
+            "brews": {
+              "kind": "brews",
+              "status": "available",
+              "summary": "BREW — completed — hot Kalita — 0 days ago — 24g, 396g, 6.2, 93° | BREW — completed — hot Kalita — 0 days ago — 18g, 279g, 6.2, 93°, measured 3:24",
+              "windowDays": null,
+              "count": 2
+            },
+            "tastings": {
+              "kind": "tastings",
+              "status": "empty",
+              "summary": "No tastings in the available history.",
+              "windowDays": null
+            },
+            "windowDays": null,
+            "readAt": "2026-10-12T00:00:00.000Z",
+            "unavailable": [],
+            "recentBrews": [
+              {
+                "brewRef": "brew-33199930852f",
+                "status": "completed",
+                "completedAt": "2026-10-11T23:50:00Z",
+                "recipe": {
+                  "method": "pour-over",
+                  "device": "kalita",
+                  "mode": "hot",
+                  "kalitaSize": "185",
+                  "configurationKey": "kalita:185:wave-paper:hot",
+                  "doseProfile": "185-large",
+                  "coffeeGrams": 24,
+                  "userCoffeeGrams": 24,
+                  "waterGrams": 396,
+                  "ratio": "1:16.5",
+                  "technique": "low-agitation-no-swirl",
+                  "techniqueInstruction": "Use slow, centered pours with a low stream. Do not spiral or swirl.",
+                  "steps": [
+                    {
+                      "time": "0:00",
+                      "timeSeconds": 0,
+                      "action": "Bloom with 74g water; keep the stream centered and do not swirl.",
+                      "waterTotal": 74,
+                      "phase": "brew"
+                    },
+                    {
+                      "time": "0:30",
+                      "timeSeconds": 30,
+                      "action": "Pour slowly and directly into the center to 178g total; keep the stream low and do not spiral.",
+                      "waterTotal": 178
+                    },
+                    {
+                      "time": "2:00",
+                      "timeSeconds": 120,
+                      "action": "Finish at 396g total with another low, centered pour; do not spiral or swirl.",
+                      "waterTotal": 396
+                    }
+                  ],
+                  "prepSteps": [
+                    {
+                      "action": "Rinse and preheat the Wave 155/185 filter and server; discard rinse water.",
+                      "phase": "prep"
+                    },
+                    {
+                      "action": "Add 24g coffee and level the bed.",
+                      "phase": "prep"
+                    }
+                  ],
+                  "postBrewSteps": [],
+                  "waterTemp": {
+                    "celsius": 93,
+                    "fahrenheit": 199
+                  },
+                  "grindSize": {
+                    "setting": "6.2",
+                    "microns": 747,
+                    "description": "Medium-Coarse"
+                  },
+                  "timerReady": true,
+                  "phaseContractVersion": 1,
+                  "candidate": true,
+                  "doseTimingPolicy": "generated-dose-v1",
+                  "engineVersion": "kalita-engine-v2",
+                  "rulesVersion": "kalita-rules-v3-phase1",
+                  "reasonCodes": [
+                    "CONSERVATIVE_UNKNOWN_TECHNIQUE",
+                    "WAVE_185_DEEPER_BED_PROFILE"
+                  ],
+                  "reasoning": "For this bean, the Wave 185 recipe uses a low agitation no swirl profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.",
+                  "tips": "Aim for 6:05 to 6:50. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.",
+                  "title": "Kalita Wave 185 recipe"
+                },
+                "grinderGuidance": {
+                  "grinderKey": "fellow-ode-gen2",
+                  "setting": "6.2",
+                  "controlUnit": "physical_setting",
+                  "oneClickFiner": 6,
+                  "oneClickCoarser": 6.6
+                },
+                "actualElapsedMs": null,
+                "timing": {
+                  "measuredElapsedSeconds": null,
+                  "plannedTargetSeconds": 390,
+                  "measurementStatus": "unknown",
+                  "guidance": "Only measuredElapsedSeconds describes how long this brew took. Planned target is not observed finish time."
+                },
+                "feedback": []
+              },
+              {
+                "brewRef": "brew-dbff611f3dea",
+                "status": "completed",
+                "completedAt": "2026-10-11T23:37:54.953Z",
+                "recipe": {
+                  "method": "pour-over",
+                  "device": "kalita",
+                  "mode": "hot",
+                  "kalitaSize": "185",
+                  "configurationKey": "kalita:185:wave-paper:hot",
+                  "doseProfile": "185-standard",
+                  "coffeeGrams": 18,
+                  "waterGrams": 279,
+                  "ratio": "1:15.5",
+                  "technique": "low-agitation-no-swirl",
+                  "techniqueInstruction": "Use slow, centered pours with a low stream. Do not spiral or swirl.",
+                  "steps": [
+                    {
+                      "time": "0:00",
+                      "timeSeconds": 0,
+                      "action": "Bloom with 54g water; keep the stream centered and do not swirl.",
+                      "waterTotal": 54,
+                      "phase": "brew"
+                    },
+                    {
+                      "time": "0:30",
+                      "timeSeconds": 30,
+                      "action": "Pour slowly and directly into the center to 126g total; keep the stream low and do not spiral.",
+                      "waterTotal": 126
+                    },
+                    {
+                      "time": "1:30",
+                      "timeSeconds": 90,
+                      "action": "Finish at 279g total with another low, centered pour; do not spiral or swirl.",
+                      "waterTotal": 279
+                    }
+                  ],
+                  "prepSteps": [
+                    {
+                      "action": "Rinse and preheat the Wave 155/185 filter and server; discard rinse water.",
+                      "phase": "prep"
+                    },
+                    {
+                      "action": "Add 18g coffee and level the bed.",
+                      "phase": "prep"
+                    }
+                  ],
+                  "postBrewSteps": [],
+                  "waterTemp": {
+                    "celsius": 93,
+                    "fahrenheit": 199
+                  },
+                  "grindSize": {
+                    "setting": "6.2",
+                    "microns": 747,
+                    "description": "Medium-Coarse"
+                  },
+                  "timerReady": true,
+                  "phaseContractVersion": 1,
+                  "candidate": true,
+                  "doseTimingPolicy": "generated-dose-v1",
+                  "engineVersion": "kalita-engine-v2",
+                  "rulesVersion": "kalita-rules-v3-phase1",
+                  "reasonCodes": [
+                    "CONSERVATIVE_UNKNOWN_TECHNIQUE",
+                    "WAVE_185_DEEPER_BED_PROFILE",
+                    "TECHNIQUE_LOW_AGITATION_NO_SWIRL",
+                    "WAVE_185_DEEPER_BED_PROFILE"
+                  ],
+                  "reasoning": "For this bean, the Wave 185 recipe uses a low agitation no swirl profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.",
+                  "tips": "Aim for 4:35 to 5:20. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.",
+                  "title": "Kalita Wave 185 recipe"
+                },
+                "grinderGuidance": {
+                  "grinderKey": "fellow-ode-gen2",
+                  "setting": "6.2",
+                  "controlUnit": "physical_setting",
+                  "oneClickFiner": 6,
+                  "oneClickCoarser": 6.6
+                },
+                "actualElapsedMs": 203813,
+                "timing": {
+                  "measuredElapsedSeconds": 204,
+                  "plannedTargetSeconds": 300,
+                  "measurementStatus": "recorded",
+                  "guidance": "Only measuredElapsedSeconds describes how long this brew took. Planned target is not observed finish time."
+                },
+                "feedback": []
+              }
+            ],
+            "method": {
+              "slot": "kalita_hot",
+              "displayName": "hot Kalita",
+              "tier": "M1"
+            },
+            "coffeeRef": "cb7fcf546",
+            "selectedRecipe": {
+              "method": "pour-over",
+              "device": "kalita",
+              "mode": "hot",
+              "kalitaSize": "185",
+              "configurationKey": "kalita:185:wave-paper:hot",
+              "doseProfile": "185-large",
+              "coffeeGrams": 24,
+              "userCoffeeGrams": 24,
+              "waterGrams": 396,
+              "ratio": "1:16.5",
+              "technique": "low-agitation-no-swirl",
+              "techniqueInstruction": "Use slow, centered pours with a low stream. Do not spiral or swirl.",
+              "steps": [
+                {
+                  "time": "0:00",
+                  "timeSeconds": 0,
+                  "action": "Bloom with 74g water; keep the stream centered and do not swirl.",
+                  "waterTotal": 74,
+                  "phase": "brew"
+                },
+                {
+                  "time": "0:30",
+                  "timeSeconds": 30,
+                  "action": "Pour slowly and directly into the center to 178g total; keep the stream low and do not spiral.",
+                  "waterTotal": 178
+                },
+                {
+                  "time": "2:00",
+                  "timeSeconds": 120,
+                  "action": "Finish at 396g total with another low, centered pour; do not spiral or swirl.",
+                  "waterTotal": 396
+                }
+              ],
+              "prepSteps": [
+                {
+                  "action": "Rinse and preheat the Wave 155/185 filter and server; discard rinse water.",
+                  "phase": "prep"
+                },
+                {
+                  "action": "Add 24g coffee and level the bed.",
+                  "phase": "prep"
+                }
+              ],
+              "postBrewSteps": [],
+              "waterTemp": {
+                "celsius": 93,
+                "fahrenheit": 199
+              },
+              "grindSize": {
+                "setting": "6.2",
+                "microns": 747,
+                "description": "Medium-Coarse"
+              },
+              "totalBrewTimeSeconds": 390,
+              "totalBrewTime": "6:30",
+              "guideTargetSeconds": 390,
+              "timerReady": true,
+              "phaseContractVersion": 1,
+              "candidate": true,
+              "doseTimingPolicy": "generated-dose-v1",
+              "engineVersion": "kalita-engine-v2",
+              "rulesVersion": "kalita-rules-v3-phase1",
+              "reasonCodes": [
+                "CONSERVATIVE_UNKNOWN_TECHNIQUE",
+                "WAVE_185_DEEPER_BED_PROFILE"
+              ],
+              "reasoning": "For this bean, the Wave 185 recipe uses a low agitation no swirl profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.",
+              "tips": "Aim for 6:05 to 6:50. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.",
+              "title": "Kalita Wave 185 recipe"
+            },
+            "sourceControls": {
+              "allowedControls": [
+                "servingDoseGrams",
+                "grind",
+                "temperature",
+                "ratio"
+              ],
+              "servingDoseGrams": [
+                15,
+                36
+              ]
+            }
+          }
+        }
+      ],
+      "inMemoryProposals": []
+    }
+  ],
+  "note": "One replay per case per arm, not a statistical reliability estimate. Original production tools/prompt versus corrected tools/prompt; sanitized actual-case fixture, in-memory proposals only. Cost is estimated using the repository pricing registry.",
+  "calls": 2,
+  "estimatedCostUSD": 0.0032104
+}

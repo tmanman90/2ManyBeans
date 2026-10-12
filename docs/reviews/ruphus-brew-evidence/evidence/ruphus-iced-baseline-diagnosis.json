@@ -1,0 +1,8 @@
+{
+  "url": "http://127.0.0.1:5173/scripts/ruphus-recipe-first-preview-fixture.html?iced=v60",
+  "errors": [
+    "useAuthContext must be used within AuthContext"
+  ],
+  "text": "",
+  "fixtureFilesUnchangedFromProduction": true
+}

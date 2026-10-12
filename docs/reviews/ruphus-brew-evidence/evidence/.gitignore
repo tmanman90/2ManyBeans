@@ -1,0 +1,4 @@
+# Keep the requested review proof with the candidate despite repository-wide
+# exclusions for generated logs and screenshots.
+!*.log
+!*.png

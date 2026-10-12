@@ -1,0 +1,705 @@
+scripts/v60-switch-runtime-contract.test.mjs
+v60 switch runtime contract [1] passed (timer + scaling survive every roast/grinder/process/dose combination)
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: no short note when iced is unsupported for the current variant
+    at file:///Users/talmeltzer/.codex/worktrees/timer-production-release/Coffee-App-Build/scripts/v60-switch-runtime-contract.test.mjs:158:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '// Hand brew recipe modal — step-by-step pour-over guide with editorial warm aesthetic\n' +
+    "import { useState, useMemo, useCallback, useEffect, useRef } from 'react';\n" +
+    "import { C, fonts, type, shadows, radius } from '../styles/theme';\n" +
+    "import { m } from '../lib/motion';\n" +
+    "import { fadeUp, spring } from '../lib/motion';\n" +
+    "import { Modal } from './Modal';\n" +
+    "import { Btn } from './Btn';\n" +
+    "import { BrewTimer } from './BrewTimer';\n" +
+    "import { DoseStepperCard } from './DoseStepperCard';\n" +
+    "import { Coffee, Droplets, Thermometer, RefreshCw, Play, Scale, Snowflake, ArrowLeft } from 'lucide-react';\n" +
+    "import { usePreferences } from '../hooks/useUserProfile';\n" +
+    "import { GRINDER_LABELS } from '../lib/brewMethods';\n" +
+    "import { timerRecipeForMode } from '../lib/brewTimerRecipe';\n" +
+    "import { transformToFlashBrew } from '../lib/flashBrewTransform';\n" +
+    "import { isDeterministicV60Hot } from '../lib/v60Generation';\n" +
+    "import { isDeterministicKalitaHot } from '../lib/kalitaIcedAdapter';\n" +
+    "import { kalitaDoseBounds } from '../data/kalitaConfiguration';\n" +
+    "import { V60_SWITCH_DOSE_BOUNDS } from '../data/v60SwitchConfiguration';\n" +
+    "import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';\n" +
+    "import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';\n" +
+    "import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';\n" +
+    "import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';\n" +
+    "import { adaptedDoseBounds } from '../lib/ruphus/techniqueOptions.js';\n" +
+    "import { manualSourceDisplay, manualSourceGrindGuidance } from '../lib/manualSourceProjection.js';\n" +
+    "import { manualSourceRecipeView } from '../lib/manualSourceRecipeView.js';\n" +
+    '\n' +
+    'const ICE_RULE       = C.frostBorder;\n' +
+    'const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;\n' +
+    'const ICE_TILE_BG    = C.frostSoft;\n' +
+    'const sourcePrimaryButtonStyle = {\n' +
+    "  width: '100%',\n" +
+    '  minHeight: 52,\n' +
+    "  padding: '16px 20px',\n" +
+    '  borderRadius: radius.md,\n' +
+    '  background: `linear-gradient(160deg, #C4844A 0%, ${C.accent} 100%)`,\n' +
+    "  color: '#FFF8F0',\n" +
+    '  border: `1px solid ${C.accent}`,\n' +
+    '  fontSize: 16,\n' +
+    '  fontWeight: 700,\n' +
+    '  fontFamily: fonts.body,\n' +
+    "  cursor: 'pointer',\n" +
+    '  boxShadow: `${shadows.button}, 0 4px 14px rgba(168,106,56,0.22)`,\n' +
+    "  WebkitTapHighlightColor: 'transparent',\n" +
+    '};\n' +
+    '\n' +
+    '// ── Eyebrow label ─────────────────────────────────────────────────────────────\n' +
+    'const SectionLabel = ({ children, style }) => (\n' +
+    '  <div style={{ ...type.label, color: C.textMuted, ...style }}>{children}</div>\n' +
+    ');\n' +
+    '\n' +
+    'const TimingMemoryHint = ({ memory, context }) => {\n' +
+    '  if (!memory?.event) return null;\n' +
+    '  const event = memory.event;\n' +
+    '  const configuration = [\n' +
+    "    event.device === 'kalita' ? `Wave ${event.kalitaSize}` : event.device.toUpperCase(),\n" +
+    '    `${event.doseGrams}g`,\n' +
+    "    event.mode === 'iced' ? 'iced' : 'hot',\n" +
+    "  ].filter(Boolean).join(' · ');\n" +
+    '  return (\n' +
+    '    <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: \'12px 16px\', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>\n' +
+    '      <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Prior brew</SectionLabel>\n' +
+    '      <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>\n' +
+    '        Last brew: <strong>{formatTimingMs(event.actualElapsedMs)}</strong> at {configuration}\n' +
+    "        {!memory.isExactDose && ' — different dose, so use this only as context'}\n" +
+    '      </div>\n' +
+    '      {memory.range && (\n' +
+    '        <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>\n' +
+    '          Your last {memory.range.sampleCount} comparable brews: {formatTimingMs(memory.range.minMs)}–{formatTimingMs(memory.range.maxMs)} (middle {formatTimingMs(memory.range.medianMs)})\n' +
+    '        </div>\n' +
+    '      )}\n' +
+    '    </div>\n' +
+    '  );\n' +
+    '};\n' +
+    '\n' +
+    'const sourceStageQuantity = (stage) => {\n' +
+    '  if (stage?.water?.value != null && stage?.water?.unit) {\n' +
+    '    const value = stage.water.value;\n' +
+    "    const rendered = value && typeof value === 'object' && Number.isFinite(value.min) && Number.isFinite(value.max)\n" +
+    '      ? `${value.min}–${value.max}`\n' +
+    '      : value;\n' +
+    '    return `${rendered}${stage.water.unit}`;\n' +
+    '  }\n' +
+    '  if (stage?.waterToGrams != null) return `${stage.waterToGrams}g`;\n' +
+    '  if (stage?.waterToMilliliters != null) return `${stage.waterToMilliliters}mL`;\n' +
+    '  return null;\n' +
+    '};\n' +
+    '\n' +
+    'const sourceTriggerLabel = (stage, projection) => {\n' +
+    '  const trigger = stage?.trigger;\n' +
+    '  if (!trigger) return null;\n' +
+    "  if (trigger.type === 'manual') return 'Begin when ready';\n" +
+    "  if (trigger.type === 'condition') return `When observed: ${trigger.condition}`;\n" +
+    "  if (trigger.type === 'after') {\n" +
+    "    const event = String(trigger.event || '').replace(/:complete$/, '').replace(/[-_]/g, ' ');\n" +
+    '    return trigger.seconds === 0\n' +
+    '      ? `Immediately after ${event} finishes`\n' +
+    '      : `${formatTimingMs(trigger.seconds * 1000)} after ${event} finishes`;\n' +
+    '  }\n' +
+    "  if (trigger.type === 'elapsed') {\n" +
+    '    const origin = projection?.clock?.origin;\n' +
+    "    const clock = origin === 'after-main-pour'\n" +
+    "      ? 'after the main pour finishes'\n" +
+    "      : origin === 'after-bloom-pour'\n" +
+    "        ? 'after the bloom pour finishes'\n" +
+    "        : origin === 'first-water'\n" +
+    "          ? 'from the first water'\n" +
+    "          : 'source clock';\n" +
+    '    return `At ${formatTimingMs(trigger.seconds * 1000)} ${clock}`;\n' +
+    '  }\n' +
+    '  return null;\n' +
+    '};\n' +
+    '\n' +
+    'const sourceEquipmentLabel = (projection) => {\n' +
+    '  const configuration = projection?.sourceConfiguration || projection?.equipment || {};\n' +
+    "  const brewer = configuration.device === 'v60' && configuration.variant === 'switch'\n" +
+    "    ? 'V60 Switch'\n" +
+    "    : configuration.device || configuration.brewer || 'Source brewer';\n" +
+    "  return `${brewer}${configuration.size ? ` ${configuration.size}` : ''}`;\n" +
+    '};\n' +
+    '\n' +
+    '// Projection field names are useful for source validation but are not user\n' +
+    '// language. Keep this presentation-only copy separate from the hashed\n' +
+    '// projection/disclosure stored with the recipe.\n' +
+    "const readableSourceDisclosure = (value) => String(value || '').replace(/\\bsourceSnapshot\\b/g, 'the original source wording');\n" +
+    '\n' +
+    'const sourceFinishGuidance = (finish, clockOrigin) => {\n' +
+    '  if (!Number.isFinite(finish?.minSeconds) || !Number.isFinite(finish?.maxSeconds)) return null;\n' +
+    '  const target = formatTimingMs(finish.minSeconds * 1000);\n' +
+    '  const range = finish.maxSeconds === finish.minSeconds\n' +
+    '    ? target\n' +
+    '    : `${target}–${formatTimingMs(finish.maxSeconds * 1000)}`;\n' +
+    "  const origin = clockOrigin === 'first-water' ? 'from first water' : clockOrigin ? `from ${clockOrigin.replaceAll('-', ' ')}` : 'on the source clock';\n" +
+    '  return `Finish the drawdown around ${range} ${origin}. Confirm the bed has drained; this is a source target, not an automatic stop.`;\n' +
+    '};\n' +
+    '\n' +
+    'const SourceProjectionPreview = ({ projection, grinderKey, grinderName, preferences, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewDoseError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {\n' +
+    '  const source = projection?.sourceSnapshot || projection?.sourceExecution || {};\n' +
+    '  const display = manualSourceDisplay(projection);\n' +
+    '  const stages = display.stages?.length\n' +
+    '    ? display.stages\n' +
+    '    : Array.isArray(projection?.stages) ? projection.stages : [];\n' +
+    '  const displayWater = display.water || projection?.water;\n' +
+    '  const water = displayWater?.value == null ? null : `${displayWater.value}${displayWater.unit}`;\n' +
+    '  const ready = projection?.timerReady === true && Boolean(projection?.sourceExecution);\n' +
+    '  const sourceDose = Number.isFinite(source?.coffeeGrams) ? source.coffeeGrams : null;\n' +
+    '  const dose = Number.isFinite(projection?.coffeeGrams) ? projection.coffeeGrams : sourceDose;\n' +
+    '  const adaptedBounds = adaptedDoseBounds(projection?.sourceSnapshot);\n' +
+    '  const originalOutsideAdaptation = sourceDose != null && adaptedBounds\n' +
+    '    && (sourceDose < adaptedBounds[0] || sourceDose > adaptedBounds[1]);\n' +
+    '  const currentDoseWithinAdaptation = dose != null && adaptedBounds\n' +
+    '    && dose >= adaptedBounds[0] && dose <= adaptedBounds[1];\n' +
+    '  const doseBounds = adaptedBounds\n' +
+    '    ? (originalOutsideAdaptation && !currentDoseWithinAdaptation ? [sourceDose, sourceDose] : adaptedBounds)\n' +
+    '    : sourceDose == null ? null : [sourceDose, sourceDose];\n' +
+    '  const doseChange = (nextDose) => {\n' +
+    '    if (previewPending || previewStale || !Number.isFinite(nextDose)) return;\n' +
+    '    if (sourceDose != null && nextDose !== sourceDose && adaptedBounds\n' +
+    '      && (nextDose < adaptedBounds[0] || nextDose > adaptedBounds[1])) return;\n' +
+    '    onCoffeeGramsChange?.(nextDose);\n' +
+    '  };\n' +
+    '  const grind = projection?.grind || source?.grind;\n' +
+    '  const nativeGrind = grind?.native;\n' +
+    "  const nativeGrindLabel = nativeGrind && typeof nativeGrind === 'object'\n" +
+    "    ? [nativeGrind.grinder, nativeGrind.setting, nativeGrind.generation].filter(Boolean).join(': ')\n" +
+    "    : typeof nativeGrind === 'string' ? nativeGrind : null;\n" +
+    '  const grindGuidance = manualSourceGrindGuidance(grind, { ...preferences, grinder: grinderKey, grinderCustomName: grinderName });\n' +
+    "  const grindLabel = grindGuidance.displayMode === 'setting' && grindGuidance.setting\n" +
+    '    ? `${grindGuidance.grinderName || grinderName}: ${grindGuidance.setting}`\n' +
+    "    : grindGuidance.displayMode === 'microns' && Number.isFinite(grindGuidance.sourceMicrons)\n" +
+    '      ? `~${grindGuidance.sourceMicrons}µm`\n' +
+    '      : grindGuidance.sourceDescription || (Number.isFinite(grind?.microns) ? `~${grind.microns}µm` : null);\n' +
+    '  const sourceMicronLabel = Number.isFinite(grindGuidance.sourceMicrons) ? `Source reference: ~${grindGuidance.sourceMicrons}µm` : null;\n' +
+    "  const approximateSettingLabel = grindGuidance.displayMode === 'microns' && grindGuidance.setting\n" +
+    '    ? `Approximate ${grindGuidance.grinderName || grinderName} setting: ${grindGuidance.setting}`\n' +
+    '    : null;\n' +
+    '  const finishGuidance = sourceFinishGuidance(projection?.finish, projection?.clock?.origin);\n' +
+    '  return (\n' +
+    '    <m.div {...fadeUp}>\n' +
+    '      <div style={{ marginBottom: 16 }}>\n' +
+    '        <SectionLabel style={{ marginBottom: 6 }}>Source recipe · {sourceEquipmentLabel(projection)}</SectionLabel>\n' +
+    "        <div style={{ fontFamily: fonts.heading, fontSize: 24, fontWeight: 600, color: C.text, lineHeight: 1.1 }}>{source.title || 'Source recipe'}</div>\n" +
+    '        <div style={{ ...type.caption,'... 62658 more characters,
+  expected: /\{timerReady && icedUnsupported && \(/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v22.22.1
+
+scripts/handbrew-v60-cutover-contract.test.mjs
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /onDismiss=\{onClose\}/. Input:
+
+'// BrewTimer — full-screen portal overlay for pour-over brew guidance.\n' +
+  '//\n' +
+  "// Renders via createPortal(document.body), not nested inside HandBrewModal's\n" +
+  "// <Modal>, because Modal's backdrop onClick would destroy a mid-brew timer.\n" +
+  '// Handles its own safe areas, close confirmation, and ring animation.\n' +
+  '//\n' +
+  '// State comes from useBrewTimer (phase/stepIndex/elapsed). Ring progression\n' +
+  '// is computed every frame via requestAnimationFrame and written directly to\n' +
+  "// the SVG circle's stroke-dashoffset via ref — this skips React reconciliation\n" +
+  '// for 60fps updates. The numeric MM:SS readout uses React state and updates at\n' +
+  "// ~10Hz via the hook's setInterval.\n" +
+  '\n' +
+  "import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';\n" +
+  'import { assetUrl } from "../lib/assetUrl";\n' +
+  "import { createPortal } from 'react-dom';\n" +
+  "import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';\n" +
+  "import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';\n" +
+  "import { m, spring, popIn } from '../lib/motion';\n" +
+  "import { haptic } from './../lib/haptics';\n" +
+  "import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';\n" +
+  "import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';\n" +
+  "import { useAuthContext } from '../contexts/AuthContext';\n" +
+  "import { clearBrewTimerSession, writeBrewTimerSession } from '../lib/brewTimerSession';\n" +
+  'import {\n' +
+  '  initialManualBrewState,\n' +
+  '  manualBrewView,\n' +
+  '  useManualSourceBrewTimer,\n' +
+  "} from '../hooks/useManualSourceBrewTimer';\n" +
+  "import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';\n" +
+  "import { timingContextFromRecipe } from '../lib/brewTimingMemory';\n" +
+  'import {\n' +
+  '  resolveGuideState,\n' +
+  '  resolveStepTiming,\n' +
+  '  restorableSourceTimerState,\n' +
+  '  resumeSourceTimerState,\n' +
+  '  saveBrewTimingEvent,\n' +
+  '  sourceTimerDisplayStages,\n' +
+  '  sourceTimerMode,\n' +
+  '  sourceTimerTotalSeconds,\n' +
+  "} from '../lib/brewTimerSteps';\n" +
+  '\n' +
+  'const RING_SIZE = 280;\n' +
+  'const RING_STROKE = 10;\n' +
+  'const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;\n' +
+  'const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;\n' +
+  '\n' +
+  'function Countdown({ onDone }) {\n' +
+  '  const [value, setValue] = useState(3);\n' +
+  '  useEffect(() => {\n' +
+  '    haptic.light().catch(() => {});\n' +
+  '  }, []);\n' +
+  '  useEffect(() => {\n' +
+  '    if (value <= 0) {\n' +
+  '      haptic.heavy().catch(() => {});\n' +
+  '      onDone();\n' +
+  '      return;\n' +
+  '    }\n' +
+  '    const id = setTimeout(() => {\n' +
+  '      haptic.light().catch(() => {});\n' +
+  '      setValue((v) => v - 1);\n' +
+  '    }, 900);\n' +
+  '    return () => clearTimeout(id);\n' +
+  '  }, [value, onDone]);\n' +
+  '\n' +
+  '  if (value <= 0) return null;\n' +
+  '  return (\n' +
+  '    <div style={{\n' +
+  "      position: 'absolute',\n" +
+  '      inset: 0,\n' +
+  "      display: 'flex',\n" +
+  "      alignItems: 'center',\n" +
+  "      justifyContent: 'center',\n" +
+  '      background: C.bg,\n' +
+  '      zIndex: 2,\n' +
+  '    }}>\n' +
+  '      <div\n' +
+  '        key={value}\n' +
+  '        style={{\n' +
+  '          fontFamily: fonts.heading,\n' +
+  '          fontSize: 160,\n' +
+  '          fontWeight: 600,\n' +
+  '          color: C.accent,\n' +
+  '          lineHeight: 1,\n' +
+  "          letterSpacing: '-0.04em',\n" +
+  "          animation: 'brewCountdownPulse 0.9s cubic-bezier(0.22,1,0.36,1)',\n" +
+  '        }}\n' +
+  '      >\n' +
+  '        {value}\n' +
+  '      </div>\n' +
+  '    </div>\n' +
+  '  );\n' +
+  '}\n' +
+  '\n' +
+  'function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone, saveState, onRetrySave }) {\n' +
+  '  useEffect(() => {\n' +
+  '    haptic.success().catch(() => {});\n' +
+  '  }, []);\n' +
+  '  return (\n' +
+  '    <div style={{\n' +
+  "      position: 'absolute',\n" +
+  '      inset: 0,\n' +
+  "      display: 'flex',\n" +
+  "      flexDirection: 'column',\n" +
+  "      alignItems: 'center',\n" +
+  "      justifyContent: 'center',\n" +
+  "      padding: '0 32px',\n" +
+  '      background: C.bg,\n' +
+  '      zIndex: 2,\n' +
+  "      paddingTop: 'env(safe-area-inset-top, 0px)',\n" +
+  "      paddingBottom: 'env(safe-area-inset-bottom, 0px)',\n" +
+  '    }}>\n' +
+  '      <video\n' +
+  '        src={assetUrl("/images/ruphus-animations/ruphus-brew-complete.mp4")}\n' +
+  '        autoPlay muted playsInline\n' +
+  '        style={{\n' +
+  "          width: 200, height: 200, objectFit: 'contain',\n" +
+  '          marginBottom: 20,\n' +
+  "          WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',\n" +
+  "          maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',\n" +
+  '        }}\n' +
+  '      />\n' +
+  '      {/* Eyebrow label */}\n' +
+  '      <div style={{\n' +
+  '        ...typeScale.label,\n' +
+  '        color: C.accent,\n' +
+  '        marginBottom: 8,\n' +
+  "        letterSpacing: '0.12em',\n" +
+  '      }}>\n' +
+  '        Brew Complete\n' +
+  '      </div>\n' +
+  '      <div style={{\n' +
+  '        fontFamily: fonts.heading,\n' +
+  '        fontSize: 40,\n' +
+  '        fontWeight: 600,\n' +
+  '        color: C.text,\n' +
+  '        lineHeight: 1.05,\n' +
+  "        letterSpacing: '-0.02em',\n" +
+  '        marginBottom: 6,\n' +
+  "        textAlign: 'center',\n" +
+  '      }}>\n' +
+  '        Well done\n' +
+  '      </div>\n' +
+  '      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 4, fontFamily: fonts.body }}>Total brew time</div>\n' +
+  '      <div style={{\n' +
+  '        fontFamily: fonts.heading,\n' +
+  '        fontSize: 48,\n' +
+  '        color: C.accent,\n' +
+  '        fontWeight: 600,\n' +
+  "        letterSpacing: '-0.02em',\n" +
+  '        marginBottom: 40,\n' +
+  '      }}>\n' +
+  '        {formatMMSS(totalElapsedMs)}\n' +
+  '      </div>\n' +
+  "      {saveState === 'saving' && <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: -26, marginBottom: 20 }}>Saving brew timing…</div>}\n" +
+  "      {saveState === 'saved' && <div style={{ ...typeScale.caption, color: C.green, marginTop: -26, marginBottom: 20 }}>Brew timing saved</div>}\n" +
+  "      {saveState === 'ephemeral' && <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: -26, marginBottom: 20 }}>Timing is not saved for this quick recipe</div>}\n" +
+  "      {saveState === 'failed' && (\n" +
+  "        <div style={{ width: '100%', maxWidth: 320, marginTop: -26, marginBottom: 20, textAlign: 'center' }}>\n" +
+  '          <div style={{ ...typeScale.caption, color: C.red, marginBottom: 8 }}>Timing was not saved.</div>\n' +
+  "          <button onClick={onRetrySave} style={{ minHeight: 44, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>\n" +
+  '        </div>\n' +
+  '      )}\n' +
+  '      {onStartTasting && (\n' +
+  '        <button\n' +
+  '          onClick={onStartTasting}\n' +
+  '          style={{\n' +
+  "            width: '100%',\n" +
+  '            maxWidth: 320,\n' +
+  "            padding: '16px 24px',\n" +
+  '            borderRadius: radius.md,\n' +
+  '            background: `linear-gradient(135deg, ${C.accent} 0%, ${C.accentDark} 100%)`,\n' +
+  "            color: '#fff',\n" +
+  "            border: 'none',\n" +
+  '            fontSize: 16,\n' +
+  '            fontWeight: 700,\n' +
+  '            fontFamily: fonts.body,\n' +
+  "            cursor: 'pointer',\n" +
+  '            boxShadow: shadows.navActive,\n' +
+  '            marginBottom: 12,\n' +
+  '          }}\n' +
+  '        >\n' +
+  '          Start Tasting Session\n' +
+  '        </button>\n' +
+  '      )}\n' +
+  '      <button\n' +
+  '        onClick={onDone}\n' +
+  '        style={{\n' +
+  "          width: '100%',\n" +
+  '          maxWidth: 320,\n' +
+  "          padding: '14px 24px',\n" +
+  '          borderRadius: radius.md,\n' +
+  '          background: glass.sheet,\n' +
+  '          color: C.textMuted,\n' +
+  '          border: `1px solid ${C.border}`,\n' +
+  '          fontSize: 15,\n' +
+  '          fontWeight: 600,\n' +
+  '          fontFamily: fonts.body,\n' +
+  "          cursor: 'pointer',\n" +
+  '          backdropFilter: glass.blur,\n' +
+  '          WebkitBackdropFilter: glass.blur,\n' +
+  '        }}\n' +
+  '      >\n' +
+  '        Done\n' +
+  '      </button>\n' +
+  '    </div>\n' +
+  '  );\n' +
+  '}\n' +
+  '\n' +
+  'function ChillServeScreen({ onCoffeeChilled, onDismiss, saveState, onRetrySave, postBrewInstruction }) {\n' +
+  '  const dialogRef = useRef(null);\n' +
+  '  useEffect(() => { dialogRef.current?.focus(); }, []);\n' +
+  '  return (\n' +
+  '    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="chill-serve-heading" style={{\n' +
+  "      position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',\n" +
+  "      alignItems: 'center', justifyContent: 'center', padding: '0 max(28px, env(safe-area-inset-left, 0px)) 0 max(28px, env(safe-area-inset-right, 0px))',\n" +
+  "      background: C.bg, zIndex: 2, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',\n" +
+  '    }}>\n' +
+  '      <SnowflakeIcon />\n' +
+  "      <div style={{ ...typeScale.label, color: C.frost, letterSpacing: '0.12em', marginBottom: 8 }}>CHILL &amp; SERVE</div>\n" +
+  `      <h2 id="chill-serve-heading" style={{ fontFamily: fonts.heading, fontSize: 30, fontWeight: 600, color: C.text, textAlign: 'center', margin: '0 0 10px' }}>{saveState === 'saved' ? 'Your drawdown is saved' : 'Finish and serve'}</h2>\n` +
+  "      <div style={{ ...typeScale.body, color: C.textMuted, lineHeight: 1.55, textAlign: 'center', maxWidth: 320, marginBottom: 18 }}>\n" +
+  "        {postBrewInstruction || 'Swirl or stir until the brew ice melts as directed, then serve over fresh ice.'} Chilling is untimed and does not change drawdown memory.\n" +
+  '      </div>\n' +
+  `      <div role="status" aria-live="polite" style={{ ...typeScale.caption, color: saveState === 'saved' ? C.green : saveState === 'failed' ? C.red : C.textMuted, marginBottom: 16 }}>\n` +
+  "        {saveState === 'saved' ? 'Drawdown saved' : saveState === 'failed' ? 'Timing not saved' : saveState === 'ephemeral' ? 'Timing not saved · Quick Recipe' : 'Saving drawdown…'}\n" +
+  '      </div>\n' +
+  "      {saveState === 'failed' && <button onClick={onRetrySave} style={{ minHeight: 44, marginBottom: 10, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>}\n" +
+  "      <button onClick={onCoffeeChilled} style={{ width: '100%', maxWidth: 320, minHeight: 52, border: 'none', borderRadius: radius.md, background: `linear-gradient(180deg, ${C.frost} 0%, #4E6878 100%)`, color: C.cream, fontFamily: fonts.body, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>Coffee chilled</button>\n" +
+  "      <button onClick={onDismiss} style={{ width: '100%', maxWidth: 320, minHeight: 48, marginTop: 10, border: `1px solid ${C.border}`, borderRadius: radius.md, background: C.card, color: C.textMuted, fontFamily: fonts.body, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Done</button>\n" +
+  '    </div>\n' +
+  '  );\n' +
+  '}\n' +
+  '\n' +
+  'function SnowflakeIcon() {\n' +
+  '  return <div aria-hidden="true" style={{ fontSize: 34, color: C.frost, marginBottom: 10 }}>❄</div>;\n' +
+  '}\n' +
+  '\n' +
+  'function StepPill({ label, status, timeLabel }) {\n' +
+  '  const bg =\n' +
+  "    status === 'current' ? C.accent :\n" +
+  "    status === '"... 41570 more characters
+
+    at file:///Users/talmeltzer/.codex/worktrees/timer-production-release/Coffee-App-Build/scripts/handbrew-v60-cutover-contract.test.mjs:37:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '// BrewTimer — full-screen portal overlay for pour-over brew guidance.\n' +
+    '//\n' +
+    "// Renders via createPortal(document.body), not nested inside HandBrewModal's\n" +
+    "// <Modal>, because Modal's backdrop onClick would destroy a mid-brew timer.\n" +
+    '// Handles its own safe areas, close confirmation, and ring animation.\n' +
+    '//\n' +
+    '// State comes from useBrewTimer (phase/stepIndex/elapsed). Ring progression\n' +
+    '// is computed every frame via requestAnimationFrame and written directly to\n' +
+    "// the SVG circle's stroke-dashoffset via ref — this skips React reconciliation\n" +
+    '// for 60fps updates. The numeric MM:SS readout uses React state and updates at\n' +
+    "// ~10Hz via the hook's setInterval.\n" +
+    '\n' +
+    "import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';\n" +
+    'import { assetUrl } from "../lib/assetUrl";\n' +
+    "import { createPortal } from 'react-dom';\n" +
+    "import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';\n" +
+    "import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';\n" +
+    "import { m, spring, popIn } from '../lib/motion';\n" +
+    "import { haptic } from './../lib/haptics';\n" +
+    "import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';\n" +
+    "import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';\n" +
+    "import { useAuthContext } from '../contexts/AuthContext';\n" +
+    "import { clearBrewTimerSession, writeBrewTimerSession } from '../lib/brewTimerSession';\n" +
+    'import {\n' +
+    '  initialManualBrewState,\n' +
+    '  manualBrewView,\n' +
+    '  useManualSourceBrewTimer,\n' +
+    "} from '../hooks/useManualSourceBrewTimer';\n" +
+    "import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';\n" +
+    "import { timingContextFromRecipe } from '../lib/brewTimingMemory';\n" +
+    'import {\n' +
+    '  resolveGuideState,\n' +
+    '  resolveStepTiming,\n' +
+    '  restorableSourceTimerState,\n' +
+    '  resumeSourceTimerState,\n' +
+    '  saveBrewTimingEvent,\n' +
+    '  sourceTimerDisplayStages,\n' +
+    '  sourceTimerMode,\n' +
+    '  sourceTimerTotalSeconds,\n' +
+    "} from '../lib/brewTimerSteps';\n" +
+    '\n' +
+    'const RING_SIZE = 280;\n' +
+    'const RING_STROKE = 10;\n' +
+    'const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;\n' +
+    'const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;\n' +
+    '\n' +
+    'function Countdown({ onDone }) {\n' +
+    '  const [value, setValue] = useState(3);\n' +
+    '  useEffect(() => {\n' +
+    '    haptic.light().catch(() => {});\n' +
+    '  }, []);\n' +
+    '  useEffect(() => {\n' +
+    '    if (value <= 0) {\n' +
+    '      haptic.heavy().catch(() => {});\n' +
+    '      onDone();\n' +
+    '      return;\n' +
+    '    }\n' +
+    '    const id = setTimeout(() => {\n' +
+    '      haptic.light().catch(() => {});\n' +
+    '      setValue((v) => v - 1);\n' +
+    '    }, 900);\n' +
+    '    return () => clearTimeout(id);\n' +
+    '  }, [value, onDone]);\n' +
+    '\n' +
+    '  if (value <= 0) return null;\n' +
+    '  return (\n' +
+    '    <div style={{\n' +
+    "      position: 'absolute',\n" +
+    '      inset: 0,\n' +
+    "      display: 'flex',\n" +
+    "      alignItems: 'center',\n" +
+    "      justifyContent: 'center',\n" +
+    '      background: C.bg,\n' +
+    '      zIndex: 2,\n' +
+    '    }}>\n' +
+    '      <div\n' +
+    '        key={value}\n' +
+    '        style={{\n' +
+    '          fontFamily: fonts.heading,\n' +
+    '          fontSize: 160,\n' +
+    '          fontWeight: 600,\n' +
+    '          color: C.accent,\n' +
+    '          lineHeight: 1,\n' +
+    "          letterSpacing: '-0.04em',\n" +
+    "          animation: 'brewCountdownPulse 0.9s cubic-bezier(0.22,1,0.36,1)',\n" +
+    '        }}\n' +
+    '      >\n' +
+    '        {value}\n' +
+    '      </div>\n' +
+    '    </div>\n' +
+    '  );\n' +
+    '}\n' +
+    '\n' +
+    'function CompletionScreen({ bean, totalElapsedMs, onStartTasting, onDone, saveState, onRetrySave }) {\n' +
+    '  useEffect(() => {\n' +
+    '    haptic.success().catch(() => {});\n' +
+    '  }, []);\n' +
+    '  return (\n' +
+    '    <div style={{\n' +
+    "      position: 'absolute',\n" +
+    '      inset: 0,\n' +
+    "      display: 'flex',\n" +
+    "      flexDirection: 'column',\n" +
+    "      alignItems: 'center',\n" +
+    "      justifyContent: 'center',\n" +
+    "      padding: '0 32px',\n" +
+    '      background: C.bg,\n' +
+    '      zIndex: 2,\n' +
+    "      paddingTop: 'env(safe-area-inset-top, 0px)',\n" +
+    "      paddingBottom: 'env(safe-area-inset-bottom, 0px)',\n" +
+    '    }}>\n' +
+    '      <video\n' +
+    '        src={assetUrl("/images/ruphus-animations/ruphus-brew-complete.mp4")}\n' +
+    '        autoPlay muted playsInline\n' +
+    '        style={{\n' +
+    "          width: 200, height: 200, objectFit: 'contain',\n" +
+    '          marginBottom: 20,\n' +
+    "          WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',\n" +
+    "          maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',\n" +
+    '        }}\n' +
+    '      />\n' +
+    '      {/* Eyebrow label */}\n' +
+    '      <div style={{\n' +
+    '        ...typeScale.label,\n' +
+    '        color: C.accent,\n' +
+    '        marginBottom: 8,\n' +
+    "        letterSpacing: '0.12em',\n" +
+    '      }}>\n' +
+    '        Brew Complete\n' +
+    '      </div>\n' +
+    '      <div style={{\n' +
+    '        fontFamily: fonts.heading,\n' +
+    '        fontSize: 40,\n' +
+    '        fontWeight: 600,\n' +
+    '        color: C.text,\n' +
+    '        lineHeight: 1.05,\n' +
+    "        letterSpacing: '-0.02em',\n" +
+    '        marginBottom: 6,\n' +
+    "        textAlign: 'center',\n" +
+    '      }}>\n' +
+    '        Well done\n' +
+    '      </div>\n' +
+    '      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 4, fontFamily: fonts.body }}>Total brew time</div>\n' +
+    '      <div style={{\n' +
+    '        fontFamily: fonts.heading,\n' +
+    '        fontSize: 48,\n' +
+    '        color: C.accent,\n' +
+    '        fontWeight: 600,\n' +
+    "        letterSpacing: '-0.02em',\n" +
+    '        marginBottom: 40,\n' +
+    '      }}>\n' +
+    '        {formatMMSS(totalElapsedMs)}\n' +
+    '      </div>\n' +
+    "      {saveState === 'saving' && <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: -26, marginBottom: 20 }}>Saving brew timing…</div>}\n" +
+    "      {saveState === 'saved' && <div style={{ ...typeScale.caption, color: C.green, marginTop: -26, marginBottom: 20 }}>Brew timing saved</div>}\n" +
+    "      {saveState === 'ephemeral' && <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: -26, marginBottom: 20 }}>Timing is not saved for this quick recipe</div>}\n" +
+    "      {saveState === 'failed' && (\n" +
+    "        <div style={{ width: '100%', maxWidth: 320, marginTop: -26, marginBottom: 20, textAlign: 'center' }}>\n" +
+    '          <div style={{ ...typeScale.caption, color: C.red, marginBottom: 8 }}>Timing was not saved.</div>\n' +
+    "          <button onClick={onRetrySave} style={{ minHeight: 44, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>\n" +
+    '        </div>\n' +
+    '      )}\n' +
+    '      {onStartTasting && (\n' +
+    '        <button\n' +
+    '          onClick={onStartTasting}\n' +
+    '          style={{\n' +
+    "            width: '100%',\n" +
+    '            maxWidth: 320,\n' +
+    "            padding: '16px 24px',\n" +
+    '            borderRadius: radius.md,\n' +
+    '            background: `linear-gradient(135deg, ${C.accent} 0%, ${C.accentDark} 100%)`,\n' +
+    "            color: '#fff',\n" +
+    "            border: 'none',\n" +
+    '            fontSize: 16,\n' +
+    '            fontWeight: 700,\n' +
+    '            fontFamily: fonts.body,\n' +
+    "            cursor: 'pointer',\n" +
+    '            boxShadow: shadows.navActive,\n' +
+    '            marginBottom: 12,\n' +
+    '          }}\n' +
+    '        >\n' +
+    '          Start Tasting Session\n' +
+    '        </button>\n' +
+    '      )}\n' +
+    '      <button\n' +
+    '        onClick={onDone}\n' +
+    '        style={{\n' +
+    "          width: '100%',\n" +
+    '          maxWidth: 320,\n' +
+    "          padding: '14px 24px',\n" +
+    '          borderRadius: radius.md,\n' +
+    '          background: glass.sheet,\n' +
+    '          color: C.textMuted,\n' +
+    '          border: `1px solid ${C.border}`,\n' +
+    '          fontSize: 15,\n' +
+    '          fontWeight: 600,\n' +
+    '          fontFamily: fonts.body,\n' +
+    "          cursor: 'pointer',\n" +
+    '          backdropFilter: glass.blur,\n' +
+    '          WebkitBackdropFilter: glass.blur,\n' +
+    '        }}\n' +
+    '      >\n' +
+    '        Done\n' +
+    '      </button>\n' +
+    '    </div>\n' +
+    '  );\n' +
+    '}\n' +
+    '\n' +
+    'function ChillServeScreen({ onCoffeeChilled, onDismiss, saveState, onRetrySave, postBrewInstruction }) {\n' +
+    '  const dialogRef = useRef(null);\n' +
+    '  useEffect(() => { dialogRef.current?.focus(); }, []);\n' +
+    '  return (\n' +
+    '    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="chill-serve-heading" style={{\n' +
+    "      position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',\n" +
+    "      alignItems: 'center', justifyContent: 'center', padding: '0 max(28px, env(safe-area-inset-left, 0px)) 0 max(28px, env(safe-area-inset-right, 0px))',\n" +
+    "      background: C.bg, zIndex: 2, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',\n" +
+    '    }}>\n' +
+    '      <SnowflakeIcon />\n' +
+    "      <div style={{ ...typeScale.label, color: C.frost, letterSpacing: '0.12em', marginBottom: 8 }}>CHILL &amp; SERVE</div>\n" +
+    `      <h2 id="chill-serve-heading" style={{ fontFamily: fonts.heading, fontSize: 30, fontWeight: 600, color: C.text, textAlign: 'center', margin: '0 0 10px' }}>{saveState === 'saved' ? 'Your drawdown is saved' : 'Finish and serve'}</h2>\n` +
+    "      <div style={{ ...typeScale.body, color: C.textMuted, lineHeight: 1.55, textAlign: 'center', maxWidth: 320, marginBottom: 18 }}>\n" +
+    "        {postBrewInstruction || 'Swirl or stir until the brew ice melts as directed, then serve over fresh ice.'} Chilling is untimed and does not change drawdown memory.\n" +
+    '      </div>\n' +
+    `      <div role="status" aria-live="polite" style={{ ...typeScale.caption, color: saveState === 'saved' ? C.green : saveState === 'failed' ? C.red : C.textMuted, marginBottom: 16 }}>\n` +
+    "        {saveState === 'saved' ? 'Drawdown saved' : saveState === 'failed' ? 'Timing not saved' : saveState === 'ephemeral' ? 'Timing not saved · Quick Recipe' : 'Saving drawdown…'}\n" +
+    '      </div>\n' +
+    "      {saveState === 'failed' && <button onClick={onRetrySave} style={{ minHeight: 44, marginBottom: 10, padding: '9px 14px', borderRadius: radius.pill, border: `1px solid ${C.red}55`, background: C.redBg, color: C.red, fontWeight: 700, cursor: 'pointer' }}>Try Again</button>}\n" +
+    "      <button onClick={onCoffeeChilled} style={{ width: '100%', maxWidth: 320, minHeight: 52, border: 'none', borderRadius: radius.md, background: `linear-gradient(180deg, ${C.frost} 0%, #4E6878 100%)`, color: C.cream, fontFamily: fonts.body, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>Coffee chilled</button>\n" +
+    "      <button onClick={onDismiss} style={{ width: '100%', maxWidth: 320, minHeight: 48, marginTop: 10, border: `1px solid ${C.border}`, borderRadius: radius.md, background: C.card, color: C.textMuted, fontFamily: fonts.body, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Done</button>\n" +
+    '    </div>\n' +
+    '  );\n' +
+    '}\n' +
+    '\n' +
+    'function SnowflakeIcon() {\n' +
+    '  return <div aria-hidden="true" style={{ fontSize: 34, color: C.frost, marginBottom: 10 }}>❄</div>;\n' +
+    '}\n' +
+    '\n' +
+    'function StepPill({ label, status, timeLabel }) {\n' +
+    '  const bg =\n' +
+    "    status === 'current' ? C.accent :\n" +
+    "    status === '"... 41570 more characters,
+  expected: /onDismiss=\{onClose\}/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v22.22.1
+

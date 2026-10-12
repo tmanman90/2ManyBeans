@@ -198,3 +198,16 @@ test('source completion reaches the existing owned attempt lifecycle and legacy 
 });
 
 console.log('Ruphus source completion contract passed');
+
+test('assistant brew evidence preserves source clock provenance and unknown planned finish', async () => {
+  const { projectBrewEvidence } = await import('../api/_lib/ruphusBrewEvidence.js');
+  const state = completedSourceState();
+  const attempt = { id: 'attempt-source-1', sessionId: 'attempt-source-1', coffeeId: 'coffee-1', slotKey: 'v60_hot', status: 'completed', snapshot: recipe };
+  const event = buildTimingEvent({ ...context, sessionId: attempt.sessionId, attemptId: attempt.id, actualElapsedMs: 182_000, completionKind: 'userFinished', sourceEvents: state.events, sourceCorrections: state.corrections });
+  assert.ok(event);
+  assert.equal(projectBrewEvidence([attempt], [event])[0].actualElapsedMs, 182_000);
+  assert.equal(event.targetMs, null);
+  for (const patch of [{ clockOrigin: 'timer-start' }, { sourceRevision: event.sourceRevision + 1 }, { sourceId: 'other-source' }, { sourceConfiguration: { ...event.sourceConfiguration, size: '02' } }]) {
+    assert.equal(projectBrewEvidence([attempt], [{ ...event, ...patch }])[0].actualElapsedMs, null, JSON.stringify(patch));
+  }
+});

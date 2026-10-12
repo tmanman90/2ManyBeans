@@ -1,0 +1,498 @@
+TAP version 13
+# Subtest: dismissing a trial survives remount without deleting its recipe or login
+ok 1 - dismissing a trial survives remount without deleting its recipe or login
+  ---
+  duration_ms: 4.280667
+  type: 'test'
+  ...
+# Subtest: recipe and timer dismissal are wired to the durable app outbox and excluded from automatic launch
+not ok 2 - recipe and timer dismissal are wired to the durable app outbox and excluded from automatic launch
+  ---
+  duration_ms: 4.19375
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-attempt-dismissal.test.mjs:44:1'
+  failureType: 'testCodeFailure'
+  error: 'source preview Back to chat dismisses the attempt'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: ''
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-attempt-dismissal.test.mjs:54:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: U4 corpus is unique, balanced, synthetic, and fully adjudicated
+ok 3 - U4 corpus is unique, balanced, synthetic, and fully adjudicated
+  ---
+  duration_ms: 29.95225
+  type: 'test'
+  ...
+# Subtest: U4 manifest freezes the amended schedule and gate-first outcomes
+not ok 4 - U4 manifest freezes the amended schedule and gate-first outcomes
+  ---
+  duration_ms: 7.944959
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:155:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '37715c563739732437dbc0809603c23b5ab226c9849319496bba79ea884fddb1'
+    - '57c5962c9f417b438655aa7c39f420b331c458ce9baec63314439d0c79f93b45'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '57c5962c9f417b438655aa7c39f420b331c458ce9baec63314439d0c79f93b45'
+  actual: '37715c563739732437dbc0809603c23b5ab226c9849319496bba79ea884fddb1'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:179:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: U4 cases execute through deterministic category graders
+ok 5 - U4 cases execute through deterministic category graders
+  ---
+  duration_ms: 2.251625
+  type: 'test'
+  ...
+# Subtest: U4 assertions fail closed on missing semantic evidence and forged identity/claims
+ok 6 - U4 assertions fail closed on missing semantic evidence and forged identity/claims
+  ---
+  duration_ms: 0.366042
+  type: 'test'
+  ...
+# Subtest: U4 executable registries reject unknown or missing declarations
+ok 7 - U4 executable registries reject unknown or missing declarations
+  ---
+  duration_ms: 0.769917
+  type: 'test'
+  ...
+# Subtest: U4 diagnosis adjudication enforces one-variable extraction directions
+not ok 8 - U4 diagnosis adjudication enforces one-variable extraction directions
+  ---
+  duration_ms: 1.349125
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:236:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    dec-023
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:244:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: U4 authority and failure rows require scenario-specific evidence
+ok 9 - U4 authority and failure rows require scenario-specific evidence
+  ---
+  duration_ms: 1.206084
+  type: 'test'
+  ...
+# Subtest: every calibration and decision case has a constructive executable positive path
+not ok 10 - every calibration and decision case has a constructive executable positive path
+  ---
+  duration_ms: 0.855542
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:316:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    cal-003: recipe-validation-failed,pending-proposal-contract,assertion-failed:proposal-unapproved
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:319:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: every declared assertion and critical failure has executable positive and targeted behavior
+not ok 11 - every declared assertion and critical failure has executable positive and targeted behavior
+  ---
+  duration_ms: 1.471375
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:323:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    recipe:proposal-unapproved:positive
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-corpus.test.mjs:351:14)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: diagnosis observations and expected controls match the independent contract
+ok 12 - diagnosis observations and expected controls match the independent contract
+  ---
+  duration_ms: 0.37925
+  type: 'test'
+  ...
+# Subtest: calibration cross-field contract is coherent and semantically disjoint
+ok 13 - calibration cross-field contract is coherent and semantically disjoint
+  ---
+  duration_ms: 0.390833
+  type: 'test'
+  ...
+# Subtest: U6 selects at most two finalists only after complete gates and locked blind scores
+ok 14 - U6 selects at most two finalists only after complete gates and locked blind scores
+  ---
+  duration_ms: 5.728667
+  type: 'test'
+  ...
+# Subtest: critical failure vetoes before cost comparison
+ok 15 - critical failure vetoes before cost comparison
+  ---
+  duration_ms: 1.441042
+  type: 'test'
+  ...
+# Subtest: repeat variance remains visible and equal cutoff metrics return insufficient evidence
+ok 16 - repeat variance remains visible and equal cutoff metrics return insufficient evidence
+  ---
+  duration_ms: 2.874625
+  type: 'test'
+  ...
+# Subtest: missing arm, repeat, unmetered, and corrupt artifacts cannot form a winner
+ok 17 - missing arm, repeat, unmetered, and corrupt artifacts cannot form a winner
+  ---
+  duration_ms: 3.643917
+  type: 'test'
+  ...
+# Subtest: unlocked or leaked blind review remains pending and map swaps are rejected
+ok 18 - unlocked or leaked blind review remains pending and map swaps are rejected
+  ---
+  duration_ms: 1.671209
+  type: 'test'
+  ...
+# Subtest: blind packet and evaluator attribution key survive JSON pause/resume without exposing the key in the packet
+ok 19 - blind packet and evaluator attribution key survive JSON pause/resume without exposing the key in the packet
+  ---
+  duration_ms: 0.453333
+  type: 'test'
+  ...
+# Subtest: sanitization retains deterministic evidence and excludes prompts, reasoning, and provider content
+ok 20 - sanitization retains deterministic evidence and excludes prompts, reasoning, and provider content
+  ---
+  duration_ms: 1.294
+  type: 'test'
+  ...
+# Subtest: shipping baseline is separate context and cannot rank
+ok 21 - shipping baseline is separate context and cannot rank
+  ---
+  duration_ms: 0.118875
+  type: 'test'
+  ...
+# Subtest: provider-neutral response bridge binds strict parsed evidence to the raw checksum
+ok 22 - provider-neutral response bridge binds strict parsed evidence to the raw checksum
+  ---
+  duration_ms: 2.154
+  type: 'test'
+  ...
+# Subtest: model requests resolve canonical recipe evidence without exposing answer keys
+ok 23 - model requests resolve canonical recipe evidence without exposing answer keys
+  ---
+  duration_ms: 1.877125
+  type: 'test'
+  ...
+# Subtest: wire evidence contract discloses applicable nested grader keys compactly
+ok 24 - wire evidence contract discloses applicable nested grader keys compactly
+  ---
+  duration_ms: 2.982042
+  type: 'test'
+  ...
+# Subtest: model-facing full recipe evidence preserves every frozen proposal candidate hash
+not ok 25 - model-facing full recipe evidence preserves every frozen proposal candidate hash
+  ---
+  duration_ms: 1.542791
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-report.test.mjs:208:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    cal-003 frozen diff must apply to model recipe
+    
+    688 !== 700
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 700
+  actual: 688
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-eval-report.test.mjs:226:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: all frozen calibration and decision requests fit the runner input ceiling
+ok 26 - all frozen calibration and decision requests fit the runner input ceiling
+  ---
+  duration_ms: 8.026625
+  type: 'test'
+  ...
+# Subtest: candidate parser accepts one optional JSON fence and enforces the category evidence contract
+ok 27 - candidate parser accepts one optional JSON fence and enforces the category evidence contract
+  ---
+  duration_ms: 0.442084
+  type: 'test'
+  ...
+# Subtest: finalist phase requires its exact partition and the staged path cannot skip it
+ok 28 - finalist phase requires its exact partition and the staged path cannot skip it
+  ---
+  duration_ms: 1.696042
+  type: 'test'
+  ...
+# Subtest: elapsed-only first-water sources use ordinary automatic timer cues
+ok 29 - elapsed-only first-water sources use ordinary automatic timer cues
+  ---
+  duration_ms: 1.62825
+  type: 'test'
+  ...
+# Subtest: automatic and confirmed timer presentation reuse rounded consumer checkpoints
+ok 30 - automatic and confirmed timer presentation reuse rounded consumer checkpoints
+  ---
+  duration_ms: 6.379875
+  type: 'test'
+  ...
+# Subtest: a tampered immutable projection never reaches the timer
+ok 31 - a tampered immutable projection never reaches the timer
+  ---
+  duration_ms: 0.53925
+  type: 'test'
+  ...
+# Subtest: automatic legacy restoration accepts only the exact source identity
+not ok 32 - automatic legacy restoration accepts only the exact source identity
+  ---
+  duration_ms: 1.90175
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-shared-brew-timer.test.mjs:81:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    null !== 1000
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1000
+  actual: ~
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-shared-brew-timer.test.mjs:102:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: confirmed-source pause/resume shifts anchors so paused time never becomes brew time
+ok 33 - confirmed-source pause/resume shifts anchors so paused time never becomes brew time
+  ---
+  duration_ms: 0.334875
+  type: 'test'
+  ...
+# Subtest: open-ended elapsed schedules keep automatic cues without inventing a finish target
+ok 34 - open-ended elapsed schedules keep automatic cues without inventing a finish target
+  ---
+  duration_ms: 0.156875
+  type: 'test'
+  ...
+# Subtest: event-relative, conditional, manual and non-first-water records retain confirmed semantics
+ok 35 - event-relative, conditional, manual and non-first-water records retain confirmed semantics
+  ---
+  duration_ms: 0.140542
+  type: 'test'
+  ...
+# Subtest: every currently timer-ready admitted registry source has a shared-timer route
+ok 36 - every currently timer-ready admitted registry source has a shared-timer route
+  ---
+  duration_ms: 4.705792
+  type: 'test'
+  ...
+# Subtest: the shared shell accepts legacy attempt state and persists source ledger fields
+ok 37 - the shared shell accepts legacy attempt state and persists source ledger fields
+  ---
+  duration_ms: 2.1835
+  type: 'test'
+  ...
+# Subtest: a rejected timing write becomes retryable instead of leaving completion stuck saving
+ok 38 - a rejected timing write becomes retryable instead of leaving completion stuck saving
+  ---
+  duration_ms: 0.372459
+  type: 'test'
+  ...
+# (node:91203) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: parallel exact recipe and technique reads preserve options (options first: true)
+ok 39 - parallel exact recipe and technique reads preserve options (options first: true)
+  ---
+  duration_ms: 14.933833
+  type: 'test'
+  ...
+# Subtest: parallel exact recipe and technique reads preserve options (options first: false)
+ok 40 - parallel exact recipe and technique reads preserve options (options first: false)
+  ---
+  duration_ms: 4.10425
+  type: 'test'
+  ...
+# Subtest: an exact recipe refresh with changed source invalidates earlier technique options
+ok 41 - an exact recipe refresh with changed source invalidates earlier technique options
+  ---
+  duration_ms: 1.68925
+  type: 'test'
+  ...
+# Subtest: Kalita preview followed by parallel V60 reads completes with a named card, not a round-limit error
+ok 42 - Kalita preview followed by parallel V60 reads completes with a named card, not a round-limit error
+  ---
+  duration_ms: 40.284
+  type: 'test'
+  ...
+# Subtest: a one-word answer to the active sensory clarifier earns readiness only with grounded evidence
+ok 43 - a one-word answer to the active sensory clarifier earns readiness only with grounded evidence
+  ---
+  duration_ms: 1.857209
+  type: 'test'
+  ...
+# Subtest: technique reader returns executable alternatives and preserves another-selection carry
+not ok 44 - technique reader returns executable alternatives and preserves another-selection carry
+  ---
+  duration_ms: 4.37125
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-technique-runtime.test.mjs:112:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    '1:16.5' !== '1:15'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '1:15'
+  actual: '1:16.5'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-technique-runtime.test.mjs:147:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: new-chat technique replay ignores archived selection artifacts
+ok 45 - new-chat technique replay ignores archived selection artifacts
+  ---
+  duration_ms: 0.184375
+  type: 'test'
+  ...
+# Subtest: missing V60 does not turn an Aiden recipe into an actionable technique proposal
+ok 46 - missing V60 does not turn an Aiden recipe into an actionable technique proposal
+  ---
+  duration_ms: 0.208375
+  type: 'test'
+  ...
+# Subtest: saved Switch 03 resolves source-backed options instead of standard V60 techniques
+ok 47 - saved Switch 03 resolves source-backed options instead of standard V60 techniques
+  ---
+  duration_ms: 7.562209
+  type: 'test'
+  ...
+# Subtest: iced Switch requests stay reference-only and cannot prepare a hot proposal
+ok 48 - iced Switch requests stay reference-only and cannot prepare a hot proposal
+  ---
+  duration_ms: 3.944542
+  type: 'test'
+  ...
+# Subtest: off-rotation Switch identity survives the bounded evidence and technique projections
+ok 49 - off-rotation Switch identity survives the bounded evidence and technique projections
+  ---
+  duration_ms: 7.598209
+  type: 'test'
+  ...
+# Subtest: off-rotation another request hydrates a retained selection after a trial receipt
+ok 50 - off-rotation another request hydrates a retained selection after a trial receipt
+  ---
+  duration_ms: 9.434958
+  type: 'test'
+  ...
+# Subtest: bare another follow-up prebinds the retained off-rotation card before evidence and options
+ok 51 - bare another follow-up prebinds the retained off-rotation card before evidence and options
+  ---
+  duration_ms: 11.355375
+  type: 'test'
+  ...
+# Subtest: new-chat and no-history bare technique follow-ups have no recipe target authority
+ok 52 - new-chat and no-history bare technique follow-ups have no recipe target authority
+  ---
+  duration_ms: 1.186583
+  type: 'test'
+  ...
+# Subtest: a mixed off-target request after Switch options recovers into one proposal within the round budget
+ok 53 - a mixed off-target request after Switch options recovers into one proposal within the round budget
+  ---
+  duration_ms: 8.474791
+  type: 'test'
+  ...
+# Subtest: an invalid proposal after the bounded Switch continuation returns technique recovery, not a round-limit failure
+ok 54 - an invalid proposal after the bounded Switch continuation returns technique recovery, not a round-limit failure
+  ---
+  duration_ms: 1.530791
+  type: 'test'
+  ...
+# Subtest: reference-only and unknown technique IDs cannot execute through the proposal tool
+ok 55 - reference-only and unknown technique IDs cannot execute through the proposal tool
+  ---
+  duration_ms: 0.83775
+  type: 'test'
+  ...
+# Subtest: resolved thin-and-sweet evidence can produce a coherent ratio card in the same turn
+ok 56 - resolved thin-and-sweet evidence can produce a coherent ratio card in the same turn
+  ---
+  duration_ms: 9.737125
+  type: 'test'
+  ...
+1..56
+# tests 56
+# suites 0
+# pass 48
+# fail 8
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 814.652958

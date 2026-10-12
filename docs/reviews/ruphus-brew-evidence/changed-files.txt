@@ -1,0 +1,40 @@
+ M api/_lib/ruphusEvidence.js
+ M api/_lib/ruphusOrchestrator.js
+ M api/_lib/ruphusPrompt.js
+ M api/_lib/ruphusTools.js
+ M scripts/ruphus-source-completion.test.mjs
+?? api/_lib/ruphusBrewEvidence.js
+?? api/_lib/ruphusSensoryConsistency.js
+?? docs/evaluations/ruphus-brew-counterfactual-final.json
+?? docs/evaluations/ruphus-brew-counterfactual-grind.json
+?? docs/evaluations/ruphus-brew-counterfactual-timing.json
+?? docs/evaluations/ruphus-brew-counterfactual.json
+?? docs/evaluations/ruphus-brew-evidence-review.md
+?? docs/reviews/ruphus-brew-evidence/changed-files.txt
+?? docs/reviews/ruphus-brew-evidence/evidence/.gitignore
+?? docs/reviews/ruphus-brew-evidence/evidence/browser-harness.mjs
+?? docs/reviews/ruphus-brew-evidence/evidence/browser-run.log
+?? docs/reviews/ruphus-brew-evidence/evidence/card-1024.png
+?? docs/reviews/ruphus-brew-evidence/evidence/card-390.png
+?? docs/reviews/ruphus-brew-evidence/evidence/focused-tests.log
+?? docs/reviews/ruphus-brew-evidence/evidence/loaded-1024.png
+?? docs/reviews/ruphus-brew-evidence/evidence/loaded-390.png
+?? docs/reviews/ruphus-brew-evidence/evidence/preview-1024.png
+?? docs/reviews/ruphus-brew-evidence/evidence/preview-390.png
+?? docs/reviews/ruphus-brew-evidence/evidence/result.json
+?? docs/reviews/ruphus-brew-evidence/evidence/review-regressions.log
+?? docs/reviews/ruphus-brew-evidence/evidence/ruphus-baseline-failures.log
+?? docs/reviews/ruphus-brew-evidence/evidence/ruphus-baseline-iced-chrome.log
+?? docs/reviews/ruphus-brew-evidence/evidence/ruphus-followup-tests.log
+?? docs/reviews/ruphus-brew-evidence/evidence/ruphus-iced-baseline-diagnosis.json
+?? docs/reviews/ruphus-brew-evidence/evidence/ruphus-iced-baseline.png
+?? docs/reviews/ruphus-brew-evidence/evidence/ruphus-installed-chrome.log
+?? docs/reviews/ruphus-brew-evidence/independent-review.md
+?? docs/reviews/ruphus-brew-evidence/patch-verification.txt
+?? docs/reviews/ruphus-brew-evidence/review.md
+?? docs/reviews/ruphus-brew-evidence/ruphus-brew-evidence.patch
+?? docs/reviews/ruphus-brew-evidence/validation-commands.txt
+?? scripts/fixtures/ruphus-frukt-brew.mjs
+?? scripts/ruphus-brew-counterfactual.mjs
+?? scripts/ruphus-brew-evidence.test.mjs
+?? scripts/ruphus-sensory-consistency.test.mjs

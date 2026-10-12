@@ -1,0 +1,22 @@
+{
+  "reviewedPatchUnchanged": true,
+  "reviewedPatchSHA256": "42ecd4d782f7bf2e29cd3a0bd5f001f985423600a9ac9ca70c347505bff6350c",
+  "additionalReleaseChanges": [
+    "package.json version1.1.255",
+    "package-lock.json version1.1.255",
+    "release evidence documentation"
+  ],
+  "sourceSHA256": {
+    "api/_lib/ruphusEvidence.js": "c142e05e19bea6a1cc9f677332025fc2d52a4a597b505e688aeac59ce51be807",
+    "api/_lib/ruphusOrchestrator.js": "70f16caa62493684f784d7d7e47799f3b0e71a04f84ff699fcb3366237320f26",
+    "api/_lib/ruphusPrompt.js": "d2de0766867ba847534b10754da7e92da912bb122fab30c3a1aa4d88325797a0",
+    "api/_lib/ruphusTools.js": "ab949592be323c21b236dc304ad8e464165925b38e0dab4352b043c349267907",
+    "scripts/ruphus-source-completion.test.mjs": "a6a6ad16ffc4b33c67d30358eab73d67776f1c07f11664df946d9e86e5e0b4f1",
+    "api/_lib/ruphusBrewEvidence.js": "271132fec50c100b96b019f335f4f378d496e0931cb216ab5ca85a7e7e804212",
+    "api/_lib/ruphusSensoryConsistency.js": "b97bd9b3f6324db1d1b385f13c7ac55e291a3bfe219becb8527b8866e91473a4",
+    "scripts/fixtures/ruphus-frukt-brew.mjs": "59f083ee21ca196839d9ceb0ca5b641a927d28f35405c865fa89a139aed8ace0",
+    "scripts/ruphus-brew-counterfactual.mjs": "f087409e3c68ff6d99481f2e22bc74b41f641128e5c167f9239c3ad64bcc8f84",
+    "scripts/ruphus-brew-evidence.test.mjs": "4b74fbc680b5bfaa7539fd758aeb705f92f8bf8f3f2d27e39e8c93afac957a88",
+    "scripts/ruphus-sensory-consistency.test.mjs": "f04c6926e1a7425e83b581f95d61b7160c7f9d03e248f654f3f0f78455bb4104"
+  }
+}

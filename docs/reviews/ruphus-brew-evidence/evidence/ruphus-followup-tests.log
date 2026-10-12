@@ -1,0 +1,732 @@
+TAP version 13
+# Subtest: snapshot wins over source dose; measured timing and explicit feedback join without rewriting history
+ok 1 - snapshot wins over source dose; measured timing and explicit feedback join without rewriting history
+  ---
+  duration_ms: 5.310625
+  type: 'test'
+  ...
+# Subtest: never infer a measurement from target, wall time, mismatched dose, skipped or unrelated timing
+ok 2 - never infer a measurement from target, wall time, mismatched dose, skipped or unrelated timing
+  ---
+  duration_ms: 0.453667
+  type: 'test'
+  ...
+# Subtest: completed baseline preserves executed 18/279, temperature and pours during finer grind experiment
+ok 3 - completed baseline preserves executed 18/279, temperature and pours during finer grind experiment
+  ---
+  duration_ms: 6.590041
+  type: 'test'
+  ...
+# Subtest: draft editing remains explicit and separate from completed-brew diagnosis
+ok 4 - draft editing remains explicit and separate from completed-brew diagnosis
+  ---
+  duration_ms: 2.347584
+  type: 'test'
+  ...
+# Subtest: unknown and uncompleted brew references cannot become experiment baselines
+ok 5 - unknown and uncompleted brew references cannot become experiment baselines
+  ---
+  duration_ms: 1.161042
+  type: 'test'
+  ...
+# Subtest: newest brews survive the four-record evidence limit regardless of database order
+ok 6 - newest brews survive the four-record evidence limit regardless of database order
+  ---
+  duration_ms: 0.490333
+  type: 'test'
+  ...
+# Subtest: opaque brew references remain stable across reads and cannot cross equipment or coffee scope
+ok 7 - opaque brew references remain stable across reads and cannot cross equipment or coffee scope
+  ---
+  duration_ms: 4.417375
+  type: 'test'
+  ...
+# Subtest: one-control trial cannot silently pair a serving resize with grind
+ok 8 - one-control trial cannot silently pair a serving resize with grind
+  ---
+  duration_ms: 0.84775
+  type: 'test'
+  ...
+# Subtest: long restored conversations fit the provider budget without deleting transcript or latest exchange
+ok 9 - long restored conversations fit the provider budget without deleting transcript or latest exchange
+  ---
+  duration_ms: 10.671792
+  type: 'test'
+  ...
+# Subtest: context accepts direct and typed launch clues without preloading record-shaped evidence
+ok 10 - context accepts direct and typed launch clues without preloading record-shaped evidence
+  ---
+  duration_ms: 2.036875
+  type: 'test'
+  ...
+# Subtest: history compaction reserves the latest exchange ahead of older UTF-8 memory
+ok 11 - history compaction reserves the latest exchange ahead of older UTF-8 memory
+  ---
+  duration_ms: 1.437917
+  type: 'test'
+  ...
+# Subtest: oversized current requests still fail closed instead of silently changing user intent
+ok 12 - oversized current requests still fail closed instead of silently changing user intent
+  ---
+  duration_ms: 1.876084
+  type: 'test'
+  ...
+# Subtest: context rejects legacy cage fields and forged owner hints
+ok 13 - context rejects legacy cage fields and forged owner hints
+  ---
+  duration_ms: 0.226833
+  type: 'test'
+  ...
+# Subtest: context keeps raw refs server-side and carries validated session state
+ok 14 - context keeps raw refs server-side and carries validated session state
+  ---
+  duration_ms: 0.419125
+  type: 'test'
+  ...
+# Subtest: launch coffee outside the three-line rotation snapshot gets an owner-scoped opaque ref
+ok 15 - launch coffee outside the three-line rotation snapshot gets an owner-scoped opaque ref
+  ---
+  duration_ms: 0.360459
+  type: 'test'
+  ...
+# Subtest: direct chat locks an explicitly named brewer ahead of the saved default and carries corrections
+ok 16 - direct chat locks an explicitly named brewer ahead of the saved default and carries corrections
+  ---
+  duration_ms: 1.401708
+  type: 'test'
+  ...
+# Subtest: context preserves a hedged candidate without changing active focus or forcing a read
+ok 17 - context preserves a hedged candidate without changing active focus or forcing a read
+  ---
+  duration_ms: 0.709375
+  type: 'test'
+  ...
+# Subtest: context exposes only the exact editable review as typed current recipe context
+ok 18 - context exposes only the exact editable review as typed current recipe context
+  ---
+  duration_ms: 2.000708
+  type: 'test'
+  ...
+# Subtest: snapshot is compact, ref-keyed, and carries setup plus jars
+ok 19 - snapshot is compact, ref-keyed, and carries setup plus jars
+  ---
+  duration_ms: 1.027917
+  type: 'test'
+  ...
+# Subtest: ledger evicts oldest entries and composite reads run in parallel with scoped outage
+ok 20 - ledger evicts oldest entries and composite reads run in parallel with scoped outage
+  ---
+  duration_ms: 3.846083
+  type: 'test'
+  ...
+# Subtest: evidence ledger replays successful and unavailable bounded summaries without server fields
+ok 21 - evidence ledger replays successful and unavailable bounded summaries without server fields
+  ---
+  duration_ms: 0.258958
+  type: 'test'
+  ...
+# Subtest: null window widens history and still returns scoped evidence
+ok 22 - null window widens history and still returns scoped evidence
+  ---
+  duration_ms: 0.254583
+  type: 'test'
+  ...
+# Subtest: brew and tasting summaries preserve distinct provenance for the model
+ok 23 - brew and tasting summaries preserve distinct provenance for the model
+  ---
+  duration_ms: 0.432917
+  type: 'test'
+  ...
+# Subtest: method focus replay keeps only an allowlisted display name
+ok 24 - method focus replay keeps only an allowlisted display name
+  ---
+  duration_ms: 0.387708
+  type: 'test'
+  ...
+# Subtest: short sour reports and review follow-ups unlock a review without authorizing a save
+ok 25 - short sour reports and review follow-ups unlock a review without authorizing a save
+  ---
+  duration_ms: 1.725833
+  type: 'test'
+  ...
+# Subtest: 31 Ode labels represent physical clicks, not decimal increments
+ok 26 - 31 Ode labels represent physical clicks, not decimal increments
+  ---
+  duration_ms: 0.208792
+  type: 'test'
+  ...
+# Subtest: all supported manual adapters generate physical Ode positions
+ok 27 - all supported manual adapters generate physical Ode positions
+  ---
+  duration_ms: 2.96775
+  type: 'test'
+  ...
+# Subtest: invalid decimal from the model recovers to one real click and emits a card, not a connection error
+ok 28 - invalid decimal from the model recovers to one real click and emits a card, not a connection error
+  ---
+  duration_ms: 26.014041
+  type: 'test'
+  ...
+# Subtest: grounded response check regenerates unsupported Ode decimals before they reach the user
+ok 29 - grounded response check regenerates unsupported Ode decimals before they reach the user
+  ---
+  duration_ms: 1.61875
+  type: 'test'
+  ...
+# Subtest: direct recipe read grounds the review follow-up before proposal dispatch
+ok 30 - direct recipe read grounds the review follow-up before proposal dispatch
+  ---
+  duration_ms: 2.247792
+  type: 'test'
+  ...
+# Subtest: real proposal chain rejects 5.5 and accepts one physical finer click with coherent microns
+ok 31 - real proposal chain rejects 5.5 and accepts one physical finer click with coherent microns
+  ---
+  duration_ms: 1.107375
+  type: 'test'
+  ...
+# Subtest: full-patch inputs cannot bypass physical grinder validation; other grinders are not Ode
+ok 32 - full-patch inputs cannot bypass physical grinder validation; other grinders are not Ode
+  ---
+  duration_ms: 2.858084
+  type: 'test'
+  ...
+# Subtest: ratio preview repairs inherited Ode value consistently without rewriting source or source hash
+ok 33 - ratio preview repairs inherited Ode value consistently without rewriting source or source hash
+  ---
+  duration_ms: 3.308584
+  type: 'test'
+  ...
+# Subtest: dose preview keeps a recognized V60 family when crossing into the large profile
+ok 34 - dose preview keeps a recognized V60 family when crossing into the large profile
+  ---
+  duration_ms: 1.707625
+  type: 'test'
+  ...
+# Subtest: another recipe rejects repeated after-state but comparison is not an alternative request
+ok 35 - another recipe rejects repeated after-state but comparison is not an alternative request
+  ---
+  duration_ms: 2.2605
+  type: 'test'
+  ...
+# Subtest: comparison context retains exact named review, excludes foreign records and respects new chat
+ok 36 - comparison context retains exact named review, excludes foreign records and respects new chat
+  ---
+  duration_ms: 0.959666
+  type: 'test'
+  ...
+# (node:12040) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: review summary preserves source-native mL and exact stage timing without inventing temperature
+ok 37 - review summary preserves source-native mL and exact stage timing without inventing temperature
+  ---
+  duration_ms: 1.874083
+  type: 'test'
+  ...
+# Subtest: review summary keeps author ranges and native Fahrenheit typed
+ok 38 - review summary keeps author ranges and native Fahrenheit typed
+  ---
+  duration_ms: 0.3535
+  type: 'test'
+  ...
+# Subtest: provider review serialization preserves a source-native mL marker over a legacy grams alias
+ok 39 - provider review serialization preserves a source-native mL marker over a legacy grams alias
+  ---
+  duration_ms: 0.540417
+  type: 'test'
+  ...
+# Subtest: reviews carry exact authenticated proposal refs and source projection while excluding foreign and archived history
+ok 40 - reviews carry exact authenticated proposal refs and source projection while excluding foreign and archived history
+  ---
+  duration_ms: 0.567708
+  type: 'test'
+  ...
+# Subtest: new-chat boundary and explicit historical inspection do not create a command reference
+ok 41 - new-chat boundary and explicit historical inspection do not create a command reference
+  ---
+  duration_ms: 1.284208
+  type: 'test'
+  ...
+# Subtest: technique exclusion state keeps exact successfully delivered proposal refs
+ok 42 - technique exclusion state keeps exact successfully delivered proposal refs
+  ---
+  duration_ms: 0.161375
+  type: 'test'
+  ...
+# Subtest: source unit changes remain distinct review identities
+ok 43 - source unit changes remain distinct review identities
+  ---
+  duration_ms: 0.807792
+  type: 'test'
+  ...
+# Subtest: provider instructions preserve partial sensory answers and evidence-backed brewer choices
+ok 44 - provider instructions preserve partial sensory answers and evidence-backed brewer choices
+  ---
+  duration_ms: 1.296084
+  type: 'test'
+  ...
+# Subtest: OpenAI adapter is pinned, stateless, and provider-neutral
+ok 45 - OpenAI adapter is pinned, stateless, and provider-neutral
+  ---
+  duration_ms: 0.525292
+  type: 'test'
+  ...
+# Subtest: provider output rejects malformed tool arguments and preserves attribution
+ok 46 - provider output rejects malformed tool arguments and preserves attribution
+  ---
+  duration_ms: 0.1425
+  type: 'test'
+  ...
+# Subtest: provider output rejects truncated, partial, and unknown final envelopes while retaining usage on errors
+ok 47 - provider output rejects truncated, partial, and unknown final envelopes while retaining usage on errors
+  ---
+  duration_ms: 0.189667
+  type: 'test'
+  ...
+# Subtest: provider transport failures are typed without leaking SDK details
+ok 48 - provider transport failures are typed without leaking SDK details
+  ---
+  duration_ms: 0.505208
+  type: 'test'
+  ...
+# Subtest: provider appends the newest user turn after authoritative history
+ok 49 - provider appends the newest user turn after authoritative history
+  ---
+  duration_ms: 0.144333
+  type: 'test'
+  ...
+# Subtest: continuation refreshes trusted brewer context without losing paired tool history
+ok 50 - continuation refreshes trusted brewer context without losing paired tool history
+  ---
+  duration_ms: 0.312375
+  type: 'test'
+  ...
+# Subtest: app-side evidence without a provider call id is not sent as an orphan function output
+ok 51 - app-side evidence without a provider call id is not sent as an orphan function output
+  ---
+  duration_ms: 0.204875
+  type: 'test'
+  ...
+# Subtest: OpenAI continuation replays prior response items alongside every tool result
+ok 52 - OpenAI continuation replays prior response items alongside every tool result
+  ---
+  duration_ms: 0.917541
+  type: 'test'
+  ...
+# Subtest: provider adapter keeps app-initiated technique continuation outputs paired
+ok 53 - provider adapter keeps app-initiated technique continuation outputs paired
+  ---
+  duration_ms: 0.473709
+  type: 'test'
+  ...
+# Subtest: stateless continuation accumulates the complete multi-round input sequence
+ok 54 - stateless continuation accumulates the complete multi-round input sequence
+  ---
+  duration_ms: 0.250333
+  type: 'test'
+  ...
+# Subtest: regeneration replays every prior tool result and includes corrective instruction
+ok 55 - regeneration replays every prior tool result and includes corrective instruction
+  ---
+  duration_ms: 0.182542
+  type: 'test'
+  ...
+# Subtest: Firestore command saves a trial then completes its existing attempt without recreating it
+ok 56 - Firestore command saves a trial then completes its existing attempt without recreating it
+  ---
+  duration_ms: 11.133667
+  type: 'test'
+  ...
+# Subtest: proposal transaction completes all reads before revision and bean writes
+ok 57 - proposal transaction completes all reads before revision and bean writes
+  ---
+  duration_ms: 2.216583
+  type: 'test'
+  ...
+# Subtest: the observed sharp/extraction reversal and categorical paraphrases are caught
+ok 58 - the observed sharp/extraction reversal and categorical paraphrases are caught
+  ---
+  duration_ms: 1.190375
+  type: 'test'
+  ...
+# Subtest: uncertainty, negated claims, comparative reports and clarifications remain allowed
+ok 59 - uncertainty, negated claims, comparative reports and clarifications remain allowed
+  ---
+  duration_ms: 0.2345
+  type: 'test'
+  ...
+# Subtest: bad explanation is rejected before publication or persistence; a corrected one preserves the experiment
+ok 60 - bad explanation is rejected before publication or persistence; a corrected one preserves the experiment
+  ---
+  duration_ms: 10.374166
+  type: 'test'
+  ...
+# Subtest: uncertainty guard does not prescribe a universal grind direction or control
+ok 61 - uncertainty guard does not prescribe a universal grind direction or control
+  ---
+  duration_ms: 7.112709
+  type: 'test'
+  ...
+# Subtest: real proposal recovery is bounded to one explanatory repair without publishing the rejected claim
+ok 62 - real proposal recovery is bounded to one explanatory repair without publishing the rejected claim
+  ---
+  duration_ms: 23.272083
+  type: 'test'
+  ...
+# Subtest: repeated unsupported proposal rationale stops after one repair, without a stored or shown proposal
+ok 63 - repeated unsupported proposal rationale stops after one repair, without a stored or shown proposal
+  ---
+  duration_ms: 1.409917
+  type: 'test'
+  ...
+# Subtest: a prose-only extraction claim receives one uncertainty correction and no recipe is invented
+ok 64 - a prose-only extraction claim receives one uncertainty correction and no recipe is invented
+  ---
+  duration_ms: 1.038708
+  type: 'test'
+  ...
+# Subtest: repeated unsupported prose is withheld, not delivered after the retry budget
+ok 65 - repeated unsupported prose is withheld, not delivered after the retry budget
+  ---
+  duration_ms: 1.030292
+  type: 'test'
+  ...
+# Subtest: a published valid card stays fixed when surrounding model prose makes the unsupported inference
+ok 66 - a published valid card stays fixed when surrounding model prose makes the unsupported inference
+  ---
+  duration_ms: 2.354459
+  type: 'test'
+  ...
+# (node:12044) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: an unready card after the read budget falls back to conversation, never dispatching the card
+ok 67 - an unready card after the read budget falls back to conversation, never dispatching the card
+  ---
+  duration_ms: 32.821042
+  type: 'test'
+  ...
+# Subtest: natural answers to the sensory question earn a grounded review, not another yes
+ok 68 - natural answers to the sensory question earn a grounded review, not another yes
+  ---
+  duration_ms: 2.551125
+  type: 'test'
+  ...
+# Subtest: retrying the answer after the displayed connection error retains the question
+ok 69 - retrying the answer after the displayed connection error retains the question
+  ---
+  duration_ms: 0.219875
+  type: 'test'
+  ...
+# Subtest: sensory answers complete two real evidence reads and a recipe card without a round-limit failure
+ok 70 - sensory answers complete two real evidence reads and a recipe card without a round-limit failure
+  ---
+  duration_ms: 32.415667
+  type: 'test'
+  ...
+# Ruphus source backend contract passed
+# Subtest: explicit classic V60 binding overrides a previous Switch technique during discovery
+ok 71 - explicit classic V60 binding overrides a previous Switch technique during discovery
+  ---
+  duration_ms: 10.32825
+  type: 'test'
+  ...
+# Subtest: source runtime keeps exact Switch identity, native units, valves, and summary
+ok 72 - source runtime keeps exact Switch identity, native units, valves, and summary
+  ---
+  duration_ms: 16.84325
+  type: 'test'
+  ...
+# Subtest: legacy resolver dispatches versioned source envelopes without old adapter validation
+ok 73 - legacy resolver dispatches versioned source envelopes without old adapter validation
+  ---
+  duration_ms: 1.402083
+  type: 'test'
+  ...
+# Subtest: unsupported source projection versions fail closed before legacy heuristics
+ok 74 - unsupported source projection versions fail closed before legacy heuristics
+  ---
+  duration_ms: 0.853833
+  type: 'test'
+  ...
+# Subtest: source option selection preserves the requested Kalita serving instead of promoting it
+ok 75 - source option selection preserves the requested Kalita serving instead of promoting it
+  ---
+  duration_ms: 5.165833
+  type: 'test'
+  ...
+# Subtest: ordinary source dose proposals dispatch through the native source preview
+ok 76 - ordinary source dose proposals dispatch through the native source preview
+  ---
+  duration_ms: 5.370834
+  type: 'test'
+  ...
+# Subtest: source dose guides preserve pour duration, size boundaries and conservative Switch loads
+ok 77 - source dose guides preserve pour duration, size boundaries and conservative Switch loads
+  ---
+  duration_ms: 5.535417
+  type: 'test'
+  ...
+# Subtest: source grind keeps its technique baseline, applies the existing bean delta, then quantizes
+ok 78 - source grind keeps its technique baseline, applies the existing bean delta, then quantizes
+  ---
+  duration_ms: 1.217167
+  type: 'test'
+  ...
+# Subtest: qualitative source grind does not invent calibration when the existing method estimate conflicts
+ok 79 - qualitative source grind does not invent calibration when the existing method estimate conflicts
+  ---
+  duration_ms: 0.9875
+  type: 'test'
+  ...
+# Subtest: server source preparation builds trusted extraction intent instead of using an empty intent
+ok 80 - server source preparation builds trusted extraction intent instead of using an empty intent
+  ---
+  duration_ms: 7.634166
+  type: 'test'
+  ...
+# (node:12046) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: current conversation selects its exact trial, not another trial or an old chat
+ok 81 - current conversation selects its exact trial, not another trial or an old chat
+  ---
+  duration_ms: 2.670667
+  type: 'test'
+  ...
+# Subtest: trial review recovers the stored recipe and confirmation without a model mutation
+ok 82 - trial review recovers the stored recipe and confirmation without a model mutation
+  ---
+  duration_ms: 33.595625
+  type: 'test'
+  ...
+# Subtest: trial review keeps the exact promoted Switch attempt after Save then Undo
+ok 83 - trial review keeps the exact promoted Switch attempt after Save then Undo
+  ---
+  duration_ms: 6.239708
+  type: 'test'
+  ...
+# Subtest: typed technique preview survives a short equipment answer without keyword gating
+ok 84 - typed technique preview survives a short equipment answer without keyword gating
+  ---
+  duration_ms: 0.643
+  type: 'test'
+  ...
+# Subtest: source quantity handoffs preserve native units and never stringify structured values
+ok 85 - source quantity handoffs preserve native units and never stringify structured values
+  ---
+  duration_ms: 0.407125
+  type: 'test'
+  ...
+# Subtest: named technique handoff uses one rationale instead of repeating the source difference
+ok 86 - named technique handoff uses one rationale instead of repeating the source difference
+  ---
+  duration_ms: 0.248667
+  type: 'test'
+  ...
+# Subtest: absent manual handoffs describe drafts without dereferencing a nonexistent saved recipe
+ok 87 - absent manual handoffs describe drafts without dereferencing a nonexistent saved recipe
+  ---
+  duration_ms: 0.1635
+  type: 'test'
+  ...
+# Subtest: first Aiden handoff describes a new draft without inventing a prior ratio
+ok 88 - first Aiden handoff describes a new draft without inventing a prior ratio
+  ---
+  duration_ms: 0.09075
+  type: 'test'
+  ...
+# Subtest: actionable recipe questions cannot end as prose-only answers
+ok 89 - actionable recipe questions cannot end as prose-only answers
+  ---
+  duration_ms: 32.923875
+  type: 'test'
+  ...
+# Subtest: information requests do not inherit recipe intent from action words or old readiness
+ok 90 - information requests do not inherit recipe intent from action words or old readiness
+  ---
+  duration_ms: 7.283834
+  type: 'test'
+  ...
+# Subtest: water quantities remain water controls rather than being rewritten as serving dose
+ok 91 - water quantities remain water controls rather than being rewritten as serving dose
+  ---
+  duration_ms: 0.730917
+  type: 'test'
+  ...
+# Subtest: micron and temperature numbers do not trigger an Ode-label correction
+ok 92 - micron and temperature numbers do not trigger an Ode-label correction
+  ---
+  duration_ms: 1.305833
+  type: 'test'
+  ...
+# Subtest: successful first Aiden proposal after JIT read does not request another draft
+ok 93 - successful first Aiden proposal after JIT read does not request another draft
+  ---
+  duration_ms: 1.523041
+  type: 'test'
+  ...
+# Subtest: invalid first Aiden draft gets one correction, with repeated failure explicitly unfulfilled
+ok 94 - invalid first Aiden draft gets one correction, with repeated failure explicitly unfulfilled
+  ---
+  duration_ms: 0.751834
+  type: 'test'
+  ...
+# Subtest: parallel thrown reads emit one safe paired failure each before interruption
+ok 95 - parallel thrown reads emit one safe paired failure each before interruption
+  ---
+  duration_ms: 6.167625
+  type: 'test'
+  ...
+# Subtest: parallel successful reads settle both tool results before the final response
+ok 96 - parallel successful reads settle both tool results before the final response
+  ---
+  duration_ms: 6.51725
+  type: 'test'
+  ...
+# Subtest: recipe envelope without a matching current-turn card gets one bounded recovery
+ok 97 - recipe envelope without a matching current-turn card gets one bounded recovery
+  ---
+  duration_ms: 0.425958
+  type: 'test'
+  ...
+# Subtest: repeated missing recipe artifact is a typed bounded failure, not turn_completed ok
+ok 98 - repeated missing recipe artifact is a typed bounded failure, not turn_completed ok
+  ---
+  duration_ms: 0.186916
+  type: 'test'
+  ...
+# Subtest: clarification envelope is an explicit non-fulfillment state
+ok 99 - clarification envelope is an explicit non-fulfillment state
+  ---
+  duration_ms: 0.135125
+  type: 'test'
+  ...
+# Subtest: answered recipe envelope requires positive coffee and brewer identity
+ok 100 - answered recipe envelope requires positive coffee and brewer identity
+  ---
+  duration_ms: 0.691583
+  type: 'test'
+  ...
+# Subtest: typed Switch resize reads the exact draft: Only 20 grams please.
+ok 101 - typed Switch resize reads the exact draft: Only 20 grams please.
+  ---
+  duration_ms: 9.876458
+  type: 'test'
+  ...
+# Subtest: typed Switch resize reads the exact draft: Can I brew that with 20g instead?
+ok 102 - typed Switch resize reads the exact draft: Can I brew that with 20g instead?
+  ---
+  duration_ms: 3.604625
+  type: 'test'
+  ...
+# Subtest: typed Switch resize reads the exact draft: I have twenty grams left; resize this one.
+ok 103 - typed Switch resize reads the exact draft: I have twenty grams left; resize this one.
+  ---
+  duration_ms: 2.782917
+  type: 'test'
+  ...
+# Subtest: serving-dose follow-up infers a typed preview when provider omits intent
+ok 104 - serving-dose follow-up infers a typed preview when provider omits intent
+  ---
+  duration_ms: 0.45725
+  type: 'test'
+  ...
+# Subtest: typed serving resize retains its explicit dose instead of timing-blocking
+ok 105 - typed serving resize retains its explicit dose instead of timing-blocking
+  ---
+  duration_ms: 0.26775
+  type: 'test'
+  ...
+# Subtest: serving resize still fulfills after a preceding technique-options read
+ok 106 - serving resize still fulfills after a preceding technique-options read
+  ---
+  duration_ms: 0.271292
+  type: 'test'
+  ...
+# Subtest: JIT read is paired with the original provider output during bounded proposal recovery
+ok 107 - JIT read is paired with the original provider output during bounded proposal recovery
+  ---
+  duration_ms: 0.496292
+  type: 'test'
+  ...
+# Subtest: typed preview JIT read fails closed without dispatching proposal on unavailable or mismatched targets
+    # Subtest: unavailable
+    ok 1 - unavailable
+      ---
+      duration_ms: 1.508208
+      type: 'test'
+      ...
+    # Subtest: invalid
+    ok 2 - invalid
+      ---
+      duration_ms: 0.69125
+      type: 'test'
+      ...
+    # Subtest: mismatch
+    ok 3 - mismatch
+      ---
+      duration_ms: 0.132458
+      type: 'test'
+      ...
+    # Subtest: explicit-method-conflict
+    ok 4 - explicit-method-conflict
+      ---
+      duration_ms: 0.490667
+      type: 'test'
+      ...
+    # Subtest: read-budget
+    ok 5 - read-budget
+      ---
+      duration_ms: 0.183792
+      type: 'test'
+      ...
+    1..5
+ok 108 - typed preview JIT read fails closed without dispatching proposal on unavailable or mismatched targets
+  ---
+  duration_ms: 3.285875
+  type: 'test'
+  ...
+# Subtest: blocked provider text is sanitized before the terminal frame
+ok 109 - blocked provider text is sanitized before the terminal frame
+  ---
+  duration_ms: 0.176708
+  type: 'test'
+  ...
+# Subtest: information answer claiming a prepared recipe cannot become successful without a card
+ok 110 - information answer claiming a prepared recipe cannot become successful without a card
+  ---
+  duration_ms: 0.428083
+  type: 'test'
+  ...
+# Subtest: answered preview rejects a card bound to the wrong coffee
+ok 111 - answered preview rejects a card bound to the wrong coffee
+  ---
+  duration_ms: 0.212958
+  type: 'test'
+  ...
+# Subtest: trial recovery action receipt is a valid current-turn recipe preview artifact
+ok 112 - trial recovery action receipt is a valid current-turn recipe preview artifact
+  ---
+  duration_ms: 0.20625
+  type: 'test'
+  ...
+# Subtest: stream parser preserves a terminal provider category through stream-result recovery
+ok 113 - stream parser preserves a terminal provider category through stream-result recovery
+  ---
+  duration_ms: 0.265125
+  type: 'test'
+  ...
+# Subtest: provider dispatch stays within the configured bounded loop
+ok 114 - provider dispatch stays within the configured bounded loop
+  ---
+  duration_ms: 0.192333
+  type: 'test'
+  ...
+1..114
+# tests 119
+# suites 0
+# pass 119
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 543.472083
