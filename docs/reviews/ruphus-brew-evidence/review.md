@@ -1,3 +1,5 @@
+> Subsequent release: this reviewed fix was authorized and deployed as1.1.255. See the [production release record](../../releases/ruphus-brew-evidence/release.md). The review below records the earlier review-stage state.
+
 # Ruphus completed-brew evidence: reviewed release candidate
 
 Date: 2026-10-12. Independent review passed after two repair rounds. No remaining concrete blocker was found in this scoped patch. This is a reviewed working diff, not a deployed or committed release.
