@@ -21,6 +21,13 @@ export function resolveRuphusActionRequest({ uid = null, mode, artifact, storage
   }
   const actionId = artifact.actionId && artifact.mode === mode ? artifact.actionId : recoveredActionId || idFactory();
   const request = { actionId, mode, coffeeId: artifact.coffeeId, slotKey: artifact.slotKey, proposalId: artifact.proposalId || (artifact.type === 'recipe_proposal' ? artifact.id : undefined), attemptId: artifact.attemptId, expectedRevisionId: artifact.sourceRevisionId || artifact.revisionId, expectedRevisionHash: artifact.sourceHash };
+  // Ordinary receipts keep their existing action contract. Espresso Undo is a
+  // separate, narrowly authorized command path and must carry its explicit
+  // intent so the server can apply the espresso-only Pro guard without
+  // enabling the generic mutation rollout.
+  if (mode === 'undo_revision' && artifact.type === 'action_receipt' && artifact.slotKey === 'espresso') {
+    request.clientIntent = 'espresso_direct_undo';
+  }
   if (identityKey && !recoveredActionId && storage) {
     try { storage.setItem(identityKey, JSON.stringify({ actionId, fingerprint: canonicalHash(request) })); } catch { /* best effort */ }
   }

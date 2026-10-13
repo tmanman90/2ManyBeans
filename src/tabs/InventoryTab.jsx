@@ -30,6 +30,8 @@ import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 import { haptic } from '../lib/haptics';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
+import { espressoTastingContext } from '../lib/brewContext';
+import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
 
 // Secondary Liquid-Glass pill for the rail card footer (matches the Rotation footer).
 // Spreads ...rest so long-press handlers (Brew) pass through.
@@ -108,6 +110,20 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
   const espresso = useEspressoBrew();
   const openEspresso = (bean) => { if (bean) espresso.handleBrewEspresso(bean); };
+  const openEspressoChat = () => {
+    const bean = espresso.espressoBean;
+    if (!bean?.id || !onOpenRuphus) return;
+    const revisionId = bean.activeRevisionIds?.espresso;
+    const hasUnsavedTarget = Boolean(espresso.espressoRecipe && (!bean.espressoRecipe
+      || espressoRecipeFingerprint(espresso.espressoRecipe) !== espressoRecipeFingerprint(bean.espressoRecipe)));
+    if (hasUnsavedTarget) return;
+    onOpenRuphus({
+      coffeeRef: bean.id,
+      surface: 'recipe_espresso',
+      launchMethod: 'espresso',
+      ...(revisionId ? { launchItem: { kind: 'recipe', ref: revisionId, method: 'espresso' } } : {}),
+    });
+  };
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
   const [editBean, setEditBean] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
@@ -565,8 +581,8 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         onUndo={espresso.undoEspressoRecipe}
         onDoseChange={espresso.editEspressoDose}
         onYieldChange={espresso.editEspressoYield}
-        onOpenChat={agentV3Enabled ? () => onOpenRuphus?.({ coffeeRef: espresso.espressoBean?.id, surface: 'recipe_espresso' }) : undefined}
-        onStartTasting={() => onStartTastingSession?.(espresso.espressoBean?.id)}
+        onOpenChat={agentV3Enabled ? openEspressoChat : undefined}
+        onStartTasting={() => onStartTastingSession?.(espresso.espressoBean?.id, null, espresso.espressoRecipe ? espressoTastingContext({ recipe: espresso.espressoRecipe, savedRecipe: espresso.espressoBean?.espressoRecipe, setup: espresso.espressoRecipe.setup, revisionId: espresso.espressoBean?.activeRevisionIds?.espresso }) : null)}
       />
       <FinishBagPrompt
         open={!!finishPrompt}

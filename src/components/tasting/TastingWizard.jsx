@@ -17,6 +17,8 @@ import { palateLevel } from '../../lib/palate';
 import { AXES as SLIDER_AXES } from '../../lib/flavorWheel';
 import { TASTING_WIZARD_STEPS, initialAnswers, stepComplete, capturedScores, buildTastingFromAnswers } from '../../lib/tastingWizardSteps';
 import { reactToTastingStep } from '../../lib/claude';
+import { formatBrewContext, isEspressoContext, isMilkDrink, resolveBrewContext, snapshotBrewContext, tastingSnapshotFromContext, tastingStepCopy } from '../../lib/brewContext';
+import { espressoSetupKey } from '../../lib/espressoRecipes';
 import { useNativeKeyboard } from '../../hooks/useNativeKeyboard';
 import { AxisSlider } from './AxisSlider';
 import { SlideSelect } from './SlideSelect';
@@ -45,12 +47,15 @@ const BONE_REVEAL_ADVANCE_MS = 1100;
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, reduce = false, isPro = true, onCharge, onboardingPalate = null, onOpenRuphus, attemptId = null }) {
-  const [initialState] = useState(() => normalizeDraft(draft, bean?.id));
+export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onSwitchToManual, onDraftChange, draft, brewContext = null, preferences = null, reduce = false, isPro = true, onCharge, onboardingPalate = null, onOpenRuphus, attemptId = null }) {
+  const [initialState] = useState(() => normalizeDraft(draft, bean?.id, brewContext, preferences, bean));
 
   const [phase, setPhase] = useState(initialState.phase); // intro | steps | reveal
   const [idx, setIdx] = useState(initialState.idx);
   const [answers, setAnswers] = useState(initialState.answers);
+  // Context is captured once when a tasting starts. It intentionally does not
+  // follow mutable preferences or a later recipe edit.
+  const [cupContext, setCupContext] = useState(initialState.brewContext);
   const [revealedSteps, setRevealedSteps] = useState(initialState.revealedSteps);
   const [aiLine, setAiLine] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -59,23 +64,27 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   const aiSeq = useRef(0);
   const reactedIdx = useRef(-1);
   const revealAdvancePending = useRef(false);
+  const savePending = useRef(false);
+  const [saveInFlight, setSaveInFlight] = useState(false);
   // Keyboard height so the content area can pad out and the focused field scrolls clear of the keyboard.
   const keyboardHeight = useNativeKeyboard({ hideTabBar: false });
 
+  const espresso = isEspressoContext(cupContext);
+  const milk = isMilkDrink(cupContext);
   const expected = useMemo(() => applyPalateTiebreak(predict(bean), onboardingPalate), [bean, onboardingPalate]);
   const palate = useMemo(() => palateLevel(tastings), [tastings]);
   const step = TASTING_WIZARD_STEPS[idx];
   const scores = answers.scores;
   const captured = capturedScores(answers);
   const allCaptured = ['fragranceAroma', 'acidity', 'sweetness', 'body', 'flavor', 'balance'].every(k => captured[k] > 0);
-  const hasProgress = hasWizardProgress(phase, idx, answers);
-  const comparisonRevealed = phase === 'steps' && !!revealedSteps[step.key];
-  const needsComparisonReveal = phase === 'steps' && stepHasAxisAnswer(step, answers) && !comparisonRevealed;
+  const hasProgress = hasWizardProgress(phase, idx, answers, cupContext);
+  const comparisonRevealed = phase === 'steps' && !espresso && !!revealedSteps[step.key];
+  const needsComparisonReveal = phase === 'steps' && !espresso && stepHasAxisAnswer(step, answers) && !comparisonRevealed;
 
   useEffect(() => {
-    if (!onDraftChange || !bean?.id || !hasProgress) return;
-    onDraftChange({ beanId: bean.id, phase, idx, answers: cloneAnswers(answers), revealedSteps: { ...revealedSteps } });
-  }, [onDraftChange, bean?.id, phase, idx, answers, revealedSteps, hasProgress]);
+    if (savePending.current || !onDraftChange || !bean?.id || !hasProgress) return;
+    onDraftChange({ beanId: bean.id, phase, idx, answers: cloneAnswers(answers), revealedSteps: { ...revealedSteps }, brewContext: tastingSnapshotFromContext(cupContext) });
+  }, [onDraftChange, bean?.id, phase, idx, answers, revealedSteps, cupContext, hasProgress]);
 
   // --- answer mutators ---
   const resetStepReveal = useCallback((stepKey) => {
@@ -125,7 +134,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
     const t = setTimeout(async () => {
       reactedIdx.current = idx;
       try {
-        const line = await reactToTastingStep({ bean, step, userText: reactionInput, expected });
+        const line = await reactToTastingStep({ bean, step, userText: reactionInput, expected: espresso ? null : expected, brewContext: cupContext });
         if (seq === aiSeq.current && line) setAiLine(line);
       } catch { /* non-gating */ }
       if (seq === aiSeq.current) setAiLoading(false);
@@ -175,12 +184,24 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
   const canAdvance = phase === 'intro' || phase === 'reveal' || stepComplete(step, answers);
 
   const handleSave = useCallback(() => {
-    const record = { ...buildTastingFromAnswers(answers, bean?.id, todayISO()), ...(attemptId ? { attemptId } : {}) };
+    if (savePending.current) return;
+    savePending.current = true;
+    setSaveInFlight(true);
+    const record = { ...buildTastingFromAnswers(answers, bean?.id, todayISO()), cupContext: tastingSnapshotFromContext(cupContext), ...(attemptId ? { attemptId } : {}) };
     haptic.success();
-    onSave?.(record);
-  }, [answers, bean, onSave, attemptId]);
+    Promise.resolve(onSave?.(record)).then((saved) => {
+      if (saved !== true) {
+        savePending.current = false;
+        setSaveInFlight(false);
+      }
+    }).catch(() => {
+      savePending.current = false;
+      setSaveInFlight(false);
+    });
+  }, [answers, bean, cupContext, onSave, attemptId]);
 
   const requestClose = useCallback(() => {
+    if (savePending.current || saveInFlight) return;
     revealAdvancePending.current = false;
     setRevealAdvanceKey(null);
     if (hasProgress) {
@@ -189,15 +210,16 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
       return;
     }
     onClose?.({ clearDraft: true });
-  }, [hasProgress, onClose]);
+  }, [hasProgress, onClose, saveInFlight]);
 
   const leaveWithDraft = useCallback(() => {
+    if (savePending.current || saveInFlight) return;
     revealAdvancePending.current = false;
     setRevealAdvanceKey(null);
     haptic.light();
     setExitConfirmOpen(false);
     onClose?.({ keepDraft: true });
-  }, [onClose]);
+  }, [onClose, saveInFlight]);
 
   // The overlay is a PLAIN div (opaque, opacity defaults to 1) so it is ALWAYS visible the instant
   // it mounts — never dependent on a JS/framer animation that could fail to fire on WKWebView and
@@ -212,22 +234,22 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
         paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={requestClose} reduce={reduce} />
+      <WizardHeader bean={bean} phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} onClose={requestClose} saving={saveInFlight} reduce={reduce} />
 
       {/* Content is plain-DOM + CSS-fade (keyed per phase/step so the fade re-runs). Visibility is
           NEVER gated on framer's animate — which does not reliably run inside the WKWebView portal,
           leaving opacity:0 content stuck invisible. No AnimatePresence mode="wait" either: it gates
           the next page on an exit animation that may never complete. */}
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 20px 20px', paddingBottom: 20 + keyboardHeight }}>
+      <div inert={saveInFlight ? true : undefined} style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 20px 20px', paddingBottom: 20 + keyboardHeight, pointerEvents: saveInFlight ? 'none' : undefined }}>
         {phase === 'intro' && (
           <Stage key="intro" reduce={reduce}>
-            <IntroCard bean={bean} expected={expected} palate={palate} reduce={reduce} />
+            <IntroCard bean={bean} expected={expected} palate={palate} brewContext={cupContext} onMethod={(method) => setCupContext(c => method === 'espresso' ? snapshotBrewContext({ method, drinkType: c.drinkType || 'straight' }) : snapshotBrewContext({ method }))} onDrinkType={(drinkType) => setCupContext(c => snapshotBrewContext({ ...c, drinkType }))} reduce={reduce} />
           </Stage>
         )}
         {phase === 'steps' && (
           <Stage key={`step-${idx}`} reduce={reduce}>
             <StepCard
-              step={step} bean={bean} expected={expected} answers={answers} captured={captured}
+              step={step} bean={bean} expected={expected} answers={answers} captured={captured} brewContext={cupContext}
               allCaptured={allCaptured} palate={palate} aiLine={aiLine} aiLoading={aiLoading} reduce={reduce}
               expectedRevealed={comparisonRevealed}
               setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip}
@@ -237,7 +259,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
         {phase === 'reveal' && (
           <Stage key="reveal" reduce={reduce}>
             <RevealCard
-              bean={bean} expected={expected} answers={answers} scores={scores} palate={palate}
+              bean={bean} expected={expected} answers={answers} scores={scores} palate={palate} brewContext={cupContext}
               reduce={reduce} setAnswers={setAnswers} onOpenRuphus={onOpenRuphus}
             />
           </Stage>
@@ -246,7 +268,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
 
       <WizardFooter
         phase={phase} idx={idx} total={TASTING_WIZARD_STEPS.length} canAdvance={canAdvance}
-        onBack={goBack} onNext={goNext} onSave={handleSave} onSwitchToManual={onSwitchToManual} reduce={reduce}
+        onBack={goBack} onNext={goNext} onSave={handleSave} onSwitchToManual={onSwitchToManual} disabled={saveInFlight} reduce={reduce}
       />
 
       {exitConfirmOpen && (
@@ -262,7 +284,7 @@ export function TastingWizard({ bean, beans, tastings = [], onSave, onClose, onS
 }
 
 // ---------------------------------------------------------------- header
-function WizardHeader({ bean, phase, idx, total, onClose, reduce }) {
+function WizardHeader({ bean, phase, idx, total, onClose, saving = false, reduce }) {
   const pct = phase === 'intro' ? 0 : phase === 'reveal' ? 1 : (idx + 1) / total;
   return (
     <div style={{ padding: '6px 16px 10px', background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur, borderBottom: `1px solid ${glass.chromeBorder}` }}>
@@ -271,7 +293,7 @@ function WizardHeader({ bean, phase, idx, total, onClose, reduce }) {
           <div style={{ ...type.eyebrow, color: C.accent }}>Guided tasting</div>
           <div style={{ fontFamily: fonts.heading, fontSize: 17, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bean?.name || bean?.roaster || 'Your coffee'}</div>
         </div>
-        <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, border: 'none', background: 'transparent', color: C.textMuted, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button onClick={onClose} disabled={saving} aria-label="Close" style={{ width: 44, height: 44, border: 'none', background: 'transparent', color: C.textMuted, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.55 : 1, WebkitTapHighlightColor: 'transparent', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <X size={22} strokeWidth={2.1} />
         </button>
       </div>
@@ -304,12 +326,25 @@ function Stage({ children, reduce }) {
 }
 
 // ---------------------------------------------------------------- intro
-function IntroCard({ bean, expected, palate, reduce }) {
+function IntroCard({ bean, expected, palate, brewContext, onMethod, onDrinkType, reduce }) {
+  const espresso = isEspressoContext(brewContext);
+  const milk = isMilkDrink(brewContext);
   return (
     <div>
       <RuphusReaction pose="presenting" reduce={reduce}
-        line={`I've studied this one. Set yours first, then I'll show where I'd land with the bone marker — no anchoring before your palate speaks.`} />
-      <div style={{ ...cardStyle, marginTop: 18 }}>
+        line={espresso ? `I've studied this one. Set your own read first — your sensory notes lead this cup.` : `I've studied this one. Set yours first, then I'll show where I'd land with the bone marker — no anchoring before your palate speaks.`} />
+      {espresso && (
+        <div style={{ ...cardStyle, marginTop: 18 }}>
+          <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 8 }}>What are you tasting?</div>
+          <div style={{ display: 'flex', gap: 8 }} role="group" aria-label="Espresso drink type">
+            {[['straight', 'Straight espresso'], ['with_milk', 'With milk']].map(([value, label]) => (
+              <button key={value} type="button" aria-pressed={brewContext.drinkType === value} onClick={() => onDrinkType?.(value)} style={{ flex: 1, minHeight: 48, borderRadius: radius.md, border: `1px solid ${brewContext.drinkType === value ? C.accent : C.border}`, background: brewContext.drinkType === value ? C.accentSoft : C.cream, color: brewContext.drinkType === value ? C.accentDark : C.text, fontFamily: fonts.body, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+            ))}
+          </div>
+          <div style={{ ...type.caption, color: C.textLight, marginTop: 9 }}>{milk ? 'Describe the finished drink; milk sweetness and body stay with this cup.' : 'Taste the shot as it is. Your own sensory read leads; numeric expectations stay out of the tasting.'}</div>
+        </div>
+      )}
+      {!espresso && <div style={{ ...cardStyle, marginTop: 18 }}>
         <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 8 }}>What to expect</div>
         <p style={{ margin: 0, fontFamily: fonts.heading, fontSize: 20, fontWeight: 600, lineHeight: 1.3, color: C.text, letterSpacing: '-0.01em' }}>{expected.summary}</p>
         {expected.heroDescriptors.length > 0 && (
@@ -319,6 +354,14 @@ function IntroCard({ bean, expected, palate, reduce }) {
             ))}
           </div>
         )}
+      </div>}
+      <div style={{ ...cardStyle, marginTop: 12 }}><div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 5 }}>Cup context</div><div style={{ ...type.body, color: C.textMuted }}>{formatBrewContext(brewContext)}</div></div>
+      <div style={{ ...cardStyle, marginTop: 12 }}>
+        <label style={{ ...type.eyebrow, color: C.textLight, display: 'block', marginBottom: 7 }} htmlFor="tasting-method">Tasting method</label>
+        <select id="tasting-method" aria-label="Tasting method" value={brewContext.method === 'unknown' ? '' : brewContext.method} onChange={(event) => onMethod?.(event.target.value)} style={{ width: '100%', minHeight: 44, borderRadius: radius.md, border: `1px solid ${C.border}`, background: C.cream, color: C.text, padding: '0 10px', fontFamily: fonts.body, fontWeight: 700 }}>
+          <option value="" disabled>Choose a method</option><option value="espresso">Espresso</option><option value="v60_hot">Hot V60</option><option value="v60_iced">Iced V60</option><option value="kalita_hot">Hot Kalita</option><option value="kalita_iced">Iced Kalita</option><option value="aiden">Aiden</option>
+        </select>
+        <div style={{ ...type.caption, color: C.textLight, marginTop: 7 }}>Changing this corrects this tasting only; it does not change your saved preferences.</div>
       </div>
       <div style={{ ...cardStyle, marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ flex: 1 }}>
@@ -332,8 +375,9 @@ function IntroCard({ bean, expected, palate, reduce }) {
 }
 
 // ---------------------------------------------------------------- step
-function StepCard({ step, bean, expected, answers, captured, allCaptured, palate, aiLine, aiLoading, expectedRevealed, reduce, setScore, setFinish, setText, toggleChip }) {
-  const cue = expected.cues[step.key] || step.prompt;
+function StepCard({ step, bean, expected, answers, captured, allCaptured, palate, aiLine, aiLoading, expectedRevealed, brewContext, reduce, setScore, setFinish, setText, toggleChip }) {
+  const copy = tastingStepCopy(step, brewContext);
+  const cue = isEspressoContext(brewContext) ? copy.prompt : (expected.cues[step.key] || step.prompt);
   return (
     <div data-wizard-step={step.key}>
       {/* live radar building */}
@@ -350,9 +394,9 @@ function StepCard({ step, bean, expected, answers, captured, allCaptured, palate
             <span style={{ fontFamily: fonts.body, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.02em', color: C.textLight, textTransform: 'none' }}>· {STEP_LENS[step.key]}</span>
           )}
         </div>
-        <p style={{ margin: '0 0 14px', fontFamily: fonts.body, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5, color: C.textMuted }}>{step.technique}</p>
+        <p style={{ margin: '0 0 14px', fontFamily: fonts.body, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5, color: C.textMuted }}>{copy.technique}</p>
 
-        <StepInput step={step} bean={bean} expected={expected} answers={answers} palate={palate} expectedRevealed={expectedRevealed} reduce={reduce}
+        <StepInput step={step} bean={bean} expected={expected} answers={answers} palate={palate} brewContext={brewContext} expectedRevealed={expectedRevealed} reduce={reduce}
           setScore={setScore} setFinish={setFinish} setText={setText} toggleChip={toggleChip} />
 
         {/* free-text — ALWAYS available */}
@@ -362,17 +406,18 @@ function StepCard({ step, bean, expected, answers, captured, allCaptured, palate
   );
 }
 
-function StepInput({ step, expected, answers, palate, expectedRevealed, reduce, setScore, setFinish, setText, toggleChip }) {
+function StepInput({ step, expected, answers, palate, expectedRevealed, brewContext, reduce, setScore, setFinish, setText, toggleChip }) {
+  const espresso = isEspressoContext(brewContext);
   if (step.kind === 'slider') {
     const axis = AXIS_BY_KEY[step.axisKey];
     const isFinish = step.key === 'finish';
     const value = isFinish ? answers.finishLevel : answers.scores[step.scoreKey];
-    const exp = expected.axes[step.axisKey]?.level ?? null;
+    const exp = espresso ? null : expected.axes[step.axisKey]?.level ?? null;
     return <AxisSlider axis={axis} value={value} expected={exp} expectedRevealed={expectedRevealed} reduce={reduce}
       onChange={(v) => (isFinish ? setFinish(v) : setScore(step.scoreKey, v))} />;
   }
   if (step.kind === 'balance') {
-    return <AxisSlider axis={BALANCE_AXIS} value={answers.scores.balance} expected={expected.axes.balance?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('balance', v)} />;
+    return <AxisSlider axis={BALANCE_AXIS} value={answers.scores.balance} expected={espresso ? null : expected.axes.balance?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('balance', v)} />;
   }
   if (step.kind === 'aroma') {
     return (
@@ -380,7 +425,7 @@ function StepInput({ step, expected, answers, palate, expectedRevealed, reduce, 
         <FlavorWheelPicker selected={answers.aromaChips} onToggle={(l) => toggleChip('aromaChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
-          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.fragranceAroma} expected={expected.axes.fragranceAroma?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('fragranceAroma', v)} />
+          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.fragranceAroma} expected={espresso ? null : expected.axes.fragranceAroma?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('fragranceAroma', v)} />
         </div>
       </div>
     );
@@ -400,7 +445,7 @@ function StepInput({ step, expected, answers, palate, expectedRevealed, reduce, 
         <FlavorWheelPicker selected={answers.flavorChips} onToggle={(l) => toggleChip('flavorChips', l)} level={palate.level} reduce={reduce} />
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.hairline}` }}>
           <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{step.intensityLabel}</div>
-          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.flavor} expected={expected.axes.flavor?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('flavor', v)} />
+          <AxisSlider axis={INTENSITY_AXIS} value={answers.scores.flavor} expected={espresso ? null : expected.axes.flavor?.level ?? null} expectedRevealed={expectedRevealed} reduce={reduce} onChange={(v) => setScore('flavor', v)} />
         </div>
       </div>
     );
@@ -437,7 +482,9 @@ function FreeText({ step, value, onChange }) {
 }
 
 // ---------------------------------------------------------------- reveal
-function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswers, onOpenRuphus }) {
+function RevealCard({ bean, expected, answers, scores, palate, brewContext, reduce, setAnswers, onOpenRuphus }) {
+  const espresso = isEspressoContext(brewContext);
+  const milk = isMilkDrink(brewContext);
   const rows = [
     ['acidity', 'Acidity'], ['sweetness', 'Sweetness'], ['body', 'Body'],
   ];
@@ -446,13 +493,14 @@ function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswer
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
         <RadarLightSweep scores={scores} size={236} complete reduce={reduce} />
       </div>
-      <RuphusReaction pose="presenting" reduce={reduce} line={revealLine(scores, expected)} />
+      <RuphusReaction pose="presenting" reduce={reduce} line={espresso ? 'Beautiful work finishing the whole cup. Your own notes and sensory scores are the record for this drink.' : revealLine(scores, expected)} />
 
       <div style={{ ...cardStyle, marginTop: 16 }}>
-        <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>You found vs. what I expected</div>
-        {rows.map(([key, label]) => (
+        <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 12 }}>{espresso ? (milk ? 'Your read of this drink' : 'Your read of this espresso') : 'You found vs. what I expected'}</div>
+        {!espresso && rows.map(([key, label]) => (
           <CompareRow key={key} label={label} found={scores[key]} expected={expected.axes[key]?.level} />
         ))}
+        {espresso && <div style={{ ...type.body, color: C.textMuted, lineHeight: 1.5 }}>Your sensory scores and notes describe this cup. Espresso expectations stay qualitative until you have your own measured experience.</div>}
         {answers.flavorChips.length > 0 && (
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.hairline}` }}>
             <div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 8 }}>Flavors you named</div>
@@ -504,7 +552,7 @@ function RevealCard({ bean, expected, answers, scores, palate, reduce, setAnswer
           const scoreLabels = [['fragranceAroma', 'aroma'], ['acidity', 'acidity'], ['sweetness', 'sweetness'], ['body', 'body'], ['flavor', 'flavor'], ['balance', 'balance']];
           const scoreEvidence = scoreLabels.map(([key, label]) => Number.isFinite(Number(scores[key])) ? `${label} ${scores[key]}/10` : null).filter(Boolean).join(', ');
           const finishEvidence = Number.isFinite(Number(answers.finishLevel)) ? `finish ${answers.finishLevel}/10` : '';
-          const starter = [scoreEvidence || finishEvidence ? `Scores: ${[scoreEvidence, finishEvidence].filter(Boolean).join(', ')}` : '', answers.oneWord, answers.notes, answers.flavorChips?.join(', ')].filter(Boolean).join('. ');
+          const starter = [formatBrewContext(brewContext), scoreEvidence || finishEvidence ? `Scores: ${[scoreEvidence, finishEvidence].filter(Boolean).join(', ')}` : '', answers.oneWord, answers.notes, answers.flavorChips?.join(', ')].filter(Boolean).join('. ');
           onOpenRuphus(Object.freeze({ coffeeRef: bean.id, surface: 'tasting_wizard' }), `Help me understand this cup${starter ? `: ${starter}` : ''}.`);
         }}
         style={{ width: '100%', minHeight: 48, marginTop: 12, border: `1px solid ${C.border}`, borderRadius: radius.lg, background: C.cream, color: C.accent, fontFamily: fonts.body, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -546,26 +594,26 @@ function PalateRing({ palate }) {
 }
 
 // ---------------------------------------------------------------- footer
-function WizardFooter({ phase, idx, total, canAdvance, onBack, onNext, onSave, onSwitchToManual, reduce }) {
+function WizardFooter({ phase, idx, total, canAdvance, onBack, onNext, onSave, onSwitchToManual, disabled = false, reduce }) {
   const showBack = !(phase === 'intro');
   return (
     <div style={{ padding: '12px 20px calc(12px + env(safe-area-inset-bottom))', background: glass.chrome, backdropFilter: glass.blur, WebkitBackdropFilter: glass.blur, borderTop: `1px solid ${glass.chromeBorder}` }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', maxWidth: 460, margin: '0 auto' }}>
         {showBack && (
-          <m.button type="button" onClick={onBack} whileTap={reduce ? {} : { scale: 0.96 }} transition={M.spring.snappy}
-            style={{ minHeight: 52, padding: '0 18px', borderRadius: radius.md, border: `1px solid ${C.border}`, background: C.cream, color: C.text, fontFamily: fonts.body, fontWeight: 700, fontSize: 15, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+          <m.button type="button" onClick={onBack} disabled={disabled} whileTap={reduce ? {} : { scale: 0.96 }} transition={M.spring.snappy}
+            style={{ minHeight: 52, padding: '0 18px', borderRadius: radius.md, border: `1px solid ${C.border}`, background: C.cream, color: C.text, fontFamily: fonts.body, fontWeight: 700, fontSize: 15, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.55 : 1, WebkitTapHighlightColor: 'transparent' }}>
             Back
           </m.button>
         )}
         {phase === 'reveal' ? (
-          <GlassCTA label="Save tasting" onClick={onSave} enabled reduce={reduce} />
+          <GlassCTA label={disabled ? 'Saving…' : 'Save tasting'} onClick={onSave} enabled={!disabled} reduce={reduce} />
         ) : (
-          <GlassCTA label={phase === 'intro' ? "Let's taste it" : (idx === total - 1 ? 'See your cup' : 'Next')} onClick={onNext} enabled={canAdvance} reduce={reduce} />
+          <GlassCTA label={phase === 'intro' ? "Let's taste it" : (idx === total - 1 ? 'See your cup' : 'Next')} onClick={onNext} enabled={canAdvance && !disabled} reduce={reduce} />
         )}
       </div>
       {phase === 'intro' && onSwitchToManual && (
         <div style={{ textAlign: 'center', marginTop: 10 }}>
-          <button onClick={onSwitchToManual} style={{ border: 'none', background: 'transparent', color: C.textMuted, fontFamily: fonts.body, fontWeight: 600, fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 3, cursor: 'pointer' }}>
+          <button onClick={onSwitchToManual} disabled={disabled} style={{ border: 'none', background: 'transparent', color: C.textMuted, fontFamily: fonts.body, fontWeight: 600, fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 3, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.55 : 1 }}>
             or log a tasting manually
           </button>
         </div>
@@ -651,12 +699,30 @@ function ExitConfirm({ onKeep, onLeave, reduce }) {
 // ---------------------------------------------------------------- helpers
 const cardStyle = { background: C.card, borderRadius: radius.lg, border: `1px solid ${C.borderLight}`, boxShadow: shadows.card, padding: 18 };
 
-function normalizeDraft(draft, beanId) {
-  if (!draft || draft.beanId !== beanId) return { phase: 'intro', idx: 0, answers: initialAnswers(), revealedSteps: {} };
+function normalizeDraft(draft, beanId, launchContext = null, preferences = null, bean = null) {
+  const fallback = launchContext && typeof launchContext === 'object'
+    ? snapshotBrewContext(launchContext)
+    : (() => {
+      const espressoActive = preferences?.brewMethod === 'espresso';
+      const setupMatches = espressoActive
+        && preferences?.espressoSetupConfirmed === true
+        && bean?.espressoRecipe?.setupKey === espressoSetupKey(preferences);
+      return resolveBrewContext({
+        method: preferences?.brewMethod,
+        preferences: espressoActive ? preferences : null,
+        recipe: setupMatches ? bean.espressoRecipe : null,
+      });
+    })();
+  if (!draft || draft.beanId !== beanId) return { phase: 'intro', idx: 0, answers: initialAnswers(), revealedSteps: {}, brewContext: tastingSnapshotFromContext(fallback) };
   const phase = ['intro', 'steps', 'reveal'].includes(draft.phase) ? draft.phase : 'intro';
   const maxIdx = TASTING_WIZARD_STEPS.length - 1;
   const idx = Math.max(0, Math.min(maxIdx, Number.isFinite(draft.idx) ? draft.idx : 0));
-  return { phase, idx, answers: cloneAnswers(draft.answers), revealedSteps: { ...(draft.revealedSteps || {}) } };
+  // An older in-session draft without a cup context cannot be safely rebound to
+  // today's preferences. Keep it unknown until the user corrects the method.
+  const preserved = (draft.brewContext || draft.cupContext) && typeof (draft.brewContext || draft.cupContext) === 'object'
+    ? (draft.brewContext || draft.cupContext)
+    : { method: 'unknown' };
+  return { phase, idx, answers: cloneAnswers(draft.answers), revealedSteps: { ...(draft.revealedSteps || {}) }, brewContext: tastingSnapshotFromContext(preserved) };
 }
 
 function cloneAnswers(source) {
@@ -672,10 +738,11 @@ function cloneAnswers(source) {
   };
 }
 
-function hasWizardProgress(phase, idx, answers) {
+function hasWizardProgress(phase, idx, answers, brewContext = null) {
   if (phase !== 'intro' || idx > 0) return true;
   if (!answers) return false;
-  return Object.values(answers.scores || {}).some(v => v != null)
+  return (isEspressoContext(brewContext) && brewContext?.drinkType === 'with_milk')
+    || Object.values(answers.scores || {}).some(v => v != null)
     || answers.finishLevel != null
     || Object.values(answers.text || {}).some(v => String(v || '').trim())
     || (answers.aromaChips || []).length > 0

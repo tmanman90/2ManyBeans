@@ -17,9 +17,12 @@ export function buildPalateSummary(tastings = []) {
 
   const level = palateLevel(tastings);
   const lines = [`Level ${level.level}: ${sanitize(level.title, 40)} (${level.cups} cups logged)`];
+  // A milk drink remains a useful historical cup, but its sweetness/body are
+  // properties of the finished drink and must not become a pure-bean trend.
+  const beanTastings = tastings.filter(t => t?.cupContext?.drinkType !== 'with_milk');
 
   const axisMeans = PALATE_AXES.map(axis => {
-    const values = tastings
+    const values = beanTastings
       .map(t => numOrNull(t?.tastingScores?.[axis]))
       .filter(n => n !== null);
     if (values.length < 3) return null;
@@ -29,7 +32,7 @@ export function buildPalateSummary(tastings = []) {
   if (axisMeans.length) lines.push(`Taste trend: ${axisMeans.join(', ')}`);
 
   const descriptorCounts = new Map();
-  for (const tasting of tastings) {
+  for (const tasting of beanTastings) {
     const descriptor = sanitize(tasting?.oneWord, 50).trim();
     if (!descriptor) continue;
     const key = descriptor.toLowerCase();

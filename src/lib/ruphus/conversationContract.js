@@ -373,9 +373,9 @@ export function classifyFailures(value = []) {
 
 // Small schema helpers are exported so U1 can freeze launch contexts without
 // importing product/runtime modules.
-export const LAUNCH_SURFACES = Object.freeze(['direct', 'bean_card', 'recipe_kalita_v60', 'recipe_aiden', 'tasting_card', 'tasting_wizard']);
+export const LAUNCH_SURFACES = Object.freeze(['direct', 'bean_card', 'recipe_kalita_v60', 'recipe_aiden', 'recipe_espresso', 'tasting_card', 'tasting_wizard']);
 export const LAUNCH_ITEM_KINDS = Object.freeze(['recipe', 'brew', 'tasting']);
-export const RECIPE_SLOTS = Object.freeze(['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
+export const RECIPE_SLOTS = Object.freeze(['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced', 'espresso']);
 
 export function validateLaunchContext(value) {
   const errors = [];
@@ -383,6 +383,7 @@ export function validateLaunchContext(value) {
   for (const key of ['coffeeId', 'method', 'slotKey', 'mode', 'revisionId', 'tastingEvidence']) if (Object.hasOwn(value, key)) errors.push(`${key} is not valid in launchContext`);
   if (value.coffeeRef != null && (typeof value.coffeeRef !== 'string' || !value.coffeeRef.trim())) errors.push('coffeeRef must be a non-empty string');
   if (!LAUNCH_SURFACES.includes(value.surface)) errors.push('surface is invalid');
+  if (value.launchMethod != null && (typeof value.launchMethod !== 'string' || !RECIPE_SLOTS.includes(value.launchMethod))) errors.push('launchMethod is invalid');
   if (value.launchItem != null) {
     if (!object(value.launchItem)) errors.push('launchItem must be an object');
     else {

@@ -69,6 +69,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
   const [pendingTastingAttemptId, setPendingTastingAttemptId] = useState(null);
+  const [pendingTastingContext, setPendingTastingContext] = useState(null);
   const [pendingRuphusAutoStartId, setPendingRuphusAutoStartId] = useState(null);
   const [ruphusLaunch, setRuphusLaunch] = useState(null);
   const { attempt: ruphusAttemptRecord, put: putRuphusAttempt, update: updateRuphusAttempt, dismiss: dismissRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
@@ -80,10 +81,11 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     if (ruphusAttemptRecord?.stage === 'tasting' && ruphusAttemptRecord.attemptId) {
       setPendingTastingBeanId(ruphusAttemptRecord.coffeeId);
       setPendingTastingAttemptId(ruphusAttemptRecord.attemptId);
+      if (ruphusAttemptRecord.cupContext) setPendingTastingContext(ruphusAttemptRecord.cupContext);
       if (ruphusAttemptRecord.draft) setTastingWizardDraft(ruphusAttemptRecord.draft);
       setTab('tasting');
     }
-  }, [ruphusAttemptRecord?.stage, ruphusAttemptRecord?.attemptId, ruphusAttemptRecord?.coffeeId, ruphusAttemptRecord?.draft]);
+  }, [ruphusAttemptRecord?.stage, ruphusAttemptRecord?.attemptId, ruphusAttemptRecord?.coffeeId, ruphusAttemptRecord?.cupContext, ruphusAttemptRecord?.draft]);
   const [tourActive, setTourActive] = useState(() => {
     if (new URLSearchParams(window.location.search).has('tour')) return true;
     return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
@@ -100,10 +102,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
     }
   }, [beans.length, dataLoaded, uid]);
 
-  const handleStartTastingSession = (beanId, attemptId = null) => {
+  const handleStartTastingSession = (beanId, attemptId = null, context = null) => {
     if (!beanId) return;
+    // A recipe/timer handoff is a new cup. Do not carry sensory answers from
+    // an unrelated draft for the same bean into this recipe snapshot. Server
+    // owned Ruphus attempts are the one resume path and keep their draft.
+    if (context && !attemptId) setTastingWizardDraft(null);
     setPendingTastingBeanId(beanId);
     setPendingTastingAttemptId(attemptId);
+    setPendingTastingContext(context || null);
     if (attemptId && ruphusAttemptRecord?.id === attemptId) updateRuphusAttempt({ stage: 'tasting', attemptId, coffeeId: beanId });
     setTab('tasting');
   };
@@ -369,10 +376,12 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               onDeleteTasting={deleteTasting}
               updateBean={updateBean}
               wizardDraft={tastingWizardDraft}
+              preferences={preferences}
+              pendingTastingContext={pendingTastingContext}
               onWizardDraftChange={(draft) => { setTastingWizardDraft(draft); if (ruphusAttemptRecord?.stage === 'tasting') updateRuphusAttempt({ draft }); }}
               pendingTastingBeanId={pendingTastingBeanId}
               pendingTastingAttemptId={pendingTastingAttemptId}
-              onPendingTastingConsumed={() => { setPendingTastingBeanId(null); setPendingTastingAttemptId(null); }}
+              onPendingTastingConsumed={() => { setPendingTastingBeanId(null); setPendingTastingAttemptId(null); setPendingTastingContext(null); }}
               onRuphusAttemptCompleted={clearRuphusAttempt}
               onOpenRuphus={openRuphus}
               onboardingPalate={onboardingPalate}

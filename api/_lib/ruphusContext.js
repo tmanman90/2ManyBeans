@@ -70,7 +70,7 @@ function priorExplicitMethod(conversation = []) {
   return null;
 }
 
-const displayMethod = (value) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[value] || value || null);
+const displayMethod = (value) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita', espresso: 'espresso' }[value] || value || null);
 const EDITABLE_REVIEW_STATUSES = new Set(['proposed', 'ready', 'prepared']);
 function reviewIdentity(recipe, slot) {
   const mode = recipe?.mode || (slot?.endsWith('_iced') ? 'iced' : 'hot');
@@ -140,7 +140,7 @@ function publicCurrentReview(item) {
 function publicSnapshot(snapshot) {
   return {
     version: snapshot.version,
-    setup: { defaultMethod: displayMethod(snapshot.setup?.defaultMethod), grinder: snapshot.setup?.grinder || null, units: snapshot.setup?.units || 'metric' },
+    setup: { defaultMethod: displayMethod(snapshot.setup?.defaultMethod), grinder: snapshot.setup?.grinder || null, units: snapshot.setup?.units || 'metric', espressoMachine: snapshot.setup?.espressoMachine || null, espressoBasket: snapshot.setup?.espressoBasket || null, espressoGrinder: snapshot.setup?.espressoGrinder || null, espressoGrinderModel: snapshot.setup?.espressoGrinderModel || null, espressoGrinderCustomName: snapshot.setup?.espressoGrinderCustomName || null, espressoSetupConfirmed: snapshot.setup?.espressoSetupConfirmed === true },
     coffees: (snapshot.coffees || []).map((coffee) => ({ ...coffee, recipes: Array.isArray(coffee.recipes) ? coffee.recipes.slice() : [] })),
     lines: snapshot.lines.slice(), text: snapshot.text, sealedCount: snapshot.sealedCount, finishedCount: snapshot.finishedCount,
   };
@@ -150,6 +150,7 @@ function publicLaunchContext(value) {
   return {
     ...(value?.surface ? { surface: value.surface } : {}),
     ...(value?.coffeeRef ? { coffeeRef: value.coffeeRef } : {}),
+    ...(value?.launchMethod ? { launchMethod: value.launchMethod } : {}),
     ...(item ? { launchItem: { kind: item.kind, method: item.method || null } } : {}),
   };
 }
@@ -200,6 +201,7 @@ export async function buildRuphusContext({ uid, contextRef = {}, userText = '', 
     userText,
     explicitSlot: equipmentAnswer?.slot,
     launchItem: launchForTurn.launchItem,
+    launchMethod: launchForTurn.launchMethod,
     launchCoffeeRef: launchCoffee,
     coffeeRef: boundCoffeeRef,
     recipeSlots: boundCoffee?.recipes || [],

@@ -25,10 +25,10 @@ export const SLOT_KEYS = Object.freeze([
   'aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced', 'espresso',
 ]);
 
-export const SUPPORTED_METHODS = Object.freeze(['aiden', 'v60', 'kalita']);
+export const SUPPORTED_METHODS = Object.freeze(['aiden', 'v60', 'kalita', 'espresso']);
 
 export const ACTION_STATES = Object.freeze([
-  'checking', 'proposed', 'applying', 'applied', 'brewing', 'attempt_tasted',
+  'checking', 'proposed', 'applying', 'applied', 'succeeded', 'brewing', 'attempt_tasted',
   'promoted', 'prepared', 'stale', 'superseded', 'validation_rejected',
   'interrupted', 'failed', 'undone', 'unavailable',
 ]);
@@ -194,6 +194,17 @@ export function validateRecipeSnapshot(value) {
   if (object(value.sourceProjection)) return validateManualSourceRecipeSnapshot(value);
   if (value.slotKey === 'espresso') {
     if (value.method !== 'espresso' || value.device !== 'espresso' || value.mode !== 'hot') errors.push('invalid espresso recipe identity');
+    if (value.schemaVersion !== 1) errors.push('unsupported espresso recipe schema');
+    if (!text(value.setupKey, 180) || !object(value.setup)) errors.push('espresso setup identity is required');
+    if (!Number.isFinite(value.doseGrams) || value.doseGrams < 16 || value.doseGrams > 19) errors.push('espresso dose is invalid');
+    if (!Number.isFinite(value.yieldGrams) || value.yieldGrams <= 0) errors.push('espresso output mass is invalid');
+    if (!Number.isFinite(value.ratio) || value.ratio < 1 || value.ratio > 4) errors.push('espresso ratio is invalid');
+    if (Number.isFinite(value.doseGrams) && Number.isFinite(value.yieldGrams) && Math.round((value.yieldGrams / value.doseGrams) * 100) / 100 !== value.ratio) errors.push('espresso ratio does not match output mass');
+    if (!Array.isArray(value.timeRangeSeconds) || value.timeRangeSeconds.length !== 2 || value.timeRangeSeconds.some((item) => !Number.isInteger(item) || item <= 0)) errors.push('espresso timing range is invalid');
+    if (value.timeBasis !== 'machine_start_to_stop') errors.push('espresso timing basis is required');
+    if (!['app_baseline', 'verified_roaster', 'user_saved'].includes(value.source)) errors.push('espresso provenance source is invalid');
+    if (!object(value.grinderSetting) || !['integrated', 'external', 'custom'].includes(value.grinderSetting?.grinder)) errors.push('espresso grinder setting is invalid');
+    if (!object(value.temperature) || value.temperature?.mode !== 'machine_default' || ![-4, -2, 0, 2, 4].includes(value.temperature?.offsetF)) errors.push('espresso temperature offset is invalid');
     return { valid: errors.length === 0, errors };
   }
   if (!text(value.method, 80) || !SUPPORTED_METHODS.includes(value.method)) errors.push('unsupported recipe method');

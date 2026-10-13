@@ -1,5 +1,6 @@
 import { projectBrewEvidence } from './ruphusBrewEvidence.js';
 import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
+import { formatBrewContext, isMilkDrink, snapshotBrewContext } from '../../src/lib/brewContext.js';
 
 export const DEFAULT_HISTORY_DAYS = 14;
 export const MAX_SNAPSHOT_LINES = 12;
@@ -15,10 +16,10 @@ export const READ_TIMEOUT_MS = 1500;
 const text = (value) => String(value ?? '').trim();
 const asDate = (value) => value instanceof Date ? value : new Date(value);
 const daysAgo = (value, now = Date.now()) => { const date = asDate(value); return Number.isFinite(date.getTime()) ? Math.max(0, Math.round((now - date.getTime()) / 86400000)) : null; };
-const slotDisplay = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' });
+const slotDisplay = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita', espresso: 'espresso' });
 const LEDGER_FIELDS = Object.freeze(['kind', 'status', 'summary', 'windowDays', 'count', 'at', 'namedCoffees', 'coffee', 'evidence', 'methodFocus']);
 const COFFEE_FIELDS = Object.freeze(['name', 'roaster', 'origin', 'process']);
-const METHOD_FOCUS_NAMES = new Set(['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita']);
+const METHOD_FOCUS_NAMES = new Set(['Aiden', 'hot V60', 'iced V60', 'hot Kalita', 'iced Kalita', 'espresso']);
 const methodFocusName = (value) => {
   const displayName = text(value);
   return METHOD_FOCUS_NAMES.has(displayName)
@@ -29,6 +30,29 @@ const methodFocusName = (value) => {
 const RECIPE_CONFIGURATION_FIELDS = Object.freeze(['method', 'device', 'mode', 'variant', 'v60Variant', 'v60Size', 'kalitaSize', 'size']);
 const SOURCE_CONFIGURATION_FIELDS = Object.freeze(['device', 'variant', 'mode', 'size', 'model', 'filter', 'material']);
 const byteLength = (value) => new TextEncoder().encode(value).byteLength;
+
+function publicTastingContext(record = {}) {
+  const raw = record.cupContext || record.brewContext || null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const context = snapshotBrewContext(raw);
+  return context.method === 'unknown' && !context.equipment && !context.recipeSnapshot ? null : context;
+}
+
+function tastingContextLine(record = {}) {
+  const context = publicTastingContext(record);
+  if (!context) return 'not linked to a specific brew (legacy tasting; cup context unknown).';
+  return `${formatBrewContext(context)}${isMilkDrink(context) ? '; milk sensory notes are drink context, not pure-bean preference evidence' : ''}`;
+}
+
+function reportedMeasurements(record = {}) {
+  const actuals = record.actuals && typeof record.actuals === 'object' ? record.actuals : record.measurements && typeof record.measurements === 'object' ? record.measurements : {};
+  const dose = actuals.doseGrams ?? actuals.dose ?? record.doseGrams ?? record.dose;
+  const output = actuals.yieldGrams ?? actuals.outputGrams ?? actuals.output ?? record.yieldGrams ?? record.outputGrams ?? record.output;
+  const elapsed = actuals.elapsedSeconds ?? actuals.measuredElapsedSeconds ?? record.elapsedSeconds ?? record.measuredElapsedSeconds;
+  const grind = actuals.grind ?? record.grind;
+  const temperature = actuals.temperatureC ?? actuals.temperatureF ?? record.temperatureC ?? record.temperatureF;
+  return [Number.isFinite(Number(dose)) ? `${dose}g in` : null, Number.isFinite(Number(output)) ? `${output}g out` : null, Number.isFinite(Number(elapsed)) ? `${elapsed}s measured` : null, typeof grind === 'string' ? grind.trim() : null, typeof temperature === 'number' ? `${temperature}°` : null].filter(Boolean).join(', ');
+}
 
 function safeLedgerValue(value) {
   if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
@@ -94,6 +118,7 @@ export function publicEvidence(evidence = {}) {
     const value = evidence[kind];
     if (!value || typeof value !== 'object') continue;
     result[kind] = Object.fromEntries(['kind', 'status', 'summary', 'windowDays', 'count'].filter((key) => Object.hasOwn(value, key)).map((key) => [key, clone(value[key])]));
+    if (kind === 'tastings' && Array.isArray(value.contexts) && value.contexts.length) result[kind].contexts = clone(value.contexts.slice(0, 4));
     if (value.coffee && typeof value.coffee === 'object') result[kind].coffee = Object.fromEntries(COFFEE_FIELDS.filter((field) => text(value.coffee[field])).map((field) => [field, text(value.coffee[field])]));
     if (kind === 'recipe' && Array.isArray(value.records)) {
       const configurations = value.records.map(publicRecipeConfiguration).filter(Boolean);
@@ -149,7 +174,7 @@ function safeCoffee(coffee, refKey) {
     jarSlot: coffee?.jarSlot ?? null,
     status: coffee?.status || null,
     daysOffRoast: daysAgo(coffee?.roastDate),
-    recipes: (coffee?.recipes || coffee?.recipeSlots || []).map((item) => slotDisplay[item] || text(item)).filter(Boolean),
+    recipes: [...new Set([...(coffee?.recipes || coffee?.recipeSlots || []), coffee?.espressoRecipe ? 'espresso' : null].map((item) => slotDisplay[item] || text(item)).filter(Boolean))],
     lastBrewDate: coffee?.lastBrewDate || null,
   };
 }
@@ -173,7 +198,7 @@ export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
     boundedLines.push(value); chars += separator + value.length;
     if (value.length < line.length) break;
   }
-  return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric' }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
+  return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric', espressoMachine: setup.espressoMachine || null, espressoBasket: setup.espressoBasket || null, espressoGrinder: setup.espressoGrinder || null, espressoGrinderModel: setup.espressoGrinderModel || null, espressoGrinderCustomName: setup.espressoGrinderCustomName || null, espressoSetupConfirmed: setup.espressoSetupConfirmed === true }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
 }
 
 function recipeFailureMarker(record, launchItem = null) {
@@ -234,11 +259,20 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
     const method = slotDisplay[record.slotKey || record.slot || record.method] || record.method || record.device || '';
     const date = daysAgo(record.date || record.createdAt || record.updatedAt, now);
     const age = date == null ? '' : `${date} days ago`;
-    const numbers = [record.dose != null ? `${record.dose}g` : null, record.water != null ? `${record.water}g` : null, record.grind || null, record.temperature != null ? `${record.temperature}°` : null, record.drawdown || null, record.notes || record.note || null].filter(Boolean).join(', ');
+    const temperature = typeof record.temperature === 'number' ? `${record.temperature}°` : record.temperature && typeof record.temperature === 'object' && Number.isInteger(record.temperature.offsetF) ? `machine default ${record.temperature.offsetF >= 0 ? '+' : ''}${record.temperature.offsetF}°F` : null;
+    const espresso = [record.slotKey, record.slot, record.method, record.snapshot?.slotKey, record.snapshot?.method].includes('espresso');
+    const ratio = espresso && record.ratio != null
+      ? `1:${String(record.ratio).replace(/^1:/, '')}`
+      : null;
+    const numbers = [record.dose != null ? `${record.dose}g` : record.doseGrams != null ? `${record.doseGrams}g in` : null, record.water != null ? `${record.water}g` : record.yieldGrams != null ? `${record.yieldGrams}g out` : null, ratio, typeof record.grind === 'string' ? record.grind : null, temperature, record.drawdown || null, record.notes || record.note || null].filter(Boolean).join(', ');
     if (kind === 'brews') return ['BREW', record.snapshot ? (record.completed ? 'completed' : 'not completed') : null, method, age, numbers].filter(Boolean).join(' — ');
-    if (kind === 'tastings') return ['TASTING', age, 'not linked to a specific brew', numbers].filter(Boolean).join(' — ');
+    if (kind === 'tastings') {
+      const measured = reportedMeasurements(record);
+      return ['TASTING', age, tastingContextLine(record), measured || null, record.oneWord || record.notes || record.note || null].filter(Boolean).join(' — ');
+    }
     return [method, numbers, age].filter(Boolean).join(': ');
   }).join(' | ');
+  const tastingContexts = kind === 'tastings' ? values.slice(0, 4).map(publicTastingContext).filter(Boolean) : [];
   if (unavailableSlots.length) {
     return {
       kind,
@@ -247,6 +281,7 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
       windowDays,
       count: values.length,
       records: clone(values.slice(0, 4)),
+      ...(tastingContexts.length ? { contexts: tastingContexts } : {}),
       unavailableSlots,
       ...(invalidSlots.length ? { invalidSlots } : {}),
     };
@@ -259,10 +294,11 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
       windowDays,
       count: values.length,
       records: clone(values.slice(0, 4)),
+      ...(tastingContexts.length ? { contexts: tastingContexts } : {}),
       invalidSlots,
     };
   }
-  return { kind, status: 'available', summary, windowDays, count: values.length, records: clone(values.slice(0, 4)) };
+  return { kind, status: 'available', summary, windowDays, count: values.length, records: clone(values.slice(0, 4)), ...(tastingContexts.length ? { contexts: tastingContexts } : {}) };
 }
 
 export function appendLedger(ledger, entry, { maxBytes = MAX_LEDGER_BYTES, maxEntries = MAX_LEDGER_ENTRIES } = {}) {

@@ -26,6 +26,7 @@ import { Toast } from './Toast';
 import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { executeRecipeCommand } from '../lib/recipeCommands';
 import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
+import { espressoTastingContext } from '../lib/brewContext';
 
 const noop = () => {};
 
@@ -395,7 +396,9 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     const beanId = await handleAutoSave();
     if (!beanId) return;
     onClose?.();
-    onStartTastingSession?.(beanId);
+    onStartTastingSession?.(beanId, null, activeMethod === 'espresso' && espresso.espressoRecipe
+      ? espressoTastingContext({ recipe: espresso.espressoRecipe, savedRecipe: espresso.espressoBean?.espressoRecipe, setup: espresso.espressoRecipe.setup, revisionId: espresso.espressoBean?.activeRevisionIds?.espresso })
+      : null);
   };
 
   const handleLearnPress = () => {

@@ -17,7 +17,7 @@ function safeAgentRetry(retry) {
   const source = retry.contextRef;
   const contextRef = {};
   if (source && typeof source === 'object') {
-    for (const key of ['surface', 'coffeeRef', 'sessionId']) {
+    for (const key of ['surface', 'coffeeRef', 'launchMethod', 'sessionId']) {
       if (typeof source[key] === 'string' && source[key].trim()) contextRef[key] = source[key].trim().slice(0, 180);
     }
     if (source.launchItem && typeof source.launchItem === 'object') {
@@ -68,7 +68,8 @@ function settleUndoneReceipts(messages) {
   return messages.map(message => !Array.isArray(message.artifacts) ? message : {
     ...message,
     artifacts: message.artifacts.map(item => {
-      const undone = ['apply_proposal', 'promote_attempt'].includes(item.mode) && undos.some(undo =>
+      const reversibleEspressoSave = item.mode === 'replace_active_recipe' && item.slotKey === 'espresso';
+      const undone = (['apply_proposal', 'promote_attempt'].includes(item.mode) || reversibleEspressoSave) && undos.some(undo =>
         undo.undoneRevisionId === item.revisionId
         && (!undo.coffeeId || undo.coffeeId === item.coffeeId)
         && (!undo.slotKey || undo.slotKey === item.slotKey));

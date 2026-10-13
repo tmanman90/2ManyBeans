@@ -27,6 +27,9 @@ import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 import { saveRuphusTasting } from '../lib/ruphusTasting';
+import { resolveBrewContext, tastingSnapshotFromContext } from '../lib/brewContext';
+import { espressoSetupKey } from '../lib/espressoRecipes';
+import { isEspressoBrewMethod } from '../lib/brewMethods';
 
 // ─────────────────────────────────────────────────────────────
 // List-mode helpers (added for redesign)
@@ -47,7 +50,7 @@ const formatDateRelative = (iso) => {
 };
 
 
-export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onRuphusAttemptCompleted, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
+export const TastingTab = ({ uid, beans, tastings, preferences = null, pendingTastingContext = null, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onRuphusAttemptCompleted, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -80,6 +83,7 @@ export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting
   // Intelligent tasting wizard — the guided-tasting experience (replaces the chat takeover).
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardAttemptId, setWizardAttemptId] = useState(null);
+  const [wizardLaunchContext, setWizardLaunchContext] = useState(null);
   const setWizardDraft = onWizardDraftChange;
 
   const tastingFields = {
@@ -141,12 +145,14 @@ export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting
       return;
     }
     haptic.medium();
+    setWizardLaunchContext(null);
     if (wizardDraft?.beanId) setSel(wizardDraft.beanId);
     setWizardOpen(true);
   };
 
   const closeWizard = (opts = {}) => {
     if (opts.clearDraft) setWizardDraft(null);
+    setWizardLaunchContext(null);
     setWizardOpen(false);
   };
 
@@ -163,12 +169,15 @@ export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting
       } else {
         await onAddTasting(record);
       }
-    setWizardDraft(null);
+      setWizardDraft(null);
       setWizardAttemptId(null);
+      setWizardLaunchContext(null);
       setWizardOpen(false);
       setMode('list');
+      return true;
     } catch (err) {
       showError("Couldn't save tasting. Check your connection and try again.");
+      return false;
     }
   };
 
@@ -191,6 +200,9 @@ export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting
     }
     if (wizardDraft?.beanId && wizardDraft.beanId !== pendingTastingBeanId) setWizardDraft(null);
     setWizardAttemptId(pendingTastingAttemptId || null);
+    // Capture before consuming the app bridge. App clears its pending prop in
+    // the same effect batch, so the wizard must retain the exact handoff locally.
+    setWizardLaunchContext(pendingTastingContext || null);
     setSel(pendingTastingBeanId);
     setWizardOpen(true);
     onPendingTastingConsumed?.();
@@ -229,6 +241,17 @@ export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting
   const draftBean = wizardDraft?.beanId ? beans.find(b => b.id === wizardDraft.beanId) : null;
 
   const wizardBean = (wizardOpen && draftBean) || beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
+  const espressoMethodActive = isEspressoBrewMethod(preferences?.brewMethod);
+  const currentEspressoSetupKey = espressoMethodActive && preferences?.espressoSetupConfirmed === true ? espressoSetupKey(preferences) : null;
+  const directEspressoRecipe = espressoMethodActive && wizardBean?.espressoRecipe?.setupKey && currentEspressoSetupKey
+    && wizardBean.espressoRecipe.setupKey === currentEspressoSetupKey
+    ? wizardBean.espressoRecipe
+    : null;
+  const directBrewContext = wizardBean ? tastingSnapshotFromContext(resolveBrewContext({
+    method: preferences?.brewMethod,
+    preferences: espressoMethodActive ? preferences : null,
+    recipe: directEspressoRecipe,
+  })) : null;
 
   return (
     <div>
@@ -242,6 +265,8 @@ export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting
           isPro={hasPro}
           reduce={reduceMotion}
           draft={wizardDraft}
+          brewContext={wizardDraft?.brewContext || wizardLaunchContext || pendingTastingContext || directBrewContext}
+          preferences={preferences}
           onDraftChange={setWizardDraft}
           attemptId={wizardAttemptId}
           onSave={saveWizardTasting}

@@ -160,7 +160,7 @@ BREWING REFERENCE (from James Hoffmann):
 KEY VARIABLES:
 - Coffee-to-water ratio: Pour-over 60g/L, French press 75g/L, AeroPress 75-100g/L, Espresso ~1:2 by weight
 - Grind: finer = more surface area = faster extraction. Use burr grinder (not blade). Blade creates uneven particles.
-- Water temp: just off boil for most methods. Espresso: 90-94C. Lighter roasts benefit from hotter water.
+- Water temp: just off boil for most filter methods. Espresso temperature follows the machine default; only the app's supported relative offsets apply. Lighter roasts may benefit from hotter water where the brewer supports it.
 - Extraction target: 18-22% of ground coffee by weight.
 
 GRIND SIZE BY METHOD:
@@ -180,7 +180,7 @@ METHOD GUIDANCE:
 - French Press: 75g/L, medium grind, steep 4 min, stir crust, skim foam, wait 5 more min, pour slowly. Heavy body.
 - Pour-Over: 60g/L, medium grind, rinse paper filter, bloom 2x coffee weight 30 sec, pour slowly. Clean, clear cup.
 - AeroPress: 75-100g/L, steep 1 min then press. Versatile. Easy clean, portable.
-- Espresso: 18g in, ~36g out, 27-29 sec, 9 bars. Invest in grinder before machine. Always adjust grind first.
+- Espresso: follow the confirmed machine, basket, grinder, and the app's saved or sourced recipe. Only a confirmed Barista Express with the stock double single-wall basket authorizes the app baseline numeric dose, output, timing, and machine-default guidance. If the basket or setup is unknown/unconfirmed, ask for the missing identity before applying that baseline; a saved recipe from another setup is historical context, while known measured dose/output and general relative coffee guidance remain usable. For an unidentified external or custom grinder, ask for its model and never recommend a middle or default dial position. Time starts at the machine button and includes preinfusion; it guides diagnosis rather than deciding whether a shot is good. If espresso is sour or sharp without actual flow, preparation, dose, yield, or measured time, ask one useful flow or preparation question instead of prescribing a control; saved targets and older tastings are not shot measurements. Keep fast and even flow separate from uneven, spraying, or channeling flow: fast and even can support a small finer test once the relevant measurements are known, while uneven flow first calls for a preparation or channeling question and never an automatic finer recommendation. If a near-balanced shot has reported dose, yield, button-time, and even flow and the user wants a small refinement while keeping dose and grind where possible, offer one modest yield test: a longer yield generally means more extraction but less concentration and lighter body; a shorter yield means more concentration and body with potentially less extraction. State this as a test with a taste criterion rather than a guaranteed improvement; stop at the target output mass rather than holding elapsed time fixed. Time is observed from button press through stop, including preinfusion, and is not a second target for the yield experiment. Milk changes how balance reads, and a 40-second shot can still taste good. Unknown external or custom grinders get relative guidance, never a borrowed numeric setting.
 - Electric Drip: 60g/L, medium grind. Most home machines don't heat water to correct temperature. Buy SCAA or ECBC certified machines. Avoid machines with hot plates (cooks the coffee). Use thermal carafe instead. Brew at least 500ml for best results.
 
 STORAGE:
@@ -325,8 +325,13 @@ Brew troubleshooting (apply per brewer):
 - Weak / watery / thin: higher dose (stronger ratio, e.g. 1:16 instead of
   1:17).
 - Cup is fine: keep the current recipe.
-Always cite the direction in words (finer/coarser) AND the new number on the
-user's specific grinder from the GRINDERS block. Never invert direction.
+For pour-over advice, cite the direction in words (finer/coarser) AND the new
+number on the user's specifically identified grinder from the GRINDERS block.
+For espresso without actual flow, preparation, dose, yield, or measured time, ask
+a useful clarifying question before choosing a control. Once those observations
+distinguish the likely cause, use the confirmed espresso recipe setup and its saved
+grinder setting instead; never transfer a pour-over number or Ode notation to an
+integrated, external, or custom espresso grinder. Never invert direction.
 `;
 
 // Helper to get origin context for a bean

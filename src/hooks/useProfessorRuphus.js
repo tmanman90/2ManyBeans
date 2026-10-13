@@ -161,7 +161,7 @@ export const useProfessorRuphus = (updateBean, tastings = [], getBeanById = null
   const tastingScores = ruphusBean
     ? (() => {
         const beanTastings = tastings
-          .filter(t => t.beanId === ruphusBean.id && t.tastingScores)
+          .filter(t => t.beanId === ruphusBean.id && t.tastingScores && t?.cupContext?.drinkType !== 'with_milk')
           .sort((a, b) => (b.rating || 0) - (a.rating || 0));
         return beanTastings[0]?.tastingScores || null;
       })()

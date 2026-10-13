@@ -3,6 +3,7 @@ import { Coffee, ExternalLink, RefreshCw, Save, Undo2 } from 'lucide-react';
 import { C, fonts, type, radius, shadows } from '../styles/theme';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
+import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
 
 const card = { background: C.bgDeep, border: `1px solid ${C.borderLight}`, borderRadius: radius.md, padding: '12px' };
 const inputStyle = { width: '100%', minHeight: 44, padding: '8px 10px', borderRadius: radius.sm, border: `1px solid ${C.border}`, background: C.cream, color: C.text, fontFamily: fonts.body, fontSize: 16 };
@@ -24,6 +25,8 @@ export function EspressoModal({
     Promise.resolve(handler()).catch(() => {});
   };
   const name = bean?.name || bean?.beanName || 'This bean';
+  const unsavedTarget = Boolean(recipe && (!bean?.espressoRecipe
+    || espressoRecipeFingerprint(recipe) !== espressoRecipeFingerprint(bean.espressoRecipe)));
   return (
     <Modal open={open} onClose={onClose} title="Espresso recipe">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -55,19 +58,31 @@ export function EspressoModal({
           <div style={{ ...card, marginBottom: 12 }}>
             <div style={{ ...type.label, color: C.textMuted }}>TARGET GUIDE</div>
             <div style={{ ...type.h2, marginTop: 5 }}>{recipe.timeRangeSeconds?.[0]}–{recipe.timeRangeSeconds?.[1]} seconds</div>
-            <div style={{ ...type.caption, color: C.textLight, marginTop: 4 }}>Timing: machine start to stop · target output mass, not water input</div>
+            <div style={{ ...type.caption, color: C.textLight, marginTop: 4 }}>Timing: press the machine button to stop, including preinfusion · target output mass, not water input. Taste outside this range if the cup is better.</div>
           </div>
           <div style={{ ...card, marginBottom: 12 }}>
             <div style={{ ...type.label, color: C.textMuted }}>GRIND & PREP</div>
             <div style={{ ...type.body, lineHeight: 1.5, marginTop: 5 }}>{recipe.grindGuidance}</div>
+            <div style={{ ...type.caption, color: C.textLight, marginTop: 8 }}>
+              Grinder setting: {recipe.grinderSetting?.value == null ? 'unreported' : `${recipe.grinderSetting.value}${recipe.grinderSetting?.unit === 'machine_setting' ? '' : ` ${recipe.grinderSetting.unit || ''}`}`}
+              {recipe.grinderSetting?.model ? ` · ${recipe.grinderSetting.model}` : ''}
+            </div>
+            <div style={{ ...type.caption, color: C.textLight, marginTop: 4 }}>
+              Temperature: machine default{Number(recipe.temperature?.offsetF) ? ` (${recipe.temperature.offsetF > 0 ? '+' : ''}${recipe.temperature.offsetF}°F)` : ''}
+            </div>
             <ul style={{ ...type.body, lineHeight: 1.5, color: C.textMuted, margin: '8px 0 0', paddingLeft: 20 }}>{recipe.preparation?.map((step) => <li key={step}>{step}</li>)}</ul>
           </div>
-          <div style={{ ...type.caption, color: C.textLight, marginBottom: 12 }}>Source: {recipe.provenance?.label || recipe.source}</div>
+          <div style={{ ...type.caption, color: C.textLight, marginBottom: 12 }}>
+            Source: {recipe.provenance?.label || recipe.source}
+            {recipe.provenance?.url ? ` · ${recipe.provenance.url}` : ''}
+            {recipe.provenance?.locator ? ` · ${recipe.provenance.locator}` : ''}
+          </div>
+          {onOpenChat && unsavedTarget && <div role="status" style={{ ...type.caption, color: C.textMuted, marginBottom: 12 }}>Save this recipe before discussing its edited target.</div>}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Btn onClick={save} disabled={saving || loading} style={{ minHeight: 44 }}><Save size={16} /> {saving ? 'Saving…' : 'Save recipe'}</Btn>
             {onUndo && notice?.undoAvailable && <Btn variant="secondary" onClick={() => runAction(onUndo)} disabled={loading} style={{ minHeight: 44 }}><Undo2 size={16} /> Undo</Btn>}
             {onRegenerate && <Btn variant="secondary" onClick={() => runAction(onRegenerate)} disabled={loading} style={{ minHeight: 44 }}><RefreshCw size={16} /> Refresh</Btn>}
-            {onOpenChat && <Btn variant="secondary" onClick={onOpenChat} style={{ minHeight: 44 }}><ExternalLink size={16} /> Discuss in chat</Btn>}
+            {onOpenChat && <Btn variant="secondary" onClick={onOpenChat} disabled={unsavedTarget || loading} aria-disabled={unsavedTarget || loading} style={{ minHeight: 44 }}><ExternalLink size={16} /> Discuss in chat</Btn>}
             {onStartTasting && <Btn variant="secondary" onClick={onStartTasting} style={{ minHeight: 44 }}>Guided tasting</Btn>}
           </div>
         </>

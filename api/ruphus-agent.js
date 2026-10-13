@@ -103,6 +103,62 @@ export function trialReceiptsForSession(session, { now = Date.now() } = {}) {
     .map(item => ({ id: item.id, attemptId: item.attemptId, coffeeId: item.coffeeId, slotKey: item.slotKey }));
 }
 
+// Espresso conversational Undo is bound to an owner-scoped receipt from the
+// active session. Keep only the receipt identity and canonical recipe setup;
+// the command service still rechecks the live bean, owner, and revision.
+export function espressoReceiptsForSession(session, { now = Date.now() } = {}) {
+  if (!session || sessionAge({ lastActivityAt: session.lastActivityAt, now }).state === 'stale') return [];
+  const artifacts = (session.messages || []).slice(session.boundaryIndex || 0).flatMap(message => message.artifacts || []);
+  const undoReceipts = artifacts.filter(item => item?.type === 'undo_receipt'
+    && item?.slotKey === 'espresso'
+    && item?.status === 'succeeded'
+    && item?.mode === 'undo_revision'
+    && item?.undoneRevisionId
+    && item?.coffeeId);
+  return artifacts
+    .filter(item => item?.type === 'action_receipt'
+      && item?.slotKey === 'espresso'
+      && ['succeeded', 'undone'].includes(item?.status)
+      && item?.mode === 'replace_active_recipe'
+      && item?.coffeeId
+      && item?.revisionId)
+    .map(item => ({
+      ...(() => {
+        const undo = undoReceipts.find(candidate => candidate.undoneRevisionId === item.revisionId
+          && candidate.coffeeId === item.coffeeId
+          && (!candidate.slotKey || candidate.slotKey === item.slotKey));
+        return undo ? {
+          status: 'undone',
+          undoAvailable: false,
+          undoRevisionId: undo.revisionId || null,
+          restoredRevisionId: undo.restoredRevisionId || null,
+          restoredSourceState: undo.restoredSourceState || (undo.recipe ? 'present' : 'absent'),
+          restoredRecipe: undo.recipe || null,
+          undoReceipt: undo,
+          undoArtifact: undo,
+        } : {};
+      })(),
+      id: item.id,
+      actionId: item.actionId,
+      coffeeId: item.coffeeId,
+      slotKey: item.slotKey,
+      status: item.status === 'undone'
+        || undoReceipts.some(candidate => candidate.undoneRevisionId === item.revisionId && candidate.coffeeId === item.coffeeId)
+        ? 'undone'
+        : item.status,
+      mode: item.mode,
+      revisionId: item.revisionId,
+      parentRevisionId: item.parentRevisionId || null,
+      ...(item.status !== 'undone' && !undoReceipts.some(candidate => candidate.undoneRevisionId === item.revisionId && candidate.coffeeId === item.coffeeId)
+        ? { undoAvailable: item.undoAvailable === true }
+        : {}),
+      sourceState: item.sourceState || null,
+      setupKey: item.recipe?.setupKey || null,
+      recipe: item.recipe || null,
+      createdAt: item.createdAt || null,
+    }));
+}
+
 // Technique selections are recovered from the bounded, owner-scoped session
 // artifacts rather than prose or the public evidence ledger. This preserves
 // the user's previously selected source identity across a fresh request while
@@ -192,15 +248,25 @@ function firestoreReaders(db) {
   // fail closed. Missing or mismatched refs remain the only reader-level
   // `{ code }` failures.
   const withRecipeValidity = (recipe, slotKey) => {
-    const validation = validateExecutableRecipe(recipe, slotKey);
-    // Keep the reader backward-compatible with older partial snapshots that
-    // still carry the core dose/water shape. An empty or core-field-malformed
-    // snapshot is the dangerous case: it can otherwise look like an
-    // executable recipe while authorizing a target. The full validator still
-    // runs here; only its required-core signal is promoted to the private
-    // evidence validity annotation.
-    const missingCore = validation.errors.some((error) => /^recipe (?:dose|water) is required$/i.test(String(error)));
-    return validation.valid || !missingCore ? recipe : { ...recipe, validationStatus: 'invalid' };
+    // Reader provenance markers are trusted selection metadata, not part of
+    // the canonical executable snapshot. Validate the bare snapshot first so
+    // strict espresso validation cannot reject a valid revision merely because
+    // the reader attached its selected path/hash.
+    const validationInput = recipe && typeof recipe === 'object'
+      ? { ...recipe }
+      : recipe;
+    if (validationInput && typeof validationInput === 'object') {
+      delete validationInput.selectedPath;
+      delete validationInput.selectedHash;
+      delete validationInput.validationStatus;
+    }
+    const validation = validateExecutableRecipe(validationInput, slotKey);
+    // Espresso snapshots have a stricter versioned contract than legacy
+    // brewer records. Any espresso validation error is a hard read failure;
+    // it must never become a writable proposal target through a partial
+    // public projection.
+    const strict = slotKey === 'espresso' || validation.errors.some((error) => /^recipe (?:dose|water) is required$/i.test(String(error)));
+    return validation.valid || !strict ? recipe : { ...recipe, validationStatus: 'invalid' };
   };
   const invalidRecipeMarker = (slotKey) => ({ slotKey, state: 'invalid', code: 'recipe_invalid' });
   const readCoffee = async ({ uid, coffeeId }) => {
@@ -273,7 +339,7 @@ function firestoreReaders(db) {
       const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
       const rawMethod = preferences.brewMethod || preferences.defaultMethod || profile.brewMethod || profile.defaultMethod || null;
       const defaultMethod = rawMethod === 'handbrew' ? 'v60_hot' : SLOT_KEYS.includes(rawMethod) ? rawMethod : rawMethod === 'v60' ? 'v60_hot' : rawMethod === 'kalita' ? 'kalita_hot' : rawMethod === 'aiden' ? 'aiden' : null;
-      return { ...(defaultMethod ? { defaultMethod } : {}), ...(preferences.grinderCustomName || preferences.grinder ? { grinder: preferences.grinderCustomName || preferences.grinder } : {}), units: preferences.units || preferences.unitSystem || 'metric' };
+      return { ...(defaultMethod ? { defaultMethod } : {}), ...(preferences.grinderCustomName || preferences.grinder ? { grinder: preferences.grinderCustomName || preferences.grinder } : {}), units: preferences.units || preferences.unitSystem || 'metric', ...(preferences.espressoMachine ? { espressoMachine: preferences.espressoMachine } : {}), ...(preferences.espressoBasket ? { espressoBasket: preferences.espressoBasket } : {}), ...(preferences.espressoGrinder ? { espressoGrinder: preferences.espressoGrinder } : {}), ...(preferences.espressoGrinderModel ? { espressoGrinderModel: preferences.espressoGrinderModel } : {}), ...(preferences.espressoGrinderCustomName ? { espressoGrinderCustomName: preferences.espressoGrinderCustomName } : {}), espressoSetupConfirmed: preferences.espressoSetupConfirmed === true };
     },
     async readLaunchItem({ uid, item, coffeeRef = null, coffees = [] }) {
       if (!item?.kind || !item?.ref) return { ok: false, code: 'invalid_launch_item' };
@@ -329,10 +395,11 @@ export default withCorsAuthPro(async (req, res, decodedToken) => {
     // A conversation reference, not write authority; the tool rechecks the
     // owner-scoped attempt and canonical receipt before displaying anything.
     Object.defineProperty(context, '__ruphusTrialReceipts', { value: trialReceiptsForSession(activeSession, { now: startedAt }), enumerable: false });
+    Object.defineProperty(context, '__ruphusPriorEspressoReceipts', { value: espressoReceiptsForSession(activeSession, { now: startedAt }), enumerable: false });
     context.sessionId = turnId;
     context.sessionState.lastActivityAt = activeSession?.lastActivityAt || null;
     context.sessionState.boundaryIndex = activeSession?.boundaryIndex || 0;
-    const tools = createRuphusTools({ uid, context, readers, proposalActions: enabledProposalActions(uid), proposalStore: (input) => persistProposal({ db, ...input }) });
+    const tools = createRuphusTools({ uid, context, readers, db, proposalActions: enabledProposalActions(uid), proposalStore: (input) => persistProposal({ db, ...input }) });
     // E5: retry the unavailable active-topic read before allowing a prose-only turn.
     await retryUnavailableEvidence({ session: activeSession, context, tools, force: replay.resumed });
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' });

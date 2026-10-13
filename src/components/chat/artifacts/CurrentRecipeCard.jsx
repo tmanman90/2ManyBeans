@@ -47,7 +47,18 @@ export function CurrentRecipeCard({ recipe = {}, title = 'Current recipe' }) {
       ? quantity(brewWaterGrams + recipeIceGrams, ' g')
       : null;
   const grind = grindLabel(recipe.sourceProjection?.grind || recipe.grindSize || recipe.grind);
-  const rows = recipe.method === 'aiden' || recipe.device === 'aiden' ? aidenProfileRows(recipe) : [
+  const isEspresso = recipe.slotKey === 'espresso' || recipe.method === 'espresso' || recipe.device === 'espresso';
+  const espressoTemperature = recipe.temperature?.offsetF == null ? null : `${recipe.temperature.offsetF >= 0 ? '+' : ''}${recipe.temperature.offsetF}°F from machine default`;
+  const espressoGrind = recipe.grinderSetting?.value ?? recipe.grinderSetting?.description ?? null;
+  const rows = recipe.method === 'aiden' || recipe.device === 'aiden' ? aidenProfileRows(recipe) : isEspresso ? [
+    ['Dose', recipe.doseGrams == null ? null : `${recipe.doseGrams} g`],
+    ['Output', recipe.yieldGrams == null ? null : `${recipe.yieldGrams} g`],
+    ['Ratio', recipe.ratio],
+    ['Grind', espressoGrind],
+    ['Temperature', espressoTemperature],
+    ['Time guide', Array.isArray(recipe.timeRangeSeconds) ? `${recipe.timeRangeSeconds[0]}–${recipe.timeRangeSeconds[1]} s · button start to stop` : null],
+    ['Source', recipe.provenance?.label || recipe.source],
+  ] : [
     [isIced ? 'Brew water' : 'Water', isIced && brewWaterGrams != null ? quantity(brewWaterGrams, ' g') : water],
     ...(isIced && recipeIceGrams != null ? [['Recipe ice', quantity(recipeIceGrams, ' g')]] : []),
     ...(isIced && totalWater != null ? [[Number.isFinite(recipe.finalBeverageWaterTargetGrams) ? 'Total beverage water' : 'Total brew input', totalWater]] : []),
