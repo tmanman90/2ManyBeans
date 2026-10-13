@@ -1,0 +1,228 @@
+{
+  "status": "dev_published_phone_installed_and_launched",
+  "completedAt": "2026-10-13T19:20:53.309455+00:00",
+  "sourceCommit": "e2b6058857d5ff2fd6be64184f4754e7210854e3",
+  "preview": {
+    "url": "https://2manybeans-eo2s96e38-tmanman90s-projects.vercel.app",
+    "id": "dpl_HrCCBHufiSNb8zdHArE3QsWHDRGK",
+    "status": "READY",
+    "smoke": [
+      {
+        "path": "/",
+        "httpStatus": 200
+      },
+      {
+        "path": "/api/ruphus-agent",
+        "httpStatus": 401
+      },
+      {
+        "path": "/api/recipe-command",
+        "httpStatus": 401
+      }
+    ]
+  },
+  "devOta": {
+    "phase": "ota",
+    "commit": "e2b6058857d5ff2fd6be64184f4754e7210854e3",
+    "cpuIdlePercent": 51.48,
+    "exitCode": 0,
+    "bundle": "1.1.257-devapp.d20261013.t191544"
+  },
+  "nativeBuild": {
+    "phase": "native",
+    "commit": "e2b6058857d5ff2fd6be64184f4754e7210854e3",
+    "cpuIdlePercent": 52.81,
+    "exitCode": 0
+  },
+  "artifactVerification": {
+    "appId": "com.talmeltzer.coffeehub.dev",
+    "displayName": "2manybeans Dev",
+    "signatureVerified": true,
+    "phoneIncludedInProfile": true,
+    "profileUUID": "f25152bd-edfa-4cce-a430-f38ff5b6790e",
+    "profileExpiration": "2027-10-13T15:55:00",
+    "indexSha256": "c0ecac5bbdfa27f86bc248ee80620d87b23b9988307fb7065841457e31590d7e",
+    "builtAssetsMatchPublishedOta": true,
+    "previewHost": "2manybeans-eo2s96e38-tmanman90s-projects.vercel.app",
+    "firebaseProject": "manybeans-7893c",
+    "googleLoginBindingMatches": true,
+    "jsAssets": [
+      {
+        "name": "web-CcqmqA5s.js",
+        "sha256": "427cf41494fb71f0bf4936ffcb11ad72b59bc5710e969bba6f2a49251dbdab68",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "web-CzIuzbVu.js",
+        "sha256": "e2d223c7cc22d0b26b5769f9f8034dc13b5962d3031c80702f5bff88fcf9ac86",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-Cbddbz0Y.js",
+        "sha256": "4364b7b3de43c45a4a5d593431c1a75dece3d575f7342439a757f2463a9bf555",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "web-CgP7SJZv.js",
+        "sha256": "afd102f13235d3cb093961bfb3d1f3b41cd146c474e1afa859df3b17193eca09",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "PaywallSheet-DOglo4l6.js",
+        "sha256": "9a0de3150dcae53ae2988d3fdda0febeb2c70f62fa2686ee606c5b95e6fabaea",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "ArchiveTab-CLOFGxHa.js",
+        "sha256": "e216780bd5ac3e5fbf658867c019943af5a11fe9112b36d4552c69f4b92e4231",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "PaywallRoast-BwrKOZs4.js",
+        "sha256": "959a48bbe94a91b8639733d70d0808595412def6ca4430123236b291008c8841",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-vX66hc1d.js",
+        "sha256": "06fd18b24a5a745ec0364703e0514a7fd775b2c94001eb630b77c16dc591fc3b",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "firebase-DEFXIrpu.js",
+        "sha256": "2d5967e055595d2d6f83badbe970853a55e256db71f02aa79102935ce87dead5",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-CfVrKAbv.js",
+        "sha256": "d33b180fdaec8bf0138de751e209b4fa4bc02836f9db248000593e36e9c9bf66",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "TastingTab-D657Tavr.js",
+        "sha256": "47c64fba967ff1de9c36f6b6cce61add119f1c798eb742c974220adfcff435c3",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-iX0262Ti.js",
+        "sha256": "da31c99ed6024fbe3eb42634e850a47ff17621cfe5aa0a658c6cca37972c3737",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "ChatTab-CmPH3qY9.js",
+        "sha256": "ca54437910b5eb4e9117f0e3b82b7f6a239e52465dae0c38268cbe3ca129a01c",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "onboarding-B5x7-0bH.js",
+        "sha256": "3e3680ad67493b0d1f736128b6c30dca6d67b09dbd7053c84a4f4ddb4dae97f4",
+        "containsNewPreviewHost": true
+      },
+      {
+        "name": "index-B46Iua1l.js",
+        "sha256": "5ed75a1f29b13cf4b8161c1e2c30223ee0f2333de1b152c471b5c9e7284e0ce3",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "web-BqU99wQo.js",
+        "sha256": "bd4d54415850f990a8d609acc0d126930def97b1fbae54452354e2ce4b876e11",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-Y5zDMYhr.js",
+        "sha256": "9dc6dc8884b2c895d61dad81df278773e28a6dcd3714f675b54072c29d8cb2db",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "web-C-_UtOn3.js",
+        "sha256": "c9128558ec59acb570553ce8e509ee0c2836b6406ddd4913bcbcad2da6bad7c4",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "InventoryTab--8XWw_5O.js",
+        "sha256": "ba790ede2e4bfa81d4b35406bf16fb0f4cdc0da1c557d720adad18994d907ee0",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "react-CSWSLE_G.js",
+        "sha256": "75a05311ff752b5c29e69827505414c995b93069fd652463fae8cf55c0b1065b",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index.esm-Ck-ZnJ48.js",
+        "sha256": "67f2f84d83e4404c401a3a25eb67528a477a1004ba50c4f23f2e0d3382caaaf3",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-1r6kyK8O.js",
+        "sha256": "5ea1cf481ab58a93d5d0fc1b3c74a8485ab27d3aa0f80ed8d59f96f6b9746745",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "web-EK8DGRL3.js",
+        "sha256": "d90d123ea761dd3c7e28cbd266d52fa63ebe1a44e95c8b0a9f143f101dfa215f",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-BVFmG5cK.js",
+        "sha256": "4ad3371baa4abbbfcbaa0439e8011ca89f6847895214b4e8ade09df401046950",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-Wmob2Ru9.js",
+        "sha256": "ba2079a2e1769824a0c3bb0473bb1b198da9fb2761fd90d180921d4158970335",
+        "containsNewPreviewHost": false
+      },
+      {
+        "name": "index-CwNGQCtZ.js",
+        "sha256": "6853843103a3b267c0960b8372b09bf150d6bb18a6febb30c85bbf8246fdda00",
+        "containsNewPreviewHost": true
+      }
+    ]
+  },
+  "phone": {
+    "name": "Tal Meltzer",
+    "os": "27.0.1",
+    "hardwareUdid": "00008160-0014609634400036",
+    "coreDeviceId": "9A6C66CF-3E3E-5AF7-93C1-C45D77663506",
+    "installExitCode": 0,
+    "launchExitCode": 0,
+    "processId": 25048
+  },
+  "acceptance": {
+    "browserReceipt": "browser-1791918277758-receipt.json",
+    "browserChecksPassed": 7,
+    "normalLanguageSummary": "docs/qa/espresso-setup/live-summary.json",
+    "normalLanguageCasesPassed": 8,
+    "finalChecks": "docs/qa/espresso-setup/final-1791918045-receipt.json",
+    "testCommandsPassed": 30,
+    "changedSourceLint": "passed",
+    "editorAfterReviewLint": "passed",
+    "projectLint": "pre-existing4errors/2warnings",
+    "review": "Code review: harness-native fallback; two findings fixed and verified"
+  },
+  "deploymentRepair": {
+    "initialPreview": "https://2manybeans-bm8sxw92t-tmanman90s-projects.vercel.app",
+    "cause": "Exported service-account string had a trailing literal newline escape after the JSON document; normalized private deployment configuration",
+    "interruptedDevUpload": "Channel remained on previous1.1.256 bundle, independently read back before retry",
+    "repairedPreviewSmoke": "200 root,401 unauthenticated chat/recipe endpoints"
+  },
+  "limits": [
+    "Authenticated hosted espresso conversation and tasting have not been executed on the physical phone; actual-provider conversations and actual-App UI tests ran against isolated local Auth/Firestore fixtures.",
+    "This Dev build uses the existing manybeans-7893c account data. No production deployment or app schema/rules change occurred.",
+    "No physical-coffee quality or universal best-recipe result was established."
+  ],
+  "cleanup": {
+    "finishedCompanionThreadsArchived": true,
+    "temporaryServerCredentialsRemoved": true,
+    "worktreeAndSignedInstallerRetainedForOngoingDevTesting": true,
+    "userPrototypeTabPreserved": true
+  },
+  "logs": {
+    "new-web-deploy.log": "00768cac2be73d75e79bb53ee550079e6f338fba29967313d195c860b858f3ec",
+    "new-dev-ota.log": "17981e6c8cc315dbaae03fb5738baa9dcb647acf557cd33fbfc18f9f8e49da36",
+    "new-phone-build.log": "5da6b38ae172a5019644dd5079c4f8684e3e87ea4c56c3380122dc5ec07a4e3b",
+    "new-phone-install.log": "56e875626ceaea6bab79ab6881a6893d59b271323c80788c719d8e30dc13fbc1",
+    "new-phone-launch.log": "f5c86519ac9f7cd5ef70b0444c4bf68450bdebfc84329c8f1b5f48500d5fbc89",
+    "new-final-dev-pointer.log": "2d0843cd76f44c23d76fd197045019b935af35cb4ca7b3a8fd0a889006a9fcf3"
+  }
+}
