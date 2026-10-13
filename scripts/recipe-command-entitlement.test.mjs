@@ -11,3 +11,12 @@ test('recipe command keeps ordinary auth access while applying per-mode entitlem
   assert.match(source, /mode === 'set_aiden_grind'.*'pro'/s);
   assert.doesNotMatch(source, /withCorsAuthPro/);
 });
+
+test('ordinary espresso Undo has a narrow direct-save escape hatch', async () => {
+  const source = await readFile(new URL('../api/recipe-command.js', import.meta.url), 'utf8');
+  assert.match(source, /clientIntent === 'espresso_direct_undo'/);
+  assert.match(source, /slotKey === 'espresso'/);
+  assert.match(source, /!command\.proposalId/);
+  assert.match(source, /!command\.attemptId/);
+  assert.match(source, /!ordinaryEspressoUndo/);
+});

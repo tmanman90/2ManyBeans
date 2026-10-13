@@ -14,10 +14,12 @@ import { streamWithAuth, resolveTerminal, holdBackScan } from '../lib/streamChat
 import { chatErrorMessage } from '../lib/fetchWithRetry';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
+import { EspressoModal } from '../components/EspressoModal';
 import { Toast } from '../components/Toast';
 import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
+import { useEspressoBrew } from '../hooks/useEspressoBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { useChatSession } from '../hooks/useChatSession';
 import { getBrewMethod, isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
@@ -708,8 +710,19 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
   const aiden = useAidenBrew(ephemeralUpdateBean);
   const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
+  const espresso = useEspressoBrew();
+  const { handleBrewEspresso } = espresso;
 
   const openRecipePreview = useCallback((artifact) => {
+    if (artifact?.slotKey === 'espresso') {
+      const bean = beans.find((item) => item.id === artifact.coffeeId);
+      if (!bean) {
+        setToast('That coffee is no longer in your rotation.');
+        return;
+      }
+      handleBrewEspresso(bean, true);
+      return;
+    }
     if (!artifact || !['v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced'].includes(artifact.slotKey)) return;
     const bean = beans.find((item) => item.id === artifact.coffeeId);
     if (!bean) {
@@ -735,7 +748,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     } catch (error) {
       setToast(error.message || 'This recipe preview is unavailable.');
     }
-  }, [beans, uid, preferences?.grinder]);
+  }, [beans, uid, preferences?.grinder, handleBrewEspresso]);
 
   // Historical cards have no action authority. Inspection keeps the exact
   // delivered artifact (including a source projection) and never enters the
@@ -1020,7 +1033,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handleBrewRecipe = (bean) => {
     if (!bean) return;
     if (isEspresso) {
-      setToast('Confirm a supported Barista Express basket in Settings before requesting an espresso recipe.');
+      handleBrewEspresso(bean);
     } else if (isHandBrew) {
       handBrew.handleBrewHandBrew(bean);
     } else {
@@ -1537,7 +1550,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!scannedBean) return;
     const ephemeralBean = { ...scannedBean, status: 'SEALED' };
     if (isEspresso) {
-      setToast('Confirm a supported Barista Express basket in Settings before requesting an espresso recipe.');
+      handleBrewEspresso(ephemeralBean);
     } else if (isHandBrew) {
       handBrew.handleBrewHandBrew(ephemeralBean);
     } else {
@@ -1686,7 +1699,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                     onBrew: handleBrewRecipe,
                     onSave: handleSaveRecipe,
                     savingKey: savingRecipeKey,
-                    brewing: isEspresso ? false : isHandBrew
+                    brewing: isEspresso ? (espresso.espressoModal || espresso.espressoLoading) : isHandBrew
                       ? (handBrew.handBrewModal || handBrew.handBrewLoading)
                       : (aiden.aidenModal || aiden.aidenLoading),
                   }}
@@ -1837,6 +1850,23 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
         onTimerStart={handBrew.startAttemptTimer}
+      />
+      <EspressoModal
+        open={espresso.espressoModal}
+        onClose={espresso.closeEspressoModal}
+        bean={espresso.espressoBean}
+        recipe={espresso.espressoRecipe}
+        loading={espresso.espressoLoading}
+        error={espresso.espressoError}
+        phase={espresso.espressoPhase}
+        notice={espresso.espressoNotice}
+        onRetry={espresso.onRetry}
+        onRegenerate={espresso.onRegenerate}
+        onSave={espresso.saveEspressoRecipe}
+        onUndo={espresso.undoEspressoRecipe}
+        onDoseChange={espresso.editEspressoDose}
+        onYieldChange={espresso.editEspressoYield}
+        onStartTasting={() => onStartTastingSession?.(espresso.espressoBean?.id)}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>

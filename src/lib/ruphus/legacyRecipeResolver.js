@@ -5,6 +5,7 @@ import { validateV60SwitchCandidate } from '../v60SwitchAdapter.js';
 import { validateV60IcedCandidate } from '../v60IcedAdapter.js';
 import { validateKalitaCandidate } from '../kalitaAdapter.js';
 import { validateKalitaIcedCandidate } from '../kalitaIcedAdapter.js';
+import { validateEspressoRecipe } from '../espressoRecipes.js';
 
 export const SLOT_DEFINITIONS = Object.freeze({
   aiden: { path: ['aidenRecipe'], method: 'aiden', mode: 'hot', device: 'aiden' },
@@ -12,6 +13,7 @@ export const SLOT_DEFINITIONS = Object.freeze({
   v60_iced: { path: ['handBrewIcedRecipes', 'v60'], method: 'v60', mode: 'iced', device: 'v60' },
   kalita_hot: { path: ['handBrewRecipes', 'kalita'], method: 'kalita', mode: 'hot', device: 'kalita' },
   kalita_iced: { path: ['handBrewIcedRecipes', 'kalita'], method: 'kalita', mode: 'iced', device: 'kalita' },
+  espresso: { path: ['espressoRecipe'], method: 'espresso', mode: 'hot', device: 'espresso' },
 });
 const atPath = (bean, path) => path.reduce((value, key) => (value == null ? undefined : value[key]), bean);
 const identity = (recipe) => ({ device: String(recipe?.device || '').toLowerCase(), mode: recipe?.mode || (recipe?.isIced ? 'iced' : 'hot'), variant: String(recipe?.variant || recipe?.v60Variant || 'classic').toLowerCase(), size: String(recipe?.kalitaSize || recipe?.size || '') });
@@ -28,7 +30,7 @@ const matchesMappedSlot = (recipe, slotKey) => {
     && !(slotKey === 'v60_iced' && variant === 'switch');
 };
 const normalize = (recipe, slotKey) => ({ ...clone(recipe), method: SLOT_DEFINITIONS[slotKey].method, device: SLOT_DEFINITIONS[slotKey].device, mode: SLOT_DEFINITIONS[slotKey].mode });
-const legacyValidator = (recipe, slotKey) => slotKey === 'aiden' ? validateAidenProfile(recipe) : slotKey === 'v60_hot' ? (identity(recipe).variant === 'switch' ? validateV60SwitchCandidate(recipe) : validateV60Candidate(recipe)) : slotKey === 'v60_iced' ? validateV60IcedCandidate(recipe) : slotKey === 'kalita_hot' ? validateKalitaCandidate(recipe) : validateKalitaIcedCandidate(recipe);
+const legacyValidator = (recipe, slotKey) => slotKey === 'espresso' ? validateEspressoRecipe(recipe) : slotKey === 'aiden' ? validateAidenProfile(recipe) : slotKey === 'v60_hot' ? (identity(recipe).variant === 'switch' ? validateV60SwitchCandidate(recipe) : validateV60Candidate(recipe)) : slotKey === 'v60_iced' ? validateV60IcedCandidate(recipe) : slotKey === 'kalita_hot' ? validateKalitaCandidate(recipe) : validateKalitaIcedCandidate(recipe);
 const validator = (recipe, slotKey) => hasManualSourceProjection(recipe) ? validateManualSourceRecipeSnapshot(recipe) : legacyValidator(recipe, slotKey);
 
 export function canonicalRecipeSnapshot(recipe, slotKey) { const normalized = normalize(recipe, slotKey); const canonical = clone(normalized); delete canonical.userCoffeeGrams; delete canonical.aidenGrind; return { ...normalized, recipeHash: canonicalHash(canonical) }; }

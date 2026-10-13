@@ -22,7 +22,7 @@ export const ARTIFACT_TYPES = Object.freeze([
 ]);
 
 export const SLOT_KEYS = Object.freeze([
-  'aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced',
+  'aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced', 'espresso',
 ]);
 
 export const SUPPORTED_METHODS = Object.freeze(['aiden', 'v60', 'kalita']);
@@ -106,7 +106,7 @@ export function recipeSourceHash(recipe, slotKey = null) {
   if (recipe == null) return canonicalHash({ slotKey: slotKey || null, absent: true });
   const identity = clone(recipe);
   if (slotKey) {
-    const method = slotKey === 'aiden' ? 'aiden' : slotKey.startsWith('kalita') ? 'kalita' : 'v60';
+    const method = slotKey === 'aiden' ? 'aiden' : slotKey === 'espresso' ? 'espresso' : slotKey.startsWith('kalita') ? 'kalita' : 'v60';
     identity.method = method;
     identity.device = method;
     identity.mode = slotKey.endsWith('iced') ? 'iced' : 'hot';
@@ -192,6 +192,10 @@ export function validateRecipeSnapshot(value) {
   const errors = [];
   if (!object(value)) return { valid: false, errors: ['recipe must be an object'] };
   if (object(value.sourceProjection)) return validateManualSourceRecipeSnapshot(value);
+  if (value.slotKey === 'espresso') {
+    if (value.method !== 'espresso' || value.device !== 'espresso' || value.mode !== 'hot') errors.push('invalid espresso recipe identity');
+    return { valid: errors.length === 0, errors };
+  }
   if (!text(value.method, 80) || !SUPPORTED_METHODS.includes(value.method)) errors.push('unsupported recipe method');
   if (!text(value.device, 80)) errors.push('recipe device is required');
   if (!['hot', 'iced'].includes(value.mode)) errors.push('recipe mode must be hot or iced');

@@ -3,11 +3,11 @@ import { ruphusApiUrl } from './apiBase.js';
 import { RUPHUS_CLIENT_COMMAND_CAPABILITIES, ruphusClientVersion } from './ruphus/census.js';
 import { recipePreviewErrorMessage } from './ruphus/recovery.js';
 
-const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'aidenLinkProfileHash', 'aidenIcedLinkProfileHash', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe']);
+const PROTECTED_KEYS = new Set(['aidenRecipe', 'aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay', 'aidenLinkRevisionId', 'aidenLinkProfileHash', 'aidenIcedLinkProfileHash', 'activeRevisionIds', 'recipeProvenance', 'handBrewRecipes', 'handBrewIcedRecipes', 'handBrewRecipe', 'espressoRecipe']);
 
-export const isProtectedRecipeUpdate = (updates = {}) => Object.keys(updates).some((key) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.'));
+export const isProtectedRecipeUpdate = (updates = {}) => Object.keys(updates).some((key) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.') || key.startsWith('espressoRecipe.'));
 export const protectedRecipeUpdates = (updates = {}) => Object.fromEntries(
-  Object.entries(updates).filter(([key]) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.'))
+  Object.entries(updates).filter(([key]) => PROTECTED_KEYS.has(key) || key.startsWith('handBrewRecipes.') || key.startsWith('handBrewIcedRecipes.') || key.startsWith('handBrewRecipe.') || key.startsWith('espressoRecipe.'))
 );
 
 // A single editor save can contain hot and iced projections. Each protected
@@ -18,6 +18,7 @@ export function splitProtectedRecipeUpdates(updates = {}) {
     let group = 'aiden';
     if (key.startsWith('handBrewIcedRecipes.') || key === 'handBrewIcedRecipes') group = 'iced';
     else if (key.startsWith('handBrewRecipes.') || key === 'handBrewRecipes' || key.startsWith('handBrewRecipe.') || key === 'handBrewRecipe') group = 'hot';
+    else if (key.startsWith('espressoRecipe') || key === 'espressoRecipe') group = 'espresso';
     if (!groups.has(group)) groups.set(group, {});
     groups.get(group)[key] = value;
   }
@@ -62,6 +63,9 @@ export function commandForBeanUpdate(bean, updates, { actionId = crypto.randomUU
   const protectedUpdates = protectedRecipeUpdates(updates);
   const keys = Object.keys(protectedUpdates);
   updates = protectedUpdates;
+  if (Object.keys(updates).some((key) => key === 'espressoRecipe' || key.startsWith('espressoRecipe.'))) {
+    return { actionId, mode: 'replace_active_recipe', coffeeId: bean.id, slotKey: 'espresso', recipe: updates.espressoRecipe || bean.espressoRecipe, patch: updates, expectedRevisionId: bean.activeRevisionIds?.espresso || undefined };
+  }
   if (updates?.aidenGrind !== undefined && keys.every((key) => ['aidenGrind', 'aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay'].includes(key))) return { actionId, mode: 'set_aiden_grind', coffeeId: bean.id, slotKey: 'aiden', grind: updates.aidenGrind, patch: updates, expectedRevisionId: bean.activeRevisionIds?.aiden || undefined };
   const aidenLinkKeys = new Set(['aidenLink', 'aidenIcedLink', 'aidenUsedRelay', 'aidenIcedUsedRelay']);
   if (Object.keys(updates || {}).length > 0 && Object.keys(updates).every((key) => aidenLinkKeys.has(key))) {

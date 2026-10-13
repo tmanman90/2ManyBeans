@@ -245,9 +245,14 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
 
       const { preferences: answerPrefs, ...answersWithoutPrefs } = answers;
       const prefsPatch = {};
+      const espressoPreferenceKeys = new Set(['espressoMachine', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName', 'espressoSetupConfirmed']);
       if (answerPrefs && typeof answerPrefs === 'object') {
         for (const [k, v] of Object.entries(answerPrefs)) {
-          if (v !== null && v !== undefined && v !== '') prefsPatch[k] = v;
+          // Null is meaningful for the new espresso equipment fields: it is
+          // the user's explicit unknown/unconfirmed choice and must clear a
+          // previous replayed selection. Keep legacy preference merge rules.
+          if (espressoPreferenceKeys.has(k) && (v === null || v === '')) prefsPatch[k] = null;
+          else if (v !== null && v !== undefined && v !== '') prefsPatch[k] = v;
         }
       }
 

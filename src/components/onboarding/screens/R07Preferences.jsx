@@ -108,6 +108,21 @@ export default function R07Preferences() {
     if (changesEspressoEquipmentIdentity('espressoBasket')) setEspressoSetupConfirmed(false);
   };
 
+  const handleEspressoGrinderChange = (event) => {
+    setEspressoGrinder(event.target.value);
+    setEspressoSetupConfirmed(false);
+  };
+
+  const handleEspressoGrinderModelChange = (event) => {
+    setEspressoGrinderModel(event.target.value);
+    setEspressoSetupConfirmed(false);
+  };
+
+  const handleEspressoCustomGrinderChange = (event) => {
+    setEspressoGrinderCustomName(event.target.value);
+    setEspressoSetupConfirmed(false);
+  };
+
   return (
     <div style={{
       width: '100%',
@@ -249,7 +264,7 @@ export default function R07Preferences() {
             <select aria-label="Espresso basket" value={espressoBasket} onChange={handleEspressoBasketChange} style={selectStyle}>
               {ESPRESSO_BASKETS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
             </select>
-            <select aria-label="Espresso grinder" value={espressoGrinder} onChange={(e) => setEspressoGrinder(e.target.value)} style={selectStyle}>
+              <select aria-label="Espresso grinder" value={espressoGrinder} onChange={handleEspressoGrinderChange} style={selectStyle}>
               {ESPRESSO_GRINDERS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
             </select>
             {espressoGrinder === 'external' && (
@@ -257,7 +272,7 @@ export default function R07Preferences() {
                 type="text"
                 aria-label="External espresso grinder model"
                 value={espressoGrinderModel}
-                onChange={(e) => setEspressoGrinderModel(e.target.value)}
+                onChange={handleEspressoGrinderModelChange}
                 onFocus={scrollOnFocus}
                 placeholder="External grinder model (optional)"
                 maxLength={80}
@@ -269,7 +284,7 @@ export default function R07Preferences() {
                 type="text"
                 aria-label="Custom espresso grinder name"
                 value={espressoGrinderCustomName}
-                onChange={(e) => setEspressoGrinderCustomName(e.target.value)}
+                onChange={handleEspressoCustomGrinderChange}
                 onFocus={scrollOnFocus}
                 placeholder="Your grinder name"
                 maxLength={80}

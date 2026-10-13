@@ -1,6 +1,7 @@
 // Brew method registry — strategy pattern per Architecture Strategist recommendation
 // Each tab renders method.label based on the user's preference.
 // Adding a new brew method requires one entry here, not editing three tabs.
+import { isSupportedEspressoSetup as isSupportedEspressoRecipeSetup } from './espressoRecipes.js';
 
 // App notation for the Ode's 31 physical positions: whole, first tick (.2),
 // second tick (.6). These labels are not decimal fractions of a dial interval.
@@ -292,21 +293,17 @@ export const isManualBrewMethod = (key) => (
 
 export const isEspressoBrewMethod = (key) => key === 'espresso';
 
-export const isSupportedEspressoSetup = (preferences = {}) => (
-  preferences.espressoSetupConfirmed === true
-  && preferences.espressoMachine === 'breville-barista-express'
-  && preferences.espressoBasket === 'stock-double-single-wall'
-);
+export const isSupportedEspressoSetup = isSupportedEspressoRecipeSetup;
 
 export const changesEspressoEquipmentIdentity = (key) => (
-  key === 'espressoMachine' || key === 'espressoBasket'
+  ['espressoMachine', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName'].includes(key)
 );
 
 // Archived bean cards show the recipe that was actually saved with the bean.
 // This is independent of the user's current brew preference, which may have
 // changed since the recipe was created.
-export const hasSavedBrewProfile = ({ showBrewProfile, aidenRecipe, handBrewRecipe } = {}) => (
-  showBrewProfile === true && Boolean(aidenRecipe || handBrewRecipe)
+export const hasSavedBrewProfile = ({ showBrewProfile, aidenRecipe, handBrewRecipe, espressoRecipe } = {}) => (
+  showBrewProfile === true && Boolean(aidenRecipe || handBrewRecipe || espressoRecipe)
 );
 
 // Normalize recipe step times for the BrewTimer contract: parse each step's

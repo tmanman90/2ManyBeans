@@ -17,11 +17,13 @@ import { ManualEntrySheet } from '../components/ManualEntrySheet';
 import { EditBeanModal } from '../components/EditBeanModal';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
+import { EspressoModal } from '../components/EspressoModal';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
+import { useEspressoBrew } from '../hooks/useEspressoBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
@@ -104,10 +106,8 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
-  const openEspresso = (bean) => {
-    if (!bean) return;
-    setToast('Espresso recipe setup is not available for this basket yet.');
-  };
+  const espresso = useEspressoBrew();
+  const openEspresso = (bean) => { if (bean) espresso.handleBrewEspresso(bean); };
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
   const [editBean, setEditBean] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
@@ -549,6 +549,24 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
         onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
+      />
+      <EspressoModal
+        open={espresso.espressoModal}
+        onClose={espresso.closeEspressoModal}
+        bean={espresso.espressoBean}
+        recipe={espresso.espressoRecipe}
+        loading={espresso.espressoLoading}
+        error={espresso.espressoError}
+        phase={espresso.espressoPhase}
+        notice={espresso.espressoNotice}
+        onRetry={espresso.onRetry}
+        onRegenerate={espresso.onRegenerate}
+        onSave={espresso.saveEspressoRecipe}
+        onUndo={espresso.undoEspressoRecipe}
+        onDoseChange={espresso.editEspressoDose}
+        onYieldChange={espresso.editEspressoYield}
+        onOpenChat={agentV3Enabled ? () => onOpenRuphus?.({ coffeeRef: espresso.espressoBean?.id, surface: 'recipe_espresso' }) : undefined}
+        onStartTasting={() => onStartTastingSession?.(espresso.espressoBean?.id)}
       />
       <FinishBagPrompt
         open={!!finishPrompt}

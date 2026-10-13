@@ -283,8 +283,10 @@ export const useUserProfile = (uid) => {
         // Drop null/undefined/empty entries so unanswered fields don't
         // clobber existing live preferences with blanks.
         const cleanPrefs = {};
+        const espressoPreferenceKeys = new Set(['espressoMachine', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName', 'espressoSetupConfirmed']);
         for (const [k, v] of Object.entries(answerPrefs)) {
-          if (v !== null && v !== undefined && v !== '') cleanPrefs[k] = v;
+          if (espressoPreferenceKeys.has(k) && (v === null || v === '')) cleanPrefs[k] = null;
+          else if (v !== null && v !== undefined && v !== '') cleanPrefs[k] = v;
         }
         if (Object.keys(cleanPrefs).length) {
           payload.preferences = { ...(profile?.preferences || DEFAULT_PREFERENCES), ...cleanPrefs };

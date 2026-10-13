@@ -40,11 +40,12 @@ test('the verified setup keeps machine, basket, and grinder choices independent'
   assert.equal(isSupportedEspressoSetup({
     espressoMachine: 'breville-barista-express',
     espressoBasket: 'stock-double-single-wall',
+    espressoGrinder: 'integrated',
     espressoSetupConfirmed: true,
   }), true);
   assert.equal(changesEspressoEquipmentIdentity('espressoMachine'), true);
   assert.equal(changesEspressoEquipmentIdentity('espressoBasket'), true);
-  assert.equal(changesEspressoEquipmentIdentity('espressoGrinder'), false);
+  assert.equal(changesEspressoEquipmentIdentity('espressoGrinder'), true);
 });
 
 test('saved archive recipe remains visible after changing current brew preference', () => {

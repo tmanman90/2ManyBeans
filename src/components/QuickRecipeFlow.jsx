@@ -12,16 +12,20 @@ import { haptic } from '../lib/haptics';
 import { ensurePhotoLibraryAccess, galleryPhotosToScanPhotos, isPhotoPickerCancel } from '../lib/photoPicker';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
+import { useEspressoBrew } from '../hooks/useEspressoBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { usePreferences } from '../hooks/useUserProfile';
 import { AidenModal } from './AidenModal';
 import { HandBrewModal } from './HandBrewModal';
+import { EspressoModal } from './EspressoModal';
 import { ProfessorRuphusSlideUp } from './ProfessorRuphusSlideUp';
 import { QuickRateForm } from './QuickRateForm';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
 import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
+import { executeRecipeCommand } from '../lib/recipeCommands';
+import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
 
 const noop = () => {};
 
@@ -66,6 +70,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   // Brew hooks with noop updateBean (ephemeral, no Firestore writes)
   const aiden = useAidenBrew(noop);
   const handBrew = useHandBrew(noop);
+  const espresso = useEspressoBrew();
   const { handleLearn, ruphusProps } = useProfessorRuphus(noop);
 
   // Reset on close + revoke blob URL
@@ -229,7 +234,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     // Start with user's preferred brew method
     if (isEspresso) {
       setActiveMethod('espresso');
-      setScanError('Espresso recipes require the verified machine and basket setup. Use Settings to confirm your equipment.');
+      espresso.handleBrewEspresso(ephemeralBean);
     } else if (isHandBrew) {
       setActiveMethod('handbrew');
       handBrew.handleBrewHandBrew(ephemeralBean);
@@ -250,6 +255,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       // Switch to Aiden, pass hand brew's research as cache
       setActiveMethod('aiden');
       aiden.handleBrewWithAiden(ephemeralBean, handBrew.handBrewResearch);
+    } else if (activeMethod === 'espresso') {
+      espresso.handleBrewEspresso(ephemeralBean, true);
     }
   };
 
@@ -282,6 +289,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       handBrewRecipe: handBrewForSave,
       ...(handBrewForSave ? { handBrewRecipes: { [handBrewForSave.device || 'v60']: handBrewForSave } } : {}),
       ...(icedForSave ? { handBrewIcedRecipes: { [icedForSave.device || 'v60']: icedForSave } } : {}),
+      ...(activeMethod === 'espresso' && espresso.espressoRecipe ? { espressoRecipe: espresso.espressoRecipe } : {}),
       photo: photos[0] || null,
       scanPhotos: photos,
     };
@@ -321,9 +329,32 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
           beanData.handBrewIcedRecipes = { [icedRecipe.device || 'v60']: icedRecipe };
         }
         const newId = await addBean(beanData);
+        let espressoAttachFailed = false;
+        if (espresso.espressoRecipe) {
+          // The scan bean is ephemeral until addBean returns its canonical id.
+          // Attach the edited snapshot through the authenticated command so a
+          // null coffeeId can never become a stored recipe projection.
+          const reboundBase = { ...espresso.espressoRecipe, coffeeId: newId };
+          const rebound = { ...reboundBase, fingerprint: espressoRecipeFingerprint(reboundBase) };
+          try {
+            await executeRecipeCommand({
+              actionId: crypto.randomUUID(),
+              mode: 'replace_active_recipe',
+              coffeeId: newId,
+              slotKey: 'espresso',
+              recipe: rebound,
+              patch: { espressoRecipe: rebound },
+            });
+          } catch (recipeError) {
+            console.error('Scanned espresso recipe attach failed:', recipeError);
+            espressoAttachFailed = true;
+          }
+        }
         setSavedBeanId(newId);
         handBrew.attachHandBrewBeanId(newId);
-        setToast(`${scanData.name || 'Bean'} saved to inventory`);
+        setToast(espressoAttachFailed
+          ? 'Bean saved, but its espresso recipe could not be attached. Open the bean and save again.'
+          : `${scanData.name || 'Bean'} saved to inventory`);
         return newId;
       } catch (err) {
         console.error('Auto-save failed:', err);
@@ -403,7 +434,9 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   // Build the action buttons shown in the recipe footer
   const recipeHasLoaded = activeMethod === 'aiden'
     ? aiden.aidenRecipe && !aiden.aidenLoading
-    : handBrew.handBrewRecipe && !handBrew.handBrewLoading;
+    : activeMethod === 'handbrew'
+      ? handBrew.handBrewRecipe && !handBrew.handBrewLoading
+      : espresso.espressoRecipe && !espresso.espressoLoading;
 
   const actionButtons = recipeHasLoaded ? (
     <m.div
@@ -416,7 +449,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       {/* Brew method toggle */}
       <Btn variant="secondary" onClick={handleToggleMethod} style={{ width: '100%', justifyContent: 'center' }}>
         <Coffee size={14} />
-        {activeMethod === 'aiden' ? 'Get Hand Brew Recipe' : 'Get Aiden Recipe'}
+        {activeMethod === 'aiden' ? 'Get Hand Brew Recipe' : activeMethod === 'handbrew' ? 'Get Aiden Recipe' : 'Refresh Espresso Recipe'}
       </Btn>
 
       {/* Quick Rate */}
@@ -493,12 +526,26 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onPersistDose={handBrew.persistDose}
           />
         ) : (
-          <Modal open={open} onClose={onClose} title="Espresso recipe" centered>
-            <div style={{ padding: '12px 0 20px', color: C.textMuted, lineHeight: 1.5 }}>
-              Confirm a Barista Express and stock double single-wall basket in Settings before requesting an espresso recipe.
-            </div>
-            <Btn variant="ghost" onClick={onClose} style={{ width: '100%', justifyContent: 'center' }}>Close</Btn>
-          </Modal>
+          <EspressoModal
+            open={open}
+            onClose={onClose}
+            bean={espresso.espressoBean || toEphemeralBean(scanData)}
+            recipe={espresso.espressoRecipe}
+            loading={espresso.espressoLoading}
+            error={espresso.espressoError}
+            phase={espresso.espressoPhase}
+            notice={espresso.espressoNotice}
+            onRetry={espresso.onRetry}
+            onRegenerate={espresso.onRegenerate}
+            // A scanned bean has no owner bean id yet. Route Save through the
+            // existing inventory path so the bean is created before any
+            // recipe mutation can be attempted.
+            onSave={handleSave}
+            onUndo={espresso.undoEspressoRecipe}
+            onDoseChange={espresso.editEspressoDose}
+            onYieldChange={espresso.editEspressoYield}
+            onStartTasting={handleBrewTimerStartTasting}
+          />
         )}
         <ProfessorRuphusSlideUp {...ruphusProps} />
         <QuickRateForm

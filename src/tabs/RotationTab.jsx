@@ -14,6 +14,7 @@ import { BeanDetailCard } from '../components/BeanDetailCard';
 import { TastingDetailCard } from '../components/TastingDetailCard';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
+import { EspressoModal } from '../components/EspressoModal';
 import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
@@ -26,6 +27,7 @@ import { EditBeanModal } from '../components/EditBeanModal';
 import { buildNewBeanData } from '../lib/beanBuilder';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
+import { useEspressoBrew } from '../hooks/useEspressoBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { useLongPress } from '../hooks/useLongPress';
 import { haptic } from '../lib/haptics';
@@ -35,6 +37,7 @@ import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 import { useBeanDetail } from '../hooks/useBeanDetail';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 import { executeRecipeCommand } from '../lib/recipeCommands';
+import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
 
 // Secondary Liquid-Glass pill (iOS 26 material): bright rim + specular top sheen +
 // a floating drop shadow that lifts it off the card, with a faint semantic tint.
@@ -78,6 +81,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
+  const espresso = useEspressoBrew();
+  const { handleBrewEspresso } = espresso;
   const { openAttempt: openAidenAttempt } = aiden;
   const { openAttempt: openHandAttempt } = handBrew;
   const [toast, setToast] = useState(null);
@@ -94,19 +99,17 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     if (!bean) return;
     consumedAttemptRef.current = ruphusAttempt.id;
     if (ruphusAttempt.slotKey === 'aiden') openAidenAttempt?.(bean, ruphusAttempt);
-    else if (ruphusAttempt.slotKey === 'espresso') setToast('Espresso recipe context is not available yet.');
+    else if (ruphusAttempt.slotKey === 'espresso') handleBrewEspresso(bean);
     else {
       const startImmediately = ruphusAttemptAutoStartId === ruphusAttempt.id;
       openHandAttempt(bean, startImmediately ? { ...ruphusAttempt, startImmediately: true } : ruphusAttempt);
       if (startImmediately) onRuphusAttemptAutoStartConsumed?.();
     }
-  }, [ruphusAttempt, beans, openAidenAttempt, openHandAttempt, ruphusAttemptAutoStartId, onRuphusAttemptAutoStartConsumed]);
+  }, [ruphusAttempt, beans, openAidenAttempt, openHandAttempt, handleBrewEspresso, ruphusAttemptAutoStartId, onRuphusAttemptAutoStartConsumed]);
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
-  const openEspresso = useCallback(() => {
-    setToast('Espresso recipe setup is not available for this basket yet.');
-  }, []);
+  const openEspresso = useCallback((bean) => handleBrewEspresso(bean), [handleBrewEspresso]);
   const [showRec, setShowRec] = useState(false);
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
@@ -166,15 +169,37 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     : null;
 
   const handleSaveToInventory = async (data) => {
-    const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, handBrewIcedRecipes, photo, ...fields } = data;
+    const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, handBrewIcedRecipes, espressoRecipe, photo, ...fields } = data;
     const aidenData = aidenRecipe ? { aidenRecipe, aidenLink, aidenGrind } : undefined;
     const beanData = buildNewBeanData(fields, { aidenData });
     if (handBrewRecipe) beanData.handBrewRecipe = handBrewRecipe;
     if (handBrewRecipes) beanData.handBrewRecipes = handBrewRecipes;
     if (handBrewIcedRecipes) beanData.handBrewIcedRecipes = handBrewIcedRecipes;
     try {
+      // A scan has no canonical bean id yet. Never persist its espresso
+      // snapshot with coffeeId:null; create the inventory record first, then
+      // attach the exact edited snapshot through the authenticated command.
       const beanId = await addBean(beanData);
-      setNewBeanEntry({ id: beanId, ...beanData });
+      let savedBean = { id: beanId, ...beanData };
+      if (espressoRecipe) {
+        const reboundBase = { ...espressoRecipe, coffeeId: beanId };
+        const rebound = { ...reboundBase, fingerprint: espressoRecipeFingerprint(reboundBase) };
+        try {
+          const result = await executeRecipeCommand({
+            actionId: crypto.randomUUID(),
+            mode: 'replace_active_recipe',
+            coffeeId: beanId,
+            slotKey: 'espresso',
+            recipe: rebound,
+            patch: { espressoRecipe: rebound },
+          });
+          savedBean = { ...savedBean, ...(result.bean || {}), espressoRecipe: result.bean?.espressoRecipe || rebound };
+        } catch (recipeError) {
+          console.error('Scanned espresso recipe attach failed:', recipeError);
+          setToast('Bean saved, but its espresso recipe could not be attached. Open the bean and save again.');
+        }
+      }
+      setNewBeanEntry(savedBean);
     } catch (err) {
       console.error('Failed to save bean:', err);
       setToast('Failed to save bean');
@@ -632,6 +657,24 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         sourceTimerState={ruphusAttempt?.sourceTimerState || null}
         sourceTimerBinding={ruphusAttempt?.sourceTimerBinding || ruphusAttempt?.sourceTimerIdentity || null}
         onSourceTimerStateChange={persistSourceTimerState}
+      />
+      <EspressoModal
+        open={espresso.espressoModal}
+        onClose={espresso.closeEspressoModal}
+        bean={espresso.espressoBean}
+        recipe={espresso.espressoRecipe}
+        loading={espresso.espressoLoading}
+        error={espresso.espressoError}
+        phase={espresso.espressoPhase}
+        notice={espresso.espressoNotice}
+        onRetry={espresso.onRetry}
+        onRegenerate={espresso.onRegenerate}
+        onSave={espresso.saveEspressoRecipe}
+        onUndo={espresso.undoEspressoRecipe}
+        onDoseChange={espresso.editEspressoDose}
+        onYieldChange={espresso.editEspressoYield}
+        onOpenChat={agentV3Enabled ? () => onOpenRuphus?.({ coffeeRef: espresso.espressoBean?.id, surface: 'recipe_espresso' }) : undefined}
+        onStartTasting={() => onStartTastingSession?.(espresso.espressoBean?.id)}
       />
       <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
         {returnConfirm && (
