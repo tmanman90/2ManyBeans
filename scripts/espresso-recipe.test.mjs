@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { validateRecipeSnapshot } from '../src/lib/ruphus/contracts.js';
+import { validateExecutableRecipe } from '../src/lib/ruphus/legacyRecipeResolver.js';
 import {
   buildEspressoRecipe,
   editEspressoRecipe,
@@ -68,6 +70,49 @@ assert.equal(outputEdit.recipe.ratio, 2.22);
 assert.equal(editEspressoRecipe(baseline.recipe, { doseGrams: 15 }).ok, false);
 assert.equal(validateEspressoRecipe({ ...baseline.recipe, waterGrams: 36 }).valid, false);
 assert.equal(validateEspressoRecipe({ ...baseline.recipe, actualYieldGrams: 40 }).valid, false);
-assert.equal(buildEspressoRecipe({ bean: { id: 'bean-1' }, setup: { ...supported, espressoBasket: 'different' } }).code, 'espresso_setup_unconfirmed');
+assert.equal(buildEspressoRecipe({ bean: { id: 'bean-1' }, setup: { ...supported, espressoBasket: 'different' } }).recipe.doseGrams, null);
 
-console.log('espresso recipe tests: 16 passed');
+// Generic equipment stays useful with Aiden as the ordinary default.
+const noEspressoGrinder = resolveEspressoRecipe({ bean: { id: 'generic-bean' }, setup: { brewMethod: 'aiden', grinder: 'fellow-ode-gen2', espressoGrinder: null } });
+assert.equal(noEspressoGrinder.recipe.setup.grinder, null);
+assert.equal(noEspressoGrinder.recipe.grinderSetting.grinder, 'unknown');
+assert.doesNotMatch(noEspressoGrinder.recipe.setupDescription, /Ode/i);
+const genericSetup = { brewMethod: 'aiden', espressoMachine: 'other', espressoMachineName: 'My machine', espressoBasket: 'unknown', espressoGrinder: 'external', espressoGrinderModel: 'DF64' };
+const generic = resolveEspressoRecipe({ bean: { id: 'generic-bean' }, setup: genericSetup });
+assert.equal(generic.ok, true);
+assert.equal(generic.recipe.recipeKind, 'generic');
+assert.equal(generic.recipe.doseGrams, null);
+assert.equal(generic.recipe.yieldGrams, null);
+assert.equal(generic.recipe.ratio, 2);
+assert.equal(generic.recipe.roastLevel, 'unknown');
+assert.equal(generic.recipe.temperature.unit, null);
+assert.equal(validateEspressoRecipe(generic.recipe).valid, false);
+assert.equal(validateEspressoRecipe(generic.recipe, { allowIncomplete: true }).valid, true);
+const chosenDose = editEspressoRecipe(generic.recipe, { doseGrams: 20 });
+assert.equal(chosenDose.ok, true);
+assert.equal(chosenDose.recipe.yieldGrams, 40);
+assert.equal(chosenDose.recipe.doseBasis, 'user_selected');
+assert.equal(validateRecipeSnapshot(chosenDose.recipe).valid, true);
+assert.equal(validateExecutableRecipe(chosenDose.recipe, 'espresso').valid, true);
+assert.equal(validateRecipeSnapshot(generic.recipe).valid, false);
+assert.equal(editEspressoRecipe(generic.recipe, { doseGrams: true }).ok, false);
+assert.equal(editEspressoRecipe(generic.recipe, { doseGrams: Number.POSITIVE_INFINITY }).ok, false);
+assert.equal(editEspressoRecipe(generic.recipe, { doseGrams: 0 }).ok, false);
+assert.equal(validateEspressoRecipe(chosenDose.recipe, { setup: genericSetup, coffeeId: 'generic-bean' }).valid, true);
+assert.equal(editEspressoRecipe(generic.recipe, { yieldGrams: 40 }).ok, false);
+assert.equal(validateEspressoRecipe({ ...baseline.recipe, recipeKind: 'generic', doseGrams: 20, yieldGrams: 40, ratio: 2 }).valid, false);
+const preground = buildEspressoRecipe({ bean: { id: 'generic-bean' }, setup: { espressoMachine: 'other', espressoGrinder: 'preground', espressoBasket: 'dual-wall' }, doseGrams: 14 });
+assert.equal(preground.ok, true);
+assert.doesNotMatch(preground.recipe.grindGuidance, /adjust|finer|known espresso range/i);
+assert.equal(validateEspressoRecipe({ ...preground.recipe, grinderSetting: { ...preground.recipe.grinderSetting, value: 5 } }).valid, false);
+assert.equal(changedSetup.setupMismatch, true);
+assert.deepEqual(changedSetup.previousRecipe, saved.recipe);
+const builtinOther = buildEspressoRecipe({ bean: { id: 'generic-bean' }, setup: { espressoMachine: 'other', espressoMachineName: 'My machine', espressoGrinder: 'integrated' }, doseGrams: 20 }).recipe;
+assert.equal(validateEspressoRecipe(builtinOther).valid, true);
+assert.doesNotMatch(builtinOther.grindGuidance, /Barista|default/i);
+assert.equal(validateEspressoRecipe({ ...builtinOther, grinderSetting: { ...builtinOther.grinderSetting, value: 30, source: 'user_saved' } }).valid, true);
+const legacy = structuredClone(saved.recipe);
+delete legacy.recipeKind;
+delete legacy.doseBasis;
+assert.equal(validateEspressoRecipe(legacy).valid, true);
+console.log('espresso recipe tests: original and generic contracts passed');

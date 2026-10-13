@@ -25,7 +25,7 @@ import { Btn } from './Btn';
 import { Toast } from './Toast';
 import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { executeRecipeCommand } from '../lib/recipeCommands';
-import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
+import { editEspressoRecipe, espressoRecipeFingerprint, validateEspressoRecipe } from '../lib/espressoRecipes';
 import { espressoTastingContext } from '../lib/brewContext';
 
 const noop = () => {};
@@ -269,8 +269,17 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     setStep('photo');
   };
 
-  const handleSave = () => {
+  const handleSave = (espressoPatch = {}) => {
     if (!scanData || !onSaveToInventory) return;
+    let espressoForSave = null;
+    if (activeMethod === 'espresso' && espresso.espressoRecipe) {
+      const edited = editEspressoRecipe(espresso.espressoRecipe, espressoPatch);
+      if (edited.ok) espressoForSave = edited.recipe;
+      else if (espressoPatch.doseGrams != null || espressoPatch.yieldGrams != null) {
+        setToast(edited.errors?.join(' ') || 'Check your espresso targets.');
+        return;
+      }
+    }
     const handBrewForSave = handBrew.handBrewRecipe
       ? {
           ...handBrew.handBrewRecipe,
@@ -290,7 +299,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       handBrewRecipe: handBrewForSave,
       ...(handBrewForSave ? { handBrewRecipes: { [handBrewForSave.device || 'v60']: handBrewForSave } } : {}),
       ...(icedForSave ? { handBrewIcedRecipes: { [icedForSave.device || 'v60']: icedForSave } } : {}),
-      ...(activeMethod === 'espresso' && espresso.espressoRecipe ? { espressoRecipe: espresso.espressoRecipe } : {}),
+      ...(espressoForSave ? { espressoRecipe: espressoForSave } : {}),
       photo: photos[0] || null,
       scanPhotos: photos,
     };
@@ -331,7 +340,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         }
         const newId = await addBean(beanData);
         let espressoAttachFailed = false;
-        if (espresso.espressoRecipe) {
+        if (espresso.espressoRecipe && validateEspressoRecipe(espresso.espressoRecipe).valid) {
           // The scan bean is ephemeral until addBean returns its canonical id.
           // Attach the edited snapshot through the authenticated command so a
           // null coffeeId can never become a stored recipe projection.
@@ -538,6 +547,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             error={espresso.espressoError}
             phase={espresso.espressoPhase}
             notice={espresso.espressoNotice}
+            setupMismatch={espresso.espressoSetupMismatch}
+            onStartCurrentSetup={espresso.startEspressoForCurrentSetup}
             onRetry={espresso.onRetry}
             onRegenerate={espresso.onRegenerate}
             // A scanned bean has no owner bean id yet. Route Save through the

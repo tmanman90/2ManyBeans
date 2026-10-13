@@ -3,7 +3,7 @@ import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResol
 import { absentRecipeSourceHash, resolveRecipeSource } from '../../src/lib/ruphus/recipeSourceState.js';
 import { normalizeClientVersion } from './ruphusRollout.js';
 import { aidenProfileHash } from '../../src/lib/ruphus/aidenProfilePreview.js';
-import { espressoSetupKey, isSupportedEspressoSetup, validateEspressoRecipe } from '../../src/lib/espressoRecipes.js';
+import { espressoSetupKey, validateEspressoRecipe } from '../../src/lib/espressoRecipes.js';
 
 export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
 export const ORDINARY_MODES = Object.freeze(['replace_active_recipe', 'set_dose', 'set_aiden_grind', 'set_aiden_link']);
@@ -176,8 +176,8 @@ const assertEspressoCommand = (bean, command, ownerPreferences = null) => {
   if (command.recipe.coffeeId !== command.coffeeId) fail('invalid_recipe', 'The espresso recipe belongs to a different bean.');
   if (command.recipe.setupKey !== espressoSetupKey(command.recipe.setup)) fail('invalid_recipe', 'The espresso setup fingerprint is inconsistent.');
   const boundPreferences = ownerPreferences || null;
-  if (!boundPreferences) fail('invalid_recipe', 'The confirmed owner espresso setup is unavailable; refresh setup preferences before saving.');
-  if (!isSupportedEspressoSetup(boundPreferences) || espressoSetupKey(boundPreferences) !== command.recipe.setupKey) fail('invalid_recipe', 'The espresso setup is not the confirmed owner setup.');
+  if (!boundPreferences) fail('invalid_recipe', 'The owner espresso setup is unavailable; refresh equipment preferences before saving.');
+  if (espressoSetupKey(boundPreferences) !== command.recipe.setupKey) fail('invalid_recipe', 'The espresso recipe does not match the current owner equipment.');
 };
 const assertOrdinaryEspressoUndo = (state, current, command) => {
   if (command.mode !== 'undo_revision' || command.slotKey !== 'espresso' || command.clientIntent !== 'espresso_direct_undo') return;

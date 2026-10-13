@@ -24,6 +24,11 @@ test('espresso is a distinct brew category and never a manual device', () => {
 
 test('the verified setup keeps machine, basket, and grinder choices independent', () => {
   assert.equal(ESPRESSO_MACHINES.some(({ key }) => key === 'breville-barista-express'), true);
+  assert.equal(ESPRESSO_MACHINES.some(({ key }) => key === 'other'), true);
+  assert.equal(ESPRESSO_GRINDERS.some(({ key }) => key === 'unknown'), true);
+  assert.equal(ESPRESSO_GRINDERS.some(({ key }) => key === 'preground'), true);
+  assert.equal(ESPRESSO_BASKETS.some(({ key }) => key === 'dual-wall'), true);
+  assert.equal(DEFAULT_ESPRESSO_SETUP.espressoGrinder, null);
   assert.equal(ESPRESSO_BASKETS.some(({ key }) => key === 'stock-double-single-wall'), true);
   assert.equal(ESPRESSO_GRINDERS.some(({ key }) => key === 'integrated'), true);
   assert.equal(ESPRESSO_GRINDERS.some(({ key }) => key === 'external'), true);
@@ -44,6 +49,8 @@ test('the verified setup keeps machine, basket, and grinder choices independent'
     espressoSetupConfirmed: true,
   }), true);
   assert.equal(changesEspressoEquipmentIdentity('espressoMachine'), true);
+  assert.equal(changesEspressoEquipmentIdentity('espressoMachineName'), true);
+  assert.equal(changesEspressoEquipmentIdentity('espressoBasketDoseGrams'), true);
   assert.equal(changesEspressoEquipmentIdentity('espressoBasket'), true);
   assert.equal(changesEspressoEquipmentIdentity('espressoGrinder'), true);
 });

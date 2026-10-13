@@ -198,7 +198,7 @@ export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
     boundedLines.push(value); chars += separator + value.length;
     if (value.length < line.length) break;
   }
-  return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric', espressoMachine: setup.espressoMachine || null, espressoBasket: setup.espressoBasket || null, espressoGrinder: setup.espressoGrinder || null, espressoGrinderModel: setup.espressoGrinderModel || null, espressoGrinderCustomName: setup.espressoGrinderCustomName || null, espressoSetupConfirmed: setup.espressoSetupConfirmed === true }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
+  return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric', espressoMachine: setup.espressoMachine || null, espressoMachineName: setup.espressoMachineName || null, espressoBasketDoseGrams: setup.espressoBasketDoseGrams ?? null, espressoBasket: setup.espressoBasket || null, espressoGrinder: setup.espressoGrinder || null, espressoGrinderModel: setup.espressoGrinderModel || null, espressoGrinderCustomName: setup.espressoGrinderCustomName || null, espressoSetupConfirmed: setup.espressoSetupConfirmed === true }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
 }
 
 function recipeFailureMarker(record, launchItem = null) {

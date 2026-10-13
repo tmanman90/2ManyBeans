@@ -245,7 +245,7 @@ export default function OnboardingFlow({ user, profile, createProfile, completeO
 
       const { preferences: answerPrefs, ...answersWithoutPrefs } = answers;
       const prefsPatch = {};
-      const espressoPreferenceKeys = new Set(['espressoMachine', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName', 'espressoSetupConfirmed']);
+      const espressoPreferenceKeys = new Set(['espressoMachine', 'espressoMachineName', 'espressoBasket', 'espressoBasketDoseGrams', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName', 'espressoSetupConfirmed']);
       if (answerPrefs && typeof answerPrefs === 'object') {
         for (const [k, v] of Object.entries(answerPrefs)) {
           // Null is meaningful for the new espresso equipment fields: it is

@@ -9,7 +9,9 @@ import { C, fonts, shadows, radius, type as typeScale, glass, motion as motionTo
 import { haptic } from '../lib/haptics';
 import { Toast } from './Toast';
 import { usePreferences } from '../hooks/useUserProfile';
-import { BREW_DEVICES, ESPRESSO_BASKETS, ESPRESSO_GRINDERS, ESPRESSO_MACHINES, changesEspressoEquipmentIdentity } from '../lib/brewMethods';
+import { BREW_DEVICES } from '../lib/brewMethods';
+import { espressoSetupDescription } from '../lib/espressoRecipes';
+import { EspressoEquipmentEditor } from './EspressoEquipmentEditor';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
@@ -167,6 +169,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const { openPaywall } = usePaywall();
 
   const [toast, setToast] = useState(null);
+  const [editingEspressoEquipment, setEditingEspressoEquipment] = useState(false);
   const [editingDisplayName, setEditingDisplayName] = useState(false);
   const [displayNameValue, setDisplayNameValue] = useState('');
   const [editingUsername, setEditingUsername] = useState(false);
@@ -338,36 +341,6 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       setToast('Brew method updated');
     } catch (err) {
       console.error('[Settings] Brew method update failed:', err);
-      setToast('Failed to save, try again');
-    }
-  };
-
-  const handleEspressoSetupChange = async (key, value) => {
-    try {
-      const updates = { [key]: value };
-      if (key === 'espressoGrinder') {
-        if (value !== 'external') updates.espressoGrinderModel = null;
-        if (value !== 'custom') updates.espressoGrinderCustomName = null;
-      }
-      if (changesEspressoEquipmentIdentity(key)) updates.espressoSetupConfirmed = false;
-      await updatePreferences(updates);
-      haptic.light();
-      setToast('Espresso setup updated');
-    } catch (err) {
-      console.error('[Settings] Espresso setup update failed:', err);
-      setToast('Failed to save, try again');
-    }
-  };
-
-  const handleEspressoTextBlur = async (key, e) => {
-    const value = e.target.value.trim() || null;
-    if (value === (preferences[key] || null)) return;
-    try {
-      await updatePreferences({ [key]: value });
-      haptic.light();
-      setToast('Espresso setup updated');
-    } catch (err) {
-      console.error('[Settings] Espresso setup update failed:', err);
       setToast('Failed to save, try again');
     }
   };
@@ -918,7 +891,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             <div style={separatorStyle} />
             {/* Brew Method */}
             <div style={rowStyle}>
-              <span style={rowLabelStyle}>Brew Method</span>
+              <span style={rowLabelStyle}>Default brew method</span>
               <div style={rowValueStyle}>
                 <select
                   value={preferences.brewMethod}
@@ -935,101 +908,26 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               </div>
             </div>
             <div style={separatorStyle} />
-            {preferences.brewMethod === 'espresso' && (
-              <>
-                <div style={{ ...sectionHeaderStyle, padding: '12px 16px 6px' }}>Espresso setup</div>
-                <div style={rowStyle}>
-                  <span style={rowLabelStyle}>Machine</span>
-                  <div style={rowValueStyle}>
-                    <select
-                      aria-label="Espresso machine"
-                      value={preferences.espressoMachine || 'unknown'}
-                      onChange={(e) => handleEspressoSetupChange('espressoMachine', e.target.value)}
-                      style={selectStyle}
-                    >
-                      {ESPRESSO_MACHINES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-                    </select>
-                    <ChevronRight size={16} color={C.textLight} />
+            <div style={{ ...sectionHeaderStyle, padding: '12px 16px 6px' }}>Espresso equipment</div>
+            {editingEspressoEquipment ? (
+              <div style={{ padding: '12px 16px 18px' }}>
+                <EspressoEquipmentEditor
+                  onCancel={() => setEditingEspressoEquipment(false)}
+                  onSaved={() => { setEditingEspressoEquipment(false); setToast('Espresso equipment saved'); }}
+                />
+              </div>
+            ) : (
+              <button type="button" aria-label="Edit espresso equipment" onClick={() => setEditingEspressoEquipment(true)} style={{ ...rowStyle, width: '100%', border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left', minHeight: 64 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={rowLabelStyle}>{preferences.espressoMachine ? 'Your espresso setup' : 'Add your machine'}</div>
+                  <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                    {preferences.espressoMachine ? espressoSetupDescription(preferences) : 'Optional · tailor your espresso recipes'}
                   </div>
                 </div>
-                <div style={separatorStyle} />
-                <div style={rowStyle}>
-                  <span style={rowLabelStyle}>Basket</span>
-                  <div style={rowValueStyle}>
-                    <select
-                      aria-label="Espresso basket"
-                      value={preferences.espressoBasket || 'unknown'}
-                      onChange={(e) => handleEspressoSetupChange('espressoBasket', e.target.value)}
-                      style={selectStyle}
-                    >
-                      {ESPRESSO_BASKETS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-                    </select>
-                    <ChevronRight size={16} color={C.textLight} />
-                  </div>
-                </div>
-                <div style={separatorStyle} />
-                <label style={{ ...rowStyle, justifyContent: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    aria-label="Confirm Barista Express stock basket"
-                    checked={preferences.espressoSetupConfirmed === true}
-                    disabled={preferences.espressoMachine !== 'breville-barista-express' || preferences.espressoBasket !== 'stock-double-single-wall'}
-                    onChange={(e) => handleEspressoSetupChange('espressoSetupConfirmed', e.target.checked)}
-                    style={{ width: 20, height: 20, flex: '0 0 auto' }}
-                  />
-                  <span style={{ color: C.textMuted, fontSize: 13, lineHeight: 1.35 }}>Confirm this machine and stock double single-wall basket</span>
-                </label>
-                <div style={separatorStyle} />
-                <div style={rowStyle}>
-                  <span style={rowLabelStyle}>Espresso grinder</span>
-                  <div style={rowValueStyle}>
-                    <select
-                      aria-label="Espresso grinder"
-                      value={preferences.espressoGrinder || 'integrated'}
-                      onChange={(e) => handleEspressoSetupChange('espressoGrinder', e.target.value)}
-                      style={selectStyle}
-                    >
-                      {ESPRESSO_GRINDERS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-                    </select>
-                    <ChevronRight size={16} color={C.textLight} />
-                  </div>
-                </div>
-                {preferences.espressoGrinder === 'external' && (
-                  <div style={{ ...rowStyle, gap: 12 }}>
-                    <span style={rowLabelStyle}>External model</span>
-                    <input
-                      type="text"
-                      aria-label="External espresso grinder model"
-                      defaultValue={preferences.espressoGrinderModel || ''}
-                      onBlur={(e) => handleEspressoTextBlur('espressoGrinderModel', e)}
-                      placeholder="Optional"
-                      maxLength={80}
-                      style={{ ...compactInputStyle, flex: 1, minWidth: 0, fontFamily: fonts.body, fontSize: 16, color: C.text, background: C.bgDeep, border: `1px solid ${C.border}`, borderRadius: radius.sm, padding: '8px 12px', textAlign: 'right', outline: 'none' }}
-                    />
-                  </div>
-                )}
-                {preferences.espressoGrinder === 'custom' && (
-                  <div style={{ ...rowStyle, gap: 12 }}>
-                    <span style={rowLabelStyle}>Custom grinder</span>
-                    <input
-                      type="text"
-                      aria-label="Custom espresso grinder name"
-                      defaultValue={preferences.espressoGrinderCustomName || ''}
-                      onBlur={(e) => handleEspressoTextBlur('espressoGrinderCustomName', e)}
-                      placeholder="Your grinder"
-                      maxLength={80}
-                      style={{ ...compactInputStyle, flex: 1, minWidth: 0, fontFamily: fonts.body, fontSize: 16, color: C.text, background: C.bgDeep, border: `1px solid ${C.border}`, borderRadius: radius.sm, padding: '8px 12px', textAlign: 'right', outline: 'none' }}
-                    />
-                  </div>
-                )}
-                {preferences.espressoBasket === 'different' && (
-                  <div style={{ padding: '4px 16px 12px', color: C.textMuted, fontSize: 13, lineHeight: 1.45 }}>
-                    The verified Barista Express recipe is unavailable for this basket. Use chat for generic espresso guidance.
-                  </div>
-                )}
-                <div style={separatorStyle} />
-              </>
+                <ChevronRight size={18} color={C.accent} style={{ flexShrink: 0 }} />
+              </button>
             )}
+            <div style={separatorStyle} />
             {/* Grind Size Display */}
             <div style={rowStyle}>
               <span style={rowLabelStyle}>Grind Size Display</span>

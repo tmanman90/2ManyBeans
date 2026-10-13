@@ -98,3 +98,33 @@ test('milk tasting stays in history but is excluded from pure-bean palate trends
   assert.doesNotMatch(summary, /sweetness 4\.8/);
   assert.doesNotMatch(summary, /milkshake/);
 });
+
+test('generic espresso tasting with Aiden default preserves unknowns and its own equipment', () => {
+  const context = resolveBrewContext({
+    method: 'espresso',
+    preferences: { brewMethod: 'aiden', grinder: 'fellow-ode-gen2', espressoMachine: 'other', espressoMachineName: 'My machine', espressoBasket: 'different', espressoBasketDoseGrams: 20, espressoGrinder: null },
+    recipe: { method: 'espresso', recipeKind: 'generic', doseBasis: 'unselected', doseGrams: null, yieldGrams: null, ratio: 2, temperature: { mode: 'unreported', unit: null, offsetF: null }, source: 'generic_framework' },
+  });
+  assert.equal(context.method, 'espresso');
+  assert.equal(context.equipment.machineName, 'My machine');
+  assert.equal(context.equipment.basketDoseGrams, 20);
+  assert.equal(context.equipment.grinder, undefined);
+  assert.equal(context.recipeSnapshot.doseGrams, undefined);
+  assert.equal(context.recipeSnapshot.yieldGrams, undefined);
+  assert.equal(context.recipeSnapshot.recipeKind, 'generic');
+  assert.doesNotMatch(formatBrewContext(context), /Ode|machine default|0°F|18g|36g|Aiden/);
+  const frozen = structuredClone(context);
+  context.equipment.machineName = 'Another machine';
+  assert.equal(frozen.equipment.machineName, 'My machine');
+});
+test('grinder-only espresso equipment survives repeated and historical snapshot normalization', () => {
+  for (const equipment of [{ grinder: 'external', grinderModel: 'DF64' }, { grinder: 'preground' }, { grinder: 'custom', grinderCustomName: 'My espresso grinder' }]) {
+    const context = resolveBrewContext({ method: 'espresso', setup: {
+      espressoGrinder: equipment.grinder, espressoGrinderModel: equipment.grinderModel,
+      espressoGrinderCustomName: equipment.grinderCustomName,
+    } });
+    assert.deepEqual(context.equipment, equipment);
+    assert.deepEqual(snapshotBrewContext(context).equipment, equipment);
+    assert.deepEqual(snapshotBrewContext({ version: 1, method: 'espresso', equipment }).equipment, equipment);
+  }
+});

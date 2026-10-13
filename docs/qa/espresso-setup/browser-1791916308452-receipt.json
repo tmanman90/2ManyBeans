@@ -1,0 +1,391 @@
+{
+  "status": "failed",
+  "checks": [
+    "Aiden default opens useful generic espresso with no invented dose or setup error; chat available",
+    "Generic20/40 persists through authenticated command; actual controls fit320/390/1280",
+    "Actual recipe-to-chat handoff and provider advice leave generic recipe unchanged with Aiden default",
+    "Inline equipment saves independent espresso preferences, returns to same coffee, preserves earlier recipe and external unknown setting"
+  ],
+  "errors": [
+    "Expected values to be strictly equal:\n\n'20' !== '18'\n"
+  ],
+  "requests": [
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "a953c142-18f1-4e1f-a82b-a7c2683367a6",
+        "mode": "replace_active_recipe",
+        "coffeeId": "browser-a",
+        "slotKey": "espresso",
+        "recipe": {
+          "schemaVersion": 1,
+          "engine": "espresso-baseline-2026-10-12",
+          "method": "espresso",
+          "device": "espresso",
+          "mode": "hot",
+          "slotKey": "espresso",
+          "coffeeId": "browser-a",
+          "setup": {
+            "machine": null,
+            "basket": null,
+            "grinder": null,
+            "grinderModel": null,
+            "grinderCustomName": null
+          },
+          "setupKey": "d3c54ffbb78bf592",
+          "setupDescription": "Machine not set · Basket not set · Grinder not set",
+          "recipeKind": "generic",
+          "doseBasis": "user_selected",
+          "doseGrams": 20,
+          "yieldGrams": 40,
+          "ratio": 2,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "grindGuidance": "Choose a grinder when you want guidance for its espresso settings.",
+          "grinderSetting": {
+            "grinder": "unknown",
+            "model": null,
+            "value": null,
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "unreported",
+            "offsetF": null,
+            "supportedOffsetsF": [],
+            "unit": null,
+            "source": "unreported"
+          },
+          "preparation": [
+            "Warm the machine and prepare your basket.",
+            "Distribute the grounds evenly and tamp level.",
+            "Weigh the espresso as it brews; stop near your target and taste."
+          ],
+          "roastLevel": "medium",
+          "source": "user_saved",
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "userAdjustedFields": [
+            "doseGrams"
+          ],
+          "generatedAt": "2026-10-13T18:31:59.465Z",
+          "fingerprint": "e96cd82c45c9e606",
+          "originalProvenance": {
+            "kind": "generic_framework",
+            "label": "General espresso starting point"
+          }
+        },
+        "patch": {
+          "espressoRecipe": {
+            "schemaVersion": 1,
+            "engine": "espresso-baseline-2026-10-12",
+            "method": "espresso",
+            "device": "espresso",
+            "mode": "hot",
+            "slotKey": "espresso",
+            "coffeeId": "browser-a",
+            "setup": {
+              "machine": null,
+              "basket": null,
+              "grinder": null,
+              "grinderModel": null,
+              "grinderCustomName": null
+            },
+            "setupKey": "d3c54ffbb78bf592",
+            "setupDescription": "Machine not set · Basket not set · Grinder not set",
+            "recipeKind": "generic",
+            "doseBasis": "user_selected",
+            "doseGrams": 20,
+            "yieldGrams": 40,
+            "ratio": 2,
+            "timeRangeSeconds": [
+              25,
+              30
+            ],
+            "timeBasis": "machine_start_to_stop",
+            "grindGuidance": "Choose a grinder when you want guidance for its espresso settings.",
+            "grinderSetting": {
+              "grinder": "unknown",
+              "model": null,
+              "value": null,
+              "unit": "machine_setting",
+              "source": "unreported"
+            },
+            "temperature": {
+              "mode": "unreported",
+              "offsetF": null,
+              "supportedOffsetsF": [],
+              "unit": null,
+              "source": "unreported"
+            },
+            "preparation": [
+              "Warm the machine and prepare your basket.",
+              "Distribute the grounds evenly and tamp level.",
+              "Weigh the espresso as it brews; stop near your target and taste."
+            ],
+            "roastLevel": "medium",
+            "source": "user_saved",
+            "provenance": {
+              "kind": "user_saved",
+              "label": "Saved recipe"
+            },
+            "userAdjustedFields": [
+              "doseGrams"
+            ],
+            "generatedAt": "2026-10-13T18:31:59.465Z",
+            "fingerprint": "e96cd82c45c9e606",
+            "originalProvenance": {
+              "kind": "generic_framework",
+              "label": "General espresso starting point"
+            }
+          }
+        },
+        "expectedRevisionHash": "4921259d9e3de9e9",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    },
+    {
+      "path": "/api/ruphus-agent"
+    },
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "6e981b6b-9577-4d53-8e2d-4ccd324ae1c9",
+        "mode": "replace_active_recipe",
+        "coffeeId": "browser-a",
+        "slotKey": "espresso",
+        "recipe": {
+          "schemaVersion": 1,
+          "engine": "espresso-baseline-2026-10-12",
+          "method": "espresso",
+          "device": "espresso",
+          "mode": "hot",
+          "slotKey": "espresso",
+          "coffeeId": "browser-a",
+          "setup": {
+            "machine": "other",
+            "basket": "different",
+            "grinder": "external",
+            "grinderModel": "DF64",
+            "grinderCustomName": null,
+            "machineName": "My machine",
+            "basketDoseGrams": 20
+          },
+          "setupKey": "310430b966f5ba89",
+          "setupDescription": "My machine · Different basket · External grinder · DF64",
+          "recipeKind": "generic",
+          "doseBasis": "basket_guidance",
+          "doseGrams": 20,
+          "yieldGrams": 40,
+          "ratio": 2,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "grindGuidance": "Use your grinder’s own espresso guidance and adjust by taste after a measured shot. No cross-grinder conversion is applied.",
+          "grinderSetting": {
+            "grinder": "external",
+            "model": "DF64",
+            "value": null,
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "unreported",
+            "offsetF": null,
+            "supportedOffsetsF": [],
+            "unit": null,
+            "source": "unreported"
+          },
+          "preparation": [
+            "Warm the machine and prepare your basket.",
+            "Distribute the grounds evenly and tamp level.",
+            "Weigh the espresso as it brews; stop near your target and taste."
+          ],
+          "roastLevel": "medium",
+          "source": "user_saved",
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "userAdjustedFields": [],
+          "generatedAt": "2026-10-13T18:32:08.245Z",
+          "fingerprint": "a22ffd78c718ca93",
+          "originalProvenance": {
+            "kind": "generic_framework",
+            "label": "General espresso starting point"
+          }
+        },
+        "patch": {
+          "espressoRecipe": {
+            "schemaVersion": 1,
+            "engine": "espresso-baseline-2026-10-12",
+            "method": "espresso",
+            "device": "espresso",
+            "mode": "hot",
+            "slotKey": "espresso",
+            "coffeeId": "browser-a",
+            "setup": {
+              "machine": "other",
+              "basket": "different",
+              "grinder": "external",
+              "grinderModel": "DF64",
+              "grinderCustomName": null,
+              "machineName": "My machine",
+              "basketDoseGrams": 20
+            },
+            "setupKey": "310430b966f5ba89",
+            "setupDescription": "My machine · Different basket · External grinder · DF64",
+            "recipeKind": "generic",
+            "doseBasis": "basket_guidance",
+            "doseGrams": 20,
+            "yieldGrams": 40,
+            "ratio": 2,
+            "timeRangeSeconds": [
+              25,
+              30
+            ],
+            "timeBasis": "machine_start_to_stop",
+            "grindGuidance": "Use your grinder’s own espresso guidance and adjust by taste after a measured shot. No cross-grinder conversion is applied.",
+            "grinderSetting": {
+              "grinder": "external",
+              "model": "DF64",
+              "value": null,
+              "unit": "machine_setting",
+              "source": "unreported"
+            },
+            "temperature": {
+              "mode": "unreported",
+              "offsetF": null,
+              "supportedOffsetsF": [],
+              "unit": null,
+              "source": "unreported"
+            },
+            "preparation": [
+              "Warm the machine and prepare your basket.",
+              "Distribute the grounds evenly and tamp level.",
+              "Weigh the espresso as it brews; stop near your target and taste."
+            ],
+            "roastLevel": "medium",
+            "source": "user_saved",
+            "provenance": {
+              "kind": "user_saved",
+              "label": "Saved recipe"
+            },
+            "userAdjustedFields": [],
+            "generatedAt": "2026-10-13T18:32:08.245Z",
+            "fingerprint": "a22ffd78c718ca93",
+            "originalProvenance": {
+              "kind": "generic_framework",
+              "label": "General espresso starting point"
+            }
+          }
+        },
+        "expectedRevisionId": "revision_a953c142-18f1-4e1f-a82b-a7c2683367a6",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    }
+  ],
+  "providerCalls": [
+    {
+      "requestedModel": "gpt-5.6-luna",
+      "status": "completed",
+      "requestId": "resp_02dc93eff8c16c3e016ace79215fe487d0802985483926dfb7",
+      "servedModel": "gpt-5.6-luna",
+      "usage": {
+        "input_tokens": 6795,
+        "input_tokens_details": {
+          "cache_write_tokens": 6792,
+          "cached_tokens": 0
+        },
+        "output_tokens": 87,
+        "output_tokens_details": {
+          "reasoning_tokens": 50
+        },
+        "total_tokens": 6882
+      },
+      "output": [
+        {
+          "id": "fc_02dc93eff8c16c3e016ace7922eb5887d0ac6b10d6527f5cf6",
+          "type": "function_call",
+          "status": "completed",
+          "arguments": "{\"coffeeRef\":\"cdf645a9a\",\"windowDays\":null,\"slot\":\"espresso\"}",
+          "call_id": "call_Ch7wA2oMLbt4sBaVboUgr35I",
+          "name": "read_coffee_evidence"
+        }
+      ]
+    },
+    {
+      "requestedModel": "gpt-5.6-luna",
+      "status": "completed",
+      "requestId": "resp_02dc93eff8c16c3e016ace7923ac6887d0917d5de6a81db385",
+      "servedModel": "gpt-5.6-luna",
+      "usage": {
+        "input_tokens": 7594,
+        "input_tokens_details": {
+          "cache_write_tokens": 7591,
+          "cached_tokens": 0
+        },
+        "output_tokens": 204,
+        "output_tokens_details": {
+          "reasoning_tokens": 97
+        },
+        "total_tokens": 7798
+      },
+      "output": [
+        {
+          "id": "msg_02dc93eff8c16c3e016ace792647b087d0ba4b2988afa9bf45",
+          "type": "message",
+          "status": "completed",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": "{\"intent\":\"information\",\"state\":\"answered\",\"text\":\"Yes—20 g in and 40 g out is a sensible generic 1:2 espresso starting point, provided your basket is designed for roughly 20 g. Use about 25–30 seconds from machine start to stop as a beginner guide, then taste and adjust; your Aiden default does not affect this espresso setup. I haven’t saved anything.\",\"coffeeRef\":\"cdf645a9a\",\"slot\":\"espresso\"}"
+            }
+          ],
+          "phase": "final_answer",
+          "role": "assistant"
+        }
+      ]
+    }
+  ],
+  "proof": "Actual App entrypoint/providers, actual Auth/Firestore and recipe-command; synthetic account; one actual configured chat; optional tasting AI unavailable503; browser fixture is not native phone proof"
+}

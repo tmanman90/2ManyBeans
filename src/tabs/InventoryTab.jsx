@@ -31,7 +31,7 @@ import { haptic } from '../lib/haptics';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
 import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { espressoTastingContext } from '../lib/brewContext';
-import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
+import { espressoHasUnsavedEdits } from '../lib/espressoUi';
 
 // Secondary Liquid-Glass pill for the rail card footer (matches the Rotation footer).
 // Spreads ...rest so long-press handlers (Brew) pass through.
@@ -114,14 +114,13 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
     const bean = espresso.espressoBean;
     if (!bean?.id || !onOpenRuphus) return;
     const revisionId = bean.activeRevisionIds?.espresso;
-    const hasUnsavedTarget = Boolean(espresso.espressoRecipe && (!bean.espressoRecipe
-      || espressoRecipeFingerprint(espresso.espressoRecipe) !== espressoRecipeFingerprint(bean.espressoRecipe)));
-    if (hasUnsavedTarget) return;
+    const hasUnsavedTarget = espressoHasUnsavedEdits(espresso.espressoRecipe, bean.espressoRecipe);
+    if (hasUnsavedTarget || espresso.espressoSetupMismatch) return;
     onOpenRuphus({
       coffeeRef: bean.id,
       surface: 'recipe_espresso',
       launchMethod: 'espresso',
-      ...(revisionId ? { launchItem: { kind: 'recipe', ref: revisionId, method: 'espresso' } } : {}),
+      ...(revisionId && bean.espressoRecipe?.setupKey === espresso.espressoRecipe?.setupKey ? { launchItem: { kind: 'recipe', ref: revisionId, method: 'espresso' } } : {}),
     });
   };
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
@@ -575,6 +574,8 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
         error={espresso.espressoError}
         phase={espresso.espressoPhase}
         notice={espresso.espressoNotice}
+        setupMismatch={espresso.espressoSetupMismatch}
+        onStartCurrentSetup={espresso.startEspressoForCurrentSetup}
         onRetry={espresso.onRetry}
         onRegenerate={espresso.onRegenerate}
         onSave={espresso.saveEspressoRecipe}

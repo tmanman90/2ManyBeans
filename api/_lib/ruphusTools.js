@@ -693,7 +693,7 @@ function modelRecipe(recipe) {
   const result = {};
   for (const key of Object.keys(RECIPE_PROPERTIES)) if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
   if (recipe.slotKey === 'espresso' || recipe.method === 'espresso') {
-    for (const key of ['schemaVersion', 'engine', 'slotKey', 'coffeeId', 'setup', 'setupKey', 'setupDescription', 'doseGrams', 'yieldGrams', 'ratio', 'timeRangeSeconds', 'timeBasis', 'grindGuidance', 'grinderSetting', 'temperature', 'preparation', 'roastLevel', 'source', 'provenance', 'originalProvenance', 'userAdjustedFields', 'fingerprint']) {
+    for (const key of ['schemaVersion', 'engine', 'slotKey', 'coffeeId', 'setup', 'setupKey', 'setupDescription', 'recipeKind', 'doseBasis', 'doseGrams', 'yieldGrams', 'ratio', 'timeRangeSeconds', 'timeBasis', 'grindGuidance', 'grinderSetting', 'temperature', 'preparation', 'roastLevel', 'source', 'provenance', 'originalProvenance', 'userAdjustedFields', 'fingerprint']) {
       if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
     }
   }
@@ -1192,6 +1192,11 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       // an absent slot. Convert the reader's private validity annotation into
       // a safe tool marker so it cannot become a proposal target.
       if (recipe?.validationStatus === 'invalid') return { code: 'recipe_invalid', slotKey, sourceState: 'present' };
+      if (slotKey === 'espresso' && recipe?.code === 'recipe_missing' && typeof readers.readCoffee === 'function') {
+        const bean = await readers.readCoffee({ uid, coffeeId });
+        const resolved = bean ? resolveEspressoRecipe({ bean, setup: snapshot.setup || {} }) : null;
+        if (resolved?.ok) return { ...resolved.recipe, ...(resolved.setupMismatch ? { setupMismatch: true, previousRecipe: resolved.previousRecipe } : {}) };
+      }
       return recipe;
     }
     return null;
@@ -1212,6 +1217,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     delete next.selectedPath;
     delete next.selectedHash;
     delete next.validationStatus;
+    delete next.setupMismatch;
+    delete next.previousRecipe;
     return next;
   };
   // This is model-facing status only; the undo command still rechecks owner,
@@ -1532,7 +1539,6 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       }
       if (!explicitEspressoRequest('save', args, { retryRecord })) return { ok: false, code: 'espresso_save_requires_explicit_request', message: 'I can explain or suggest an espresso change, but I only save it after a direct request.' };
       const setup = context.rotationSnapshot?.setup || {};
-      if (setup.espressoSetupConfirmed !== true) return { ok: false, code: 'espresso_setup_unconfirmed', message: 'Confirm your espresso machine, basket, and grinder before saving numeric targets.' };
       const bean = typeof readers.readCoffee === 'function' ? await readers.readCoffee({ uid, coffeeId }) : null;
       const activeRevisionId = bean?.activeRevisionIds?.espresso || null;
       const setupKey = espressoSetupKey(setup);
@@ -1564,12 +1570,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         if (baseline.ok) current = espressoRecipeForCommand(baseline.recipe);
       }
       if (!current) return { ok: false, code: currentRead?.code || 'recipe_unavailable', message: 'I could not verify the current espresso recipe. Nothing was changed.' };
+      if (current.doseGrams == null && args.doseGrams == null) return { ok: false, code: 'espresso_dose_required', message: 'What coffee dose does your basket use? I need that before saving an output target; your recipe is unchanged.' };
       let next = current;
       if (args.doseGrams != null || args.yieldGrams != null) {
-        const edited = editEspressoRecipe(current, { doseGrams: args.doseGrams ?? current.doseGrams, yieldGrams: args.yieldGrams ?? current.yieldGrams });
+        const edited = editEspressoRecipe(current, { ...(args.doseGrams == null ? {} : { doseGrams: args.doseGrams }), ...((args.yieldGrams ?? current.yieldGrams) == null ? {} : { yieldGrams: args.yieldGrams ?? current.yieldGrams }) });
         if (!edited.ok) {
           if (retryRequested && retryRecord) await invalidatePersistedEspressoRetry(retryRecord, 'stale');
-          return { ok: false, code: edited.code || 'invalid_recipe', message: 'Those espresso masses are outside the supported bounds; nothing was saved.' };
+          return { ok: false, code: edited.code || 'invalid_recipe', message: 'Those espresso targets need a positive basket-appropriate dose and matching output ratio; nothing was saved.' };
         }
         next = edited.recipe;
       } else next = { ...current, source: 'user_saved', originalProvenance: current.originalProvenance || current.provenance || null, provenance: { kind: 'user_saved', label: 'Saved recipe' }, userAdjustedFields: [...new Set(current.userAdjustedFields || [])] };
@@ -2083,13 +2090,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         ? await currentEspressoUndoReceipt(coffeeId, recipe)
         : null;
       const recipeSummary = slotKey === 'espresso'
-        ? `${recipe.doseGrams ?? '?'}g in to ${recipe.yieldGrams ?? '?'}g out`
+        ? recipe.doseGrams == null ? `general espresso starting point at 1:${recipe.ratio}; coffee dose and output mass are not selected. Ask for the basket’s recommended or usual dose before choosing an absolute mass; equipment can remain unknown` : `${recipe.doseGrams}g in to ${recipe.yieldGrams}g out`
         : `${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water`;
       if (!currentReview && needsConfigurationDraft(context, recipe, slotKey)) {
         return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, sourceState: 'present', recipe: modelRecipe(recipe), creation: firstRecipeCreation(slotKey), preparingNewConfiguration: true,
           summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. If the user wants a recipe, the requested ${displayName} can be prepared here with propose_recipe_change, intent recipe_preview and servingDoseGrams. For an informational question, answer without proposing. The saved recipe remains unchanged until confirmation.` };
       }
-      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, recentBrews, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(reversibleReceipt ? { undoAvailable: true, reversibleAction: { action: 'undo_espresso_recipe', message: 'An authenticated current espresso save receipt is available. If the user explicitly asks to undo or put this save back, call undo_espresso_recipe for this coffee and setup.' } } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipeSummary}.${reversibleReceipt ? ' An authenticated current espresso save receipt is available; an explicit undo request can use undo_espresso_recipe.' : ''}`, recipe: modelRecipe(recipe) };
+      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, recentBrews, ...(recipe.setupMismatch ? { setupMismatch: true, previousRecipe: modelRecipe(recipe.previousRecipe), equipmentMessage: 'The prior saved recipe belongs to different equipment and remains unchanged. This is a new starting point for the current equipment.' } : {}), ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(reversibleReceipt ? { undoAvailable: true, reversibleAction: { action: 'undo_espresso_recipe', message: 'An authenticated current espresso save receipt is available. If the user explicitly asks to undo or put this save back, call undo_espresso_recipe for this coffee and setup.' } } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipeSummary}.${reversibleReceipt ? ' An authenticated current espresso save receipt is available; an explicit undo request can use undo_espresso_recipe.' : ''}`, recipe: modelRecipe(recipe) };
     }
     const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
     const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
@@ -2408,7 +2415,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, one servingDoseGrams-only resize (or one serving size paired with one control/technique), one explicitly selected source-backed technique experiment, or a complete Aiden profile for a verified absent Aiden slot. The optional aidenProfile must be a complete profile when creating that first Aiden draft; never send a partial profile or manual pour-over fields. Allowed recipe controls are dose, water, grind, temperature, and ratio; a verified absent manual slot separately reports which first-recipe controls/configurations are available. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: { type: 'string', enum: ['recipe_preview', 'information'] }, baseline: nullable({ type: 'string', description: 'A verified recentBrews brewRef for an experiment on a completed cup; current_review for editing an untried draft; saved_recipe for the saved recipe. Required when completed brews exist. Never treat an untried proposal as tasted.' }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), aidenProfile: nullable(AIDEN_DRAFT_SCHEMA), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string', maxLength: 280, description: 'Brief reason for this test, within 280 characters so it can be shown with the card. Distinguish measured time from planned time and acknowledge uncertainty.' }) }, required: ['coffeeRef', 'slot', 'intent', 'baseline', 'change', 'servingDoseGrams', 'aidenProfile', 'experiment', 'explanation'], additionalProperties: false } };
   });
   definitions.push(
-    { type: 'function', name: 'save_espresso_recipe', description: 'Save one explicit espresso recipe adjustment after reading the exact current espresso recipe. This is the only conversational save tool: use it only when the user explicitly asks to save, apply, or make the change. Preserve every field not requested. Provide exact saved fields in the response; do not save observations or a shot log. Use null for untouched fields.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['espresso'] }, doseGrams: nullable({ type: 'number' }), yieldGrams: nullable({ type: 'number' }), grinderValue: nullable({ anyOf: [{ type: 'number' }, { type: 'string' }] }), temperatureOffsetF: nullable({ type: 'integer', enum: [-4, -2, 0, 2, 4] }) }, required: ['coffeeRef', 'slot', 'doseGrams', 'yieldGrams', 'grinderValue', 'temperatureOffsetF'], additionalProperties: false } },
+    { type: 'function', name: 'save_espresso_recipe', description: 'Save one explicit espresso recipe adjustment after reading the exact current espresso recipe or general framework. Missing equipment is valid; a concrete positive basket-appropriate dose is required. A dose on an incomplete general framework derives output from its ratio. Generic recipes do not use Breville temperature offsets, and unknown/preground grinders never receive invented settings. This is the only conversational save tool: use it only when the user explicitly asks to save, apply, or make the change. Preserve every field not requested. Provide exact saved fields in the response; do not save observations or a shot log. Use null for untouched fields.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['espresso'] }, doseGrams: nullable({ type: 'number' }), yieldGrams: nullable({ type: 'number' }), grinderValue: nullable({ anyOf: [{ type: 'number' }, { type: 'string' }] }), temperatureOffsetF: nullable({ type: 'integer', enum: [-4, -2, 0, 2, 4] }) }, required: ['coffeeRef', 'slot', 'doseGrams', 'yieldGrams', 'grinderValue', 'temperatureOffsetF'], additionalProperties: false } },
     { type: 'function', name: 'undo_espresso_recipe', description: 'Undo the latest explicit espresso save for the exact coffee and setup when the user explicitly asks to undo it. Use only after a saved espresso action receipt; never undo another brewer or a stale revision.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['espresso'] } }, required: ['coffeeRef', 'slot'], additionalProperties: false } },
   );
   return Object.freeze({ names: Object.freeze([...RUPHUS_READ_TOOL_NAMES, ...RUPHUS_ESPRESSO_TOOL_NAMES]), definitions, call });

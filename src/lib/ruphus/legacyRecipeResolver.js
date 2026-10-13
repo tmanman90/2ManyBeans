@@ -36,6 +36,7 @@ const validator = (recipe, slotKey) => hasManualSourceProjection(recipe) ? valid
 export function canonicalRecipeSnapshot(recipe, slotKey) { const normalized = normalize(recipe, slotKey); const canonical = clone(normalized); delete canonical.userCoffeeGrams; delete canonical.aidenGrind; return { ...normalized, recipeHash: canonicalHash(canonical) }; }
 export function validateExecutableRecipe(recipe, slotKey) {
   const normalized = normalize(recipe, slotKey);
+  if (slotKey === 'espresso') return validateEspressoRecipe(normalized);
   const generic = validateRecipeSnapshot(normalized);
   if (!generic.valid) return generic;
   // New source projections own their typed stage/clock contract. Calling a

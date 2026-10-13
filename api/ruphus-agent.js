@@ -13,6 +13,7 @@ import { recentProposalReviews } from '../src/lib/ruphus/proposalContinuity.js';
 import { isAgentAccessAllowed, isMutationAllowed, normalizeTelemetryUsage, persistRuphusTrace } from './_lib/ruphusRollout.js';
 import { normalizeAgentSession, prepareSession, sessionAge } from '../src/lib/ruphus/session.js';
 import { boundLedger, MAX_LEDGER_BYTES } from './_lib/ruphusEvidence.js';
+import { resolveEspressoRecipe, espressoSetupKey } from '../src/lib/espressoRecipes.js';
 import { answeredSensoryClarifier as hasSensoryAnswer } from './_lib/ruphusSensoryAnswer.js';
 
 export const allowedAgentUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_UIDS || '').split(',').map((uid) => uid.trim()).filter(Boolean));
@@ -283,6 +284,18 @@ function firestoreReaders(db) {
     async readRecipe({ uid, coffeeId, slotKey, slot, launchItem }) {
       const bean = await readCoffee({ uid, coffeeId }); if (!bean) return null;
       const requested = slotKey || slot;
+      if (requested === 'espresso' && !launchItem) {
+        const profile = await db.collection('users').doc(uid).get();
+        const preferences = profile?.exists ? profile.data()?.preferences || {} : {};
+        const resolved = resolveEspressoRecipe({ bean, setup: preferences });
+        const sameActiveSetup = bean.espressoRecipe?.setupKey === espressoSetupKey(preferences);
+        // Preserve canonical active revision authority when this setup owns it.
+        // A different setup's saved recipe is history, never a silent conversion.
+        if (!sameActiveSetup || !bean.activeRevisionIds?.espresso) {
+          if (!resolved.ok) return { code: resolved.code };
+          return { ...resolved.recipe, ...(resolved.cached ? { selectedPath: `espressoRecipesBySetup.${resolved.recipe.setupKey}`, selectedHash: resolved.recipe.recipeHash || resolved.recipe.fingerprint } : {}), ...(resolved.setupMismatch ? { setupMismatch: true, previousRecipe: resolved.previousRecipe } : {}) };
+        }
+      }
       const revisionId = launchItem?.kind === 'recipe' ? launchItem.ref : bean.activeRevisionIds?.[requested] || null;
       if (revisionId) {
         const revision = await db.collection('users').doc(uid).collection('recipeRevisions').doc(revisionId).get();
@@ -339,7 +352,7 @@ function firestoreReaders(db) {
       const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
       const rawMethod = preferences.brewMethod || preferences.defaultMethod || profile.brewMethod || profile.defaultMethod || null;
       const defaultMethod = rawMethod === 'handbrew' ? 'v60_hot' : SLOT_KEYS.includes(rawMethod) ? rawMethod : rawMethod === 'v60' ? 'v60_hot' : rawMethod === 'kalita' ? 'kalita_hot' : rawMethod === 'aiden' ? 'aiden' : null;
-      return { ...(defaultMethod ? { defaultMethod } : {}), ...(preferences.grinderCustomName || preferences.grinder ? { grinder: preferences.grinderCustomName || preferences.grinder } : {}), units: preferences.units || preferences.unitSystem || 'metric', ...(preferences.espressoMachine ? { espressoMachine: preferences.espressoMachine } : {}), ...(preferences.espressoBasket ? { espressoBasket: preferences.espressoBasket } : {}), ...(preferences.espressoGrinder ? { espressoGrinder: preferences.espressoGrinder } : {}), ...(preferences.espressoGrinderModel ? { espressoGrinderModel: preferences.espressoGrinderModel } : {}), ...(preferences.espressoGrinderCustomName ? { espressoGrinderCustomName: preferences.espressoGrinderCustomName } : {}), espressoSetupConfirmed: preferences.espressoSetupConfirmed === true };
+      return { ...(defaultMethod ? { defaultMethod } : {}), ...(preferences.grinderCustomName || preferences.grinder ? { grinder: preferences.grinderCustomName || preferences.grinder } : {}), units: preferences.units || preferences.unitSystem || 'metric', ...(preferences.espressoMachine ? { espressoMachine: preferences.espressoMachine } : {}), ...(preferences.espressoMachineName ? { espressoMachineName: preferences.espressoMachineName } : {}), ...(preferences.espressoBasketDoseGrams != null ? { espressoBasketDoseGrams: preferences.espressoBasketDoseGrams } : {}), ...(preferences.espressoBasket ? { espressoBasket: preferences.espressoBasket } : {}), ...(preferences.espressoGrinder ? { espressoGrinder: preferences.espressoGrinder } : {}), ...(preferences.espressoGrinderModel ? { espressoGrinderModel: preferences.espressoGrinderModel } : {}), ...(preferences.espressoGrinderCustomName ? { espressoGrinderCustomName: preferences.espressoGrinderCustomName } : {}), espressoSetupConfirmed: preferences.espressoSetupConfirmed === true };
     },
     async readLaunchItem({ uid, item, coffeeRef = null, coffees = [] }) {
       if (!item?.kind || !item?.ref) return { ok: false, code: 'invalid_launch_item' };

@@ -54,18 +54,22 @@ export const GRINDER_LABELS = {
 // either the machine's integrated grinder or a separately named grinder for
 // espresso.
 export const ESPRESSO_MACHINES = [
-  { key: 'unknown', label: 'Choose your machine' },
+  { key: 'unknown', label: 'Not sure' },
   { key: 'breville-barista-express', label: 'Breville Barista Express' },
+  { key: 'other', label: 'Other espresso machine' },
 ];
 
 export const ESPRESSO_BASKETS = [
-  { key: 'unknown', label: 'Choose your basket', supported: false },
+  { key: 'unknown', label: 'Not sure', supported: false },
   { key: 'stock-double-single-wall', label: 'Stock double · single-wall', supported: true },
+  { key: 'dual-wall', label: 'Dual-wall basket', supported: false },
   { key: 'different', label: "I'm using a different basket", supported: false },
 ];
 
 export const ESPRESSO_GRINDERS = [
-  { key: 'integrated', label: 'Barista Express built-in grinder' },
+  { key: 'unknown', label: 'Not sure' },
+  { key: 'integrated', label: 'Built-in grinder' },
+  { key: 'preground', label: 'Preground coffee' },
   { key: 'external', label: 'External grinder' },
   { key: 'custom', label: 'Custom grinder' },
 ];
@@ -73,7 +77,9 @@ export const ESPRESSO_GRINDERS = [
 export const DEFAULT_ESPRESSO_SETUP = {
   espressoMachine: null,
   espressoBasket: null,
-  espressoGrinder: 'integrated',
+  espressoGrinder: null,
+  espressoMachineName: null,
+  espressoBasketDoseGrams: null,
   espressoGrinderModel: null,
   espressoGrinderCustomName: null,
   espressoSetupConfirmed: false,
@@ -296,7 +302,7 @@ export const isEspressoBrewMethod = (key) => key === 'espresso';
 export const isSupportedEspressoSetup = isSupportedEspressoRecipeSetup;
 
 export const changesEspressoEquipmentIdentity = (key) => (
-  ['espressoMachine', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName'].includes(key)
+  ['espressoMachine', 'espressoMachineName', 'espressoBasketDoseGrams', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName'].includes(key)
 );
 
 // Archived bean cards show the recipe that was actually saved with the bean.

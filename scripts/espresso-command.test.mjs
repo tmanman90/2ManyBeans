@@ -53,4 +53,17 @@ assert.throws(() => otherOwner.execute({ actionId: 'wrong-owner', mode: 'replace
 assert.throws(() => store.execute({ actionId: 'bad-patch', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'espresso', expectedRevisionId: externalUndone.revision.id, recipe: generated.recipe, patch: { espressoRecipe: { ...generated.recipe, yieldGrams: 999 } } }), (error) => error.code === 'invalid_action');
 assert.throws(() => store.execute({ actionId: 'bad-identity', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'espresso', expectedRevisionId: externalUndone.revision.id, recipe: { ...generated.recipe, coffeeId: 'other' }, patch: { espressoRecipe: { ...generated.recipe, coffeeId: 'other' } } }), (error) => error.code === 'invalid_recipe');
 assert.throws(() => store.execute({ actionId: 'bad-observed', mode: 'replace_active_recipe', coffeeId: 'bean-1', slotKey: 'espresso', expectedRevisionId: externalUndone.revision.id, recipe: { ...generated.recipe, actualYieldGrams: 40 }, patch: { espressoRecipe: { ...generated.recipe, actualYieldGrams: 40 } } }), (error) => error.code === 'invalid_recipe');
-console.log('espresso command tests: 12 passed');
+const genericPreferences = { brewMethod: 'aiden', grinder: 'fellow-ode-gen2', espressoMachine: 'other', espressoMachineName: 'My machine', espressoGrinder: 'external', espressoGrinderModel: 'DF64' };
+const genericStore = createMemoryCommandStore({ uid: 'generic-owner', preferences: genericPreferences });
+genericStore.seedBean('generic-bean', { id: 'generic-bean', ownerId: 'generic-owner' });
+const genericDraft = buildEspressoRecipe({ bean: { id: 'generic-bean' }, setup: genericPreferences }).recipe;
+assert.throws(() => genericStore.execute({ actionId: 'incomplete', mode: 'replace_active_recipe', coffeeId: 'generic-bean', slotKey: 'espresso', recipe: genericDraft, patch: { espressoRecipe: genericDraft } }), error => error.code === 'invalid_recipe');
+assert.equal(genericStore.getBean('generic-bean').espressoRecipe, undefined);
+const genericTargets = editEspressoRecipe(genericDraft, { doseGrams: 20 }).recipe;
+const genericSaved = genericStore.execute({ actionId: 'generic-save', mode: 'replace_active_recipe', coffeeId: 'generic-bean', slotKey: 'espresso', recipe: genericTargets, patch: { espressoRecipe: genericTargets } });
+assert.equal(genericSaved.receipt.status, 'succeeded');
+assert.equal(genericStore.getBean('generic-bean').espressoRecipe.yieldGrams, 40);
+assert.equal(genericStore.getBean('generic-bean').espressoRecipe.temperature.unit, null);
+genericStore.setPreferences({ ...genericPreferences, espressoGrinderModel: 'Niche Zero' });
+assert.throws(() => genericStore.execute({ actionId: 'stale-grinder', mode: 'replace_active_recipe', coffeeId: 'generic-bean', slotKey: 'espresso', recipe: genericTargets, patch: { espressoRecipe: genericTargets } }), error => error.code === 'invalid_recipe');
+console.log('espresso command tests: original and generic persistence contracts passed');

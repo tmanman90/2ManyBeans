@@ -242,7 +242,7 @@ export const TastingTab = ({ uid, beans, tastings, preferences = null, pendingTa
 
   const wizardBean = (wizardOpen && draftBean) || beans.find(b => b.id === sel) || active[0] || sealed[0] || null;
   const espressoMethodActive = isEspressoBrewMethod(preferences?.brewMethod);
-  const currentEspressoSetupKey = espressoMethodActive && preferences?.espressoSetupConfirmed === true ? espressoSetupKey(preferences) : null;
+  const currentEspressoSetupKey = espressoMethodActive ? espressoSetupKey(preferences) : null;
   const directEspressoRecipe = espressoMethodActive && wizardBean?.espressoRecipe?.setupKey && currentEspressoSetupKey
     && wizardBean.espressoRecipe.setupKey === currentEspressoSetupKey
     ? wizardBean.espressoRecipe

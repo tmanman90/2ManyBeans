@@ -7,7 +7,7 @@ import { validateLaunchContext } from '../src/lib/ruphus/conversationContract.js
 import { resolveMethod } from '../src/lib/ruphus/methodResolver.js';
 import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { retainActionReceipt } from '../src/lib/ruphus/session.js';
-import { espressoReceiptsForSession } from '../api/ruphus-agent.js';
+import { espressoReceiptsForSession, firestoreReaders } from '../api/ruphus-agent.js';
 import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
 
 const setup = {
@@ -55,6 +55,7 @@ function makeFirestore() {
     id: path.split('/').at(-1),
     doc: (id) => node(`${path}/${id}`),
     collection: (name) => node(`${path}/${name}`),
+    get: async () => ({ exists: values.has(path), id: path.split('/').at(-1), data: () => clone(values.get(path)) }),
   });
   const clone = (value) => value == null ? value : structuredClone(value);
   const db = {
@@ -665,4 +666,51 @@ assert.equal(pourOverUndoRequest.clientIntent, undefined);
 
 assert.equal(validateLaunchContext({ surface: 'recipe_espresso', coffeeRef: 'bean', launchMethod: 'espresso' }).valid, true);
 assert.equal(resolveMethod({ launchMethod: 'espresso', defaultMethod: 'v60_hot', recipeSlots: [] }).slot, 'espresso');
-console.log('ruphus espresso tools tests: active save/idempotency/stale-Undo/Undo/handoff passed');
+// Aiden default and a pour-over Ode never hide generic espresso or become its grinder.
+const genericSetup = { defaultMethod: 'aiden', brewMethod: 'aiden', grinder: 'fellow-ode-gen2', espressoMachine: 'other', espressoMachineName: 'My espresso machine', espressoGrinder: 'external', espressoGrinderModel: 'DF64' };
+const genericDb = makeFirestore();
+genericDb.seed(genericDb.collection('users').doc('owner-1'), { preferences: genericSetup });
+genericDb.seed(genericDb.collection('users').doc('owner-1').collection('beans').doc('bean-1'), { id: 'bean-1', ownerId: 'owner-1', name: 'Test Bean' });
+const genericContext = { ...makeContext('Can I make espresso if Aiden is my default?', 'generic-read'), rotationSnapshot: { setup: genericSetup, refs: { bean: 'bean-1' }, coffees: [{ refKey: 'bean', id: 'bean-1', name: 'Test Bean' }] }, methodBinding: { status: 'locked', slot: 'espresso', displayName: 'espresso' } };
+const genericTools = createRuphusTools({ uid: 'owner-1', context: genericContext, readers: makeReaders(genericDb), db: genericDb });
+const genericRead = await genericTools.call('read_recipe', { coffeeRef: 'bean', slot: 'espresso' });
+assert.equal(genericRead.ok, true);
+assert.equal(genericRead.recipe.doseGrams, null);
+assert.equal(genericRead.recipe.ratio, 2);
+assert.equal(genericRead.recipe.recipeKind, 'generic');
+assert.equal(genericRead.recipe.setup.grinderModel, 'DF64');
+assert.equal(genericRead.grinderGuidance, undefined);
+genericContext.userText = 'Please save output 40 grams for this espresso recipe.';
+const doseMissing = await genericTools.call('save_espresso_recipe', { coffeeRef: 'bean', slot: 'espresso', doseGrams: null, yieldGrams: 40, grinderValue: null, temperatureOffsetF: null });
+assert.equal(doseMissing.code, 'espresso_dose_required');
+assert.equal(genericDb.read(genericDb.collection('users').doc('owner-1').collection('beans').doc('bean-1')).espressoRecipe, undefined);
+genericContext.userText = 'Please save 20 grams for this espresso recipe.';
+const genericSave = await genericTools.call('save_espresso_recipe', { coffeeRef: 'bean', slot: 'espresso', doseGrams: 20, yieldGrams: null, grinderValue: null, temperatureOffsetF: null });
+assert.equal(genericSave.ok, true);
+assert.equal(genericSave.recipe.yieldGrams, 40);
+assert.equal(genericSave.recipe.temperature.unit, null);
+assert.equal(genericSave.recipe.setup.machineName, 'My espresso machine');
+assert.equal(genericDb.read(genericDb.collection('users').doc('owner-1')).preferences.brewMethod, 'aiden');
+genericContext.userText = 'Please save temperature offset 2 for this espresso recipe.';
+const genericTemperature = await genericTools.call('save_espresso_recipe', { coffeeRef: 'bean', slot: 'espresso', doseGrams: null, yieldGrams: null, grinderValue: null, temperatureOffsetF: 2 });
+assert.equal(genericTemperature.ok, false);
+const genericServerReader = firestoreReaders(genericDb);
+const sameEquipmentRead = await genericServerReader.readRecipe({ uid: 'owner-1', coffeeId: 'bean-1', slotKey: 'espresso' });
+assert.equal(sameEquipmentRead.doseGrams, 20);
+assert.equal(sameEquipmentRead.validationStatus, undefined);
+const changedEquipment = { ...genericSetup, espressoGrinderModel: 'Niche Zero' };
+genericDb.seed(genericDb.collection('users').doc('owner-1'), { preferences: changedEquipment });
+const changedEquipmentRead = await genericServerReader.readRecipe({ uid: 'owner-1', coffeeId: 'bean-1', slotKey: 'espresso' });
+assert.equal(changedEquipmentRead.doseGrams, null);
+assert.equal(changedEquipmentRead.setupMismatch, true);
+assert.equal(changedEquipmentRead.previousRecipe.doseGrams, 20);
+assert.equal(changedEquipmentRead.setup.grinderModel, 'Niche Zero');
+const historicalGenericRead = await genericServerReader.readRecipe({ uid: 'owner-1', coffeeId: 'bean-1', slotKey: 'espresso', launchItem: { kind: 'recipe', ref: genericSave.receipt.revisionId } });
+assert.equal(historicalGenericRead.doseGrams, 20);
+assert.equal(historicalGenericRead.setup.grinderModel, 'DF64');
+assert.equal(historicalGenericRead.validationStatus, undefined);
+const partialGeneric = buildEspressoRecipe({ bean: { id: 'bean-1' }, setup: { espressoMachine: 'breville-barista-express' } });
+assert.equal(partialGeneric.recipe.doseGrams, null);
+assert.match(partialGeneric.recipe.setupDescription, /Barista Express/);
+assert.doesNotMatch(partialGeneric.recipe.grindGuidance, /Barista Express grinder default/);
+console.log('ruphus espresso tools tests: existing save/idempotency/Undo plus generic equipment contracts passed');

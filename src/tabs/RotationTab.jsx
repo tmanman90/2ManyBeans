@@ -36,6 +36,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 import { useBeanDetail } from '../hooks/useBeanDetail';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { espressoHasUnsavedEdits } from '../lib/espressoUi';
 import { espressoRecipeFingerprint } from '../lib/espressoRecipes';
 import { executeRecipeCommand } from '../lib/recipeCommands';
 import { espressoTastingContext } from '../lib/brewContext';
@@ -88,16 +89,15 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     const bean = espresso.espressoBean;
     if (!bean?.id || !onOpenRuphus) return;
     const revisionId = bean.activeRevisionIds?.espresso;
-    const hasUnsavedTarget = Boolean(espresso.espressoRecipe && (!bean.espressoRecipe
-      || espressoRecipeFingerprint(espresso.espressoRecipe) !== espressoRecipeFingerprint(bean.espressoRecipe)));
-    if (hasUnsavedTarget) return;
+    const hasUnsavedTarget = espressoHasUnsavedEdits(espresso.espressoRecipe, bean.espressoRecipe);
+    if (hasUnsavedTarget || espresso.espressoSetupMismatch) return;
     onOpenRuphus({
       coffeeRef: bean.id,
       surface: 'recipe_espresso',
       launchMethod: 'espresso',
-      ...(revisionId ? { launchItem: { kind: 'recipe', ref: revisionId, method: 'espresso' } } : {}),
+      ...(revisionId && bean.espressoRecipe?.setupKey === espresso.espressoRecipe?.setupKey ? { launchItem: { kind: 'recipe', ref: revisionId, method: 'espresso' } } : {}),
     });
-  }, [espresso.espressoBean, espresso.espressoRecipe, onOpenRuphus]);
+  }, [espresso.espressoBean, espresso.espressoRecipe, espresso.espressoSetupMismatch, onOpenRuphus]);
   const { openAttempt: openAidenAttempt } = aiden;
   const { openAttempt: openHandAttempt } = handBrew;
   const [toast, setToast] = useState(null);
@@ -682,6 +682,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         error={espresso.espressoError}
         phase={espresso.espressoPhase}
         notice={espresso.espressoNotice}
+        setupMismatch={espresso.espressoSetupMismatch}
+        onStartCurrentSetup={espresso.startEspressoForCurrentSetup}
         onRetry={espresso.onRetry}
         onRegenerate={espresso.onRegenerate}
         onSave={espresso.saveEspressoRecipe}

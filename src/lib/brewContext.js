@@ -1,3 +1,5 @@
+import { espressoSetupIdentity } from './espressoRecipes.js';
+
 // Shared, compact context for a brewed cup. This is deliberately a snapshot
 // seam, not a second brew log: callers may preserve it on a draft/tasting and
 // the chat evidence formatter may describe it without guessing from today's
@@ -21,18 +23,22 @@ export function normalizeDrinkType(value) {
 }
 
 function setupIdentity(setup = {}) {
-  const machine = text(setup.espressoMachine || setup.machine, 80) || null;
-  const basket = text(setup.espressoBasket || setup.basket, 80) || null;
-  const grinder = text(setup.espressoGrinder || setup.grinder, 80) || null;
-  const grinderModel = text(setup.espressoGrinderModel || setup.grinderModel, 100) || null;
-  const grinderCustomName = text(setup.espressoGrinderCustomName || setup.grinderCustomName, 100) || null;
-  return { ...(machine ? { machine } : {}), ...(basket ? { basket } : {}), ...(grinder ? { grinder } : {}), ...(grinderModel ? { grinderModel } : {}), ...(grinderCustomName ? { grinderCustomName } : {}) };
+  const identity = espressoSetupIdentity(setup);
+  const equipment = {};
+  for (const key of ['machine', 'machineName', 'basket', 'grinder', 'grinderModel', 'grinderCustomName']) {
+    const value = text(identity[key], 100);
+    if (value) equipment[key] = value;
+  }
+  if (typeof identity.basketDoseGrams === 'number' && Number.isFinite(identity.basketDoseGrams) && identity.basketDoseGrams > 0) equipment.basketDoseGrams = identity.basketDoseGrams;
+  return equipment;
 }
 
 function recipeSnapshot(recipe, method) {
   if (!recipe || typeof recipe !== 'object' || method !== 'espresso') return null;
   const snapshot = {
     ...(recipe.schemaVersion != null ? { schemaVersion: recipe.schemaVersion } : {}),
+    ...(recipe.recipeKind ? { recipeKind: text(recipe.recipeKind, 32) } : {}),
+    ...(recipe.doseBasis ? { doseBasis: text(recipe.doseBasis, 32) } : {}),
     ...(recipe.fingerprint ? { fingerprint: text(recipe.fingerprint, 100) } : {}),
     ...(recipe.recipeHash ? { recipeHash: text(recipe.recipeHash, 100) } : {}),
     ...(scalar(recipe.doseGrams) != null ? { doseGrams: recipe.doseGrams } : {}),
@@ -63,7 +69,9 @@ export function resolveBrewContext({ method = null, setup = null, preferences = 
     version: 1,
     method: resolvedMethod || 'unknown',
     ...(resolvedDrink ? { drinkType: resolvedDrink } : {}),
-    ...(equipment && Object.keys(equipment).length ? { equipment: setupIdentity(equipment) } : {}),
+    // Equipment is already a canonical cup snapshot here, including when
+    // only its grinder is known. Keep that distinct from general preferences.
+    ...(equipment && Object.keys(equipment).length ? { equipment: setupIdentity({ ...equipment, machine: equipment.machine ?? null, basket: equipment.basket ?? null }) } : {}),
     ...(snapshot ? { recipeSnapshot: snapshot } : {}),
     ...(revisionId ? { recipeRevisionId: revisionId } : {}),
   };
@@ -98,7 +106,7 @@ export function formatBrewContext(context = {}) {
   const label = method === 'espresso' ? 'espresso' : ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[method] || method);
   const drink = method === 'espresso' && context.drinkType ? `, ${isMilkDrink(context) ? 'with milk' : 'straight'}` : '';
   const equipment = context.equipment || {};
-  const equipmentParts = [equipment.machine, equipment.grinderModel || equipment.grinderCustomName || equipment.grinder, equipment.basket].filter(Boolean).map(item => text(item, 80));
+  const equipmentParts = [equipment.machineName || equipment.machine, equipment.grinderModel || equipment.grinderCustomName || equipment.grinder, equipment.basket].filter(Boolean).map(item => text(item, 80));
   const recipe = context.recipeSnapshot || {};
   const targets = [recipe.doseGrams != null ? `${recipe.doseGrams}g in` : null, recipe.yieldGrams != null ? `${recipe.yieldGrams}g out` : null, recipe.ratio != null ? `1:${recipe.ratio}` : null].filter(Boolean).join(', ');
   const grinderValue = recipe.grinderSetting?.value;

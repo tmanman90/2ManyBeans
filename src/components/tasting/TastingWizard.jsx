@@ -705,7 +705,6 @@ function normalizeDraft(draft, beanId, launchContext = null, preferences = null,
     : (() => {
       const espressoActive = preferences?.brewMethod === 'espresso';
       const setupMatches = espressoActive
-        && preferences?.espressoSetupConfirmed === true
         && bean?.espressoRecipe?.setupKey === espressoSetupKey(preferences);
       return resolveBrewContext({
         method: preferences?.brewMethod,
