@@ -1,5 +1,5 @@
 {
-  "status": "preview_and_ota_published_phone_install_blocked",
+  "status": "dev_published_phone_installed_and_launched",
   "sourceCommit": "8e8da05b56385a094202c5ee40b958b57b073866",
   "webPreview": "https://2manybeans-erl86upph-tmanman90s-projects.vercel.app",
   "previewSmoke": [
@@ -28,15 +28,25 @@
     "webIndexSha256": "cb09afac4e7984710e1694f970d5fab657f664c480ca6adf0e6343a9d986f12f",
     "uploadedAssetsMatch": true,
     "rawXcodeBuildSucceeded": true,
-    "helperFalseNegative": "Source snippets in warnings contained error: and were misclassified; no raw compiler failure"
+    "finalHelperExitCode": 0,
+    "finalCodeSignatureValid": true,
+    "existingDevGoogleLoginResourceApplied": true,
+    "earlierHelperFalseNegative": "Source snippets in warnings contained error: and were misclassified; no raw compiler failure"
   },
   "phone": {
     "name": "Tal Meltzer",
     "os": "27.0.1",
     "coreDeviceId": "9A6C66CF-3E3E-5AF7-93C1-C45D77663506",
     "hardwareUdid": "00008160-0014609634400036",
-    "installed": false,
-    "blocker": "Development profile excludes this phone; device-specific automatic signing reports No Accounts"
+    "installed": true,
+    "launched": true,
+    "launchProcessId": 22998,
+    "installExitCode": 0,
+    "launchExitCode": 0,
+    "profileIncludesHardwareUdid": true,
+    "signingTeam": "WC5UF2NSAP",
+    "profileExpires": "2027-10-13T15:55:00Z",
+    "signingAccess": "Existing user-owned App Store Connect API key; verified Dev bundle access before registration/signing"
   },
   "nativeCompatibility": {
     "package": "purchases-ios-spm",
@@ -49,15 +59,25 @@
   },
   "packageVersionUnchanged": "1.1.255",
   "production": "Existing production deployment and production Capgo app/channel untouched",
-  "temporaryCredentials": "Server credential copies removed; private client build config retained outside Git for pending install",
+  "temporaryCredentials": "Temporary server credential copies removed; API private key reused from its existing location without copying or printing it; private client build config retained outside Git for reproducibility",
   "resume": {
     "projectPath": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/ios/App/App.xcodeproj",
     "scheme": "App",
     "derivedDataPath": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/.runtime/iOSDerivedData",
     "appPath": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/.runtime/iOSDerivedData/Build/Products/Debug-iphoneos/App.app",
     "clientBuildEnvironment": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/.runtime/ios-dev-env.json",
-    "next": "After Xcode account sign-in or a supplied existing Coffee signing API-key reference, rebuild specifically for hardware UDID, verify profile membership, install, launch and verify device receipt"
+    "next": "User testing in 2manybeans Dev; signed installer and native compatibility evidence retained for reproducing any device issues."
   },
   "vercelDeploymentId": "dpl_CpaN3QaYYQ19FKpFw49G5TE7CpNN",
-  "vercelState": "READY"
+  "vercelState": "READY",
+  "proofLimits": [
+    "Installation and launch verified on the physical phone; authenticated sign-in, hosted chat and native tasting have not yet been exercised on-device.",
+    "Dev uses the existing Firebase project/account data; this is not an isolated test database."
+  ],
+  "evidence": {
+    "apiSigningBuild": "docs/qa/espresso-implementation/.runtime/phone-api-signing-build.log",
+    "install": "docs/qa/espresso-implementation/.runtime/phone-install.log",
+    "launch": "docs/qa/espresso-implementation/.runtime/phone-launch.log",
+    "finalArtifact": "docs/qa/espresso-implementation/.runtime/native-final-verification.json"
+  }
 }
