@@ -1,0 +1,5 @@
+{
+  "source": "firestore.rules",
+  "copy": ".runtime/firestore.rules",
+  "sha256": "3d25eb03e9decd9f61f2f96884a70c79ac954db765c56c2a738c065a3aea691a"
+}

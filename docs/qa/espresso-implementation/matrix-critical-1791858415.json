@@ -1,0 +1,91 @@
+{
+  "group": "critical",
+  "startIndex": 0,
+  "records": [
+    {
+      "case": [
+        "E04",
+        "clear",
+        "E04.ambiguous"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-19-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 56.39%; log live-espresso-19.log"
+    },
+    {
+      "case": [
+        "E04",
+        "clear",
+        "E04.grind-only"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-20-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 62.39%; log live-espresso-20.log"
+    },
+    {
+      "case": [
+        "E07",
+        "casual",
+        "E07.duplicate"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-21-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 64.93%; log live-espresso-21.log"
+    },
+    {
+      "case": [
+        "E07",
+        "clear",
+        "E07.stale"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-22-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 58.22%; log live-espresso-22.log"
+    },
+    {
+      "case": [
+        "E08",
+        "clear",
+        "E08.switch-save"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-23-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 59.66%; log live-espresso-23.log"
+    },
+    {
+      "case": [
+        "E11",
+        "clear",
+        "E11.switch-save"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-24-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 60.51%; log live-espresso-24.log"
+    },
+    {
+      "case": [
+        "E12",
+        "clear",
+        "E12.replay"
+      ],
+      "exitCode": 1,
+      "manifests": [],
+      "message": "DEFER: CPU idle gate"
+    }
+  ],
+  "requiredInBatch": 7,
+  "requiredInMatrix": 7,
+  "semanticReview": "pending"
+}

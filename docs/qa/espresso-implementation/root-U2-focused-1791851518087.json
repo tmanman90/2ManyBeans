@@ -1,0 +1,29 @@
+[
+  {
+    "command": [
+      "node",
+      "scripts/espresso-equipment-routing.test.mjs"
+    ],
+    "exit": 1,
+    "cpuIdle": 60.54,
+    "log": "root-U2-1791851516453-espresso-equipment-routing.test.mjs.log"
+  },
+  {
+    "command": [
+      "node",
+      "scripts/espresso-recipe.test.mjs"
+    ],
+    "exit": 0,
+    "cpuIdle": 63.32,
+    "log": "root-U2-1791851517221-espresso-recipe.test.mjs.log"
+  },
+  {
+    "command": [
+      "node",
+      "scripts/espresso-command.test.mjs"
+    ],
+    "exit": 1,
+    "cpuIdle": 63.94,
+    "log": "root-U2-1791851518087-espresso-command.test.mjs.log"
+  }
+]

@@ -1,0 +1,46 @@
+{
+  "suite": "focused",
+  "startIndex": 0,
+  "status": "failed",
+  "sourceBefore": "42e2d3c95c52c7cf65cd53f45bf2fb3d828ae6ae7cbfcd35ca1683a4710514e7",
+  "sourceAfter": "42e2d3c95c52c7cf65cd53f45bf2fb3d828ae6ae7cbfcd35ca1683a4710514e7",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/espresso-equipment-routing.test.mjs"
+      ],
+      "cpuIdlePercent": 58.5,
+      "exitCode": 0,
+      "log": "focused-1791866049-00.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/espresso-recipe.test.mjs"
+      ],
+      "cpuIdlePercent": 63.95,
+      "exitCode": 0,
+      "log": "focused-1791866049-01.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/espresso-command.test.mjs"
+      ],
+      "cpuIdlePercent": 58.81,
+      "exitCode": 0,
+      "log": "focused-1791866049-02.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-espresso-tools.test.mjs"
+      ],
+      "cpuIdlePercent": 59.51,
+      "exitCode": 1,
+      "log": "focused-1791866049-03.log"
+    }
+  ],
+  "requiredCommands": 13
+}

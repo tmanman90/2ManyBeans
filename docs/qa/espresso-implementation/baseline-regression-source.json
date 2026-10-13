@@ -1,0 +1,35 @@
+{
+  "base": "58d1643",
+  "files": [
+    {
+      "file": "scripts/v60-switch-runtime-contract.test.mjs",
+      "unchangedFromBase": true,
+      "sha256": "5ee1f19d67bdc407c9950a9e8fb31c894d1fc3b46365db379e716373096db6fb"
+    },
+    {
+      "file": "scripts/handbrew-v60-cutover-contract.test.mjs",
+      "unchangedFromBase": true,
+      "sha256": "99f579b39f6706d2b63449bc4905a7080545ff1dd39746c6c3449608ad49a1ab"
+    },
+    {
+      "file": "scripts/verify-kalita-iced-ui.mjs",
+      "unchangedFromBase": true,
+      "sha256": "30874fd1ad98d7a0d785aeddd0137924fe37fa19eb90c90f7055bf43779664ef"
+    },
+    {
+      "file": "scripts/fixtures/kalita-iced-harness.jsx",
+      "unchangedFromBase": true,
+      "sha256": "8ebe63a208da21c0ce388eff62fbb52bae92d5fdf85e39904e70f777e98a527f"
+    },
+    {
+      "file": "src/components/HandBrewModal.jsx",
+      "unchangedFromBase": true,
+      "sha256": "60967200954aac284a3e28055bf99ea5aa4cda2770a2cd5466c8347627f49b98"
+    },
+    {
+      "file": "src/components/BrewTimer.jsx",
+      "unchangedFromBase": true,
+      "sha256": "1e05a5631580311e1b9e0092d64ab7ff08e19bcf582600be0eab4235557415b7"
+    }
+  ]
+}

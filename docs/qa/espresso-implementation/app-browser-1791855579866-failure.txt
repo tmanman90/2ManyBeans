@@ -1,0 +1,96 @@
+Hi Local
+YOUR 3 JARS
+Active Rotation
+Quick Recipe
+JAR 1
+C
+11
+DAYS
+Stale (+NaNd)
+Cocoa Garden
+Espresso Recipe
+Taste
+Learn
+Ask Ruphus
+Finish
+JAR 2
+Open a bean
+Tap to fill this jar from your inventory
+JAR 3
+Open a bean
+Tap to fill this jar from your inventory
+Show Recommendations
+Rotation
+Inventory
+Tasting
+Chat
+Archive
+Settings
+Done
+PROFILE
+Local espresso fixture
+Name
+Local espresso fixture
+Username
+Set username
+EQUIPMENT
+Grinder
+Fellow Ode Gen 2
+Fellow Opus
+Baratza Encore ESP
+Comandante C40 MK4
+1Zpresso JX-Pro
+Baratza Virtuoso+
+Other / Manual Entry
+Brew Method
+Aiden Brew
+Espresso
+V60
+Kalita Wave
+Chemex
+Aeropress
+French Press
+ESPRESSO SETUP
+Machine
+Choose your machine
+Breville Barista Express
+Basket
+Choose your basket
+Stock double · single-wall
+I'm using a different basket
+Confirm this machine and stock double single-wall basket
+Espresso grinder
+Barista Express built-in grinder
+External grinder
+Custom grinder
+Grind Size Display
+Grinder Steps
+Microns
+Coffee Jars
+1
+2
+3
+4
+5
+6
+SUBSCRIPTION
+Current Plan
+pro
+Manage Subscription
+Restore Purchases
+LEGAL
+Data & AI
+AI features enabled
+Privacy Policy
+Terms of Service
+NOTIFICATIONS
+Email updates
+DEV
+Replay onboarding
+Paywall: Roast / Classic
+Roast (new)
+v1.1.255
+Dev build 20261013T013940Z-aafebff80b26
+ACCOUNT
+Sign Out
+Delete Account

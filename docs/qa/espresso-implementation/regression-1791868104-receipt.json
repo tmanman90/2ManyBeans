@@ -1,0 +1,24 @@
+{
+  "suite": "regression",
+  "startIndex": 43,
+  "status": "passed",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "--import",
+        "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/installed-chrome.mjs",
+        "--test",
+        "scripts/aiden-generated-grind.test.mjs",
+        "scripts/aiden-foreground.test.mjs",
+        "scripts/aiden-modal-render.test.mjs"
+      ],
+      "cpuIdlePercent": 69.43,
+      "exitCode": 0,
+      "log": "regression-1791868104-43.log"
+    }
+  ],
+  "requiredCommands": 44
+}

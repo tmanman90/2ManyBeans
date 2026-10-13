@@ -1,0 +1,423 @@
+{
+  "requiredDistinct": 36,
+  "distinctExecuted": 36,
+  "semanticReview": "review-final-acceptance.md and review-live-final.md; accepted versions are source-specific",
+  "cases": {
+    "E01.casual": {
+      "manifestIndex": 41,
+      "manifest": "live-espresso-41-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E01-casual-1791862398136-receipt.json"
+      ]
+    },
+    "E01.clear": {
+      "manifestIndex": 40,
+      "manifest": "live-espresso-40-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E01-clear-1791862382260-receipt.json"
+      ]
+    },
+    "E01.incomplete": {
+      "manifestIndex": 42,
+      "manifest": "live-espresso-42-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E01-incomplete-1791862416155-receipt.json"
+      ]
+    },
+    "E02.casual": {
+      "manifestIndex": 34,
+      "manifest": "live-espresso-34-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E02-casual-1791862141278-receipt.json"
+      ]
+    },
+    "E02.clear": {
+      "manifestIndex": 33,
+      "manifest": "live-espresso-33-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E02-clear-1791862124539-receipt.json"
+      ]
+    },
+    "E02.incomplete": {
+      "manifestIndex": 35,
+      "manifest": "live-espresso-35-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E02-incomplete-1791862159143-receipt.json"
+      ]
+    },
+    "E03.casual": {
+      "manifestIndex": 49,
+      "manifest": "live-espresso-49-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E03-casual-1791863066376-receipt.json"
+      ]
+    },
+    "E03.clear": {
+      "manifestIndex": 48,
+      "manifest": "live-espresso-48-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E03-clear-1791863048648-receipt.json"
+      ]
+    },
+    "E03.incomplete": {
+      "manifestIndex": 50,
+      "manifest": "live-espresso-50-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E03-incomplete-1791863083297-receipt.json"
+      ]
+    },
+    "E04.casual": {
+      "manifestIndex": 95,
+      "manifest": "live-espresso-95-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E04-casual-1791867354701-receipt.json"
+      ]
+    },
+    "E04.clear": {
+      "manifestIndex": 94,
+      "manifest": "live-espresso-94-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E04-clear-1791867336335-receipt.json"
+      ]
+    },
+    "E04.incomplete": {
+      "manifestIndex": 96,
+      "manifest": "live-espresso-96-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E04-incomplete-1791867376143-receipt.json"
+      ]
+    },
+    "E05.casual": {
+      "manifestIndex": 58,
+      "manifest": "live-espresso-58-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E05-casual-1791863465183-receipt.json"
+      ]
+    },
+    "E05.clear": {
+      "manifestIndex": 57,
+      "manifest": "live-espresso-57-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E05-clear-1791863449657-receipt.json"
+      ]
+    },
+    "E05.incomplete": {
+      "manifestIndex": 59,
+      "manifest": "live-espresso-59-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E05-incomplete-1791863481140-receipt.json"
+      ]
+    },
+    "E06.casual": {
+      "manifestIndex": 98,
+      "manifest": "live-espresso-98-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E06-casual-1791867413537-receipt.json"
+      ]
+    },
+    "E06.clear": {
+      "manifestIndex": 97,
+      "manifest": "live-espresso-97-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E06-clear-1791867393649-receipt.json"
+      ]
+    },
+    "E06.incomplete": {
+      "manifestIndex": 99,
+      "manifest": "live-espresso-99-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E06-incomplete-1791867435145-receipt.json"
+      ]
+    },
+    "E07.casual": {
+      "manifestIndex": 101,
+      "manifest": "live-espresso-101-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-casual-1791867524986-receipt.json"
+      ]
+    },
+    "E07.clear": {
+      "manifestIndex": 100,
+      "manifest": "live-espresso-100-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-clear-1791867511486-receipt.json"
+      ]
+    },
+    "E07.incomplete": {
+      "manifestIndex": 102,
+      "manifest": "live-espresso-102-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-incomplete-1791867548115-receipt.json"
+      ]
+    },
+    "E08.casual": {
+      "manifestIndex": 69,
+      "manifest": "live-espresso-69-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E08-casual-1791863881183-receipt.json"
+      ]
+    },
+    "E08.clear": {
+      "manifestIndex": 68,
+      "manifest": "live-espresso-68-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E08-clear-1791863866780-receipt.json"
+      ]
+    },
+    "E08.incomplete": {
+      "manifestIndex": 70,
+      "manifest": "live-espresso-70-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E08-incomplete-1791863894635-receipt.json"
+      ]
+    },
+    "E09.casual": {
+      "manifestIndex": 71,
+      "manifest": "live-espresso-71-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E09-casual-1791863948068-receipt.json"
+      ]
+    },
+    "E09.clear": {
+      "manifestIndex": 67,
+      "manifest": "live-espresso-67-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E09-clear-1791863677992-receipt.json"
+      ]
+    },
+    "E09.incomplete": {
+      "manifestIndex": 72,
+      "manifest": "live-espresso-72-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E09-incomplete-1791863966125-receipt.json"
+      ]
+    },
+    "E10.casual": {
+      "manifestIndex": 74,
+      "manifest": "live-espresso-74-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E10-casual-1791864002028-receipt.json"
+      ]
+    },
+    "E10.clear": {
+      "manifestIndex": 73,
+      "manifest": "live-espresso-73-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E10-clear-1791863984660-receipt.json"
+      ]
+    },
+    "E10.incomplete": {
+      "manifestIndex": 75,
+      "manifest": "live-espresso-75-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E10-incomplete-1791864022278-receipt.json"
+      ]
+    },
+    "E11.casual": {
+      "manifestIndex": 89,
+      "manifest": "live-espresso-89-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E11-casual-1791866330241-receipt.json"
+      ]
+    },
+    "E11.clear": {
+      "manifestIndex": 88,
+      "manifest": "live-espresso-88-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E11-clear-1791866312245-receipt.json"
+      ]
+    },
+    "E11.incomplete": {
+      "manifestIndex": 90,
+      "manifest": "live-espresso-90-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E11-incomplete-1791867118175-receipt.json"
+      ]
+    },
+    "E12.casual": {
+      "manifestIndex": 92,
+      "manifest": "live-espresso-92-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E12-casual-1791867152599-receipt.json"
+      ]
+    },
+    "E12.clear": {
+      "manifestIndex": 91,
+      "manifest": "live-espresso-91-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E12-clear-1791867134520-receipt.json"
+      ]
+    },
+    "E12.incomplete": {
+      "manifestIndex": 93,
+      "manifest": "live-espresso-93-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E12-incomplete-1791867312344-receipt.json"
+      ]
+    }
+  },
+  "perturbations": {
+    "E04.ambiguous": {
+      "manifestIndex": 103,
+      "manifest": "live-espresso-103-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E04-ambiguous-1791867566472-receipt.json"
+      ]
+    },
+    "E04.grind-only": {
+      "manifestIndex": 104,
+      "manifest": "live-espresso-104-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E04-grind-only-1791867581925-receipt.json"
+      ]
+    },
+    "E07.ambiguous": {
+      "manifestIndex": 112,
+      "manifest": "live-espresso-112-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-ambiguous-1791867773716-receipt.json"
+      ]
+    },
+    "E07.duplicate": {
+      "manifestIndex": 105,
+      "manifest": "live-espresso-105-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-duplicate-1791867592114-receipt.json"
+      ]
+    },
+    "E07.hypothetical": {
+      "manifestIndex": 111,
+      "manifest": "live-espresso-111-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-hypothetical-1791867760011-receipt.json"
+      ]
+    },
+    "E07.negated": {
+      "manifestIndex": 110,
+      "manifest": "live-espresso-110-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-negated-1791867743561-receipt.json"
+      ]
+    },
+    "E07.stale": {
+      "manifestIndex": 106,
+      "manifest": "live-espresso-106-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E07-stale-1791867609922-receipt.json"
+      ]
+    },
+    "E08.switch-save": {
+      "manifestIndex": 107,
+      "manifest": "live-espresso-107-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E08-switch-save-1791867623097-receipt.json"
+      ]
+    },
+    "E11.switch-save": {
+      "manifestIndex": 108,
+      "manifest": "live-espresso-108-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E11-switch-save-1791867637191-receipt.json"
+      ]
+    },
+    "E12.replay": {
+      "manifestIndex": 109,
+      "manifest": "live-espresso-109-manifest.json",
+      "exitCode": 0,
+      "sourceStable": true,
+      "receipts": [
+        "live-E12-replay-1791867720776-receipt.json"
+      ]
+    }
+  }
+}

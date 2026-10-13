@@ -1,0 +1,31 @@
+{
+  "suite": "regression",
+  "startIndex": 42,
+  "status": "failed",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/handbrew-timing-memory-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 48.33,
+      "exitCode": 0,
+      "log": "regression-1791868009-42.log"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "scripts/aiden-generated-grind.test.mjs",
+        "scripts/aiden-foreground.test.mjs",
+        "scripts/aiden-modal-render.test.mjs"
+      ],
+      "cpuIdlePercent": 58.7,
+      "exitCode": 1,
+      "log": "regression-1791868009-43.log"
+    }
+  ],
+  "requiredCommands": 44
+}

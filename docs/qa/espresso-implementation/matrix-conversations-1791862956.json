@@ -1,0 +1,31 @@
+{
+  "group": "conversations",
+  "startIndex": 10,
+  "records": [
+    {
+      "case": [
+        "E04",
+        "casual"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-46-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 62.19%; log live-espresso-46.log"
+    },
+    {
+      "case": [
+        "E04",
+        "incomplete"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-47-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 58.99%; log live-espresso-47.log"
+    }
+  ],
+  "requiredInBatch": 26,
+  "requiredInMatrix": 36,
+  "semanticReview": "pending"
+}

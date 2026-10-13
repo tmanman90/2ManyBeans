@@ -1,0 +1,18 @@
+{
+  "group": "conversations",
+  "startIndex": 35,
+  "records": [
+    {
+      "case": [
+        "E12",
+        "incomplete"
+      ],
+      "exitCode": 1,
+      "manifests": [],
+      "message": "DEFER: CPU idle gate"
+    }
+  ],
+  "requiredInBatch": 1,
+  "requiredInMatrix": 36,
+  "semanticReview": "pending"
+}

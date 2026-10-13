@@ -1,0 +1,46 @@
+{
+  "suite": "focused",
+  "startIndex": 9,
+  "status": "passed",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-runtime-contracts.test.mjs"
+      ],
+      "cpuIdlePercent": 55.95,
+      "exitCode": 0,
+      "log": "focused-1791867488-09.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-reference-resolution.test.mjs"
+      ],
+      "cpuIdlePercent": 55.1,
+      "exitCode": 0,
+      "log": "focused-1791867488-10.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-provider-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 55.35,
+      "exitCode": 0,
+      "log": "focused-1791867488-11.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-u2-runtime.test.mjs"
+      ],
+      "cpuIdlePercent": 52.44,
+      "exitCode": 0,
+      "log": "focused-1791867488-12.log"
+    }
+  ],
+  "requiredCommands": 13
+}

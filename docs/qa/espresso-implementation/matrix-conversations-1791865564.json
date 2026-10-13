@@ -1,0 +1,20 @@
+{
+  "group": "conversations",
+  "startIndex": 34,
+  "records": [
+    {
+      "case": [
+        "E12",
+        "casual"
+      ],
+      "exitCode": 1,
+      "manifests": [
+        "live-espresso-87-manifest.json"
+      ],
+      "message": "live-espresso exit 1; CPU idle 53.28%; log live-espresso-87.log"
+    }
+  ],
+  "requiredInBatch": 2,
+  "requiredInMatrix": 36,
+  "semanticReview": "pending"
+}

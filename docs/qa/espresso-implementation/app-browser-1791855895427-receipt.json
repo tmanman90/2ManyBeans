@@ -1,0 +1,942 @@
+{
+  "runId": 1791855895427,
+  "status": "failed",
+  "proof": "Unchanged main.jsx/App navigation, real client Auth/Firestore, authenticated recipe-command and actual configured provider for chat. Synthetic vision/enrichment responses; optional tasting AI intentionally fails locally. No image-recognition proof claimed.",
+  "checks": [
+    "Real Rotation opens espresso and saves through authenticated command outside generic mutation rollout",
+    "Real App recipe controls fit mobile and desktop widths",
+    "Real modal-to-chat handoff, actual provider Save, View recipe and native guarded Undo work outside generic mutation rollout",
+    "Actual eight-step tasting preserves unsaved cup targets, original grinder, notes and scores across draft resume, newer recipe and grinder changes; optional AI 503 does not block save",
+    "Second milk tasting saves separately with saved revision; prior straight cup is byte-for-byte unchanged and new observations start empty",
+    "Real Inventory routes its own bean to espresso and saves independently",
+    "Returning through App navigation reopens the saved recipe"
+  ],
+  "errors": [
+    "locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Start guided tasting', exact: true })\n"
+  ],
+  "requests": [
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "811e4a66-395f-4e45-a816-ddbd87d5d697",
+        "mode": "replace_active_recipe",
+        "coffeeId": "browser-a",
+        "slotKey": "espresso",
+        "recipe": {
+          "schemaVersion": 1,
+          "engine": "espresso-baseline-2026-10-12",
+          "method": "espresso",
+          "device": "espresso",
+          "mode": "hot",
+          "slotKey": "espresso",
+          "coffeeId": "browser-a",
+          "setup": {
+            "machine": "breville-barista-express",
+            "basket": "stock-double-single-wall",
+            "grinder": "integrated",
+            "grinderModel": null,
+            "grinderCustomName": null
+          },
+          "setupKey": "f89c3ede4e2f6745",
+          "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+          "doseGrams": 18,
+          "yieldGrams": 39,
+          "ratio": 2.17,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+          "grinderSetting": {
+            "grinder": "integrated",
+            "model": null,
+            "value": null,
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "machine_default",
+            "offsetF": 0,
+            "supportedOffsetsF": [
+              -4,
+              -2,
+              0,
+              2,
+              4
+            ],
+            "unit": "F",
+            "source": "breville-manual"
+          },
+          "preparation": [
+            "Distribute the dose evenly.",
+            "Tamp level with consistent pressure.",
+            "Stop at the target output mass."
+          ],
+          "roastLevel": "medium",
+          "source": "user_saved",
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "userAdjustedFields": [
+            "yieldGrams"
+          ],
+          "generatedAt": "2026-10-13T01:44:59.097Z",
+          "fingerprint": "cec7b807f151057a",
+          "originalProvenance": {
+            "kind": "app_baseline",
+            "label": "App baseline"
+          }
+        },
+        "patch": {
+          "espressoRecipe": {
+            "schemaVersion": 1,
+            "engine": "espresso-baseline-2026-10-12",
+            "method": "espresso",
+            "device": "espresso",
+            "mode": "hot",
+            "slotKey": "espresso",
+            "coffeeId": "browser-a",
+            "setup": {
+              "machine": "breville-barista-express",
+              "basket": "stock-double-single-wall",
+              "grinder": "integrated",
+              "grinderModel": null,
+              "grinderCustomName": null
+            },
+            "setupKey": "f89c3ede4e2f6745",
+            "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+            "doseGrams": 18,
+            "yieldGrams": 39,
+            "ratio": 2.17,
+            "timeRangeSeconds": [
+              25,
+              30
+            ],
+            "timeBasis": "machine_start_to_stop",
+            "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+            "grinderSetting": {
+              "grinder": "integrated",
+              "model": null,
+              "value": null,
+              "unit": "machine_setting",
+              "source": "unreported"
+            },
+            "temperature": {
+              "mode": "machine_default",
+              "offsetF": 0,
+              "supportedOffsetsF": [
+                -4,
+                -2,
+                0,
+                2,
+                4
+              ],
+              "unit": "F",
+              "source": "breville-manual"
+            },
+            "preparation": [
+              "Distribute the dose evenly.",
+              "Tamp level with consistent pressure.",
+              "Stop at the target output mass."
+            ],
+            "roastLevel": "medium",
+            "source": "user_saved",
+            "provenance": {
+              "kind": "user_saved",
+              "label": "Saved recipe"
+            },
+            "userAdjustedFields": [
+              "yieldGrams"
+            ],
+            "generatedAt": "2026-10-13T01:44:59.097Z",
+            "fingerprint": "cec7b807f151057a",
+            "originalProvenance": {
+              "kind": "app_baseline",
+              "label": "App baseline"
+            }
+          }
+        },
+        "expectedRevisionHash": "4921259d9e3de9e9",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    },
+    {
+      "path": "/api/ruphus-agent"
+    },
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "4a3dee1d-d0fd-494e-b967-830ab9166efc",
+        "mode": "undo_revision",
+        "coffeeId": "browser-a",
+        "slotKey": "espresso",
+        "expectedRevisionId": "revision_ruphus_espresso_46bd13110a738b44",
+        "clientIntent": "espresso_direct_undo",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    },
+    {
+      "path": "/api/claude",
+      "feature": "tastingCoach"
+    },
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "47fa7de6-3a1a-46ee-850b-0ce8b7d87e5e",
+        "mode": "replace_active_recipe",
+        "coffeeId": "browser-a",
+        "slotKey": "espresso",
+        "recipe": {
+          "schemaVersion": 1,
+          "engine": "espresso-baseline-2026-10-12",
+          "method": "espresso",
+          "device": "espresso",
+          "mode": "hot",
+          "slotKey": "espresso",
+          "coffeeId": "browser-a",
+          "setup": {
+            "machine": "breville-barista-express",
+            "basket": "stock-double-single-wall",
+            "grinder": "integrated",
+            "grinderModel": null,
+            "grinderCustomName": null
+          },
+          "setupKey": "f89c3ede4e2f6745",
+          "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+          "doseGrams": 18,
+          "yieldGrams": 42,
+          "ratio": 2.33,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+          "grinderSetting": {
+            "grinder": "integrated",
+            "model": null,
+            "value": null,
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "machine_default",
+            "offsetF": 0,
+            "supportedOffsetsF": [
+              -4,
+              -2,
+              0,
+              2,
+              4
+            ],
+            "unit": "F",
+            "source": "breville-manual"
+          },
+          "preparation": [
+            "Distribute the dose evenly.",
+            "Tamp level with consistent pressure.",
+            "Stop at the target output mass."
+          ],
+          "roastLevel": "medium",
+          "source": "user_saved",
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "userAdjustedFields": [
+            "yieldGrams"
+          ],
+          "generatedAt": "2026-10-13T01:44:59.097Z",
+          "fingerprint": "f5a30ebf2794fa40",
+          "originalProvenance": {
+            "kind": "app_baseline",
+            "label": "App baseline"
+          }
+        },
+        "patch": {
+          "espressoRecipe": {
+            "schemaVersion": 1,
+            "engine": "espresso-baseline-2026-10-12",
+            "method": "espresso",
+            "device": "espresso",
+            "mode": "hot",
+            "slotKey": "espresso",
+            "coffeeId": "browser-a",
+            "setup": {
+              "machine": "breville-barista-express",
+              "basket": "stock-double-single-wall",
+              "grinder": "integrated",
+              "grinderModel": null,
+              "grinderCustomName": null
+            },
+            "setupKey": "f89c3ede4e2f6745",
+            "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+            "doseGrams": 18,
+            "yieldGrams": 42,
+            "ratio": 2.33,
+            "timeRangeSeconds": [
+              25,
+              30
+            ],
+            "timeBasis": "machine_start_to_stop",
+            "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+            "grinderSetting": {
+              "grinder": "integrated",
+              "model": null,
+              "value": null,
+              "unit": "machine_setting",
+              "source": "unreported"
+            },
+            "temperature": {
+              "mode": "machine_default",
+              "offsetF": 0,
+              "supportedOffsetsF": [
+                -4,
+                -2,
+                0,
+                2,
+                4
+              ],
+              "unit": "F",
+              "source": "breville-manual"
+            },
+            "preparation": [
+              "Distribute the dose evenly.",
+              "Tamp level with consistent pressure.",
+              "Stop at the target output mass."
+            ],
+            "roastLevel": "medium",
+            "source": "user_saved",
+            "provenance": {
+              "kind": "user_saved",
+              "label": "Saved recipe"
+            },
+            "userAdjustedFields": [
+              "yieldGrams"
+            ],
+            "generatedAt": "2026-10-13T01:44:59.097Z",
+            "fingerprint": "f5a30ebf2794fa40",
+            "originalProvenance": {
+              "kind": "app_baseline",
+              "label": "App baseline"
+            }
+          }
+        },
+        "expectedRevisionId": "revision_4a3dee1d-d0fd-494e-b967-830ab9166efc",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    },
+    {
+      "path": "/api/claude",
+      "feature": "tastingCoach"
+    },
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "5f4a1c55-5e08-49cf-8137-6c29fecef3d3",
+        "mode": "replace_active_recipe",
+        "coffeeId": "browser-a",
+        "slotKey": "espresso",
+        "recipe": {
+          "schemaVersion": 1,
+          "engine": "espresso-baseline-2026-10-12",
+          "method": "espresso",
+          "device": "espresso",
+          "mode": "hot",
+          "slotKey": "espresso",
+          "coffeeId": "browser-a",
+          "setup": {
+            "machine": "breville-barista-express",
+            "basket": "stock-double-single-wall",
+            "grinder": "integrated",
+            "grinderModel": null,
+            "grinderCustomName": null
+          },
+          "setupKey": "f89c3ede4e2f6745",
+          "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+          "doseGrams": 18,
+          "yieldGrams": 39,
+          "ratio": 2.17,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+          "grinderSetting": {
+            "grinder": "integrated",
+            "model": null,
+            "value": null,
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "machine_default",
+            "offsetF": 0,
+            "supportedOffsetsF": [
+              -4,
+              -2,
+              0,
+              2,
+              4
+            ],
+            "unit": "F",
+            "source": "breville-manual"
+          },
+          "preparation": [
+            "Distribute the dose evenly.",
+            "Tamp level with consistent pressure.",
+            "Stop at the target output mass."
+          ],
+          "roastLevel": "medium",
+          "source": "user_saved",
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "userAdjustedFields": [
+            "yieldGrams"
+          ],
+          "generatedAt": "2026-10-13T01:44:59.097Z",
+          "fingerprint": "cec7b807f151057a",
+          "originalProvenance": {
+            "kind": "app_baseline",
+            "label": "App baseline"
+          }
+        },
+        "patch": {
+          "espressoRecipe": {
+            "schemaVersion": 1,
+            "engine": "espresso-baseline-2026-10-12",
+            "method": "espresso",
+            "device": "espresso",
+            "mode": "hot",
+            "slotKey": "espresso",
+            "coffeeId": "browser-a",
+            "setup": {
+              "machine": "breville-barista-express",
+              "basket": "stock-double-single-wall",
+              "grinder": "integrated",
+              "grinderModel": null,
+              "grinderCustomName": null
+            },
+            "setupKey": "f89c3ede4e2f6745",
+            "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+            "doseGrams": 18,
+            "yieldGrams": 39,
+            "ratio": 2.17,
+            "timeRangeSeconds": [
+              25,
+              30
+            ],
+            "timeBasis": "machine_start_to_stop",
+            "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+            "grinderSetting": {
+              "grinder": "integrated",
+              "model": null,
+              "value": null,
+              "unit": "machine_setting",
+              "source": "unreported"
+            },
+            "temperature": {
+              "mode": "machine_default",
+              "offsetF": 0,
+              "supportedOffsetsF": [
+                -4,
+                -2,
+                0,
+                2,
+                4
+              ],
+              "unit": "F",
+              "source": "breville-manual"
+            },
+            "preparation": [
+              "Distribute the dose evenly.",
+              "Tamp level with consistent pressure.",
+              "Stop at the target output mass."
+            ],
+            "roastLevel": "medium",
+            "source": "user_saved",
+            "provenance": {
+              "kind": "user_saved",
+              "label": "Saved recipe"
+            },
+            "userAdjustedFields": [
+              "yieldGrams"
+            ],
+            "generatedAt": "2026-10-13T01:44:59.097Z",
+            "fingerprint": "cec7b807f151057a",
+            "originalProvenance": {
+              "kind": "app_baseline",
+              "label": "App baseline"
+            }
+          }
+        },
+        "expectedRevisionId": "revision_47fa7de6-3a1a-46ee-850b-0ce8b7d87e5e",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    },
+    {
+      "path": "/api/claude",
+      "feature": "tastingCoach"
+    },
+    {
+      "path": "/api/recipe-command",
+      "body": {
+        "actionId": "7d94c475-4694-4b34-81cf-e03ad94e24c5",
+        "mode": "replace_active_recipe",
+        "coffeeId": "browser-b",
+        "slotKey": "espresso",
+        "recipe": {
+          "schemaVersion": 1,
+          "engine": "espresso-baseline-2026-10-12",
+          "method": "espresso",
+          "device": "espresso",
+          "mode": "hot",
+          "slotKey": "espresso",
+          "coffeeId": "browser-b",
+          "setup": {
+            "machine": "breville-barista-express",
+            "basket": "stock-double-single-wall",
+            "grinder": "integrated",
+            "grinderModel": null,
+            "grinderCustomName": null
+          },
+          "setupKey": "f89c3ede4e2f6745",
+          "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+          "doseGrams": 18,
+          "yieldGrams": 38,
+          "ratio": 2.11,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+          "grinderSetting": {
+            "grinder": "integrated",
+            "model": null,
+            "value": null,
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "machine_default",
+            "offsetF": 0,
+            "supportedOffsetsF": [
+              -4,
+              -2,
+              0,
+              2,
+              4
+            ],
+            "unit": "F",
+            "source": "breville-manual"
+          },
+          "preparation": [
+            "Distribute the dose evenly.",
+            "Tamp level with consistent pressure.",
+            "Stop at the target output mass."
+          ],
+          "roastLevel": "medium",
+          "source": "user_saved",
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "userAdjustedFields": [
+            "yieldGrams"
+          ],
+          "generatedAt": "2026-10-13T01:45:11.853Z",
+          "fingerprint": "1709c00f95b5a166",
+          "originalProvenance": {
+            "kind": "app_baseline",
+            "label": "App baseline"
+          }
+        },
+        "patch": {
+          "espressoRecipe": {
+            "schemaVersion": 1,
+            "engine": "espresso-baseline-2026-10-12",
+            "method": "espresso",
+            "device": "espresso",
+            "mode": "hot",
+            "slotKey": "espresso",
+            "coffeeId": "browser-b",
+            "setup": {
+              "machine": "breville-barista-express",
+              "basket": "stock-double-single-wall",
+              "grinder": "integrated",
+              "grinderModel": null,
+              "grinderCustomName": null
+            },
+            "setupKey": "f89c3ede4e2f6745",
+            "setupDescription": "Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder",
+            "doseGrams": 18,
+            "yieldGrams": 38,
+            "ratio": 2.11,
+            "timeRangeSeconds": [
+              25,
+              30
+            ],
+            "timeBasis": "machine_start_to_stop",
+            "grindGuidance": "Start near the Barista Express grinder default and adjust by taste after a measured shot.",
+            "grinderSetting": {
+              "grinder": "integrated",
+              "model": null,
+              "value": null,
+              "unit": "machine_setting",
+              "source": "unreported"
+            },
+            "temperature": {
+              "mode": "machine_default",
+              "offsetF": 0,
+              "supportedOffsetsF": [
+                -4,
+                -2,
+                0,
+                2,
+                4
+              ],
+              "unit": "F",
+              "source": "breville-manual"
+            },
+            "preparation": [
+              "Distribute the dose evenly.",
+              "Tamp level with consistent pressure.",
+              "Stop at the target output mass."
+            ],
+            "roastLevel": "medium",
+            "source": "user_saved",
+            "provenance": {
+              "kind": "user_saved",
+              "label": "Saved recipe"
+            },
+            "userAdjustedFields": [
+              "yieldGrams"
+            ],
+            "generatedAt": "2026-10-13T01:45:11.853Z",
+            "fingerprint": "1709c00f95b5a166",
+            "originalProvenance": {
+              "kind": "app_baseline",
+              "label": "App baseline"
+            }
+          }
+        },
+        "expectedRevisionHash": "4921259d9e3de9e9",
+        "clientVersion": "1.1.255",
+        "commandCapabilities": [
+          "apply_proposal",
+          "brew_once",
+          "keep_current",
+          "start_attempt",
+          "timer_started",
+          "complete_attempt",
+          "prepare_attempt",
+          "promote_attempt",
+          "set_dose",
+          "set_aiden_grind",
+          "set_aiden_link",
+          "undo_revision",
+          "replace_active_recipe"
+        ]
+      }
+    }
+  ],
+  "persistedTastings": [
+    {
+      "id": "OR9xYSAL4rshbYf29QFA",
+      "beanId": "browser-a",
+      "date": "2026-10-13",
+      "aroma": "smell: With milk: creamy cocoa, finished drink sweetness.",
+      "firstSip": "Round & smooth",
+      "acidity": "Crisp — acidity: With milk: creamy cocoa, finished drink sweetness.",
+      "sweetness": "Sweet — sweetness: With milk: creamy cocoa, finished drink sweetness.",
+      "body": "Juice — body: With milk: creamy cocoa, finished drink sweetness.",
+      "finish": "Long — finish: With milk: creamy cocoa, finished drink sweetness.",
+      "oneWord": "Cocoa",
+      "notes": "With milk: creamy cocoa, finished drink sweetness. Balance — balance: With milk: creamy cocoa, finished drink sweetness..",
+      "changeTomorrow": "",
+      "rating": null,
+      "tastingScores": {
+        "fragranceAroma": 6,
+        "acidity": 6,
+        "sweetness": 6,
+        "body": 6,
+        "flavor": 6,
+        "balance": 6
+      },
+      "cupContext": {
+        "version": 1,
+        "method": "espresso",
+        "drinkType": "with_milk",
+        "equipment": {
+          "machine": "breville-barista-express",
+          "basket": "stock-double-single-wall",
+          "grinder": "integrated"
+        },
+        "recipeSnapshot": {
+          "schemaVersion": 1,
+          "fingerprint": "cec7b807f151057a",
+          "doseGrams": 18,
+          "yieldGrams": 39,
+          "ratio": 2.17,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "source": "user_saved",
+          "grinderSetting": {
+            "grinder": "integrated",
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "machine_default",
+            "offsetF": 0,
+            "supportedOffsetsF": [
+              -4,
+              -2,
+              0,
+              2,
+              4
+            ],
+            "unit": "F",
+            "source": "breville-manual"
+          },
+          "provenance": {
+            "kind": "user_saved",
+            "label": "Saved recipe"
+          },
+          "originalProvenance": {
+            "kind": "app_baseline",
+            "label": "App baseline"
+          }
+        },
+        "recipeRevisionId": "revision_5f4a1c55-5e08-49cf-8137-6c29fecef3d3"
+      },
+      "createdAt": {
+        "_seconds": 1791855910,
+        "_nanoseconds": 504000000
+      },
+      "updatedAt": {
+        "_seconds": 1791855910,
+        "_nanoseconds": 504000000
+      }
+    },
+    {
+      "id": "zaXp3E9DAxo6E6Psqvkg",
+      "beanId": "browser-a",
+      "date": "2026-10-13",
+      "aroma": "smell: Straight espresso: cocoa and a smooth finish.",
+      "firstSip": "Round & smooth",
+      "acidity": "Crisp — acidity: Straight espresso: cocoa and a smooth finish.",
+      "sweetness": "Sweet — sweetness: Straight espresso: cocoa and a smooth finish.",
+      "body": "Juice — body: Straight espresso: cocoa and a smooth finish.",
+      "finish": "Long — finish: Straight espresso: cocoa and a smooth finish.",
+      "oneWord": "Cocoa",
+      "notes": "Straight espresso: cocoa and a smooth finish. Balance — balance: Straight espresso: cocoa and a smooth finish..",
+      "changeTomorrow": "",
+      "rating": null,
+      "tastingScores": {
+        "fragranceAroma": 6,
+        "acidity": 6,
+        "sweetness": 6,
+        "body": 6,
+        "flavor": 6,
+        "balance": 6
+      },
+      "cupContext": {
+        "version": 1,
+        "method": "espresso",
+        "drinkType": "straight",
+        "equipment": {
+          "machine": "breville-barista-express",
+          "basket": "stock-double-single-wall",
+          "grinder": "integrated"
+        },
+        "recipeSnapshot": {
+          "schemaVersion": 1,
+          "fingerprint": "e1cff2ef37feb196",
+          "doseGrams": 18,
+          "yieldGrams": 40,
+          "ratio": 2.22,
+          "timeRangeSeconds": [
+            25,
+            30
+          ],
+          "timeBasis": "machine_start_to_stop",
+          "source": "unsaved_target",
+          "grinderSetting": {
+            "grinder": "integrated",
+            "unit": "machine_setting",
+            "source": "unreported"
+          },
+          "temperature": {
+            "mode": "machine_default",
+            "offsetF": 0,
+            "supportedOffsetsF": [
+              -4,
+              -2,
+              0,
+              2,
+              4
+            ],
+            "unit": "F",
+            "source": "breville-manual"
+          },
+          "provenance": {
+            "kind": "unsaved_target",
+            "label": "Unsaved target"
+          },
+          "originalProvenance": {
+            "kind": "app_baseline",
+            "label": "App baseline"
+          }
+        }
+      },
+      "createdAt": {
+        "_seconds": 1791855908,
+        "_nanoseconds": 56000000
+      },
+      "updatedAt": {
+        "_seconds": 1791855908,
+        "_nanoseconds": 56000000
+      }
+    }
+  ],
+  "finalPreferences": {
+    "brewMethod": "espresso",
+    "grinder": "fellow-ode-gen2",
+    "canisterCount": 3,
+    "espressoMachine": "breville-barista-express",
+    "espressoBasket": "stock-double-single-wall",
+    "espressoGrinderCustomName": null,
+    "espressoGrinder": "external",
+    "espressoSetupConfirmed": false,
+    "espressoGrinderModel": "Encore ESP"
+  },
+  "modelCalls": 2,
+  "providerCalls": [
+    {
+      "requestedModel": "gpt-5.6-luna",
+      "status": "completed",
+      "requestId": "resp_0a28643ab61abec9016acd8d1c7b0c87d08e8361a203b072b8",
+      "servedModel": "gpt-5.6-luna",
+      "usage": {
+        "input_tokens": 6549,
+        "input_tokens_details": {
+          "cache_write_tokens": 6546,
+          "cached_tokens": 0
+        },
+        "output_tokens": 48,
+        "output_tokens_details": {
+          "reasoning_tokens": 19
+        },
+        "total_tokens": 6597
+      },
+      "output": [
+        {
+          "id": "fc_0a28643ab61abec9016acd8d1d819887d0bdeddb7fb4f42ab6",
+          "type": "function_call",
+          "status": "completed",
+          "arguments": "{\"coffeeRef\":\"cdf645a9a\",\"slot\":\"espresso\"}",
+          "call_id": "call_MkbsCExDJGfK57EmCKmiwWoD",
+          "name": "read_recipe"
+        }
+      ]
+    },
+    {
+      "requestedModel": "gpt-5.6-luna",
+      "status": "completed",
+      "requestId": "resp_0a28643ab61abec9016acd8d1de2b487d085478736f7bc11c6",
+      "servedModel": "gpt-5.6-luna",
+      "usage": {
+        "input_tokens": 6991,
+        "input_tokens_details": {
+          "cache_write_tokens": 6988,
+          "cached_tokens": 0
+        },
+        "output_tokens": 77,
+        "output_tokens_details": {
+          "reasoning_tokens": 22
+        },
+        "total_tokens": 7068
+      },
+      "output": [
+        {
+          "id": "fc_0a28643ab61abec9016acd8d1ebaa487d0bbb3379d51f7729c",
+          "type": "function_call",
+          "status": "completed",
+          "arguments": "{\"slot\":\"espresso\",\"coffeeRef\":\"cdf645a9a\",\"doseGrams\":null,\"yieldGrams\":41,\"grinderValue\":null,\"temperatureOffsetF\":null}",
+          "call_id": "call_tleForzrDdAwd1bnYUkNgGUl",
+          "name": "save_espresso_recipe"
+        }
+      ]
+    }
+  ]
+}

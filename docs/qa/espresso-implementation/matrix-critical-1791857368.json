@@ -1,0 +1,19 @@
+{
+  "group": "critical",
+  "startIndex": 0,
+  "records": [
+    {
+      "case": [
+        "E04",
+        "clear",
+        "E04.ambiguous"
+      ],
+      "exitCode": 1,
+      "manifests": [],
+      "message": "DEFER: shared lock held"
+    }
+  ],
+  "requiredInBatch": 7,
+  "requiredInMatrix": 7,
+  "semanticReview": "pending"
+}

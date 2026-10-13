@@ -1,0 +1,38 @@
+{
+  "base": "58d1643",
+  "startIndex": 0,
+  "records": [
+    {
+      "index": 0,
+      "command": [
+        "node",
+        "scripts/v60-switch-runtime-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 70.33,
+      "exitCode": 1,
+      "log": "baseline-1791868022-0.log"
+    },
+    {
+      "index": 1,
+      "command": [
+        "node",
+        "scripts/handbrew-v60-cutover-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 71.43,
+      "exitCode": 1,
+      "log": "baseline-1791868022-1.log"
+    },
+    {
+      "index": 2,
+      "command": [
+        "node",
+        "--import",
+        "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/installed-chrome.mjs",
+        "scripts/verify-kalita-iced-ui.mjs"
+      ],
+      "cpuIdlePercent": 64.3,
+      "exitCode": 1,
+      "log": "baseline-1791868022-2.log"
+    }
+  ]
+}

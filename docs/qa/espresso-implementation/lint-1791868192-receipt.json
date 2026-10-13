@@ -1,0 +1,20 @@
+{
+  "suite": "lint",
+  "startIndex": 0,
+  "status": "failed",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "cpuIdlePercent": 56.18,
+      "exitCode": 1,
+      "log": "lint-1791868192-00.log"
+    }
+  ],
+  "requiredCommands": 1
+}

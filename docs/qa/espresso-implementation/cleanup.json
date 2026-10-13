@@ -1,0 +1,13 @@
+{
+  "removed": [
+    ".runtime/baseline-check: task-owned disposable untouched-source extraction"
+  ],
+  "retained": [
+    "Implementation worktree and canonical commits for user review",
+    "Research, mockup, failed and passing acceptance receipts",
+    "Existing local test runtime needed to reproduce verification"
+  ],
+  "browser": "Test-created Playwright contexts and Vite/emulator processes exited in harness cleanup; pre-existing user browser tab preserved",
+  "sidebar": "No user-visible worker chats were created for this run; native writer/reviewer results are preserved. Earlier inventory was limited to50 returned chats and is not claimed as a complete historical sidebar audit.",
+  "primary_checkout": "Preserved; implementation only in isolated espresso worktree"
+}

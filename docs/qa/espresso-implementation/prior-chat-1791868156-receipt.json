@@ -1,0 +1,136 @@
+{
+  "suite": "prior-chat",
+  "startIndex": 0,
+  "status": "passed",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-physical-grind.test.mjs"
+      ],
+      "cpuIdlePercent": 66.12,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-00.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-proposal-continuity.test.mjs"
+      ],
+      "cpuIdlePercent": 66.66,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-01.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-trial-recovery.test.mjs"
+      ],
+      "cpuIdlePercent": 68.41,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-02.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-sensory-followup.test.mjs"
+      ],
+      "cpuIdlePercent": 62.4,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-03.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-sensory-consistency.test.mjs"
+      ],
+      "cpuIdlePercent": 68.93,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-04.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-repository-transaction.test.mjs"
+      ],
+      "cpuIdlePercent": 67.51,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-05.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-method-resolution.test.mjs"
+      ],
+      "cpuIdlePercent": 54.25,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-06.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-u3-runtime.test.mjs"
+      ],
+      "cpuIdlePercent": 58.1,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-07.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-source-backend.test.mjs"
+      ],
+      "cpuIdlePercent": 64.87,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-08.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-recipe-first-actions.test.mjs"
+      ],
+      "cpuIdlePercent": 61.15,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-09.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-aiden-conversation.test.mjs"
+      ],
+      "cpuIdlePercent": 66.69,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-10.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-aiden-preparation.test.mjs"
+      ],
+      "cpuIdlePercent": 71.16,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-11.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-aiden-first-profile.test.mjs"
+      ],
+      "cpuIdlePercent": 68.67,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-12.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-agent-endpoint.test.mjs"
+      ],
+      "cpuIdlePercent": 65.8,
+      "exitCode": 0,
+      "log": "prior-chat-1791868156-13.log"
+    }
+  ],
+  "requiredCommands": 14
+}

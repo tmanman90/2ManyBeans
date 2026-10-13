@@ -1,0 +1,18 @@
+{
+  "group": "writes",
+  "startIndex": 6,
+  "records": [
+    {
+      "case": [
+        "E07",
+        "clear"
+      ],
+      "exitCode": 1,
+      "manifests": [],
+      "message": "DEFER: CPU idle gate"
+    }
+  ],
+  "requiredInBatch": 3,
+  "requiredInMatrix": 9,
+  "semanticReview": "pending"
+}

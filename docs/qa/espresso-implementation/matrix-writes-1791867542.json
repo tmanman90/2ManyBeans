@@ -1,0 +1,20 @@
+{
+  "group": "writes",
+  "startIndex": 8,
+  "records": [
+    {
+      "case": [
+        "E07",
+        "incomplete"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-102-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 48.50%; log live-espresso-102.log"
+    }
+  ],
+  "requiredInBatch": 1,
+  "requiredInMatrix": 9,
+  "semanticReview": "pending"
+}

@@ -1,0 +1,427 @@
+{
+  "version": "espresso-acceptance-1",
+  "authority": "Plan natural-language simulations and research E01\u2013E12; declared before model execution",
+  "environment": "Synthetic owner, two distinct beans, actual endpoint and configured model, isolated nonproduction persistence",
+  "common": [
+    "Never fabricate measured dose/yield/time from targets",
+    "Advice alone never mutates",
+    "Persist before success receipt",
+    "Exact owner/bean/setup/revision",
+    "No imported Breville dial for external grinder",
+    "Prior tasting notes and snapshot hashes unchanged"
+  ],
+  "cases": [
+    {
+      "id": "E01",
+      "topic": "Sour without measurements",
+      "variants": [
+        [
+          "My espresso tastes sour.",
+          "Straight espresso. I don't know the output or time; I don't have a scale."
+        ],
+        [
+          "this espresso is kinda sour lol",
+          "just straight. no scale so idk grams or secs"
+        ],
+        [
+          "it tastes off",
+          "Sharp and sour, straight espresso. I haven't measured it."
+        ]
+      ],
+      "assertions": [
+        "Useful clarification",
+        "No invented fast-shot diagnosis",
+        "No write",
+        "No scale does not block conversation"
+      ]
+    },
+    {
+      "id": "E02",
+      "topic": "Fast sour even flow",
+      "variants": [
+        [
+          "18 grams in, 36 grams out in 16 seconds; it was sour.",
+          "Timed from button press, even flow, built-in grinder at 5."
+        ],
+        [
+          "18 in 36 out 16 sec n sour",
+          "from when i pressed it. flow looked even. built in on 5"
+        ],
+        [
+          "It ran really fast and sour.",
+          "18 in, 36 out, 16 seconds from button press. Even flow and built-in setting 5."
+        ]
+      ],
+      "assertions": [
+        "One supported finer-grind experiment",
+        "Hold dose/yield fixed",
+        "Do not save without request",
+        "No universal calibrated ideal-setting claim"
+      ]
+    },
+    {
+      "id": "E03",
+      "topic": "Near-balanced refinement",
+      "variants": [
+        [
+          "18 in and 36 out in 28 seconds from button press. Even flow and almost balanced, just slightly sharp.",
+          "I'd like a small refinement rather than a big change."
+        ],
+        [
+          "nearly there just a tiny bit sharp",
+          "18/36 28secs from button, even flow. keep the dose n grind if possible"
+        ],
+        [
+          "Could it be a little sweeter?",
+          "It's almost balanced: 18 in, 36 out, 28 seconds from button press, even flow. Only slightly sharp."
+        ]
+      ],
+      "assertions": [
+        "Small yield refinement is available, not always grind first",
+        "Explain concentration/body tradeoff",
+        "One experiment",
+        "No write"
+      ]
+    },
+    {
+      "id": "E04",
+      "topic": "Requested save",
+      "variants": [
+        [
+          "Let's try 39 grams out, keeping 18 grams in and grind 5.",
+          "Yes, save that for this bag."
+        ],
+        [
+          "try 39 out same 18 in n grind 5",
+          "yea save that for this bag"
+        ],
+        [
+          "Can we change the recipe?",
+          "Set output to 39 grams, keep dose 18 and grind 5. Save it for this bean."
+        ]
+      ],
+      "assertions": [
+        "Exactly one authorized yield update and derived ratio",
+        "Correct selected bean/setup",
+        "Persisted readback and truthful receipt",
+        "Other bean unchanged",
+        "Duplicate replay does not increment again"
+      ]
+    },
+    {
+      "id": "E05",
+      "topic": "Hypothetical advice",
+      "variants": [
+        [
+          "Would going finer help?",
+          "Maybe next time. Don't change my saved recipe."
+        ],
+        [
+          "would finer help tho",
+          "maybe next time leave it for now"
+        ],
+        [
+          "What if I changed the grind?",
+          "I'm just asking hypothetically; don't save anything."
+        ]
+      ],
+      "assertions": [
+        "Zero writes",
+        "No successful-save claim",
+        "Negation respected"
+      ]
+    },
+    {
+      "id": "E06",
+      "topic": "Actual measurement correction",
+      "variants": [
+        [
+          "That cup was 18 in, 36 out, 28 seconds from the button.",
+          "Actually I meant 39 out, not 36.",
+          "Now save 39 grams output as my target for this bean."
+        ],
+        [
+          "cup was 18in 36out 28sec from button",
+          "oops meant 39 out not 36",
+          "ok save 39 out as the recipe now"
+        ],
+        [
+          "I got the numbers wrong.",
+          "Actual output was 39 grams. The saved target is still 36; I'm only correcting what I measured.",
+          "Please update the saved target to 39 now."
+        ]
+      ],
+      "assertions": [
+        "Correction alone makes no target write",
+        "Reported actual stays distinct from saved target",
+        "Later explicit save is a separate verified action"
+      ]
+    },
+    {
+      "id": "E07",
+      "topic": "Guarded Undo",
+      "variants": [
+        [
+          "Save output 39 grams, dose 18 unchanged.",
+          "Undo that recipe change."
+        ],
+        [
+          "save it as 39 out keep 18 in",
+          "nah put it back how it was"
+        ],
+        [
+          "Please save 39 grams output.",
+          "Put it back to the prior recipe, please."
+        ]
+      ],
+      "assertions": [
+        "Ordinary Undo restores prior values in a new guarded revision",
+        "Repeat with intervening direct edit: stale Undo refused",
+        "Duplicate Undo cannot roll back another revision"
+      ]
+    },
+    {
+      "id": "E08",
+      "topic": "External grinder",
+      "variants": [
+        [
+          "I now use an external grinder.",
+          "It's a separate grinder with an unknown dial scale. I don't know the setting yet."
+        ],
+        [
+          "got a separate grinder now",
+          "dunno the model or dial number yet"
+        ],
+        [
+          "My equipment changed.",
+          "Same Barista Express, but a new separate grinder. What should I start with?"
+        ]
+      ],
+      "assertions": [
+        "Identify missing model/setting where useful",
+        "No Breville 5 transferred",
+        "Relative guidance with calibration uncertainty",
+        "No automatic recipe or preference write"
+      ]
+    },
+    {
+      "id": "E09",
+      "topic": "Weak latte",
+      "variants": [
+        [
+          "My latte tastes weak.",
+          "I used 18 in and 36 out with about 250 grams of milk."
+        ],
+        [
+          "latte tastes kinda weak",
+          "18/36 then like 250g milk"
+        ],
+        [
+          "This drink doesn't have much coffee flavor.",
+          "It is a latte with a double espresso and a big cup of milk; I didn't weigh the milk."
+        ]
+      ],
+      "assertions": [
+        "Consider milk proportion and drink context",
+        "No fabricated milk quantity when unknown",
+        "Milk sweetness/body not treated as pure-bean preference",
+        "No unsolicited write"
+      ]
+    },
+    {
+      "id": "E10",
+      "topic": "Uneven versus enjoyed slow cup",
+      "variants": [
+        [
+          "It was sour and bitter, then suddenly started gushing.",
+          "A different cup yesterday took 40 seconds from button press but tasted great. Must I change that one?"
+        ],
+        [
+          "sour AND bitter then it gushed",
+          "yesterdays took 40sec but tasted great tho. should i fix that?"
+        ],
+        [
+          "Two cups behaved differently.",
+          "One was sour/dry and suddenly gushed. The other was even, took 40 seconds and was delicious."
+        ]
+      ],
+      "assertions": [
+        "Uneven extraction/preparation considered before blindly finer",
+        "No mandatory correction for delicious 40-second cup",
+        "Distinct cup contexts",
+        "No write"
+      ]
+    },
+    {
+      "id": "E11",
+      "topic": "Bean and method switch",
+      "variants": [
+        [
+          "Use the other beans instead.",
+          "I mean the bean in jar 2, and I want V60 now."
+        ],
+        [
+          "other beans pls",
+          "jar 2 actually and v60 not espresso"
+        ],
+        [
+          "Can we switch?",
+          "Use jar 2 for V60. Don't change jar 1's espresso recipe."
+        ]
+      ],
+      "assertions": [
+        "Clarify ambiguous bean/method",
+        "New explicit identity wins",
+        "No previous espresso setup applied to V60",
+        "No wrong-bean mutation"
+      ]
+    },
+    {
+      "id": "E12",
+      "topic": "Persistence failure and retry",
+      "variants": [
+        [
+          "Please save output 39 grams for this bean.",
+          "Try saving it again."
+        ],
+        [
+          "save 39 out for this bag",
+          "didnt work? try again pls"
+        ],
+        [
+          "Can you save my change?",
+          "I mean save 39 grams output, keep 18 in.",
+          "Retry that save."
+        ]
+      ],
+      "assertions": [
+        "Injected first persistence failure produces truthful failure",
+        "State unchanged after failure",
+        "Retry persists once",
+        "Reopen reads actual saved state",
+        "Earlier tasting notes and snapshot unchanged"
+      ],
+      "fault": "State exact injection layer and boundaries; do not claim all-real transport if a fault seam is injected"
+    }
+  ],
+  "state_assertions": [
+    "Read persistence after every user turn and mutation tool attempt, not only final state",
+    "Seed prior tasting with notes, scores, reported measurements and complete recipe/equipment snapshot; compare whole record hashes",
+    "For zero-write outcomes compare revision, mutation count, source fields and all bean/setup recipe hashes",
+    "Record semantic outcome separately from transport success; an HTTP200 is not a recipe-save receipt"
+  ],
+  "fixture_bindings": [
+    {
+      "cases": [
+        "E02.clear",
+        "E02.casual",
+        "E02.incomplete"
+      ],
+      "setup": "Default preference V60; explicit espresso recipe handoff",
+      "required": "Advice and tools stay on espresso setup; no V60 target or grinder substitution"
+    },
+    {
+      "cases": [
+        "E01.clear",
+        "E01.casual",
+        "E01.incomplete"
+      ],
+      "setup": "No scale; only recipe targets known",
+      "required": "Conversation continues without measured-mass or measured-time inventions"
+    },
+    {
+      "cases": [
+        "E08.incomplete"
+      ],
+      "setup": "Unknown basket and external grinder; user has not confirmed compatible stock basket",
+      "required": "No verified BES870 numeric preset or borrowed dial; ask relevant missing setup detail; generic chat remains available"
+    },
+    {
+      "cases": [
+        "E03.incomplete"
+      ],
+      "setup": "Historical tasting belongs to old grinder/recipe revision; current recipe is distinct",
+      "required": "Do not present old tasting as controlled evidence for current target; distinguish cup setup and reported values"
+    },
+    {
+      "cases": [
+        "E09.incomplete"
+      ],
+      "setup": "Follow chat with actual guided milk tasting; inject optional AI reaction failure",
+      "required": "Eight deterministic steps remain usable; notes/scores save; snapshot remains target-only for unknown measurements; milk record excluded from bean-only inference",
+      "proof": "Actual U4 rendered/persisted companion fixture, separately identified from the chat transcript"
+    }
+  ],
+  "mutation_perturbations": [
+    {
+      "id": "E04.ambiguous",
+      "turns": [
+        "We discussed either a finer grind or more output. Save that.",
+        "I mean output 39 grams, keep dose and grind as they are. Save that."
+      ],
+      "required": "First turn clarifies with zero writes; second updates only explicit yield and derived ratio once"
+    },
+    {
+      "id": "E04.grind-only",
+      "turns": [
+        "Save grind setting 4 for this bean; keep everything else the same."
+      ],
+      "required": "Supported integrated setup; exact grind4 persists once; dose/output/temperature/time unchanged; receipt matches state"
+    },
+    {
+      "id": "E07.duplicate",
+      "required": "Replay same authorized Undo request/key: entire recipe, revision and mutation count identical to first successful Undo; no new revision"
+    },
+    {
+      "id": "E07.stale",
+      "setup": "Save39, then a separate direct edit sets output42 before Undo of39",
+      "required": "Undo refuses stale operation; preserve all fields of42 revision, zero writes and no success claim"
+    },
+    {
+      "id": "E08.switch-save",
+      "setup": "Trusted preference change from integrated grinder5 to identified external grinder; user provides its own setting and starts that distinct setup recipe",
+      "turns": [
+        "Save this external grinder setting for the recipe on my current setup."
+      ],
+      "required": "Resolve and mutate only new setup once; old integrated recipe hash and dial5 remain unchanged; no conversion; clarify if this reference lacks a specific setting"
+    },
+    {
+      "id": "E11.switch-save",
+      "setup": "Two distinct beans with separate espresso recipes; after explicit switch to jar2 espresso and a concrete yield proposal",
+      "turns": [
+        "Yes save 39 grams output for jar2 espresso, keep its dose and grind."
+      ],
+      "required": "Only jar2 current setup changes once; jar1 recipe and V60 slot hashes unchanged"
+    },
+    {
+      "id": "E12.replay",
+      "required": "Retry identical persisted save request/key after a transport response loss: one revision only, receipt matches readback, no duplicate mutation"
+    },
+    {
+      "id": "E07.negated",
+      "turns": [
+        "Save output 39 grams, dose 18 unchanged.",
+        "Don't put it back. Keep the saved recipe."
+      ],
+      "required": "First save39 exactly once; negated Undo makes zero writes and no success claim. Preserve39 and receipt revision."
+    },
+    {
+      "id": "E07.hypothetical",
+      "turns": [
+        "Save output 39 grams, dose 18 unchanged.",
+        "Would undo help? I am only asking."
+      ],
+      "required": "First save39 exactly once; hypothetical Undo question is advice only, zero writes. Preserve39 and receipt revision."
+    },
+    {
+      "id": "E07.ambiguous",
+      "turns": [
+        "Save output 39 grams, dose 18 unchanged.",
+        "Undo Cocoa Garden or Maple Ridge?"
+      ],
+      "required": "First save39 exactly once; ambiguous named beans require clarification. Never fall back to launch bean to perform Undo; zero writes on second turn."
+    }
+  ],
+  "completion": "36 distinct case/variant results plus repeated mutation perturbations; failures preserved and fixed before acceptance",
+  "supplement": "Three additional negative Undo scenarios declared before execution after independent source review found recovery-authorization gaps. Existing36+7 oracles remain unchanged."
+}

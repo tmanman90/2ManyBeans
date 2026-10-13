@@ -1,0 +1,72 @@
+{
+  "suite": "focused",
+  "startIndex": 3,
+  "status": "deferred_cpu",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-espresso-tools.test.mjs"
+      ],
+      "cpuIdlePercent": 52.8,
+      "exitCode": 0,
+      "log": "focused-1791867090-03.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-u4-tasting-context.test.mjs"
+      ],
+      "cpuIdlePercent": 49.44,
+      "exitCode": 0,
+      "log": "focused-1791867090-04.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-context.test.mjs"
+      ],
+      "cpuIdlePercent": 56.52,
+      "exitCode": 0,
+      "log": "focused-1791867090-05.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-evidence.test.mjs"
+      ],
+      "cpuIdlePercent": 50.59,
+      "exitCode": 0,
+      "log": "focused-1791867090-06.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-brew-evidence.test.mjs"
+      ],
+      "cpuIdlePercent": 56.76,
+      "exitCode": 0,
+      "log": "focused-1791867090-07.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-conversation-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 55.3,
+      "exitCode": 0,
+      "log": "focused-1791867090-08.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-runtime-contracts.test.mjs"
+      ],
+      "cpuIdlePercent": 10.87,
+      "executed": false
+    }
+  ],
+  "requiredCommands": 13
+}

@@ -1,0 +1,99 @@
+{
+  "suite": "regression",
+  "startIndex": 15,
+  "status": "deferred_cpu",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/v60-source-registry.test.mjs"
+      ],
+      "cpuIdlePercent": 62.62,
+      "exitCode": 0,
+      "log": "regression-1791867873-15.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 61.18,
+      "exitCode": 0,
+      "log": "regression-1791867873-16.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-recipe-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 61.46,
+      "exitCode": 0,
+      "log": "regression-1791867873-17.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-technique-copy.test.mjs"
+      ],
+      "cpuIdlePercent": 61.64,
+      "exitCode": 0,
+      "log": "regression-1791867873-18.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-dose-scaling-provenance.test.mjs"
+      ],
+      "cpuIdlePercent": 59.9,
+      "exitCode": 0,
+      "log": "regression-1791867873-19.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-cutover-boundaries.test.mjs"
+      ],
+      "cpuIdlePercent": 61.4,
+      "exitCode": 0,
+      "log": "regression-1791867873-20.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-selector-counterexamples.test.mjs"
+      ],
+      "cpuIdlePercent": 62.1,
+      "exitCode": 0,
+      "log": "regression-1791867873-21.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-iced-source-registry.test.mjs"
+      ],
+      "cpuIdlePercent": 62.3,
+      "exitCode": 0,
+      "log": "regression-1791867873-22.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-iced-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 61.59,
+      "exitCode": 0,
+      "log": "regression-1791867873-23.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/v60-iced-recipe-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 34.93,
+      "executed": false
+    }
+  ],
+  "requiredCommands": 44
+}

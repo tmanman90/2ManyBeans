@@ -1,0 +1,51 @@
+Archive
+1 bean·0 tastings
+Filter
+2026
+1 bean
+OCT
+Old Bag
+10d owned
+Rotation
+Inventory
+Tasting
+Chat
+Archive
+COFFEE
+O
+Old Bag
+ROAST
+MEDIUM
+VARIETY
+—
+WEIGHT
+—
+VIEW STAT SHEET
+FINISHED
+2026
+OCT
+STAT SHEET
+Old Bag
+COFFEE NAME
+Old Bag
+ROAST LEVEL
+medium
+ROAST DATE
+Oct 1, 2026
+FINISHED
+Oct 11, 2026
+DAYS OWNED
+10 days
+YOUR TASTINGS
+No tastings logged yet for this bean.
+BREW PROFILE
+Espresso
+18g · 36g out · 1:2 · App baseline
+BACK TO CARD
+Learn
+Restore
+Edit
+Delete
+FINISHED
+2026
+OCT

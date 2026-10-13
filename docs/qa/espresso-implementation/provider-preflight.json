@@ -1,0 +1,8 @@
+{
+  "requestedModel": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "operation": "models.retrieve (no generation)",
+  "timestamp": "2026-10-13T00:07:32.782Z",
+  "available": true,
+  "returnedId": "gpt-5.6-luna"
+}

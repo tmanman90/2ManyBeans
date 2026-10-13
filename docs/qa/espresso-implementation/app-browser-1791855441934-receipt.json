@@ -1,0 +1,13 @@
+{
+  "runId": 1791855441934,
+  "status": "failed",
+  "proof": "Unchanged main.jsx/App navigation, real client Auth/Firestore, authenticated recipe-command and actual configured provider for chat. Synthetic vision/enrichment responses; optional tasting AI intentionally fails locally. No image-recognition proof claimed.",
+  "checks": [],
+  "errors": [
+    "Failed to fetch dynamically imported module: http://127.0.0.1:5173/src/main.jsx",
+    "locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Espresso Recipe', exact: true })\n"
+  ],
+  "requests": [],
+  "modelCalls": 0,
+  "providerCalls": []
+}

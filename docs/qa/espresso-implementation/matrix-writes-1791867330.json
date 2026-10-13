@@ -1,0 +1,84 @@
+{
+  "group": "writes",
+  "startIndex": 0,
+  "records": [
+    {
+      "case": [
+        "E04",
+        "clear"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-94-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 56.37%; log live-espresso-94.log"
+    },
+    {
+      "case": [
+        "E04",
+        "casual"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-95-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 53.89%; log live-espresso-95.log"
+    },
+    {
+      "case": [
+        "E04",
+        "incomplete"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-96-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 54.64%; log live-espresso-96.log"
+    },
+    {
+      "case": [
+        "E06",
+        "clear"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-97-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 56.35%; log live-espresso-97.log"
+    },
+    {
+      "case": [
+        "E06",
+        "casual"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-98-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 43.22%; log live-espresso-98.log"
+    },
+    {
+      "case": [
+        "E06",
+        "incomplete"
+      ],
+      "exitCode": 0,
+      "manifests": [
+        "live-espresso-99-manifest.json"
+      ],
+      "message": "live-espresso exit 0; CPU idle 57.6%; log live-espresso-99.log"
+    },
+    {
+      "case": [
+        "E07",
+        "clear"
+      ],
+      "exitCode": 1,
+      "manifests": [],
+      "message": "DEFER: CPU idle gate"
+    }
+  ],
+  "requiredInBatch": 9,
+  "requiredInMatrix": 9,
+  "semanticReview": "pending"
+}

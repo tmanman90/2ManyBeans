@@ -1,0 +1,20 @@
+[
+  {
+    "command": [
+      "node",
+      "scripts/ruphus-espresso-tools.test.mjs"
+    ],
+    "cpuIdlePercent": 57.12,
+    "exitCode": 0,
+    "log": "focused-short-1791856243-0.log"
+  },
+  {
+    "command": [
+      "node",
+      "scripts/ruphus-u4-tasting-context.test.mjs"
+    ],
+    "cpuIdlePercent": 58.45,
+    "exitCode": 0,
+    "log": "focused-short-1791856243-1.log"
+  }
+]

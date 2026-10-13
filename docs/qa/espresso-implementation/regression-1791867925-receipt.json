@@ -1,0 +1,46 @@
+{
+  "suite": "regression",
+  "startIndex": 31,
+  "status": "failed",
+  "sourceBefore": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "sourceAfter": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/handbrew-v60-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 52.2,
+      "exitCode": 0,
+      "log": "regression-1791867925-31.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/handbrew-v60-switch-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 49.38,
+      "exitCode": 0,
+      "log": "regression-1791867925-32.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/handbrew-iced-prep-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 54.96,
+      "exitCode": 0,
+      "log": "regression-1791867925-33.log"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/handbrew-v60-cutover-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 57.65,
+      "exitCode": 1,
+      "log": "regression-1791867925-34.log"
+    }
+  ],
+  "requiredCommands": 44
+}

@@ -1,0 +1,458 @@
+{
+  "status": "41_passed_3_reproduced_baseline_failures",
+  "commandsRequired": 44,
+  "commandsExecuted": 44,
+  "passed": 41,
+  "failed": 3,
+  "sourceDigest": "ff61d04fe9931dd44a229baacec57c90f2c3d18457a69a95ee92ac41cf09dc49",
+  "baselineReceipt": "baseline-1791868022-receipt.json",
+  "commands": {
+    "0": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/source-insights-regression.test.mjs"
+      ],
+      "cpuIdlePercent": 67.36,
+      "exitCode": 0,
+      "log": "regression-1791867787-00.log"
+    },
+    "1": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/recipe-evidence.test.mjs"
+      ],
+      "cpuIdlePercent": 69.0,
+      "exitCode": 0,
+      "log": "regression-1791867787-01.log"
+    },
+    "2": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/extraction-intent.test.mjs"
+      ],
+      "cpuIdlePercent": 66.39,
+      "exitCode": 0,
+      "log": "regression-1791867787-02.log"
+    },
+    "3": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 60.86,
+      "exitCode": 0,
+      "log": "regression-1791867787-03.log"
+    },
+    "4": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-runtime-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 63.36,
+      "exitCode": 0,
+      "log": "regression-1791867787-04.log"
+    },
+    "5": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-iced-source-registry.test.mjs"
+      ],
+      "cpuIdlePercent": 62.8,
+      "exitCode": 0,
+      "log": "regression-1791867787-05.log"
+    },
+    "6": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-iced-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 65.25,
+      "exitCode": 0,
+      "log": "regression-1791867787-06.log"
+    },
+    "7": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-iced-recipe-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 61.68,
+      "exitCode": 0,
+      "log": "regression-1791867787-07.log"
+    },
+    "8": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-iced-technique-copy.test.mjs"
+      ],
+      "cpuIdlePercent": 63.45,
+      "exitCode": 0,
+      "log": "regression-1791867787-08.log"
+    },
+    "9": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/latest-write-queue.test.mjs"
+      ],
+      "cpuIdlePercent": 64.22,
+      "exitCode": 0,
+      "log": "regression-1791867787-09.log"
+    },
+    "10": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-cache-policy.test.mjs"
+      ],
+      "cpuIdlePercent": 66.57,
+      "exitCode": 0,
+      "log": "regression-1791867787-10.log"
+    },
+    "11": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-kalita-iced-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 63.33,
+      "exitCode": 0,
+      "log": "regression-1791867787-11.log"
+    },
+    "12": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-kalita-iced-cutover-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 64.3,
+      "exitCode": 0,
+      "log": "regression-1791867787-12.log"
+    },
+    "13": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "scripts/kalita-iced-evaluate-inventory.test.mjs"
+      ],
+      "cpuIdlePercent": 65.61,
+      "exitCode": 0,
+      "log": "regression-1791867787-13.log"
+    },
+    "14": {
+      "receipt": "regression-1791867787-receipt.json",
+      "command": [
+        "node",
+        "--import",
+        "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/installed-chrome.mjs",
+        "scripts/verify-kalita-iced-ui.mjs"
+      ],
+      "cpuIdlePercent": 66.0,
+      "exitCode": 1,
+      "log": "regression-1791867787-14.log"
+    },
+    "15": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-source-registry.test.mjs"
+      ],
+      "cpuIdlePercent": 62.62,
+      "exitCode": 0,
+      "log": "regression-1791867873-15.log"
+    },
+    "16": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 61.18,
+      "exitCode": 0,
+      "log": "regression-1791867873-16.log"
+    },
+    "17": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-recipe-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 61.46,
+      "exitCode": 0,
+      "log": "regression-1791867873-17.log"
+    },
+    "18": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-technique-copy.test.mjs"
+      ],
+      "cpuIdlePercent": 61.64,
+      "exitCode": 0,
+      "log": "regression-1791867873-18.log"
+    },
+    "19": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-dose-scaling-provenance.test.mjs"
+      ],
+      "cpuIdlePercent": 59.9,
+      "exitCode": 0,
+      "log": "regression-1791867873-19.log"
+    },
+    "20": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-cutover-boundaries.test.mjs"
+      ],
+      "cpuIdlePercent": 61.4,
+      "exitCode": 0,
+      "log": "regression-1791867873-20.log"
+    },
+    "21": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-selector-counterexamples.test.mjs"
+      ],
+      "cpuIdlePercent": 62.1,
+      "exitCode": 0,
+      "log": "regression-1791867873-21.log"
+    },
+    "22": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-iced-source-registry.test.mjs"
+      ],
+      "cpuIdlePercent": 62.3,
+      "exitCode": 0,
+      "log": "regression-1791867873-22.log"
+    },
+    "23": {
+      "receipt": "regression-1791867873-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-iced-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 61.59,
+      "exitCode": 0,
+      "log": "regression-1791867873-23.log"
+    },
+    "24": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-iced-recipe-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 57.98,
+      "exitCode": 0,
+      "log": "regression-1791867898-24.log"
+    },
+    "25": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-iced-technique-copy.test.mjs"
+      ],
+      "cpuIdlePercent": 56.28,
+      "exitCode": 0,
+      "log": "regression-1791867898-25.log"
+    },
+    "26": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-switch-adapter.test.mjs"
+      ],
+      "cpuIdlePercent": 58.98,
+      "exitCode": 0,
+      "log": "regression-1791867898-26.log"
+    },
+    "27": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-switch-recipe-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 60.8,
+      "exitCode": 0,
+      "log": "regression-1791867898-27.log"
+    },
+    "28": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-prep-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 57.48,
+      "exitCode": 0,
+      "log": "regression-1791867898-28.log"
+    },
+    "29": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-runtime-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 60.12,
+      "exitCode": 0,
+      "log": "regression-1791867898-29.log"
+    },
+    "30": {
+      "receipt": "regression-1791867898-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-switch-runtime-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 60.33,
+      "exitCode": 1,
+      "log": "regression-1791867898-30.log"
+    },
+    "31": {
+      "receipt": "regression-1791867925-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-v60-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 52.2,
+      "exitCode": 0,
+      "log": "regression-1791867925-31.log"
+    },
+    "32": {
+      "receipt": "regression-1791867925-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-v60-switch-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 49.38,
+      "exitCode": 0,
+      "log": "regression-1791867925-32.log"
+    },
+    "33": {
+      "receipt": "regression-1791867925-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-iced-prep-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 54.96,
+      "exitCode": 0,
+      "log": "regression-1791867925-33.log"
+    },
+    "34": {
+      "receipt": "regression-1791867925-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-v60-cutover-contract.test.mjs"
+      ],
+      "cpuIdlePercent": 57.65,
+      "exitCode": 1,
+      "log": "regression-1791867925-34.log"
+    },
+    "35": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-evaluate-inventory.test.mjs"
+      ],
+      "cpuIdlePercent": 55.73,
+      "exitCode": 0,
+      "log": "regression-1791867949-35.log"
+    },
+    "36": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/v60-switch-recipe-compare.test.mjs"
+      ],
+      "cpuIdlePercent": 62.2,
+      "exitCode": 0,
+      "log": "regression-1791867949-36.log"
+    },
+    "37": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/recipe-scaling.test.mjs"
+      ],
+      "cpuIdlePercent": 63.79,
+      "exitCode": 0,
+      "log": "regression-1791867949-37.log"
+    },
+    "38": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/brew-timing-memory.test.mjs"
+      ],
+      "cpuIdlePercent": 69.86,
+      "exitCode": 0,
+      "log": "regression-1791867949-38.log"
+    },
+    "39": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/brew-timing-persistence.test.mjs"
+      ],
+      "cpuIdlePercent": 68.69,
+      "exitCode": 0,
+      "log": "regression-1791867949-39.log"
+    },
+    "40": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/brew-timer-lifecycle.test.mjs"
+      ],
+      "cpuIdlePercent": 67.98,
+      "exitCode": 0,
+      "log": "regression-1791867949-40.log"
+    },
+    "41": {
+      "receipt": "regression-1791867949-receipt.json",
+      "command": [
+        "node",
+        "scripts/brew-timer-session.test.mjs"
+      ],
+      "cpuIdlePercent": 62.45,
+      "exitCode": 0,
+      "log": "regression-1791867949-41.log"
+    },
+    "42": {
+      "receipt": "regression-1791868009-receipt.json",
+      "command": [
+        "node",
+        "scripts/handbrew-timing-memory-integration.test.mjs"
+      ],
+      "cpuIdlePercent": 48.33,
+      "exitCode": 0,
+      "log": "regression-1791868009-42.log"
+    },
+    "43": {
+      "receipt": "regression-1791868104-receipt.json",
+      "command": [
+        "node",
+        "--import",
+        "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/installed-chrome.mjs",
+        "--test",
+        "scripts/aiden-generated-grind.test.mjs",
+        "scripts/aiden-foreground.test.mjs",
+        "scripts/aiden-modal-render.test.mjs"
+      ],
+      "cpuIdlePercent": 69.43,
+      "exitCode": 0,
+      "log": "regression-1791868104-43.log"
+    }
+  }
+}

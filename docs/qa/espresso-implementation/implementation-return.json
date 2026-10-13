@@ -1,0 +1,464 @@
+{
+  "status": "complete",
+  "plan_path": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/plans/2026-10-12-0920-feat-barista-express-espresso-plan.md",
+  "changed_files": [
+    "api/_lib/ruphusCommandService.js",
+    "api/_lib/ruphusContext.js",
+    "api/_lib/ruphusEvidence.js",
+    "api/_lib/ruphusOrchestrator.js",
+    "api/_lib/ruphusPrompt.js",
+    "api/_lib/ruphusProviders/openai.js",
+    "api/_lib/ruphusRollout.js",
+    "api/_lib/ruphusTools.js",
+    "api/_lib/ruphusTurnBinder.js",
+    "api/recipe-command.js",
+    "api/ruphus-agent.js",
+    "scripts/espresso-command.test.mjs",
+    "scripts/espresso-equipment-routing.test.mjs",
+    "scripts/espresso-recipe.test.mjs",
+    "scripts/recipe-command-entitlement.test.mjs",
+    "scripts/ruphus-context.test.mjs",
+    "scripts/ruphus-espresso-tools.test.mjs",
+    "scripts/ruphus-reference-resolution.test.mjs",
+    "scripts/ruphus-rollout-gates.test.mjs",
+    "scripts/ruphus-u2-runtime.test.mjs",
+    "scripts/ruphus-u4-tasting-context.test.mjs",
+    "src/App.jsx",
+    "src/components/BeanCard.jsx",
+    "src/components/BeanDetailCard.jsx",
+    "src/components/BrewButton.jsx",
+    "src/components/BrewMethodMenu.jsx",
+    "src/components/EspressoModal.jsx",
+    "src/components/QuickRecipeFlow.jsx",
+    "src/components/SettingsPage.jsx",
+    "src/components/TastingDetailCard.jsx",
+    "src/components/chat/ArtifactRenderer.jsx",
+    "src/components/chat/artifacts/ActionReceiptCard.jsx",
+    "src/components/chat/artifacts/CurrentRecipeCard.jsx",
+    "src/components/onboarding/OnboardingFlow.jsx",
+    "src/components/onboarding/screens/R07Preferences.jsx",
+    "src/components/tasting/TastingWizard.jsx",
+    "src/hooks/useEspressoBrew.js",
+    "src/hooks/useHandBrew.js",
+    "src/hooks/useProfessorRuphus.js",
+    "src/hooks/useUserProfile.jsx",
+    "src/lib/brewContext.js",
+    "src/lib/brewMethods.js",
+    "src/lib/claude.js",
+    "src/lib/coffeeKnowledge.js",
+    "src/lib/espressoRecipes.js",
+    "src/lib/palateSummary.js",
+    "src/lib/recipeCommands.js",
+    "src/lib/ruphus/contracts.js",
+    "src/lib/ruphus/conversationContract.js",
+    "src/lib/ruphus/launch.js",
+    "src/lib/ruphus/legacyRecipeResolver.js",
+    "src/lib/ruphus/methodResolver.js",
+    "src/lib/ruphus/session.js",
+    "src/lib/ruphusActionIdentity.js",
+    "src/tabs/ChatTab.jsx",
+    "src/tabs/InventoryTab.jsx",
+    "src/tabs/RotationTab.jsx",
+    "src/tabs/TastingTab.jsx"
+  ],
+  "u_ids_attempted": [
+    "U1",
+    "U2",
+    "U3",
+    "U4"
+  ],
+  "u_ids_completed": [
+    "U1",
+    "U2",
+    "U3",
+    "U4"
+  ],
+  "verification_results": {
+    "conversations": {
+      "accepted": 36,
+      "required": 36,
+      "index": "conversation-index.json"
+    },
+    "mutationPerturbations": {
+      "accepted": 10,
+      "required": 10
+    },
+    "strengthenedStandardWrites": {
+      "accepted": 9,
+      "required": 9
+    },
+    "focused": {
+      "commandsPassed": 13,
+      "receipt": "final-focused.json"
+    },
+    "priorChat": {
+      "commandsPassed": 14,
+      "receipt": "prior-chat-1791868156-receipt.json"
+    },
+    "regression": {
+      "commands": 44,
+      "passed": 41,
+      "baselineFailures": 3,
+      "receipt": "final-regression.json"
+    },
+    "lint": {
+      "changedFiles": 48,
+      "changedFilesPassed": true,
+      "wholeRepositoryErrors": 4,
+      "wholeRepositoryWarnings": 2,
+      "attribution": "preexisting-lint-source.json",
+      "receipt": "lint-1791868192-receipt.json"
+    },
+    "browser": {
+      "groupsPassed": 12,
+      "widths": [
+        320,
+        390,
+        1280
+      ],
+      "receipt": "app-browser-1791868247111-receipt.json",
+      "manifest": "emulator-app-browser-11-manifest.json",
+      "visualInspection": [
+        "390px",
+        "1280px"
+      ]
+    }
+  },
+  "verification_evidence": [
+    {
+      "unit": "U1",
+      "task": "Equipment and existing entry routing",
+      "behavior_changed": true,
+      "writer_evidence": "writer-U1.md",
+      "existing_tests_inspected": "Writer report plus prior-chat-findings.md; root existing regression packages",
+      "tests_added_or_changed": [
+        "scripts/espresso-equipment-routing.test.mjs"
+      ],
+      "tests_used_unchanged": "final-regression.json and prior-chat-1791868156-receipt.json",
+      "red_failure_or_characterization": "Writer observed missing equipment/routing exports before implementation; initial inverted CPU label is not trusted as admission proof.",
+      "verification_commands_results": {
+        "conversations": {
+          "accepted": 36,
+          "required": 36,
+          "index": "conversation-index.json"
+        },
+        "mutationPerturbations": {
+          "accepted": 10,
+          "required": 10
+        },
+        "strengthenedStandardWrites": {
+          "accepted": 9,
+          "required": 9
+        },
+        "focused": {
+          "commandsPassed": 13,
+          "receipt": "final-focused.json"
+        },
+        "priorChat": {
+          "commandsPassed": 14,
+          "receipt": "prior-chat-1791868156-receipt.json"
+        },
+        "regression": {
+          "commands": 44,
+          "passed": 41,
+          "baselineFailures": 3,
+          "receipt": "final-regression.json"
+        },
+        "lint": {
+          "changedFiles": 48,
+          "changedFilesPassed": true,
+          "wholeRepositoryErrors": 4,
+          "wholeRepositoryWarnings": 2,
+          "attribution": "preexisting-lint-source.json",
+          "receipt": "lint-1791868192-receipt.json"
+        },
+        "browser": {
+          "groupsPassed": 12,
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "receipt": "app-browser-1791868247111-receipt.json",
+          "manifest": "emulator-app-browser-11-manifest.json",
+          "visualInspection": [
+            "390px",
+            "1280px"
+          ]
+        }
+      },
+      "exception_reason": "Baseline and native-proof limits listed in acceptance-index.json",
+      "canonical_commit": "09c0ad5cffed5ed3fe0afc3c104e61db806b9623"
+    },
+    {
+      "unit": "U2",
+      "task": "Researched recipes and authenticated persistence",
+      "behavior_changed": true,
+      "writer_evidence": "writer-U2.md",
+      "existing_tests_inspected": "Writer report plus prior-chat-findings.md; root existing regression packages",
+      "tests_added_or_changed": [
+        "scripts/espresso-recipe.test.mjs",
+        "scripts/espresso-command.test.mjs"
+      ],
+      "tests_used_unchanged": "final-regression.json and prior-chat-1791868156-receipt.json",
+      "red_failure_or_characterization": "Writer does not record an initial red execution; no red chronology is inferred. Root emulator/browser exposed and verified subsequent fixes.",
+      "verification_commands_results": {
+        "conversations": {
+          "accepted": 36,
+          "required": 36,
+          "index": "conversation-index.json"
+        },
+        "mutationPerturbations": {
+          "accepted": 10,
+          "required": 10
+        },
+        "strengthenedStandardWrites": {
+          "accepted": 9,
+          "required": 9
+        },
+        "focused": {
+          "commandsPassed": 13,
+          "receipt": "final-focused.json"
+        },
+        "priorChat": {
+          "commandsPassed": 14,
+          "receipt": "prior-chat-1791868156-receipt.json"
+        },
+        "regression": {
+          "commands": 44,
+          "passed": 41,
+          "baselineFailures": 3,
+          "receipt": "final-regression.json"
+        },
+        "lint": {
+          "changedFiles": 48,
+          "changedFilesPassed": true,
+          "wholeRepositoryErrors": 4,
+          "wholeRepositoryWarnings": 2,
+          "attribution": "preexisting-lint-source.json",
+          "receipt": "lint-1791868192-receipt.json"
+        },
+        "browser": {
+          "groupsPassed": 12,
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "receipt": "app-browser-1791868247111-receipt.json",
+          "manifest": "emulator-app-browser-11-manifest.json",
+          "visualInspection": [
+            "390px",
+            "1280px"
+          ]
+        }
+      },
+      "exception_reason": "Baseline and native-proof limits listed in acceptance-index.json; U2 initial-red chronology unavailable",
+      "canonical_commit": "aafebff80b269c27849122266bf0cdf5e0e72c35"
+    },
+    {
+      "unit": "U3",
+      "task": "Contextual chat, explicit Save, retry and guarded Undo",
+      "behavior_changed": true,
+      "writer_evidence": "writer-U3.md",
+      "existing_tests_inspected": "Writer report plus prior-chat-findings.md; root existing regression packages",
+      "tests_added_or_changed": [
+        "scripts/ruphus-espresso-tools.test.mjs",
+        "scripts/ruphus-context.test.mjs",
+        "scripts/ruphus-reference-resolution.test.mjs",
+        "scripts/ruphus-u2-runtime.test.mjs"
+      ],
+      "tests_used_unchanged": "final-regression.json and prior-chat-1791868156-receipt.json",
+      "red_failure_or_characterization": "Actual failed E11/E12, stale/replay and advice transcripts retained before corrections. Final ordering fixtures were CPU-deferred before correction, then passed; no new pre-fix red execution claimed.",
+      "verification_commands_results": {
+        "conversations": {
+          "accepted": 36,
+          "required": 36,
+          "index": "conversation-index.json"
+        },
+        "mutationPerturbations": {
+          "accepted": 10,
+          "required": 10
+        },
+        "strengthenedStandardWrites": {
+          "accepted": 9,
+          "required": 9
+        },
+        "focused": {
+          "commandsPassed": 13,
+          "receipt": "final-focused.json"
+        },
+        "priorChat": {
+          "commandsPassed": 14,
+          "receipt": "prior-chat-1791868156-receipt.json"
+        },
+        "regression": {
+          "commands": 44,
+          "passed": 41,
+          "baselineFailures": 3,
+          "receipt": "final-regression.json"
+        },
+        "lint": {
+          "changedFiles": 48,
+          "changedFilesPassed": true,
+          "wholeRepositoryErrors": 4,
+          "wholeRepositoryWarnings": 2,
+          "attribution": "preexisting-lint-source.json",
+          "receipt": "lint-1791868192-receipt.json"
+        },
+        "browser": {
+          "groupsPassed": 12,
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "receipt": "app-browser-1791868247111-receipt.json",
+          "manifest": "emulator-app-browser-11-manifest.json",
+          "visualInspection": [
+            "390px",
+            "1280px"
+          ]
+        }
+      },
+      "exception_reason": "Baseline and native-proof limits listed in acceptance-index.json",
+      "canonical_commit": "a1da52c3fd2ef767f057c0afd80b43337e221008"
+    },
+    {
+      "unit": "U4",
+      "task": "Immutable cup-aware eight-step tasting",
+      "behavior_changed": true,
+      "writer_evidence": "writer-U4.md",
+      "existing_tests_inspected": "Writer report plus prior-chat-findings.md; root existing regression packages",
+      "tests_added_or_changed": [
+        "scripts/ruphus-u4-tasting-context.test.mjs"
+      ],
+      "tests_used_unchanged": "final-regression.json and prior-chat-1791868156-receipt.json",
+      "red_failure_or_characterization": "Writer characterized missing cup linkage and object temperature interpolation. Root browser observed draft resurrection and pending-save lifecycle failures; corrected final flow passed.",
+      "verification_commands_results": {
+        "conversations": {
+          "accepted": 36,
+          "required": 36,
+          "index": "conversation-index.json"
+        },
+        "mutationPerturbations": {
+          "accepted": 10,
+          "required": 10
+        },
+        "strengthenedStandardWrites": {
+          "accepted": 9,
+          "required": 9
+        },
+        "focused": {
+          "commandsPassed": 13,
+          "receipt": "final-focused.json"
+        },
+        "priorChat": {
+          "commandsPassed": 14,
+          "receipt": "prior-chat-1791868156-receipt.json"
+        },
+        "regression": {
+          "commands": 44,
+          "passed": 41,
+          "baselineFailures": 3,
+          "receipt": "final-regression.json"
+        },
+        "lint": {
+          "changedFiles": 48,
+          "changedFilesPassed": true,
+          "wholeRepositoryErrors": 4,
+          "wholeRepositoryWarnings": 2,
+          "attribution": "preexisting-lint-source.json",
+          "receipt": "lint-1791868192-receipt.json"
+        },
+        "browser": {
+          "groupsPassed": 12,
+          "widths": [
+            320,
+            390,
+            1280
+          ],
+          "receipt": "app-browser-1791868247111-receipt.json",
+          "manifest": "emulator-app-browser-11-manifest.json",
+          "visualInspection": [
+            "390px",
+            "1280px"
+          ]
+        }
+      },
+      "exception_reason": "Baseline and native-proof limits listed in acceptance-index.json",
+      "canonical_commit": "a1da52c3fd2ef767f057c0afd80b43337e221008"
+    }
+  ],
+  "implementation_engine_binding": null,
+  "requested_route": "Native agents primary writer /root/espresso_writer; goal-babysitter with root-controlled verification",
+  "actual_route": "Native agent primary implementation, root integration and final retry metadata correction; native independent reviewer",
+  "requested_model": "gpt-5.6-luna",
+  "actual_model": "unverified",
+  "requested_effort": null,
+  "native_agent_request": {
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "high",
+    "served_model": "unverified"
+  },
+  "fallback_reason": null,
+  "run_id": null,
+  "source_kind": "plan",
+  "source_digest": "12fcd311ab40c347252151927ef61b42d18d828612f023886b00d109744b6df0",
+  "unit_receipts": [
+    {
+      "unit": "U1",
+      "route": "native agents and root integration",
+      "model": "requested gpt-5.6-luna; served unverified",
+      "detached_process": "none remaining",
+      "integration": "root verified",
+      "verification": "acceptance-index.json",
+      "canonical_commit": "09c0ad5cffed5ed3fe0afc3c104e61db806b9623",
+      "cleanup": "cleanup.json; worktree retained for user review"
+    },
+    {
+      "unit": "U2",
+      "route": "native agents and root integration",
+      "model": "requested gpt-5.6-luna; served unverified",
+      "detached_process": "none remaining",
+      "integration": "root verified",
+      "verification": "acceptance-index.json",
+      "canonical_commit": "aafebff80b269c27849122266bf0cdf5e0e72c35",
+      "cleanup": "cleanup.json; worktree retained for user review"
+    },
+    {
+      "unit": "U3",
+      "route": "native agents and root integration",
+      "model": "requested gpt-5.6-luna; served unverified",
+      "detached_process": "none remaining",
+      "integration": "root verified",
+      "verification": "acceptance-index.json",
+      "canonical_commit": "a1da52c3fd2ef767f057c0afd80b43337e221008",
+      "cleanup": "cleanup.json; worktree retained for user review"
+    },
+    {
+      "unit": "U4",
+      "route": "native agents and root integration",
+      "model": "requested gpt-5.6-luna; served unverified",
+      "detached_process": "none remaining",
+      "integration": "root verified",
+      "verification": "acceptance-index.json",
+      "canonical_commit": "a1da52c3fd2ef767f057c0afd80b43337e221008",
+      "cleanup": "cleanup.json; worktree retained for user review"
+    }
+  ],
+  "plan_checkpoint": null,
+  "blockers": [],
+  "known_limitations": [
+    "Three broad regression failures reproduced on untouched58d1643; no all-green repository claim",
+    "Four whole-lint errors and two warnings in unchanged files",
+    "No native iOS, production release or human cup-quality proof",
+    "Actual conversations use explicit evaluation caps and source-specific accepted versions",
+    "Scan/enrichment and held tasting-save callback are identified fixtures"
+  ],
+  "recovery_path": null,
+  "review_workspace": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build",
+  "settled_decision_conflicts": [],
+  "behavior_change": true,
+  "standalone_shipping_skipped": true
+}

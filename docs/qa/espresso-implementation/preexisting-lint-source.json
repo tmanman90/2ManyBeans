@@ -1,0 +1,26 @@
+{
+  "base": "58d1643",
+  "lintReceipt": "lint-1791855519-receipt.json",
+  "files": [
+    {
+      "file": "src/components/paywall/usePaywallOfferings.js",
+      "unchangedFromBase": true,
+      "sha256": "88fa58464ae40c508f3c9fd9f8544e51f6d642892a612247b0a625e0d35a026c"
+    },
+    {
+      "file": "src/lib/paywallFlag.js",
+      "unchangedFromBase": true,
+      "sha256": "cb6c94fdd98cea9d74552da59f3ef2c7590ffffc711e4a99ea55c0d4e30e8e4b"
+    },
+    {
+      "file": "src/hooks/useBrewTimerAlerts.js",
+      "unchangedFromBase": true,
+      "sha256": "a6ce05e34700b958f7f792147c64b54aa8c2f82d0362c60a01089ef7ceaa1b71"
+    },
+    {
+      "file": "src/components/paywall/usePaywallPurchase.js",
+      "unchangedFromBase": true,
+      "sha256": "84a379b90af514e947f399f2bd3d37fff8e60247744d5f52caf1e13a1d81c0f4"
+    }
+  ]
+}

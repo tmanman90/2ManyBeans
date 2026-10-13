@@ -1,0 +1,19 @@
+{
+  "group": "critical",
+  "startIndex": 6,
+  "records": [
+    {
+      "case": [
+        "E12",
+        "clear",
+        "E12.replay"
+      ],
+      "exitCode": 1,
+      "manifests": [],
+      "message": "DEFER: CPU idle gate"
+    }
+  ],
+  "requiredInBatch": 1,
+  "requiredInMatrix": 7,
+  "semanticReview": "pending"
+}

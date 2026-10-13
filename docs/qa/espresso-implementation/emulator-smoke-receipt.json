@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "projectId": "demo-espresso-acceptance",
+  "persistence": "actual local Firestore emulator",
+  "authentication": "actual Auth emulator token verified by unchanged API middleware",
+  "anonymousStatus": 401,
+  "authenticatedValidationStatus": 400,
+  "transactionCounter": 2,
+  "modelCalls": 0,
+  "liveConversationCases": 0,
+  "timestamp": "2026-10-13T00:06:33.194Z"
+}

@@ -1,0 +1,18 @@
+{
+  "suite": "focused",
+  "startIndex": 3,
+  "status": "deferred_cpu",
+  "sourceBefore": "8bdaab61cbb0e3bd759730fb43558d0847a9e856084ff28a5be6aad37b7cbff0",
+  "sourceAfter": "8bdaab61cbb0e3bd759730fb43558d0847a9e856084ff28a5be6aad37b7cbff0",
+  "records": [
+    {
+      "command": [
+        "node",
+        "scripts/ruphus-espresso-tools.test.mjs"
+      ],
+      "cpuIdlePercent": 0.65,
+      "executed": false
+    }
+  ],
+  "requiredCommands": 13
+}
