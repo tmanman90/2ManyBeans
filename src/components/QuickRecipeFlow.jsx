@@ -21,6 +21,7 @@ import { QuickRateForm } from './QuickRateForm';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
+import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 
 const noop = () => {};
 
@@ -34,14 +35,15 @@ const toEphemeralBean = (data) => {
 
 export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, uid, onStartTastingSession }) => {
   const { preferences } = usePreferences();
-  const isHandBrew = preferences.brewMethod !== 'aiden';
+  const isHandBrew = isManualBrewMethod(preferences.brewMethod);
+  const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
 
   const [step, setStep] = useState('photo'); // photo | scanning | enriching | bagSize | brewing
   const [photos, setPhotos] = useState([]); // up to 3 { base64, mediaType, previewUrl }
   const [scanData, setScanData] = useState(null);
   const [scanError, setScanError] = useState(null);
   const [bagSizeInput, setBagSizeInput] = useState('');
-  const [activeMethod, setActiveMethod] = useState(isHandBrew ? 'handbrew' : 'aiden');
+  const [activeMethod, setActiveMethod] = useState(isEspresso ? 'espresso' : (isHandBrew ? 'handbrew' : 'aiden'));
   const [savedBeanId, setSavedBeanId] = useState(null);
   const [quickRateOpen, setQuickRateOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -74,13 +76,13 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       setScanData(null);
       setScanError(null);
       setBagSizeInput('');
-      setActiveMethod(isHandBrew ? 'handbrew' : 'aiden');
+      setActiveMethod(isEspresso ? 'espresso' : (isHandBrew ? 'handbrew' : 'aiden'));
       setSavedBeanId(null);
       savingRef.current = null;
       setQuickRateOpen(false);
       setToast(null);
     }
-  }, [clearPhotos, isHandBrew, open]);
+  }, [clearPhotos, isEspresso, isHandBrew, open]);
 
   const takeNativePhoto = async () => {
     try {
@@ -225,7 +227,10 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     setStep('brewing');
     const ephemeralBean = toEphemeralBean(data);
     // Start with user's preferred brew method
-    if (isHandBrew) {
+    if (isEspresso) {
+      setActiveMethod('espresso');
+      setScanError('Espresso recipes require the verified machine and basket setup. Use Settings to confirm your equipment.');
+    } else if (isHandBrew) {
       setActiveMethod('handbrew');
       handBrew.handleBrewHandBrew(ephemeralBean);
     } else {
@@ -241,7 +246,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       // Switch to hand brew, pass Aiden's research as cache
       setActiveMethod('handbrew');
       handBrew.handleBrewHandBrew(ephemeralBean, aiden.aidenResearch);
-    } else {
+    } else if (activeMethod === 'handbrew') {
       // Switch to Aiden, pass hand brew's research as cache
       setActiveMethod('aiden');
       aiden.handleBrewWithAiden(ephemeralBean, handBrew.handBrewResearch);
@@ -463,7 +468,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onRetryIcedPush={aiden.onRetryIcedPush}
             extraFooter={actionButtons}
           />
-        ) : (
+        ) : activeMethod === 'handbrew' ? (
           <HandBrewModal
             open={open}
             onClose={onClose}
@@ -487,6 +492,13 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
             onPersistDose={handBrew.persistDose}
           />
+        ) : (
+          <Modal open={open} onClose={onClose} title="Espresso recipe" centered>
+            <div style={{ padding: '12px 0 20px', color: C.textMuted, lineHeight: 1.5 }}>
+              Confirm a Barista Express and stock double single-wall basket in Settings before requesting an espresso recipe.
+            </div>
+            <Btn variant="ghost" onClick={onClose} style={{ width: '100%', justifyContent: 'center' }}>Close</Btn>
+          </Modal>
         )}
         <ProfessorRuphusSlideUp {...ruphusProps} />
         <QuickRateForm

@@ -17,7 +17,7 @@ import { haptic } from '../lib/haptics';
 import { fonts } from '../styles/theme';
 import { getPeakStatus, daysSinceRoast, formatDate } from '../lib/peakStatus';
 import { summarizeSourceInsights } from '../lib/sourceInsights';
-import { getBrewMethod } from '../lib/brewMethods';
+import { getBrewMethod, hasSavedBrewProfile } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { tastingIcon, tastingIconImage } from '../lib/tastingIcons';
 import { useStrippedBag, bagPhotoFor } from '../lib/stripBg';
@@ -723,7 +723,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                   </Panel>
 
                   {/* Saved brew profile (archive only) — read-only recap of stored recipes */}
-                  {showBrewProfile && (bean.aidenRecipe || bean.handBrewRecipe) && (
+                  {hasSavedBrewProfile({ showBrewProfile, aidenRecipe: bean.aidenRecipe, handBrewRecipe: bean.handBrewRecipe }) && (
                     <Panel>
                       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                         <Coffee size={26} color={INK} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />

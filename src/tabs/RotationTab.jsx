@@ -29,7 +29,7 @@ import { useHandBrew } from '../hooks/useHandBrew';
 import { useProfessorRuphus } from '../hooks/useProfessorRuphus';
 import { useLongPress } from '../hooks/useLongPress';
 import { haptic } from '../lib/haptics';
-import { getBrewMethod } from '../lib/brewMethods';
+import { getBrewMethod, isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 import { useBeanDetail } from '../hooks/useBeanDetail';
@@ -72,13 +72,15 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
 export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null, onUpdateRuphusAttempt = null, ruphusAttemptAutoStartId = null, onRuphusAttemptAutoStartConsumed = null }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
-  const isHandBrew = preferences.brewMethod !== 'aiden';
+  const isHandBrew = isManualBrewMethod(preferences.brewMethod);
+  const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
   const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
   const { openAttempt: openAidenAttempt } = aiden;
   const { openAttempt: openHandAttempt } = handBrew;
+  const [toast, setToast] = useState(null);
   const activeRuphusAttemptId = ruphusAttempt?.id || null;
   const persistSourceTimerState = useCallback((state) => {
     if (!activeRuphusAttemptId || !state || !onUpdateRuphusAttempt) return;
@@ -92,6 +94,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     if (!bean) return;
     consumedAttemptRef.current = ruphusAttempt.id;
     if (ruphusAttempt.slotKey === 'aiden') openAidenAttempt?.(bean, ruphusAttempt);
+    else if (ruphusAttempt.slotKey === 'espresso') setToast('Espresso recipe context is not available yet.');
     else {
       const startImmediately = ruphusAttemptAutoStartId === ruphusAttempt.id;
       openHandAttempt(bean, startImmediately ? { ...ruphusAttempt, startImmediately: true } : ruphusAttempt);
@@ -101,7 +104,9 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
-  const [toast, setToast] = useState(null);
+  const openEspresso = useCallback(() => {
+    setToast('Espresso recipe setup is not available for this basket yet.');
+  }, []);
   const [showRec, setShowRec] = useState(false);
   const [recBlurb, setRecBlurb] = useState('');
   const [recLoading, setRecLoading] = useState(false);
@@ -408,10 +413,12 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                         bean={bean}
                         label={brewMethod.label}
                         isHandBrew={isHandBrew}
+                        isEspresso={isEspresso}
                         brewMenuBean={brewMenuBean}
                         setBrewMenuBean={setBrewMenuBean}
                         onAiden={isDemo ? onDemoAction : aiden.handleBrewWithAiden}
                         onHandBrew={isDemo ? onDemoAction : handBrew.handleBrewHandBrew}
+                        onEspresso={isDemo ? onDemoAction : openEspresso}
                         compact={false}
                       />
                     </div>

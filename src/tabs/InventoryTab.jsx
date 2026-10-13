@@ -27,6 +27,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp } from '../lib/motion';
 import { haptic } from '../lib/haptics';
 import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 
 // Secondary Liquid-Glass pill for the rail card footer (matches the Rotation footer).
 // Spreads ...rest so long-press handlers (Brew) pass through.
@@ -40,14 +41,14 @@ const GlassPill = ({ color, bg, icon, label, onClick, ...rest }) => (
 );
 
 // Brew pill with long-press → brew-method menu (restores the Rotation brew behavior).
-const BrewPill = ({ bean, isHandBrew, isDemo, onDemoAction, aiden, handBrew }) => {
+const BrewPill = ({ bean, isHandBrew, isEspresso, isDemo, onDemoAction, aiden, handBrew, onEspresso }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const brew = () => isDemo ? onDemoAction?.() : (isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean));
+  const brew = () => isDemo ? onDemoAction?.() : (isEspresso ? onEspresso?.(bean) : (isHandBrew ? handBrew.handleBrewHandBrew(bean) : aiden.handleBrewWithAiden(bean)));
   const handlers = useLongPress({ onTap: brew, onLongPress: () => isDemo ? onDemoAction?.() : setMenuOpen(true) });
   return (
     <div style={{ position: 'relative', display: 'flex' }}>
       <GlassPill color={C.accent} bg={C.accentSoft} icon={<Coffee size={18} />} label="Brew" {...handlers} />
-      <BrewMethodMenu open={menuOpen} onClose={() => setMenuOpen(false)} onAiden={() => aiden.handleBrewWithAiden(bean)} onHandBrew={(deviceKey) => handBrew.handleBrewHandBrew(bean, null, false, deviceKey)} />
+      <BrewMethodMenu open={menuOpen} onClose={() => setMenuOpen(false)} onAiden={() => aiden.handleBrewWithAiden(bean)} onHandBrew={(deviceKey) => handBrew.handleBrewHandBrew(bean, null, false, deviceKey)} onEspresso={() => onEspresso?.(bean)} />
     </div>
   );
 };
@@ -66,7 +67,8 @@ const OpenJarBtn = ({ onClick }) => (
 
 export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, updateBean, saveHandBrewTiming, deleteBean, onFinishBean, addTasting, updateTasting, getBeanById, pendingAddBeanMode, onPendingAddBeanConsumed, onStartTastingSession, isDemo, onDemoAction, onOpenRuphus }) => {
   const { preferences } = usePreferences();
-  const isHandBrew = preferences.brewMethod !== 'aiden';
+  const isHandBrew = isManualBrewMethod(preferences.brewMethod);
+  const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
   const canisterCount = preferences.canisterCount || 3;
   const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const sealed = beans.filter(b => b.status === 'SEALED');
@@ -102,6 +104,10 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
+  const openEspresso = (bean) => {
+    if (!bean) return;
+    setToast('Espresso recipe setup is not available for this basket yet.');
+  };
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
   const [editBean, setEditBean] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
@@ -137,7 +143,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
       <div style={{ borderTop: `1px solid ${C.hairline}`, marginBottom: 1 }} />
       <OpenJarBtn onClick={() => tryOpenBean(bean)} />
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${agentV3Enabled ? 4 : 3}, 1fr)`, gap: 8 }}>
-        <BrewPill bean={bean} isHandBrew={isHandBrew} isDemo={isDemo} onDemoAction={onDemoAction} aiden={aiden} handBrew={handBrew} />
+        <BrewPill bean={bean} isHandBrew={isHandBrew} isEspresso={isEspresso} isDemo={isDemo} onDemoAction={onDemoAction} aiden={aiden} handBrew={handBrew} onEspresso={openEspresso} />
         <GlassPill color={C.accent} bg={C.accentSoft}
           icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />}
           label="Learn" onClick={() => isDemo ? onDemoAction?.() : handleLearn(bean)} />

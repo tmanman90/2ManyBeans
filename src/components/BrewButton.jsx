@@ -30,10 +30,12 @@ const renderLabel = (label, aidenSize) => {
   );
 };
 
-export const BrewButton = ({ bean, label, isHandBrew, brewMenuBean, setBrewMenuBean, onAiden, onHandBrew, compact = true }) => {
+export const BrewButton = ({ bean, label, isHandBrew, isEspresso = false, brewMenuBean, setBrewMenuBean, onAiden, onHandBrew, onEspresso, compact = true }) => {
   const handleTap = useCallback(() => {
-    isHandBrew ? onHandBrew(bean) : onAiden(bean);
-  }, [bean, isHandBrew, onAiden, onHandBrew]);
+    if (isEspresso) onEspresso?.(bean);
+    else if (isHandBrew) onHandBrew(bean);
+    else onAiden(bean);
+  }, [bean, isEspresso, isHandBrew, onAiden, onEspresso, onHandBrew]);
 
   const handleLongPress = useCallback(() => {
     setBrewMenuBean(bean);
@@ -62,6 +64,7 @@ export const BrewButton = ({ bean, label, isHandBrew, brewMenuBean, setBrewMenuB
         onClose={() => setBrewMenuBean(null)}
         onAiden={() => onAiden(bean)}
         onHandBrew={(deviceKey) => onHandBrew(bean, null, false, deviceKey)}
+        onEspresso={() => onEspresso?.(bean)}
       />
     </div>
   );

@@ -7,7 +7,7 @@ import { C, glass, fonts, shadows, radius } from '../styles/theme';
 import { m, popIn } from '../lib/motion';
 import { BREW_DEVICES } from '../lib/brewMethods';
 
-export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew }) => {
+export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew, onEspresso }) => {
   const menuRef = useRef(null);
 
   // Dismiss on outside tap
@@ -112,6 +112,19 @@ export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew }) => {
               {device.label}
             </div>
           ))}
+          <button
+            type="button"
+            onClick={() => { onEspresso?.(); onClose(); }}
+            aria-label="Espresso Recipe"
+            style={{ ...rowStyle, width: '100%', border: 'none', background: 'transparent', textAlign: 'left' }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.accentSoft; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: radius.xs, background: C.accentSoft, flexShrink: 0 }}>
+              <Droplets size={14} color={C.accent} />
+            </span>
+            Espresso Recipe
+          </button>
         </m.div>
       )}
     </AnimatePresence>

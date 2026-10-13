@@ -20,7 +20,7 @@ import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { useChatSession } from '../hooks/useChatSession';
-import { getBrewMethod } from '../lib/brewMethods';
+import { getBrewMethod, isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { buildNewBeanData } from '../lib/beanBuilder';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { usePreferences } from '../hooks/useUserProfile';
@@ -704,7 +704,8 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!beanId) return;
     await updateBean(beanId, updates);
   };
-  const isHandBrew = preferences.brewMethod !== 'aiden';
+  const isHandBrew = isManualBrewMethod(preferences.brewMethod);
+  const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
   const aiden = useAidenBrew(ephemeralUpdateBean);
   const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
 
@@ -1018,7 +1019,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
 
   const handleBrewRecipe = (bean) => {
     if (!bean) return;
-    if (isHandBrew) {
+    if (isEspresso) {
+      setToast('Confirm a supported Barista Express basket in Settings before requesting an espresso recipe.');
+    } else if (isHandBrew) {
       handBrew.handleBrewHandBrew(bean);
     } else {
       aiden.handleBrewWithAiden(bean);
@@ -1533,7 +1536,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handleBrewScanned = () => {
     if (!scannedBean) return;
     const ephemeralBean = { ...scannedBean, status: 'SEALED' };
-    if (isHandBrew) {
+    if (isEspresso) {
+      setToast('Confirm a supported Barista Express basket in Settings before requesting an espresso recipe.');
+    } else if (isHandBrew) {
       handBrew.handleBrewHandBrew(ephemeralBean);
     } else {
       aiden.handleBrewWithAiden(ephemeralBean);
@@ -1681,7 +1686,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                     onBrew: handleBrewRecipe,
                     onSave: handleSaveRecipe,
                     savingKey: savingRecipeKey,
-                    brewing: isHandBrew
+                    brewing: isEspresso ? false : isHandBrew
                       ? (handBrew.handBrewModal || handBrew.handBrewLoading)
                       : (aiden.aidenModal || aiden.aidenLoading),
                   }}

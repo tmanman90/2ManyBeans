@@ -3,12 +3,14 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'fir
 import { Capacitor } from '@capacitor/core';
 import { auth, db } from '../firebase';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
+import { DEFAULT_ESPRESSO_SETUP } from '../lib/brewMethods';
 
 // Default preferences for new users and existing user migration
-const DEFAULT_PREFERENCES = {
+export const DEFAULT_PREFERENCES = {
   grinder: 'fellow-ode-gen2',
   grinderCustomName: null,
   brewMethod: 'aiden',
+  ...DEFAULT_ESPRESSO_SETUP,
   kalitaSize: '185',
   v60Variant: 'classic',
   grindSizeDisplay: 'default',
