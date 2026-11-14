@@ -6,6 +6,16 @@ const port = 4176;
 const server = spawn(process.execPath, ['./node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
   cwd: new URL('..', import.meta.url),
   stdio: 'ignore',
+  // The harness never talks to Firebase, but src/firebase.js initializes at import
+  // and throws auth/invalid-api-key when no config exists (a fresh clone has no
+  // local env file). Placeholders also keep a test run off the real project.
+  env: {
+    ...process.env,
+    VITE_FIREBASE_API_KEY: 'test-only-not-a-key',
+    VITE_FIREBASE_AUTH_DOMAIN: 'test.invalid',
+    VITE_FIREBASE_PROJECT_ID: 'test-only',
+    VITE_FIREBASE_APP_ID: 'test-only',
+  },
 });
 
 async function waitForServer() {
