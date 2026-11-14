@@ -10,17 +10,38 @@ import { DoseStepperCard } from './DoseStepperCard';
 import { Coffee, Droplets, Thermometer, RefreshCw, Play, Scale, Snowflake, ArrowLeft } from 'lucide-react';
 import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
-import { scaleRecipeForDose } from '../lib/recipeScaling';
+import { timerRecipeForMode } from '../lib/brewTimerRecipe';
 import { transformToFlashBrew } from '../lib/flashBrewTransform';
 import { isDeterministicV60Hot } from '../lib/v60Generation';
 import { isDeterministicKalitaHot } from '../lib/kalitaIcedAdapter';
 import { kalitaDoseBounds } from '../data/kalitaConfiguration';
+import { V60_SWITCH_DOSE_BOUNDS } from '../data/v60SwitchConfiguration';
 import { formatTimingMs, selectTimingMemory, timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { buildTimerSteps, normalizeRecipePhases } from '../lib/brewTimerSteps';
+import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
+import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';
+import { adaptedDoseBounds } from '../lib/ruphus/techniqueOptions.js';
+import { manualSourceDisplay, manualSourceGrindGuidance } from '../lib/manualSourceProjection.js';
+import { manualSourceRecipeView } from '../lib/manualSourceRecipeView.js';
 
 const ICE_RULE       = C.frostBorder;
 const ICE_PAPER_GRAD = `linear-gradient(160deg, ${C.frostBg} 0%, ${C.frostSoft} 100%)`;
 const ICE_TILE_BG    = C.frostSoft;
+const sourcePrimaryButtonStyle = {
+  width: '100%',
+  minHeight: 52,
+  padding: '16px 20px',
+  borderRadius: radius.md,
+  background: `linear-gradient(160deg, #C4844A 0%, ${C.accent} 100%)`,
+  color: '#FFF8F0',
+  border: `1px solid ${C.accent}`,
+  fontSize: 16,
+  fontWeight: 700,
+  fontFamily: fonts.body,
+  cursor: 'pointer',
+  boxShadow: `${shadows.button}, 0 4px 14px rgba(168,106,56,0.22)`,
+  WebkitTapHighlightColor: 'transparent',
+};
 
 // ── Eyebrow label ─────────────────────────────────────────────────────────────
 const SectionLabel = ({ children, style }) => (
@@ -48,6 +69,230 @@ const TimingMemoryHint = ({ memory, context }) => {
         </div>
       )}
     </div>
+  );
+};
+
+const sourceStageQuantity = (stage) => {
+  if (stage?.water?.value != null && stage?.water?.unit) {
+    const value = stage.water.value;
+    const rendered = value && typeof value === 'object' && Number.isFinite(value.min) && Number.isFinite(value.max)
+      ? `${value.min}–${value.max}`
+      : value;
+    return `${rendered}${stage.water.unit}`;
+  }
+  if (stage?.waterToGrams != null) return `${stage.waterToGrams}g`;
+  if (stage?.waterToMilliliters != null) return `${stage.waterToMilliliters}mL`;
+  return null;
+};
+
+const sourceTriggerLabel = (stage, projection) => {
+  const trigger = stage?.trigger;
+  if (!trigger) return null;
+  if (trigger.type === 'manual') return 'Begin when ready';
+  if (trigger.type === 'condition') return `When observed: ${trigger.condition}`;
+  if (trigger.type === 'after') {
+    const event = String(trigger.event || '').replace(/:complete$/, '').replace(/[-_]/g, ' ');
+    return trigger.seconds === 0
+      ? `Immediately after ${event} finishes`
+      : `${formatTimingMs(trigger.seconds * 1000)} after ${event} finishes`;
+  }
+  if (trigger.type === 'elapsed') {
+    const origin = projection?.clock?.origin;
+    const clock = origin === 'after-main-pour'
+      ? 'after the main pour finishes'
+      : origin === 'after-bloom-pour'
+        ? 'after the bloom pour finishes'
+        : origin === 'first-water'
+          ? 'from the first water'
+          : 'source clock';
+    return `At ${formatTimingMs(trigger.seconds * 1000)} ${clock}`;
+  }
+  return null;
+};
+
+const sourceEquipmentLabel = (projection) => {
+  const configuration = projection?.sourceConfiguration || projection?.equipment || {};
+  const brewer = configuration.device === 'v60' && configuration.variant === 'switch'
+    ? 'V60 Switch'
+    : configuration.device || configuration.brewer || 'Source brewer';
+  return `${brewer}${configuration.size ? ` ${configuration.size}` : ''}`;
+};
+
+// Projection field names are useful for source validation but are not user
+// language. Keep this presentation-only copy separate from the hashed
+// projection/disclosure stored with the recipe.
+const readableSourceDisclosure = (value) => String(value || '').replace(/\bsourceSnapshot\b/g, 'the original source wording');
+
+const sourceFinishGuidance = (finish, clockOrigin) => {
+  if (!Number.isFinite(finish?.minSeconds) || !Number.isFinite(finish?.maxSeconds)) return null;
+  const target = formatTimingMs(finish.minSeconds * 1000);
+  const range = finish.maxSeconds === finish.minSeconds
+    ? target
+    : `${target}–${formatTimingMs(finish.maxSeconds * 1000)}`;
+  const origin = clockOrigin === 'first-water' ? 'from first water' : clockOrigin ? `from ${clockOrigin.replaceAll('-', ' ')}` : 'on the source clock';
+  return `Finish the drawdown around ${range} ${origin}. Confirm the bed has drained; this is a source target, not an automatic stop.`;
+};
+
+const SourceProjectionPreview = ({ projection, grinderKey, grinderName, preferences, onStart, onCoffeeGramsChange, onPreviewSave, disabled, previewPending, previewError, previewDoseError, previewStale, previewMode, error, onClose, attemptId, extraFooter }) => {
+  const source = projection?.sourceSnapshot || projection?.sourceExecution || {};
+  const display = manualSourceDisplay(projection);
+  const stages = display.stages?.length
+    ? display.stages
+    : Array.isArray(projection?.stages) ? projection.stages : [];
+  const displayWater = display.water || projection?.water;
+  const water = displayWater?.value == null ? null : `${displayWater.value}${displayWater.unit}`;
+  const ready = projection?.timerReady === true && Boolean(projection?.sourceExecution);
+  const sourceDose = Number.isFinite(source?.coffeeGrams) ? source.coffeeGrams : null;
+  const dose = Number.isFinite(projection?.coffeeGrams) ? projection.coffeeGrams : sourceDose;
+  const adaptedBounds = adaptedDoseBounds(projection?.sourceSnapshot);
+  const originalOutsideAdaptation = sourceDose != null && adaptedBounds
+    && (sourceDose < adaptedBounds[0] || sourceDose > adaptedBounds[1]);
+  const currentDoseWithinAdaptation = dose != null && adaptedBounds
+    && dose >= adaptedBounds[0] && dose <= adaptedBounds[1];
+  const doseBounds = adaptedBounds
+    ? (originalOutsideAdaptation && !currentDoseWithinAdaptation ? [sourceDose, sourceDose] : adaptedBounds)
+    : sourceDose == null ? null : [sourceDose, sourceDose];
+  const doseChange = (nextDose) => {
+    if (previewPending || previewStale || !Number.isFinite(nextDose)) return;
+    if (sourceDose != null && nextDose !== sourceDose && adaptedBounds
+      && (nextDose < adaptedBounds[0] || nextDose > adaptedBounds[1])) return;
+    onCoffeeGramsChange?.(nextDose);
+  };
+  const grind = projection?.grind || source?.grind;
+  const nativeGrind = grind?.native;
+  const nativeGrindLabel = nativeGrind && typeof nativeGrind === 'object'
+    ? [nativeGrind.grinder, nativeGrind.setting, nativeGrind.generation].filter(Boolean).join(': ')
+    : typeof nativeGrind === 'string' ? nativeGrind : null;
+  const grindGuidance = manualSourceGrindGuidance(grind, { ...preferences, grinder: grinderKey, grinderCustomName: grinderName });
+  const grindLabel = grindGuidance.displayMode === 'setting' && grindGuidance.setting
+    ? `${grindGuidance.grinderName || grinderName}: ${grindGuidance.setting}`
+    : grindGuidance.displayMode === 'microns' && Number.isFinite(grindGuidance.sourceMicrons)
+      ? `~${grindGuidance.sourceMicrons}µm`
+      : grindGuidance.sourceDescription || (Number.isFinite(grind?.microns) ? `~${grind.microns}µm` : null);
+  const sourceMicronLabel = Number.isFinite(grindGuidance.sourceMicrons) ? `Source reference: ~${grindGuidance.sourceMicrons}µm` : null;
+  const approximateSettingLabel = grindGuidance.displayMode === 'microns' && grindGuidance.setting
+    ? `Approximate ${grindGuidance.grinderName || grinderName} setting: ${grindGuidance.setting}`
+    : null;
+  const finishGuidance = sourceFinishGuidance(projection?.finish, projection?.clock?.origin);
+  return (
+    <m.div {...fadeUp}>
+      <div style={{ marginBottom: 16 }}>
+        <SectionLabel style={{ marginBottom: 6 }}>Source recipe · {sourceEquipmentLabel(projection)}</SectionLabel>
+        <div style={{ fontFamily: fonts.heading, fontSize: 24, fontWeight: 600, color: C.text, lineHeight: 1.1 }}>{source.title || 'Source recipe'}</div>
+        <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{source.author || 'Named source'} · {projection?.mode === 'iced' ? 'Iced' : 'Hot'}</div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: water ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 14 }}>
+        {!attemptId && dose != null && doseBounds && onCoffeeGramsChange
+          ? <DoseStepperCard
+            dose={dose}
+            min={doseBounds[0]}
+            max={doseBounds[1]}
+            onChange={doseChange}
+          />
+          : <ParamCard label="Coffee" value={dose == null ? 'Source amount' : `${dose}g`} icon={Coffee} iconColor={C.accent} />}
+        {water && <ParamCard label="Water" value={water} icon={Droplets} iconColor={C.blue} />}
+      </div>
+
+      {previewMode && previewDoseError && <div role="alert" data-preview-dose-error style={{ ...type.body, color: C.red, background: C.redBg, borderRadius: radius.md, padding: '10px 12px', marginBottom: 14 }}>{previewDoseError}</div>}
+
+      {(grindLabel || nativeGrindLabel) && (
+        <div style={{ background: C.amberBg, border: `1px solid ${C.accentLight}`, borderRadius: radius.lg, padding: '12px 14px', marginBottom: 14, boxShadow: shadows.e1 }}>
+          <SectionLabel style={{ marginBottom: 5 }}>Grind · {grindGuidance.grinderName || grinderName || 'your grinder'}</SectionLabel>
+          {grindLabel && <div style={{ ...type.body, color: C.text, lineHeight: 1.45 }}>{grindLabel}</div>}
+          {grindGuidance.approximate && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>Approximate starting point from the source micron note; adjust by taste.</div>}
+          {approximateSettingLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>{approximateSettingLabel}</div>}
+          {!grindGuidance.approximate && grindGuidance.status === 'source-microns-only' && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>No calibration is available for this grinder, so use the source micron reference without an invented dial setting.</div>}
+          {!grindGuidance.approximate && grindGuidance.status === 'qualitative' && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>The source gives a qualitative grind only; no numeric setting is invented.</div>}
+          {sourceMicronLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>{sourceMicronLabel}</div>}
+          {nativeGrindLabel && <div style={{ ...type.caption, color: C.textMuted, marginTop: grindLabel ? 3 : 0 }}>Source setting: {nativeGrindLabel}</div>}
+        </div>
+      )}
+
+      {projection?.preparation?.length > 0 && (
+        <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
+          <SectionLabel style={{ color: C.accent, marginBottom: 6 }}>Prepare before the clock</SectionLabel>
+          <ol style={{ margin: 0, paddingLeft: 20, color: C.text, lineHeight: 1.5 }}>
+            {projection.preparation.map((instruction, index) => <li key={index}>{instruction}</li>)}
+          </ol>
+        </div>
+      )}
+
+      <div style={{ background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, padding: 14, marginBottom: 14, boxShadow: shadows.e1 }}>
+        <SectionLabel style={{ marginBottom: 8 }}>Source schedule</SectionLabel>
+        <ol style={{ display: 'grid', gap: 10, margin: 0, paddingLeft: 22, color: C.text }}>
+          {stages.map((stage) => (
+            <li key={stage.id} style={{ paddingLeft: 2, lineHeight: 1.45 }}>
+              <div style={{ fontSize: 14 }}>{stage.label}</div>
+              <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>
+                {sourceStageQuantity(stage) && <span>{sourceStageQuantity(stage)} · </span>}
+                {stage.valve && <span>Valve {stage.valve} · </span>}
+                {sourceTriggerLabel(stage, projection)}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {finishGuidance && (
+        <div role="note" data-source-finish-guidance style={{ ...type.body, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          {finishGuidance}
+        </div>
+      )}
+
+      {projection?.temperature && (
+        <div style={{ ...type.body, color: C.textMuted, margin: '-2px 4px 12px' }}>
+          Water temperature: {projection.temperature.value == null ? projection.temperature.description : `${projection.temperature.value}°${projection.temperature.unit}`}
+        </div>
+      )}
+
+      {projection?.adaptation?.disclosure && (
+        <div role="note" style={{ ...type.caption, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          {readableSourceDisclosure(projection.adaptation.disclosure)}
+        </div>
+      )}
+
+      {previewMode && previewError && (
+        <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          {previewError}
+          {previewStale && <Btn variant="secondary" onClick={onClose} style={{ width: '100%', justifyContent: 'center', marginTop: 10, minHeight: 44 }} aria-label="Back to chat">Back to chat</Btn>}
+        </div>
+      )}
+      {error && !previewMode && attemptId && (
+        <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          Could not start this brew: {error}
+        </div>
+      )}
+
+      {!ready && (
+        <div role="status" style={{ ...type.body, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+          This source remains readable, but guided execution is unavailable until its timing and configuration are validated.
+          {projection?.readiness?.blockers?.length > 0 && <div style={{ ...type.caption, marginTop: 5 }}>Reason: {projection.readiness.blockers.join('; ')}</div>}
+        </div>
+      )}
+
+      {ready && (
+        <m.button
+          type="button"
+          onClick={onStart}
+          disabled={disabled || previewStale}
+          aria-label="Start source brew guide"
+          whileTap={{ scale: 0.97 }}
+          transition={spring.snappy}
+          style={{ ...sourcePrimaryButtonStyle, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: disabled || previewStale ? 0.55 : 1 }}
+        >
+          <Play size={16} fill="currentColor" aria-hidden="true" /> {previewPending ? 'Preparing…' : (previewMode ? 'Start brew' : 'Start source guide')}
+        </m.button>
+      )}
+
+      {previewMode && onPreviewSave && (
+        <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || previewStale || !ready} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
+          {previewPending ? 'Preparing…' : 'Save recipe'}
+        </Btn>
+      )}
+
+      {extraFooter}
+    </m.div>
   );
 };
 
@@ -129,6 +374,77 @@ const KalitaSizeSwitch = ({ value, onChange, disabled }) => {
               }}
             >
               {size}
+            </m.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const V60_VARIANT_LABELS = { classic: 'Classic', switch: 'Switch' };
+
+const V60VariantSwitch = ({ value, onChange, disabled }) => {
+  const selected = value === 'switch' ? 'switch' : 'classic';
+  return (
+    <div
+      role="group"
+      aria-label="V60 variant"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '10px 12px',
+        marginBottom: 14,
+        background: C.amberBg,
+        border: `1px solid ${C.accentLight}`,
+        borderRadius: radius.lg,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <SectionLabel style={{ color: C.accent }}>V60 variant</SectionLabel>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexShrink: 0,
+          padding: 3,
+          gap: 2,
+          background: C.card,
+          border: `1px solid ${C.borderLight}`,
+          borderRadius: radius.pill,
+          boxShadow: shadows.e1,
+        }}
+      >
+        {['classic', 'switch'].map((variant) => {
+          const active = selected === variant;
+          return (
+            <m.button
+              key={variant}
+              type="button"
+              onClick={() => onChange?.(variant)}
+              disabled={disabled || active}
+              whileTap={disabled || active ? undefined : { scale: 0.94 }}
+              transition={spring.snappy}
+              aria-pressed={active}
+              aria-label={`Use V60 ${V60_VARIANT_LABELS[variant]}`}
+              style={{
+                minWidth: 52,
+                minHeight: 44,
+                padding: '0 12px',
+                border: 'none',
+                borderRadius: radius.pill,
+                background: active ? C.accent : 'transparent',
+                color: active ? C.cream : C.textMuted,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: disabled || active ? 'default' : 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {V60_VARIANT_LABELS[variant]}
             </m.button>
           );
         })}
@@ -336,7 +652,7 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
                 <div style={{ ...type.bodyL, color: C.text, lineHeight: 1.4 }}>{step.action}</div>
                 {step.waterTotal > 0 && (
                   <div style={{ ...type.caption, color: C.textMuted, marginTop: 3 }}>
-                    Total water: {step.waterTotal}g
+                    Total water: {step.waterTotal}{step.waterUnit || 'g'}
                   </div>
                 )}
               </div>
@@ -349,10 +665,12 @@ const StepTimeline = ({ steps, timelineColor, accentColor, iceAccent }) => (
 );
 
 export const HandBrewModal = ({
-  open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, onRetryIced, loading, error, phase, onRetry, onRegenerate,
-  extraFooter, bean, onStartTasting,
+  open, onClose, recipe, icedRecipe: icedRecipeProp, icedLoading = false, icedError = null, icedUnsupported = false, onRetryIced, loading, error, phase, onRetry, onRegenerate,
+  extraFooter, bean, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onStartTasting, onOpenRuphus = null, onDismissAttempt = null,
   userCoffeeGrams, onCoffeeGramsChange, onPersistDose,
-  deviceKey, onKalitaSizeChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent,
+  deviceKey, onKalitaSizeChange, onV60VariantChange, onKalitaIcedChillingMethodChange, onSaveTimingEvent, onSourceCoffeeGramsChange,
+  previewMode = false, previewPending = false, previewError = null, previewDoseError = null, previewStale = false, onPreviewStart, onPreviewSave, onTimerStart, autoStartAttempt = false,
+  sourceTimerState = null, onSourceTimerStateChange = null, sourceTimerBinding = null,
 }) => {
   const { preferences } = usePreferences();
   const grinderKey = preferences?.grinder || 'fellow-ode-gen2';
@@ -362,41 +680,93 @@ export const HandBrewModal = ({
   const [icedMode, setIcedMode] = useState(false);
   const [timerRecipeOverride, setTimerRecipeOverride] = useState(null);
   const modalContentRef = useRef(null);
+  const autoStartConsumedRef = useRef(false);
+  const startRequestRef = useRef(0);
+  const sourceProjection = recipe?.sourceProjection || null;
+  const sourceExecution = sourceProjection?.sourceExecution || null;
 
   useEffect(() => {
+    startRequestRef.current += 1;
+    setTimerOpen(false);
     if (open) {
       setIcedMode(false);
       setTimerRecipeOverride(null);
+      if (!autoStartAttempt) autoStartConsumedRef.current = false;
     }
-  }, [open]);
+  }, [open, attemptId, autoStartAttempt]);
 
   const effectiveDose = typeof userCoffeeGrams === 'number' && userCoffeeGrams > 0
     ? userCoffeeGrams
     : recipe?.coffeeGrams;
-  const doseUpdating = recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
+  const doseUpdating = !attemptId && recipe?.candidate === true && typeof effectiveDose === 'number' && effectiveDose !== recipe.coffeeGrams;
 
   const scaledRecipe = useMemo(
-    () => (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1'
+    () => (sourceProjection ? recipe : (recipe?.candidate && recipe?.doseTimingPolicy === 'generated-dose-v60-v1' && !attemptId
       ? recipe
-      : scaleRecipeForDose(recipe, effectiveDose)),
-    [recipe, effectiveDose]
+      : timerRecipeForMode({ recipe, attemptId, effectiveDose }))),
+    [recipe, attemptId, effectiveDose, sourceProjection]
   );
-  const displayRecipe = useMemo(() => normalizeRecipePhases(scaledRecipe), [scaledRecipe]);
+  const displayRecipe = useMemo(
+    () => sourceProjection
+      ? manualSourceRecipeView(recipe, { dose: effectiveDose })
+      : normalizeRecipePhases(scaledRecipe),
+    [recipe, effectiveDose, scaledRecipe, sourceProjection]
+  );
+  // Chat and persisted attempts open their exact recipe directly, including
+  // iced recipes. They do not enter the optional hot-to-iced browsing flow.
+  const directIcedRecipe = displayRecipe?.mode === 'iced' || displayRecipe?.isIced === true;
+  const displayedTechniqueReasoning = useMemo(() => {
+    const reasoning = displayRecipe?.reasoning;
+    if (!directIcedRecipe || recipe?.device !== 'v60' || typeof reasoning !== 'string') return reasoning;
+    // Iced dose previews preserve the source cadence and lineage while their
+    // quantities are scaled. Keep the recipe immutable, but do not leave the
+    // source's single-cup profile label attached to a displayed larger dose.
+    if (displayRecipe.coffeeGrams > 20 && /single cup\s+12\s+20 dose/i.test(reasoning)) {
+      return reasoning.replace(/single cup\s+12\s+20 dose/i, 'larger dose (21–30g)');
+    }
+    return reasoning;
+  }, [directIcedRecipe, displayRecipe, recipe?.device]);
   const hotGuideRange = useMemo(() => renderGuideRange(displayRecipe), [displayRecipe]);
   const hotTimerSteps = useMemo(() => buildTimerSteps(displayRecipe), [displayRecipe]);
-  const timerReady = Boolean(hotTimerSteps) && !doseUpdating;
+  const timerReady = Boolean(hotTimerSteps);
+  const sourceTimerReady = Boolean(sourceProjection?.timerReady === true && sourceExecution);
+  const effectiveTimerReady = sourceProjection ? sourceTimerReady : timerReady && !doseUpdating;
+  const sourceDoseBounds = displayRecipe?.sourceDoseBounds || null;
+  const handleDisplayDoseChange = useCallback((nextDose) => {
+    if (sourceProjection && sourceDoseBounds
+      && (nextDose < sourceDoseBounds[0] || nextDose > sourceDoseBounds[1])) return;
+    if (sourceProjection) {
+      // Preview callers may supply the validated source-preview adapter. A
+      // saved source has no generic regeneration fallback: preserving its
+      // source identity is safer than silently replacing it with a candidate.
+      (onSourceCoffeeGramsChange || (previewMode ? onCoffeeGramsChange : null))?.(nextDose);
+      return;
+    }
+    onCoffeeGramsChange?.(nextDose);
+  }, [onCoffeeGramsChange, onSourceCoffeeGramsChange, previewMode, sourceDoseBounds, sourceProjection]);
+  const displayWaterLabel = displayRecipe?.sourceWaterLabel || (displayRecipe?.waterGrams != null ? `${displayRecipe.waterGrams}g` : null);
 
-  const device = deviceKey || recipe?.device || 'v60';
+  const device = deviceKey || recipe?.device || sourceProjection?.sourceConfiguration?.device || 'v60';
+  const handDevice = device === 'kalita' ? 'kalita' : 'v60';
+  const recipeLaunchContext = (mode, displayedRecipe, provenance = null) => {
+    const slot = `${handDevice}_${mode}`;
+    const ref = displayedRecipe?.revisionId || (mode === 'hot' ? revisionId || provenance?.revisionId : null) || bean?.activeRevisionIds?.[slot] || null;
+    return buildRecipeLaunchContext({ coffeeRef: bean?.id, surface: 'recipe_kalita_v60', slot, ref });
+  };
 
   const icedRecipe = useMemo(
     () => {
       if (!icedMode) return null;
+      // Defense in depth: iced Switch is out of scope. Even if icedMode were
+      // somehow entered stale (e.g. a variant flip mid-session), never
+      // render an iced recipe for a Switch hot request.
+      if (icedUnsupported) return null;
       if (icedRecipeProp?.candidate) return normalizeRecipePhases(icedRecipeProp);
       if (icedRecipeProp?.mode === 'iced' || icedRecipeProp?.isIced) return normalizeRecipePhases(icedRecipeProp);
       if (isDeterministicV60Hot(displayRecipe) || isDeterministicKalitaHot(displayRecipe)) return null;
       return displayRecipe ? transformToFlashBrew(displayRecipe, device, effectiveDose) : null;
     },
-    [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose]
+    [icedMode, icedRecipeProp, displayRecipe, device, effectiveDose, icedUnsupported]
   );
 
   const handleEnterIced = () => {
@@ -416,31 +786,63 @@ export const HandBrewModal = ({
   };
 
   const persistIfChanged = useCallback(() => {
+    if (previewMode || attemptId) return;
     if (onPersistDose && typeof effectiveDose === 'number') {
       const stored = recipe?.userCoffeeGrams;
       if (effectiveDose !== stored) {
         onPersistDose(effectiveDose);
       }
     }
-  }, [onPersistDose, effectiveDose, recipe?.userCoffeeGrams]);
+  }, [attemptId, onPersistDose, effectiveDose, recipe?.userCoffeeGrams, previewMode]);
 
   const handleClose = useCallback(() => {
+    startRequestRef.current += 1;
     persistIfChanged();
     onClose?.();
   }, [persistIfChanged, onClose]);
 
-  const handleStartBrew = useCallback(() => {
+  const handleStartBrew = useCallback(async () => {
+    const requestToken = ++startRequestRef.current;
+    if (previewMode) {
+      await onPreviewStart?.();
+      return;
+    }
+    if (attemptId && onTimerStart && !(await onTimerStart())) return;
+    if (!open || requestToken !== startRequestRef.current) return;
     persistIfChanged();
     setTimerOpen(true);
-  }, [persistIfChanged]);
+  }, [attemptId, onPreviewStart, onTimerStart, open, persistIfChanged, previewMode]);
 
   const handleStartIcedBrew = useCallback(() => {
     setTimerRecipeOverride(icedRecipe);
     setTimerOpen(true);
   }, [icedRecipe]);
 
+  // A deliberate close is a durable dismissal for both the source-backed and
+  // generated timer. Keep this separate from tasting, which advances the
+  // attempt and must not dismiss its recovery receipt.
+  const handleTimerClose = useCallback(() => {
+    setTimerOpen(false);
+    setTimerRecipeOverride(null);
+    onDismissAttempt?.(attemptId);
+  }, [attemptId, onDismissAttempt]);
+
+  // Recipe-sheet dismissal is distinct from the programmatic close used when
+  // handing the attempt into tasting. Preserve the receipt until the user
+  // explicitly closes this sheet, including the source preview's back action.
+  const handleDismiss = useCallback(() => {
+    handleClose();
+    onDismissAttempt?.(attemptId);
+  }, [attemptId, handleClose, onDismissAttempt]);
+
+  useEffect(() => {
+    if (!open || previewMode || !autoStartAttempt || autoStartConsumedRef.current || !attemptId || !effectiveTimerReady) return;
+    autoStartConsumedRef.current = true;
+    handleStartBrew();
+  }, [autoStartAttempt, attemptId, effectiveTimerReady, handleStartBrew, open, previewMode]);
+
   const timerRecipe = icedMode ? (timerRecipeOverride || icedRecipe) : displayRecipe;
-  const icedTimerSteps = useMemo(() => buildTimerSteps(icedRecipe), [icedRecipe]);
+  const icedTimerSteps = useMemo(() => (sourceProjection ? null : buildTimerSteps(icedRecipe)), [icedRecipe, sourceProjection]);
   const icedTimerReady = Boolean(icedTimerSteps) && !doseUpdating && icedRecipe.coffeeGrams === effectiveDose;
   const timingContext = useMemo(
     () => timingContextFromRecipe({ beanId: bean?.id, recipe: displayRecipe, mode: 'hot' }),
@@ -463,7 +865,7 @@ export const HandBrewModal = ({
     <>
     <Modal
       open={open && !timerOpen}
-      onClose={handleClose}
+      onClose={handleDismiss}
       title={icedMode ? (icedRecipe?.icedModeLabel || (device === 'kalita' ? 'Iced Kalita' : 'Iced Flash Brew')) : 'Hand Brew Recipe'}
     >
       {/* Loading state */}
@@ -501,7 +903,15 @@ export const HandBrewModal = ({
         <m.div ref={modalContentRef} {...fadeUp}>
           {/* Recipe header */}
           <div style={{ marginBottom: 16 }}>
-            <SectionLabel style={{ marginBottom: 6 }}>{recipe.device === 'v60' ? 'V60 02 · Hot' : 'Hand brew recipe'}</SectionLabel>
+            <SectionLabel style={{ marginBottom: 6 }}>
+              {recipe.device === 'v60'
+                ? (directIcedRecipe
+                  ? `V60 ${recipe.v60Size || '02'} · Iced`
+                  : (recipe.variant === 'switch' ? 'V60 03 Switch · Hot' : 'V60 02 · Hot'))
+                : (directIcedRecipe && recipe.device === 'kalita'
+                  ? `Wave ${recipe.kalitaSize || '185'} · Iced`
+                  : 'Hand brew recipe')}
+            </SectionLabel>
             <div style={{
               fontFamily: fonts.heading,
               fontSize: 24,
@@ -510,41 +920,73 @@ export const HandBrewModal = ({
               lineHeight: 1.1,
               letterSpacing: '-0.01em',
             }}>
-              {recipe.title || 'Pour-Over Recipe'}
+              {displayRecipe.title || 'Pour-Over Recipe'}
             </div>
-            {(recipe.techniqueLabel || (recipe.technique && TECHNIQUE_LABELS[recipe.technique])) && (
+            {(displayRecipe.techniqueLabel || (displayRecipe.technique && TECHNIQUE_LABELS[displayRecipe.technique])) && (
               <div style={{ ...type.caption, color: C.textMuted, marginTop: 4 }}>
-                {recipe.techniqueLabel || TECHNIQUE_LABELS[recipe.technique]} method
+              {displayRecipe.techniqueLabel || TECHNIQUE_LABELS[displayRecipe.technique]} method
+              </div>
+            )}
+            {displayRecipe.sourceAuthor && (
+              <div data-source-attribution style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>
+                {displayRecipe.sourceAuthor} · source-backed method
               </div>
             )}
           </div>
+          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: `${device === 'kalita' ? 'kalita' : 'v60'}_${directIcedRecipe ? 'iced' : 'hot'}` } : (recipeProvenance || {})} />
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext(directIcedRecipe ? 'iced' : 'hot', recipe, recipeProvenance), 'How should I improve this recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
-          {recipe.device === 'kalita' && (
+          {recipe.device === 'kalita' && !sourceProjection && !previewMode && !attemptId && (
             <KalitaSizeSwitch
               value={recipe.kalitaSize}
               onChange={onKalitaSizeChange}
               disabled={loading}
             />
           )}
+          {recipe.device === 'v60' && !sourceProjection && !previewMode && !attemptId && (
+            <V60VariantSwitch
+              value={recipe.variant}
+              onChange={onV60VariantChange}
+              disabled={loading}
+            />
+          )}
 
           {/* Param tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <DoseStepperCard
+          <div style={{ display: 'grid', gridTemplateColumns: directIcedRecipe || !(displayRecipe.ratio || displayRecipe.hotExtractionRatio) ? '1fr 1fr' : '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+            {attemptId || (sourceProjection && !previewMode && !onSourceCoffeeGramsChange) ? <ParamCard label="Coffee" value={`${displayRecipe.coffeeGrams}g`} icon={Coffee} iconColor={C.accent} /> : <DoseStepperCard
               dose={displayRecipe.coffeeGrams}
-              onChange={onCoffeeGramsChange}
-              {...(device === 'v60' ? { min: 12, max: 30 } : device === 'kalita' ? {
+              onChange={previewPending ? () => {} : handleDisplayDoseChange}
+              {...(sourceProjection && sourceDoseBounds ? { min: sourceDoseBounds[0], max: sourceDoseBounds[1] } : device === 'v60' ? { min: 12, max: 30 } : device === 'kalita' ? {
                 min: kalitaDoseBounds(displayRecipe.kalitaSize).minDose,
                 max: kalitaDoseBounds(displayRecipe.kalitaSize).maxDose,
               } : {})}
-            />
-            <ParamCard label="Water" value={`${displayRecipe.waterGrams}g`} icon={Droplets} iconColor={C.blue} />
-            <ParamCard label="Ratio" value={displayRecipe.ratio} icon={Scale} />
+              {...(device === 'v60' && recipe.variant === 'switch' ? {
+                min: V60_SWITCH_DOSE_BOUNDS.minDose,
+                max: V60_SWITCH_DOSE_BOUNDS.maxDose,
+              } : {})}
+            />}
+            <ParamCard label={directIcedRecipe ? 'Brew water' : 'Water'} value={displayWaterLabel || 'Source amount'} icon={Droplets} iconColor={C.blue} />
+            {directIcedRecipe && (!sourceProjection || displayRecipe.sourceIceLabel) && <ParamCard label="Recipe ice" value={displayRecipe.sourceIceLabel || `${displayRecipe.iceGrams}g`} icon={Snowflake} iconColor={C.frost} />}
+            {(displayRecipe.ratio || displayRecipe.hotExtractionRatio) && <ParamCard label={directIcedRecipe ? (displayRecipe.ratio ? 'Total ratio' : 'Hot extraction ratio') : 'Ratio'} value={displayRecipe.ratio || displayRecipe.hotExtractionRatio} icon={Scale} />}
           </div>
-          {recipe.device === 'kalita' && (
+          {directIcedRecipe && <div style={{ ...type.caption, color: C.textMuted, marginBottom: 14 }}>
+            {sourceProjection
+              ? `Source brew water: ${displayWaterLabel || 'native source amount'}.${displayRecipe.sourceIceLabel ? ` Source recipe ice: ${displayRecipe.sourceIceLabel}.` : ''} Native units are preserved; no mass equivalent is assumed.`
+              : `Brew water + recipe ice: ${displayRecipe.waterGrams + displayRecipe.iceGrams}g input. ${displayRecipe.ratio ? '' : 'Final strength depends on ice melt; a total beverage ratio is not assumed. '}Serving ice is separate; follow the chilling instructions below.`}
+          </div>}
+          {previewMode && previewDoseError && <div role="alert" data-preview-dose-error style={{ ...type.body, color: C.red, background: C.redBg, borderRadius: radius.md, padding: '10px 12px', marginBottom: 14 }}>{previewDoseError}</div>}
+          {recipe.device === 'kalita' && !sourceProjection && (
             <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
               Wave {recipe.kalitaSize || '185'} · {recipe.doseProfile || 'legacy profile'}
               {recipe.candidate ? ' · Bean-specific engine' : ''}
               {recipe.generationStatus === 'fallback' ? ' · GPT fallback' : ''}
+            </div>
+          )}
+          {recipe.device === 'v60' && recipe.variant === 'switch' && !sourceProjection && (
+            <div style={{ ...type.caption, color: C.textMuted, margin: '-4px 4px 14px', lineHeight: 1.5 }}>
+              Switch 03 · {recipe.doseProfile || recipe.roastPreset || 'hybrid'}
+              {recipe.candidate ? ' · Bean-specific engine' : ''}
+              {recipe.fallback ? ' · Conservative baseline' : ''}
             </div>
           )}
 
@@ -564,16 +1006,18 @@ export const HandBrewModal = ({
             </div>
           )}
 
-          {recipe.candidate && recipe.reasoning && (
+          {displayRecipe.candidate && displayedTechniqueReasoning && (
             <div role="note" style={{ background: C.amberBg, borderRadius: radius.lg, padding: '12px 16px', marginBottom: 14, border: `1px solid ${C.accentLight}` }}>
               <SectionLabel style={{ color: C.accent, marginBottom: 5 }}>Why this technique</SectionLabel>
-              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.reasoning}</div>
-              {recipe.sourceLineage?.adaptation && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{recipe.sourceLineage.adaptation}</div>}
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{displayedTechniqueReasoning}</div>
+              {displayRecipe.sourceLineage?.adaptation && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{displayRecipe.sourceLineage.adaptation}</div>}
             </div>
           )}
 
+          {error && recipe && !previewMode && attemptId && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>Could not start this brew: {error}</div>}
+
           {/* Grind card */}
-          {recipe.grindSize && (
+          {displayRecipe.grindSize && (
             <div style={{
               background: C.amberBg,
               borderRadius: radius.lg,
@@ -582,18 +1026,37 @@ export const HandBrewModal = ({
               border: `1px solid ${C.accentLight}`,
               boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ marginBottom: 8 }}>{recipe.grindSize.grinderSpecific === false ? 'Grind' : `${grinderName} Grind`}</SectionLabel>
+              <SectionLabel style={{ marginBottom: 8 }}>{displayRecipe.grindSize.grinderSpecific === false ? 'Grind' : `${grinderName} Grind`}</SectionLabel>
               <GrindDisplay
-                grindSize={recipe.grindSize}
+                grindSize={displayRecipe.grindSize}
                 grinderName={grinderName}
                 preferences={preferences}
                 accentColor={C.amber}
               />
+              {displayRecipe.sourceLineage?.grindAdaptation?.disclosure && (
+                <div data-grind-adaptation-disclosure style={{ ...type.caption, color: C.textMuted, marginTop: 8, lineHeight: 1.45 }}>
+                  Estimated starting grind for this technique and grinder. Adjust to taste.
+                </div>
+              )}
+              {recipe.recipePreview?.grindNormalization?.grinder === 'fellow-ode-gen2' && (
+                <div data-grind-normalization style={{ ...type.body, color: C.textMuted, marginTop: 8 }}>
+                  The old setting {recipe.recipePreview.grindNormalization.from} falls between clicks. This preview uses the nearest Ode Gen 2 click, {recipe.recipePreview.grindNormalization.to}.
+                </div>
+              )}
             </div>
           )}
 
-          {/* Temperature */}
-          {recipe.waterTemp && (
+          {/* Temperature — single kettle temperature only (Revision
+              2026-08-16): every freshly generated Switch recipe carries a
+              single waterTemp and no waterTemp2, so this tile always renders
+              the plain single-temperature line for current candidates. The
+              waterTemp2 branch is kept ONLY as tolerant legacy-cache display:
+              if a stale cached dual-temp candidate from before the
+              single-temp mandate ever surfaces (should not happen — the
+              rulesVersion bump invalidates them), it still renders its
+              phase-1/phase-2 "hot → cool" line instead of crashing. Do not
+              remove this branch; it is the crash guard, not a live feature. */}
+          {(displayRecipe.waterTemp || displayRecipe.sourceTemperatureLabel) && (
             <div style={{
               background: C.card,
               borderRadius: radius.lg,
@@ -607,9 +1070,11 @@ export const HandBrewModal = ({
             }}>
               <Thermometer size={18} color={C.accent} />
               <div>
-                <SectionLabel>Water Temperature</SectionLabel>
+                <SectionLabel>{displayRecipe.waterTemp2 ? 'Water Temperature (percolation → immersion)' : 'Water Temperature'}</SectionLabel>
                 <div style={{ fontFamily: fonts.heading, fontSize: 16, fontWeight: 600, color: C.text, marginTop: 2 }}>
-                  {renderTemp(recipe.waterTemp)}
+                  {displayRecipe.sourceTemperatureLabel || (displayRecipe.waterTemp2
+                    ? `${renderTemp(displayRecipe.waterTemp)} → ${renderTemp(displayRecipe.waterTemp2)}`
+                    : renderTemp(displayRecipe.waterTemp))}
                 </div>
               </div>
             </div>
@@ -631,8 +1096,15 @@ export const HandBrewModal = ({
             accentColor={C.accent}
           />
 
+          {(directIcedRecipe || sourceProjection) && displayRecipe.postBrewSteps?.length > 0 && <section aria-label="After brewing" style={{ marginBottom: 14 }}>
+            <SectionLabel>{sourceProjection ? 'After the source method' : 'After brewing'}</SectionLabel>
+            <ol style={{ margin: 0, paddingLeft: 20, color: C.text, lineHeight: 1.5 }}>
+              {displayRecipe.postBrewSteps.map((step, index) => <li key={index}>{step.action}</li>)}
+            </ol>
+          </section>}
+
           {/* Total brew time */}
-          {displayRecipe.totalBrewTime && (
+          {(displayRecipe.totalBrewTime || displayRecipe.sourceFinishLabel) && (
             <div style={{
               textAlign: 'center',
               ...type.body,
@@ -640,14 +1112,14 @@ export const HandBrewModal = ({
               marginBottom: 14,
               paddingTop: 4,
             }}>
-              Expected drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{hotGuideRange}</strong>
+              {displayRecipe.sourceFinishLabel || <>Expected drawdown: <strong style={{ color: C.text, fontFamily: fonts.heading }}>{hotGuideRange}</strong></>}
             </div>
           )}
 
           <TimingMemoryHint memory={timingMemory} context={timingContext} />
 
           {/* Tasting tip */}
-          {recipe.tips && (
+          {displayRecipe.tips && (
             <div style={{
               background: C.greenBg,
               borderRadius: radius.lg,
@@ -656,13 +1128,13 @@ export const HandBrewModal = ({
               border: `1px solid ${C.green}22`,
               boxShadow: shadows.e1,
             }}>
-              <SectionLabel style={{ color: C.green, marginBottom: 6 }}>{recipe.device === 'v60' ? 'Drawdown tip' : 'Tasting tip'}</SectionLabel>
-              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{recipe.tips}</div>
+              <SectionLabel style={{ color: C.green, marginBottom: 6 }}>{displayRecipe.device === 'v60' ? 'Drawdown tip' : 'Tasting tip'}</SectionLabel>
+              <div style={{ ...type.body, color: C.text, lineHeight: 1.5 }}>{displayRecipe.tips}</div>
             </div>
           )}
 
           {/* Reasoning */}
-          {recipe.reasoning && !recipe.candidate && (
+          {displayRecipe.reasoning && !displayRecipe.candidate && (
             <div style={{
               ...type.caption,
               color: C.textMuted,
@@ -671,14 +1143,27 @@ export const HandBrewModal = ({
               lineHeight: 1.6,
               padding: '0 4px',
             }}>
-              {recipe.reasoning}
+              {displayRecipe.reasoning}
+            </div>
+          )}
+
+          {previewMode && previewError && <div role="alert" style={{ ...type.body, color: C.red, background: C.redBg, border: `1px solid ${C.red}30`, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12 }}>
+            <div>{previewError}</div>
+            {previewStale && <Btn variant="secondary" onClick={onClose} style={{ width: '100%', justifyContent: 'center', marginTop: 10, minHeight: 44 }} aria-label="Back to chat">Back to chat</Btn>}
+          </div>}
+
+          {sourceProjection && !effectiveTimerReady && (
+            <div role="status" data-source-execution-unavailable style={{ ...type.body, color: C.textMuted, background: C.bgDeep, borderRadius: radius.md, padding: '10px 12px', marginBottom: 12, lineHeight: 1.45 }}>
+              This source remains readable, but guided execution is unavailable until its timing and configuration are validated.
+              {sourceProjection.readiness?.blockers?.length > 0 && <div style={{ ...type.caption, marginTop: 5 }}>Reason: {sourceProjection.readiness.blockers.join('; ')}</div>}
             </div>
           )}
 
           {/* Start Brew button */}
-          {timerReady && (
+          {effectiveTimerReady && (
             <m.button
               onClick={handleStartBrew}
+              disabled={previewPending || previewStale}
               aria-label="Start brew timer"
               whileTap={{ scale: 0.97 }}
               transition={spring.snappy}
@@ -703,18 +1188,32 @@ export const HandBrewModal = ({
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Play size={16} fill="#FFF8F0" strokeWidth={0} /> {displayRecipe.phaseContractVersion ? 'Start Bloom & Timer' : 'Start Brew'}
+              <Play size={16} fill="#FFF8F0" strokeWidth={0} /> {previewPending ? 'Preparing…' : (previewMode ? 'Start brew' : (displayRecipe.phaseContractVersion ? 'Start Bloom & Timer' : 'Start Brew'))}
             </m.button>
           )}
 
-          {onRegenerate && (
+          {previewMode && onPreviewSave && (
+            <Btn variant="secondary" onClick={onPreviewSave} disabled={previewPending || previewStale || !effectiveTimerReady} style={{ width: '100%', justifyContent: 'center', marginBottom: 10, minHeight: 44 }} aria-label="Save recipe">
+              {previewPending ? 'Preparing…' : 'Save recipe'}
+            </Btn>
+          )}
+
+          {onRegenerate && !sourceProjection && !previewMode && !attemptId && (
             <Btn variant="ghost" onClick={handleRegenerate} style={{ width: '100%', justifyContent: 'center' }} aria-label="Regenerate hand brew recipe">
               <RefreshCw size={14} /> Regenerate Recipe
             </Btn>
           )}
 
-          {/* Iced entry point */}
-          {timerReady && (
+          {/* Iced entry point — hidden (not offered) for the Switch variant;
+              iced Switch is out of scope for this slice (plan Scope
+              Boundaries). A short note explains why instead of silently
+              omitting the option. */}
+          {!sourceProjection && !previewMode && !attemptId && effectiveTimerReady && icedUnsupported && (
+            <div style={{ ...type.caption, color: C.textLight, textAlign: 'center', marginTop: 10 }}>
+              Iced isn't available yet for the Switch — switch to classic V60 for an iced recipe.
+            </div>
+          )}
+          {!sourceProjection && !previewMode && !attemptId && !directIcedRecipe && effectiveTimerReady && !icedUnsupported && (
             <m.button
               onClick={handleEnterIced}
               whileTap={{ scale: 0.97 }}
@@ -805,6 +1304,7 @@ export const HandBrewModal = ({
                 )}
               </div>
             )}
+            {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(recipeLaunchContext('iced', icedRecipe), 'How should I improve this iced recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
           </div>
 
           {icedRecipe.device === 'kalita' && (
@@ -995,16 +1495,22 @@ export const HandBrewModal = ({
       )}
     </Modal>
     <BrewTimer
+      key={attemptId || (sourceProjection ? `${sourceProjection.sourceId}:${sourceProjection.sourceRevision}` : 'standard-brew')}
       open={timerOpen}
       recipe={timerRecipe}
+      sourceTimerState={sourceTimerState}
+      onSourceTimerStateChange={onSourceTimerStateChange}
+      sourceTimerBinding={sourceTimerBinding}
       bean={bean}
+      attemptId={attemptId}
+      revisionId={revisionId}
       onSaveTimingEvent={onSaveTimingEvent}
-      onClose={() => { setTimerOpen(false); setTimerRecipeOverride(null); }}
+      onClose={handleTimerClose}
       onStartTasting={(beanId) => {
         setTimerOpen(false);
         setTimerRecipeOverride(null);
         handleClose();
-        onStartTasting?.(beanId);
+        onStartTasting?.(beanId, attemptId);
       }}
     />
     </>

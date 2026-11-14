@@ -13,6 +13,8 @@ import { Capacitor } from '@capacitor/core';
 import { RecipeShareCard, captureShareCard, offScreenStyle } from './ShareCard';
 import { shareImage } from '../lib/share';
 import { transformAiden } from '../lib/flashBrewTransform';
+import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
+import { buildRecipeLaunchContext } from '../lib/ruphus/launch.js';
 
 const openExternalLink = (url) => {
   if (Capacitor.isNativePlatform()) {
@@ -371,7 +373,7 @@ const phaseMessages = {
   },
 };
 
-export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush }) => {
+export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error, phase, onRetry, onRetryPush, onRegenerate, onPushCached, onPushIced, extraFooter, icedResult, icedLoading, icedError, onRetryIcedPush, attemptId = null, revisionId = null, provenanceSource = null, recipeProvenance = null, onOpenRuphus = null, onRetryAttempt = null, onSendAsNewProfile = null, onCompleteAttempt = null, onStartTasting = null }) => {
   const { preferences, fellowConnected } = usePreferences();
   const [sharing, setSharing] = useState(false);
   const shareCardRef = useRef(null);
@@ -403,6 +405,10 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
     setIcedMode(false);
     modalContentRef.current?.closest('[role="dialog"]')?.scrollTo?.({ top: 0 });
   };
+  const handleAttemptComplete = async () => {
+    const completed = await onCompleteAttempt?.();
+    if (completed) onStartTasting?.(bean?.id, attemptId);
+  };
 
   const handleRegenerate = () => {
     setIcedMode(false);
@@ -428,6 +434,7 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
   const grinderName = GRINDER_LABELS[preferences?.grinder] || preferences?.grinderCustomName || 'Grinder';
   const isDeviceFull = error && (error.includes('maximum number of profiles') || error.includes('14 profiles'));
   const msg = phaseMessages[phase] || phaseMessages.recipe;
+  const launchContext = buildRecipeLaunchContext({ coffeeRef: bean?.id, surface: 'recipe_aiden', slot: 'aiden', ref: revisionId || recipeProvenance?.revisionId || bean?.activeRevisionIds?.aiden });
   return (
     <Modal open={open} onClose={onClose} title="Brew with Aiden">
       {/* Loading state */}
@@ -469,6 +476,11 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           <BeanChip bean={bean} />
 
           <RecipeTitleRow title={recipe.title} note={recipe.note} />
+          <RecipeProvenanceStrip provenance={attemptId ? { revisionId, source: provenanceSource, slotKey: 'aiden' } : recipeProvenance} />
+          {attemptId && result?.status === 'uncertain' && onRetryAttempt && <Btn variant="ghost" onClick={onRetryAttempt} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Check Fellow again</Btn>}
+          {attemptId && result?.status === 'uncertain' && onSendAsNewProfile && <Btn variant="ghost" onClick={onSendAsNewProfile} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Send as a new profile</Btn>}
+          {attemptId && result?.status === 'profile_prepared' && onCompleteAttempt && <Btn variant="primary" onClick={handleAttemptComplete} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Start tasting</Btn>}
+          {onOpenRuphus && <Btn variant="ghost" onClick={() => onOpenRuphus(launchContext, 'How should I improve this Aiden recipe?')} style={{ width: '100%', justifyContent: 'center', marginBottom: 10 }}>Ask Ruphus about this recipe</Btn>}
 
           <DialCard recipe={recipe} />
 

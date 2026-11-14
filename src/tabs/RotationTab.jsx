@@ -1,7 +1,7 @@
 // Rotation tab — ported from prototype lines 279-434
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { assetUrl } from "../lib/assetUrl";
-import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive } from 'lucide-react';
+import { Check, Plus, Star, X, Coffee, Undo2, Camera, Bean, Archive, MessageCircle } from 'lucide-react';
 import { BrewButton } from '../components/BrewButton';
 import { GlassButton } from '../components/GlassButton';
 import { C, fonts, type, shadows, radius, glass, journalCard, cardBase } from '../styles/theme';
@@ -33,6 +33,8 @@ import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { m, listContainer, listItem, fadeUp, cardPress } from '../lib/motion';
 import { useBeanDetail } from '../hooks/useBeanDetail';
+import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { executeRecipeCommand } from '../lib/recipeCommands';
 
 // Secondary Liquid-Glass pill (iOS 26 material): bright rim + specular top sheen +
 // a floating drop shadow that lifts it off the card, with a faint semantic tint.
@@ -67,13 +69,35 @@ const PillButton = ({ color, bg, icon, label, onClick }) => (
   </m.button>
 );
 
-export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction }) => {
+export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, onOpenBean, updateBean, saveHandBrewTiming, deleteBean, addBean, addTasting, updateTasting, getBeanById, onStartTastingSession, onAddBeanQuickAction, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus, ruphusAttempt = null, onDismissRuphusAttempt = null, onUpdateRuphusAttempt = null, ruphusAttemptAutoStartId = null, onRuphusAttemptAutoStartConsumed = null }) => {
   const { preferences } = usePreferences();
   const brewMethod = getBrewMethod(preferences.brewMethod);
   const isHandBrew = preferences.brewMethod !== 'aiden';
+  const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const { handleLearn, ruphusProps } = useProfessorRuphus(updateBean, tastings, getBeanById);
   const aiden = useAidenBrew(updateBean);
   const handBrew = useHandBrew(updateBean, saveHandBrewTiming);
+  const { openAttempt: openAidenAttempt } = aiden;
+  const { openAttempt: openHandAttempt } = handBrew;
+  const activeRuphusAttemptId = ruphusAttempt?.id || null;
+  const persistSourceTimerState = useCallback((state) => {
+    if (!activeRuphusAttemptId || !state || !onUpdateRuphusAttempt) return;
+    onUpdateRuphusAttempt({ sourceTimerState: state }, activeRuphusAttemptId);
+  }, [activeRuphusAttemptId, onUpdateRuphusAttempt]);
+  const consumedAttemptRef = useRef(null);
+  useEffect(() => {
+    if (!ruphusAttempt) return;
+    if (consumedAttemptRef.current === ruphusAttempt.id) return;
+    const bean = beans.find((item) => item.id === ruphusAttempt.coffeeId);
+    if (!bean) return;
+    consumedAttemptRef.current = ruphusAttempt.id;
+    if (ruphusAttempt.slotKey === 'aiden') openAidenAttempt?.(bean, ruphusAttempt);
+    else {
+      const startImmediately = ruphusAttemptAutoStartId === ruphusAttempt.id;
+      openHandAttempt(bean, startImmediately ? { ...ruphusAttempt, startImmediately: true } : ruphusAttempt);
+      if (startImmediately) onRuphusAttemptAutoStartConsumed?.();
+    }
+  }, [ruphusAttempt, beans, openAidenAttempt, openHandAttempt, ruphusAttemptAutoStartId, onRuphusAttemptAutoStartConsumed]);
   const [finishPrompt, setFinishPrompt] = useState(null);
   const [returnConfirm, setReturnConfirm] = useState(null);
   const [detailTasting, setDetailTasting] = useState(null); // tasting opened from the bean card
@@ -88,6 +112,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
   const [newBeanEntry, setNewBeanEntry] = useState(null);
   const [activeJar, setActiveJar] = useState(0);
   const { detailBean, morphRect, openDetail, closeDetail } = useBeanDetail();
+  const undoRuphusRecipe = useCallback(async (provenance) => {
+    if (!detailBean?.id || !provenance?.revisionId || !provenance?.slotKey) return;
+    await executeRecipeCommand({ actionId: `undo_${provenance.revisionId}`, mode: 'undo_revision', coffeeId: detailBean.id, slotKey: provenance.slotKey, expectedRevisionId: provenance.revisionId });
+    closeDetail();
+  }, [detailBean, closeDetail]);
   const [editBean, setEditBean] = useState(null);
   const shelfRef = useRef(null);
   const cardRefs = useRef([]);
@@ -386,9 +415,10 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
                         compact={false}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${agentV3Enabled ? 4 : 3}, 1fr)`, gap: 8 }}>
                       <PillButton color={C.green} bg={C.greenBg} icon={<Bean size={18} />} label="Taste" onClick={() => onStartTastingSession?.(bean.id)} />
                       <PillButton color={C.accent} bg={C.accentSoft} icon={<img src="/images/ruphus-avatar.png" alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />} label="Learn" onClick={() => (isDemo ? onDemoAction : handleLearn)?.(bean)} />
+                      {agentV3Enabled && <PillButton color={C.accent} bg={C.accentSoft} icon={<MessageCircle size={18} />} label="Ask Ruphus" onClick={() => onOpenRuphus?.({ coffeeRef: bean.id, surface: 'bean_card' })} />}
                       <PillButton color={C.red} bg={C.redBg} icon={<Archive size={18} />} label="Finish" onClick={() => handleFinishBag(bean)} />
                     </div>
                   </div>
@@ -550,14 +580,25 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         icedError={aiden.icedError}
         onPushIced={aiden.onPushIced}
         onRetryIcedPush={aiden.onRetryIcedPush}
+        attemptId={aiden.attemptContext?.id || null}
+        revisionId={aiden.attemptContext?.revisionId || null}
+        provenanceSource={aiden.attemptContext?.source || null}
+        recipeProvenance={aiden.aidenBean?.recipeProvenance?.aiden || null}
+        onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
+        onRetryAttempt={aiden.retryAttempt}
+        onSendAsNewProfile={aiden.sendAsNewProfile}
+        onCompleteAttempt={aiden.completeAttempt}
+        onStartTasting={onStartTastingSession}
       />
       <HandBrewModal
+        onDismissAttempt={onDismissRuphusAttempt}
         open={handBrew.handBrewModal}
         onClose={handBrew.closeHandBrewModal}
         recipe={handBrew.handBrewRecipe}
         icedRecipe={handBrew.handBrewIcedRecipe}
         icedLoading={handBrew.handBrewIcedLoading}
         icedError={handBrew.handBrewIcedError}
+        icedUnsupported={handBrew.handBrewIcedUnsupported}
         onRetryIced={handBrew.onRetryIced}
         loading={handBrew.handBrewLoading}
         error={handBrew.handBrewError}
@@ -565,13 +606,25 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onRetry={handBrew.onRetry}
         onRegenerate={handBrew.onRegenerate}
         onKalitaSizeChange={handBrew.handleKalitaSizeChange}
+        onV60VariantChange={handBrew.handleV60VariantChange}
         onKalitaIcedChillingMethodChange={handBrew.handleKalitaIcedChillingMethodChange}
         bean={handBrew.handBrewBean}
+        attemptId={handBrew.attemptContext?.id || null}
+        revisionId={handBrew.attemptContext?.revisionId || null}
+        provenanceSource={handBrew.attemptContext?.source || null}
+        autoStartAttempt={handBrew.autoStartAttempt}
+        recipeProvenance={handBrew.handBrewBean?.recipeProvenance?.[`${handBrew.handBrewRecipe?.device === 'kalita' ? 'kalita' : 'v60'}_${handBrew.handBrewRecipe?.mode === 'iced' ? 'iced' : 'hot'}`] || null}
+        onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined}
         onStartTasting={onStartTastingSession}
         userCoffeeGrams={handBrew.userCoffeeGrams}
         onCoffeeGramsChange={handBrew.handleCoffeeGramsChange}
+        onSourceCoffeeGramsChange={handBrew.handleSourceCoffeeGramsChange}
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
+        onTimerStart={handBrew.startAttemptTimer}
+        sourceTimerState={ruphusAttempt?.sourceTimerState || null}
+        sourceTimerBinding={ruphusAttempt?.sourceTimerBinding || ruphusAttempt?.sourceTimerIdentity || null}
+        onSourceTimerStateChange={persistSourceTimerState}
       />
       <Modal open={!!returnConfirm} onClose={() => setReturnConfirm(null)} title="Return to Inventory?" centered>
         {returnConfirm && (
@@ -649,14 +702,16 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           onNavigate={(b) => openDetail(b, null)}
           onClose={closeDetail}
           onLearn={(b) => { closeDetail(); (isDemo ? onDemoAction : handleLearn)?.(b); }}
+          onAskRuphus={agentV3Enabled ? ((b) => { closeDetail(); onOpenRuphus?.({ coffeeRef: b.id, surface: 'bean_card' }); }) : undefined}
           onReturn={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setReturnConfirm(b); }}
           onFreeze={handleFreeze}
           onEdit={(b) => { closeDetail(); isDemo ? onDemoAction?.() : setEditBean(b); }}
           onOpenTasting={(t) => setDetailTasting(t)}
+          onUndoRecipe={undoRuphusRecipe}
         />
       )}
       {detailTasting && (
-        <TastingDetailCard tasting={detailTasting} bean={detailBean} z={5000} onClose={() => setDetailTasting(null)} />
+        <TastingDetailCard tasting={detailTasting} bean={detailBean} z={5000} onClose={() => setDetailTasting(null)} onOpenRuphus={agentV3Enabled ? onOpenRuphus : undefined} />
       )}
       {editBean && (
         <EditBeanModal

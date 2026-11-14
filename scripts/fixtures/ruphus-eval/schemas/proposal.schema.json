@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruphus-eval/proposal.schema.json",
+  "type": "object",
+  "required": ["id", "userId", "coffeeId", "method", "expectedRevision", "expectedRevisionId", "recipe", "recipeHash", "status", "createdAt"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "userId": { "type": "string", "minLength": 1 },
+    "coffeeId": { "type": "string", "minLength": 1 },
+    "method": { "type": "string", "minLength": 1 },
+    "expectedRevision": { "type": "integer", "minimum": 0 },
+    "expectedRevisionId": { "type": "string", "minLength": 1 },
+    "recipe": { "type": "object" },
+    "recipeHash": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pending", "applied", "rejected"] },
+    "createdAt": { "type": "integer", "minimum": 0 },
+    "appliedRevisionId": { "type": "string", "minLength": 1 },
+    "denialResult": { "type": "object" }
+  },
+  "additionalProperties": false
+}

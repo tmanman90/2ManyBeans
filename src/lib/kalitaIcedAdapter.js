@@ -1,4 +1,4 @@
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
 import { kalitaDoseBounds, normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 import {
   KALITA_ICED_RULES,
@@ -103,7 +103,7 @@ function grindFor(grinder, source, flowGuard) {
   const scale = GRINDER_MICRON_SCALES[grinder];
   if (!scale) return { setting: null, microns: targetMicrons, description: sourceGrindDescription(source, flowGuard), micronDescription: descriptorForMicrons(targetMicrons), grinderSpecific: false };
   const range = GRINDER_RANGES[grinder] || [1, 40];
-  const numericSetting = Math.round(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]) * 10) / 10;
+  const numericSetting = quantizeGrinderSetting(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]), grinder);
   const microns = grinderSettingToMicrons(numericSetting, grinder);
   const setting = grinder === 'comandante-c40' ? `${Math.round(numericSetting)} clicks`
     : grinder === '1zpresso-jx-pro' ? `${Math.round(numericSetting)} clicks` : String(numericSetting);

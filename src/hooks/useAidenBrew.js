@@ -9,11 +9,13 @@
 // abandoned async chain from landing on a bean the user has since moved on from, and
 // prevents a stale push from persisting aidenLink on the wrong Firestore doc.
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { generateAidenRecipe, pushToAiden } from '../lib/aiden';
+import { generateAidenRecipe, pushToAiden, prepareAidenAttempt } from '../lib/aiden';
 import { researchBean } from '../lib/beanResearch';
 import { buildSourceContextHash, hasSourceInsights } from '../lib/sourceInsights';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from './usePaywall.jsx';
+import { executeRecipeCommand } from '../lib/recipeCommands';
+import { aidenLinkMatchesProfile } from '../lib/ruphus/aidenProfilePreview';
 
 export function useAidenBrew(updateBean) {
   const mountedRef = useRef(true);
@@ -31,9 +33,51 @@ export function useAidenBrew(updateBean) {
   const [aidenBean, setAidenBean] = useState(null);
   const [aidenResearch, setAidenResearch] = useState(null);
   const [aidenPhase, setAidenPhase] = useState(null);
+  const [attemptContext, setAttemptContext] = useState(null);
   const [icedResult, setIcedResult] = useState(null);
   const [icedLoading, setIcedLoading] = useState(false);
   const [icedError, setIcedError] = useState(null);
+
+  const openAttempt = useCallback((bean, attempt) => {
+    if (!bean?.id || !attempt?.snapshot) return;
+    setAidenBean(bean);
+    setAidenRecipe(attempt.snapshot);
+    setAttemptContext({ id: attempt.id, revisionId: attempt.revisionId || null, source: attempt.revisionSource || null });
+    setAidenResult(null);
+    setAidenError(null);
+    setAidenPhase('push');
+    setAidenModal(true);
+    prepareAidenAttempt(attempt.id)
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setAidenResult(result);
+        setAidenPhase(null);
+      })
+      .catch((error) => {
+        if (!mountedRef.current) return;
+        setAidenError(error.message || 'Could not prepare this profile in Fellow');
+        setAidenPhase(null);
+      });
+  }, []);
+
+  const retryAttempt = useCallback(async () => {
+    if (!attemptContext?.id) return null;
+    const result = await prepareAidenAttempt(attemptContext.id);
+    if (mountedRef.current) { setAidenResult(result); setAidenError(null); }
+    return result;
+  }, [attemptContext]);
+
+  const sendAsNewProfile = useCallback(async () => {
+    if (!attemptContext?.id) return null;
+    const result = await prepareAidenAttempt(attemptContext.id, { recovery: 'new_profile' });
+    if (mountedRef.current) { setAidenResult(result); setAidenError(null); }
+    return result;
+  }, [attemptContext]);
+
+  const completeAttempt = useCallback(async () => {
+    if (!attemptContext?.id || !aidenBean?.id) return null;
+    return executeRecipeCommand({ actionId: `complete_${attemptContext.id}`, mode: 'complete_attempt', coffeeId: aidenBean.id, slotKey: 'aiden', attemptId: attemptContext.id, expectedRevisionId: attemptContext.revisionId || undefined });
+  }, [attemptContext, aidenBean]);
 
   // Returns true if this async chain should still be applying state updates.
   const isActive = (requestId) => mountedRef.current && activeRequestRef.current === requestId;
@@ -117,13 +161,13 @@ export function useAidenBrew(updateBean) {
     // Cached recipe with no push pending: free to show (just displays stored data).
     const sourceHash = buildSourceContextHash(bean);
     const cachedRecipeFresh = recipeMatchesSource(bean, bean.aidenRecipe);
-    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && cachedRecipeFresh && bean.aidenLink;
+    const hasCachedRecipeOnly = !forceRegenerate && bean.aidenRecipe && cachedRecipeFresh && aidenLinkMatchesProfile(bean);
     if (!hasCachedRecipeOnly && !hasPro) {
       // Cancel any in-flight chain so its tail effects don't land after
       // the paywall opens (and possibly persist a Pro-gated recipe to a
       // user who no longer has Pro).
       activeRequestRef.current = null;
-      openPaywall({ feature: 'generic', promote: 'pro' });
+      openPaywall({ feature: 'recipe', promote: 'pro' });
       return;
     }
 
@@ -133,7 +177,7 @@ export function useAidenBrew(updateBean) {
     setAidenBean(bean);
     setAidenResult(null);
     setAidenError(null);
-    setIcedResult(bean.aidenIcedLink ? { link: bean.aidenIcedLink, usedRelay: bean.aidenIcedUsedRelay || false } : null);
+    setIcedResult(aidenLinkMatchesProfile(bean, true) ? { link: bean.aidenIcedLink, usedRelay: bean.aidenIcedUsedRelay || false } : null);
     setIcedError(null);
     setIcedLoading(false);
     setAidenModal(true);
@@ -144,7 +188,7 @@ export function useAidenBrew(updateBean) {
       setAidenRecipe(bean.aidenRecipe);
 
       // If we already have a brew.link for this bean, show it directly (no re-push)
-      if (bean.aidenLink) {
+      if (aidenLinkMatchesProfile(bean)) {
         if (!isActive(rid)) return;
         setAidenResult({ link: bean.aidenLink, usedRelay: bean.aidenUsedRelay || false });
         setAidenLoading(false);
@@ -211,13 +255,14 @@ export function useAidenBrew(updateBean) {
     // Cancel any in-flight request so its tail doesn't re-populate state after close.
     activeRequestRef.current = null;
     setAidenModal(false);
+    setAttemptContext(null);
   };
 
   return {
     aidenModal, aidenRecipe, aidenResult, aidenLoading, aidenError,
-    aidenPhase, aidenBean, aidenResearch,
+    aidenPhase, aidenBean, aidenResearch, attemptContext,
     icedResult, icedLoading, icedError,
-    handleBrewWithAiden, closeAidenModal,
+    handleBrewWithAiden, closeAidenModal, openAttempt, retryAttempt, sendAsNewProfile, completeAttempt,
     onRetry: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch) : undefined,
     onRetryPush: aidenRecipe ? () => handlePushToAiden(aidenRecipe) : undefined,
     onRegenerate: aidenBean ? () => handleBrewWithAiden(aidenBean, aidenResearch, true) : undefined,

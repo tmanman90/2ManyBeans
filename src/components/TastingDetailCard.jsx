@@ -4,7 +4,7 @@
 // slide-up sheet (iOS curve), swipe-to-dismiss. Presentation only — no data writes here.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Share2, Pencil, Trash2 } from 'lucide-react';
+import { Share2, Pencil, Trash2, Sparkles } from 'lucide-react';
 import { C, fonts, type, glass, shadows, radius } from '../styles/theme';
 import { m } from '../lib/motion';
 import { useReducedMotion, useDragControls } from 'framer-motion';
@@ -12,6 +12,7 @@ import { StarRating } from './StarRating';
 import { SwipeDownHandle } from './SwipeDownHandle';
 import { splitTastingNotes } from '../lib/tastingHero';
 import { FlavorRadar } from './FlavorRadar';
+import { resolveTastingLaunchMethod } from '../lib/ruphus/launch.js';
 
 const IOS = 'cubic-bezier(0.32, 0.72, 0, 1)';
 // The organized flavor rows — one descriptor per line (no wall of text).
@@ -45,12 +46,18 @@ function ActionBtn({ icon, label, danger, onClick }) {
   );
 }
 
-export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete, z = 1200 }) {
+export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onDelete, onOpenRuphus, z = 1200 }) {
   const reduce = useReducedMotion();
   const dragControls = useDragControls();
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
+  const close = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    setTimeout(() => { setMounted(false); setClosing(false); closingRef.current = false; onClose?.(); }, 240);
+  };
 
   useEffect(() => {
     if (!tasting) { setMounted(false); setClosing(false); closingRef.current = false; return; }
@@ -68,19 +75,22 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
 
   if (!tasting) return null;
 
-  const close = () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setClosing(true);
-    setTimeout(() => { setMounted(false); setClosing(false); closingRef.current = false; onClose?.(); }, 240);
-  };
-
   const visible = mounted && !closing;
   const rows = DETAIL_AXES.filter(([k]) => tasting[k] && String(tasting[k]).trim());
   // The named flavors + the user's own-words reflection are stored together in `notes`; split them
   // so flavors show as their own element and "Your notes" is the reflection, not the auto line.
   const { flavors: flavorStr, reflection } = splitTastingNotes(tasting.notes);
   const flavorList = flavorStr ? flavorStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const openRuphusFromTasting = () => {
+    if (!onOpenRuphus || !bean?.id) return;
+    const recordedMethod = resolveTastingLaunchMethod(tasting);
+    onOpenRuphus({
+      coffeeRef: bean.id,
+      surface: 'tasting_card',
+      ...(tasting.id ? { launchItem: { kind: 'tasting', ref: tasting.id, ...(recordedMethod ? { method: recordedMethod } : {}) } } : {}),
+    }, reflection || tasting.notes || 'This was my last cup. What should I change for the next brew?');
+    onClose?.();
+  };
   const reveal = (i) => reduce ? {} : {
     initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 },
     transition: { delay: 0.15 + i * 0.05, duration: 0.28, ease: [0.16, 1, 0.3, 1] },
@@ -176,6 +186,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
 
           {/* actions */}
           <div style={{ display: 'flex', gap: 8, padding: '16px 20px 8px' }}>
+            {onOpenRuphus && <ActionBtn icon={<Sparkles size={17} />} label="Ask Ruphus" onClick={openRuphusFromTasting} />}
             {onShare && <ActionBtn icon={<Share2 size={17} />} label="Share" onClick={() => onShare(tasting)} />}
             {onEdit && <ActionBtn icon={<Pencil size={17} />} label="Edit" onClick={() => { close(); onEdit(tasting); }} />}
             {onDelete && <ActionBtn icon={<Trash2 size={17} />} label="Delete" danger onClick={() => onDelete(tasting)} />}

@@ -478,6 +478,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onRetry={handBrew.onRetry}
             onRegenerate={handBrew.onRegenerate}
             onKalitaSizeChange={handBrew.handleKalitaSizeChange}
+            onV60VariantChange={handBrew.handleV60VariantChange}
             onKalitaIcedChillingMethodChange={handBrew.handleKalitaIcedChillingMethodChange}
             extraFooter={actionButtons}
             bean={handBrew.handBrewBean}

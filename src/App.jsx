@@ -24,6 +24,8 @@ import { TourOverlay } from './components/TourOverlay';
 import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
 import { Modal } from './components/Modal';
+import { useRuphusAttemptOutbox } from './hooks/useRuphusAttemptOutbox';
+import { validateLaunchContext } from './lib/ruphus/conversationContract.js';
 
 // Minimal fallback while a lazy tab chunk is fetching. Matches the app
 // background so it doesn't flash white on iOS WKWebView.
@@ -41,7 +43,7 @@ const tabs = [
   { key: 'archive', label: 'Archive', img: '/images/nav-archive.webp' },
 ];
 
-export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTiming, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, isDemo, onDemoAction }) => {
+export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTiming, deleteBean, addTasting, updateTasting, deleteTasting, openBean, finishBean, returnBean, getBeanById, profile, updateProfile, refetchBeans, dataLoaded = true, isDemo, onDemoAction }) => {
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   // Onboarding palate seam (null for every pre-onboarding-100x profile).
@@ -62,29 +64,60 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   // Mirrors pendingAddBeanMode: set here, consumed by TastingTab which
   // pre-selects the bean and starts chat mode, then clears the flag.
   const [pendingTastingBeanId, setPendingTastingBeanId] = useState(null);
+  const [pendingTastingAttemptId, setPendingTastingAttemptId] = useState(null);
+  const [pendingRuphusAutoStartId, setPendingRuphusAutoStartId] = useState(null);
+  const [ruphusLaunch, setRuphusLaunch] = useState(null);
+  const { attempt: ruphusAttemptRecord, put: putRuphusAttempt, update: updateRuphusAttempt, dismiss: dismissRuphusAttempt, clear: clearRuphusAttempt } = useRuphusAttemptOutbox(uid);
+  const ruphusAttempt = ruphusAttemptRecord?.stage === 'tasting' || ruphusAttemptRecord?.stage === 'dismissed' ? null : ruphusAttemptRecord;
   // In-session tasting wizard draft. Kept above TastingTab so tab navigation
   // cannot discard an unfinished guided tasting; never persisted to Firebase.
-  const [tastingWizardDraft, setTastingWizardDraft] = useState(null);
+  const [tastingWizardDraft, setTastingWizardDraft] = useState(() => ruphusAttemptRecord?.stage === 'tasting' ? ruphusAttemptRecord.draft || null : null);
+  useEffect(() => {
+    if (ruphusAttemptRecord?.stage === 'tasting' && ruphusAttemptRecord.attemptId) {
+      setPendingTastingBeanId(ruphusAttemptRecord.coffeeId);
+      setPendingTastingAttemptId(ruphusAttemptRecord.attemptId);
+      if (ruphusAttemptRecord.draft) setTastingWizardDraft(ruphusAttemptRecord.draft);
+      setTab('tasting');
+    }
+  }, [ruphusAttemptRecord?.stage, ruphusAttemptRecord?.attemptId, ruphusAttemptRecord?.coffeeId, ruphusAttemptRecord?.draft]);
   const [tourActive, setTourActive] = useState(() => {
     if (new URLSearchParams(window.location.search).has('tour')) return true;
     return !!profile && !profile.tourCompleted && !!profile.onboardingComplete;
   });
 
-  // First-bean celebration: fires once when user goes from 0 beans to >= 1
+  // First-bean celebration: loading existing inventory is not an addition.
   const [firstBeanCelebrating, setFirstBeanCelebrating] = useState(false);
-  const prevBeanCountRef = useRef(beans.length);
+  const prevBeanCountRef = useRef(null);
   useEffect(() => {
     const prev = prevBeanCountRef.current;
-    prevBeanCountRef.current = beans.length;
-    if (prev === 0 && beans.length > 0) {
+    prevBeanCountRef.current = dataLoaded ? { uid, count: beans.length } : null;
+    if (dataLoaded && prev && prev.uid === uid && prev.count === 0 && beans.length > 0) {
       setFirstBeanCelebrating(true);
     }
-  }, [beans.length]);
+  }, [beans.length, dataLoaded, uid]);
 
-  const handleStartTastingSession = (beanId) => {
+  const handleStartTastingSession = (beanId, attemptId = null) => {
     if (!beanId) return;
     setPendingTastingBeanId(beanId);
+    setPendingTastingAttemptId(attemptId);
+    if (attemptId && ruphusAttemptRecord?.id === attemptId) updateRuphusAttempt({ stage: 'tasting', attemptId, coffeeId: beanId });
     setTab('tasting');
+  };
+
+  // Single app-owned handoff for contextual Agent v3 entry points. Tabs never
+  // construct cross-tab navigation state themselves; they receive this bound
+  // context and one starter intent.
+  const openRuphus = (launchContext, starterIntent = '') => {
+    if (!launchContext?.coffeeRef || !validateLaunchContext(launchContext).valid) return;
+    setRuphusLaunch({ contextRef: launchContext, starterIntent });
+    setTab('chat');
+  };
+  const handleRuphusAttempt = (attempt) => {
+    if (!attempt?.id) return;
+    const { startImmediately, ...durableAttempt } = attempt;
+    putRuphusAttempt(durableAttempt);
+    setPendingRuphusAutoStartId(startImmediately === true ? attempt.id : null);
+    setTab('rotation');
   };
 
   const handleOpenBean = (preselectedBeanId, slot) => {
@@ -213,7 +246,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   }, [profile, updateProfile, tourActive, addBean]);
 
   return (
-    <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ fontFamily: fonts.body, background: C.bg, minHeight: '100dvh', ...(tab === 'chat' ? { height: '100dvh', overflow: 'hidden' } : {}), display: 'flex', flexDirection: 'column' }}>
       {/* html background set via useEffect covers WKWebView canvas gap */}
       {/* Header */}
       {isRotation ? (
@@ -268,7 +301,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: (tab === 'inventory' || tab === 'rotation') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : tab === 'archive' ? `12px 0 calc(100px + env(safe-area-inset-bottom, 0px))` : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: (tab === 'inventory' || tab === 'rotation' || tab === 'chat') ? 'hidden' : 'auto', padding: (tab === 'inventory' || tab === 'rotation') ? 0 : tab === 'archive' ? `12px 0 calc(100px + env(safe-area-inset-bottom, 0px))` : `12px 20px calc(100px + env(safe-area-inset-bottom, 0px))`, position: 'relative', zIndex: 1 }}>
         {tab === 'rotation' && (
           <RotationTab
             uid={uid}
@@ -289,6 +322,12 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
             onboardingPalate={onboardingPalate}
             isDemo={isDemo}
             onDemoAction={onDemoAction}
+            onOpenRuphus={(contextRef, starterIntent) => openRuphus(contextRef, starterIntent)}
+            ruphusAttempt={ruphusAttempt}
+            onDismissRuphusAttempt={dismissRuphusAttempt}
+            onUpdateRuphusAttempt={updateRuphusAttempt}
+            ruphusAttemptAutoStartId={pendingRuphusAutoStartId}
+            onRuphusAttemptAutoStartConsumed={() => setPendingRuphusAutoStartId(null)}
           />
         )}
         {tab === 'inventory' && (
@@ -311,12 +350,14 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               onStartTastingSession={handleStartTastingSession}
               isDemo={isDemo}
               onDemoAction={onDemoAction}
+              onOpenRuphus={openRuphus}
             />
           </Suspense>
         )}
         {tab === 'tasting' && (
           <Suspense fallback={<TabFallback />}>
             <TastingTab
+              uid={uid}
               beans={beans}
               tastings={tastings}
               onAddTasting={addTasting}
@@ -324,9 +365,12 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
               onDeleteTasting={deleteTasting}
               updateBean={updateBean}
               wizardDraft={tastingWizardDraft}
-              onWizardDraftChange={setTastingWizardDraft}
+              onWizardDraftChange={(draft) => { setTastingWizardDraft(draft); if (ruphusAttemptRecord?.stage === 'tasting') updateRuphusAttempt({ draft }); }}
               pendingTastingBeanId={pendingTastingBeanId}
-              onPendingTastingConsumed={() => setPendingTastingBeanId(null)}
+              pendingTastingAttemptId={pendingTastingAttemptId}
+              onPendingTastingConsumed={() => { setPendingTastingBeanId(null); setPendingTastingAttemptId(null); }}
+              onRuphusAttemptCompleted={clearRuphusAttempt}
+              onOpenRuphus={openRuphus}
               onboardingPalate={onboardingPalate}
               isDemo={isDemo}
               onDemoAction={onDemoAction}
@@ -348,12 +392,16 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
                 addTasting={addTasting}
                 updateTasting={updateTasting}
                 profile={profile}
+                dataLoaded={dataLoaded}
                 uid={uid}
                 isActive={tab === 'chat'}
                 onStartTastingSession={handleStartTastingSession}
                 onNavigateToTasting={() => setTab('tasting')}
                 isDemo={isDemo}
                 onDemoAction={onDemoAction}
+                ruphusLaunch={ruphusLaunch}
+                onRuphusLaunchConsumed={() => setRuphusLaunch(null)}
+                onRuphusAttempt={handleRuphusAttempt}
               />
             </Suspense>
           </div>

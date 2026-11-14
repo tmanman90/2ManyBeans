@@ -1,4 +1,5 @@
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v3';
@@ -7,6 +8,10 @@ export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
 export const V60_SCALING_RULE_ID = 'v60-dose-scaling-v1';
+export const V60_REVIEWED_RATIO_BOUNDS = Object.freeze([...(V60_RULES[V60_ADAPTATION_RULE_ID]?.bounds?.ratio || [15, 18.5])]);
+export const V60_EXPLICIT_RATIO_RULE_ID = 'v60-explicit-ratio-adaptation-v1';
+export const V60_EXPLICIT_RATIO_BOUNDS = Object.freeze([...(V60_RULES[V60_EXPLICIT_RATIO_RULE_ID]?.bounds?.ratio || [10, 25])]);
+export const V60_REVIEWED_TEMPERATURE_BOUNDS = Object.freeze([92, 100]);
 const MIN_DOSE = 12;
 const MAX_DOSE = 30;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -77,14 +82,29 @@ export function selectV60Technique(intent = {}, configuration = {}, evidence = n
   return { ...V60_TECHNIQUES.smallPulse, reasonCode: 'BALANCED_SMALL_DOSE_PROFILE' };
 }
 
-function grindFor(grinder, technique, intent) {
-  const targetMicrons = clamp(
-    technique.id === 'hoffmann-large-batch' ? 760
-      : technique.id === 'kasuya-coarse-pulses' ? 850
-        : technique.id === 'rao-two-stage' ? 610
-          : technique.id === 'gentle-main-pour' ? 720 : 660,
-    380, 1050,
-  ) + clamp(Number(intentValue(intent, 'grindAdjustmentMicrons', 0)) || 0, -45, 45);
+export function v60TechniqueGrindBaselineMicrons(techniqueOrId) {
+  const id = typeof techniqueOrId === 'string' ? techniqueOrId : techniqueOrId?.id;
+  return id === 'hoffmann-large-batch' ? 760
+    : id === 'kasuya-coarse-pulses' ? 850
+      : id === 'rao-two-stage' ? 610
+        : id === 'gentle-main-pour' ? 720 : 660;
+}
+
+export function v60GrindAdjustmentMicrons(intent = {}) {
+  return clamp(Number(intentValue(intent, 'grindAdjustmentMicrons', 0)) || 0, -45, 45);
+}
+
+function grindFor(grinder, technique, intent, override = null) {
+  if (override && typeof override === 'object') {
+    return {
+      ...structuredClone(override),
+      sourceExact: false,
+      overrideApplied: true,
+      grinderSpecific: override.grinderSpecific ?? Boolean(grinder),
+    };
+  }
+  const targetMicrons = clamp(v60TechniqueGrindBaselineMicrons(technique), 380, 1050)
+    + v60GrindAdjustmentMicrons(intent);
   const scale = GRINDER_MICRON_SCALES[grinder];
   if (!scale) {
     return {
@@ -93,7 +113,7 @@ function grindFor(grinder, technique, intent) {
     };
   }
   const raw = clamp((targetMicrons - scale.base) / scale.perStep + 1, 1, 40);
-  const setting = Math.round(raw * 10) / 10;
+  const setting = quantizeGrinderSetting(raw, grinder);
   const microns = grinderSettingToMicrons(setting, grinder);
   return { setting: String(setting), microns, description: descriptorForMicrons(microns), grinderSpecific: true };
 }
@@ -109,7 +129,8 @@ function techniqueShape(technique, dose, water, source, intent = {}) {
     [75, water, `Continue pouring a little more slowly to ${water}g by 1:45.`, 'Final pour'],
     [105, water, 'Stir once clockwise and once counterclockwise, let the brewer drain briefly, then give it one gentle swirl.', 'Settle & draw down'],
   ];
-  if (technique.id === 'kasuya-coarse-pulses' && source.id === 'kasuya-46-v1' && dose === source.doseGrams && Array.isArray(source.pourTargets)) return source.pourTargets.map((target, index) => [target.seconds, target.grams, index === 0
+  if (technique.id === 'kasuya-coarse-pulses' && source.id === 'kasuya-46-v1' && dose === source.doseGrams
+    && water === round(source.doseGrams * source.ratio) && Array.isArray(source.pourTargets)) return source.pourTargets.map((target, index) => [target.seconds, target.grams, index === 0
     ? `Pour ${target.grams}g in the center, then let it drain until 0:45. Do not swirl.`
     : index === source.pourTargets.length - 1
       ? `Pour the final centered pulse to ${target.grams}g total, then let it drain without swirling.`
@@ -167,7 +188,9 @@ function reasonForTechnique(technique, config) {
   switch (technique.reasonCode) {
     case 'EXACT_STRUCTURED_SOURCE': return 'This coffee includes a complete roaster recipe, so the app follows that published V60 02 method directly.';
     case 'PARTIAL_STRUCTURED_SOURCE_ADAPTED': return 'The roaster supplied useful V60 guidance but not a complete timed recipe, so the app keeps those details inside a tested V60 02 profile.';
-    case 'LARGE_DOSE_DEDICATED_PROFILE': return `${config.dose}g needs the dedicated large-batch cadence so the deeper bed stays evenly saturated.`;
+    case 'LARGE_DOSE_DEDICATED_PROFILE': return technique.explicitSelection
+      ? 'The selected family uses the dedicated large-batch cadence so the deeper bed stays evenly saturated.'
+      : `${config.dose}g needs the dedicated large-batch cadence so the deeper bed stays evenly saturated.`;
     case 'HIGH_FINES_LOW_AGITATION': return 'This coffee is likely to produce more fines, so one gentle main pour limits agitation and helps prevent stalling.';
     case 'COARSE_PULSE_SOLUBILITY_PROFILE': return 'This coffee benefits from a coarser grind and separated pulses that build sweetness without excessive agitation.';
     case 'HIGH_ENERGY_LOW_FINES_PROFILE': return 'This coffee can handle more brewing energy, so two staged pours and controlled spins support an even extraction.';
@@ -178,13 +201,31 @@ function reasonForTechnique(technique, config) {
   }
 }
 
-function buildRecipe(intent, config, technique, { fallback = false } = {}) {
+// Explicit experiments use the same source-backed family explanations as the
+// automatic selector. The explicit-selection marker is kept separately so a
+// reviewed family cannot inherit the current recipe's default rationale.
+const EXPLICIT_REASON_CODES = Object.freeze({
+  'hoffmann-small-pulses': 'CENTER_SPIRAL_PULSE_PROFILE',
+  'hoffmann-large-batch': 'LARGE_DOSE_DEDICATED_PROFILE',
+  'kasuya-coarse-pulses': 'COARSE_PULSE_SOLUBILITY_PROFILE',
+  'gentle-main-pour': 'LOW_ENERGY_GENTLE_PROFILE',
+});
+
+function buildRecipe(intent, config, technique, { fallback = false, preserveIntentOverrides = false } = {}) {
   const source = technique.sourceRecipe || sourceById(technique.sourceIds[0]) || V60_SOURCES[0];
-  const ratio = clamp(Number(source.ratio) || Number(intentValue(intent, 'targetRatio', 16.5)) || 16.5, 15, 18.5);
+  const requestedRatioValue = intentValue(intent, 'targetRatio', null);
+  const requestedRatio = requestedRatioValue == null ? null : Number(requestedRatioValue);
+  const ratio = clamp(preserveIntentOverrides && Number.isFinite(requestedRatio)
+    ? requestedRatio
+    : Number(source.ratio) || requestedRatio || 16.5, 15, 18.5);
   const waterGrams = round(config.dose * ratio);
-  const temperature = technique.sourceRecipe
+  const requestedTemperatureValue = intentValue(intent, 'targetTemperatureC', null);
+  const requestedTemperature = requestedTemperatureValue == null ? null : Number(requestedTemperatureValue);
+  const temperature = technique.sourceRecipe && !preserveIntentOverrides
     ? clamp(source.temperatureC, 92, 100)
-    : clamp(Number(intentValue(intent, 'targetTemperatureC', source.temperatureC || 96)) || 96, 92, 100);
+    : clamp(preserveIntentOverrides && Number.isFinite(requestedTemperature)
+      ? requestedTemperature
+      : Number(intentValue(intent, 'targetTemperatureC', source.temperatureC || 96)) || 96, 92, 100);
   const shape = techniqueShape(technique, config.dose, waterGrams, source, intent);
   const finalAt = shape.at(-1)[0];
   const prepSteps = [
@@ -199,8 +240,13 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   const scaled = sourceSupportsV60 && !exactSourceDose;
   const adaptedTechnique = technique.id === 'gentle-main-pour' && intent.finesRisk === 'high';
   const sourceCadenceExact = technique.sourceRecipe ? true : source.executableCadence === true;
-  const temperatureAdapted = !technique.sourceRecipe && Number.isFinite(source.temperatureC) && temperature !== source.temperatureC;
-  const exactSourceProfile = exactSourceDose && sourceCadenceExact && !adaptedTechnique && !temperatureAdapted;
+  const temperatureAdapted = Number.isFinite(source.temperatureC) && temperature !== source.temperatureC;
+  const ratioAdapted = Number.isFinite(source.ratio) && ratio !== source.ratio;
+  const grindOverride = preserveIntentOverrides
+    ? (config.grindSize || intentValue(intent, 'grindSize', null) || intentValue(intent, 'reviewedGrindSize', null) || intentValue(intent, 'grindOverride', null))
+    : null;
+  const grindAdapted = Boolean(grindOverride && typeof grindOverride === 'object');
+  const exactSourceProfile = exactSourceDose && sourceCadenceExact && !adaptedTechnique && !temperatureAdapted && !ratioAdapted && !grindAdapted;
   const sourceGuide = round(source.guideSeconds || 210);
   const doseGuideAdjustment = round((config.dose - (Number(source.doseGrams) || config.dose)) * 2);
   const contactGuideAdjustment = clamp(round(Number(intentValue(intent, 'contactTimeAdjustmentSeconds', 0)) || 0), -15, 15);
@@ -219,7 +265,7 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
   ];
   const scalingFields = scaled ? ['dose', 'water', 'bloom', 'cadence', 'guide'] : [];
   const cadenceFields = !sourceCadenceExact ? ['cadence'] : [];
-  const status = !sourceSupportsV60 || adaptedTechnique || (exactSourceDose && (!sourceCadenceExact || temperatureAdapted || guideAdapted))
+  const status = !sourceSupportsV60 || adaptedTechnique || ratioAdapted || grindAdapted || (exactSourceDose && (!sourceCadenceExact || temperatureAdapted || guideAdapted))
     ? 'adapted'
     : exactSourceDose ? 'original' : 'scaled';
   const adaptation = technique.sourceRecipe
@@ -227,26 +273,27 @@ function buildRecipe(intent, config, technique, { fallback = false } = {}) {
     : technique.structuredSource
       ? 'Keeps the roaster’s available guidance inside a complete, tested V60 02 method.'
       : sourceSupportsV60
-        ? `Published method: ${source.author} — ${source.publication}${exactSourceDose ? '' : `, scaled to ${config.dose}g`}${temperatureAdapted ? ' with a bean-specific temperature adjustment' : ''}.`
+        ? `Published method: ${source.author} — ${source.publication}${exactSourceDose ? '' : `, scaled to ${config.dose}g`}${temperatureAdapted ? ' with a bean-specific temperature adjustment' : ''}${ratioAdapted ? ' with the reviewed ratio' : ''}${grindAdapted ? ' with the reviewed grind' : ''}.`
         : `Adapted from ${source.author}’s V60 01 guide for V60 02 and ${config.dose}g.`;
   const lineage = {
-    method: 'v60', mode: 'hot', configurationKey: V60_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.sourceRecipe), canonicalUrls: technique.sourceRecipe ? [technique.sourceRecipe.canonicalUrl] : undefined,
+    method: 'v60', mode: 'hot', configurationKey: V60_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.sourceRecipe),
+    ...(technique.sourceRecipe ? { canonicalUrls: [technique.sourceRecipe.canonicalUrl] } : {}),
     sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, status, adaptation,
-    changedFields: [...scalingFields, ...cadenceFields, !scaled && guideAdapted && 'guide', temperatureAdapted && 'temperature', !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', (!sourceSupportsV60 || !source.grind) && 'grind', !sourceSupportsV60 && 'geometry', !sourceSupportsV60 && 'cadence', !sourceSupportsV60 && 'agitation', adaptedTechnique && 'agitation'].filter(Boolean),
-    parameterSources: { ratio: sourceSupportsV60 ? sourceIds[0] : parameterRule, dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: temperatureAdapted || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], grind: sourceSupportsV60 && source.grind ? sourceIds[0] : V60_ADAPTATION_RULE_ID, geometry: sourceSupportsV60 ? sourceIds[0] : parameterRule, agitation: adaptedTechnique || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), bloom: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], cadence: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], guide: scaled ? V60_SCALING_RULE_ID : guideAdapted ? V60_ADAPTATION_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
+    changedFields: [...scalingFields, ...cadenceFields, !scaled && guideAdapted && 'guide', temperatureAdapted && 'temperature', ratioAdapted && 'ratio', grindAdapted && 'grind', !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', (!sourceSupportsV60 || !source.grind) && 'grind', !sourceSupportsV60 && 'geometry', !sourceSupportsV60 && 'cadence', !sourceSupportsV60 && 'agitation', adaptedTechnique && 'agitation'].filter(Boolean),
+    parameterSources: { ratio: ratioAdapted || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: temperatureAdapted || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], grind: grindAdapted || !sourceSupportsV60 || !source.grind ? V60_ADAPTATION_RULE_ID : sourceIds[0], geometry: sourceSupportsV60 ? sourceIds[0] : parameterRule, agitation: adaptedTechnique || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), bloom: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], cadence: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], guide: scaled ? V60_SCALING_RULE_ID : guideAdapted ? V60_ADAPTATION_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'hot', isIced: false, configurationKey: V60_CONFIGURATION_KEY,
     v60Size: '02', doseProfile: config.doseProfile, coffeeGrams: config.dose, waterGrams, ratio: `1:${displayRatio(ratio)}`,
-    waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) }, grindSize: technique.sourceRecipe
+    waterTemp: { celsius: temperature, fahrenheit: Math.round(temperature * 9 / 5 + 32) }, grindSize: technique.sourceRecipe && !grindAdapted
       ? { setting: null, microns: null, description: source.grind, grinderSpecific: false, sourceExact: true }
-      : grindFor(config.grinder, technique, intent),
+      : grindFor(config.grinder, technique, intent, grindOverride),
     technique: technique.id, techniqueLabel: technique.label, techniqueInstruction: technique.id === 'direct-roaster-v60' ? `${source.geometry || 'Source cadence'}; ${source.agitation || 'source agitation'}.` : `${technique.label}: center start, low stream, keep water off the paper walls.`,
     prepSteps, steps, postBrewSteps: [], totalBrewTimeSeconds: guide, totalBrewTime: timeLabel(guide), guideTargetSeconds: guide,
     guideRangeSeconds: guideRange, timerReady: true, phaseContractVersion: V60_PHASE_CONTRACT_VERSION,
     candidate: true, doseTimingPolicy: 'generated-dose-v60-v3', engineVersion: V60_ENGINE_VERSION, rulesVersion: V60_RULES_VERSION,
     sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, sourceLineage: lineage, timingProfile: `v60:hot:${technique.id}`,
-    reasonCodes: [...(intent.reasonCodes || []), technique.reasonCode, fallback && 'V60_CONSERVATIVE_BASELINE'].filter(Boolean),
+    reasonCodes: [...(intent.reasonCodes || []), technique.reasonCode, technique.explicitSelection && 'EXPLICIT_TECHNIQUE_SELECTION', fallback && 'V60_CONSERVATIVE_BASELINE'].filter(Boolean),
     fallback: Boolean(fallback), generationStatus: fallback ? 'fallback' : 'candidate',
     reasoning: reasonForTechnique(technique, config),
     tips: 'Finish when the steady stream slows to occasional drips. Save the actual drawdown; taste decides what to change next time.',
@@ -297,6 +344,157 @@ export function generateV60Recipe(intent = {}, configuration = {}, evidence = nu
   if (!validation.valid) throw new Error(`V60 candidate contract failed: ${validation.errors.join(', ')}`);
   return recipe;
 }
+
+function explicitConfiguration(configuration = {}) {
+  const brewer = configuration.brewer ?? configuration.device ?? configuration.method;
+  const size = configuration.v60Size ?? configuration.size;
+  if (brewer != null && !/v60/i.test(String(brewer))) {
+    throw new Error('Explicit V60 technique requires a hot V60 brewer');
+  }
+  if (size != null && String(size) !== '02') {
+    throw new Error('Explicit V60 technique requires V60 02');
+  }
+  if (configuration.configurationKey != null && configuration.configurationKey !== V60_CONFIGURATION_KEY) {
+    throw new Error('Explicit V60 technique requires V60 02 standard paper configuration');
+  }
+  const normalized = normalizeV60Configuration(configuration);
+  if (configuration.grindSize && typeof configuration.grindSize === 'object') normalized.grindSize = structuredClone(configuration.grindSize);
+  return normalized;
+}
+
+function validateExplicitIntent(intent = {}) {
+  const ratioValue = intentValue(intent, 'targetRatio', null);
+  if (ratioValue != null) {
+    const ratio = Number(ratioValue);
+    const bounds = V60_REVIEWED_RATIO_BOUNDS;
+    if (!Number.isFinite(ratio) || ratio < bounds[0] || ratio > bounds[1]) {
+      throw Object.assign(new Error(`Explicit V60 reviewed ratio must be between ${bounds[0]} and ${bounds[1]}`), { code: 'invalid_ratio_preview', bounds: { ratio: [...bounds] } });
+    }
+  }
+  const temperatureValue = intentValue(intent, 'targetTemperatureC', null);
+  if (temperatureValue != null) {
+    const temperature = Number(temperatureValue);
+    if (!Number.isFinite(temperature) || temperature < V60_REVIEWED_TEMPERATURE_BOUNDS[0] || temperature > V60_REVIEWED_TEMPERATURE_BOUNDS[1]) {
+      throw Object.assign(new Error(`Explicit V60 reviewed temperature must be between ${V60_REVIEWED_TEMPERATURE_BOUNDS[0]}C and ${V60_REVIEWED_TEMPERATURE_BOUNDS[1]}C`), { code: 'invalid_temperature_preview', bounds: { temperatureC: [...V60_REVIEWED_TEMPERATURE_BOUNDS] } });
+    }
+  }
+}
+
+function ratioNumber(value) {
+  if (Number.isFinite(Number(value))) return Number(value);
+  const match = String(value || '').match(/(?:1\s*[:/]\s*)?([0-9]+(?:\.[0-9]+)?)/);
+  return match ? Number(match[1]) : null;
+}
+
+function scaleRatioSteps(steps, targetWater, sourceWater) {
+  if (!Array.isArray(steps) || !steps.length || !Number.isFinite(sourceWater) || sourceWater <= 0) return [];
+  const factor = targetWater / sourceWater;
+  let previous = 0;
+  return steps.map((step, index) => {
+    const originalWater = Number(step?.waterTotal);
+    if (!Number.isFinite(originalWater)) return structuredClone(step);
+    const scaledWater = index === steps.length - 1
+      ? targetWater
+      : Math.max(previous, Math.round(originalWater * factor));
+    previous = scaledWater;
+    const action = typeof step.action === 'string'
+      ? step.action.replace(/(?<![\w.])(\d+(?:\.\d+)?)\s*(grams?|g)\b/gi, (match, amount, unit) => Number(amount) === originalWater ? `${scaledWater}${unit}` : match)
+      : step.action;
+    return { ...structuredClone(step), waterTotal: scaledWater, ...(action !== undefined ? { action } : {}) };
+  });
+}
+
+/**
+ * Scale one verified executable V60 source to an explicitly requested ratio.
+ * This is separate from normal technique generation: source ratio bounds stay
+ * 15–18.5, while this app-authored preview experiment uses 10–25 and records
+ * the changed cumulative water schedule.
+ */
+export function createV60RatioExperiment(recipe, requestedRatio) {
+  const ratio = ratioNumber(requestedRatio);
+  if (!Number.isFinite(ratio) || ratio < V60_EXPLICIT_RATIO_BOUNDS[0] || ratio > V60_EXPLICIT_RATIO_BOUNDS[1]) {
+    throw Object.assign(new Error(`Explicit V60 ratio experiment must be between ${V60_EXPLICIT_RATIO_BOUNDS[0]} and ${V60_EXPLICIT_RATIO_BOUNDS[1]}`), { code: 'invalid_ratio_experiment', bounds: { ratio: [...V60_EXPLICIT_RATIO_BOUNDS] } });
+  }
+  const sourceId = recipe?.sourceLineage?.sourceIds?.[0];
+  const source = sourceById(sourceId);
+  const baseRatio = ratioNumber(recipe?.ratio);
+  if (!source || recipe?.sourceLineage?.method !== 'v60' || recipe?.sourceLineage?.mode !== 'hot'
+    || recipe?.configurationKey !== V60_CONFIGURATION_KEY || recipe?.v60Size !== '02'
+    || !Number.isFinite(recipe?.coffeeGrams) || !Number.isFinite(recipe?.waterGrams)
+    || !Array.isArray(recipe?.steps) || !recipe.steps.length
+    || recipe.sourceLineage?.sourceRegistryVersion == null
+    || (recipe.sourceLineage?.status === 'original'
+      && (!Number.isFinite(baseRatio) || Math.abs(baseRatio - Number(source.ratio)) > 0.051
+        || recipe.sourceLineage?.parameterSources?.ratio !== sourceId))) {
+    throw Object.assign(new Error('The selected V60 source cannot safely support an explicit ratio experiment.'), { code: 'ratio_experiment_unsupported' });
+  }
+  const targetWater = Math.round(recipe.coffeeGrams * ratio);
+  const steps = scaleRatioSteps(recipe.steps, targetWater, recipe.waterGrams);
+  if (!steps.length || steps.at(-1).waterTotal !== targetWater
+    || steps.some((step, index) => index > 0 && Number(step.waterTotal) < Number(steps[index - 1].waterTotal))) {
+    throw Object.assign(new Error('The V60 source schedule could not be scaled monotonically.'), { code: 'ratio_experiment_invalid_schedule' });
+  }
+  const sourceLineage = structuredClone(recipe.sourceLineage);
+  sourceLineage.status = 'adapted';
+  sourceLineage.adaptationRuleId = V60_EXPLICIT_RATIO_RULE_ID;
+  sourceLineage.adaptationRuleVersion = V60_EXPLICIT_RATIO_RULE_ID;
+  sourceLineage.changedFields = [...new Set([...(sourceLineage.changedFields || []), 'ratio', 'water', 'bloom'])];
+  sourceLineage.parameterSources = {
+    ...(sourceLineage.parameterSources || {}),
+    ratio: V60_EXPLICIT_RATIO_RULE_ID,
+    water: V60_EXPLICIT_RATIO_RULE_ID,
+    bloom: V60_EXPLICIT_RATIO_RULE_ID,
+  };
+  sourceLineage.adaptation = `${sourceLineage.adaptation || `Published method: ${source.author} — ${source.publication}.`} App-authored explicit ratio experiment at 1:${ratio}; cumulative source pours are scaled in place.`;
+  return {
+    ...structuredClone(recipe),
+    waterGrams: targetWater,
+    ratio: `1:${ratio}`,
+    steps,
+    sourceLineage,
+  };
+}
+
+function explicitTechnique(techniqueId) {
+  const technique = Object.values(V60_TECHNIQUES).find((candidate) => candidate.id === techniqueId
+    || candidate.sourceIds.includes(techniqueId));
+  if (!technique) throw new Error(`Unknown or unsupported V60 technique family: ${String(techniqueId)}`);
+  const source = sourceById(technique.sourceIds[0]);
+  if (!source || source.supportedV60_02 === false || source.status !== 'original' || source.executableCadence !== true
+    || !Number.isFinite(source.ratio) || !Number.isFinite(source.temperatureC) || !Number.isFinite(source.guideSeconds)
+    || !source.grind || !source.geometry || !source.agitation) {
+    throw new Error(`V60 technique family ${techniqueId} is not an executable registry option`);
+  }
+  return {
+    ...technique,
+    sourceIds: [source.id],
+    reasonCode: EXPLICIT_REASON_CODES[technique.id] || 'EXPLICIT_TECHNIQUE_SELECTION',
+    explicitSelection: true,
+  };
+}
+
+/**
+ * Generate one registry-backed V60 family without consulting the automatic
+ * intent selector. This is the authority boundary for technique experiments.
+ */
+export function generateV60RecipeForTechnique(techniqueId, intent = {}, configuration = {}, _evidence = null) {
+  if (techniqueId && typeof techniqueId === 'object') {
+    const request = techniqueId;
+    techniqueId = request.familyId || request.techniqueId || request.sourceId || request.id;
+    intent = request.intent || {};
+    configuration = request.configuration || {};
+  }
+  validateExplicitIntent(intent);
+  const config = explicitConfiguration(configuration);
+  const technique = explicitTechnique(techniqueId);
+  const recipe = buildRecipe(intent, config, technique, { preserveIntentOverrides: true });
+  const validation = validateV60Candidate(recipe);
+  if (!validation.valid) throw new Error(`Explicit V60 technique contract failed: ${validation.errors.join(', ')}`);
+  if (!buildTimerSteps(recipe)) throw new Error('Explicit V60 technique contract failed: invalid timer schedule');
+  return recipe;
+}
+
+export const generateV60TechniqueRecipe = generateV60RecipeForTechnique;
 
 export function generateV60Fallback(configuration = {}, reason = 'candidate-failed') {
   const config = normalizeV60Configuration(configuration);

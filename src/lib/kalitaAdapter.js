@@ -1,5 +1,5 @@
-import { descriptorForMicrons, grinderSettingToMicrons, GRINDER_MICRON_SCALES } from './brewMethods.js';
-import { normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
+import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, GRINDER_MICRON_SCALES } from './brewMethods.js';
+import { kalitaDoseBounds, normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
 export const KALITA_RULES_VERSION = 'kalita-rules-v3-phase1';
@@ -25,9 +25,23 @@ export function normalizeKalitaConfiguration(config = {}) {
 function buildGrind(grinder, targetMicrons) {
   const scale = GRINDER_MICRON_SCALES[grinder] || GRINDER_MICRON_SCALES['fellow-ode-gen2'];
   const range = GRINDER_RANGES[grinder] || GRINDER_RANGES['fellow-ode-gen2'];
-  const setting = Math.round(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]) * 10) / 10;
+  const setting = quantizeGrinderSetting(clamp((targetMicrons - scale.base) / scale.perStep + 1, range[0], range[1]), GRINDER_MICRON_SCALES[grinder] ? grinder : 'fellow-ode-gen2');
   const microns = grinderSettingToMicrons(setting, GRINDER_MICRON_SCALES[grinder] ? grinder : 'fellow-ode-gen2');
   return { setting: String(setting), microns, description: descriptorForMicrons(microns) };
+}
+
+// Keep the bean-driven part of Kalita grind selection separate from the
+// method baseline. Source-backed techniques can reuse this exact adjustment
+// around their own published/compatible baseline instead of being reset to
+// the generic 700/735µm Kalita starting point.
+export function kalitaGrindAdjustmentMicrons(intent = {}) {
+  return (intent.finesRisk === 'high' ? 55 : 0)
+    + (intent.solubilityRisk === 'high' ? 30 : 0)
+    + (Number(intent.grindAdjustmentMicrons) || 0);
+}
+
+export function kalitaGrindBaselineMicrons(size) {
+  return 700 + (String(size) === '185' ? 35 : 0);
 }
 
 function techniqueFor(intent) {
@@ -59,6 +73,11 @@ function techniqueInstructionFor(key) {
 
 export function validateKalitaCandidate(recipe) {
   const errors = [];
+  const size = String(recipe?.kalitaSize || '');
+  if (!recipe || recipe.device !== 'kalita' || recipe.mode !== 'hot' || recipe.isIced === true) errors.push('wrong-mode-or-device');
+  if (!['155', '185'].includes(size) || recipe?.configurationKey !== `kalita:${size}:wave-paper:hot`) errors.push('invalid-configuration');
+  const bounds = kalitaDoseBounds(size);
+  if (!Number.isFinite(recipe?.coffeeGrams) || recipe.coffeeGrams < bounds.minDose || recipe.coffeeGrams > bounds.maxDose) errors.push('invalid-dose');
   if (!Number.isFinite(recipe?.coffeeGrams) || !Number.isFinite(recipe?.waterGrams)) errors.push('non-finite-dose-or-water');
   if (!Number.isFinite(recipe?.waterTemp?.celsius) || recipe.waterTemp.celsius < 93 || recipe.waterTemp.celsius > 100) errors.push('invalid-temperature');
   if (!recipe?.grindSize?.setting || !Number.isFinite(recipe?.grindSize?.microns)) errors.push('invalid-grind');
@@ -70,6 +89,7 @@ export function validateKalitaCandidate(recipe) {
     lastTime = step.timeSeconds;
     lastWater = step.waterTotal;
   }
+  if (recipe?.steps?.length && recipe.steps.at(-1).waterTotal !== recipe.waterGrams) errors.push('final-water-mismatch');
   if (!Array.isArray(recipe?.steps) || !recipe.steps.length || !Number.isFinite(recipe.totalBrewTimeSeconds) || recipe.totalBrewTimeSeconds <= lastTime) errors.push('invalid-total-duration');
   return { valid: errors.length === 0, errors };
 }
@@ -85,7 +105,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   const temperature = clamp(Number.isFinite(intent.targetTemperatureC)
     ? intent.targetTemperatureC
     : intent.energyTendency === 'lower' ? 93 : intent.energyTendency === 'higher' ? 97 : 96, 93, 100);
-  const targetMicrons = 700 + (config.size === '185' ? 35 : 0) + (intent.finesRisk === 'high' ? 55 : 0) + (intent.solubilityRisk === 'high' ? 30 : 0) + (intent.grindAdjustmentMicrons || 0);
+  const targetMicrons = kalitaGrindBaselineMicrons(config.size) + kalitaGrindAdjustmentMicrons(intent);
   const bloom = Math.round(config.dose * 3);
   const first = Math.round(waterGrams * 0.45);
   const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '155-extended' || config.doseProfile === '185-standard' ? 120 : 150;

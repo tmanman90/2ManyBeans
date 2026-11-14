@@ -27,6 +27,7 @@ import {
   isRevenueCatAvailable,
   deriveEntitlements,
 } from '../lib/revenuecat';
+import { introOfferFromPackage } from '../lib/trialOffer';
 
 const CONTEXT_COPY = {
   scan_cap: {
@@ -105,18 +106,10 @@ function matchUltraAnnual(pkg) {
   return productId.includes('ultra.annual');
 }
 
+// Trial parsing lives in src/lib/trialOffer.js so the paywall, the R12
+// timeline, and the R13 CTA all read the SAME StoreKit-derived value.
 function introTrialLabel(pkg) {
-  const intro = pkg?.product?.introPrice;
-  if (!intro) return null;
-  if (intro.priceString === '$0.00' || intro.price === 0) {
-    // 3-day free trial format. RevenueCat returns periodNumberOfUnits/periodUnit
-    // but the exact shape varies by SDK version — fall back gracefully.
-    const units = intro.periodNumberOfUnits ?? intro.period?.value;
-    const unit = intro.periodUnit ?? intro.period?.unit;
-    if (units && unit) return `${units}-${String(unit).toLowerCase()} free trial`;
-    return 'Free trial';
-  }
-  return null;
+  return introOfferFromPackage(pkg)?.label ?? null;
 }
 
 export function PaywallSheet({ open, context, onClose }) {

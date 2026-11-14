@@ -13,6 +13,7 @@ import { AiDataConsentModal } from './components/AiDataConsentModal';
 import { AuthContext } from './contexts/AuthContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { PaywallProvider, usePaywall } from './hooks/usePaywall.jsx';
+import { paywallFlagOn } from './lib/paywallFlag';
 import { cacheClear, cacheClearLastUid } from './lib/offlineCache';
 import { logInRevenueCat, logOutRevenueCat } from './lib/revenuecat';
 import { C, fonts } from './styles/theme';
@@ -26,15 +27,31 @@ import GrainOverlay from './components/visual/GrainOverlay';
 // file is deleted in Phase 5 once the new flow is verified on TestFlight.
 const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'));
 const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
+const PaywallRoast = React.lazy(() => import('./components/paywall/PaywallRoast'));
+
+// Triggers that stay on the classic PaywallSheet regardless of the
+// pw_roast flag. R13 (onboarding) isn't repointed to PaywallRoast this
+// pass — see docs/plans for the paywall-roast rollout sequencing.
+const CLASSIC_TRIGGERS = new Set(['onboarding']);
 
 // Mounts the actual paywall UI. Kept out of <Root> so it can read the
 // PaywallContext without triggering extra renders of the app shell.
+//
+// Routes by trigger: onboarding (R13) always gets the classic PaywallSheet
+// (it's the rollback target); every other trigger gets PaywallRoast when
+// the pw_roast flag is on. Both lazy chunks are declared above so only the
+// one actually rendered downloads for a given session.
 function PaywallMount() {
   const { paywallContext, close } = usePaywall();
   const open = paywallContext !== null;
+  const useClassic = CLASSIC_TRIGGERS.has(paywallContext?.trigger) || !paywallFlagOn();
   return (
     <React.Suspense fallback={null}>
-      <PaywallSheet open={open} context={paywallContext} onClose={close} />
+      {useClassic ? (
+        <PaywallSheet open={open} context={paywallContext} onClose={close} />
+      ) : (
+        <PaywallRoast open={open} context={paywallContext} onClose={close} />
+      )}
     </React.Suspense>
   );
 }
@@ -347,11 +364,10 @@ const Root = () => {
             // Catches both new users (post-onboarding) and existing
             // users who completed onboarding before this gate existed.
             <AiDataConsentModal updateProfile={updateProfile} />
-          ) : !dataLoaded ? (
-            // Gate 6a: Waiting for Firestore data
-            <LoadingScreen />
           ) : (
-            // Gate 6b: Main app
+            // Gate 6: Main app can mount while data hydrates so Chat's opening
+            // remains truthful instead of treating transient empty arrays as
+            // an empty rotation.
             <UserPreferencesProvider value={contextValue}>
               <App
                 uid={user.uid}
@@ -369,6 +385,7 @@ const Root = () => {
                 returnBean={returnBean}
                 getBeanById={getBeanById}
                 profile={profile}
+                dataLoaded={dataLoaded}
                 updateProfile={updateProfile}
                 refetchBeans={refetch}
               />
@@ -390,8 +407,15 @@ const Root = () => {
 const TestShareCardLazy = import.meta.env.DEV
   ? React.lazy(() => import('./pages/TestShareCard').then(m => ({ default: m.TestShareCard })))
   : null;
+const RuphusHarnessLazy = import.meta.env.DEV
+  ? React.lazy(() => import('./components/chat/RuphusBrowserHarness').then(m => ({ default: m.RuphusBrowserHarness })))
+  : null;
 
 const DevRouter = () => {
+  const search = new URLSearchParams(window.location.search);
+  if (search.has('ruphus-harness') && RuphusHarnessLazy) {
+    return <React.Suspense fallback={<div>Loading harness…</div>}><RuphusHarnessLazy legacy={search.has('legacy')} /></React.Suspense>;
+  }
   if (window.location.hash === '#/test-share-card' && TestShareCardLazy) {
     return (
       <React.Suspense fallback={<div style={{ color: '#fff', padding: 40 }}>Loading test page...</div>}>

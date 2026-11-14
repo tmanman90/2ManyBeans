@@ -39,6 +39,7 @@ export default [
         ...globals.node,
         __APP_VERSION__: 'readonly',
         __APP_VARIANT__: 'readonly',
+        __APP_BUILD_ID__: 'readonly',
         __GOOGLE_IOS_CLIENT_ID__: 'readonly',
       },
     },

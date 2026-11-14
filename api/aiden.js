@@ -5,42 +5,11 @@
 import { withCorsAuthUltra, getDb } from './_lib/cors-auth.js';
 import { decrypt } from './_lib/crypto.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { validateAidenProfile } from '../src/lib/aidenProfileValidation.js';
+import { buildRuphusAttemptProfile, prepareRuphusAttempt } from './_lib/ruphusAidenPreparation.js';
 
 const FELLOW_API = 'https://l8qtmnc692.execute-api.us-west-2.amazonaws.com/v1';
 const RATE_LIMIT = { key: 'aidenPush', limit: 30, windowMs: 60 * 60 * 1000 };
-
-function validateProfile(profile) {
-  const errors = [];
-  const { ratio, bloomRatio, bloomDuration, bloomTemperature,
-    ssPulsesNumber, ssPulsesInterval, ssPulseTemperatures,
-    batchPulsesNumber, batchPulsesInterval, batchPulseTemperatures } = profile;
-
-  if (ratio < 14 || ratio > 20) errors.push(`ratio ${ratio} out of range 14-20`);
-  if (ratio % 0.5 !== 0) errors.push(`ratio ${ratio} must be in 0.5 steps`);
-
-  if (profile.bloomEnabled) {
-    if (bloomRatio < 1 || bloomRatio > 3) errors.push(`bloomRatio ${bloomRatio} out of range 1-3`);
-    if (bloomDuration < 1 || bloomDuration > 120) errors.push(`bloomDuration ${bloomDuration} out of range 1-120`);
-    if (bloomTemperature < 50 || bloomTemperature > 99) errors.push(`bloomTemperature ${bloomTemperature} out of range 50-99`);
-  }
-
-  const checkPulses = (label, enabled, num, interval, temps) => {
-    if (!enabled) return;
-    if (num < 1 || num > 10) errors.push(`${label} pulsesNumber ${num} out of range 1-10`);
-    if (interval < 5 || interval > 60) errors.push(`${label} pulsesInterval ${interval} out of range 5-60`);
-    if (temps.length !== num) errors.push(`${label} temps length ${temps.length} !== pulsesNumber ${num}`);
-    temps.forEach((t, i) => {
-      if (t < 50 || t > 99) errors.push(`${label} temp[${i}] ${t} out of range 50-99`);
-    });
-  };
-
-  checkPulses('ss', profile.ssPulsesEnabled, ssPulsesNumber, ssPulsesInterval, ssPulseTemperatures || []);
-  checkPulses('batch', profile.batchPulsesEnabled, batchPulsesNumber, batchPulsesInterval, batchPulseTemperatures || []);
-
-  if (profile.title && profile.title.length > 50) errors.push(`title too long (${profile.title.length} > 50)`);
-
-  return errors;
-}
 
 async function fellowFetch(path, options = {}) {
   const { timeout = 5000, ...fetchOpts } = options;
@@ -156,7 +125,7 @@ async function clearTokenCache(secretsRef) {
   }
 }
 
-async function pushWithCredentials(profile, creds) {
+async function pushWithCredentials(profile, creds, { allowDuplicateRecovery = true, reconcileOnly = false } = {}) {
   let token = null;
   let deviceId = creds.cachedDeviceId || null;
 
@@ -194,6 +163,13 @@ async function pushWithCredentials(profile, creds) {
   // Cache token + device for next time (non-blocking)
   cacheTokenAndDevice(creds.secretsRef, token, deviceId);
 
+  if (reconcileOnly) {
+    const existing = await fellowFetch(`/devices/${deviceId}/profiles`, { headers: authHeaders });
+    const profiles = existing.profiles || existing;
+    const match = Array.isArray(profiles) && profiles.find((candidate) => candidate.title === profile.title || candidate.name === profile.title);
+    return match ? { profileId: match.id || match.profileId, title: profile.title, link: match.link || match.url || null } : null;
+  }
+
   // Create temp profile on device (auto-delete duplicate if leftover from previous push)
   let created;
   try {
@@ -203,7 +179,13 @@ async function pushWithCredentials(profile, creds) {
       body: JSON.stringify(profile),
     });
   } catch (createErr) {
-    if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists')) {
+    if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists') && !allowDuplicateRecovery) {
+      const existing = await fellowFetch(`/devices/${deviceId}/profiles`, { headers: authHeaders });
+      const profiles = existing.profiles || existing;
+      const match = Array.isArray(profiles) && profiles.find((candidate) => candidate.title === profile.title || candidate.name === profile.title);
+      if (match) return { profileId: match.id || match.profileId, title: profile.title, link: match.link || match.url || null, reconciled: true };
+      throw Object.assign(new Error('Aiden profile creation is uncertain; no matching profile was observed.'), { code: 'timeout', status: 202 });
+    } else if (createErr.status === 400 && createErr.message && createErr.message.includes('already exists')) {
       // Stale profile from a previous push that failed to clean up -- delete it and retry
       console.warn('Duplicate profile detected, cleaning up and retrying...');
       try {
@@ -233,10 +215,18 @@ async function pushWithCredentials(profile, creds) {
   const profileId = created.id || created.profileId;
 
   // Share profile -> get brew.link
-  const shared = await fellowFetch(`/devices/${deviceId}/profiles/${profileId}/share`, {
-    method: 'POST',
-    headers: authHeaders,
-  });
+  let shared;
+  try {
+    shared = await fellowFetch(`/devices/${deviceId}/profiles/${profileId}/share`, {
+      method: 'POST',
+      headers: authHeaders,
+    });
+  } catch (shareError) {
+    // Preserve the observed provider identity so an uncertain retry can
+    // reconcile this exact profile instead of creating another one.
+    shareError.externalId = profileId;
+    throw shareError;
+  }
   const link = shared.link || shared.url || shared.shareUrl;
 
   // Delete the temp profile -- keep device clean
@@ -260,12 +250,45 @@ async function pushWithCredentials(profile, creds) {
 // integration feature that differentiates Ultra from Pro.
 export default withCorsAuthUltra(async (req, res, decodedToken) => {
   const uid = decodedToken?.uid;
+  const body = req.body || {};
+  const attemptId = typeof body.attemptId === 'string' ? body.attemptId : null;
+  const recovery = body.recovery === 'new_profile' ? 'new_profile' : null;
+  const recoveryActionId = typeof body.actionId === 'string' ? body.actionId : null;
+  let attemptRef = null;
+  let attemptRecord = null;
+  let attemptBean = null;
+  let recoveryReplay = false;
 
   try {
-    const profile = req.body;
-    const errors = validateProfile(profile);
-    if (errors.length > 0) {
-      return res.status(400).json({ error: `Invalid profile: ${errors.join('; ')}` });
+    let profile = body;
+    if (attemptId) {
+      if (Object.keys(body).some((key) => key !== 'attemptId' && key !== 'recovery' && key !== 'actionId')) return res.status(400).json({ error: 'attempt_id_only' });
+      if (recovery && recoveryActionId !== `new_profile_${attemptId}`) return res.status(400).json({ error: 'recovery_action_invalid' });
+      const db = getDb();
+      attemptRef = db.collection('users').doc(uid).collection('brewAttempts').doc(attemptId);
+      const attemptSnap = await attemptRef.get();
+      const beanRef = db.collection('users').doc(uid).collection('beans').doc(attemptSnap.data()?.coffeeId || '__missing__');
+      const beanSnap = await beanRef.get();
+      if (!attemptSnap.exists || !beanSnap.exists) return res.status(404).json({ error: 'attempt_not_found' });
+      const attempt = { id: attemptSnap.id, ...attemptSnap.data() };
+      attemptRecord = attempt;
+      if (attempt.status === 'profile_prepared' && (!recovery || attempt.recoveryActionId === recoveryActionId)) return res.status(200).json({ attemptId, status: attempt.status, link: attempt.link || null, profileId: attempt.externalId || null, recovery: attempt.recovery || null, physicalBrewConfirmed: false });
+      if (!['created', 'preparing', 'uncertain'].includes(attempt.status)) return res.status(409).json({ error: 'invalid_attempt_state' });
+      attemptBean = { id: beanSnap.id, ...beanSnap.data() };
+      // A new-profile recovery is explicit and user initiated. It gets a
+      // distinct attempt-scoped title, while the durable attempt identity
+      // remains the authority for reconciliation and tasting provenance.
+      recoveryReplay = Boolean(recovery && attempt.recoveryTitle && attempt.recoveryActionId === recoveryActionId);
+      profile = buildRuphusAttemptProfile(recovery && !recoveryReplay ? { ...attempt, id: `${attempt.id}-new`, recoveryTitle: null } : attempt, attemptBean);
+      await db.runTransaction(async (tx) => {
+        const current = await tx.get(attemptRef);
+        if (!current.exists) throw Object.assign(new Error('Attempt is unavailable.'), { code: 'attempt_not_found' });
+        if (attempt.status !== 'uncertain') tx.update(attemptRef, { status: 'preparing', preparingAt: new Date().toISOString() });
+      });
+    }
+    const validation = validateAidenProfile(profile);
+    if (!validation.valid) {
+      return res.status(400).json({ error: `Invalid profile: ${validation.errors.join('; ')}` });
     }
 
     // Get credentials (per-user or relay)
@@ -273,34 +296,60 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
     try {
       creds = await getFellowCredentials(uid);
     } catch (credsErr) {
+      if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
       if (credsErr.status === 400) {
         return res.status(400).json({ error: credsErr.message });
       }
       throw credsErr;
     }
 
+    // Attempt preparation is the durable, attempt-ID-only boundary. It
+    // reloads the canonical snapshot and reconciles uncertain creates by the
+    // unique title; it never trusts a client recipe or auto-recreates a
+    // profile after a response-loss ambiguity.
+    if (attemptRef && attemptRecord) {
+      const prepared = await prepareRuphusAttempt({
+        attempt: { ...attemptRecord, id: recovery && !recoveryReplay ? `${attemptRecord.id}-new` : attemptRecord.id, status: recoveryReplay ? 'uncertain' : 'preparing' },
+        bean: attemptBean,
+        adapter: {
+          prepare: (canonicalProfile) => pushWithCredentials(canonicalProfile, creds, { allowDuplicateRecovery: recovery === 'new_profile' }),
+          reconcile: ({ title }) => pushWithCredentials({ ...profile, title }, creds, { reconcileOnly: true }),
+        },
+      });
+      const attemptUpdate = { ...prepared.attempt, ...(recovery ? { recovery, recoveryActionId, recoveryTitle: profile.title } : {}) };
+      await attemptRef.update(attemptUpdate).catch(() => {});
+      if (prepared.error) {
+        if (prepared.attempt.status === 'uncertain') return res.status(202).json({ attemptId, status: 'uncertain', physicalBrewConfirmed: false });
+        return res.status(502).json({ error: prepared.error.message || 'Could not prepare Aiden attempt.' });
+      }
+      return res.status(200).json({ ...prepared.external, attemptId, status: 'profile_prepared', recovery, physicalBrewConfirmed: false });
+    }
+
     // Decryption failed: return error + try relay fallback ONLY for the
     // allowlisted relay uid. For everyone else, the relay would push to the
     // owner's personal Aiden -- refuse and surface a reconnect prompt.
-    if (creds.source === 'decrypt_failed') {
+      if (creds.source === 'decrypt_failed') {
       if (isRelayAllowed(uid)) {
         try {
           const { FELLOW_EMAIL, FELLOW_PASSWORD } = process.env;
           if (FELLOW_EMAIL && FELLOW_PASSWORD) {
             const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
             const result = await pushWithCredentials(profile, relayCreds);
+            if (attemptRef) await attemptRef.update({ status: 'profile_prepared', preparedAt: new Date().toISOString(), externalId: result.profileId || null, link: result.link || null });
             return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
           }
         } catch {
           // Relay also failed
         }
       }
+      if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
       return res.status(500).json({ error: 'Your Fellow credentials could not be read. Please reconnect in Settings.' });
     }
 
     // Try push with the resolved credentials
     try {
       const result = await pushWithCredentials(profile, creds);
+      if (attemptRef) await attemptRef.update({ status: 'profile_prepared', preparedAt: new Date().toISOString(), externalId: result.profileId || null, link: result.link || null });
       return res.status(200).json({ ...result, usedRelay: creds.source === 'relay' });
     } catch (pushErr) {
       // If user credentials failed with 401/403, try relay fallback -- again,
@@ -315,25 +364,32 @@ export default withCorsAuthUltra(async (req, res, decodedToken) => {
             try {
               const relayCreds = { email: FELLOW_EMAIL, password: FELLOW_PASSWORD, source: 'relay' };
               const result = await pushWithCredentials(profile, relayCreds);
+              if (attemptRef) await attemptRef.update({ status: 'profile_prepared', preparedAt: new Date().toISOString(), externalId: result.profileId || null, link: result.link || null });
               return res.status(200).json({ ...result, usedRelay: true, fellowCredentialsInvalid: true });
             } catch (relayErr) {
               console.error('Relay fallback also failed:', relayErr.message);
             }
           }
         }
+        if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
         return res.status(401).json({ error: 'Your Fellow credentials are invalid. Please reconnect in Settings.' });
       }
 
       // Surface specific errors
       if (pushErr.status === 404) {
+        if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
         return res.status(404).json({ error: pushErr.message });
       }
       if (pushErr.status === 409) {
+        if (attemptRef) await attemptRef.update({ status: 'failed', updatedAt: new Date().toISOString() }).catch(() => {});
         return res.status(409).json({ error: pushErr.message });
       }
       throw pushErr;
     }
   } catch (error) {
+    if (attemptRef) {
+      try { await attemptRef.update({ status: error?.name === 'AbortError' || error?.code === 'ETIMEDOUT' ? 'uncertain' : 'failed', updatedAt: new Date().toISOString() }); } catch { /* preserve original provider error */ }
+    }
     console.error('Fellow API error:', error.message);
     return res.status(502).json({ error: error.message || 'Failed to push profile to Fellow' });
   }

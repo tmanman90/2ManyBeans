@@ -25,6 +25,8 @@ import { shareImage } from '../lib/share';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+import { isRuphusAgentV3Enabled } from '../lib/ruphus/featureFlags';
+import { saveRuphusTasting } from '../lib/ruphusTasting';
 
 // ─────────────────────────────────────────────────────────────
 // List-mode helpers (added for redesign)
@@ -45,7 +47,7 @@ const formatDateRelative = (iso) => {
 };
 
 
-export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, onPendingTastingConsumed, onboardingPalate = null, isDemo, onDemoAction }) => {
+export const TastingTab = ({ uid, beans, tastings, onAddTasting, onUpdateTasting, onDeleteTasting, wizardDraft = null, onWizardDraftChange = () => {}, pendingTastingBeanId, pendingTastingAttemptId = null, onPendingTastingConsumed, onRuphusAttemptCompleted, onboardingPalate = null, isDemo, onDemoAction, onOpenRuphus }) => {
   const active = beans.filter(b => b.status === 'ACTIVE');
   const sealed = beans.filter(b => b.status === 'SEALED');
   // Tasting picker shows all non-finished beans. Active (in-jar) beans get
@@ -55,6 +57,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [sel, setSel] = useState(active[0]?.id || sealed[0]?.id || '');
   const { hasPro, freeUsage } = useSubscription();
   const { openPaywall } = usePaywall();
+  const agentV3Enabled = isRuphusAgentV3Enabled({ uid, isDemo });
   const { errorMsg, showError, hideError } = useErrorToast();
   // Background tasting score conversion for spider chart overlay
   const convertScoresInBackground = (tastingId, tastingData) => {
@@ -76,6 +79,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   const [editForm, setEditForm] = useState(null);
   // Intelligent tasting wizard — the guided-tasting experience (replaces the chat takeover).
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardAttemptId, setWizardAttemptId] = useState(null);
   const setWizardDraft = onWizardDraftChange;
 
   const tastingFields = {
@@ -150,8 +154,17 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
   // persist as-is without the background LLM score conversion that the manual/chat paths use.
   const saveWizardTasting = async (record) => {
     try {
-      await onAddTasting(record);
-      setWizardDraft(null);
+      // Agent-started attempts use the server seam so recipe provenance and
+      // the attempt's immutable snapshot cannot be supplied by the client.
+      if (record?.attemptId) {
+        const { attemptId, ...sensory } = record;
+        await saveRuphusTasting({ attemptId, coffeeId: record.beanId, sensory });
+        onRuphusAttemptCompleted?.();
+      } else {
+        await onAddTasting(record);
+      }
+    setWizardDraft(null);
+      setWizardAttemptId(null);
       setWizardOpen(false);
       setMode('list');
     } catch (err) {
@@ -177,6 +190,7 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
       return;
     }
     if (wizardDraft?.beanId && wizardDraft.beanId !== pendingTastingBeanId) setWizardDraft(null);
+    setWizardAttemptId(pendingTastingAttemptId || null);
     setSel(pendingTastingBeanId);
     setWizardOpen(true);
     onPendingTastingConsumed?.();
@@ -229,8 +243,10 @@ export const TastingTab = ({ beans, tastings, onAddTasting, onUpdateTasting, onD
           reduce={reduceMotion}
           draft={wizardDraft}
           onDraftChange={setWizardDraft}
+          attemptId={wizardAttemptId}
           onSave={saveWizardTasting}
           onClose={closeWizard}
+          onOpenRuphus={agentV3Enabled ? ((contextRef, starterIntent) => onOpenRuphus?.(contextRef, starterIntent)) : undefined}
           onSwitchToManual={() => { setWizardDraft(null); setWizardOpen(false); setMode('form'); }}
         />
       )}

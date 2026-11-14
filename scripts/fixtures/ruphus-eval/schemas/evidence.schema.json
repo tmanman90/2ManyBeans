@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruphus-eval/evidence.schema.json",
+  "type": "object",
+  "required": ["type", "version", "source", "trust", "recordId", "data"],
+  "properties": {
+    "type": { "const": "evidence" },
+    "version": { "type": "string" },
+    "source": { "enum": ["coffee-state", "recipe", "tasting", "tool-result", "provider-response"] },
+    "trust": { "enum": ["canonical", "user-provided", "untrusted", "synthetic"] },
+    "recordId": { "type": "object", "required": ["kind", "id"], "properties": { "kind": { "type": "string" }, "id": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
+    "data": {}
+  },
+  "additionalProperties": false
+}

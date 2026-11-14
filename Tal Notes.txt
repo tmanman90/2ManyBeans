@@ -1,3 +1,134 @@
+- the brew button lost the long press functionality (where it shows diff brew methods)
+- you made the buttons different on inventory (diff icons and all). 
+- remove the "free a jar to open" 
+- the icon for "open into jar" should be blue to match the trading card blue button. and the icon should be a jar (i feel like i have that icon made alrady) 
+- i think the "finish" button should move to the back of the card and instead put the freeze/frozen button (for inventory) 
+
+
+reeze/return/edit/learn buttons: yea those can stay on stats page. well see i may eventually wanna put them back on the main home page scrolller but chill for now 
+
+Shelll: Couple Notes: the variety gets cut off. we should never have anything cut off so we need to figure out a fix. Also the "Columobia Mosto Anaeorbic...." should ALWAYS fit on one line and just scale down to fit. 
+the STEREOSCOP on the left side is too far down (cmon no apple award winning designer would approve the spacing/placement u did)
+The borders were better in the mockup (lmk if i need to resend it). I liked the edges they had and how they were placed so u still had white behind them. 
+This font feels heavier than the mockup font. Lastly it felt like the mockup really made the coffee bag more of the focus. it takes up WAY more space in the mockup and all the text is further down... 
+Also the circle on top right needs to match the mockup how its pushed to top right going over the border lines. 
+On stats page theres no button to flip back over to the front... 
+Hero - Yes it's the AI product shot as the hero HOWEVER, right now you have a diff color background (cream) vs the white background we have on the trading card so it looks bad. what do we do to fix this u think ? going forward.. 
+Lastly the "weight" icon i dont like as much as the reference icon
+
+
+
+
+
+/goal I want you to do a complete visual redesign of the app. It is a React 19 + Vite +       
+Capacitor 8                                                                                                  
+  iOS app. I want a super clean, minimalist, design-forward and deeply aesthetic result. Sweat all the tiny  
+  details and make everything feel absurdly premium.                                                         
+                                                                                                             
+  Make every interaction extremely delightful. You can go so far as to write custom shaders (WebGL/GLSL,     
+  since this is a web/Capacitor app, this is your equivalent of Metal), custom UI components from scratch,   
+  anything you want, to make everything fluid, unique, and delightful. Make every transition fluid and       
+  delightful: fun gestures, bouncy physics, an Apple-y liquid-glass kind of feel to it. Use shader effects   
+to                                                                                                           
+  make transitions look special and memorable, to make imagery and visuals look good, and even to make the   
+  chat and token-streaming experience unique and fun. Think through the flows to make everything genuinely   
+  usable and show me the information I need without cluttering the screen or making it too technical.        
+                                                                                                             
+  Everything is on the table. Want to write your own components from scratch? Do it. Build a game engine for 
+  all I care. Write the most god-forsaken shaders the world has ever seen. Just make it look absurdly good.  
+  Don't stop until it looks like something Alan Dye would use. Make NO mistakes. HUmans are saying   
+  you aren't capable of making but AI slop. you need to cook hard and prove   
+  them wrong. Get every pixel perfect, every transition flawless frame to frame, top 1% of human designers,  
+  instantly eligible for an Apple Design Award.                                                              
+                                                                                                             
+  Hard constraints, do not violate these:                                                                    
+  - This is a UI/visual redesign ONLY. Every existing feature must keep working exactly as it does today:    
+  Inventory, Rotation, Tasting, Chat, Archive, the full onboarding flow, all AI features (bean scanning,     
+  Aiden recipes, Professor Ruphus, tasting coach), redemption codes, subscriptions, auth.                    
+  - Do NOT touch Firebase, Firestore, the data model, the API proxies in api/, or any read/write logic. Same 
+  data in, same data out. You are changing how things look and feel, not what gets stored or how it works.   
+  - Do not change feature behavior, app structure, navigation, or flows, and do not remove anything. Keep    
+the                                                                                                          
+  same tabs, the same screens, and the same navigation in place. If a redesign idea would require a data,    
+  logic, or feature change, skip it and keep the existing behavior. You are restyling what already exists.   
+  - Respect the iOS layout rules in .claude/rules/ (safe areas, status bar, notch, touch targets, keyboard   
+  handling) and follow Apple HIG.                                                                            
+                                                                                                             
+  You must verify your own work. Build the app and run it in the iOS simulator (use the XcodeBuildMCP        
+tooling                                                                                                      
+  and the /ios-qa and /ios-screenshot flows). Drive the UI, screenshot every tab and key screen, and examine 
+  the results. Record and inspect transitions and animations frame by frame, analyze pixel-level detail, and 
+  keep iterating until every frame is clean, every transition is flawless and hitch-free, and every pixel    
+  looks intentional. Aim for pixel-perfect with flawless frame-to-frame motion. Also verify in the browser   
+  via the dev server where useful. The single most important instruction: actually verify animations at the  
+  frame level and do not stop until they are fluid.                                                          
+                                                                                                             
+  Work on a dedicated redesign branch (create it off main if it does not exist). Initialize/track with git   
+  and commit as you go. Keep a short design doc capturing your intent and decisions so you don't lose track  
+  across long sessions. Write clean, maintainable, modular code.                                             
+                                                                                                             
+  For the most part use your best judgment and do not ask me questions unless you are hard stuck. Interpret  
+  this however you want and show me what you are capable of. Redesign it end to end, verify everything in    
+the                                                                                                          
+  simulator, and do not stop until the entire app looks and feels stellar while every feature still works    
+  perfectly. Use subagents; be efficient with your tokens and use    
+opus to orchestrate and plan with sonnett to write if that makes sense and is token efficient. Use codex for 
+review along the way. 
+
+
+.claude/plans/cozy-noodling-rose.mdwh
+
+
+Get a custom brew recipe from Aiden, your AI barista. - no aidan is the name of the machine. professor ruphus makes the recipe or just say for your aidan. 
+
+.claude/plans/cozy-noodling-rose.mdmm
+ 
+ 
+ 
+ New codes:
+  - 2MB2026-VIP — Ultra for 365 days, 3 redemptions (friends)
+  - 2MANY-BEANS26 — Ultra for 7 days, 50 redemptions (Reddit r/fellow)
+
+BUGS:
+Product shotl while generating if i hit save changes and close out, it basically cancels. it should just load in the background if that happens. 
+
+
+
+Onboarding notes:
+1) What do you want to brew better? - need to include Aidan and update images/icons here as they are random and generic. we should work through that part and think about the icons..
+2) What bugs you most right now? - should include "i have 2manybeans to keep track of"
+3) the You're in good company. page had comments that didnt relate to what i clicked (i clicked the one about beans not being abel to remember)
+4) Here's how I'll help with V60 / pour over. - doesnt talk enough about the cool features IE AI that has studied Hoffman theory and vast coffee knowledge to create the perfect recipes taiolred to ur bean and ur equipment
+also finally a neat way to store info on all your beans - no white boards no excel docs needed
+5) screenshot looks a little weird and we shouoldnt pick a frozen one? 
+6) the Privacy Policy link doesnt actually work? 
+
+
+
+
+1) Product shot isnt working, it just hangs on "Generating Product Shot". Also while its generating it lets u press save changes or X out... not sure how that effects and if it continues loading in the background? 
+2) The product shot flow isn't working as intended. Right now the only way to do product shot is AFTER you ingest the bean, to go to edit bean and press "Add photo". This shoudl happen at point of ingesting bean once i upload the image that is being analyzed. it should just generate product shot at same time.... 
+3)   "PProducer" still overlaps with Roast Date even though youve claimed to have fixed this... both in edit and in ingestion... 
+4) AI Fil still is super narrow and looks weird. we need to rethink positioning so the buttons are displayed in a clean easy to read and professional manner...
+5)              u keep claiming that youve fixed the keyboard bug but as u can see int he screenshot it persists. if i am clicking on a field towards the bottom of the screen, they keyboard completely covers it making it impossible to see whaat u are typing... 
+                                                                                    
+                                                                                                                                           
+                                              
+⏺ Done. Vercel (web) + Capgo OTA (iOS v1.1.73) both live. Try rescanning that ditta Artigianale bag. You should see:                
+                                                                                                                                  
+  - Accolades field capturing "1st Place Italian Roasting Championship 2026"                                                        
+  - Roasted In field capturing "Florence, Italy"                                                                                    
+  - Add to Inventory on its own full-width row                                                                                      
+  - AI Fill button no longer squished                                                                                               
+  - Keyboard scrolls focused field into view on lower inputs                                                                        
+  - Producer text truncates instead of overflowing                                                                                  
+                                                                                                                                    
+✻ Baked for 1m 41s                                                                                                                 
+                                                                                                                                  
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                                   
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)                           
 
 ⏺ Deployed. v1.1.62 is live on both Vercel and Capgo (production channel).
                                                                                                                                     

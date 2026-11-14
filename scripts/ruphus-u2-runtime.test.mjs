@@ -1,0 +1,848 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createRuphusTools } from '../api/_lib/ruphusTools.js';
+import { ambiguityClarification, methodBindingTriggers, proposalEligibleForTarget, proposalHandoff, runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
+import { runtimeTriggers } from '../src/lib/ruphus/conversationContract.js';
+import { buildDynamicEvidenceBlock, RUPHUS_SYSTEM_PROMPT } from '../api/_lib/ruphusPrompt.js';
+import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
+
+const base = { launchContext: { surface: 'direct' }, rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }], refs: { c1: 'coffee-1' } }, ledger: { entries: [], namedCoffees: [] }, evidenceHash: 'e1', conversation: [{ role: 'assistant', content: 'The recent brew ran long, so I would go finer than Ode 4.2.' }] };
+test('diagnosis exposes the exact selected canonical recipe, not only its brewer label', async () => {
+  const recipe = { ...generateKalitaRecipe({}, { dose: 13 }), slotKey: 'kalita_hot', coffeeGrams: 13, waterGrams: 215, waterTemp: { celsius: 94 }, grindSize: { setting: '5.6' }, id: 'private-revision', selectedPath: 'private-path', hash: 'private-hash' };
+  const context = { ...structuredClone(base), userText: 'I brewed jar 1 with the Kalita 155. It tasted muted.', __ruphusResolvedTargets: new Map(), proposalState: { target: null } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: {
+    readCoffee: async () => ({ name: 'El Vergel' }),
+    readRecipe: async () => [{ ...generateV60Recipe({}, { dose: 20 }), slotKey: 'v60_hot' }, recipe],
+    readBrews: async () => [], readTastings: async () => [],
+  } });
+  const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(result.method.slot, 'kalita_hot');
+  assert.equal(result.selectedRecipe?.coffeeGrams, 13);
+  assert.equal(result.selectedRecipe.waterGrams, 215);
+  assert.equal(result.selectedRecipe.waterTemp.celsius, 94);
+  assert.equal(result.selectedRecipe.grindSize.setting, '5.6');
+  assert.deepEqual(result.selectedRecipe.steps, recipe.steps);
+  assert.ok(result.selectedRecipe.steps.length > 0);
+  assert.doesNotMatch(JSON.stringify(result), /private-revision|private-path|private-hash/);
+  assert.doesNotMatch(JSON.stringify(context.ledger), /waterGrams|private-revision|private-path|private-hash/);
+});
+test('locked coffee is supplied directly instead of offering redundant model resolution', () => {
+  const locked = createRuphusTools({ uid: 'owner', context: { ...structuredClone(base), turnBinding: { status: 'locked', coffeeRef: 'c1' } } });
+  assert.equal(locked.definitions.some(({ name }) => name === 'resolve_coffee'), false);
+  assert.equal(locked.definitions.some(({ name }) => name === 'read_recipe'), true);
+  const unbound = createRuphusTools({ uid: 'owner', context: structuredClone(base) });
+  assert.equal(unbound.definitions.some(({ name }) => name === 'resolve_coffee'), true);
+});
+test('prompt uses held brew details and deterministic focus before asking', () => {
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Never ask for dose, water, grind, temperature, or brew time when a tool result already supplies it/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /method result contains an ask list, reply only with one natural question/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /never exceed 90 words in an ordinary reply/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /asks you to tell them about it, answer with one useful recipe or history detail/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice or a generic invitation/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /“The other” means the matching coffee other than the current one/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /without adding unsolicited tuning advice/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /never leave it at vague “more extraction/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Keep brew attempts and tasting notes separate unless the evidence explicitly links them/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /a photo or visual symptom alone does not identify the bean/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Never select a coffee from rotation order, default method, or old focus/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /unknown coffee remains unmatched after the user supplies a roaster, origin/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Before choosing among coffees, read the recent evidence for every plausible candidate/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /stay with the most recently named coffee/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /only reaffirms the already focused coffee, acknowledge it in one short phrase/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /give the advice and prepare its separate review card in the same turn without asking for another yes/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /thin but sweet or clean points to strength/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /launchItem method in LAUNCH_CLUE is verified app context/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /older coffee-level tasting that is not linked to the current brew does not diagnose today's cup/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /never send two consecutive question-only replies/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /do not add that there is no separate tasting unless the checked evidence explicitly establishes that absence/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /locked binding says Colombia La Esperanza for “the other Colombia,” answer about Colombia La Esperanza/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /ready to review—not applied/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Technique requests are a separate typed experiment/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Use fresh, fresher, and freshest only for literal roast age/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /Never call a coffee or brewer a “slot”/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /When TRUSTED_METHOD_BINDING says locked/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /A missing saved recipe does not make an explicitly named brewer ambiguous/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /exact grounded diagnosis after reading the exact recipe.*typed intent recipe_preview/);
+  assert.match(RUPHUS_SYSTEM_PROMPT, /correction materially changes the method or technique.*brief explanation/);
+});
+test('locked turn binding is the final explicit developer target', () => {
+  const block = buildDynamicEvidenceBlock({
+    rotationSnapshot: { coffees: [{ refKey: 'c2', name: 'Colombia La Esperanza' }] },
+    ledger: { namedCoffees: ['El Vergel', 'Colombia La Esperanza'] },
+    launchContext: { surface: 'direct' },
+    turnBinding: { status: 'locked', coffeeRef: 'c2', coffeeName: 'Colombia La Esperanza' },
+  });
+  assert.match(block, /<AUTHORITATIVE_TURN_TARGET>/);
+  assert.match(block, /current message resolves to Colombia La Esperanza/);
+  assert.match(block, /Do not answer from the prior coffee focus/);
+  assert.ok(block.lastIndexOf('<AUTHORITATIVE_TURN_TARGET>') > block.lastIndexOf('<TRUSTED_TURN_BINDING>'));
+});
+test('launch method is an opened recipe clue, not a claim about the actual brew', () => {
+  const block = buildDynamicEvidenceBlock({ methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1b' } });
+  assert.match(block, /opened the hot Kalita recipe/);
+  assert.match(block, /Name hot Kalita once/);
+  assert.doesNotMatch(block, /user used hot Kalita/);
+});
+test('locked method binding is injected after general setup and rejects another brewer', () => {
+  const block = buildDynamicEvidenceBlock({
+    rotationSnapshot: { setup: { defaultMethod: 'Aiden' } },
+    methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' },
+  });
+  assert.match(block, /<AUTHORITATIVE_METHOD_TARGET>/);
+  assert.match(block, /current request concerns hot Kalita/);
+  assert.doesNotMatch(block, /user used hot Kalita/, 'a recipe request is not proof of a past brew');
+  assert.ok(block.lastIndexOf('<AUTHORITATIVE_METHOD_TARGET>') > block.lastIndexOf('<TRUSTED_METHOD_BINDING>'));
+  assert.deepEqual(methodBindingTriggers({ reply: 'Use the Aiden recipe instead.', binding: { status: 'locked', slot: 'kalita_hot' } }).map((item) => item.code), ['RT6_METHOD_CONTRADICTION']);
+  assert.deepEqual(methodBindingTriggers({ reply: 'For the Kalita, was it thin but clean or sour?', binding: { status: 'locked', slot: 'kalita_hot' } }), []);
+});
+test('tools expose reads, trial review, and proposal but no mutation', async () => {
+  const calls = [];
+  const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });
+  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
+  const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
+  const changeSchema = proposalSchema.properties.change.anyOf.find((schema) => schema.type === 'object');
+  assert.deepEqual(changeSchema.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
+  assert.deepEqual(proposalSchema.properties.servingDoseGrams.anyOf, [{ type: 'number' }, { type: 'null' }]);
+  assert.ok(proposalSchema.required.includes('servingDoseGrams'));
+  assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);
+  assert.deepEqual(proposalSchema.properties.explanation.anyOf, [{ type: 'string' }, { type: 'null' }]);
+  assert.ok(proposalSchema.required.includes('explanation'));
+  assert.deepEqual(tools.definitions.find((definition) => definition.name === 'read_recipe').parameters.properties.slot.enum, ['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
+  const assertStrictSchema = (schema) => {
+    if (schema?.type === 'array') {
+      assert.ok(schema.items, 'every provider array schema must declare items');
+      assertStrictSchema(schema.items);
+    }
+    if (schema?.type === 'object') {
+      assert.equal(schema.additionalProperties, false);
+      assert.deepEqual(schema.required, Object.keys(schema.properties));
+      Object.values(schema.properties).forEach(assertStrictSchema);
+    }
+    if (Array.isArray(schema?.anyOf)) schema.anyOf.forEach(assertStrictSchema);
+  };
+  assertStrictSchema(proposalSchema);
+  assert.equal((await tools.call('resolve_coffee', { reference: 'jar 1' })).coffeeRef, 'c1');
+  const offRotation = await tools.call('resolve_coffee', { reference: 'Rwanda' });
+  assert.equal((await tools.call('read_coffee_evidence', { coffeeRef: offRotation.coffeeRef, windowDays: 14 })).coffee.status, 'available');
+  const evidence = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 }); calls.push(evidence); assert.equal(evidence.coffee.status, 'available');
+  await assert.rejects(() => tools.call('read_coffee_evidence', { coffeeRef: 'c1', uid: 'evil', windowDays: 14 }), /server-bound/);
+});
+test('persisted proposals expose only server-enabled registered actions', async () => {
+  for (const enabled of [false, true]) {
+    const context = { ...base, __ruphusRefs: { c1: 'coffee-1' }, proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+    const tools = createRuphusTools({
+      uid: 'u1', context,
+      proposalActions: enabled ? ['apply_proposal', 'brew_once', 'keep_current', 'delete_account'] : [],
+      readers: { readRecipe: async () => generateV60Recipe({}, { dose: 15 }) },
+      proposalStore: async (input) => ({ id: input.proposalId, status: 'proposed', sourceRevisionId: 'revision-1' }),
+    });
+    await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+    const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'temperature', value: 93 } });
+    assert.equal(result.ok, true);
+    assert.equal(result.artifact.explanation, null);
+    assert.deepEqual(result.artifact.actions, enabled ? ['apply_proposal', 'brew_once', 'keep_current'] : []);
+  }
+});
+test('typed ordinary preview intent can prepare a card after an exact recipe read without agreement', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. What should I try next?', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), sessionId: 'typed-preview', proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const explanation = 'The selected source-backed method fits this brewer and the correction you described.';
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null, explanation });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.type, 'recipe_proposal');
+  assert.deepEqual(result.artifact.actions, []);
+  assert.equal(result.artifact.explanation, explanation);
+  assert.equal(result.artifact.after.explanation, undefined);
+  assert.equal(context.proposalState.proposalIssued, true);
+});
+test('typed preview remains denied for information-only or unbound calls', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const context = { ...structuredClone(base), userText: 'Explain why this V60 recipe works.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information', change: { control: 'grind', value: '4.0' }, experiment: null }), (error) => error.code === 'proposal_timing');
+  const unbound = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(unbound.code, 'proposal_target_required');
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information', change: { control: 'grind', value: '4.0' }, experiment: null }), (error) => error.code === 'proposal_timing');
+  context.proposalState.target = { coffeeRef: 'c2', slot: 'v60_hot' };
+  const mismatch = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(mismatch.code, 'proposal_target_mismatch');
+});
+test('typed preview rejects a stale exact recipe after it changes', async () => {
+  let current = generateV60Recipe({}, { dose: 15 });
+  const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. Try a small adjustment.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => current } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  current = generateV60Recipe({}, { dose: 16 });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null });
+  assert.equal(result.code, 'proposal_target_stale');
+  assert.equal(context.proposalState.proposalIssued, false);
+});
+
+test('ratio preview can carry a validated serving dose without dropping water or timing', async () => {
+  const before = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const context = { ...structuredClone(base), userText: 'Prepare this at 1:15 for two mugs.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'ratio', value: '1:15' }, servingDoseGrams: 30, experiment: null, explanation: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.before.coffeeGrams, 20);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.waterGrams, 450);
+  assert.equal(result.artifact.after.steps.at(-1).waterTotal, 450);
+  assert.equal(result.artifact.after.ratio, '1:15');
+  assert.notDeepEqual(result.artifact.before, result.artifact.after);
+  assert.equal(context.proposalState.proposalIssued, true);
+});
+
+test('serving dose is bounded by the selected brewer and cannot be paired with dose control', async () => {
+  const before = generateV60Recipe({}, { dose: 20 });
+  const context = { ...structuredClone(base), userText: 'Prepare a larger V60.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const tooLarge = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'ratio', value: '1:15' }, servingDoseGrams: 31, experiment: null, explanation: null });
+  assert.equal(tooLarge.ok, false);
+  assert.equal(tooLarge.code, 'unsupported-dose');
+  const bothControls = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, servingDoseGrams: 30, experiment: null, explanation: null });
+  assert.equal(bothControls.ok, false);
+  assert.equal(bothControls.code, 'invalid_proposal_intent');
+});
+
+test('V60 technique previews honor a distinct serving dose', async () => {
+  const before = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const context = { ...structuredClone(base), userText: 'Try a different V60 technique for two mugs.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  const options = await tools.call('read_technique_options', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' });
+  const selected = options.options.find((option) => option.executable);
+  assert.ok(selected);
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: null, servingDoseGrams: 30, experiment: { kind: 'v60_technique', techniqueId: selected.id }, explanation: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.steps.at(-1).waterTotal, result.artifact.after.waterGrams);
+  assert.notEqual(result.artifact.after.technique, before.technique);
+});
+
+test('serving dose can accompany one non-ratio diagnostic control', async () => {
+  const before = generateV60Recipe({}, { dose: 20, grinder: 'fellow-ode-gen2' });
+  const context = { ...structuredClone(base), userText: 'Try a coarser V60 grind for two mugs.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '5.6' }, servingDoseGrams: 30, experiment: null, explanation: null });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifact.after.coffeeGrams, 30);
+  assert.equal(result.artifact.after.grindSize.setting, '5.6');
+  assert.equal(result.artifact.after.steps.at(-1).waterTotal, result.artifact.after.waterGrams);
+});
+test('orchestrator completes an exact-read typed preview with one inert artifact', async () => {
+  const context = { ...structuredClone(base), userText: 'Jar one V60 was sour. Try a small adjustment.', __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'owner', context, readers: { readRecipe: async () => generateV60Recipe({}, { dose: 15 }) } });
+  let calls = 0;
+  const result = await runRuphusTurn({ turnId: 'typed-preview-turn', context, userText: context.userText, tools, emit: () => {}, provider: { runTurn: async () => {
+    calls += 1;
+    return calls === 1
+      ? { toolCalls: [{ callId: 'read', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'v60_hot' } }] }
+      : { toolCalls: [{ callId: 'proposal', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'grind', value: '4.0' }, experiment: null } }] };
+  } } });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(result.artifacts.length, 1);
+  assert.deepEqual(result.artifacts[0].actions, []);
+  assert.equal(calls, 2);
+});
+test('proposal request guidance reaches the provider only after diagnosis and assent', () => {
+  assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: false } }), /RECIPE_REVIEW_REQUEST/);
+  assert.doesNotMatch(buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: false, userAgreed: true } }), /RECIPE_REVIEW_REQUEST/);
+  const block = buildDynamicEvidenceBlock({ proposalState: { diagnosisReady: true, userAgreed: true } });
+  assert.match(block, /Prepare the bounded change or explicitly selected technique experiment/);
+  assert.match(block, /without asking for another yes/);
+  assert.match(block, /native card Start or Save control, not this request, authorizes a change/);
+});
+test('this coffee resolves the current named coffee, then the verified launch coffee', async () => {
+  const readers = { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel' }, { id: 'coffee-2', name: 'Colombia La Esperanza' }] };
+  const launchContext = { ...base, launchCoffeeId: 'c2', __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' }, ledger: { entries: [], namedCoffees: [] } };
+  assert.equal((await createRuphusTools({ uid: 'u1', context: launchContext, readers }).call('resolve_coffee', { reference: 'this coffee' })).coffeeRef, 'c2');
+  const namedContext = { ...launchContext, ledger: { entries: [], namedCoffees: ['El Vergel'] } };
+  assert.equal((await createRuphusTools({ uid: 'u1', context: namedContext, readers }).call('resolve_coffee', { reference: 'current coffee' })).coffeeRef, 'c1');
+});
+test('successful focus resolution is replayed so the next pronoun follows the latest coffee', async () => {
+  const context = { ...base, __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' }, ledger: { entries: [], namedCoffees: [] } };
+  const readers = { listCoffees: async () => [
+    { id: 'coffee-1', name: 'El Vergel', origin: 'Colombia', process: 'washed' },
+    { id: 'coffee-2', name: 'Colombia La Esperanza', origin: 'Colombia', process: 'natural' },
+  ] };
+  const tools = createRuphusTools({ uid: 'u1', context, readers });
+  assert.equal((await tools.call('resolve_coffee', { reference: 'El Vergel' })).coffeeRef, 'c1');
+  assert.equal((await tools.call('resolve_coffee', { reference: 'the other Colombia' })).coffeeRef, 'c2');
+  assert.equal((await tools.call('resolve_coffee', { reference: 'that one' })).coffeeRef, 'c2');
+  assert.deepEqual(context.ledger.namedCoffees, ['El Vergel', 'Colombia La Esperanza']);
+});
+test('ambiguous coffee resolution asks once instead of guessing through another tool round', async () => {
+  let providerCalls = 0; const frames = [];
+  const candidates = [{ name: 'Colombia La Esperanza', process: 'natural' }, { name: 'El Vergel', process: 'washed' }];
+  const result = await runRuphusTurn({ turnId: 'ambiguous', context: base, userText: 'the Colombian one', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'resolve-1', name: 'resolve_coffee', args: { reference: 'the Colombian one' } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['resolve_coffee'], definitions: [], call: async () => ({ ok: false, reason: 'ambiguous', candidates }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'Which do you mean: Colombia La Esperanza, the natural one, or El Vergel, the washed one?');
+  assert.equal(frames.at(-1).type, 'turn_completed'); assert.equal(result.toolCalls, 1);
+  assert.equal(ambiguityClarification([{ name: 'coffeeId-secret' }, { name: 'Safe' }]), 'Which coffee do you mean?');
+});
+test('a successful recipe proposal ends with one truthful review handoff', async () => {
+  let providerCalls = 0; const frames = [];
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const result = await runRuphusTurn({ turnId: 'proposal-complete', context: current, userText: 'Yes, make that change.', provider: { async runTurn() { providerCalls += 1; return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } }], usage: { input_tokens: 10, output_tokens: 2 } }; } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, proposal: { id: 'p1' }, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0', temperature: 94 } } }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1); assert.equal(result.ok, true); assert.equal(result.text, 'Prepared: change the grind from 4.2 to 4.0. Dose, water, and temperature stay the same. Review it before applying.');
+  assert.equal(frames.filter((frame) => frame.type === 'artifact_ready').length, 1); assert.equal(frames.at(-1).type, 'turn_completed');
+  assert.deepEqual(result.artifacts, frames.filter(frame => frame.type === 'artifact_ready').map(frame => frame.artifact), 'Server persistence receives the exact card delivered to the client');
+});
+test('a function-only proposal preserves its rationale before the deterministic handoff', async () => {
+  let providerCalls = 0; const frames = [];
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const explanation = 'The selected source-backed technique fits the brewer you just clarified.';
+  const result = await runRuphusTurn({ turnId: 'proposal-explanation', context: current, userText: 'Try that correction.', provider: { async runTurn() {
+    providerCalls += 1;
+    return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: null, change: { control: 'grind', value: '4.0' }, experiment: null, explanation } }] };
+  } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], explanation, before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0', temperature: 94 } } }) }, emit: (frame) => frames.push(frame) });
+  assert.equal(providerCalls, 1);
+  assert.equal(result.ok, true);
+  assert.match(result.text, new RegExp(`${explanation} Prepared:`));
+  assert.ok(result.text.indexOf(explanation) < result.text.indexOf('Prepared:'));
+  assert.equal(result.artifacts[0].explanation, explanation);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+test('unsafe authority in an explanation still goes through the existing final response check', async () => {
+  let providerCalls = 0;
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const result = await runRuphusTurn({ turnId: 'unsafe-proposal-explanation', context: current, userText: 'Try that correction.', provider: { async runTurn(input) {
+    providerCalls += 1;
+    if (!input.regeneration) return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: '4.0' }, experiment: null, explanation: "I've saved this recipe already." } }] };
+    return { text: 'The recipe is ready for review; nothing is saved.' };
+  } }, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => ({ ok: true, artifact: { type: 'recipe_proposal', id: 'p1', changedPaths: ['grind'], explanation: "I've saved this recipe already.", before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } } }) } });
+  assert.equal(providerCalls, 2);
+  assert.match(result.text, /nothing is saved/i);
+  assert.doesNotMatch(result.text, /I've saved this recipe already/i);
+  assert.equal(result.artifacts[0].explanation, "I've saved this recipe already.");
+});
+test('two evidence rounds can finish with one eligible proposal without another model dispatch', async () => {
+  const calls = []; let modelCalls = 0; const frames = [];
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } };
+  const names = ['resolve_coffee', 'read_recipe', 'propose_recipe_change'];
+  const result = await runRuphusTurn({ turnId: 'final-proposal', context: current, userText: 'Ok update the recipe',
+    provider: { runTurn: async () => ({ toolCalls: [{ name: names[modelCalls++], args: { coffeeRef: 'c1', slot: 'v60_hot' } }], usage: { input_tokens: 10, output_tokens: 2 } }) },
+    tools: { names, definitions: [], call: async name => {
+      calls.push(name);
+      return name !== 'propose_recipe_change' ? { ok: true } : { ok: true, artifact: { id: 'p-final', type: 'recipe_proposal', changedPaths: ['dose'], before: { dose: 13 }, after: { dose: 14 } } };
+    } }, emit: frame => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, names);
+  assert.equal(modelCalls, 3);
+  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+
+test('the final proposal slot cannot bypass agreement, target binding, or the call budget', async () => {
+  for (const scenario of ['no agreement', 'wrong target', 'invalid proposal']) {
+    let modelCalls = 0; let proposalCalls = 0;
+    const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: scenario !== 'no agreement' } };
+    const names = ['resolve_coffee', 'read_recipe', 'propose_recipe_change'];
+    const result = await runRuphusTurn({ turnId: 'final-proposal-rejected', context: current, userText: 'Update recipe',
+      provider: { runTurn: async input => { if (scenario === 'no agreement' && modelCalls === 3) { modelCalls += 1; assert.deepEqual(input.tools, []); return { text: 'We can leave the recipe unchanged for now.' }; } assert.ok(modelCalls < 3, 'no extra model call for invalid target'); return { toolCalls: [{ name: names[modelCalls++], args: { coffeeRef: scenario === 'wrong target' ? 'c2' : 'c1', slot: 'v60_hot' } }], usage: { input_tokens: 10, output_tokens: 2 } }; } },
+      tools: { names, definitions: [], call: async name => { if (name === 'propose_recipe_change') proposalCalls += 1; return { ok: name !== 'propose_recipe_change', code: 'one_change_required' }; } } });
+    assert.equal(modelCalls, scenario === 'no agreement' ? 4 : 3);
+    assert.equal(proposalCalls, scenario === 'invalid proposal' ? 1 : 0);
+    assert.equal(result.artifacts?.length || 0, 0);
+    if (scenario === 'invalid proposal') { assert.equal(result.ok, false); assert.equal(result.code, 'one_change_required'); assert.equal(result.text, ''); }
+    else assert.equal(result.ok, scenario === 'no agreement');
+  }
+});
+
+test('proposal candidates treat null schema fields as unchanged recipe values', async () => {
+  const before = generateV60Recipe({}, { dose: 15 }); const saved = [];
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's1' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => { saved.push(input); return { id: 'p1', ...input }; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { method: null, device: null, mode: null, dose: null, water: null, grindSize: { setting: 4, microns: null, description: null, grinderSpecific: null, sourceExact: null } } });
+  assert.equal(result.ok, true); assert.equal(saved.length, 1); assert.equal(saved[0].after.dose, before.dose); assert.equal(saved[0].after.grindSize.setting, 4);
+  assert.deepEqual(result.artifact.changedPaths, ['grindSize.setting']);
+});
+test('proposal candidates allow mirrored fields for one user-facing control but reject two controls', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's1' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => ({ id: 'p1', ...input }) });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const mirroredGrind = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { grind: 'Ode 4.0', grindSize: { setting: 4 } } });
+  assert.equal(mirroredGrind.ok, true);
+  const secondContext = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's2' };
+  const secondTools = createRuphusTools({ uid: 'u1', context: secondContext, readers: { readRecipe: async () => before } });
+  await secondTools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const multipleControls = await secondTools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: { dose: 16, grindSize: { setting: 4 } } });
+  assert.equal(multipleControls.code, 'one_change_required');
+});
+test('proposal tool maps one explicit control into a complete executable recipe', async () => {
+  const before = generateV60Recipe({}, { dose: 15 }); const saved = [];
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 's3' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => { saved.push(input); return { id: 'p1', ...input }; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: 'Ode 4.0' } });
+  assert.equal(result.ok, true);
+  assert.equal(saved[0].after.grindSize.setting, '4.0');
+  assert.deepEqual(result.artifact.changedPaths, ['sourceLineage.status', 'sourceLineage.adaptation', 'sourceLineage.changedFields', 'sourceLineage.parameterSources.grind', 'grindSize.setting']);
+});
+test('dose proposal regenerates every executable alias and timed instruction from the new dose', async () => {
+  const source = generateV60Recipe({}, { dose: 15 });
+  const before = { ...source, dose: 15, userCoffeeGrams: 15, water: source.waterGrams, prepSteps: source.prepSteps.map((step) => ({ ...step })) };
+  const saved = [];
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId: 'dose-canonical' };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before }, proposalStore: async (input) => { saved.push(input); return { id: 'p-dose', ...input }; } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'dose', value: 16 } });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.artifact.changedPaths, ['dose']);
+  assert.equal(saved[0].after.coffeeGrams, 16);
+  assert.equal(saved[0].after.userCoffeeGrams, 16);
+  assert.equal(saved[0].after.dose, 16);
+  assert.equal(saved[0].after.waterGrams, before.waterGrams);
+  assert.equal(saved[0].after.water, saved[0].after.waterGrams);
+  assert.notEqual(saved[0].after.ratio, before.ratio);
+  assert.equal(saved[0].after.steps.at(-1).waterTotal, saved[0].after.waterGrams);
+  assert.match(saved[0].after.prepSteps[1].action, /Add 16g coffee/);
+  assert.doesNotMatch(JSON.stringify(saved[0].after), /15g/);
+  assert.equal(saved[0].after.steps.some((step) => /15g/.test(step.action)), false);
+});
+test('Kalita water proposal keeps the ratio, aliases, and final pour consistent', async () => {
+  const source = generateKalitaRecipe({ targetRatio: 215 / 13 }, { dose: 13, size: '155' });
+  const before = { ...source, water: source.waterGrams, dose: 13 };
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, proposalState: { target: null, diagnosisReady: true, userAgreed: true } };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot' });
+  const result = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'water', value: 205 } });
+  assert.equal(result.ok, true);
+  const after = result.artifact.after;
+  assert.equal(after.waterGrams, 205);
+  assert.equal(after.water, 205);
+  assert.equal(after.ratio, '1:15.8');
+  assert.equal(after.coffeeGrams, 13);
+  assert.deepEqual(after.waterTemp, before.waterTemp);
+  assert.deepEqual(after.grindSize, before.grindSize);
+  assert.deepEqual(after.steps.slice(0, -1), before.steps.slice(0, -1));
+  assert.equal(after.steps.at(-1).waterTotal, 205);
+  assert.match(after.steps.at(-1).action, /205g total/);
+  assert.doesNotMatch(after.steps.at(-1).action, /215g/);
+  assert.equal(before.waterGrams, 215);
+});
+test('conditional sensory diagnosis cannot mint proposal authority', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: {
+    target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false,
+    diagnosis: { conditional: true, pendingClarification: { kind: 'sensory', question: 'Was the cup sour or bitter?' } },
+  } };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
+  await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  await assert.rejects(() => tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 16 } }), (error) => error.code === 'proposal_timing');
+  assert.equal(current.proposalState.proposalIssued, false);
+});
+test('proposal handoff names the exact change and makes review authority explicit', () => {
+  assert.equal(proposalHandoff({ changedPaths: ['dose'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2', temperature: 94 }, after: { coffeeGrams: 16, waterGrams: 250, grind: '4.2', temperature: 94 } }), 'Try a 1:15.6 ratio instead of 1:16.7. That changes your dose from 15 g to 16 g for the same water. Open the recipe to choose your dose and review the pours; nothing is saved yet.');
+  assert.equal(proposalHandoff({ changedPaths: ['water'], before: { coffeeGrams: 13, waterGrams: 215, ratio: '1:16.53846153846154', grind: '5.8', temperature: 96 }, after: { coffeeGrams: 13, waterGrams: 202, ratio: '1:15.538461538461538', grind: '5.8', temperature: 96 } }), "Try a 1:15.5 ratio instead of 1:16.5. At your current 13 g dose, that's 202 g of water. Open the recipe to choose your dose and review the pours; nothing is saved yet.");
+  assert.match(proposalHandoff({ changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } }), /change the grind from 4\.2 to 4\.0/);
+  assert.match(proposalHandoff({ explanation: 'Your saved Switch recipe needs a valve.', changedPaths: ['grind'], before: { coffeeGrams: 15, waterGrams: 250, grind: '4.2' }, after: { coffeeGrams: 15, waterGrams: 250, grind: '4.0' } }), /^Your saved Switch recipe needs a valve\. Prepared:/);
+});
+test('the same recipe advice is idempotent within one session but distinct across chats', async () => {
+  const before = generateV60Recipe({}, { dose: 15 });
+  const propose = async (sessionId) => {
+    const current = { ...base, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false }, sessionId };
+    const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async () => before } });
+    await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+    return tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: '4.0' } });
+  };
+  const first = await propose('chat-1');
+  const replay = await propose('chat-1');
+  const anotherChat = await propose('chat-2');
+  assert.equal(first.artifact.id, replay.artifact.id);
+  assert.notEqual(first.artifact.id, anotherChat.artifact.id);
+});
+test('orchestrator buffers text, rejects premature proposal, and regenerates one runtime trigger', async () => {
+  const frames = []; let runs = 0;
+  const provider = { async runTurn() { runs += 1; return runs === 1 ? { text: 'Proposal: {"dose":16}' } : { text: 'Try one step finer than Ode 4.2.' }; } };
+  const tools = createRuphusTools({ uid: 'u1', context: base });
+  const result = await runRuphusTurn({ turnId: 't1', context: base, userText: 'Go ahead and make that change.', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true); assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 1); assert.equal(frames.find((frame) => frame.type === 'text_delta').text, 'Try one step finer than Ode 4.2.'); assert.equal(result.trace.regenerations.length, 1);
+});
+test('orchestrator regenerates a reply that contradicts the user-locked brewer', async () => {
+  let runs = 0;
+  const context = { ...base, methodBinding: { status: 'locked', slot: 'kalita_hot', displayName: 'hot Kalita', source: 'M1' }, trace: { focusChanges: [], reads: [], regenerations: [] } };
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs === 1) return { text: 'Use the Aiden recipe instead.' };
+    assert.match(input.correctiveInstruction, /current request is bound to hot Kalita/);
+    return { text: 'For that Kalita cup, was it thin but clean, or sour and sharp?' };
+  } };
+  const result = await runRuphusTurn({ turnId: 'locked-method', context, userText: 'I used the Kalita 155 and it tasted watery.', provider, tools: createRuphusTools({ uid: 'u1', context }) });
+  assert.equal(result.text, 'For that Kalita cup, was it thin but clean, or sour and sharp?');
+  assert.equal(runs, 2);
+  assert.deepEqual(result.trace.regenerations[0].triggers, ['RT6_METHOD_CONTRADICTION']);
+});
+test('method correction can explicitly retire the old brewer without a false contradiction retry', async () => {
+  const binding = { status: 'locked', slot: 'v60_hot', displayName: 'hot V60', source: 'M1' };
+  for (const reply of ['Got it—V60, not Kalita.', 'V60 rather than the Kalita—was it muted?', 'You used the V60 instead of your Kalita.']) {
+    assert.deepEqual(methodBindingTriggers({ reply, binding }), [], reply);
+  }
+  for (const reply of ['Use the Kalita instead.', 'Not Kalita. Use Aiden instead.', 'I am not sure whether Kalita would help.', 'Try iced V60 instead of the hot V60.']) {
+    assert.ok(methodBindingTriggers({ reply, binding }).length, reply);
+  }
+  let calls = 0;
+  const context = { ...base, methodBinding: binding, trace: { focusChanges: [], reads: [], regenerations: [] } };
+  const reply = 'Got it—V60, not Kalita. Did it feel thin and clean, or dull and muted?';
+  const result = await runRuphusTurn({ turnId: 'negative-method-correction', context, userText: 'Actually I brewed it on the V60 this morning.', provider: { async runTurn() { calls += 1; return { text: reply }; } }, tools: createRuphusTools({ uid: 'u1', context }) });
+  assert.equal(result.text, reply);
+  assert.equal(calls, 1);
+  assert.deepEqual(result.trace.regenerations, []);
+});
+test('a premature proposal becomes normal advice without dispatch or interruption', async () => {
+  const frames = []; let runs = 0; let dispatched = 0;
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs === 1) return { toolCalls: [{ callId: 'too-soon', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', change: { control: 'grind', value: 4 } } }] };
+    assert.equal(input.toolResult.results[0].result.code, 'proposal_timing');
+    assert.equal(input.regeneration, true);
+    assert.deepEqual(input.tools, []);
+    assert.match(input.correctiveInstruction, /not authorized yet/i);
+    assert.match(input.correctiveInstruction, /If the symptom is only watery, weak, or watered down/);
+    assert.match(input.correctiveInstruction, /ask one short sensory question/);
+    return { text: 'For this V60, try one small grind step finer first.' };
+  } };
+  const current = { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: false, proposalIssued: false } };
+  const result = await runRuphusTurn({ turnId: 'premature-proposal', context: current, userText: 'the V60', provider, tools: { names: ['propose_recipe_change'], definitions: [], call: async () => { dispatched += 1; } }, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.equal(result.text, 'For this V60, try one small grind step finer first.');
+  assert.equal(dispatched, 0);
+  assert.equal(frames.some((frame) => frame.type === 'artifact_ready'), false);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+test('method correction permanently drops the launch hint before evidence resolution', async () => {
+  const current = { ...base, launchCoffeeId: 'c1', launchContext: { surface: 'recipe_aiden', launchItem: { kind: 'recipe', ref: 'recipe-1', method: 'aiden' } }, userText: 'Actually, I used v60', __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'recipe-1', method: 'aiden' } }, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map() };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readCoffee: async () => ({ name: 'El Vergel' }), readRecipe: async () => [{ slotKey: 'v60_hot', dose: 15 }], readBrews: async () => [], readTastings: async () => [] } });
+  const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', windowDays: 14 });
+  assert.equal(result.method.slot, 'v60_hot'); assert.equal(current.__ruphusLaunchHintConsumed, true);
+});
+
+test('same-coffee evidence carries the verified method focus until correction or switch', async () => {
+  const evidenceWindow = { windowDays: 14, now: Date.parse('2026-09-01T00:00:00Z') };
+  const current = {
+    ...base,
+    launchCoffeeId: 'c1',
+    launchContext: { surface: 'recipe_kalita', launchItem: { kind: 'recipe', ref: 'recipe-kalita', method: 'kalita_hot' } },
+    __ruphusLaunchHintConsumed: false,
+    __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'recipe-kalita', method: 'kalita_hot' } },
+    __ruphusRefs: { c1: 'coffee-1', c2: 'coffee-2' },
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel', jarSlot: 1 }, { refKey: 'c2', name: 'Colombia La Esperanza', jarSlot: 2 }], refs: { c1: 'coffee-1', c2: 'coffee-2' } },
+    __ruphusEvidenceByteCap: 4096,
+    __ruphusResolvedTargets: new Map(),
+    proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false },
+  };
+  const readers = {
+    readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Colombia La Esperanza' : 'El Vergel' }),
+    readRecipe: async ({ coffeeId, slotKey, windowDays }) => {
+      const slot = slotKey || (coffeeId === 'coffee-2' ? 'v60_hot' : 'v60_hot');
+      const recipe = slot === 'kalita_hot' ? generateKalitaRecipe({}, { dose: 15 }) : generateV60Recipe({}, { dose: 15 });
+      if (windowDays === undefined) return { ...recipe, slotKey: slot };
+      return [{ ...generateV60Recipe({}, { dose: 15 }), slotKey: 'v60_hot' }, { ...generateKalitaRecipe({}, { dose: 15 }), slotKey: 'kalita_hot' }];
+    },
+    readBrews: async () => [{ slotKey: 'v60_hot', updatedAt: '2026-08-30T00:00:00Z' }],
+    readTastings: async () => [],
+  };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers });
+  current.userText = 'Tell me about this coffee.';
+  const first = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', ...evidenceWindow });
+  assert.equal(first.method.slot, 'kalita_hot'); assert.equal(first.method.tier, 'M1b');
+  assert.deepEqual(current.ledger.entries.at(-1).methodFocus, { displayName: 'hot Kalita' });
+  current.userText = 'What should I change?';
+  const continued = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', ...evidenceWindow });
+  assert.equal(continued.method.slot, 'kalita_hot'); assert.equal(continued.method.tier, 'M2');
+  current.proposalState.target = { coffeeRef: 'c1', slot: 'kalita_hot' };
+  const proposal = await tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', change: { control: 'grind', value: 4 } });
+  assert.equal(proposal.ok, true);
+  current.userText = 'Actually, I used the V60 this morning.';
+  const corrected = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', ...evidenceWindow });
+  assert.equal(corrected.method.slot, 'v60_hot');
+  assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.methodFocus?.displayName === 'hot Kalita'), false);
+  current.userText = 'Now the other coffee.';
+  const switched = await tools.call('read_coffee_evidence', { coffeeRef: 'c2', ...evidenceWindow });
+  assert.notEqual(switched.method.slot, 'kalita_hot');
+  assert.equal(current.ledger.entries.some((entry) => entry.kind === 'method_focus' && entry.namedCoffees?.includes('El Vergel')), false);
+});
+
+test('a switched coffee keeps its explicit brewer on follow-up even without a saved matching recipe', async () => {
+  const current = { ...base, launchCoffeeId: 'c1', __ruphusLaunchHintConsumed: true,
+    __ruphusRefs: { c1: 'coffee-1', c3: 'coffee-3' },
+    rotationSnapshot: { coffees: [{ refKey: 'c1', name: 'El Vergel' }, { refKey: 'c3', name: 'Rwanda', recipes: ['aiden', 'kalita_hot'] }], refs: { c1: 'coffee-1', c3: 'coffee-3' } },
+    ledger: { entries: [{ kind: 'method_focus', status: 'available', namedCoffees: ['Rwanda'], methodFocus: { displayName: 'hot V60' } }] },
+    userText: 'Thin but sweet and clean',
+  };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: {
+    readCoffee: async () => ({ id: 'coffee-3', name: 'Rwanda' }),
+    readRecipe: async () => [{ ...generateKalitaRecipe({}, { dose: 15 }), slotKey: 'kalita_hot' }],
+    readBrews: async () => [], readTastings: async () => [],
+  } });
+  const result = await tools.call('read_coffee_evidence', { coffeeRef: 'c3', windowDays: 14 });
+  assert.equal(result.method.slot, 'v60_hot');
+  assert.equal(result.method.tier, 'M2');
+  assert.equal(result.method.ask, undefined);
+  assert.equal(current.ledger.entries.at(-1).methodFocus.displayName, 'hot V60');
+});
+
+test('direct recipe read carries the verified matching launch revision', async () => {
+  const seen = [];
+  const current = { ...base, launchCoffeeId: 'c1', __ruphusLaunchHintConsumed: false, __ruphusLaunchContext: { launchItem: { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' } }, __ruphusRefs: { c1: 'coffee-1' }, __ruphusResolvedTargets: new Map(), proposalState: { target: null, diagnosisReady: true, userAgreed: true, proposalIssued: false } };
+  const tools = createRuphusTools({ uid: 'u1', context: current, readers: { readRecipe: async (input) => { seen.push(input); return { method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250 }; } } });
+  const result = await tools.call('read_recipe', { coffeeRef: 'c1', slot: 'v60_hot' });
+  assert.equal(result.recipe.dose, 15);
+  assert.deepEqual(seen[0].launchItem, { kind: 'recipe', ref: 'rev-1', method: 'v60_hot' });
+  assert.deepEqual(current.proposalState.target, { coffeeRef: 'c1', slot: 'v60_hot' });
+});
+
+test('RT3 delivers regenerated length/markup text and carries corrective instruction plus all tool evidence', async () => {
+  const frames = []; let runs = 0; const seen = [];
+  const evidence = { name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 }, coffee: 'El Vergel', records: [{ id: 'brew-1', dose: 15 }] };
+  const tools = { names: ['read_coffee_evidence'], definitions: [], call: async (name, args) => ({ ...evidence, name, args }) };
+  const provider = { async runTurn(input) {
+    seen.push(input); runs += 1;
+    if (runs === 1) return { toolCalls: [{ callId: 'read-1', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } }] };
+    if (runs === 2) return { text: 'Proposal: {"dose":16}' };
+    assert.equal(input.regeneration, true);
+    assert.match(input.correctiveInstruction, /fresh complete reply/i);
+    assert.deepEqual(input.priorToolEvidence, [{ callId: 'read-1', name: 'read_coffee_evidence', result: evidence }]);
+    assert.deepEqual(input.toolResult.results, input.priorToolEvidence);
+    return { text: '```regenerated but explicitly delivered```' };
+  } };
+  const result = await runRuphusTurn({ turnId: 'rt3-mixed', context: base, userText: 'What should I change?', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.equal(result.text, '```regenerated but explicitly delivered```');
+  assert.equal(frames.find((frame) => frame.type === 'text_delta').text, result.text);
+  assert.deepEqual(result.trace.regenerations[0].secondFailure, ['RT2_MARKUP']);
+  assert.equal(result.trace.regenerations[0].delivered, 'regenerated');
+  assert.equal(seen.length, 3);
+});
+
+test('short credential-shaped secrets trigger RT2 and replace a severe second failure', async () => {
+  assert.ok(runtimeTriggers({ reply: 'The key is sk-short.' }).some((item) => item.code === 'CF5_SECRET'));
+  const frames = []; let runs = 0;
+  const provider = { async runTurn() { runs += 1; return { text: runs === 1 ? 'sk-short' : 'pk-worse' }; } };
+  const result = await runRuphusTurn({ turnId: 'secret-short', context: base, userText: 'Help', provider, tools: createRuphusTools({ uid: 'u1', context: base }), emit: (frame) => frames.push(frame) });
+  assert.equal(result.text, '');
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'response_validation_failed');
+  assert.equal(frames.filter((frame) => frame.type === 'text_delta').length, 0);
+  assert.deepEqual(result.trace.regenerations[0].secondFailure, ['CF5_SECRET']);
+  assert.equal(result.trace.regenerations[0].delivered, 'failed');
+});
+
+test('internal drafting notes trigger RT2 and replace a severe second failure', async () => {
+  assert.ok(runtimeTriggers({ reply: 'Snapshot says the current recipe is unknown. Need no generic question. final.' }).some((item) => item.code === 'CF5_DRAFT_LEAK'));
+  const context = { ...base, trace: { focusChanges: [], reads: [], regenerations: [] }, proposalState: { target: null, diagnosisReady: false, userAgreed: false, proposalIssued: false } };
+  const provider = { runTurn: async ({ regeneration }) => ({ text: regeneration ? 'No tool until agreement. final.' : 'Snapshot says Ode 4.2. Need no generic question. final.', toolCalls: [], usage: { input_tokens: 10, output_tokens: 10 } }) };
+  const result = await runRuphusTurn({ turnId: 'draft-leak', context, userText: 'What should I change?', provider, tools: { definitions: [], call: async () => ({}) }, send: () => {} });
+  assert.equal(result.text, '');
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'response_validation_failed');
+  assert.deepEqual(result.trace.regenerations[0].secondFailure, ['CF5_DRAFT_LEAK']);
+});
+
+test('unavailable evidence cannot be turned into an absence claim', async () => {
+  const frames = []; let runs = 0;
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs === 1) return { toolCalls: [{ callId: 'read-1', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } }] };
+    if (runs === 2) return { text: "I don't have a tasting note from that cup." };
+    assert.equal(input.regeneration, true);
+    assert.match(input.correctiveInstruction, /source was unavailable/i);
+    return { text: "I couldn't check the tasting notes just now. The brew log still gives us enough to start with one small grind step finer." };
+  } };
+  const tools = { names: ['read_coffee_evidence'], definitions: [], call: async () => ({ coffeeRef: 'c1', tastings: { status: 'unavailable', summary: "I couldn't check tastings right now." }, unavailable: ['tastings'] }) };
+  const result = await runRuphusTurn({ turnId: 'unavailable-truth', context: base, userText: 'What went wrong?', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.match(result.text, /couldn't check the tasting notes/i);
+  assert.deepEqual(result.trace.regenerations[0].triggers, ['EVIDENCE_SCOPE']);
+  assert.equal(frames.at(-1).type, 'turn_completed');
+});
+
+test('proposal eligibility is exact-target scoped and one proposal per round is atomic', async () => {
+  const unrelated = { ...base, proposalState: { target: { coffeeRef: 'c2', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } };
+  assert.equal(proposalEligibleForTarget(unrelated, { coffeeRef: 'c1', slot: 'v60_hot' }), false);
+  assert.equal(proposalEligibleForTarget({ ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } }, { coffeeRef: 'c1', slot: 'v60_hot' }), true);
+  const exactRead = { ...base, __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]), proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: false, userAgreed: false } };
+  assert.equal(proposalEligibleForTarget(exactRead, { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' }), true);
+  assert.equal(proposalEligibleForTarget(exactRead, { coffeeRef: 'c1', slot: 'v60_hot', intent: 'information' }), false);
+  let dispatched = 0; const frames = [];
+  const tools = { names: ['propose_recipe_change'], definitions: [], call: async () => { dispatched += 1; return { ok: true }; } };
+  const provider = { async runTurn() { return { toolCalls: [
+    { callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } },
+    { callId: 'proposal-2', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', afterRecipe: {} } },
+  ] }; } };
+  const result = await runRuphusTurn({ turnId: 'proposal-atomic', context: { ...base, proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, diagnosisReady: true, userAgreed: true } }, userText: 'Yes', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, false); assert.equal(result.code, 'proposal_timing'); assert.equal(dispatched, 0); assert.equal(frames.at(-1).type, 'turn_interrupted');
+});
+
+test('parallel tool calls start before either Promise settles and preserve completion order in frames', async () => {
+  const frames = []; const started = []; const deferred = new Map(); let continuation;
+  const tools = { names: ['read_coffee_evidence'], definitions: [], call: async (_name, args) => {
+    started.push(args.coffeeRef);
+    return new Promise((resolve) => deferred.set(args.coffeeRef, resolve));
+  } };
+  const provider = { async runTurn(input) {
+    if (input.toolResult) { continuation = input.toolResult.results; return { text: 'evidence checked' }; }
+    return { toolCalls: [
+      { callId: 'read-a', name: 'read_coffee_evidence', args: { coffeeRef: 'a', windowDays: 14 } },
+      { callId: 'read-b', name: 'read_coffee_evidence', args: { coffeeRef: 'b', windowDays: 14 } },
+    ] };
+  } };
+  const run = runRuphusTurn({ turnId: 'parallel-round', context: base, userText: 'Compare these', provider, tools, emit: (frame) => frames.push(frame) });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(started, ['a', 'b']);
+  deferred.get('b')({ coffeeRef: 'b' }); await new Promise((resolve) => setImmediate(resolve));
+  deferred.get('a')({ coffeeRef: 'a' });
+  const result = await run;
+  assert.equal(result.ok, true); assert.equal(continuation.length, 2);
+  const resultFrames = frames.filter((frame) => frame.type === 'tool_result');
+  assert.deepEqual(resultFrames.map((frame) => frame.result.coffeeRef), ['b', 'a']);
+});
+
+test('a redundant read beyond the tool-round budget recovers to prose without dispatch', async () => {
+  const frames = []; let runs = 0; const dispatched = [];
+  const provider = { async runTurn(input) {
+    runs += 1;
+    if (runs <= 3) return { toolCalls: [{ callId: `read-${runs}`, name: runs === 1 ? 'resolve_coffee' : runs === 2 ? 'read_coffee_evidence' : 'read_recipe', args: runs === 1 ? { reference: 'El Vergel' } : runs === 2 ? { coffeeRef: 'c1', windowDays: 14 } : { coffeeRef: 'c1', slot: 'v60_hot' } }] };
+    assert.equal(input.regeneration, true);
+    assert.deepEqual(input.tools, []);
+    assert.equal(input.toolResult.results[0].result.code, 'read_budget_complete');
+    return { text: 'Try one small grind step finer and keep everything else the same.' };
+  } };
+  const tools = { names: ['resolve_coffee', 'read_coffee_evidence', 'read_recipe'], definitions: [], call: async (name) => { dispatched.push(name); return { ok: true, coffeeRef: 'c1' }; } };
+  const result = await runRuphusTurn({ turnId: 'read-round-recovery', context: base, userText: 'What should I change?', provider, tools, emit: (frame) => frames.push(frame) });
+  assert.equal(result.ok, true);
+  assert.equal(result.text, 'Try one small grind step finer and keep everything else the same.');
+  assert.deepEqual(dispatched, ['resolve_coffee', 'read_coffee_evidence']);
+  assert.equal(frames.some((frame) => frame.type === 'turn_interrupted'), false);
+});
+
+test('serving resize handoff does not claim an unchanged ratio changed or water stayed fixed', () => {
+  const text = proposalHandoff({ changedPaths: ['coffeeGrams'], before: { coffeeGrams: 20, waterGrams: 200, iceGrams: 100, ratio: 15 }, after: { coffeeGrams: 18, waterGrams: 180, iceGrams: 90, ratio: 15 } });
+  assert.match(text, /Scaled to 18 g coffee at the same 1:15 ratio/);
+  assert.doesNotMatch(text, /instead of|same water/);
+});
+
+test('already matching recipe values produce information without a corrective proposal', async () => {
+  const context = { ...structuredClone(base), conversation: [],
+    __ruphusResolvedTargets: new Map([['c1:kalita_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let calls = 0;
+  const result = await runRuphusTurn({ turnId: 'no-change-information', context, userText: 'Use 205 F', emit: () => {},
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => ({ ok: false, code: 'no_recipe_change' }) },
+    provider: { async runTurn(input) {
+      calls += 1;
+      if (calls === 1) return { toolCalls: [{ callId: 'same-temperature', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'temperature', value: 96.1 } } }] };
+      assert.deepEqual(input.tools, []);
+      assert.match(input.correctiveInstruction, /successful no-change outcome/);
+      return { text: 'The preview already uses 205°F. Your saved recipe is unchanged.' };
+    } },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(calls, 2);
+  assert.deepEqual(result.artifacts, []);
+});
+
+test('one expected proposal validation failure gets one bounded correction and card', async () => {
+  const context = {
+    ...structuredClone(base),
+    userText: 'Make the dose 30g for this V60.',
+    __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0;
+  let proposalCalls = 0;
+  const artifact = {
+    type: 'recipe_proposal', id: 'proposal-1', before: { coffeeGrams: 20, waterGrams: 300 },
+    after: { coffeeGrams: 30, waterGrams: 450 }, changedPaths: ['dose'], actions: [],
+  };
+  const tools = {
+    names: ['read_coffee_evidence', 'read_technique_options', 'propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }],
+    call: async (name) => {
+      if (name !== 'propose_recipe_change') return { ok: true };
+      proposalCalls += 1;
+      return proposalCalls === 1
+        ? { ok: false, code: 'unsupported-dose-profile', message: 'The first derived profile needs one bounded correction.' }
+        : { ok: true, artifact };
+    },
+  };
+  const result = await runRuphusTurn({
+    turnId: 'proposal-correction', context, userText: context.userText, tools,
+    provider: { async runTurn(input) {
+      providerCalls += 1;
+      if (providerCalls === 1) return { toolCalls: [
+        { callId: 'evidence', name: 'read_coffee_evidence', args: { coffeeRef: 'c1', windowDays: 14 } },
+        { callId: 'options', name: 'read_technique_options', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview' } },
+      ] };
+      if (providerCalls === 2) return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+      assert.equal(input.regeneration, true);
+      assert.deepEqual(input.tools.map((definition) => definition.name), ['propose_recipe_change']);
+      assert.match(input.correctiveInstruction, /one corrected proposal/i);
+      return { toolCalls: [{ callId: 'proposal-2', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+    } },
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(providerCalls, 3);
+  assert.equal(proposalCalls, 2);
+  assert.equal(result.artifacts.length, 1);
+  assert.equal(result.artifacts[0].id, 'proposal-1');
+});
+
+test('a repeated expected proposal failure stops after one replacement attempt', async () => {
+  const context = {
+    ...structuredClone(base),
+    userText: 'Make the dose 30g for this V60.',
+    __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0;
+  let proposalCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'proposal-correction-limit', context, userText: context.userText,
+    provider: { async runTurn(input) {
+      providerCalls += 1;
+      if (providerCalls > 1) assert.equal(input.regeneration, true);
+      return { toolCalls: [{ callId: `proposal-${providerCalls}`, name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+    } },
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => {
+      proposalCalls += 1;
+      return { ok: false, code: 'unsupported-dose-profile', message: 'No bounded correction exists.' };
+    } },
+    emit: () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'unsupported-dose-profile');
+  assert.match(result.text, /saved recipe is unchanged/);
+  assert.equal(providerCalls, 2);
+  assert.equal(proposalCalls, 2);
+  assert.equal(result.artifacts.length, 0);
+});
+
+test('proposal transport failure does not enter the business correction path', async () => {
+  const context = {
+    ...structuredClone(base),
+    __ruphusResolvedTargets: new Map([['c1:v60_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'recipe-hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'v60_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0;
+  const result = await runRuphusTurn({
+    turnId: 'proposal-transport-failure', context, userText: 'Make the dose 30g for this V60.',
+    provider: { async runTurn() {
+      providerCalls += 1;
+      return { toolCalls: [{ callId: 'proposal-1', name: 'propose_recipe_change', args: { coffeeRef: 'c1', slot: 'v60_hot', intent: 'recipe_preview', change: { control: 'dose', value: 30 }, experiment: null, explanation: null } }] };
+    } },
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => { throw Object.assign(new Error('provider unavailable'), { code: 'provider_unavailable' }); } },
+    emit: () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'provider_unavailable');
+  assert.equal(providerCalls, 1);
+});

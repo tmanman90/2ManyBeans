@@ -243,7 +243,7 @@ export const ScanSheet = ({ open, onClose, onBeanCreated, onManualEntry, uid, ad
       onBeanCreated(beanId, savedBean);
     } catch (err) {
       if (thisGen !== genCounter.current) return;
-      if (handlePaywallError(err, openPaywall)) {
+      if (handlePaywallError(err, openPaywall, 'scan_cap')) {
         setStep('photo');
         return;
       }

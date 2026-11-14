@@ -9,7 +9,7 @@
 // pending (real photos render as-is on the white card for now).
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight, Settings2 } from 'lucide-react';
+import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight, Settings2, MessageCircle } from 'lucide-react';
 import { splitTastingNotes } from '../lib/tastingHero';
 import { AnimatePresence, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
 import { m, spring } from '../lib/motion';
@@ -21,6 +21,7 @@ import { getBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { tastingIcon, tastingIconImage } from '../lib/tastingIcons';
 import { useStrippedBag, bagPhotoFor } from '../lib/stripBg';
+import { RecipeProvenanceStrip } from './RecipeProvenanceStrip';
 
 // ---- card palette (its own collectible look) ----
 const RED = '#E0241C';
@@ -321,7 +322,7 @@ const RedFrame = ({ children }) => (
   </div>
 );
 
-export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null }) {
+export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClose, onLearn, learnLabel = 'Learn', onAskRuphus, onReturn, onFreeze, onFinish, onEdit, onRestore, onDelete, onOpenTasting, showBrewProfile = false, siblings = null, onNavigate = null, onUndoRecipe = null }) {
   const { preferences } = usePreferences();
   const [flipped, setFlipped] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
@@ -730,6 +731,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                           <div style={{ ...lbl, fontSize: 11, color: INK, marginBottom: 8 }}>Brew Profile</div>
                           {bean.aidenRecipe && (
                             <div style={{ marginBottom: bean.handBrewRecipe ? 10 : 0 }}>
+                              <RecipeProvenanceStrip provenance={bean.recipeProvenance?.aiden} onUndo={onUndoRecipe ? () => onUndoRecipe(bean.recipeProvenance.aiden) : undefined} />
                               <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>Aiden Recipe</div>
                               <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
                                 {[bean.aidenRecipe.ratio && `Ratio ${bean.aidenRecipe.ratio}`, bean.aidenRecipe.bloomTime && `Bloom ${bean.aidenRecipe.bloomTime}`, bean.aidenRecipe.pulseCount && `${bean.aidenRecipe.pulseCount} pulses`, bean.aidenRecipe.grindRecommendation?.singleServe && `Grind ${bean.aidenRecipe.grindRecommendation.singleServe}`].filter(Boolean).join(' · ')}
@@ -738,6 +740,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                           )}
                           {bean.handBrewRecipe && (
                             <div>
+                              {(() => { const slotKey = `${bean.handBrewRecipe.device === 'kalita' ? 'kalita' : 'v60'}_${bean.handBrewRecipe.mode === 'iced' ? 'iced' : 'hot'}`; const provenance = bean.recipeProvenance?.[slotKey]; return <RecipeProvenanceStrip provenance={provenance} onUndo={onUndoRecipe ? () => onUndoRecipe(provenance) : undefined} />; })()}
                               <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>{bean.handBrewRecipe.title || 'Hand Brew'}</div>
                               <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
                                 {[bean.handBrewRecipe.method, bean.handBrewRecipe.coffeeGrams && bean.handBrewRecipe.waterGrams && `${bean.handBrewRecipe.coffeeGrams}g / ${bean.handBrewRecipe.waterGrams}g`, bean.handBrewRecipe.ratio, bean.handBrewRecipe.grindSize?.description && `Grind ${bean.handBrewRecipe.grindSize.description}`].filter(Boolean).join(' · ')}
@@ -755,11 +758,18 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                     <span style={{ fontFamily: G, fontWeight: 700, fontSize: 13, letterSpacing: '0.14em', color: BLUE }}>BACK TO CARD</span>
                   </button>
 
+                  {onAskRuphus && (
+                    <button onClick={() => onAskRuphus(bean)} style={{ width: '100%', background: '#FFF8F0', border: '1.5px solid #B06A2D', borderRadius: 13, padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer', marginTop: 10 }}>
+                      <MessageCircle size={17} color="#9A5824" />
+                      <span style={{ fontFamily: G, fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', color: '#9A5824' }}>ASK PROFESSOR RUPHUS</span>
+                    </button>
+                  )}
+
                   {/* management actions — only those with a handler (e.g. sealed Inventory
                       beans have no "Return"), grid sized to the count so it stays even */}
                   {(() => {
                     const acts = [
-                      onLearn && { icon: <BookOpen size={16} />, label: 'Learn', onClick: () => onLearn(bean) },
+                      onLearn && { icon: <BookOpen size={16} />, label: learnLabel, onClick: () => onLearn(bean) },
                       onFreeze && { icon: <Snowflake size={16} />, label: bean.frozenAt ? 'Frozen' : 'Freeze', onClick: () => onFreeze(bean), active: !!bean.frozenAt },
                       onReturn && { icon: <Undo2 size={16} />, label: 'Return', onClick: () => onReturn(bean) },
                       onRestore && { icon: <RotateCcw size={16} />, label: 'Restore', onClick: () => { if (window.confirm('Move back to inventory?')) onRestore(bean); } },

@@ -13,6 +13,7 @@ import { BREW_DEVICES } from '../lib/brewMethods';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
+import { paywallFlagOn } from '../lib/paywallFlag';
 import { restorePurchases, isRevenueCatAvailable, deriveEntitlements } from '../lib/revenuecat';
 import { PLAN_LABELS } from '../lib/subscriptionConfig';
 import { auth } from '../firebase';
@@ -24,6 +25,7 @@ import { redeemCode } from '../lib/redeemCode';
 import { sanitizeUserText } from '../lib/sanitizeUserText';
 import { reauthenticateForAccountDeletion } from '../lib/reauth';
 import { m, scrim, sheet, popIn } from '../lib/motion';
+import { ruphusClientVersion } from '../lib/ruphus/census';
 
 // Reason-code -> user copy for the inline redeem row. Unknown codes fall
 // back to a generic message. Kept here (consumer) instead of the helper
@@ -179,6 +181,10 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   // Live OTA bundle id — confirms which Capgo bundle is actually running (vs. the
   // static native version), so update delivery can be verified at a glance.
   const [otaBundle, setOtaBundle] = useState(null);
+  // Dev-only paywall variant flag (localStorage 'pw_roast'). See
+  // src/lib/paywallFlag.js — localStorage rather than a build constant so a
+  // device regression can be rolled back instantly.
+  const [pwRoastOn, setPwRoastOn] = useState(() => paywallFlagOn());
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     import('@capgo/capacitor-updater')
@@ -386,6 +392,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
           jarSlot: null,
           atmosSlot: deleteField(),
           openDate: null,
+          clientVersion: ruphusClientVersion(),
+          clientVersionUpdatedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       }
@@ -1371,6 +1379,47 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 >
                   <span style={rowLabelStyle}>Replay onboarding</span>
                 </button>
+                <div style={separatorStyle} />
+                <div
+                  style={{ ...rowStyle, cursor: 'pointer' }}
+                  onClick={() => {
+                    const next = !pwRoastOn;
+                    try {
+                      localStorage.setItem('pw_roast', next ? '1' : '0');
+                    } catch (err) {
+                      console.error('[Dev] pw_roast flag write failed', err);
+                    }
+                    setPwRoastOn(next);
+                    haptic.light();
+                  }}
+                >
+                  <div>
+                    <span style={rowLabelStyle}>Paywall: Roast / Classic</span>
+                    <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3, fontFamily: fonts.body, fontWeight: 500 }}>
+                      {pwRoastOn ? 'Roast (new)' : 'Classic (rollback)'}
+                    </div>
+                  </div>
+                  {/* Refined toggle */}
+                  <div style={{
+                    width: 51, height: 31, borderRadius: radius.pill,
+                    background: pwRoastOn ? C.green : C.cardMuted,
+                    position: 'relative',
+                    transition: `background ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
+                    flexShrink: 0,
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.08)',
+                  }}>
+                    <div style={{
+                      width: 27, height: 27,
+                      borderRadius: '50%',
+                      background: '#fff',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.18)',
+                      position: 'absolute',
+                      top: 2,
+                      left: pwRoastOn ? 22 : 2,
+                      transition: `left ${motionTokens.dur.fast}s ${motionTokens.cssOut}`,
+                    }} />
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -1387,6 +1436,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             marginBottom: 8,
           }}>
             v{__APP_VERSION__}{otaBundle ? ` · OTA ${otaBundle}` : ''}
+            {__APP_VARIANT__ === 'dev' && <div>Dev build {__APP_BUILD_ID__}</div>}
           </div>
 
           {/* --- Account Section --- */}

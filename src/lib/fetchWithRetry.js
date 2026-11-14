@@ -24,13 +24,43 @@ const FRIENDLY_ERRORS = {
   529: 'AI service is temporarily busy, please try again in a moment',
 };
 
+export function authSessionError(error) {
+  const code = error?.code === 'auth/quota-exceeded' || error?.code === 'auth/too-many-requests'
+    ? 'auth_temporarily_limited'
+    : 'auth_session_unavailable';
+  const err = new Error(code === 'auth_temporarily_limited'
+    ? 'Sign-in renewal is temporarily rate-limited. Your message is kept. Please wait a little before retrying.'
+    : 'Your sign-in could not be verified. Your message is kept. Please try again.');
+  err.code = code;
+  return err;
+}
+
+export function chatErrorMessage(error, { agent = false } = {}) {
+  return ['auth_temporarily_limited', 'auth_session_unavailable'].includes(error?.code)
+    ? error.message
+    : agent
+      ? ({
+        provider_timeout: 'The coffee coach took too long to finish. Your message is kept—tap retry.',
+        provider_transport: 'The coffee coach is temporarily unavailable. Your message is kept—tap retry.',
+        provider_unavailable: 'The coffee coach is temporarily unavailable. Your message is kept—tap retry.',
+        provider_rate_limited: 'The coffee coach is busy right now. Your message is kept—try again in a moment.',
+        stream_incomplete: 'The coffee coach stopped before finishing. Your message is kept—tap retry.',
+        malformed_stream: 'The coffee coach returned an incomplete answer. Your message is kept—tap retry.',
+        recipe_artifact_required: 'I couldn’t finish the recipe card. Your message is kept—tap retry.',
+        proposal_target_stale: 'That recipe changed while I was checking it. Your message is kept—tap retry to refresh.',
+        read_timeout: 'I couldn’t check that coffee’s records right now. Your message is kept—tap retry.',
+      }[error?.code] || 'I couldn’t finish that response. Your message is kept—try again.')
+      : "Couldn't reach the AI. Try again in a sec.";
+}
+
 export async function getAuthToken() {
   try {
     const { auth } = await import('../firebase');
     return await auth.currentUser?.getIdToken();
-  } catch {
-    // If token fetch fails, proceed without (server will reject if auth required)
-    return undefined;
+  } catch (error) {
+    // A temporarily unavailable token is not an anonymous session. Preserve
+    // the login and stop here rather than sending doomed unauthenticated calls.
+    throw authSessionError(error);
   }
 }
 
@@ -40,6 +70,8 @@ export function parseTypedError(data, status) {
     err.code = 'reauth_required';
     return err;
   }
+
+  if (status === 401) return authSessionError();
 
   if (status === 403) {
     if (data?.error === 'subscription_required') {

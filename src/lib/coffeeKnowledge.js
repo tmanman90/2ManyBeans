@@ -221,7 +221,48 @@ The user pours water by hand and controls ratio, grind, water temperature,
 bloom, pour schedule, and total brew time directly. The app stores a recipe
 per bean with those parameters plus step-by-step pour times. When dialing in,
 any of these are adjustable. The app's Brew button regenerates the recipe
-with fresh research.
+with fresh research. V60 has two variants in the app: classic (percolation
+only) and Switch (a valve-equipped V60 that can also run immersion — see
+V60 SWITCH below). The classic drainage/drawdown guidance in this file
+applies to the classic V60 only, not the Switch.
+`;
+
+// --- V60 SWITCH KNOWLEDGE ---
+// The Switch is the same V60 cone geometry with a ball valve at the base.
+// Closed, it behaves like an immersion brewer (Clever-style); open, it drains
+// like a classic V60. This block exists because the classic V60 prose above
+// and HANDBREW_POUROVER_KNOWLEDGE below both describe a free-draining,
+// percolation-only cone — accurate for classic V60, wrong for the Switch,
+// whose signature move is a closed-valve steep. Keep tight; feeds prompts.
+export const V60_SWITCH_KNOWLEDGE = `
+V60 SWITCH (valve-equipped V60 — hybrid percolation + immersion, app default 03/360ml):
+- The valve is the primary strength dial, not the pour. Closed = immersion
+  (water pools and steeps like a Clever); open = percolation (drains like a
+  classic V60). ~90% of extraction happens during the closed-valve immersion
+  phase, so valve-close and valve-open are precisely-timed steps, not
+  pour annotations.
+- App default structure (two-pour hybrid, Kasuya/Chronicler-derived): pour 1
+  with the valve OPEN (percolation, ~40-50% of water), close the valve, pour
+  2 to full water (immersion steep), then open the valve to drain. This is
+  different from Hoffmann's Switch recipes, which are immersion-first
+  (closed bloom before any percolation) — do not conflate the two structures
+  when discussing technique.
+- Dual temperature is common and intentional: hotter water for the open
+  percolation phase, a cooler pour (often ~20C lower) for the closed
+  immersion phase, since a long hot steep over-extracts and turns
+  astringent. Light roasts may skip the drop and run both phases hot.
+- Grind runs coarser than a classic V60 on the same bean — roughly one grind
+  step coarser once closed-valve time passes about 60-90 seconds, coarser
+  again for dark roast or anaerobic process, because the immersion phase is
+  far more extraction-efficient than an open percolation pour at the same
+  grind.
+- Drawdown budget: after opening the valve at the end of the steep, budget
+  45s-1:15+ for the bed to fully drain before calling the brew done — this
+  is on top of the steep time, not instead of it.
+- Guardrails: closed bloom (holding the valve shut before any pour) beyond
+  ~60s risks bed clog and multi-minute drawdowns. Hot (>=90C) closed-valve
+  steeps beyond ~2:00 risk astringency — the cooler second pour is the fix,
+  not a shorter steep alone.
 `;
 
 // --- GRINDER KNOWLEDGE ---
@@ -231,13 +272,15 @@ with fresh research.
 // keys. Dynamic USER SETUP block names which blurb is active.
 export const GRINDER_KNOWLEDGE = `
 GRINDERS (micron calibrations per Honest Coffee Guide measured ranges):
-Fellow Ode Gen 2: scale 1-11 with 0.1/0.2 sub-steps (e.g. 4.1, 4.2). Lower
+Fellow Ode Gen 2: 31 physical clicks, labelled whole number, .2, .6 in this app
+  (e.g. 4, 4.2, 4.6, 5). Never suggest nonexistent 4.3 or 5.5. Lower
   number = finer grind. ~275µm at 1, ~88µm per whole number (5 ≈ 630µm,
   6 ≈ 720µm, 7 ≈ 805µm). V60 range roughly 4-6; light roast V60 starts
-  around 4.5. Flat-bed brewers (Kalita) run COARSER: light roast starts
-  5.5-6.5 — the device restricts flow, and dense light washed beans shed
+  around 4.6. Flat-bed brewers (Kalita) run COARSER: light roast starts
+  5.6-6.6 — the device restricts flow, and dense light washed beans shed
   fines that stall the flat bed if ground fine. Note: Aiden light-roast
-  recipes use 3.1-4.0 on the Ode, which is too fine for manual pour-over.
+  recipes may use 3.2-4 on the Ode; do not transfer a setting across brewers
+  without checking the actual recipe and cup feedback.
 Fellow Opus: dial 1-11 with quarter-step clicks. Lower number = finer.
   ~230µm at 1, ~93µm per whole number. Pour-over range about 3-8.5; light
   roast starts around 4.5.
@@ -273,9 +316,12 @@ Brew troubleshooting (apply per brewer):
   pulse temperatures 1-2C; on hand-brew, lower water temp or shorten
   contact.
 - Stalled / choked pour-over (water pooling, drawdown way past target —
-  V60 2:30-3:30, Kalita 3:00-3:45, Chemex 3:30-5:00): grind coarser 0.5-1
-  step. Dense light washed beans on a flat-bed (Kalita) are the classic
-  case — never fix a stall by pouring slower or grinding finer.
+  classic V60 2:30-3:30, Kalita 3:00-3:45, Chemex 3:30-5:00): grind coarser
+  0.5-1 step. Dense light washed beans on a flat-bed (Kalita) are the
+  classic case — never fix a stall by pouring slower or grinding finer.
+  V60 Switch: this target does not apply during a closed-valve steep (the
+  valve is deliberately holding water) — see V60 SWITCH below for its own
+  drawdown budget, which starts only after the valve reopens.
 - Weak / watery / thin: higher dose (stronger ratio, e.g. 1:16 instead of
   1:17).
 - Cup is fine: keep the current recipe.
@@ -300,6 +346,9 @@ export function getOriginContext(origin) {
 // to save ~200 tokens per request while keeping all pour-over-relevant content.
 export const HANDBREW_POUROVER_KNOWLEDGE = `
 POUR-OVER METHODOLOGY (Hoffmann-inspired, Atlas-derived, app-adapted):
+This section describes free-draining percolation brewers (classic V60,
+Kalita, Chemex). The V60 Switch, valve closed, is an immersion brewer
+instead — see V60 SWITCH above for its own bloom/pour/drawdown behavior.
 - Rinse paper filter under hot water (reduces paper taste, warms device). Use bleached white papers.
 - Bloom: Pour ~2x coffee weight in water. Pick up and swirl or stir to wet all grounds. Wait 30-45 seconds (Hoffmann's published V60 recipe blooms ~45s with staged pours; shorter suits darker roasts).
 - Slowly pour remainder of water directly onto coffee bed (NOT the walls). Weigh as you go.

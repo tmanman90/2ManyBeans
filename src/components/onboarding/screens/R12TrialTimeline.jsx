@@ -4,17 +4,31 @@ import { m, listContainer, listItem, spring } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 import { MARKETING_CONSENT_VERSION } from '../onboardingConstants';
+import { readWarmedTrial, trialTimelineSteps } from '../../../lib/trialOffer';
 
-// Copy bank — CREATIVE_SPEC.md §2 R12 (contract law, verbatim).
-const TIMELINE_STEPS = [
-  { day: 'Today', body: 'Everything unlocked. Scan, taste, brew with me at full power.' },
-  { day: 'Day 5', body: "I'll remind you before anything happens. No surprises." },
-  { day: 'Day 7', body: 'Trial ends. Cancel any time before and you pay nothing.' },
+// Copy bank — CREATIVE_SPEC.md §2 R12. The BEAT of each line is contract law;
+// the day NUMBERS are not ours to choose — they come from the introductory
+// offer configured in App Store Connect, read off the offerings warmed at R7
+// (see src/lib/trialOffer.js). Hardcoding them is how we ended up promising a
+// 7-day trial on a 3-day offer.
+const NO_TRIAL_STEPS = [
+  { day: 'Today', body: 'Pick a plan and everything unlocks. Scan, taste, brew with me at full power.' },
+  { day: 'Any time', body: 'Cancel from your Apple account whenever you like. No lock-in.' },
 ];
 
 export default function R12TrialTimeline() {
   const { dispatch, answers } = useOnboarding();
   const [consent, setConsent] = useState(!!answers?.marketingConsent);
+  // Read once per mount: the warmed cache is already settled by R12 (warmed at
+  // R7, gated on at R9), and a mid-screen re-read would swap the copy under
+  // the user.
+  const [trial] = useState(() => readWarmedTrial());
+  const timelineSteps = trialTimelineSteps(trial);
+  const TIMELINE_STEPS = timelineSteps ?? NO_TRIAL_STEPS;
+  const headline = timelineSteps ? 'Your free trial, briefly.' : 'How this works, briefly.';
+  const intro = timelineSteps
+    ? "Here's what the next few days look like. No surprises."
+    : "Here's exactly what you're signing up for. No surprises.";
 
   const handleContinue = () => {
     dispatch({
@@ -62,7 +76,7 @@ export default function R12TrialTimeline() {
         <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <m.div variants={listItem}>
             <NoteBubble>
-              Here's what the next few days look like. No surprises.
+              {intro}
             </NoteBubble>
           </m.div>
 
@@ -77,7 +91,7 @@ export default function R12TrialTimeline() {
             color: C.text,
             marginTop: 2,
           }}>
-            Your free trial, briefly.
+            {headline}
           </m.div>
 
           {/* Vertical stepper — 2px hairline spine, 10px ink node dots */}

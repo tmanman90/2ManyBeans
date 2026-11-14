@@ -1,0 +1,692 @@
+/* ==========================================================================
+   Paywall — "Ruphus Paywall" (approved mockup 2026-08-16)
+   Everything is scoped under .pw-root. Tokens come from PW_CSS_VARS
+   (src/components/paywall/paywallTheme.js) spread inline on the root.
+
+   Hard rules carried from the mockup:
+   - Motion is transform/opacity only, visible-by-default base state, all
+     keyframes gated behind prefers-reduced-motion: no-preference (WKWebView
+     has shipped us invisible screens twice when visibility depended on an
+     animation actually firing).
+   - Cards carry ZERO box-shadow; elevation is a surface-ladder step.
+   - No backdrop-filter anywhere (none survive from the mockup, intended).
+   - Radius language: 14px controls, 18px cards, 999px pills/badges/discs.
+   ========================================================================== */
+
+.pw-root {
+  position: relative;
+  height: 100%;
+  background: var(--pw-canvas);
+  color: var(--pw-text);
+  font-family: Nunito, system-ui, -apple-system, sans-serif;
+  overscroll-behavior: contain;
+  overflow: hidden;
+}
+
+/* Grain: deliberate OLED-banding fix on the long dark gradient, not decor. */
+.pw-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* --------------------------------------------------------------------------
+   Stage + steps (value -> plans -> compare)
+   -------------------------------------------------------------------------- */
+.pw-stage {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+}
+
+.pw-step {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* NO horizontal padding here. .pw-step-scroll below is an overflow:auto
+     container, and such a container clips its children's PAINT to its own
+     box even though negative margins still report a full-width layout rect.
+     That silently turned the full-bleed hero band into an inset rectangle
+     with hard left/right edges. Gutters now live on the individual blocks,
+     so nothing needs to escape the scroller. */
+  overscroll-behavior: contain;
+}
+
+.pw-step-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Nav row (steps 2 and 3 only — step 1 has NO close X by design;
+   the only exit is the "Not right now" text button). */
+/* env() fallbacks only apply where env() is UNSUPPORTED, not where the inset
+   is 0 — so `env(safe-area-inset-top, 56px)` yields 0 on a non-notched iPhone
+   and jams the nav against the status bar. Repo convention (R13Paywall.jsx:338)
+   is calc(env(..., 0px) + fixed), which is additive and always safe. */
+.pw-nav-row {
+  flex: none;
+  height: 44px;
+  padding: 0 24px;
+  margin-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 36px visual, 44x44 hit area via the ::before overlay (Apple HIG minimum,
+   .claude/rules/ios-layout.md). Expanding the box itself would break the
+   nav row's optical alignment, so the target is expanded invisibly. */
+.pw-icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pw-s2);
+  border: 1px solid var(--pw-line);
+  color: var(--pw-text-2);
+  cursor: pointer;
+}
+.pw-icon-btn::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.pw-icon-btn:hover { background: var(--pw-s3); color: var(--pw-text); }
+.pw-icon-btn:active { background: var(--pw-s4); }
+.pw-icon-btn svg { width: 16px; height: 16px; }
+
+/* --------------------------------------------------------------------------
+   Type
+   -------------------------------------------------------------------------- */
+.pw-h1 {
+  font-family: Fraunces, 'Playfair Display', Georgia, serif;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+  margin: 0;
+}
+.pw-h1-sm { font-size: 26px; }
+
+/* The headline tail phrase — one of the five sanctioned gold surfaces. */
+.pw-hl { color: var(--pw-gold); }
+
+.pw-head-c { text-align: center; margin-left: 24px; margin-right: 24px; }
+
+.pw-sub {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pw-text-2);
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.pw-price { font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------------------------
+   Hero band (step 1)
+   Full-bleed flat-vector illustration; sparkles + hills are baked into the
+   art on a #211008 ground, so the band just matches that ground and lets the
+   bottom dissolve into the canvas.
+
+   MASK PLACEMENT IS LOAD-BEARING (lessons.md: "CSS masks silently vanish on
+   positioned elements in real-device WKWebView"): the mask lives on THIS
+   parent div, which must stay UNPOSITIONED and untransformed. Real devices
+   drop masks on promoted compositing layers, and neither the simulator nor
+   desktop WebKit reproduces the failure. The float animation lives on the
+   child <img>, never here.
+   -------------------------------------------------------------------------- */
+.pw-hero-band {
+  position: relative;
+  /* dvh-clamped so the third value row still fits above the CTA bar on
+     shorter screens; it was being pushed under the bar at a fixed 224px. */
+  height: clamp(140px, 23dvh, 224px);
+  margin: clamp(12px, 3dvh, 35px) 0 0;
+  flex: none;
+  overflow: hidden;
+  background: var(--pw-hero-bg);
+}
+
+/* Feather the clip's left and right edges into the canvas. The band ground is
+   matched to the DECODED video background, but decode can shift a level or two
+   per device, and any mismatch shows as a rectangle. These are ordinary
+   overlay elements rather than a mask, because masks over a composited <video>
+   are dropped on real devices (lessons.md). Cheap insurance either way. */
+.pw-hero-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 56px;
+  pointer-events: none;
+}
+.pw-hero-edge-l { left: 0; background: linear-gradient(to right, var(--pw-canvas), rgba(31, 16, 9, 0)); }
+.pw-hero-edge-r { right: 0; background: linear-gradient(to left, var(--pw-canvas), rgba(31, 16, 9, 0)); }
+
+/* The hero is a looping <video>. Do NOT put a mask on this band or on the
+   media: lessons.md records that CSS masks over a composited <video> silently
+   vanish in real-device WKWebView, and neither the simulator nor desktop
+   WebKit reproduces the failure — it would ship as hard visible edges. The
+   dissolves are painted overlays instead, which cannot be dropped. */
+.pw-hero-band video,
+.pw-hero-band img {
+  display: block;
+  height: 100%;
+  width: auto;
+  margin: 0 auto;
+}
+
+
+/* --------------------------------------------------------------------------
+   Value rows (step 1) — bare rows on the raw canvas. No card, no border,
+   no fill. The 48px disc is the only shape; its glyph is gold (sanctioned).
+   -------------------------------------------------------------------------- */
+.pw-value-rows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3dvh, 28px);
+  margin: clamp(20px, 5dvh, 57px) auto 0;
+  width: max-content;
+  max-width: calc(100% - 48px);
+}
+
+.pw-vrow {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.pw-disc {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pw-s2);
+  color: var(--pw-gold);
+}
+.pw-disc svg { width: 22px; height: 22px; }
+
+.pw-vrow h3 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0;
+}
+.pw-vrow p {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pw-text-2);
+  line-height: 1.4;
+  margin: 2px 0 0;
+}
+
+/* --------------------------------------------------------------------------
+   Bottom CTA bar — pinned, with a scrim so scrolling content dissolves
+   under it instead of clipping hard. Scrim fades to s1 (the canvas gradient
+   value at the bottom of the screen).
+   -------------------------------------------------------------------------- */
+.pw-cta-bar {
+  flex: none;
+  /* additive, see .pw-nav-row: a 0 inset must still leave real bottom padding */
+  padding: 28px 24px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(to top, var(--pw-canvas) 60%, rgba(31, 16, 9, 0) 100%);
+}
+
+/* --------------------------------------------------------------------------
+   CTA — full pill, MFP-sampled horizontal gold gradient, dark ink.
+   All six control states below.
+   -------------------------------------------------------------------------- */
+.pw-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 54px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--pw-gold) 0%, var(--pw-gold-lt) 100%);
+  color: var(--pw-cta-ink);
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pw-cta:hover { filter: brightness(1.07); }
+.pw-cta:focus-visible { outline: 2px solid var(--pw-gold); outline-offset: 2px; }
+.pw-cta:active { filter: brightness(0.9); transform: scale(0.98); }
+.pw-cta:disabled {
+  background: var(--pw-s2);
+  color: var(--pw-text-3);
+  cursor: default;
+  filter: none;
+  transform: none;
+}
+.pw-cta.is-loading { cursor: progress; }
+
+.pw-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  flex: none;
+  border: 2px solid rgba(36, 23, 16, 0.3);
+  border-top-color: var(--pw-cta-ink);
+}
+
+.pw-ghost {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--pw-text);
+  text-align: center;
+  cursor: pointer;
+}
+.pw-ghost:hover { color: var(--pw-text-2); }
+.pw-ghost:focus-visible { outline: 2px solid var(--pw-gold); outline-offset: 2px; border-radius: 4px; }
+
+.pw-fineprint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pw-text-3);
+  text-align: center;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.pw-legal {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pw-text-3);
+}
+/* 11px text, but Restore Purchases is a real action — pad to a 44pt-tall
+   target (HIG) without changing the row's visual rhythm. */
+.pw-legal a,
+.pw-legal button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font: inherit;
+  color: var(--pw-text-3);
+  text-decoration: none;
+  cursor: pointer;
+}
+.pw-legal a:hover,
+.pw-legal button:hover { color: var(--pw-text-2); text-decoration: underline; }
+
+/* --------------------------------------------------------------------------
+   Plan cards (step 2) — MFP dark-plan anatomy: outlines directly on the
+   canvas, no fill, Save badge inside the card, filled gold check on the
+   selected SKU. Two columns so all four prices stay visible (App Store
+   requirement: no billing-cycle toggle).
+   -------------------------------------------------------------------------- */
+.pw-plan-grid {
+  display: flex;
+  gap: 12px;
+  margin: 24px 24px 0;
+}
+
+.pw-plan-card {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 18px;
+  background: transparent;
+  border: 1.5px solid var(--pw-line-strong);
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 200ms;
+}
+.pw-plan-card.is-selected { border-color: var(--pw-gold); }
+
+/* FIXED HEIGHT, not min-height — price-alignment fix Tal caught and a
+   known regression target. Pro's head is one line + no badge row while
+   Ultra's wraps with the Best value badge; with auto/min heights the two
+   cards' annual prices land at different y and the grid reads broken.
+   Same reason .pw-badge-slot below reserves the badge line even when a
+   row has no badge. Do not "simplify" either back to auto height. */
+.pw-plan-head {
+  /* name (23) + gap (4) + badge slot (20) + gap (4) + two desc lines (33) */
+  height: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.pw-plan-name {
+  font-family: Fraunces, 'Playfair Display', Georgia, serif;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.pw-plan-desc {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pw-text-2);
+  line-height: 1.35;
+  margin: 0;
+}
+
+/* Badges (Save 17% / Best value) — gold fill + dark ink, sanctioned. */
+.pw-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--pw-gold);
+  color: var(--pw-cta-ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* See .pw-plan-head comment: fixed-height slot so annual rows with a Save
+   badge and monthly rows without one keep their prices on the same baseline
+   across both cards. Regression target — keep the fixed height. */
+.pw-badge-slot {
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.pw-sku {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.pw-sku:hover { background: var(--pw-s2); }
+.pw-sku:focus-visible { outline: 2px solid var(--pw-gold); outline-offset: 2px; }
+.pw-sku.is-selected { background: var(--pw-s1); }
+
+.pw-chk {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  margin-left: auto;
+  border: 1.5px solid var(--pw-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+}
+.pw-sku.is-selected .pw-chk {
+  background: var(--pw-gold);
+  border-color: var(--pw-gold);
+  color: var(--pw-cta-ink);
+}
+.pw-chk svg { width: 11px; height: 11px; }
+
+.pw-sku-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pw-sku-price-lg { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.pw-sku-price-sm { font-size: 14px; font-weight: 600; }
+.pw-sku-unit { font-size: 13px; font-weight: 600; color: var(--pw-text-2); }
+.pw-sku-note { font-size: 11px; font-weight: 500; color: var(--pw-text-2); }
+
+.pw-compare-link {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pw-text);
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--pw-line-strong);
+  cursor: pointer;
+}
+.pw-compare-link:hover { text-decoration-color: var(--pw-text); }
+.pw-compare-link:focus-visible { outline: 2px solid var(--pw-gold); outline-offset: 2px; border-radius: 4px; }
+
+/* --------------------------------------------------------------------------
+   Compare matrix (step 3) — checks in body-text white, absent dashes in
+   text-3. Gold does NOT appear in the matrix.
+   -------------------------------------------------------------------------- */
+.pw-matrix {
+  margin: 16px 24px 0;
+  border: 1px solid var(--pw-line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--pw-s2);
+}
+
+.pw-mx-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px 0 14px;
+  border-top: 1px solid var(--pw-line);
+}
+.pw-mx-row:first-child { border-top: none; }
+
+.pw-mx-head { background: var(--pw-s1); min-height: 56px; }
+.pw-mx-head .pw-mx-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 0;
+}
+.pw-mx-plan {
+  font-family: Fraunces, 'Playfair Display', Georgia, serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pw-mx-price {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--pw-text-2);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.pw-mx-feat {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 10px 8px 10px 0;
+}
+.pw-mx-feat small {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pw-text-3);
+}
+
+.pw-mx-cell { display: flex; justify-content: center; color: var(--pw-text); }
+.pw-mx-cell svg { width: 16px; height: 16px; }
+.pw-mx-dash { color: var(--pw-text-3); font-weight: 600; }
+
+.pw-free-block {
+  margin: 12px 24px 0;
+  border-radius: 18px;
+  background: var(--pw-s1);
+  border: 1px solid var(--pw-line);
+  padding: 14px 16px;
+}
+.pw-free-block h4 { font-size: 13px; font-weight: 700; margin: 0 0 6px; }
+.pw-free-block p {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pw-text-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* Purchase/offerings error line. Semantic error color, deliberately NOT the
+   gold accent (semantic state and accent are separate systems). */
+.pw-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: #E4A08D;
+  text-align: center;
+  line-height: 1.45;
+  margin: 16px 0 0;
+}
+
+/* Pre-sized loading skeleton blocks (step 2 while offerings load). Base
+   state is fully visible; the pulse is gated below. */
+.pw-skel {
+  background: var(--pw-s2);
+}
+
+/* --------------------------------------------------------------------------
+   Toast (purchase/restore feedback) — CSS-only, visible by default. The
+   entrance keyframe lives in the reduced-motion block below.
+   -------------------------------------------------------------------------- */
+.pw-toast {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  z-index: 10;
+  max-width: calc(100% - 48px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--pw-s2);
+  border: 1px solid var(--pw-line-strong);
+  color: var(--pw-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Motion
+   Base state is VISIBLE (opacity 1, no transform). Keyframes only exist
+   inside no-preference. This is a hard rule: WKWebView has twice shipped
+   screens whose visibility depended on an animation firing, and it didn't.
+   ========================================================================== */
+.pw-in { opacity: 1; }
+
+/* Reduced motion: content is simply visible, with NO animation of any kind.
+   A staggered crossfade was tried here and reverted deliberately. Any rule
+   that sets opacity: 0 and depends on a keyframe to bring it back is a
+   catastrophic failure mode if the keyframe does not run — an invisible
+   paywall. Nothing on this screen is communicated by arrival order alone, so
+   the information cost of dropping the stagger is zero and the downside risk
+   is total. Safety wins. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Staggered entrance in reading order; --pw-d carries the per-element delay.
+     Side-by-side peers (the two plan cards) share ONE delay, never staggered.
+     Duration and travel are deliberately larger than the first pass: at 240ms
+     with a 0.95 scale and no translation the arrival was literally
+     imperceptible on device and read as "no animation at all". */
+  .pw-in {
+    opacity: 0;
+    animation: pwIn 380ms var(--pw-ease) both;
+    animation-delay: var(--pw-d, 0ms);
+  }
+  @keyframes pwIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Step push: incoming step only, forward from the right, back from the
+     left. Never animate the outgoing step. */
+  .pw-step-fwd { animation: pwStepFwd 340ms var(--pw-ease) both; }
+  @keyframes pwStepFwd {
+    from { opacity: 0; transform: translate3d(40px, 0, 0); }
+    to { opacity: 1; transform: none; }
+  }
+  .pw-step-back { animation: pwStepBack 340ms var(--pw-ease) both; }
+  @keyframes pwStepBack {
+    from { opacity: 0; transform: translate3d(-40px, 0, 0); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Ambient: one slow float on the hero image ONLY (the mask stays on the
+     unpositioned parent, see .pw-hero-band). Sparkles are baked into the
+     art and stay static. */
+  /* No CSS float on the hero any more: it is a real animated loop, and a bob
+     on top of it read as "just moving up and down". Motion comes from the
+     artwork itself. */
+
+  .pw-cta.is-loading .pw-spinner { animation: pwSpin 800ms linear infinite; }
+  @keyframes pwSpin { to { transform: rotate(360deg); } }
+
+  .pw-skel { animation: pwSkel 1.4s ease-in-out infinite; }
+  @keyframes pwSkel { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+  /* Toast entrance — transform/opacity only; base state above is visible. */
+  .pw-toast { animation: pwToastIn 240ms var(--pw-ease) both; }
+  @keyframes pwToastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+}
+
+/* Dev-only marker. Rendered whenever the paywall is showing the dev offerings
+   stand-in (see src/lib/devOfferings.js) so stub prices can never be mistaken
+   for real App Store pricing. Cannot appear in a production build. */
+.pw-devbadge {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #E4A08D;
+  color: #241710;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+}

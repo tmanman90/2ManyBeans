@@ -10,6 +10,9 @@ import { deleteBeanPhoto } from '../lib/storage';
 import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
 import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
+import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate, protectedRecipeUpdates, splitProtectedRecipeUpdates } from '../lib/recipeCommands';
+import { canonicalHash } from '../lib/ruphus/contracts';
+import { ruphusClientVersion } from '../lib/ruphus/census';
 
 // Normalize legacy atmosSlot field to jarSlot on read (migration shim, added 2026-04-05)
 const normalizeBean = (d) => {
@@ -115,7 +118,7 @@ export const useAppData = (uid) => {
       // Network fetch (updates cache on success)
       const fetchData = async () => {
         try {
-          await fetchAndCache(beansColl, tastingsColl, beansCacheKey, tastingsCacheKey);
+          await refetch();
         } catch (err) {
           console.error('Firestore fetch error:', err);
         }
@@ -127,17 +130,15 @@ export const useAppData = (uid) => {
       fetchData().finally(() => clearTimeout(fetchTimeout));
 
       // Poll every 60s to keep data fresh (replaces real-time listeners).
-      // Skip this tick if a mutation's refetch is already in flight -- the
-      // in-flight result will cover us and is at least as fresh.
+      // Initial load, polls and mutations all use the same single-flight.
+      // Merely checking the ref here without claiming it allowed suspended
+      // native requests to pile up and refresh expired credentials on wake.
       const startPoll = () => {
-        pollRef.current = setInterval(async () => {
-          if (inflightFetchRef.current) return;
-          try {
-            await fetchAndCache(beansColl, tastingsColl, beansCacheKey, tastingsCacheKey);
-          } catch { /* silent retry next interval */ }
+        pollRef.current = setInterval(() => {
+          if (!document.hidden) void refetch();
         }, 60000);
       };
-      startPoll();
+      if (!document.hidden) startPoll();
 
       // Pause polling when app is backgrounded (battery optimization)
       const handleVisibility = () => {
@@ -193,29 +194,47 @@ export const useAppData = (uid) => {
       unsubBeans();
       unsubTastings();
     };
-  }, [fetchAndCache, uid]);
+  }, [refetch, uid]);
 
   const addBean = useCallback(async (beanData, existingId = null) => {
     if (!uid) return;
     if (existingId) {
       // Use pre-allocated ID (from product shot pre-generation)
       const beanRef = doc(db, 'users', uid, 'beans', existingId);
-      await setDoc(beanRef, { ...beanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await setDoc(beanRef, { ...beanData, clientVersion: ruphusClientVersion(), clientVersionUpdatedAt: serverTimestamp(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       await refetch();
       return existingId;
     }
     // Default: auto-generate ID
     const beansColl = collection(db, 'users', uid, 'beans');
-    const docRef = await addDoc(beansColl, { ...beanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    const docRef = await addDoc(beansColl, { ...beanData, clientVersion: ruphusClientVersion(), clientVersionUpdatedAt: serverTimestamp(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     await refetch();
     return docRef.id;
   }, [uid, refetch]);
 
   const updateBean = useCallback(async (beanId, updates) => {
     if (!uid) return;
+    if (isProtectedRecipeUpdate(updates)) {
+      const bean = beansStateRef.current.find((item) => item.id === beanId);
+      if (!bean) throw new Error('This bean is no longer available.');
+      const protectedUpdates = protectedRecipeUpdates(updates);
+      for (const [index, updateGroup] of splitProtectedRecipeUpdates(protectedUpdates).entries()) {
+        const command = commandForBeanUpdate(bean, updateGroup, { actionId: `${beanId}:${canonicalHash(updateGroup)}:${index}` });
+        if (!command.recipe && command.mode === 'replace_active_recipe') throw new Error('A complete recipe is required for this change.');
+        await executeRecipeCommand({ ...command, patch: (command.mode === 'replace_active_recipe' || command.mode === 'set_aiden_link' || command.mode === 'set_aiden_grind') ? updateGroup : undefined });
+      }
+      const ordinaryUpdates = Object.fromEntries(Object.entries(updates).filter(([key]) => !Object.hasOwn(protectedUpdates, key)));
+      if (Object.keys(ordinaryUpdates).length) {
+        await updateDoc(doc(db, 'users', uid, 'beans', beanId), { ...ordinaryUpdates, clientVersion: ruphusClientVersion(), clientVersionUpdatedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      }
+      await refetch();
+      return;
+    }
     const beanRef = doc(db, 'users', uid, 'beans', beanId);
     await updateDoc(beanRef, {
       ...updates,
+      clientVersion: ruphusClientVersion(),
+      clientVersionUpdatedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
     await refetch();
@@ -237,9 +256,22 @@ export const useAppData = (uid) => {
         const history = mergeTimingEvent(current.data().handBrewTimingMemory, event);
         transaction.update(beanRef, {
           handBrewTimingMemory: history,
+          clientVersion: ruphusClientVersion(),
+          clientVersionUpdatedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       });
+      if (event.attemptId && event.completionKind !== 'skipped') {
+        const slotKey = event.device === 'aiden' ? 'aiden' : `${event.device === 'kalita' ? 'kalita' : 'v60'}_${event.mode === 'iced' ? 'iced' : 'hot'}`;
+        await executeRecipeCommand({
+          actionId: `complete_${event.attemptId}`,
+          mode: 'complete_attempt',
+          coffeeId: beanId,
+          slotKey,
+          attemptId: event.attemptId,
+          expectedRevisionId: event.revisionId || undefined,
+        });
+      }
       await refetch();
       return { status: 'saved' };
     } catch (error) {
@@ -318,6 +350,8 @@ export const useAppData = (uid) => {
           atmosSlot: deleteField(),
           status: 'SEALED',
           openDate: null,
+          clientVersion: ruphusClientVersion(),
+          clientVersionUpdatedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       }
@@ -326,6 +360,8 @@ export const useAppData = (uid) => {
         jarSlot: slot,
         atmosSlot: deleteField(),
         openDate: today(),
+        clientVersion: ruphusClientVersion(),
+        clientVersionUpdatedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       await batch.commit();
@@ -394,6 +430,8 @@ export const useAppData = (uid) => {
       const { seedId: _seedId, ...beanData } = bean;
       batch.set(beanRef, {
         ...beanData,
+        clientVersion: ruphusClientVersion(),
+        clientVersionUpdatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

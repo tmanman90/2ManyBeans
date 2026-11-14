@@ -118,6 +118,12 @@ function makeError(code, message) {
   return err;
 }
 
+function makeAbortError() {
+  const err = makeError('turn_cancelled', 'Chat turn was cancelled.');
+  err.name = 'AbortError';
+  return err;
+}
+
 async function parseErrorBody(response) {
   try {
     return await response.json();
@@ -157,8 +163,18 @@ function getStreamingFetch() {
   return webFetch || fetch;
 }
 
-export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxRetries = 2 }) {
-  const token = await getAuthToken();
+export async function streamWithAuth({ url, body, onDelta, onDone, onError, onFrame, signal, maxRetries = 2 }) {
+  let token;
+  try {
+    token = await getAuthToken();
+  } catch (error) {
+    onError?.(signal?.aborted ? makeAbortError() : error);
+    return;
+  }
+  if (signal?.aborted) {
+    onError?.(makeAbortError());
+    return;
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -166,6 +182,10 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
   let lastError = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    if (signal?.aborted) {
+      onError?.(makeAbortError());
+      return;
+    }
     if (attempt > 0) {
       await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
@@ -178,6 +198,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
       });
 
       if (!response.ok) {
@@ -185,6 +206,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
         const typed = parseTypedError(data, response.status);
         if (typed) throw typed;
         const err = errorFromStatus(data, response.status);
+        err.status = response.status;
         if ([429, 529, 503].includes(response.status) && attempt < maxRetries) {
           lastError = err;
           continue;
@@ -220,6 +242,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
           } catch {
             throw makeError('malformed_stream', 'The AI stream returned malformed data.');
           }
+          onFrame?.(frame);
 
           if (frame.type === 'delta') {
             onDelta?.(frame.text || '');
@@ -241,6 +264,7 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
         } catch {
           throw makeError('malformed_stream', 'The AI stream returned malformed data.');
         }
+        onFrame?.(frame);
         if (frame.type === 'usage') {
           sawUsage = true;
           onDone?.({ usage: frame.usage, stopReason: frame.stop_reason });
@@ -266,7 +290,15 @@ export async function streamWithAuth({ url, body, onDelta, onDone, onError, maxR
         reader.cancel().catch(() => {});
       }
     } catch (err) {
-      if (!sawByte && attempt < maxRetries) {
+      if (signal?.aborted) {
+        onError?.(makeAbortError());
+        return;
+      }
+      // A rejected credential or entitlement cannot recover by replaying the
+      // same headers. Only transient transport/server failures may retry.
+      const rejected = ['auth_session_unavailable', 'auth_temporarily_limited', 'reauth_required', 'subscription_required', 'free_tier_exhausted'].includes(err?.code)
+        || (err?.status >= 400 && err.status < 500 && err.status !== 429);
+      if (!rejected && !sawByte && attempt < maxRetries) {
         lastError = err;
         continue;
       }

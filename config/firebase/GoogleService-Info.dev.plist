@@ -2,33 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>902243550931-oapf974v3f78m5plmoh4urqos01cj6v9.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.902243550931-oapf974v3f78m5plmoh4urqos01cj6v9</string>
 	<key>API_KEY</key>
-	<string>AIzaSyApR_pDyCYL-AcbSLfAXgbWJrJ6UTp0X18</string>
-	<key>GCM_SENDER_ID</key>
-	<string>902243550931</string>
-	<key>PLIST_VERSION</key>
-	<string>1</string>
+	<string>AIzaSyBtHHGTewfR6dZWBVA-IfrI056gpookE3s</string>
 	<key>BUNDLE_ID</key>
 	<string>com.talmeltzer.coffeehub.dev</string>
-	<key>PROJECT_ID</key>
-	<string>manybeans-7893c</string>
-	<key>STORAGE_BUCKET</key>
-	<string>manybeans-7893c.firebasestorage.app</string>
-	<key>IS_ADS_ENABLED</key>
-	<false></false>
-	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
-	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
-	<key>IS_GCM_ENABLED</key>
-	<true></true>
-	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
+	<key>CLIENT_ID</key>
+	<string>902243550931-oapf974v3f78m5plmoh4urqos01cj6v9.apps.googleusercontent.com</string>
+	<key>GCM_SENDER_ID</key>
+	<string>289411933057</string>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:902243550931:ios:4615fbb41e6363f9e3b626</string>
+	<string>1:289411933057:ios:98a89674a7655613a2be80</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>PROJECT_ID</key>
+	<string>twomanybeans-ruphus-dev</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.902243550931-oapf974v3f78m5plmoh4urqos01cj6v9</string>
+	<key>STORAGE_BUCKET</key>
+	<string>twomanybeans-ruphus-dev.firebasestorage.app</string>
 </dict>
 </plist>

@@ -6,7 +6,10 @@ const modal = readFileSync(new URL('../src/components/HandBrewModal.jsx', import
 const settings = readFileSync(new URL('../src/components/SettingsPage.jsx', import.meta.url), 'utf8');
 const adapter = readFileSync(new URL('../src/lib/kalitaAdapter.js', import.meta.url), 'utf8');
 assert.match(hook, /candidateMatchesConfiguration/);
-assert.match(hook, /const candidateMode = device === 'kalita' \? 'candidate' : 'legacy'/);
+// V60 joined the deterministic-candidate path in the V60 Switch cutover;
+// the condition legitimately grew from a Kalita-only check to a
+// Kalita-or-V60 check.
+assert.match(hook, /const candidateMode = device === 'kalita' \|\| device === 'v60' \? 'candidate' : 'legacy'/);
 assert.match(hook, /engineVersion === KALITA_ENGINE_VERSION/);
 assert.match(hook, /delete persistedRecipe\.shadowCandidate/);
 assert.match(hook, /generationStatus: 'fallback'/);

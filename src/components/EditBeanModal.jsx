@@ -252,7 +252,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
         })
         .catch(() => {});
     } catch (err) {
-      if (handlePaywallError(err, openPaywall)) {
+      if (handlePaywallError(err, openPaywall, 'scan_cap')) {
         setAiFilling(false);
         return;
       }

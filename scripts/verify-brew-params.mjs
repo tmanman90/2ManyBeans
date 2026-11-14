@@ -237,7 +237,18 @@ check('handbrew repair uses normalizeStepTimes; maxTokens raised; light fallback
 check('iced start button gated on timerReady', () => {
   const modal = read('src/components/HandBrewModal.jsx');
   assert.match(modal, /\{!icedRecipe\.timerReady && \(/, 'no fallback message for non-timer-ready iced');
-  assert.match(modal, /\{icedRecipe\.timerReady && \(\s*<m\.button\s*onClick=\{handleStartIcedBrew\}/, 'iced start not gated');
+  // The start button gate is a derived `icedTimerReady`, not the raw
+  // `icedRecipe.timerReady` — it additionally guards against an in-flight
+  // dose edit and a stale iced recipe generated for a different dose
+  // (V60 Switch runtime-contract slice). Assert both the derivation and its
+  // use on the start button so the original invariant (never start a timer
+  // on non-timer-ready iced data) still holds.
+  assert.match(
+    modal,
+    /const icedTimerReady = Boolean\(icedTimerSteps\) && !doseUpdating && icedRecipe\.coffeeGrams === effectiveDose;/,
+    'icedTimerReady derivation missing or changed shape'
+  );
+  assert.match(modal, /\{icedTimerReady && \(\s*<m\.button\s*onClick=\{handleStartIcedBrew\}/, 'iced start not gated on the derived icedTimerReady');
 });
 
 console.log('\n[Guard] Aiden deterministic grind + bands untouched (full pin in verify-grind-calibration)');

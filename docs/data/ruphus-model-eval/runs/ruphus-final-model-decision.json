@@ -1,0 +1,104 @@
+{
+  "kind": "ruphus-final-model-decision",
+  "version": 1,
+  "classification": "insufficient-evidence",
+  "run": {
+    "screen": {
+      "attempts": 60,
+      "completed": 60,
+      "eligibleArms": ["luna-medium", "terra-medium"],
+      "evidenceHash": "1258027e127e7bb29c4f1ecbcd314a2e08f980ee185e8f1d04923056816f8a93",
+      "artifactMeteredSpendUsd": 0.24293,
+      "retryCount": 0,
+      "blindPreference": "luna-medium",
+      "scoreLockHash": "c352f3deb9123ad440962607afb51bf0ead06b58d85f179ab45514a139605dd1",
+      "decisionHash": "caf59d1c5d7216f9b5964fc3583f6dca5bc56bc02553e4ed840c716197e8ac7e"
+    },
+    "finalist": {
+      "runId": "ruphus-finalist-replacement-1787998472445",
+      "evaluationHash": "a12ada5e4fc13e8b8b02956216ae06cd9001a2f4fb603222a787500f4764a398",
+      "attempts": 24,
+      "completed": 24,
+      "regradeEvidenceHash": "724abc2fc65810a98ee54c8d2a3a0edf69e486d035f086cb511e7f914113af93",
+      "artifactMeteredSpendUsd": 0.049846999999999995,
+      "retryCount": 0
+    }
+  },
+  "arms": {
+    "luna-medium": {
+      "validAttempts": 10,
+      "invalidAttempts": 2,
+      "workflowValidRepeats": {
+        "read-stats": [1, 2],
+        "tasting-diagnosis": [1, 2],
+        "recipe-proposal": [1, 2],
+        "approval-bound-apply": [],
+        "undo-stale-revision": [1, 2],
+        "fellow-preparation-receipt": [1, 2]
+      },
+      "criticalFailureCounts": {
+        "approved-apply-not-committed": 1,
+        "state-artifact-binding-mismatch": 1,
+        "attempt-failed": 1
+      },
+      "artifactMeteredSpendUsd": 0.0052569999999999995,
+      "aggregateLatencyMs": 39444.22525100001
+    },
+    "terra-medium": {
+      "validAttempts": 9,
+      "invalidAttempts": 3,
+      "workflowValidRepeats": {
+        "read-stats": [1, 2],
+        "tasting-diagnosis": [1, 2],
+        "recipe-proposal": [1, 2],
+        "approval-bound-apply": [],
+        "undo-stale-revision": [1, 2],
+        "fellow-preparation-receipt": [1]
+      },
+      "criticalFailureCounts": {
+        "state-artifact-binding-mismatch": 1,
+        "attempt-failed": 1,
+        "approved-apply-not-committed": 1,
+        "unsupported-physical-claim": 1
+      },
+      "artifactMeteredSpendUsd": 0.04459,
+      "aggregateLatencyMs": 37696.17762500001
+    }
+  },
+  "terminal": {
+    "modelSelected": false,
+    "finalists": [],
+    "shippingChat": "unchanged",
+    "agentV3": "locked",
+    "productionModelSwitch": false,
+    "reason": "both-finalists-fail-six-workflow-validity-gate",
+    "requiredNextState": "revise-rerun",
+    "physicalEvidence": "absent",
+    "firebaseWrites": false,
+    "fellowWrites": false
+  },
+  "developmentRecommendation": {
+    "armId": "luna-medium",
+    "scope": "development-only",
+    "productionApproved": false,
+    "basis": ["locked-blind-preference", "10-vs-9-valid-attempts", "lower-finalist-metered-spend"],
+    "finalistSpendRatioTerraToLuna": 8.481061689302395
+  },
+  "knownArtifactMeteredSpendUsd": {
+    "historicalCalibration": 0.37037899999999985,
+    "replacementSmoke": 0.016222,
+    "compositeScreen": 0.24293,
+    "invalidFirstFinalist": 0.057152,
+    "replacementFinalist": 0.049846999999999995,
+    "total": 0.7365299999999998
+  },
+  "budget": {
+    "providerCapUsd": 30,
+    "frozenDispatchReservationUsd": 27.798201000000006,
+    "knownArtifactMeteredSpendIsInvoiceTotal": false,
+    "unmeteredCapabilityAndFailureCosts": "not-exactly-derivable-from-artifacts",
+    "additionalCallsAuthorized": false
+  },
+  "historicalReport": "runs/ruphus-2026-08-28-e5acab4d-calibration-outcome.json",
+  "rawProviderContentCommitted": false
+}
