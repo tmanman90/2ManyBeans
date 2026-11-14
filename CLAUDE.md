@@ -4,7 +4,9 @@ Personal specialty coffee inventory + tasting tracker. PWA hosted on Vercel with
 
 ## Project-Specific Notes
 - **CLAUDE.md**: Update when project structure, conventions, or tech stack change
-- **lessons.md**: Add a bullet after any painful debugging session or gotcha
+- **lessons.md**: Add a bullet after any painful debugging session or gotcha, then follow the sort rule in `~/Dropbox/Claude Code Work Hub/coding/README.md` (a lesson that would bite another app also gets a Hub index line and a check of that app)
+- **CODING_STANDARDS.md**: the shared standard for all of Tal's apps (a copy of the Hub page; edit the Hub page, not the copy)
+- **Shared skills**: `rip-it` and `xcodebuildmcp-cli` live once in the Hub (`.claude/user-scope/skills/`) and load in every session; this repo no longer carries copies
 - **PRD.md**: Update only when feature specs actually change
 - Don't update MDs for routine changes. Keep files concise.
 
