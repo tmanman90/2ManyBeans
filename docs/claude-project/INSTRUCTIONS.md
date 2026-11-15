@@ -35,13 +35,14 @@ Shipping (Vercel and Capgo) runs only on the Studio; the cloud has no deploy log
 ## Tests
 
 - Run `npm test` (10 steps, needs no keys; the Kalita check uses placeholder Firebase values) and `npm run lint`. Paste the final result lines in the PR body.
+- Lint on main already shows 4 old errors (paywall hooks, `paywallFlag.js`, `useBrewTimerAlerts.js`). A change must add no new lint errors; it need not fix those unless asked.
 - This repo has no CI. The thread's own test run is the only proof, so never skip it and never claim a pass you did not see.
 
 ## Merging and shipping
 
 Merging to main deploys nothing on this repo. Users only get a change when someone ships it. So:
 
-- A change ask ends MERGED: tests and lint pass, the thread merges its own pull request into main, and reports. If tests fail, fix them; never merge red. If Tal says "PR only" or "don't merge", stop at the pull request.
+- A change ask ends MERGED: tests pass and lint adds no new errors, the thread merges its own pull request into main, and reports. If tests fail, fix them; never merge red. If Tal says "PR only" or "don't merge", stop at the pull request.
 - UI changes: before merging, the coordinator starts a Studio thread on the PR branch to open the changed screens in the simulator and look at them. Merge after that check passes. Tal is not asked to look.
 - Shipping happens when Tal says so in the chat, for that change or batch:
   - "ship web": a Studio thread deploys main to Vercel production (`npx vercel --prod`) and reports the URL.
