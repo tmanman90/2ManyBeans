@@ -45,7 +45,7 @@ Merging to main deploys nothing on this repo. Users only get a change when someo
 - UI changes: before merging, the coordinator starts a Studio thread on the PR branch to open the changed screens in the simulator and look at them. Merge after that check passes. Tal is not asked to look.
 - Shipping happens when Tal says so in the chat, for that change or batch:
   - "ship web": a Studio thread deploys main to Vercel production (`npx vercel --prod`) and reports the URL.
-  - "ship app": a Studio thread runs `npm run ship:prod:ios` (Capgo production channel) and reports the bundle version.
+  - "ship app": a Studio thread runs `npm run ship:prod:ios` (Capgo production channel) and reports the bundle version. The script refuses unless the package version is above the live Capgo bundle, so bump the patch version first (check with `npx @capgo/cli@latest channel currentBundle production com.talmeltzer.coffeehub`). It also needs the Firebase build values in the shell: run `npx vercel env pull .vercel/prod-build-values --environment=production --yes`, load that file into the shell, ship, then delete the file. Never print its contents.
   - "ship" or "ship it": both.
   - "dev build": a Studio thread runs `npm run ship:dev:ios`.
 - Ship threads run in the Studio's main checkout (`~/Developer/Coffee-App`): `git switch main`, `git pull --ff-only`, `npm ci` if the lockfile changed, then the command. If that checkout has local changes, stop and say so; never discard them.
