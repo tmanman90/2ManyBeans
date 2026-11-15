@@ -444,7 +444,12 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     if (open && step === 'brewing' && recipeHasLoaded) handleAutoSave();
   }, [open, step, recipeHasLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const actionButtons = recipeHasLoaded ? (
+  // The brewer picker stays whenever a scanned bean is brewing, including
+  // while a recipe failed or for Espresso, so the user can always switch.
+  // The other actions need a loaded recipe. Espresso's own sheet already has
+  // a Taste button, so Tasting with Ruphus is not repeated there.
+  const isEspressoSheet = activeMethod === 'espresso';
+  const actionButtons = step === 'brewing' && scanData ? (
     <m.div
       {...fadeUp}
       style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}
@@ -484,15 +489,18 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         })}
       </div>
 
+      {recipeHasLoaded && <>
       {/* Quick Rate */}
       <Btn variant="ghost" onClick={handleQuickRate} style={{ width: '100%', justifyContent: 'center' }}>
         <Star size={14} /> Quick Rate
       </Btn>
 
       {/* Ruphus Tasting */}
-      <Btn variant="ghost" onClick={handleBrewTimerStartTasting} style={{ width: '100%', justifyContent: 'center' }}>
-        <Coffee size={14} /> Tasting with Ruphus
-      </Btn>
+      {!isEspressoSheet && (
+        <Btn variant="ghost" onClick={handleBrewTimerStartTasting} style={{ width: '100%', justifyContent: 'center' }}>
+          <Coffee size={14} /> Tasting with Ruphus
+        </Btn>
+      )}
 
       {/* Learn */}
       <Btn variant="ghost" onClick={handleLearnPress} style={{ width: '100%', justifyContent: 'center' }}>
@@ -501,10 +509,11 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
 
       {/* Save to Inventory */}
       {onSaveToInventory && (
-        <Btn variant="ghost" onClick={handleSave} style={{ width: '100%', justifyContent: 'center' }}>
+        <Btn variant="ghost" onClick={() => handleSave()} style={{ width: '100%', justifyContent: 'center' }}>
           <Save size={14} /> Save to Inventory
         </Btn>
       )}
+      </>}
     </m.div>
   ) : null;
 
@@ -579,6 +588,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onDoseChange={espresso.editEspressoDose}
             onYieldChange={espresso.editEspressoYield}
             onStartTasting={handleBrewTimerStartTasting}
+            extraFooter={actionButtons}
           />
         )}
         <ProfessorRuphusSlideUp {...ruphusProps} />

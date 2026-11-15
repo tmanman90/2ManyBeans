@@ -1,5 +1,7 @@
 # Espresso implementation verification
 
+> The raw run logs this folder refers to (receipts, manifests, failure logs, ledgers) were removed before merging to main on 2026-11-15 to keep about 67 MB of logs out of the public repo. They remain in the history of PR #12's branch, up to commit `da8c193`.
+
 Status: **local implementation verified, with reproduced baseline exceptions**. Local branch `codex/espresso-recipes`; no release is authorized by this work. Final application source: `a1da52c3fd2ef767f057c0afd80b43337e221008`.
 
 The final evidence includes 36 independently accepted natural-language conversation variants, all 10 mutation perturbations, nine additional write variants with per-attempt state capture, 13 focused commands, 14 existing pour-over/Aiden chat commands, and 12 full App browser groups at mobile/desktop widths. The broad suite ran all 44 commands: 41 passed and three failed identically on the untouched starting code. Changed-source lint passed all 48 files; whole-repository lint retains four unchanged errors and two warnings. See [baseline exceptions](baseline-regressions.md), [aggregate acceptance](acceptance-index.json), and [independent final review](review-final-acceptance.md).

@@ -1,5 +1,7 @@
 # Generic espresso acceptance
 
+> The raw run logs this folder refers to (receipts, manifests, failure logs, ledgers) were removed before merging to main on 2026-11-15 to keep about 67 MB of logs out of the public repo. They remain in the history of PR #12's branch, up to commit `da8c193`.
+
 The approved generic espresso experience works alongside Aiden as the default. Equipment can be added from the recipe or Settings, with basket and grinder optional. Saved targets remain tied to their equipment; old recipes are disclosed before starting on a new setup.
 
 Final actual-App browser run: seven checks pass with synthetic authenticated Auth/Firestore accounts and real recipe-command persistence. Includes generic20/40, independent DF64, verified Barista Express stock targets, Cancel, preground14/28, all eight tasting steps with saved immutable context, and reopening a named-later built-in grinder. Mobile controls checked at320/390px and desktop1280px. One actual configured chat request ran; optional tasting-AI503 was a deliberate failure seam.

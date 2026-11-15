@@ -17,6 +17,7 @@ export function EspressoModal({
   setupMismatch = false, onStartCurrentSetup,
   onRetry, onSave, onUndo, onDoseChange, onYieldChange,
   onOpenChat = null, onStartTasting = null,
+  extraFooter = null,
 }) {
   const { preferences } = usePreferences();
   const [editingEquipment, setEditingEquipment] = useState(false);
@@ -122,6 +123,7 @@ export function EspressoModal({
             {recipe.provenance?.url && <a href={recipe.provenance.url} target="_blank" rel="noopener noreferrer" style={{ ...type.body, color: C.accent, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Read recipe source</a>}
           </details>
         </>}
+        {extraFooter}
       </>}
       </section>
     </Modal>

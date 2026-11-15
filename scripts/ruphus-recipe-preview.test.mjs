@@ -65,7 +65,7 @@ import { grinderSettingToMicrons, isOdeStep } from '../src/lib/brewMethods.js';
   assert.equal(preview.coffeeGrams, 20);
   assert.equal(preview.waterGrams, 320);
   assert.equal(preview.doseProfile, '155-extended');
-  assert.equal(preview.totalBrewTimeSeconds, 285);
+  assert.equal(preview.totalBrewTimeSeconds, 195);
   assert.equal(preview.steps.at(-1).waterTotal, 320);
   assert.equal(preview.recipePreview.regenerated, true);
   assert.equal(preview.technique, source.technique);

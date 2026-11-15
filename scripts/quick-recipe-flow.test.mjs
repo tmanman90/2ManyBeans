@@ -127,8 +127,16 @@ test('Quick Recipe offers every brewer and keeps the bean in the Archive', async
     await page.getByText('kalita recipe').waitFor();
     await page.getByRole('radio', { name: 'Aiden' }).click();
     await page.getByText('aiden recipe').waitFor();
+    // Espresso (and any brewer whose recipe has not loaded) keeps the picker,
+    // so the user can always switch back to another brewer.
+    await page.getByRole('radio', { name: 'Espresso' }).click();
+    await page.locator('[data-sheet="espresso"]').waitFor();
+    assert.equal(await page.getByRole('radio').count(), 7);
+    assert.equal(await page.getByRole('radio', { name: 'Espresso' }).getAttribute('aria-checked'), 'true');
+    await page.getByRole('radio', { name: 'Aiden' }).click();
+    await page.getByText('aiden recipe').waitFor();
     assert.deepEqual(await page.evaluate(() => window.__calls), [
-      ['handbrew', 'v60'], ['handbrew', 'kalita'], ['aiden', 'research'],
+      ['handbrew', 'v60'], ['handbrew', 'kalita'], ['aiden', 'research'], ['espresso'], ['aiden', 'research'],
     ]);
 
     // Save to Inventory reuses the Archive record (no second bean) and carries
@@ -140,6 +148,7 @@ test('Quick Recipe offers every brewer and keeps the bean in the Archive', async
     assert.equal(saved.aidenRecipe.title, 'aiden recipe');
     assert.equal(saved.handBrewRecipes.kalita.title, 'kalita recipe');
     assert.equal(await page.evaluate(() => window.__added.length), 1);
+
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

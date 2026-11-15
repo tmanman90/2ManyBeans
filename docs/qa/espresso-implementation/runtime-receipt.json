@@ -1,9 +1,0 @@
-{
-  "javaSource": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_aarch64_mac_hotspot_21.0.12.1_1.tar.gz",
-  "sha256": "dec50fc6f9fcd4fe3ae8cabf5a5fa68f6afc48841f7698e468e9aa5d54beed84",
-  "verified": true,
-  "firebaseTools": "15.33.0",
-  "rulesTesting": "5.0.0",
-  "npmExit": 0,
-  "time": "2026-10-13T00:01:57.396065+00:00"
-}

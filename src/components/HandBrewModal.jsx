@@ -897,6 +897,8 @@ export const HandBrewModal = ({
           )}
         </m.div>
       )}
+      {/* Quick Recipe's brewer picker, so a failed recipe is not a dead end */}
+      {error && !recipe && extraFooter}
 
       {/* Hot recipe display */}
       {recipe && !icedMode && (

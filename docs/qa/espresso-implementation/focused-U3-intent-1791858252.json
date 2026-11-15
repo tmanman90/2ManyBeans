@@ -1,5 +1,0 @@
-{
-  "cpuIdlePercent": 65.22,
-  "exitCode": 0,
-  "output": "ruphus espresso tools tests: active save/idempotency/stale-Undo/Undo/handoff passed\n"
-}
