@@ -39,6 +39,7 @@ ios/capacitor-cordova-ios-plugins/
 
 # Launch deliverables + screenshot generator assets (tracked)
 !docs/launch/screenshots/*.png
+!docs/plans/mockups/**/*.png
 !screenshot-generator/public/**/*.png
 !public/*.png
 !public/images/*.png
