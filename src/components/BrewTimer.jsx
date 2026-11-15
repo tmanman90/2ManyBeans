@@ -18,6 +18,7 @@ import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/t
 import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
 import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';
+import { useBrewLiveActivity } from '../hooks/useBrewLiveActivity';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
 import { useAuthContext } from '../contexts/AuthContext';
 import { clearBrewTimerSession, writeBrewTimerSession } from '../lib/brewTimerSession';
@@ -580,6 +581,15 @@ const BrewTimerShell = ({
       };
     }
   }, [open, recipe, bean?.id, attemptId, revisionId]);
+
+  const startTastingFromTimer = onStartTasting
+    ? () => { clearBrewTimerSession(timerOwner); onStartTasting(bean?.id); }
+    : null;
+  useBrewLiveActivity({
+    open, timer, recipe, bean, sessionRef, attemptId, chilled,
+    // "Rate this cup" only appears once the iced chill is confirmed.
+    onRateCup: recipe?.isIced && !chilled ? null : startTastingFromTimer,
+  });
 
   // Store structural clock changes so a reclaimed WebView can reopen the
   // same bean brew. Confirmed source timers use their own attempt state.
@@ -1322,7 +1332,7 @@ const BrewTimerShell = ({
             totalElapsedMs={globalElapsedMs}
             saveState={saveState}
             onRetrySave={persistCompletion}
-            onStartTasting={onStartTasting ? () => { clearBrewTimerSession(timerOwner); onStartTasting(bean?.id); } : null}
+            onStartTasting={startTastingFromTimer}
             onDone={() => { clearBrewTimerSession(timerOwner); onClose?.(); }}
           />
         )}

@@ -17,7 +17,37 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		BA0000000000000000000001 /* BrewActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA00000000000000000000F1 /* BrewActivityAttributes.swift */; };
+		BA0000000000000000000002 /* BrewActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA00000000000000000000F2 /* BrewActivityPlugin.swift */; };
+		BA0000000000000000000003 /* BrewActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA00000000000000000000F1 /* BrewActivityAttributes.swift */; };
+		BA0000000000000000000004 /* BrewLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA00000000000000000000F3 /* BrewLiveActivity.swift */; };
+		BA0000000000000000000005 /* BrewActivityWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA00000000000000000000F4 /* BrewActivityWidgetBundle.swift */; };
+		BA0000000000000000000006 /* BrewActivityWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA00000000000000000000F6 /* BrewActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BA00000000000000000000C1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BA00000000000000000000A1;
+			remoteInfo = BrewActivityWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BA00000000000000000000E1 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BA0000000000000000000006 /* BrewActivityWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -34,6 +64,12 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		A1B2C3D42DB1000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BA00000000000000000000F1 /* BrewActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewActivityAttributes.swift; sourceTree = "<group>"; };
+		BA00000000000000000000F2 /* BrewActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewActivityPlugin.swift; sourceTree = "<group>"; };
+		BA00000000000000000000F3 /* BrewLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewLiveActivity.swift; sourceTree = "<group>"; };
+		BA00000000000000000000F4 /* BrewActivityWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewActivityWidgetBundle.swift; sourceTree = "<group>"; };
+		BA00000000000000000000F5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BA00000000000000000000F6 /* BrewActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BrewActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +78,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA00000000000000000000B2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -54,6 +97,8 @@
 				458DCAE12F73AB590026446A /* GoogleService-Info.plist */,
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				BA00000000000000000000D1 /* BrewActivityShared */,
+				BA00000000000000000000D2 /* BrewActivityWidget */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				BA00000000000000000000F6 /* BrewActivityWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -71,6 +117,7 @@
 			children = (
 				459C77882F8224FF0004A995 /* App.entitlements */,
 				45ABCCE62F81B756004D1F5B /* MyViewController.swift */,
+				BA00000000000000000000F2 /* BrewActivityPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -84,6 +131,24 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		BA00000000000000000000D1 /* BrewActivityShared */ = {
+			isa = PBXGroup;
+			children = (
+				BA00000000000000000000F1 /* BrewActivityAttributes.swift */,
+			);
+			path = BrewActivityShared;
+			sourceTree = "<group>";
+		};
+		BA00000000000000000000D2 /* BrewActivityWidget */ = {
+			isa = PBXGroup;
+			children = (
+				BA00000000000000000000F4 /* BrewActivityWidgetBundle.swift */,
+				BA00000000000000000000F3 /* BrewLiveActivity.swift */,
+				BA00000000000000000000F5 /* Info.plist */,
+			);
+			path = BrewActivityWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -94,10 +159,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				BA00000000000000000000E1 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BA0000000000000000000DD1 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -106,6 +173,22 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BA00000000000000000000A1 /* BrewActivityWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA000000000000000000001C /* Build configuration list for PBXNativeTarget "BrewActivityWidget" */;
+			buildPhases = (
+				BA00000000000000000000B1 /* Sources */,
+				BA00000000000000000000B2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BrewActivityWidget;
+			productName = BrewActivityWidget;
+			productReference = BA00000000000000000000F6 /* BrewActivityWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -120,6 +203,9 @@
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+					};
+					BA00000000000000000000A1 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -140,6 +226,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				BA00000000000000000000A1 /* BrewActivityWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -168,10 +255,30 @@
 			files = (
 				45ABCCE72F81B756004D1F5B /* MyViewController.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				BA0000000000000000000001 /* BrewActivityAttributes.swift in Sources */,
+				BA0000000000000000000002 /* BrewActivityPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA00000000000000000000B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BA0000000000000000000003 /* BrewActivityAttributes.swift in Sources */,
+				BA0000000000000000000004 /* BrewLiveActivity.swift in Sources */,
+				BA0000000000000000000005 /* BrewActivityWidgetBundle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BA0000000000000000000DD1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BA00000000000000000000A1 /* BrewActivityWidget */;
+			targetProxy = BA00000000000000000000C1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -350,6 +457,52 @@
 			};
 			name = Release;
 		};
+		BA000000000000000000009D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 41;
+				DEVELOPMENT_TEAM = WC5UF2NSAP;
+				INFOPLIST_FILE = BrewActivityWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.talmeltzer.coffeehub.dev.BrewActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1";
+			};
+			name = Debug;
+		};
+		BA000000000000000000009E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 41;
+				DEVELOPMENT_TEAM = WC5UF2NSAP;
+				INFOPLIST_FILE = BrewActivityWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.talmeltzer.coffeehub.dev.BrewActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -367,6 +520,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BA000000000000000000001C /* Build configuration list for PBXNativeTarget "BrewActivityWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA000000000000000000009D /* Debug */,
+				BA000000000000000000009E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
