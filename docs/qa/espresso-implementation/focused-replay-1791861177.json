@@ -1,6 +1,0 @@
-{
-  "command": "node scripts/ruphus-espresso-tools.test.mjs",
-  "cpuIdlePercent": 58.35,
-  "exitCode": 1,
-  "log": "focused-replay-1791861177.log"
-}

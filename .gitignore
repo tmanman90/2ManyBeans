@@ -36,3 +36,9 @@ demo-recordings/
 # U5 raw provider artifacts remain outside the committed evaluation evidence.
 scripts/ruphus-eval/runs/raw/
 docs/data/ruphus-model-eval/runs/raw/
+
+# Raw QA run logs (receipts, manifests, failures) stay local; commit only the written summaries.
+docs/qa/**/*.json
+docs/qa/**/*.txt
+!docs/qa/**/acceptance-index.json
+!docs/qa/**/live-summary.json
