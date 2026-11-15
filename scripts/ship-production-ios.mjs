@@ -116,6 +116,10 @@ capgo([
   '--channel', PROD_CHANNEL,
   '--bundle', bundleVersion,
   '--fail-on-incompatible',
+  // Delta only: devices fetch just the files that changed. Every native build
+  // has shipped @capgo/capacitor-updater 8.45.0 (delta needs 7.0.35+ on 7.x),
+  // so no installed app needs the full zip.
+  '--delta-only',
   '--comment', `Production iOS bundle ${bundleVersion}`,
 ]);
 

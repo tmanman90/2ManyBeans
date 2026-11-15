@@ -98,9 +98,9 @@ const IMAGE_ICONS = {
 
 export function tastingIconImage(note) {
   const n = (note || '').toLowerCase().trim();
-  if (IMAGE_ICONS[n]) return `/images/tasting-icons/${IMAGE_ICONS[n]}.png`;
+  if (IMAGE_ICONS[n]) return `/images/tasting-icons/${IMAGE_ICONS[n]}.webp`;
   for (const [k, f] of Object.entries(IMAGE_ICONS)) {
-    if (n.includes(k)) return `/images/tasting-icons/${f}.png`;
+    if (n.includes(k)) return `/images/tasting-icons/${f}.webp`;
   }
   return null;
 }

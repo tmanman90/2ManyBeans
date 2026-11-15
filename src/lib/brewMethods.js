@@ -235,45 +235,36 @@ const handBrewGrindLabel = (bean, preferences) => {
 export const BREW_METHODS = {
   aiden: {
     label: 'Brew with Aiden',
-    icon: '/images/aiden-icon.png',
     category: 'machine',
     grindLabel: (bean, preferences) => formatAidenGrind(bean, preferences),
   },
   v60: {
     label: 'V60 Recipe',
-    icon: '/images/v60-icon.webp',
     category: 'pourover',
     grindLabel: handBrewGrindLabel,
   },
   kalita: {
     label: 'Kalita Wave Recipe',
-    icon: '/images/kalita-icon.webp',
     category: 'pourover',
     grindLabel: handBrewGrindLabel,
   },
   chemex: {
     label: 'Chemex Recipe',
-    icon: '/images/chemex-icon.webp',
     category: 'pourover',
     grindLabel: handBrewGrindLabel,
   },
   aeropress: {
     label: 'Aeropress Recipe',
-    icon: '/images/aeropress-icon.webp',
     category: 'immersion',
     grindLabel: handBrewGrindLabel,
   },
   'french-press': {
     label: 'French Press Recipe',
-    icon: '/images/frenchpress-icon.webp',
     category: 'immersion',
     grindLabel: handBrewGrindLabel,
   },
   espresso: {
     label: 'Espresso Recipe',
-    // Entry points use the shared Coffee/Droplets icon strategy; no
-    // espresso-specific raster asset exists in this release.
-    icon: null,
     category: 'espresso',
     // Espresso targets use their own schema and must never render a
     // pour-over/Aiden grind value in this shared bean-card helper.

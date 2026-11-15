@@ -3,9 +3,9 @@ import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 
 // Demo-only product imagery (does not touch the shared seed used for real accounts)
 const DEMO_PHOTOS = {
-  'ag-sanjose-1': '/images/demo/bags/san-jose-bag-t.png',
-  'ag-triangulo': '/images/demo/bags/el-triangulo-bag-t.png',
-  'dg-cafen': '/images/demo/bags/cafen-bag-t.png',
+  'ag-sanjose-1': '/images/demo/bags/san-jose-bag-t.webp',
+  'ag-triangulo': '/images/demo/bags/el-triangulo-bag-t.webp',
+  'dg-cafen': '/images/demo/bags/cafen-bag-t.webp',
 };
 
 const DEMO_BEANS_SEED = [
