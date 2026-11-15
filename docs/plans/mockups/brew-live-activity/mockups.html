@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brew Live Activity mockups</title>
+<!--
+  Mockups for docs/plans/2026-11-15-001-feat-brew-timer-live-activity-plan.md.
+  Sizes are iOS points for a 393 pt wide iPhone (15/16 Pro class), rendered 1 CSS px = 1 pt.
+  Sample recipe (no personal data): V60, 15 g coffee to 250 g water.
+    Bloom to 50 g 0:00 | Pour 2 to 120 g 0:45 | Pour 3 to 190 g 1:15 | Pour 4 to 250 g 1:45 | Drawdown 2:15 to 3:30
+  "Now" in the running boards is 1:24 into the brew: Pour 3 of 4, 0:21 left in the step.
+  Render: node docs/plans/mockups/brew-live-activity/render.mjs
+-->
+<style>
+  :root {
+    /* Widget tokens. The island is always black, so the brand caramel (#A2632F)
+       is lifted to a brighter caramel for contrast on black. */
+    --black: #000;
+    --ink: #F6EFE6;                 /* primary text on dark */
+    --ink-2: rgba(246,239,230,0.62);/* secondary */
+    --ink-3: rgba(246,239,230,0.38);/* tertiary, track */
+    --caramel: #E2A266;             /* accent on black */
+    --caramel-dim: rgba(226,162,102,0.28);
+    --sage: #8FC09A;                /* done */
+    --frost: #A9C3D0;               /* iced */
+    --amber: #E8BE6A;               /* waiting for you */
+    --ls-bg: #1B120C;               /* Lock Screen activityBackgroundTint (roast) */
+    --hair: rgba(246,239,230,0.10);
+    --page: #E9E2D8;
+    font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--page); color: #241710; padding: 24px; }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+  .board { width: 441px; background: #F7F3EE; border-radius: 20px; padding: 18px 24px 20px; margin-bottom: 24px; }
+  .board.wide { width: 900px; }
+  .board h2 { font: 700 11px/1.2 -apple-system, system-ui; letter-spacing: .12em; text-transform: uppercase; color: #8A7765; margin-bottom: 4px; }
+  .board h3 { font: 600 17px/1.25 -apple-system, system-ui; color: #241710; margin-bottom: 14px; letter-spacing: -.01em; }
+  .note { font: 500 12px/1.4 -apple-system, system-ui; color: #6E5D4E; margin-top: 8px; }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .cap { font: 600 11px/1.3 -apple-system, system-ui; color: #6E5D4E; margin: 10px 0 0 2px; }
+  .cap b { color: #241710; }
+
+  /* Phone top strip: a 393 pt wide slice of a dark wallpaper with the status bar. */
+  .strip { width: 393px; height: 64px; border-radius: 22px 22px 0 0; position: relative; overflow: hidden;
+           background: linear-gradient(160deg, #3A4A55 0%, #26313A 60%, #1C232A 100%); }
+  .strip.tall { height: 196px; }
+  .sb { position: absolute; top: 19px; font: 600 16px/1 -apple-system, system-ui; color: #fff; }
+  .sb.l { left: 34px; } .sb.r { right: 30px; display: flex; gap: 6px; align-items: center; }
+  .bars { display: flex; gap: 2px; align-items: flex-end; height: 11px; }
+  .bars i { width: 3px; background: #fff; border-radius: 1px; display: block; }
+  .batt { width: 25px; height: 12px; border: 1.5px solid rgba(255,255,255,.55); border-radius: 4px; padding: 1.5px; }
+  .batt i { display: block; height: 100%; width: 70%; background: #fff; border-radius: 1.5px; }
+
+  /* Dynamic Island */
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); height: 36.67px; background: var(--black);
+            border-radius: 18.33px; display: flex; align-items: center; justify-content: space-between; }
+  .island.compact { width: 231px; padding: 0 10px 0 12px; }
+  .island.rest { width: 126.67px; }
+  .island .lead, .island .trail { display: flex; align-items: center; gap: 4px; height: 100%; }
+  .island .trail { justify-content: flex-end; min-width: 44px; }
+  .cmp-num { font: 600 15px/1 -apple-system, system-ui; letter-spacing: -.01em; }
+  .camera { position: absolute; top: 11px; left: 50%; margin-left: 30px; width: 11px; height: 11px; border-radius: 50%;
+            background: radial-gradient(circle at 40% 40%, #1d2a3a 0%, #0a0f15 60%); transform: translateY(13px); }
+
+  /* Minimal: detached circle to the right of the island */
+  .minimal { position: absolute; top: 11px; width: 36.67px; height: 36.67px; border-radius: 50%; background: #000;
+             display: flex; align-items: center; justify-content: center; }
+
+  /* Expanded */
+  .expanded { position: absolute; top: 11px; left: 11px; width: 371px; background: #000; border-radius: 44px;
+              padding: 14px 22px 18px; color: var(--ink); }
+  .ex-top { display: flex; justify-content: space-between; align-items: flex-start; height: 44px; }
+  .ex-top .lead { display: flex; flex-direction: column; gap: 3px; padding-top: 2px; }
+  .eyebrow { font: 700 11px/1.1 -apple-system, system-ui; letter-spacing: .08em; text-transform: uppercase; }
+  .ex-big { font: 600 34px/1 -apple-system, system-ui; letter-spacing: -.02em; }
+  .ex-target { font: 600 22px/1.15 -apple-system, system-ui; letter-spacing: -.015em; margin-top: 6px; }
+  .ex-target .u { color: var(--ink-2); font-weight: 500; }
+
+  /* Brew progress bar with one segment per step */
+  .segs { display: flex; gap: 3px; height: 6px; margin-top: 12px; }
+  .segs i { display: block; height: 100%; border-radius: 3px; background: var(--ink-3); position: relative; overflow: hidden; }
+  .segs i.done { background: var(--caramel); }
+  .segs i.cur > b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--caramel); border-radius: 3px; }
+  .foot { display: flex; justify-content: space-between; margin-top: 8px; font: 500 13px/1.2 -apple-system, system-ui; color: var(--ink-2); }
+  .foot .next b { color: var(--ink); font-weight: 600; }
+
+  /* Lock Screen */
+  .lock { width: 393px; height: 852px; border-radius: 48px; position: relative; overflow: hidden;
+          background: radial-gradient(120% 70% at 30% 20%, #5B6E66 0%, #2E3B3B 45%, #141A1C 100%); }
+  .lock.short { height: 560px; }
+  .lock .date { position: absolute; top: 70px; width: 100%; text-align: center; font: 600 20px/1 -apple-system, system-ui; color: rgba(255,255,255,.85); }
+  .lock .clock { position: absolute; top: 92px; width: 100%; text-align: center; font: 700 96px/1 -apple-system, "SF Pro Display", system-ui; color: rgba(255,255,255,.92); letter-spacing: -.02em; }
+  .lock .la { position: absolute; left: 11px; bottom: 140px; }
+  .lock.short .la { bottom: auto; top: 250px; }
+  .la { width: 371px; border-radius: 24px; background: var(--ls-bg); color: var(--ink); padding: 14px 16px 14px 14px;
+        display: flex; gap: 12px; }
+  .keyline { width: 4px; border-radius: 3px; background: var(--caramel); flex: none; }
+  .la-body { flex: 1; min-width: 0; }
+  .la-head { display: flex; justify-content: space-between; align-items: center; font: 600 13px/1.2 -apple-system, system-ui; color: var(--ink-2); }
+  .la-head .t { display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .la-main { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; }
+  .la-main .what { font: 600 24px/1.1 -apple-system, system-ui; letter-spacing: -.02em; }
+  .la-main .what .u { color: var(--ink-2); font-weight: 500; }
+  .la-main .sub { font: 600 12px/1.2 -apple-system, system-ui; color: var(--ink-2); margin-top: 3px; letter-spacing: .04em; text-transform: uppercase; }
+  .la-main .clockbig { font: 600 38px/0.9 -apple-system, system-ui; letter-spacing: -.02em; color: var(--caramel); }
+  .hint { font: 600 12px/1 -apple-system, system-ui; color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 16px;
+         font: 600 14px/1 -apple-system, system-ui; }
+  .bottom-dock { position: absolute; bottom: 40px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 48px; }
+  .bottom-dock i { width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.14); display: block; backdrop-filter: blur(10px); }
+  .home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.8); }
+
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; font: 500 12px/1.4 -apple-system, system-ui; color: #6E5D4E; margin-top: 12px; }
+  .legend b { color: #241710; }
+</style>
+</head>
+<body>
+
+<!-- SVG glyph symbols (stand-ins for SF Symbols: drop.fill, hourglass, pause.fill, checkmark, snowflake, hand.tap) -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="drop" viewBox="0 0 24 24"><path d="M12 2.5c-.3 0-.6.15-.78.4C8.7 6.4 5.5 10.9 5.5 14.6A6.5 6.5 0 0 0 18.5 14.6c0-3.7-3.2-8.2-5.72-11.7a.96.96 0 0 0-.78-.4Z" fill="currentColor"/></symbol>
+  <symbol id="hourglass" viewBox="0 0 24 24"><path d="M6 2.75h12M6 21.25h12M7.5 2.75v2.6c0 2 1.2 3.7 3 4.6l1.5.75-1.5.75c-1.8.9-3 2.6-3 4.6v4.2M16.5 2.75v2.6c0 2-1.2 3.7-3 4.6L12 10.7l1.5.75c1.8.9 3 2.6 3 4.6v4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 19.5c0-1.5 1.3-2.6 3-3.4 1.7.8 3 1.9 3 3.4Z" fill="currentColor"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1.3" fill="currentColor"/><rect x="14" y="4.5" width="4" height="15" rx="1.3" fill="currentColor"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="snow" viewBox="0 0 24 24"><path d="M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5M9.3 4.3 12 6.6l2.7-2.3M9.3 19.7 12 17.4l2.7 2.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="tap" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></symbol>
+  <symbol id="cup" viewBox="0 0 24 24"><path d="M4 8.5h12.5v5.5a5.5 5.5 0 0 1-5.5 5.5H9.5A5.5 5.5 0 0 1 4 14V8.5Zm12.5 1.5h1.2a2.8 2.8 0 0 1 0 5.6h-1.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 2.8c-.6.9.6 1.6 0 2.6M11.5 2.8c-.6.9.6 1.6 0 2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+</svg>
+
+<template id="statusbar"><div class="sb l num">9:41</div><div class="sb r"><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span class="batt"><i></i></span></div></template>
+
+<!-- ============ 01 COMPACT ============ -->
+<div class="board" id="compact">
+  <h2>01 · Compact</h2>
+  <h3>Island while you use another app</h3>
+
+  <div class="strip" data-sb>
+    <div class="island compact">
+      <div class="lead" style="color:var(--caramel)">
+        <svg width="12" height="12"><use href="#drop"/></svg>
+        <span class="cmp-num num">190g</span>
+      </div>
+      <div class="trail"><span class="cmp-num num" style="color:var(--ink)">0:21</span></div>
+    </div>
+  </div>
+  <div class="cap"><b>Pouring.</b> Target scale weight left, step countdown right.</div>
+
+  <div class="strip" data-sb style="margin-top:14px">
+    <div class="island compact">
+      <div class="lead" style="color:var(--caramel)"><svg width="15" height="15"><use href="#hourglass"/></svg></div>
+      <div class="trail"><span class="cmp-num num" style="color:var(--ink)">1:12</span></div>
+    </div>
+  </div>
+  <div class="cap"><b>Drawdown or wait.</b> Glyph left, time left in the step right.</div>
+
+  <div class="strip" data-sb style="margin-top:14px">
+    <div class="island compact">
+      <div class="lead" style="color:var(--ink-2)"><svg width="13" height="13"><use href="#pause"/></svg></div>
+      <div class="trail"><span class="cmp-num num" style="color:var(--ink-2)">0:21</span></div>
+    </div>
+  </div>
+  <div class="cap"><b>Paused.</b> Frozen time, muted. Nothing ticks.</div>
+
+  <div class="strip" data-sb style="margin-top:14px">
+    <div class="island compact">
+      <div class="lead" style="color:var(--amber)"><svg width="14" height="14"><use href="#tap"/></svg></div>
+      <div class="trail"><span class="cmp-num" style="color:var(--amber);font-size:14px">Your turn</span></div>
+    </div>
+  </div>
+  <div class="cap"><b>Confirm-to-advance step</b> (source recipes that wait for you). No countdown to show.</div>
+</div>
+
+<!-- ============ 02 MINIMAL ============ -->
+<div class="board" id="minimal">
+  <h2>02 · Minimal</h2>
+  <h3>When music or another activity is also live</h3>
+
+  <div class="strip" data-sb>
+    <!-- other activity (music) takes the island; ours is the detached circle -->
+    <div class="island" style="width:126.67px;padding:0 10px">
+      <div style="width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6d5bd0,#d0679c)"></div>
+      <svg width="22" height="14" viewBox="0 0 22 14"><g fill="#d0679c"><rect x="0" y="5" width="2.5" height="4" rx="1"/><rect x="5" y="2" width="2.5" height="10" rx="1"/><rect x="10" y="4" width="2.5" height="6" rx="1"/><rect x="15" y="0" width="2.5" height="14" rx="1"/><rect x="19.5" y="4" width="2.5" height="6" rx="1"/></g></svg>
+    </div>
+    <div class="minimal" style="left:calc(50% + 70px)">
+      <svg width="30" height="30" viewBox="0 0 30 30">
+        <circle cx="15" cy="15" r="12.5" fill="none" stroke="rgba(226,162,102,0.25)" stroke-width="3"/>
+        <circle cx="15" cy="15" r="12.5" fill="none" stroke="#E2A266" stroke-width="3" stroke-linecap="round"
+                stroke-dasharray="78.54" stroke-dashoffset="23.6" transform="rotate(-90 15 15)"/>
+        <use href="#drop" x="9.5" y="9.5" width="11" height="11" style="color:#E2A266"/>
+      </svg>
+    </div>
+  </div>
+  <div class="cap"><b>Running.</b> Ring drains to the end of the current step (ProgressView(timerInterval:), no app updates).</div>
+
+  <div class="row" style="margin-top:16px;gap:28px">
+    <div>
+      <div class="strip" data-sb style="width:190px;border-radius:22px 22px 0 0">
+        <div class="island rest" style="left:40%"></div>
+        <div class="minimal" style="left:146px">
+          <svg width="30" height="30" viewBox="0 0 30 30">
+            <circle cx="15" cy="15" r="12.5" fill="none" stroke="rgba(226,162,102,0.25)" stroke-width="3"/>
+            <circle cx="15" cy="15" r="12.5" fill="none" stroke="#E2A266" stroke-width="3" stroke-linecap="round" stroke-dasharray="78.54" stroke-dashoffset="62" transform="rotate(-90 15 15)"/>
+            <use href="#hourglass" x="9" y="9" width="12" height="12" style="color:#E2A266"/>
+          </svg>
+        </div>
+      </div>
+      <div class="cap"><b>Drawdown</b></div>
+    </div>
+    <div>
+      <div class="strip" data-sb style="width:190px">
+        <div class="island rest" style="left:40%"></div>
+        <div class="minimal" style="left:146px"><svg width="14" height="14" style="color:var(--ink-2)"><use href="#pause"/></svg></div>
+      </div>
+      <div class="cap"><b>Paused</b></div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px;gap:28px">
+    <div>
+      <div class="strip" data-sb style="width:190px">
+        <div class="island rest" style="left:40%"></div>
+        <div class="minimal" style="left:146px"><svg width="16" height="16" style="color:var(--sage)"><use href="#check"/></svg></div>
+      </div>
+      <div class="cap"><b>Done</b></div>
+    </div>
+    <div>
+      <div class="strip" data-sb style="width:190px">
+        <div class="island rest" style="left:40%"></div>
+        <div class="minimal" style="left:146px"><svg width="15" height="15" style="color:var(--amber)"><use href="#tap"/></svg></div>
+      </div>
+      <div class="cap"><b>Your turn</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 EXPANDED ============ -->
+<div class="board" id="expanded">
+  <h2>03 · Expanded</h2>
+  <h3>Long-press the island</h3>
+  <div class="strip tall" data-sb style="height:200px">
+    <div class="expanded">
+      <div class="ex-top">
+        <div class="lead">
+          <div class="eyebrow" style="color:var(--caramel);display:flex;gap:5px;align-items:center"><svg width="11" height="11"><use href="#drop"/></svg>Pour 3 of 4</div>
+          <div style="font:500 12px/1.2 -apple-system,system-ui;color:var(--ink-2)">V60 · 15 g</div>
+        </div>
+        <div class="ex-big num" style="color:var(--caramel)">0:21</div>
+      </div>
+      <div class="ex-target">Pour to 190 <span class="u">g</span></div>
+      <div class="segs">
+        <i class="done" style="flex:45"></i><i class="done" style="flex:30"></i><i class="cur" style="flex:30"><b style="width:30%"></b></i><i style="flex:30"></i><i style="flex:75"></i>
+      </div>
+      <div class="foot">
+        <span class="num">1:24 of 3:30</span>
+        <span class="next">Next <b>Pour 4 to 250 g</b> <span class="num">1:45</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>Running.</b> Same placement as compact: target left, countdown right. One segment per step, sized by its duration.</div>
+</div>
+
+<!-- ============ 04 LOCK SCREEN ============ -->
+<div class="board" id="lock">
+  <h2>04 · Lock Screen</h2>
+  <h3>Phone locked mid-brew</h3>
+  <div class="lock">
+    <div class="date">Sunday, November 15</div>
+    <div class="clock num">9:41</div>
+    <div class="la">
+      <div class="keyline"></div>
+      <div class="la-body">
+        <div class="la-head">
+          <span class="t"><svg width="13" height="13" style="color:var(--caramel)"><use href="#cup"/></svg>Ethiopia Guji · V60</span>
+          <span class="num">1:24 of 3:30</span>
+        </div>
+        <div class="la-main">
+          <div>
+            <div class="sub">Pour 3 of 4</div>
+            <div class="what">Pour to 190 <span class="u">g</span></div>
+          </div>
+          <div class="clockbig num">0:21</div>
+        </div>
+        <div class="segs" style="margin-top:12px">
+          <i class="done" style="flex:45"></i><i class="done" style="flex:30"></i><i class="cur" style="flex:30"><b style="width:30%"></b></i><i style="flex:30"></i><i style="flex:75"></i>
+        </div>
+        <div class="foot" style="margin-top:9px">
+          <span class="next">Next <b>Pour 4 to 250 g</b></span>
+          <span class="num">at 1:45</span>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-dock"><i></i><i></i></div>
+    <div class="home"></div>
+  </div>
+  <div class="cap"><b>Running.</b> 371 x 150 pt, under the 160 pt cap. Roast background, caramel keyline. Tap opens the timer.</div>
+</div>
+
+<!-- ============ 05 DONE ============ -->
+<div class="board" id="done">
+  <h2>05 · Done</h2>
+  <h3>Brew finished (stays about 2 minutes, then dismisses)</h3>
+
+  <div class="strip" data-sb>
+    <div class="island compact">
+      <div class="lead" style="color:var(--sage)"><svg width="15" height="15"><use href="#check"/></svg></div>
+      <div class="trail"><span class="cmp-num num" style="color:var(--ink)">3:28</span></div>
+    </div>
+  </div>
+  <div class="cap"><b>Compact.</b> Check plus total brew time.</div>
+
+  <div class="strip tall" data-sb style="margin-top:14px;height:170px">
+    <div class="expanded" style="padding-bottom:16px">
+      <div class="ex-top">
+        <div class="lead">
+          <div class="eyebrow" style="color:var(--sage);display:flex;gap:5px;align-items:center"><svg width="11" height="11"><use href="#check"/></svg>Brew done</div>
+          <div style="font:500 12px/1.2 -apple-system,system-ui;color:var(--ink-2)">V60 · 15 g</div>
+        </div>
+        <div class="ex-big num">3:28</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+        <div style="font:600 20px/1.2 -apple-system,system-ui;letter-spacing:-.015em">Ready to taste</div>
+        <span class="btn" style="background:var(--caramel);color:#1B120C"><svg width="14" height="14"><use href="#cup"/></svg>Rate this cup</span>
+      </div>
+      <div class="segs" style="margin-top:12px"><i class="done" style="flex:45;background:var(--sage)"></i><i class="done" style="flex:30;background:var(--sage)"></i><i class="done" style="flex:30;background:var(--sage)"></i><i class="done" style="flex:30;background:var(--sage)"></i><i class="done" style="flex:75;background:var(--sage)"></i></div>
+    </div>
+  </div>
+  <div class="cap"><b>Expanded.</b> The button is a deep link (Link), not an intent. It opens tasting for this bean.</div>
+
+  <div class="lock short" style="margin-top:14px;height:430px">
+    <div class="date">Sunday, November 15</div>
+    <div class="clock num">9:43</div>
+    <div class="la" style="top:236px">
+      <div class="keyline" style="background:var(--sage)"></div>
+      <div class="la-body">
+        <div class="la-head">
+          <span class="t"><svg width="13" height="13" style="color:var(--sage)"><use href="#cup"/></svg>Ethiopia Guji · V60</span>
+          <span style="color:var(--sage)">Brew done</span>
+        </div>
+        <div class="la-main">
+          <div>
+            <div class="sub">Total time</div>
+            <div class="what num">3:28</div>
+          </div>
+          <span class="btn" style="background:var(--caramel);color:#1B120C"><svg width="14" height="14"><use href="#cup"/></svg>Rate this cup</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>Lock Screen.</b> Shrinks to about 100 pt. Sage keyline marks the change from brewing to done.</div>
+</div>
+
+<!-- ============ 06 OTHER STATES ============ -->
+<div class="board" id="states">
+  <h2>06 · Other states</h2>
+  <h3>Paused, your turn, iced chill (Lock Screen)</h3>
+
+  <div class="la" style="background:var(--ls-bg)">
+    <div class="keyline" style="background:var(--ink-3)"></div>
+    <div class="la-body">
+      <div class="la-head"><span class="t"><svg width="13" height="13" style="color:var(--ink-2)"><use href="#cup"/></svg>Ethiopia Guji · V60</span><span class="num">1:24 of 3:30</span></div>
+      <div class="la-main">
+        <div><div class="sub">Paused · Pour 3 of 4</div><div class="what" style="color:var(--ink-2)">Pour to 190 <span class="u">g</span></div></div>
+        <div class="clockbig num" style="color:var(--ink-2)">0:21</div>
+      </div>
+      <div class="segs" style="margin-top:12px;opacity:.55"><i class="done" style="flex:45"></i><i class="done" style="flex:30"></i><i class="cur" style="flex:30"><b style="width:30%"></b></i><i style="flex:30"></i><i style="flex:75"></i></div>
+    </div>
+  </div>
+  <div class="cap"><b>Paused.</b> Static text only, grey keyline. No timer anchors, so nothing drifts.</div>
+
+  <div class="la" style="margin-top:14px">
+    <div class="keyline" style="background:var(--amber)"></div>
+    <div class="la-body">
+      <div class="la-head"><span class="t"><svg width="13" height="13" style="color:var(--amber)"><use href="#cup"/></svg>Kenya Nyeri · Switch</span><span class="num">2:05 elapsed</span></div>
+      <div class="la-main">
+        <div><div class="sub" style="color:var(--amber)">Your turn · Step 3 of 5</div><div class="what">Open the valve</div></div>
+        <div style="text-align:right"><div class="hint" style="justify-content:flex-end">waiting</div><div class="num" style="font:600 26px/1 -apple-system,system-ui;color:var(--amber);margin-top:4px">0:08</div></div>
+      </div>
+      <div class="foot" style="margin-top:10px"><span>Open the app to confirm</span><span class="next">Then <b>Drawdown</b></span></div>
+    </div>
+  </div>
+  <div class="cap"><b>Your turn.</b> Source recipes that advance on confirmation. Counts up from when the step became due (Text(date, style: .timer)).</div>
+
+  <div class="la" style="margin-top:14px">
+    <div class="keyline" style="background:var(--frost)"></div>
+    <div class="la-body">
+      <div class="la-head"><span class="t"><svg width="13" height="13" style="color:var(--frost)"><use href="#snow"/></svg>Ethiopia Guji · Iced V60</span><span class="num">Brew 3:05</span></div>
+      <div class="la-main">
+        <div><div class="sub" style="color:var(--frost)">Chill and serve</div><div class="what">Swirl over ice</div></div>
+        <svg width="40" height="40" viewBox="0 0 40 40" style="color:var(--frost)"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(169,195,208,.25)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#A9C3D0" stroke-width="4" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="40" transform="rotate(-90 20 20)"/><use href="#snow" x="12" y="12" width="16" height="16"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>Iced.</b> After drawdown, the frost tint takes over for the chill step, matching the in-app iced mode.</div>
+</div>
+
+<script>
+  const sb = document.getElementById('statusbar');
+  document.querySelectorAll('[data-sb]').forEach(el => el.prepend(sb.content.cloneNode(true)));
+</script>
+</body>
+</html>
