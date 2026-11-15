@@ -4,6 +4,7 @@
 
 import { MANUAL_SOURCE_CLOCK_EVENTS, MANUAL_SOURCE_RECORD_VERSION } from './manualRecipeContract.js';
 import { MANUAL_SOURCE_PROJECTION_VERSION, manualSourceConfigurationKey } from './manualSourceProjection.js';
+import { normalizeScaleSummary } from './scale/scaleSession.js';
 
 export const TIMING_MEMORY_LIMIT = 24;
 export const LEARNING_COMPLETION_KINDS = new Set(['natural', 'manualEarly', 'userFinished']);
@@ -243,6 +244,7 @@ export function buildTimingEvent(snapshot) {
   }
 
   const createdAt = finiteNonNegative(snapshot?.createdAt) ? snapshot.createdAt : Date.now();
+  const scaleSummary = normalizeScaleSummary(snapshot?.scaleSummary);
   return {
     sessionId,
     beanId,
@@ -260,6 +262,7 @@ export function buildTimingEvent(snapshot) {
     createdAt: Math.round(createdAt),
     lineage,
     ...(sourceTiming || {}),
+    ...(scaleSummary ? { scaleSummary } : {}),
   };
 }
 

@@ -28,6 +28,12 @@ import {
 } from '../hooks/useManualSourceBrewTimer';
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
+import { useScaleBrew } from '../hooks/useScaleBrew';
+import { lastScaleCurve, pourProgress, targetState } from '../lib/scale/scaleSession';
+import { ScalePairSheet } from './scale/ScalePairSheet';
+import { ScalePrebrew } from './scale/ScalePrebrew';
+import { ScaleSummary } from './scale/ScaleSummary';
+import { BigGrams, FlowCard, PourChips, RingLabel, RingSub, ScaleRing, ScaleStatusPill } from './scale/ScaleParts';
 import {
   resolveGuideState,
   resolveStepTiming,
@@ -432,8 +438,8 @@ function useConfirmedSourceTimer(recipe, {
     if (source.running) setPhase('running');
     else setPhase('countdown');
   }, [source.running]);
-  const beginRunning = useCallback(() => {
-    source.act('start');
+  const beginRunning = useCallback((atMs) => {
+    source.act('start', atMs);
     setPhase('running');
   }, [source]);
   const pause = useCallback(() => {
@@ -458,6 +464,7 @@ function useConfirmedSourceTimer(recipe, {
     return next?.events?.['extraction:complete'] == null ? null : source.elapsedMs;
   }, [source]);
   const rewind = useCallback(() => source.act('undo'), [source]);
+  const cancelCountdown = useCallback(() => setPhase((current) => (current === 'countdown' ? 'idle' : current)), []);
   const reset = useCallback(() => {
     onReplaceSourceTimerState?.(initialManualBrewState(record, binding));
   }, [binding, onReplaceSourceTimerState, record]);
@@ -484,6 +491,7 @@ function useConfirmedSourceTimer(recipe, {
     skipForward: advance,
     rewind,
     reset,
+    cancelCountdown,
     completionKind: source.done ? 'userFinished' : null,
     completionElapsedMs: source.done ? source.elapsedMs : null,
     completionAtMs,
@@ -517,6 +525,14 @@ const BrewTimerShell = ({
   const sourceProjection = recipe?.sourceProjection || null;
   const isConfirmedSource = timer.sourceMode === 'confirmed';
   const suppressStepAlert = useBrewTimerAlerts(open, phase, stepIndex, timer.sourceReadiness?.status);
+  const doseGrams = Number(recipe?.coffeeGrams ?? sourceProjection?.coffeeGrams);
+  // A recovered or already-started brew never waits for the scale.
+  const canHoldForScale = !restoredSession && !Number.isFinite(sourceTimerState?.events?.['first-water']);
+  const scaleBrew = useScaleBrew({
+    open, phase, stepIndex, timerSteps, beginRunning, canHold: canHoldForScale, doseGrams,
+  });
+  const scale = scaleBrew.scale;
+  const scaleLive = scaleBrew.stage === 'live' && (phase === 'running' || phase === 'paused');
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
@@ -588,6 +604,7 @@ const BrewTimerShell = ({
   }, [open, timerOverride, phase, stepIndex, recipe, bean, saveState, getClockSnapshot, timerOwner]);
 
   const persistCompletion = useCallback(async () => {
+    const scaleSummary = scaleBrew.finishSummary(Math.round(completionAtMs ?? Date.now()));
     const session = sessionRef.current;
     if (!session || !completionKind) {
       setSaveState('ephemeral');
@@ -618,9 +635,10 @@ const BrewTimerShell = ({
         sourceEvents,
         sourceCorrections: isConfirmedSource ? timer.sourceCorrections : [],
       } : {}),
+      ...(scaleSummary ? { scaleSummary } : {}),
     });
     setSaveState(status);
-  }, [completionAtMs, completionElapsedMs, completionKind, isConfirmedSource, onSaveTimingEvent, readGlobalMs, sourceProjection, timer.sourceCorrections, timer.sourceEvents]);
+  }, [completionAtMs, completionElapsedMs, completionKind, isConfirmedSource, onSaveTimingEvent, readGlobalMs, scaleBrew, sourceProjection, timer.sourceCorrections, timer.sourceEvents]);
 
   useEffect(() => {
     if (phase !== 'done' || reportedRef.current) return;
@@ -635,14 +653,15 @@ const BrewTimerShell = ({
       return;
     }
     if (!isReady) return;
-    if (phase === 'idle') start();
-  }, [open, isReady, phase, start, reset]);
+    if (phase === 'idle' && !scaleBrew.holdStart) start();
+  }, [open, isReady, phase, start, reset, scaleBrew.holdStart]);
 
   // Screen wake lock — acquire during running, release on pause/done/unmount.
   // Re-acquire on foreground (visibilitychange) because iOS auto-releases the
   // sentinel when the page is hidden.
+  const keepAwake = phase === 'running' || (open && scaleBrew.holdStart);
   useEffect(() => {
-    if (phase !== 'running') {
+    if (!keepAwake) {
       releaseWakeLock();
       return;
     }
@@ -657,7 +676,7 @@ const BrewTimerShell = ({
       document.removeEventListener('visibilitychange', onVis);
       releaseWakeLock();
     };
-  }, [phase]);
+  }, [keepAwake]);
 
   // Ring animation loop — reads Date.now-derived elapsed directly from the
   // hook's refs every frame, NOT from React state. This is the only way to
@@ -723,6 +742,13 @@ const BrewTimerShell = ({
       pillNode.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
   }, [stepIndex]);
+
+  const scaleSummary = scaleBrew.summary;
+  const lastCurve = useMemo(() => {
+    if (!scaleSummary || !recipe || !bean?.id) return null;
+    const context = timingContextFromRecipe({ beanId: bean.id, recipe, mode: recipe.isIced ? 'iced' : 'hot' });
+    return lastScaleCurve(bean.handBrewTimingMemory, { device: context?.device, mode: context?.mode, beforeMs: scaleSummary.firstWaterAtMs });
+  }, [scaleSummary, recipe, bean]);
 
   if (!open) return null;
 
@@ -810,6 +836,23 @@ const BrewTimerShell = ({
     }
   };
 
+  const prebrew = phase === 'idle' || phase === 'countdown';
+  const handleScalePill = () => {
+    if (scaleLive && ['lost', 'silent'].includes(scale.status)) {
+      scale.reconnect();
+      return;
+    }
+    if (!prebrew || ['connected', 'connecting'].includes(scale.status)) return;
+    if (phase === 'countdown') (timer.cancelCountdown || reset)();
+    scaleBrew.openPair();
+  };
+  const scaleTarget = scaleBrew.target;
+  const scaleGrams = scale.grams ?? 0;
+  const scaleState = scaleLive ? targetState(scaleGrams, scaleTarget?.targetG) : null;
+  const isLastPour = scaleTarget && scaleTarget === scaleBrew.targets[scaleBrew.targets.length - 1];
+  const nextPour = scaleTarget ? scaleBrew.targets[scaleBrew.targets.indexOf(scaleTarget) + 1] : null;
+  const scaleRingColor = phase === 'paused' ? C.accentLight : scaleState === 'reached' ? C.green : scaleState === 'over' ? C.amber : C.accent;
+
   const beanName = bean?.name || bean?.roasterName || '';
   const beanPhoto = bean?.productPhotoUrl || bean?.photoUrl || null;
 
@@ -845,6 +888,8 @@ const BrewTimerShell = ({
           50% { filter: drop-shadow(0 0 14px rgba(168,106,56,0.45)); }
         }
         .brew-pills::-webkit-scrollbar { display: none; }
+        @keyframes scaleSpin { to { transform: rotate(360deg); } }
+        .scale-spinner { animation: scaleSpin 0.9s linear infinite; }
         .brew-ring-active {
           animation: brewRingGlow 2.4s ease-in-out infinite;
         }
@@ -903,6 +948,11 @@ const BrewTimerShell = ({
             )}
           </div>
         </div>
+        {scale.available && (
+          <div style={{ flexShrink: 0, marginLeft: 8 }}>
+            <ScaleStatusPill scale={scale} onPress={handleScalePill} disabled={!prebrew && !(scaleLive && ['lost', 'silent'].includes(scale.status))} />
+          </div>
+        )}
         <m.button
           onClick={handleCloseRequest}
           aria-label="Close brew timer"
@@ -933,9 +983,48 @@ const BrewTimerShell = ({
       }}>
         <div inert={completionOverlayVisible ? true : undefined} aria-hidden={completionOverlayVisible ? true : undefined} style={{ display: 'contents' }}>
         {/* Countdown overlay (covers the rest while active) */}
-        {phase === 'countdown' && <Countdown onDone={beginRunning} />}
+        {phase === 'countdown' && !scaleBrew.holdStart && <Countdown onDone={beginRunning} />}
+        {['connecting', 'lost', 'tare', 'listening'].includes(scaleBrew.stage) && (
+          <ScalePrebrew
+            stage={scaleBrew.stage}
+            scale={scale}
+            doseGrams={doseGrams}
+            iced={Boolean(recipe?.isIced)}
+            firstStep={timerSteps?.[0]?.step}
+            targets={scaleBrew.targets}
+            onTare={scaleBrew.tare}
+            onStartNow={scaleBrew.startNow}
+            onStartWithout={scaleBrew.startWithoutScale}
+            onRetry={scale.reconnect}
+          />
+        )}
 
-        {/* Ring */}
+        {scaleLive ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            {scaleBrew.startedToast ? (
+              <div role="status" style={{ minHeight: 36, background: C.accentDark, color: '#fff', fontSize: 13, fontWeight: 700, padding: '0 14px', borderRadius: radius.pill, display: 'flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap', boxShadow: shadows.e2 }}>
+                <Check size={14} strokeWidth={3} /> Timer started on your first pour
+              </div>
+            ) : (
+              <div style={{ minHeight: 36, display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ ...typeScale.label, color: C.textLight, letterSpacing: '0.08em' }}>{phase === 'paused' ? 'Paused' : 'Brewing'}</span>
+                <span style={{ fontFamily: fonts.heading, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{formatMMSS(globalElapsedMs)}</span>
+              </div>
+            )}
+            <ScaleRing progress={pourProgress(scaleGrams, scaleBrew.targets, scaleTarget)} color={scaleRingColor}>
+              <RingLabel color={scaleState === 'reached' ? C.green : scaleState === 'over' ? C.amber : C.accent}>{!scaleTarget ? 'Water' : scaleTarget.label === 'Bloom' ? 'Bloom pour' : scaleTarget.label}</RingLabel>
+              <BigGrams grams={scale.grams} />
+              <RingSub>
+                {scale.status === 'connecting' ? 'Scale reconnecting'
+                  : ['silent', 'lost'].includes(scale.status) ? 'Scale not connected · tap it above'
+                  : !scaleTarget ? ''
+                  : scaleState === 'over' ? `of ${scaleTarget.targetG} g · ${Math.round(scaleGrams - scaleTarget.targetG)} g over`
+                    : scaleState === 'reached' ? `of ${scaleTarget.targetG} g`
+                      : `of ${scaleTarget.targetG} g · ${(scaleTarget.targetG - scaleGrams).toFixed(1)} g to go`}
+              </RingSub>
+            </ScaleRing>
+          </div>
+        ) : (
         <div style={{
           position: 'relative',
           width: 'min(280px, calc(100vw - 40px), 34vh)',
@@ -1036,6 +1125,7 @@ const BrewTimerShell = ({
             </div>
           </div>
         </div>
+        )}
 
         {(phase === 'running' || phase === 'paused') && (
           <button
@@ -1051,8 +1141,8 @@ const BrewTimerShell = ({
         )}
 
         {/* Current step name + instruction */}
-        <div style={{ textAlign: 'center', padding: '12px 8px 6px', width: '100%' }}>
-          <div style={{
+        <div style={{ textAlign: 'center', padding: scaleLive ? '4px 4px 0' : '12px 8px 6px', width: '100%' }}>
+          {!scaleLive && <div style={{
             fontFamily: fonts.heading,
             fontSize: 26,
             fontWeight: 600,
@@ -1062,7 +1152,7 @@ const BrewTimerShell = ({
             letterSpacing: '-0.01em',
           }}>
             {currentStep?.step?.name || currentStep?.step?.label || `Step ${stepIndex + 1}`}
-          </div>
+          </div>}
           <div role="status" aria-live="polite" aria-atomic="true" style={{
             fontSize: 14,
             color: C.textMuted,
@@ -1073,7 +1163,7 @@ const BrewTimerShell = ({
           }}>
             {currentStep?.step?.action || ''}
           </div>
-          {currentStep?.step?.waterTotal != null && (
+          {!scaleLive && currentStep?.step?.waterTotal != null && (
             <div style={{
               marginTop: 12,
               display: 'inline-flex',
@@ -1103,8 +1193,22 @@ const BrewTimerShell = ({
           )}
         </div>
 
+        {scaleLive && (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {scaleState === 'reached' || scaleState === 'over' ? (
+              <div role="status" style={{ width: '100%', boxSizing: 'border-box', borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'center', fontWeight: 800, fontSize: 16, background: scaleState === 'over' ? C.amber : C.green, color: '#fff' }}>
+                <span>{scaleState === 'over' ? `Over by ${Math.round(scaleGrams - scaleTarget.targetG)} g` : isLastPour ? 'Last pour done' : 'Stop pouring'}</span>
+                {nextPour && <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 13, opacity: 0.9 }}>Next pour at {formatMMSS(nextPour.startSeconds * 1000)}</span>}
+              </div>
+            ) : (
+              <FlowCard gps={scaleBrew.flow} />
+            )}
+            <PourChips targets={scaleBrew.targets} current={scaleTarget} poured={scaleBrew.poured} />
+          </div>
+        )}
+
         {/* Step pills */}
-        <div
+        {!scaleLive && <div
           ref={pillsScrollRef}
           className="brew-pills"
           style={{
@@ -1156,7 +1260,7 @@ const BrewTimerShell = ({
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {/* Controls */}
         <div style={{
@@ -1198,7 +1302,21 @@ const BrewTimerShell = ({
         {phase === 'done' && recipe?.isIced && !chilled && (
           <ChillServeScreen postBrewInstruction={recipe?.postBrewSteps?.[0]?.action} onCoffeeChilled={() => setChilled(true)} onDismiss={() => { clearBrewTimerSession(timerOwner); onClose?.(); }} saveState={saveState} onRetrySave={persistCompletion} />
         )}
-        {phase === 'done' && (!recipe?.isIced || chilled) && (
+        {phase === 'done' && (!recipe?.isIced || chilled) && scaleSummary && (
+          <ScaleSummary
+            summary={scaleSummary}
+            lastCurve={lastCurve}
+            totalElapsedMs={globalElapsedMs}
+            bean={bean}
+            device={recipe?.device}
+            doseGrams={doseGrams}
+            saveState={saveState}
+            onRetrySave={persistCompletion}
+            onStartTasting={onStartTasting ? () => { clearBrewTimerSession(timerOwner); onStartTasting(bean?.id); } : null}
+            onDone={() => { clearBrewTimerSession(timerOwner); onClose?.(); }}
+          />
+        )}
+        {phase === 'done' && (!recipe?.isIced || chilled) && !scaleSummary && (
           <CompletionScreen
             bean={bean}
             totalElapsedMs={globalElapsedMs}
@@ -1209,6 +1327,10 @@ const BrewTimerShell = ({
           />
         )}
       </div>
+
+      {scaleBrew.stage === 'pair' && (
+        <ScalePairSheet found={scale.found} scanError={scale.scanError} onChoose={scaleBrew.chooseScale} onClose={scaleBrew.closePair} />
+      )}
 
       {/* Close confirmation */}
       {confirmClose && (
