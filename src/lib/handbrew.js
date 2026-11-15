@@ -87,7 +87,7 @@ export const BREW_DEVICE_CONFIGS = {
     drawdownTarget: '3:00-3:45',
     defaultTechnique: 'center-pour',
     techniques: ['center-pour'],
-    promptContext: 'Flat-bed brewer with restricted flow (3 tiny exit holes). The DEVICE controls flow rate, so do NOT grind fine to slow the flow — fine grinds shed fines that clog the flat bed and stall the brew, especially dense light roasts. Grind coarser than V60 and recover extraction with hotter water and a swirl. Center-pour technique, avoid hitting walls.',
+    promptContext: 'Flat-bed brewer with restricted flow (3 tiny exit holes). The DEVICE controls flow rate, so do NOT grind fine to slow the flow — fine grinds shed fines that clog the flat bed and stall the brew, especially dense light roasts. Grind coarser than V60 and recover extraction with hotter water and a swirl. Bloom with a spiral that wets the whole bed, then pour in slow, small circles from the center outward, staying off the paper walls.',
   },
   chemex: {
     label: 'Chemex',
@@ -560,11 +560,11 @@ function buildTechniqueBlock(config) {
   const blocks = {
     hoffmann: 'Hoffmann Classic: all-rounder, bloom then 2-3 pours to target weight, gentle swirl after each pour, target 2:30-3:30.',
     'kasuya-46': 'Kasuya 4:6: 93C water, medium-coarse grind, 1:15 base. Pour when the previous pour has drained (~30-45s cadence, watch the bed not the clock). First 40% in 2 pours controls sweetness/acidity; last 60% in 1-3 pours controls strength (fewer = stronger) — the original uses 3 (5 pours total), the medium-strength variant 2 (4 pours total).',
-    'center-pour': 'Center-Pour: steady pour in center, avoid hitting paper walls. The device controls flow rate. More forgiving technique.',
-    'low-agitation-center': 'Low-agitation center: keep the stream low and centered to reduce fines migration; no automatic swirl.',
+    'center-pour': 'Center-Pour (Wave): bloom with a spiral from the center out so every ground is wet, then pour in slow, small circles or a controlled spiral from the center outward, staying about 1 cm off the paper walls. The device controls flow rate. More forgiving technique. Do not tell the user to avoid spirals; spiral is the pour path, swirl is spinning the brewer.',
+    'low-agitation-center': 'Low-agitation center: wet the whole bed for the bloom, then pour gently in a tight circle around the center with a low stream to reduce fines migration; no automatic swirl.',
     'center-to-spiral-pulse': 'Center-to-spiral pulse: begin centered, then use a controlled small spiral pulse when the cup needs more even extraction.',
     'bloom-led-pulse': 'Bloom-led pulse: let the bloom do more of the work, then use restrained pulses for high-solubility coffee.',
-    'low-agitation-no-swirl': 'Low-agitation no-swirl: conservative centered pours with no finishing swirl when evidence is uncertain.',
+    'low-agitation-no-swirl': 'Low-agitation no-swirl: slow, small circles from the center outward with a low stream, and no finishing swirl when evidence is uncertain.',
     'hoffmann-chemex': 'Hoffmann Chemex: adapted for thick filter. Higher temp compensates glass heat loss. Pre-rinse filter AND glass body. Coarser grind. 3:30-5:00 total.',
     standard: 'Standard: add water, stir, steep 1-2 min, press. Quick and clean.',
     inverted: 'Inverted: flip Aeropress, steep upside-down for more control over steep time. Flip and press.',
