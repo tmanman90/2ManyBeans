@@ -45,6 +45,7 @@ ios/capacitor-cordova-ios-plugins/
 !public/images/**/*.png
 !assets/*.png
 !ios/App/App/Assets.xcassets/**/*.png
+!docs/plans/mockups/**/*.png
 # Unreferenced splash leftovers (Contents.json does not list them)
 ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732*.png
 demo-recordings/
