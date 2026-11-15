@@ -1,4 +1,5 @@
-import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
+import { hasUnsupportedSensoryInference, SENSORY_UNCERTAINTY_CORRECTION } from './ruphusSensoryConsistency.js';
+import { canonicalHash, createLifecycleFrame, RUPHUS_CONTRACT_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
 import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
@@ -10,13 +11,13 @@ const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 
 const SEVERE_SECOND_FAILURES = new Set([
   'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
-  'RT6_METHOD_CONTRADICTION',
+  'RT6_METHOD_CONTRADICTION', 'RT8_UNSUPPORTED_SENSORY_INFERENCE',
 ]);
 // These are expected proposal-validation outcomes. They may be corrected once
 // from the same exact evidence; owner, target, stale, timing, and transport
 // failures remain terminal and must never earn a second proposal attempt.
 const PROPOSAL_RECOVERABLE_FAILURES = new Set([
-  'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal',
+  'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal', 'sensory_claim_uncertain',
   'invalid_proposal_intent', 'invalid_ratio_preview',
   'one_change_required', 'technique-conflict', 'unsupported-dose-profile', 'invalid_aiden_change', 'invalid_aiden_candidate',
 ]);
@@ -41,6 +42,7 @@ const safeFailureMessage = (error, fallback = 'I couldn’t complete that safely
 const safeRecoveryText = (value, fallback = CARD_RECOVERY) => {
   const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
   if (!text || text.length > 280 || /[{}[\]<>`]/.test(text)
+    || hasUnsupportedSensoryInference(text)
     || runtimeTriggers({ reply: text, userTurn: '' }).length
     || /\b(?:internal|debug|provider|tool|function|credential|secret|stack|trace|hash)\b/i.test(text)) return fallback;
   return text;
@@ -48,7 +50,7 @@ const safeRecoveryText = (value, fallback = CARD_RECOVERY) => {
 const safeProposalExplanation = (value) => {
   if (typeof value !== 'string') return null;
   const text = value.trim().replace(/\s+/g, ' ');
-  if (!text || text.length > 280 || /[<>`]/.test(text)) return null;
+  if (!text || text.length > 280 || /[<>`]/.test(text) || hasUnsupportedSensoryInference(text)) return null;
   return text;
 };
 const techniqueRequest = (value, context = null, target = null) => isTechniqueExplorationRequest(value || '')
@@ -138,7 +140,7 @@ function groundedClaimTriggers({ reply = '', context = null } = {}) {
 }
 
 function checkedTriggers({ reply, userTurn, trace, evidence, methodBinding, context }) {
-  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding }), ...groundedClaimTriggers({ reply, context })];
+  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding }), ...groundedClaimTriggers({ reply, context }), ...(hasUnsupportedSensoryInference(reply) ? [{ code: 'RT8_UNSUPPORTED_SENSORY_INFERENCE', severity: 'catastrophic' }] : [])];
 }
 
 function runtimeEvidence(toolEvidence = []) {
@@ -397,6 +399,20 @@ function envelopeArtifactIssue(envelope, artifacts, context) {
   return null;
 }
 
+// Sensory recovery may repair prose only. Canonicalize nullable schema fields
+// and equivalent numeric representations, while binding every other argument.
+function sensoryRepairIdentity(args = {}) {
+  const identity = Object.fromEntries(Object.entries(args).filter(([key, value]) => key !== 'explanation' && value != null));
+  if (identity.slotKey && !identity.slot) identity.slot = identity.slotKey;
+  delete identity.slotKey;
+  if (identity.change) {
+    const raw = identity.change.value;
+    const numeric = typeof raw === 'string' && identity.change.control === 'ratio' ? raw.replace(/^1:/, '') : raw;
+    identity.change = { ...identity.change, value: numeric !== '' && Number.isFinite(Number(numeric)) ? Number(numeric) : raw };
+  }
+  return canonicalHash(identity);
+}
+
 export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, signal, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
   if (!turnId || !provider?.runTurn || !tools?.call) throw new Error('turn requires identity, provider, and tools');
   const turnStartedAt = performance.now(); let firstFrameAt = null; let readRoundMs = 0;
@@ -412,6 +428,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   let proposalClaimed = false;
   let proposalRecoveryAttempted = false;
   let proposalRetryAvailable = false;
+  let sensoryRepairBinding = null;
   let preparationClaimRecoveryAttempted = false;
   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
   if (!Array.isArray(trace.toolEvents)) trace.toolEvents = [];
@@ -521,6 +538,15 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       responseEnvelope = response?.envelope || null;
       if (response.text) text += String(response.text);
       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
+      // Check before any read, correction or persistence can run. A provider
+      // ignoring the proposal-only repair instruction must stop visibly.
+      if (sensoryRepairBinding && calls.some(request => request.name !== 'propose_recipe_change'
+        || sensoryRepairIdentity(request.args) !== sensoryRepairBinding)) {
+        throw Object.assign(new Error('sensory repair changed the experiment'), {
+          code: 'sensory_correction_changed_recipe',
+          responseText: 'I couldn’t correct the explanation while keeping the same recipe test. No new card was prepared.',
+        });
+      }
       throwIfCancelled();
       // An authenticated ordinal inspection reopens its original card. Do
       // this before dispatching provider calls: a model-selected fresh
@@ -846,11 +872,15 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         }
         proposalRecoveryAttempted = true;
         proposalRetryAvailable = true;
+        if (failedProposal.result.code === 'sensory_claim_uncertain') {
+          const original = calls.find(candidate => candidate.callId === failedProposal.callId);
+          sensoryRepairBinding = sensoryRepairIdentity(original.args);
+        }
         response = await runProvider({
           turnId, context, userText, conversation: context?.conversation || [],
           tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
           previous: response, toolResult: { results }, regeneration: true,
-          correctiveInstruction: 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, return a typed blocked response, or clarification only when a specific missing user choice would allow completion.',
+          correctiveInstruction: (failedProposal.result.code === 'sensory_claim_uncertain' ? `${SENSORY_UNCERTAINTY_CORRECTION} Change only explanation; every other proposal argument must remain identical. ` : '') + 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, return a typed blocked response, or clarification only when a specific missing user choice would allow completion.',
           signal,
         });
         throwIfCancelled();
@@ -975,7 +1005,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const groundedCorrection = triggers.some((trigger) => trigger.code === 'RT7_UNGROUNDED_GRINDER_STEP')
         ? ' The user has a Fellow Ode Gen 2: use only its physical labels (whole number, .2, or .6). Replace any unsupported decimal with the nearest real click and explain the exact click change.'
         : '';
-      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}${groundedCorrection}`;
+      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}${groundedCorrection}${triggers.some(trigger => trigger.code === 'RT8_UNSUPPORTED_SENSORY_INFERENCE') ? ` ${SENSORY_UNCERTAINTY_CORRECTION}` : ''}`;
       response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
       throwIfCancelled();
       text = '';

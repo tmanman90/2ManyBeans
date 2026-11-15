@@ -1,0 +1,32 @@
+TAP version 13
+# node:internal/modules/run_main:123
+#     triggerUncaughtException(
+#     ^
+# locator.click: Timeout 30000ms exceeded.
+# Call log:
+# [2m  - waiting for getByRole('button', { name: 'View recipe', exact: true })[22m
+#     at /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-iced-preview-ui.test.mjs:33:76 {
+#   name: 'TimeoutError'
+# }
+# Node.js v22.22.1
+# Subtest: scripts/ruphus-iced-preview-ui.test.mjs
+not ok 1 - scripts/ruphus-iced-preview-ui.test.mjs
+  ---
+  duration_ms: 47164.402042
+  type: 'test'
+  location: '/Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/ruphus-iced-preview-ui.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47168.990416

@@ -1,3 +1,4 @@
+import { projectBrewEvidence } from './ruphusBrewEvidence.js';
 import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
 
 export const DEFAULT_HISTORY_DAYS = 14;
@@ -234,7 +235,7 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
     const date = daysAgo(record.date || record.createdAt || record.updatedAt, now);
     const age = date == null ? '' : `${date} days ago`;
     const numbers = [record.dose != null ? `${record.dose}g` : null, record.water != null ? `${record.water}g` : null, record.grind || null, record.temperature != null ? `${record.temperature}°` : null, record.drawdown || null, record.notes || record.note || null].filter(Boolean).join(', ');
-    if (kind === 'brews') return ['BREW', method, age, numbers].filter(Boolean).join(' — ');
+    if (kind === 'brews') return ['BREW', record.snapshot ? (record.completed ? 'completed' : 'not completed') : null, method, age, numbers].filter(Boolean).join(' — ');
     if (kind === 'tastings') return ['TASTING', age, 'not linked to a specific brew', numbers].filter(Boolean).join(' — ');
     return [method, numbers, age].filter(Boolean).join(': ');
   }).join(' | ');
@@ -308,17 +309,27 @@ export async function readCoffeeEvidence({ uid, coffeeId, launchItem = null, rea
     if (typeof reader !== 'function') return summarizeEvidence(kind, fallback, { windowDays, now, launchItem });
     try {
       const value = await withTimeout(reader({ uid, coffeeId, windowDays, launchItem, slotKey: launchItem?.method || launchItem?.slot || null }), timeoutMs);
-      return summarizeEvidence(kind, scopeHistory(kind, value, windowDays, now, launchItem), { windowDays, now, launchItem });
+      const scoped = scopeHistory(kind, value, windowDays, now, launchItem);
+      if (kind === 'brews' || kind === 'tastings') return { ...summarizeEvidence(kind, scoped, { windowDays, now, launchItem }), rawRecords: Array.isArray(scoped) ? scoped : [] };
+      return summarizeEvidence(kind, scoped, { windowDays, now, launchItem });
     } catch (error) {
       return { kind, status: 'unavailable', summary: `I couldn't check ${kind} in the ${windowDays == null ? 'available history' : `last ${windowDays} days`} right now.`, windowDays, errorCode: error.code || 'read_failed' };
     }
   };
-  const [coffee, recipe, brews, tastings] = await Promise.all([
+  let [coffee, recipe, brews, tastings] = await Promise.all([
     typeof readers.readCoffee === 'function' ? withTimeout(readers.readCoffee({ uid, coffeeId }), timeoutMs).then((value) => ({ kind: 'coffee', status: value ? 'available' : 'empty', coffee: clone(value), summary: value?.name ? `${value.name} is in your rotation.` : 'No coffee matched that reference.' })).catch((error) => ({ kind: 'coffee', status: 'unavailable', summary: "I couldn't check that coffee right now.", errorCode: error.code || 'read_failed' })) : { kind: 'coffee', status: 'empty', summary: 'No coffee matched that reference.' },
     read('recipe', readers.readRecipe),
     read('brews', readers.readBrews || readers.readAttempts),
     read('tastings', readers.readTastings),
   ]);
+  if (brews.rawRecords) {
+    const projected = projectBrewEvidence(brews.rawRecords, coffee.coffee?.handBrewTimingMemory || [], tastings.rawRecords || []);
+    brews = summarizeEvidence('brews', projected, { windowDays, now, launchItem });
+    // Ephemeral server-only history lets the tool filter the resolved brewer
+    // and equipment before bounding to four; it never enters public evidence.
+    Object.defineProperty(brews, 'projectedRecords', { value: projected });
+  }
+  delete tastings.rawRecords;
   return { coffee, recipe, brews, tastings, windowDays, readAt: new Date(now).toISOString(), launchItem: clone(launchItem), unavailable: [coffee, recipe, brews, tastings].filter((item) => item.status === 'unavailable').map((item) => item.kind) };
 }
 

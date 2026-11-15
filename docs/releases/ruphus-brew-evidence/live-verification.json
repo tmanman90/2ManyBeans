@@ -1,0 +1,51 @@
+{
+  "verifiedAt": "2026-10-12T01:43:15.713607+00:00",
+  "deployment": {
+    "id": "dpl_CPK2owRM6ZN9zfSNvbVJoKmeyGrD",
+    "url": "2manybeans-d1h39q3gg-tmanman90s-projects.vercel.app",
+    "readyState": "READY",
+    "target": "production",
+    "meta": {
+      "gitCommitSha": "15f927350a4aabe0d5041e393ea255c7d250f600",
+      "gitCommitRef": "codex/ruphus-brew-evidence-release",
+      "appVersion": "1.1.255",
+      "actor": "codex",
+      "lambdaRuntimeStats": "{\"nodejs\":15}"
+    },
+    "alias": [
+      "2manybeans.vercel.app",
+      "2manybeans.superxmusic.com",
+      "2manybeans-tmanman90s-projects.vercel.app"
+    ]
+  },
+  "checks": [
+    {
+      "url": "https://2manybeans.vercel.app",
+      "status": 200,
+      "entry": "/assets/index-BgtI9rOK.js",
+      "bundleStatus": 200,
+      "version": "1.1.255",
+      "productionFirebase": true
+    },
+    {
+      "url": "https://2manybeans.superxmusic.com",
+      "status": 200,
+      "entry": "/assets/index-BgtI9rOK.js",
+      "bundleStatus": 200,
+      "version": "1.1.255",
+      "productionFirebase": true
+    },
+    {
+      "endpoint": "/api/ruphus-agent",
+      "unauthenticatedStatus": 401,
+      "body": "{\"error\":\"Missing or invalid Authorization header\"}",
+      "modelOrCustomerWriteInvoked": false
+    },
+    {
+      "endpoint": "/api/ruphus-preview",
+      "unauthenticatedStatus": 401,
+      "body": "{\"error\":\"Missing or invalid Authorization header\"}",
+      "modelOrCustomerWriteInvoked": false
+    }
+  ]
+}

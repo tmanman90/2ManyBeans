@@ -1,0 +1,40 @@
+{
+  "browser": "154.0.8037.99",
+  "channel": "chrome",
+  "origin": "http://127.0.0.1:59188",
+  "flow": "Completed-brew proposal -> View recipe -> 18 g / 279 g / 93 C / Ode 6 preview -> local Start callback",
+  "checks": [
+    {
+      "width": 390,
+      "height": 844,
+      "url": "http://127.0.0.1:59188/",
+      "title": "Ruphus completed-brew QA",
+      "notBlank": true,
+      "frameworkOverlay": false,
+      "pageErrors": [],
+      "consoleMessages": [],
+      "blockedOrigins": [],
+      "interaction": "View recipe opened actual proposal snapshot; Start called local fixture once",
+      "text": "FRUKT completed-brew review\nCasa Almeida Barreto · Kalita 185\nGrind 6.2 → 6\nView recipe\n\nYour saved recipe is unchanged until you choose.\n\n0\nHand Brew Recipe\nHAND BREW RECIPE\nKalita Wave 185 recipe\nLow-Agitation, No Swirl method\nCOFFEE\n18g\nWATER\n279g\nRATIO\n1:15.5\nWave 185 · 185-standard · Bean-specific engine\nPOURING TECHNIQUE\nUse slow, centered pours with a low stream. Do not spiral or swirl.\nWHY THIS TECHNIQUE\nFor this bean, the Wave 185 recipe uses a low agitation no swirl profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.\nODE GEN 2 GRIND\n6\nMedium-Coarse\n~718µm\nWATER TEMPERATURE\n93°C / 199°F\nPREPARE BEFORE THE CLOCK\nRinse and preheat the Wave 155/185 filter and server; discard rinse water.\nAdd 18g coffee and level the bed.\nSTEPS\n1\n0:00\nBloom with 54g water; keep the stream centered and do not swirl.\nTotal water: 54g\n2\n0:30\nPour slowly and directly into the center to 126g total; keep the stream low and do not spiral.\nTotal water: 126g\n3\n1:30\nFinish at 279g total with another low, centered pour; do not spiral or swirl.\nTotal water: 279g\nExpected drawdown: 5:00\nTASTING TIP\nAim for 4:35 to 5:20. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.\nStart brew\nSave recipe"
+    },
+    {
+      "width": 1024,
+      "height": 844,
+      "url": "http://127.0.0.1:59188/",
+      "title": "Ruphus completed-brew QA",
+      "notBlank": true,
+      "frameworkOverlay": false,
+      "pageErrors": [],
+      "consoleMessages": [],
+      "blockedOrigins": [],
+      "interaction": "View recipe opened actual proposal snapshot; Start called local fixture once",
+      "text": "FRUKT completed-brew review\nCasa Almeida Barreto · Kalita 185\nGrind 6.2 → 6\nView recipe\n\nYour saved recipe is unchanged until you choose.\n\n0\nHand Brew Recipe\nHAND BREW RECIPE\nKalita Wave 185 recipe\nLow-Agitation, No Swirl method\nCOFFEE\n18g\nWATER\n279g\nRATIO\n1:15.5\nWave 185 · 185-standard · Bean-specific engine\nPOURING TECHNIQUE\nUse slow, centered pours with a low stream. Do not spiral or swirl.\nWHY THIS TECHNIQUE\nFor this bean, the Wave 185 recipe uses a low agitation no swirl profile based on the coffee's extraction characteristics. Adjust one lever at a time from drawdown and taste.\nODE GEN 2 GRIND\n6\nMedium-Coarse\n~718µm\nWATER TEMPERATURE\n93°C / 199°F\nPREPARE BEFORE THE CLOCK\nRinse and preheat the Wave 155/185 filter and server; discard rinse water.\nAdd 18g coffee and level the bed.\nSTEPS\n1\n0:00\nBloom with 54g water; keep the stream centered and do not swirl.\nTotal water: 54g\n2\n0:30\nPour slowly and directly into the center to 126g total; keep the stream low and do not spiral.\nTotal water: 126g\n3\n1:30\nFinish at 279g total with another low, centered pour; do not spiral or swirl.\nTotal water: 279g\nExpected drawdown: 5:00\nTASTING TIP\nAim for 4:35 to 5:20. If it stalls, go coarser before reducing agitation; if it races and tastes thin, make one bounded finer or hotter adjustment.\nStart brew\nSave recipe"
+    }
+  ],
+  "loaded": {
+    "errors": [],
+    "warnings": [],
+    "text": "FRUKT completed-brew review\nCasa Almeida Barreto · Kalita 185\nGrind 6.2 → 6\nView recipe\n\nYour saved recipe is unchanged until you choose.\n\n0"
+  },
+  "passed": true
+}

@@ -1,3 +1,4 @@
+import { hasUnsupportedSensoryInference, SENSORY_UNCERTAINTY_CORRECTION } from './ruphusSensoryConsistency.js';
 import { canonicalHash, clone, hasManualSourceProjection, RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
 import { canonicalRecipeSnapshot, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
@@ -34,7 +35,12 @@ import { normalizeRecipeEvidence } from '../../src/lib/recipeEvidence.js';
 import { buildExtractionIntent } from '../../src/lib/extractionIntent.js';
 
 function sourceGrinderGuidance(recipe, setup) {
-  if (!hasManualSourceProjection(recipe)) return null;
+  if (!hasManualSourceProjection(recipe)) {
+    const setting = recipe?.grindSize?.setting ?? recipe?.grind;
+    if (setup?.grinder !== 'fellow-ode-gen2' || !isOdeStep(setting)) return null;
+    const index = ODE_GEN2_STEPS.indexOf(Number(setting));
+    return { grinderKey: setup.grinder, setting, controlUnit: 'physical_setting', oneClickFiner: ODE_GEN2_STEPS[index - 1] ?? null, oneClickCoarser: ODE_GEN2_STEPS[index + 1] ?? null };
+  }
   const rawPersonalizedMicrons = recipe.sourceLineage?.grindAdaptation?.targetMicrons;
   const personalizedMicrons = rawPersonalizedMicrons == null ? null : Number(rawPersonalizedMicrons);
   const guidance = manualSourceGrindGuidance(Number.isFinite(personalizedMicrons)
@@ -1081,6 +1087,27 @@ function techniqueReadinessMatches(context, { coffeeRef, slotKey, target = null,
 export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true, proposalActions = [] } = {}) {
   if (!uid || !context) throw new Error('tools require owner and context');
   if (!(context.__ruphusResolvedTargets instanceof Map)) Object.defineProperty(context, '__ruphusResolvedTargets', { value: new Map(), enumerable: false, writable: true, configurable: true });
+  const brewBaselines = new Map();
+  const rememberBrews = (evidence, coffeeRef, slotKey) => {
+    const rows = (evidence.brews?.projectedRecords || evidence.brews?.records || [])
+      .filter(row => row.slotKey === slotKey
+        && (!row.snapshot || !context.methodBinding?.displayName || methodBindingMatchesRecipe(slotKey, context.methodBinding.displayName, row.snapshot)))
+      .slice(0, 4);
+    const completed = new Map();
+    const result = rows.map(row => {
+      const brewRef = `brew-${canonicalHash({ id: row.id, snapshot: row.snapshot }).slice(0, 12)}`;
+      const recipe = modelRecipe(row.snapshot);
+      if (row.completed && recipe && validateExecutableRecipe(recipe, slotKey).valid && (!context.methodBinding?.displayName || methodBindingMatchesRecipe(slotKey, context.methodBinding.displayName, recipe))) completed.set(brewRef, recipe);
+      const publicRecipe = clone(recipe);
+      // A planned timer duration is not a measurement of this completed cup.
+      // Keep the exact snapshot privately for proposal construction.
+      if (publicRecipe) for (const key of ['totalBrewTime', 'totalBrewTimeSeconds', 'guideTargetSeconds', 'drawdownTarget']) delete publicRecipe[key];
+      return { brewRef, status: row.completed ? 'completed' : row.snapshot ? 'not_completed' : 'unknown', completedAt: row.completedAt || null, recipe: publicRecipe, grinderGuidance: sourceGrinderGuidance(recipe, snapshot.setup), actualElapsedMs: row.actualElapsedMs ?? null,
+        timing: { measuredElapsedSeconds: row.actualElapsedMs == null ? null : Math.round(row.actualElapsedMs / 1000), plannedTargetSeconds: recipe?.guideTargetSeconds ?? recipe?.totalBrewTimeSeconds ?? null, measurementStatus: row.actualElapsedMs == null ? 'unknown' : 'recorded', guidance: 'Only measuredElapsedSeconds describes how long this brew took. Planned target is not observed finish time.' }, feedback: row.feedback || [] };
+    });
+    brewBaselines.set(`${coffeeRef}:${slotKey}`, completed);
+    return result;
+  };
   const snapshot = context.__ruphusServerSnapshot || context.rotationSnapshot || { coffees: [], refs: {} };
   const refs = context.__ruphusRefs ? { ...context.__ruphusRefs } : { ...(snapshot.refs || {}) };
   const resolveId = (coffeeRef) => refs[coffeeRef] || null;
@@ -1275,7 +1302,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       // Keep only the resolved brewer's allowlisted recipe in this ephemeral tool
       // result; raw records and source authority remain server-only, not in memory.
       const sourceControls = editableReviewControlAvailability(exactTarget);
-      return { ...publicEvidence(evidence), method, coffeeRef: args.coffeeRef, selectedRecipe: modelRecipe(exactTarget), ...(sourceControls ? { sourceControls } : currentReview?.sourceControls ? { sourceControls: currentReview.sourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(absentCreation ? { sourceState: 'absent' } : {}), ...(absentCreation && !compatibleDraft && !currentReview ? { creation: absentCreation } : {}), ...(compatibleDraft ? { draft: { sourceState: 'absent', recipe: modelRecipe(compatibleDraft.after) } } : {}) };
+      return { ...publicEvidence(evidence), recentBrews: rememberBrews(evidence, args.coffeeRef, method?.slot), method, coffeeRef: args.coffeeRef, selectedRecipe: modelRecipe(exactTarget), ...(sourceControls ? { sourceControls } : currentReview?.sourceControls ? { sourceControls: currentReview.sourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(absentCreation ? { sourceState: 'absent' } : {}), ...(absentCreation && !compatibleDraft && !currentReview ? { creation: absentCreation } : {}), ...(compatibleDraft ? { draft: { sourceState: 'absent', recipe: modelRecipe(compatibleDraft.after) } } : {}) };
     }
     const slotKey = args.slot || args.slotKey;
     if (name === 'read_technique_options') {
@@ -1493,6 +1520,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
           recipe: null,
         };
       }
+      const brewEvidence = await readCoffeeEvidence({ uid, coffeeId, readers: { ...readers, readRecipe: undefined }, now: args.now, windowDays: context.historyWidened || context.__ruphusHistoryWidened ? null : undefined });
+      const recentBrews = rememberBrews(brewEvidence, args.coffeeRef, slotKey);
       const currentReview = activeReviewForTarget(context, { coffeeId, slotKey, sourceHash: recipeSourceHash(recipe, slotKey) });
       if (currentReview) context.currentReview = publicCurrentReview(currentReview);
       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
@@ -1513,7 +1542,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
         return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, sourceState: 'present', recipe: modelRecipe(recipe), creation: firstRecipeCreation(slotKey), preparingNewConfiguration: true,
           summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. If the user wants a recipe, the requested ${displayName} can be prepared here with propose_recipe_change, intent recipe_preview and servingDoseGrams. For an informational question, answer without proposing. The saved recipe remains unchanged until confirmation.` };
       }
-      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
+      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, recentBrews, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
     }
     const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
     const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
@@ -1536,7 +1565,14 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const compatibleDraft = draft && draftMatchesBoundMethod(context, draft, slotKey) ? draft : null;
     const reviewDraft = activeReview && activeReview.sourceState === 'absent' && activeReview.before === null ? activeReview : null;
     const compatibleReview = activeReview && draftMatchesBoundMethod(context, activeReview, slotKey) ? activeReview : null;
-    const target = compatibleDraft
+    const completedBaselines = brewBaselines.get(`${args.coffeeRef}:${slotKey}`);
+    const completedRecipe = completedBaselines?.get(args.baseline);
+    if (args.baseline != null && !['saved_recipe', 'current_review'].includes(args.baseline) && !completedRecipe) return { ok: false, code: 'brew_baseline_unavailable', message: 'Read the completed brew evidence and choose a verified brewRef, or clarify which cup was tasted.' };
+    if (completedBaselines?.size && args.baseline == null && !techniqueExperiment) return { ok: false, code: 'brew_baseline_required', message: 'Choose baseline explicitly: a completed brewRef for a tasted-cup experiment, current_review for an untried draft edit, or saved_recipe. If the tasted cup is ambiguous, clarify first.' };
+    if (args.baseline === 'current_review' && !compatibleReview) return { ok: false, code: 'review_baseline_unavailable', message: 'There is no compatible active review.' };
+    const target = completedRecipe ? { ...resolvedTarget, before: clone(completedRecipe) }
+      : args.baseline === 'saved_recipe' ? resolvedTarget
+      : compatibleDraft
       ? { ...resolvedTarget, draftRecipe: clone(compatibleDraft.after), draftProposalId: compatibleDraft.id }
       : reviewDraft && compatibleReview
         ? { ...resolvedTarget, draftRecipe: clone(compatibleReview.after), draftProposalId: compatibleReview.id }
@@ -1549,6 +1585,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const reviewContinuation = Boolean(compatibleReview && args.intent !== 'information' && (args.change || args.servingDoseGrams != null));
     const typedPreview = args.intent === 'recipe_preview' || reviewContinuation;
     const servingDose = args.servingDoseGrams;
+    if (completedRecipe && args.change && servingDose != null) return { ok: false, code: 'one_change_required', message: 'Keep the completed brew dose fixed for a one-control experiment; resize separately.' };
     if (servingDose != null && (!Number.isFinite(servingDose) || servingDose <= 0)) {
       return { ok: false, code: 'invalid_serving_dose', message: 'The serving dose must be a positive number within this brewer’s supported range.' };
     }
@@ -1794,6 +1831,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const coffeeName = snapshot.coffees?.find((item) => item.refKey === args.coffeeRef)?.name
       || (context.turnBinding?.coffeeRef === args.coffeeRef ? context.turnBinding.coffeeName : null);
     const explanation = safeProposalExplanation(args.explanation);
+    if (hasUnsupportedSensoryInference(explanation)) return { ok: false, code: 'sensory_claim_uncertain', message: SENSORY_UNCERTAINTY_CORRECTION };
     const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: techniqueExperiment ? ['technique', ...paths] : paths, ...(experimentMetadata ? { techniqueExperiment: experimentMetadata } : {}), ...(explanation ? { explanation } : { explanation: null }), actions: [], recipeHash: canonicalHash(after), sourceHash: target.sourceHash });
     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
     if (context.proposalState) {
@@ -1819,7 +1857,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel. Set slot to the brewer the user means in this conversation, interpreting ordinary spelling and follow-ups. Null means genuinely unspecified. A selected recipe for another brewer does not establish whether the requested one exists.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }), slot: nullable({ type: 'string', enum: SLOT_KEYS }) }, required: ['coffeeRef', 'windowDays', 'slot'], additionalProperties: false } };
     if (name === 'read_recipe') return { type: 'function', name, description: 'Read one exact recipe slot when its source data is needed. Reuse read_coffee_evidence.selectedRecipe only when it matches the requested brewer. If it is absent or for another brewer, read the requested slot before concluding its recipe is unavailable. A verified absent manual slot returns the available first-recipe configurations and controls; invalid or unavailable slots never authorize creation.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
     if (name === 'read_technique_options') return { type: 'function', name, description: 'Read source-backed hot V60, Kalita Wave, or ribbed Switch recipes for this coffee. Interpret the user’s conversational intent, not keywords: recipe_preview means they want something to brew, a recipe suggestion, an alternative, or a corrected-equipment recipe; information means explanation or comparison only. A preview does not save or start anything and needs no extra yes. For recipe_preview, select an exact executable option and call propose_recipe_change in this turn. Use the requested equipment; no matching saved recipe is required. Reference-only sources remain discussion-only.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot', 'kalita_hot'] }, intent: { type: 'string', enum: ['recipe_preview', 'information'] } }, required: ['coffeeRef', 'slot', 'intent'], additionalProperties: false } };
-    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, one servingDoseGrams-only resize (or one serving size paired with one control/technique), one explicitly selected source-backed technique experiment, or a complete Aiden profile for a verified absent Aiden slot. The optional aidenProfile must be a complete profile when creating that first Aiden draft; never send a partial profile or manual pour-over fields. Allowed recipe controls are dose, water, grind, temperature, and ratio; a verified absent manual slot separately reports which first-recipe controls/configurations are available. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: { type: 'string', enum: ['recipe_preview', 'information'] }, change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), aidenProfile: nullable(AIDEN_DRAFT_SCHEMA), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'intent', 'change', 'servingDoseGrams', 'aidenProfile', 'experiment', 'explanation'], additionalProperties: false } };
+    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, one servingDoseGrams-only resize (or one serving size paired with one control/technique), one explicitly selected source-backed technique experiment, or a complete Aiden profile for a verified absent Aiden slot. The optional aidenProfile must be a complete profile when creating that first Aiden draft; never send a partial profile or manual pour-over fields. Allowed recipe controls are dose, water, grind, temperature, and ratio; a verified absent manual slot separately reports which first-recipe controls/configurations are available. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: { type: 'string', enum: ['recipe_preview', 'information'] }, baseline: nullable({ type: 'string', description: 'A verified recentBrews brewRef for an experiment on a completed cup; current_review for editing an untried draft; saved_recipe for the saved recipe. Required when completed brews exist. Never treat an untried proposal as tasted.' }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), aidenProfile: nullable(AIDEN_DRAFT_SCHEMA), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string', maxLength: 280, description: 'Brief reason for this test, within 280 characters so it can be shown with the card. Distinguish measured time from planned time and acknowledge uncertainty.' }) }, required: ['coffeeRef', 'slot', 'intent', 'baseline', 'change', 'servingDoseGrams', 'aidenProfile', 'experiment', 'explanation'], additionalProperties: false } };
   });
   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
 }

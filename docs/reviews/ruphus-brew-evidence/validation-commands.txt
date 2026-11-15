@@ -1,0 +1,7 @@
+# Run from the isolated worktree with Node 22 (no new packages required):
+node --test scripts/ruphus-sensory-consistency.test.mjs scripts/ruphus-brew-evidence.test.mjs scripts/ruphus-evidence.test.mjs scripts/ruphus-physical-grind.test.mjs scripts/ruphus-proposal-continuity.test.mjs scripts/ruphus-trial-recovery.test.mjs scripts/ruphus-provider-contract.test.mjs scripts/ruphus-sensory-followup.test.mjs scripts/ruphus-repository-transaction.test.mjs scripts/ruphus-context.test.mjs scripts/ruphus-u3-runtime.test.mjs scripts/ruphus-source-backend.test.mjs scripts/ruphus-source-completion.test.mjs scripts/brew-timing-memory.test.mjs scripts/brew-timing-persistence.test.mjs scripts/handbrew-timing-memory-integration.test.mjs
+node --test scripts/ruphus-brew-evidence.test.mjs scripts/ruphus-sensory-consistency.test.mjs scripts/ruphus-source-completion.test.mjs
+node --check scripts/ruphus-brew-counterfactual.mjs
+git diff --check
+node docs/reviews/ruphus-brew-evidence/evidence/browser-harness.mjs
+# Counterfactual runner was syntax-checked only; do not run paid evaluation without authorization.

@@ -390,9 +390,41 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     setHandBrewIcedLoading(device === 'v60' || device === 'kalita');
     setHandBrewLoading(true);
 
-    // Step 1: Research (skip if cached)
+    // Kalita's deterministic engine can build a timer-ready recipe from the
+    // bean's stored facts. Do that before the optional network research so an
+    // uncached chat-to-brew action does not wait for an AI round trip.
     let research = requestResearch;
-    if (!research) {
+    let immediateKalita = null;
+    if (device === 'kalita' && !research) {
+      try {
+        const intent = buildExtractionIntent(normalizeRecipeEvidence(bean, null));
+        const recipe = generateKalitaRecipe(intent, {
+          size: activePreferences?.kalitaSize,
+          dose: candidateDose,
+          grinder: grinderKey,
+        });
+        if (!recipe) throw new Error('No timer-ready candidate');
+        immediateKalita = {
+          intent,
+          recipe,
+        };
+      } catch (err) {
+        console.warn('[handBrew] Immediate Kalita candidate unavailable:', err?.message || err);
+      }
+    }
+
+    // Research still enriches the bean for later brews. It never replaces an
+    // already displayed recipe while a timer may be using it.
+    if (immediateKalita) {
+      researchBean(bean).then(async (result) => {
+        if (!isActive(rid)) return;
+        setHandBrewResearch(result);
+        if (bean.id) await updateBean(bean.id, { beanResearch: result });
+      }).catch((err) => console.warn('[handBrew] Background bean research failed:', err?.message || err));
+    }
+
+    // Step 1: Research (skip if cached or the immediate candidate succeeded)
+    if (!research && !immediateKalita) {
       setHandBrewPhase('research');
       try {
         research = await researchBean(bean);
@@ -416,11 +448,11 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
       let sharedIntent = null;
       if (device === 'kalita' || device === 'v60') {
         const evidence = normalizeRecipeEvidence(bean, research);
-        sharedIntent = buildExtractionIntent(evidence);
+        sharedIntent = immediateKalita?.intent || buildExtractionIntent(evidence);
       }
       if (device === 'kalita' && (candidateMode === 'candidate' || candidateMode === 'shadow')) {
         try {
-          shadowCandidate = generateKalitaRecipe(sharedIntent, {
+          shadowCandidate = immediateKalita?.recipe || generateKalitaRecipe(sharedIntent, {
             size: activePreferences?.kalitaSize,
             dose: candidateDose,
             grinder: grinderKey,

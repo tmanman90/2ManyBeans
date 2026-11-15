@@ -1,0 +1,138 @@
+
+> coffee-hub@1.1.255 test
+> npm run test:aiden-modal && npm run test:recipe-scaling && npm run test:brew-timing-memory && npm run test:recipe-engine && npm run test:ship-dev && npm run test:ship-production && npm run test:onboarding-redemption && npm run test:trial-offer
+
+
+> coffee-hub@1.1.255 test:aiden-modal
+> node --test scripts/aiden-generated-grind.test.mjs scripts/aiden-foreground.test.mjs scripts/aiden-modal-render.test.mjs
+
+TAP version 13
+# Subtest: a retained Aiden sheet closes when the app returns to the foreground
+ok 1 - a retained Aiden sheet closes when the app returns to the foreground
+  ---
+  duration_ms: 2743.259834
+  type: 'test'
+  ...
+# Subtest: generated recipes replace a nonphysical model grind before validating the profile
+ok 2 - generated recipes replace a nonphysical model grind before validating the profile
+  ---
+  duration_ms: 1.68525
+  type: 'test'
+  ...
+# Subtest: generated recipes still reject missing brew parameters
+ok 3 - generated recipes still reject missing brew parameters
+  ---
+  duration_ms: 0.15125
+  type: 'test'
+  ...
+# Subtest: generated title is stamped from the bean before validating its length
+ok 4 - generated title is stamped from the bean before validating its length
+  ---
+  duration_ms: 0.257125
+  type: 'test'
+  ...
+# Subtest: saved Aiden recipes remain viewable, actionable and dismissible without Ruphus metadata
+    # Subtest: null
+    ok 1 - null
+      ---
+      duration_ms: 5895.087334
+      type: 'test'
+      ...
+    # Subtest: undefined
+    ok 2 - undefined
+      ---
+      duration_ms: 3918.60825
+      type: 'test'
+      ...
+    # Subtest: empty
+    ok 3 - empty
+      ---
+      duration_ms: 3963.443083
+      type: 'test'
+      ...
+    # Subtest: apply
+    ok 4 - apply
+      ---
+      duration_ms: 4071.287542
+      type: 'test'
+      ...
+    # Subtest: promote
+    ok 5 - promote
+      ---
+      duration_ms: 4070.463958
+      type: 'test'
+      ...
+    # Subtest: linked
+    ok 6 - linked
+      ---
+      duration_ms: 4850.818916
+      type: 'test'
+      ...
+    # Subtest: loading
+    ok 7 - loading
+      ---
+      duration_ms: 3775.47575
+      type: 'test'
+      ...
+    # Subtest: error
+    ok 8 - error
+      ---
+      duration_ms: 4010.147792
+      type: 'test'
+      ...
+    1..8
+ok 5 - saved Aiden recipes remain viewable, actionable and dismissible without Ruphus metadata
+  ---
+  duration_ms: 45932.881667
+  type: 'test'
+  ...
+1..5
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 46130.564458
+
+> coffee-hub@1.1.255 test:recipe-scaling
+> node scripts/recipe-scaling.test.mjs
+
+recipe scaling regression passed
+
+> coffee-hub@1.1.255 test:brew-timing-memory
+> node scripts/brew-timing-memory.test.mjs && node scripts/brew-timing-persistence.test.mjs && node scripts/brew-timer-lifecycle.test.mjs && node scripts/brew-timer-session.test.mjs && node scripts/handbrew-timing-memory-integration.test.mjs
+
+brew timing memory passed
+brew timing persistence contract passed
+brew timer lifecycle contract passed
+brew timer session recovery passed
+handbrew timing memory integration passed
+
+> coffee-hub@1.1.255 test:recipe-engine
+> node scripts/source-insights-regression.test.mjs && node scripts/recipe-evidence.test.mjs && node scripts/extraction-intent.test.mjs && node scripts/kalita-adapter.test.mjs && node scripts/kalita-runtime-contract.test.mjs && node scripts/kalita-iced-source-registry.test.mjs && node scripts/kalita-iced-adapter.test.mjs && node scripts/kalita-iced-recipe-contract.test.mjs && node scripts/kalita-iced-technique-copy.test.mjs && node scripts/latest-write-queue.test.mjs && node scripts/handbrew-cache-policy.test.mjs && node scripts/handbrew-kalita-iced-integration.test.mjs && node scripts/handbrew-kalita-iced-cutover-contract.test.mjs && node scripts/kalita-iced-evaluate-inventory.test.mjs && node scripts/verify-kalita-iced-ui.mjs && node scripts/v60-source-registry.test.mjs && node scripts/v60-adapter.test.mjs && node scripts/v60-recipe-contract.test.mjs && node scripts/v60-technique-copy.test.mjs && node scripts/v60-dose-scaling-provenance.test.mjs && node scripts/v60-cutover-boundaries.test.mjs && node scripts/v60-selector-counterexamples.test.mjs && node scripts/v60-iced-source-registry.test.mjs && node scripts/v60-iced-adapter.test.mjs && node scripts/v60-iced-recipe-contract.test.mjs && node scripts/v60-iced-technique-copy.test.mjs && node scripts/v60-switch-adapter.test.mjs && node scripts/v60-switch-recipe-contract.test.mjs && node scripts/handbrew-prep-contract.test.mjs && node scripts/v60-runtime-contract.test.mjs && node scripts/v60-switch-runtime-contract.test.mjs && node scripts/handbrew-v60-integration.test.mjs && node scripts/handbrew-v60-switch-integration.test.mjs && node scripts/handbrew-iced-prep-contract.test.mjs && node scripts/handbrew-v60-cutover-contract.test.mjs && node scripts/v60-evaluate-inventory.test.mjs && node scripts/v60-switch-recipe-compare.test.mjs
+
+source-insights regression passed
+recipe evidence passed
+extraction intent passed
+kalita adapter passed
+kalita runtime contract passed
+kalita iced source registry passed
+kalita iced adapter passed
+kalita iced recipe contract passed
+kalita iced technique copy passed
+latest write queue passed
+hand brew cache policy passed
+handbrew Kalita iced integration passed
+handbrew Kalita iced cutover contract passed
+read-only Kalita iced inventory evaluator passed
+file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/verify-kalita-iced-ui.mjs:19
+  throw new Error('Kalita iced UI harness did not start');
+        ^
+
+Error: Kalita iced UI harness did not start
+    at waitForServer (file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/verify-kalita-iced-ui.mjs:19:9)
+    at async file:///Users/talmeltzer/Documents/VIBE%20CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/verify-kalita-iced-ui.mjs:29:3
+
+Node.js v22.22.1

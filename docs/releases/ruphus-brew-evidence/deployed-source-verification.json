@@ -1,0 +1,57 @@
+{
+  "deploymentId": "dpl_CPK2owRM6ZN9zfSNvbVJoKmeyGrD",
+  "fileCount": 458,
+  "reviewArchivesAndEnvironmentsExcluded": true,
+  "checks": [
+    {
+      "path": "api/_lib/ruphusBrewEvidence.js",
+      "expectedSHA1": "5594fef4c05ea96c252dd3a1d60fb413cb07eaa6",
+      "deploymentFileUID": "5594fef4c05ea96c252dd3a1d60fb413cb07eaa6",
+      "matches": true
+    },
+    {
+      "path": "api/_lib/ruphusSensoryConsistency.js",
+      "expectedSHA1": "9bfe75d9d6891faa986b498daeb64e3f5f331870",
+      "deploymentFileUID": "9bfe75d9d6891faa986b498daeb64e3f5f331870",
+      "matches": true
+    },
+    {
+      "path": "api/_lib/ruphusEvidence.js",
+      "expectedSHA1": "69b27543affa219af8515363e4c803b2a6c2b15c",
+      "deploymentFileUID": "69b27543affa219af8515363e4c803b2a6c2b15c",
+      "matches": true
+    },
+    {
+      "path": "api/_lib/ruphusOrchestrator.js",
+      "expectedSHA1": "0e815254b00acf0e90d8884ae1581907dc8a50a0",
+      "deploymentFileUID": "0e815254b00acf0e90d8884ae1581907dc8a50a0",
+      "matches": true
+    },
+    {
+      "path": "api/_lib/ruphusPrompt.js",
+      "expectedSHA1": "40d5e89f6ce9e180039fe8c2128a1f7f7f9a0738",
+      "deploymentFileUID": "40d5e89f6ce9e180039fe8c2128a1f7f7f9a0738",
+      "matches": true
+    },
+    {
+      "path": "api/_lib/ruphusTools.js",
+      "expectedSHA1": "d0ffd4fd097e4f091af82a9d2ea274208ffc7ffb",
+      "deploymentFileUID": "d0ffd4fd097e4f091af82a9d2ea274208ffc7ffb",
+      "matches": true
+    },
+    {
+      "path": "package.json",
+      "expectedSHA1": "91b5029ff324a6a52ade3b1f7d8e1e5ad04b6c17",
+      "deploymentFileUID": "91b5029ff324a6a52ade3b1f7d8e1e5ad04b6c17",
+      "matches": true
+    },
+    {
+      "path": "package-lock.json",
+      "expectedSHA1": "0976e6324c7e924e7c709e2861824412200a3c29",
+      "deploymentFileUID": "0976e6324c7e924e7c709e2861824412200a3c29",
+      "matches": true
+    }
+  ],
+  "allUploadedFilesMatchCommittedStaging": true,
+  "allFileHashChecks": 458
+}

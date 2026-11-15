@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'framer-motion';
+import { AuthContext } from '../src/contexts/AuthContext.jsx';
 import '../src/styles/global.css';
 import { HandBrewModal } from '../src/components/HandBrewModal.jsx';
+import { BrewTimer } from '../src/components/BrewTimer.jsx';
 import { UserPreferencesProvider } from '../src/hooks/useUserProfile.jsx';
 import { SWITCH_SOURCES } from '../src/data/manualSources/switch.js';
 import { KALITA_SOURCES } from '../src/data/manualSources/kalita.js';
@@ -15,6 +17,7 @@ import { previewSavedSourceDose, savedSourceDosePersistence } from '../src/lib/s
 const params = new URLSearchParams(window.location.search);
 const ordinaryMode = params.has('ordinary');
 const onyx23 = params.has('onyx23');
+const recoveryOverlay = params.has('recovery-overlay');
 const source = onyx23
   ? KALITA_SOURCES.find((record) => record.id === 'onyx-monarch-wave-185')
   : SWITCH_SOURCES.find((record) => record.id === 'hario-switch-03-matt-winton-hybrid-24-2022');
@@ -81,6 +84,12 @@ function Fixture() {
             <output data-source-card-returned>{String(tastingStarted && !sourceOpen)}</output>
           </section>
         )}
+        {recoveryOverlay && <BrewTimer
+          open recipe={sourceRecipe} bean={bean}
+          restoredSession={{ phase: 'running', stepIndex: 0, startedAt: Date.now() - 20_000,
+            stepStartedAt: Date.now() - 20_000, pauseStartedAt: null,
+            pausedAccumMs: 0, stepPausedAccumMs: 0, completion: null }}
+        />}
         <HandBrewModal
           open={ordinaryMode ? ordinaryOpen : sourceOpen}
           previewMode={ordinaryMode && ordinaryReviewMode}
@@ -113,4 +122,4 @@ function Fixture() {
   );
 }
 
-createRoot(document.getElementById('root')).render(<MotionConfig reducedMotion="user"><Fixture /></MotionConfig>);
+createRoot(document.getElementById('root')).render(<AuthContext.Provider value={{ user: null }}><MotionConfig reducedMotion="user"><Fixture /></MotionConfig></AuthContext.Provider>);

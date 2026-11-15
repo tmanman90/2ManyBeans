@@ -1,0 +1,10 @@
+[
+  {
+    "test": "scripts/v60-switch-runtime-contract.test.mjs",
+    "baseExitCode": 1
+  },
+  {
+    "test": "scripts/handbrew-v60-cutover-contract.test.mjs",
+    "baseExitCode": 1
+  }
+]

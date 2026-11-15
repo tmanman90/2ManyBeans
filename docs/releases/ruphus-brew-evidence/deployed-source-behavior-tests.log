@@ -1,0 +1,173 @@
+TAP version 13
+# Subtest: snapshot wins over source dose; measured timing and explicit feedback join without rewriting history
+ok 1 - snapshot wins over source dose; measured timing and explicit feedback join without rewriting history
+  ---
+  duration_ms: 138.089958
+  type: 'test'
+  ...
+# Subtest: never infer a measurement from target, wall time, mismatched dose, skipped or unrelated timing
+ok 2 - never infer a measurement from target, wall time, mismatched dose, skipped or unrelated timing
+  ---
+  duration_ms: 36.440375
+  type: 'test'
+  ...
+# Subtest: completed baseline preserves executed 18/279, temperature and pours during finer grind experiment
+ok 3 - completed baseline preserves executed 18/279, temperature and pours during finer grind experiment
+  ---
+  duration_ms: 44.329166
+  type: 'test'
+  ...
+# Subtest: draft editing remains explicit and separate from completed-brew diagnosis
+ok 4 - draft editing remains explicit and separate from completed-brew diagnosis
+  ---
+  duration_ms: 29.782
+  type: 'test'
+  ...
+# Subtest: unknown and uncompleted brew references cannot become experiment baselines
+ok 5 - unknown and uncompleted brew references cannot become experiment baselines
+  ---
+  duration_ms: 21.157792
+  type: 'test'
+  ...
+# Subtest: newest brews survive the four-record evidence limit regardless of database order
+ok 6 - newest brews survive the four-record evidence limit regardless of database order
+  ---
+  duration_ms: 2.726583
+  type: 'test'
+  ...
+# Subtest: opaque brew references remain stable across reads and cannot cross equipment or coffee scope
+ok 7 - opaque brew references remain stable across reads and cannot cross equipment or coffee scope
+  ---
+  duration_ms: 144.453542
+  type: 'test'
+  ...
+# Subtest: one-control trial cannot silently pair a serving resize with grind
+ok 8 - one-control trial cannot silently pair a serving resize with grind
+  ---
+  duration_ms: 16.252792
+  type: 'test'
+  ...
+# Subtest: timing must match coffee, brewer, equipment, lineage, session and revision
+ok 9 - timing must match coffee, brewer, equipment, lineage, session and revision
+  ---
+  duration_ms: 4.570375
+  type: 'test'
+  ...
+# Subtest: other brewers and equipment cannot crowd out the completed diagnostic baseline
+ok 10 - other brewers and equipment cannot crowd out the completed diagnostic baseline
+  ---
+  duration_ms: 217.026708
+  type: 'test'
+  ...
+# Subtest: the observed sharp/extraction reversal and categorical paraphrases are caught
+ok 11 - the observed sharp/extraction reversal and categorical paraphrases are caught
+  ---
+  duration_ms: 8.995583
+  type: 'test'
+  ...
+# Subtest: uncertainty, negated claims, comparative reports and clarifications remain allowed
+ok 12 - uncertainty, negated claims, comparative reports and clarifications remain allowed
+  ---
+  duration_ms: 8.194375
+  type: 'test'
+  ...
+# Subtest: bad explanation is rejected before publication or persistence; a corrected one preserves the experiment
+ok 13 - bad explanation is rejected before publication or persistence; a corrected one preserves the experiment
+  ---
+  duration_ms: 73.320541
+  type: 'test'
+  ...
+# Subtest: uncertainty guard does not prescribe a universal grind direction or control
+ok 14 - uncertainty guard does not prescribe a universal grind direction or control
+  ---
+  duration_ms: 317.681916
+  type: 'test'
+  ...
+# Subtest: real proposal recovery is bounded to one explanatory repair without publishing the rejected claim
+ok 15 - real proposal recovery is bounded to one explanatory repair without publishing the rejected claim
+  ---
+  duration_ms: 264.585833
+  type: 'test'
+  ...
+# Subtest: repeated unsupported proposal rationale stops after one repair, without a stored or shown proposal
+ok 16 - repeated unsupported proposal rationale stops after one repair, without a stored or shown proposal
+  ---
+  duration_ms: 49.324208
+  type: 'test'
+  ...
+# Subtest: a prose-only extraction claim receives one uncertainty correction and no recipe is invented
+ok 17 - a prose-only extraction claim receives one uncertainty correction and no recipe is invented
+  ---
+  duration_ms: 1.651542
+  type: 'test'
+  ...
+# Subtest: repeated unsupported prose is withheld, not delivered after the retry budget
+ok 18 - repeated unsupported prose is withheld, not delivered after the retry budget
+  ---
+  duration_ms: 2.343208
+  type: 'test'
+  ...
+# Subtest: a published valid card stays fixed when surrounding model prose makes the unsupported inference
+ok 19 - a published valid card stays fixed when surrounding model prose makes the unsupported inference
+  ---
+  duration_ms: 31.826666
+  type: 'test'
+  ...
+# Subtest: ordinary negation and independent conditional advice do not spend a repair call
+ok 20 - ordinary negation and independent conditional advice do not spend a repair call
+  ---
+  duration_ms: 7.580542
+  type: 'test'
+  ...
+# Subtest: explanation repair cannot replace the baseline, control, dose, equipment or other recipe arguments
+ok 21 - explanation repair cannot replace the baseline, control, dose, equipment or other recipe arguments
+  ---
+  duration_ms: 48.451041
+  type: 'test'
+  ...
+# Subtest: repair rejects an extra read but accepts equivalent numeric and nullable schema representations
+ok 22 - repair rejects an extra read but accepts equivalent numeric and nullable schema representations
+  ---
+  duration_ms: 77.80725
+  type: 'test'
+  ...
+# Subtest: explicitly rejected diagnoses are allowed without exempting a separate asserted claim
+ok 23 - explicitly rejected diagnoses are allowed without exempting a separate asserted claim
+  ---
+  duration_ms: 11.342375
+  type: 'test'
+  ...
+# Subtest: a blocked repair cannot echo the rejected claim through recovery text
+ok 24 - a blocked repair cannot echo the rejected claim through recovery text
+  ---
+  duration_ms: 1.579208
+  type: 'test'
+  ...
+# Ruphus source completion contract passed
+# Subtest: unknown source finish persists null and keeps the native event ledger
+ok 25 - unknown source finish persists null and keeps the native event ledger
+  ---
+  duration_ms: 21.55625
+  type: 'test'
+  ...
+# Subtest: source completion reaches the existing owned attempt lifecycle and legacy targets remain valid
+ok 26 - source completion reaches the existing owned attempt lifecycle and legacy targets remain valid
+  ---
+  duration_ms: 748.621375
+  type: 'test'
+  ...
+# Subtest: assistant brew evidence preserves source clock provenance and unknown planned finish
+ok 27 - assistant brew evidence preserves source clock provenance and unknown planned finish
+  ---
+  duration_ms: 1.159417
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2093.93275
