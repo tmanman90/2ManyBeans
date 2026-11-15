@@ -2,7 +2,7 @@ import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, 
 import { kalitaDoseBounds, normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
-export const KALITA_RULES_VERSION = 'kalita-rules-v3-phase1';
+export const KALITA_RULES_VERSION = 'kalita-rules-v4-published-timing';
 export const KALITA_PHASE_CONTRACT_VERSION = 1;
 
 const GRINDER_RANGES = {
@@ -71,6 +71,40 @@ function techniqueInstructionFor(key) {
   return 'Pour slowly and directly into the center with a low stream. Do not spiral or swirl.';
 }
 
+// Pour schedules per dose profile, timed from the first drop of bloom water
+// (every published Wave recipe in src/data/manualSources/kalita.js counts the
+// bloom pour inside the bloom window). Each pour is [start second, share of
+// total water]. Totals follow the published Wave ranges: 155 at 15-16g
+// finishes 2:30-3:00 (Ozone, Drop, Foundation), 185 at 20-22g 2:45-3:45
+// (Onyx, Madcap), 185 at 25-30g 3:00-4:00 (Drop, Onyx, Ozone, George Howell).
+// Doses above 22g split the water into four pours like Drop's 30g Wave 185
+// recipe so no single pour overfills the brewer.
+const KALITA_SCHEDULES = {
+  '155-small': { pours: [[40, 0.45], [75, 1]], totalSeconds: 165 },
+  '155-extended': { pours: [[40, 0.4], [65, 0.7], [90, 1]], totalSeconds: 195 },
+  '185-standard': { pours: [[40, 0.45], [90, 1]], totalSeconds: 195 },
+  '185-large': { pours: [[45, 0.4], [70, 0.6], [95, 0.8], [120, 1]], totalSeconds: 225 },
+  'large-185': { pours: [[45, 0.4], [70, 0.6], [95, 0.8], [120, 1]], totalSeconds: 240 },
+};
+
+function firstPourAction(key, target) {
+  if (key === 'center-to-spiral-pulse') return `Start in the center, then pour in a controlled spiral outward to ${target}g total; keep the stream on the coffee bed, not the paper walls.`;
+  if (key === 'bloom-led-pulse') return `Pour from the center in a restrained pulse to ${target}g total; keep the stream on the coffee bed and away from the paper walls.`;
+  return `Pour slowly and directly into the center to ${target}g total; keep the stream low and do not spiral.`;
+}
+
+function middlePourAction(key, target) {
+  if (key === 'center-to-spiral-pulse') return `Pour again with the same controlled spiral to ${target}g total; keep the stream on the coffee bed.`;
+  if (key === 'bloom-led-pulse') return `Pour another restrained center pulse to ${target}g total; do not use a wide spiral.`;
+  return `Pour slowly into the center again to ${target}g total; keep the stream low and do not spiral.`;
+}
+
+function finalPourAction(technique, target) {
+  if (technique.key === 'center-to-spiral-pulse') return `Finish at ${target}g total with a gentle center-to-outward spiral; ${technique.finalSwirl ? 'swirl once only if the bed is uneven.' : 'do not swirl.'}`;
+  if (technique.key === 'bloom-led-pulse') return `Finish with a last restrained center pulse to ${target}g total; do not use a wide spiral or stir.`;
+  return `Finish at ${target}g total with another low, centered pour; do not spiral or swirl.`;
+}
+
 export function validateKalitaCandidate(recipe) {
   const errors = [];
   const size = String(recipe?.kalitaSize || '');
@@ -107,12 +141,8 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     : intent.energyTendency === 'lower' ? 93 : intent.energyTendency === 'higher' ? 97 : 96, 93, 100);
   const targetMicrons = kalitaGrindBaselineMicrons(config.size) + kalitaGrindAdjustmentMicrons(intent);
   const bloom = Math.round(config.dose * 3);
-  const first = Math.round(waterGrams * 0.45);
-  const finalStepAt = config.doseProfile === '155-small' ? 105 : config.doseProfile === '155-extended' || config.doseProfile === '185-standard' ? 120 : 150;
-  const firstPourAt = 30;
-  const finalPourAt = finalStepAt - 30;
-  const drawdownSeconds = config.doseProfile === '155-small' ? 165 : config.doseProfile === '155-extended' ? 195 : config.doseProfile === '185-standard' ? 210 : 270;
-  const totalBrewTimeSeconds = finalStepAt + drawdownSeconds - 30 + clamp(intent.contactTimeAdjustmentSeconds || 0, -15, 30);
+  const schedule = KALITA_SCHEDULES[config.doseProfile];
+  const totalBrewTimeSeconds = schedule.totalSeconds + clamp(intent.contactTimeAdjustmentSeconds || 0, -15, 30);
   const reasonCodes = [
     ...(intent.reasonCodes || []), technique.code,
     config.doseProfile === '155-extended' ? 'WAVE_155_EXTENDED_DOSE_PROFILE' : config.size === '155' ? 'WAVE_155_SMALL_BED_PROFILE' : 'WAVE_185_DEEPER_BED_PROFILE',
@@ -123,18 +153,15 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
     { action: 'Rinse and preheat the Wave 155/185 filter and server; discard rinse water.', phase: 'prep' },
     { action: `Add ${config.dose}g coffee and level the bed.`, phase: 'prep' },
   ];
+  const pourTargets = schedule.pours.map(([seconds, share]) => [seconds, Math.round(waterGrams * share)]);
   const steps = [
-    { time: '0:00', timeSeconds: 0, action: `Bloom with ${bloom}g water; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom, phase: 'brew' },
-    { time: timeLabel(firstPourAt), timeSeconds: firstPourAt, action: technique.key === 'center-to-spiral-pulse'
-      ? `Start in the center, then pour in a controlled spiral outward to ${first}g total; keep the stream on the coffee bed, not the paper walls.`
-      : technique.key === 'bloom-led-pulse'
-        ? `Pour from the center in a restrained pulse to ${first}g total; keep the stream on the coffee bed and away from the paper walls.`
-        : `Pour slowly and directly into the center to ${first}g total; keep the stream low and do not spiral.`, waterTotal: first },
-    { time: timeLabel(finalPourAt), timeSeconds: finalPourAt, action: technique.key === 'center-to-spiral-pulse'
-      ? `Finish at ${waterGrams}g total with a gentle center-to-outward spiral; ${technique.finalSwirl ? 'swirl once only if the bed is uneven.' : 'do not swirl.'}`
-      : technique.key === 'bloom-led-pulse'
-        ? `Finish with a second restrained center pulse to ${waterGrams}g total; do not use a wide spiral or stir.`
-        : `Finish at ${waterGrams}g total with another low, centered pour; do not spiral or swirl.`, waterTotal: waterGrams },
+    { time: '0:00', timeSeconds: 0, action: `Bloom with ${bloom}g water in the first 10-15 seconds; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom, phase: 'brew' },
+    ...pourTargets.map(([seconds, target], index) => ({
+      time: timeLabel(seconds),
+      timeSeconds: seconds,
+      action: index === 0 ? firstPourAction(technique.key, target) : index === pourTargets.length - 1 ? finalPourAction(technique, target) : middlePourAction(technique.key, target),
+      waterTotal: target,
+    })),
   ];
   const recipe = {
     method: 'pour-over', device: 'kalita', mode: 'hot', kalitaSize: config.size, configurationKey: `kalita:${config.size}:wave-paper:hot`, doseProfile: config.doseProfile,
