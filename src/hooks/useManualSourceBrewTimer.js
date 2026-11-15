@@ -77,8 +77,8 @@ export function useManualSourceBrewTimer(record, options = {}) {
     onStateChange?.(state);
   }, [onStateChange, state]);
 
-  const dispatch = useCallback((action) => {
-    const atMs = now();
+  // `atMs` lets the scale back-date the start to the first pour.
+  const dispatch = useCallback((action, atMs = now()) => {
     const current = stateRef.current;
     const next = transitionManualBrew(record, current, action, atMs, identity);
     if (next === current) return current;

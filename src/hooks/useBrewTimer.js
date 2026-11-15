@@ -29,6 +29,7 @@ export { buildTimerSteps } from '../lib/brewTimerSteps';
 
 const TICK_MS = 100;
 const checkpointKey = id => `ruphus-timer-v1:${id}`;
+const stepSignature = steps => JSON.stringify(steps.map(step => [step.startSeconds, step.durationSeconds]));
 
 function readCheckpoint(id, signature, stepCount) {
   if (!id) return null;
@@ -259,7 +260,7 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     if (!timerSteps) return;
     completionRef.current = null;
     setCompletion(null);
-    const signature = JSON.stringify(timerSteps.map(step => [step.startSeconds, step.durationSeconds]));
+    const signature = stepSignature(timerSteps);
     checkpointRef.current = { id: sessionId, signature };
     const saved = readCheckpoint(sessionId, signature, timerSteps.length);
     if (saved) {
@@ -296,20 +297,21 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     dispatch({ type: 'START' });
   }, [timerSteps, sessionId, options.sourceTimerBinding, options.sourceTimerState, recipe, resolvedSourceMode]);
 
-  // Called by the 3-2-1 countdown overlay when it reaches 0.
-  const beginRunning = useCallback(() => {
-    const now = Date.now();
-    startedAtRef.current = now;
-    stepStartedAtRef.current = now;
+  // Called by the 3-2-1 countdown overlay when it reaches 0, or by the scale
+  // with the time of the first pour, which can be a moment in the past.
+  const beginRunning = useCallback((atMs = Date.now()) => {
+    if (!checkpointRef.current && timerSteps) checkpointRef.current = { id: sessionId, signature: stepSignature(timerSteps) };
+    startedAtRef.current = atMs;
+    stepStartedAtRef.current = atMs;
     pauseStartedAtRef.current = null;
     pausedAccumMsRef.current = 0;
     stepPausedAccumMsRef.current = 0;
     completionRef.current = null;
     setCompletion(null);
-    setGlobalElapsedMs(0);
-    setStepElapsedMs(0);
+    setGlobalElapsedMs(Math.max(0, Date.now() - atMs));
+    setStepElapsedMs(Math.max(0, Date.now() - atMs));
     dispatch({ type: 'COUNTDOWN_DONE' });
-  }, []);
+  }, [sessionId, timerSteps]);
 
   const pause = useCallback(() => {
     if (state.phase !== 'running') return;

@@ -1,6 +1,7 @@
 // One-shot: convert oversized PNG icons/illustrations in public/images/ to WebP
-// at appropriate display sizes. Run with `node scripts/convert-icons-to-webp.mjs`.
-// Outputs alongside originals, then the orchestrator removes the PNGs.
+// at appropriate display sizes, then delete the PNGs. Run with
+// `node scripts/convert-icons-to-webp.mjs`, then point the code at the .webp
+// paths. Keeps the iOS OTA bundle small (Capgo asks for under 20 MB).
 import sharp from 'sharp';
 import { readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -9,74 +10,60 @@ import { fileURLToPath } from 'node:url';
 // fileURLToPath handles %20 decoding for the trailing-space directory path.
 const IMAGES_DIR = fileURLToPath(new URL('../public/images/', import.meta.url));
 
-// Target sizes are 3x the largest DOM render size per asset, matching iPhone
-// Retina display density. WebP quality 82 is visually lossless for UI icons.
+// Target sizes are about 3x the largest DOM render size per asset (iPhone
+// Retina density). Entries ending in "/" convert every PNG in that folder.
 const TARGETS = {
-  // Nav icons render at 44x44pt in the tab bar (see App.jsx:213-224).
-  'nav-rotation.png':  { max: 132 },
-  'nav-inventory.png': { max: 132 },
-  'nav-tasting.png':   { max: 132 },
-  'nav-chat.png':      { max: 132 },
-  'nav-archive.png':   { max: 132 },
-  // Jar icons render at 24x24pt in RotationTab.
-  'jar-full.png':  { max: 72 },
-  'jar-empty.png': { max: 72 },
-  // Brew method buttons -- medium-sized, probably max 80pt.
-  'brew-aiden.png':    { max: 240 },
-  'brew-handbrew.png': { max: 240 },
-  'handbrew-icon.png': { max: 180 },
-  // Empty rotation placeholder illustration, full-width at ~280pt.
-  'empty-rotation.png': { max: 840 },
-  // Rotation header background, full screen width at 430pt (iPhone 16 Pro Max).
-  'rotation-header.png': { max: 1290 },
-  // Professor Ruphus portrait. Biggest use is 60px in ShareCard at 2x scale
-  // = 120px output. 240px covers future 3x.
-  'professor-ruphus.png': { max: 240 },
+  // Tasting-note illustrations render at up to 52px * 74% = ~39pt in
+  // BeanDetailCard's NoteCell. 160px leaves headroom over 3x.
+  'tasting-icons/': { max: 160 },
+  // Demo-mode bag shots render 240pt tall in BeanCard.
+  'demo/bags/san-jose-bag-t.png': { max: 960 },
+  'demo/bags/el-triangulo-bag-t.png': { max: 960 },
+  'demo/bags/cafen-bag-t.png': { max: 960 },
 };
 
+async function expand(target) {
+  if (!target.endsWith('/')) return [target];
+  const files = await readdir(path.join(IMAGES_DIR, target));
+  return files.filter((f) => f.endsWith('.png')).sort().map((f) => target + f);
+}
+
 async function run() {
-  const files = await readdir(IMAGES_DIR);
   let savedBytes = 0;
   let savedCount = 0;
+  let failed = 0;
 
-  for (const [filename, opts] of Object.entries(TARGETS)) {
-    const srcPath = path.join(IMAGES_DIR, filename);
-    try {
-      const before = await stat(srcPath);
-      const outPath = srcPath.replace(/\.png$/, '.webp');
+  for (const [target, opts] of Object.entries(TARGETS)) {
+    for (const filename of await expand(target)) {
+      const srcPath = path.join(IMAGES_DIR, filename);
+      try {
+        const before = await stat(srcPath);
+        const outPath = srcPath.replace(/\.png$/, '.webp');
 
-      const meta = await sharp(srcPath).metadata();
-      const fits = Math.min(meta.width || opts.max, opts.max);
+        await sharp(srcPath)
+          .resize({ width: opts.max, height: opts.max, fit: 'inside', withoutEnlargement: true })
+          // q90 keeps flat illustration edges clean (see lessons.md, sips/WebP).
+          .webp({ quality: 90, alphaQuality: 100, effort: 6 })
+          .toFile(outPath);
 
-      await sharp(srcPath)
-        .resize({
-          width: fits,
-          height: fits,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 82, effort: 6 })
-        .toFile(outPath);
+        const after = await stat(outPath);
+        savedBytes += before.size - after.size;
+        savedCount += 1;
+        console.log(
+          `${filename.padEnd(40)} ${(before.size / 1024).toFixed(0).padStart(5)}KB -> ${(after.size / 1024).toFixed(1).padStart(6)}KB WebP`
+        );
 
-      const after = await stat(outPath);
-      const saved = before.size - after.size;
-      savedBytes += saved;
-      savedCount += 1;
-
-      console.log(
-        `${filename.padEnd(22)} ${(before.size / 1024).toFixed(0).padStart(5)}KB -> ${(after.size / 1024).toFixed(1).padStart(6)}KB WebP  (-${((saved / before.size) * 100).toFixed(1)}%)`
-      );
-
-      // Remove the PNG only after successful WebP write.
-      await unlink(srcPath);
-    } catch (err) {
-      console.error(`FAILED ${filename}:`, err.message);
+        // Remove the PNG only after a successful WebP write.
+        await unlink(srcPath);
+      } catch (err) {
+        failed += 1;
+        console.error(`FAILED ${filename}:`, err.message);
+      }
     }
   }
 
-  console.log(
-    `\nConverted ${savedCount} assets. Total saved: ${(savedBytes / 1024 / 1024).toFixed(2)}MB`
-  );
+  console.log(`\nConverted ${savedCount} assets. Total saved: ${(savedBytes / 1024 / 1024).toFixed(2)}MB`);
+  if (failed) process.exitCode = 1;
 }
 
 run();

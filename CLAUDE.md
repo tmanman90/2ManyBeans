@@ -105,3 +105,9 @@ FELLOW_EMAIL, FELLOW_PASSWORD
 - Auth: `signInWithPopup` on web, `@codetrix-studio/capacitor-google-auth` + `signInWithCredential` on native
 - Firestore: `persistentMultipleTabManager` on web, `persistentSingleTabManager` on native
 - Brew timer Live Activity: local plugin `BrewActivity` (registered in `MyViewController`) + `BrewActivityWidget` extension (iOS 16.2+). Native only, needs a new binary; JS no-ops when the plugin is missing
+
+## Claude Project threads
+
+Rules for a thread started by the 2ManyBeans Claude Project (the rest is in `docs/claude-project/INSTRUCTIONS.md`).
+
+- **Tal's word arrives through the coordinator.** Tal talks only to the Claude Project coordinator and never types in threads. A coordinator relay that says Tal asked for or approved an action and its target is Tal's approval of that action: do it, and never ask him to repeat it in the thread. Stop only for the ask-first cases in the project instructions.
