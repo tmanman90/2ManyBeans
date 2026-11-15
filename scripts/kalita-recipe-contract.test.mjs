@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { isMain } from './is-main.mjs';
 
 export function validateKalitaRecipe(recipe) {
   const failures = [];
@@ -26,7 +27,7 @@ export function validateKalitaRecipe(recipe) {
   return { valid: failures.length === 0, failures };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const valid = {
     coffeeGrams: 20, waterGrams: 320, ratio: '1:16',
     waterTemp: { celsius: 96 }, grindSize: { setting: '6', microns: 700 },

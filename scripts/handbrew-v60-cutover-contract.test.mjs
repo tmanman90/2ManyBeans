@@ -34,7 +34,9 @@ assert.match(icedView, /icedRecipe\.techniqueLabel/);
 assert.match(icedView, /icedRecipe\.sourceLineage\?\.adaptation/);
 assert.match(timer, /dialogRef\.current\?\.focus\(\)/);
 assert.match(timer, /inert=\{completionOverlayVisible \? true : undefined\}/);
-assert.match(timer, /onDismiss=\{onClose\}/);
+// Done on the chill screen closes the timer; since 1.1.254 it also clears the saved
+// timer session first so a recovered timer never reappears after the user finished.
+assert.match(timer, /onDismiss=\{\(\) => \{ clearBrewTimerSession\(timerOwner\); onClose\?\.\(\); \}\}/);
 assert.match(timer, /expected drawdown/);
 assert.match(timer, /finish on drawdown/);
 assert.doesNotMatch(timer, /guide finish/);

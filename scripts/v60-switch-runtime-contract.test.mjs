@@ -155,8 +155,10 @@ assert.equal(retryConfigForClassic.variant, 'classic', 'a classic (or legacy, va
 // Switch variant, with a short explanatory note, instead of silently
 // falling back to a classic-derived iced recipe. ---------------------------
 assert.match(modal, /icedUnsupported = false/, 'HandBrewModal must accept an icedUnsupported prop');
-assert.match(modal, /\{timerReady && icedUnsupported && \(/, 'no short note when iced is unsupported for the current variant');
-assert.match(modal, /\{timerReady && !icedUnsupported && \(\s*<m\.button\s*onClick=\{handleEnterIced\}/, 'iced entry point must be hidden (not just erroring) when icedUnsupported');
+// The note and the iced button may carry extra guards (source-backed and preview modes
+// render neither), so match the icedUnsupported gate, not the whole condition.
+assert.match(modal, /\{[^\n{}]*[tT]imerReady && icedUnsupported && \(/, 'no short note when iced is unsupported for the current variant');
+assert.match(modal, /\{[^\n{}]*[tT]imerReady && !icedUnsupported && \(\s*<m\.button\s*onClick=\{handleEnterIced\}/, 'iced entry point must be hidden (not just erroring) when icedUnsupported');
 assert.match(modal, /if \(icedUnsupported\) return null;/, 'icedRecipe derivation must defend against a stale icedMode for the Switch variant');
 
 console.log('v60 switch runtime contract [2]+[3] passed (iced rejection: no crash, no silent classic-iced, hidden entry point with a note)');
