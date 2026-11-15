@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { execFileSync } from 'node:child_process'
+import { rmSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { CDN_PREFIXES } from './src/lib/cdnAssets.js'
 
 const isCapacitor = process.env.CAPACITOR_BUILD === 'true'
 const appVariant = process.env.TMB_APP_VARIANT === 'dev' ? 'dev' : 'prod'
@@ -16,6 +19,20 @@ if (appVariant === 'dev') {
 const googleIosClientId = appVariant === 'dev'
   ? '902243550931-oapf974v3f78m5plmoh4urqos01cj6v9.apps.googleusercontent.com'
   : '902243550931-jp7aur82tepcpi54r0er41sp2semqamp.apps.googleusercontent.com'
+
+// Native builds load CDN_PREFIXES media from the web host (src/lib/assetUrl.js),
+// so drop those folders from dist. Keeps the Capgo OTA bundle small.
+function dropCdnServedMedia() {
+  let outDir = ''
+  return {
+    name: 'drop-cdn-served-media',
+    apply: 'build',
+    configResolved(config) { outDir = resolve(config.root, config.build.outDir) },
+    closeBundle() {
+      for (const prefix of CDN_PREFIXES) rmSync(join(outDir, prefix), { recursive: true, force: true })
+    },
+  }
+}
 
 export default defineConfig({
   define: {
@@ -65,6 +82,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    ...(isCapacitor ? [dropCdnServedMedia()] : []),
     // Disable PWA service worker for native builds (Capacitor serves from bundled assets)
     ...(!isCapacitor ? [VitePWA({
       registerType: 'autoUpdate',

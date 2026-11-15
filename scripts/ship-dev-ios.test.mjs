@@ -9,6 +9,7 @@ assert.match(source, /const DEV_CHANNEL = 'dev';/);
 assert.match(source, /scripts\/patch-social-login\.mjs/);
 assert.match(source, /build:ios:dev/);
 assert.match(source, /'--fail-on-incompatible'/);
+assert.match(source, /'--delta-only'/);
 assert.match(source, /channel', 'currentBundle', DEV_CHANNEL, DEV_APP_ID/);
 assert.match(source, /-devapp\./);
 assert.match(source, /REQUIRED_BUILD_ENV/);

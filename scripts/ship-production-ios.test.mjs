@@ -9,6 +9,7 @@ assert.match(source, /REQUIRED_BUILD_ENV/);
 assert.match(source, /VITE_FIREBASE_API_KEY/);
 assert.match(source, /build:ios/);
 assert.match(source, /'--fail-on-incompatible'/);
+assert.match(source, /'--delta-only'/);
 assert.match(source, /channel', 'currentBundle', PROD_CHANNEL, PROD_APP_ID/);
 assert.match(source, /does not advance current Capgo bundle/);
 assert.match(source, /installed production[\s\S]*baseline/);
