@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { espressoTastingContext, formatBrewContext, resolveBrewContext, snapshotBrewContext, tastingStepCopy } from '../src/lib/brewContext.js';
+import { describeCupContext, espressoTastingContext, formatBrewContext, resolveBrewContext, snapshotBrewContext, tastingStepCopy } from '../src/lib/brewContext.js';
 import { summarizeEvidence } from '../api/_lib/ruphusEvidence.js';
 import { resolveTastingLaunchMethod } from '../src/lib/ruphus/launch.js';
 import { buildPalateSummary } from '../src/lib/palateSummary.js';
@@ -127,4 +127,18 @@ test('grinder-only espresso equipment survives repeated and historical snapshot 
     assert.deepEqual(snapshotBrewContext(context).equipment, equipment);
     assert.deepEqual(snapshotBrewContext({ version: 1, method: 'espresso', equipment }).equipment, equipment);
   }
+});
+
+test('cup context shown to people uses equipment names, not stored ids or AI evidence wording', () => {
+  const context = espressoTastingContext({
+    setup: { espressoMachine: 'breville-barista-express', espressoBasket: 'stock-double-single-wall', espressoGrinder: 'integrated', espressoSetupConfirmed: true },
+    recipe: { method: 'espresso', doseGrams: 18, yieldGrams: 36, ratio: 2, source: 'app_baseline', temperature: { mode: 'machine_default', offsetF: 0 } },
+  });
+  const lines = describeCupContext(context);
+  assert.deepEqual(lines, ['Straight espresso', 'Breville Barista Express · Stock double · single-wall · Barista Express built-in grinder', '18 g in, 36 g out']);
+  assert.doesNotMatch(lines.join(' '), /breville-barista-express|stock-double|integrated|Cup context|°F|Unsaved target|snapshot/);
+  const grinderOnly = snapshotBrewContext({ method: 'espresso', drinkType: 'with_milk', equipment: { grinder: 'external', grinderModel: 'Niche Zero' } });
+  assert.deepEqual(describeCupContext(grinderOnly), ['Espresso with milk', 'External grinder · Niche Zero']);
+  assert.deepEqual(describeCupContext(snapshotBrewContext({ method: 'v60_iced' })), ['Iced V60']);
+  assert.deepEqual(describeCupContext({}), ['Brew method not recorded']);
 });

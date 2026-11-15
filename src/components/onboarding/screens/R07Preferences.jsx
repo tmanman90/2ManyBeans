@@ -48,6 +48,9 @@ const inputStyle = {
   transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
 };
 
+// Names each espresso dropdown; "Not sure" alone does not say which part it is.
+const subLabelStyle = { ...t.body, fontWeight: 700, color: C.text, marginBottom: -4 };
+
 const selectStyle = {
   ...inputStyle,
   appearance: 'none',
@@ -258,13 +261,16 @@ export default function R07Preferences() {
         {brewMethod === 'espresso' && (
           <m.div variants={listItem} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <FieldLabel style={{ marginTop: 2 }}>Espresso setup</FieldLabel>
-            <select aria-label="Espresso machine" value={espressoMachine} onChange={handleEspressoMachineChange} style={selectStyle}>
+            <label htmlFor="r07-espresso-machine" style={subLabelStyle}>Machine</label>
+            <select id="r07-espresso-machine" aria-label="Espresso machine" value={espressoMachine} onChange={handleEspressoMachineChange} style={selectStyle}>
               {ESPRESSO_MACHINES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
             </select>
-            <select aria-label="Espresso basket" value={espressoBasket} onChange={handleEspressoBasketChange} style={selectStyle}>
+            <label htmlFor="r07-espresso-basket" style={subLabelStyle}>Basket</label>
+            <select id="r07-espresso-basket" aria-label="Espresso basket" value={espressoBasket} onChange={handleEspressoBasketChange} style={selectStyle}>
               {ESPRESSO_BASKETS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
             </select>
-              <select aria-label="Espresso grinder" value={espressoGrinder} onChange={handleEspressoGrinderChange} style={selectStyle}>
+            <label htmlFor="r07-espresso-grinder" style={subLabelStyle}>Grinder</label>
+            <select id="r07-espresso-grinder" aria-label="Espresso grinder" value={espressoGrinder} onChange={handleEspressoGrinderChange} style={selectStyle}>
               {ESPRESSO_GRINDERS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
             </select>
             {espressoGrinder === 'external' && (

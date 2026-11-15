@@ -69,15 +69,28 @@ export function isSupportedEspressoSetup(setup = {}) {
     && (identity.grinder !== 'custom' || identity.grinderCustomName == null || typeof identity.grinderCustomName === 'string');
 }
 
-export function espressoSetupDescription(setup = {}) {
+function espressoSetupLabels(setup = {}) {
   const identity = espressoSetupIdentity(setup);
-  const grinder = identity.grinder === 'integrated'
-    ? (identity.machine === SUPPORTED_MACHINE ? 'Barista Express built-in grinder' : 'Built-in grinder')
-    : identity.grinder === 'external'
-      ? `External grinder${identity.grinderModel ? ` · ${identity.grinderModel}` : ''}`
-      : identity.grinder === 'custom' ? `Custom grinder${identity.grinderCustomName ? ` · ${identity.grinderCustomName}` : ''}`
-        : identity.grinder === 'preground' ? 'Preground coffee' : 'Grinder not set';
-  return `${MACHINE_LABELS[identity.machine] || identity.machineName || (identity.machine === 'other' ? 'Other espresso machine' : 'Machine not set')} · ${BASKET_LABELS[identity.basket] || (identity.basket === 'dual-wall' ? 'Dual-wall basket' : identity.basket === 'different' ? 'Different basket' : 'Basket not set')} · ${grinder}`;
+  return {
+    machine: MACHINE_LABELS[identity.machine] || identity.machineName || (identity.machine === 'other' ? 'Other espresso machine' : null),
+    basket: BASKET_LABELS[identity.basket] || (identity.basket === 'dual-wall' ? 'Dual-wall basket' : identity.basket === 'different' ? 'Different basket' : null),
+    grinder: identity.grinder === 'integrated'
+      ? (identity.machine === SUPPORTED_MACHINE ? 'Barista Express built-in grinder' : 'Built-in grinder')
+      : identity.grinder === 'external'
+        ? `External grinder${identity.grinderModel ? ` · ${identity.grinderModel}` : ''}`
+        : identity.grinder === 'custom' ? `Custom grinder${identity.grinderCustomName ? ` · ${identity.grinderCustomName}` : ''}`
+          : identity.grinder === 'preground' ? 'Preground coffee' : null,
+  };
+}
+
+export function espressoSetupDescription(setup = {}) {
+  const labels = espressoSetupLabels(setup);
+  return `${labels.machine || 'Machine not set'} · ${labels.basket || 'Basket not set'} · ${labels.grinder || 'Grinder not set'}`;
+}
+
+/** Only the parts of the setup that are known, for display. */
+export function espressoSetupSummary(setup = {}) {
+  return Object.values(espressoSetupLabels(setup)).filter(Boolean).join(' · ');
 }
 
 const isStockBasket = (setup) => {

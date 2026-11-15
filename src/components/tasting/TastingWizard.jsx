@@ -17,7 +17,7 @@ import { palateLevel } from '../../lib/palate';
 import { AXES as SLIDER_AXES } from '../../lib/flavorWheel';
 import { TASTING_WIZARD_STEPS, initialAnswers, stepComplete, capturedScores, buildTastingFromAnswers } from '../../lib/tastingWizardSteps';
 import { reactToTastingStep } from '../../lib/claude';
-import { formatBrewContext, isEspressoContext, isMilkDrink, resolveBrewContext, snapshotBrewContext, tastingSnapshotFromContext, tastingStepCopy } from '../../lib/brewContext';
+import { describeCupContext, formatBrewContext, isEspressoContext, isMilkDrink, resolveBrewContext, snapshotBrewContext, tastingSnapshotFromContext, tastingStepCopy } from '../../lib/brewContext';
 import { espressoSetupKey } from '../../lib/espressoRecipes';
 import { useNativeKeyboard } from '../../hooks/useNativeKeyboard';
 import { AxisSlider } from './AxisSlider';
@@ -355,10 +355,10 @@ function IntroCard({ bean, expected, palate, brewContext, onMethod, onDrinkType,
           </div>
         )}
       </div>}
-      <div style={{ ...cardStyle, marginTop: 12 }}><div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 5 }}>Cup context</div><div style={{ ...type.body, color: C.textMuted }}>{formatBrewContext(brewContext)}</div></div>
+      <div style={{ ...cardStyle, marginTop: 12 }}><div style={{ ...type.eyebrow, color: C.textLight, marginBottom: 5 }}>Cup context</div>{describeCupContext(brewContext).map(line => <div key={line} style={{ ...type.body, color: C.textMuted }}>{line}</div>)}</div>
       <div style={{ ...cardStyle, marginTop: 12 }}>
         <label style={{ ...type.eyebrow, color: C.textLight, display: 'block', marginBottom: 7 }} htmlFor="tasting-method">Tasting method</label>
-        <select id="tasting-method" aria-label="Tasting method" value={brewContext.method === 'unknown' ? '' : brewContext.method} onChange={(event) => onMethod?.(event.target.value)} style={{ width: '100%', minHeight: 44, borderRadius: radius.md, border: `1px solid ${C.border}`, background: C.cream, color: C.text, padding: '0 10px', fontFamily: fonts.body, fontWeight: 700 }}>
+        <select id="tasting-method" aria-label="Tasting method" value={brewContext.method === 'unknown' ? '' : brewContext.method} onChange={(event) => onMethod?.(event.target.value)} style={{ width: '100%', minHeight: 44, borderRadius: radius.md, border: `1px solid ${C.border}`, background: C.cream, color: C.text, padding: '0 10px', fontFamily: fonts.body, fontSize: 16, fontWeight: 700 }}>
           <option value="" disabled>Choose a method</option><option value="espresso">Espresso</option><option value="v60_hot">Hot V60</option><option value="v60_iced">Iced V60</option><option value="kalita_hot">Hot Kalita</option><option value="kalita_iced">Iced Kalita</option><option value="aiden">Aiden</option>
         </select>
         <div style={{ ...type.caption, color: C.textLight, marginTop: 7 }}>Changing this corrects this tasting only; it does not change your saved preferences.</div>

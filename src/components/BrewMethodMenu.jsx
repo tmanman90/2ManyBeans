@@ -1,6 +1,9 @@
 // Floating brew method menu — appears on long-press of Brew button
-// Shows Aiden + all 5 manual brew devices
-import { useEffect, useRef } from 'react';
+// Shows Aiden, all 5 manual brew devices and Espresso.
+// Rendered in a portal: the bean cards clip their overflow for rounded corners,
+// and seven rows are taller than the space above the button inside a card.
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Coffee, Droplets } from 'lucide-react';
 import { C, glass, fonts, shadows, radius } from '../styles/theme';
@@ -9,6 +12,20 @@ import { BREW_DEVICES } from '../lib/brewMethods';
 
 export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew, onEspresso }) => {
   const menuRef = useRef(null);
+  const anchorRef = useRef(null);
+  const [place, setPlace] = useState(null);
+
+  // Anchor above the parent (the Brew button wrapper), measured when opened.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const rect = anchorRef.current?.parentElement?.getBoundingClientRect();
+    if (!rect) return;
+    setPlace({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - 218)),
+      bottom: window.innerHeight - rect.top + 8,
+      spaceAbove: rect.top - 8,
+    });
+  }, [open]);
 
   // Dismiss on outside tap
   useEffect(() => {
@@ -43,16 +60,18 @@ export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew, onEspresso 
   };
 
   return (
+    <>
+    <span ref={anchorRef} hidden />
+    {createPortal(
     <AnimatePresence>
-      {open && (
+      {open && place && (
         <m.div
           ref={menuRef}
           {...popIn}
           style={{
-            position: 'absolute',
-            bottom: '100%',
-            left: 0,
-            marginBottom: 8,
+            position: 'fixed',
+            bottom: place.bottom,
+            left: place.left,
             background: glass.sheet,
             backdropFilter: glass.blur,
             WebkitBackdropFilter: glass.blur,
@@ -60,9 +79,9 @@ export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew, onEspresso 
             boxShadow: shadows.e3,
             border: `1px solid ${glass.chromeBorder}`,
             overflow: 'hidden',
-            zIndex: 10,
+            zIndex: 1000,
             minWidth: 210,
-            maxHeight: 340,
+            maxHeight: `min(380px, calc(${place.spaceAbove}px - env(safe-area-inset-top, 0px)))`,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             padding: '6px',
@@ -127,6 +146,9 @@ export const BrewMethodMenu = ({ open, onClose, onAiden, onHandBrew, onEspresso 
           </button>
         </m.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
+    )}
+    </>
   );
 };
