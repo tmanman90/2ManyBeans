@@ -12,15 +12,18 @@ This project is 2ManyBeans (the app is called Coffee Hub in the code): Tal Meltz
 - At most 3 threads working at once. Queue the rest and say so.
 - Thread model: Opus, high effort, for Firebase, auth and sign-in, the Firestore data model, onboarding commit, paywall, AI proxies and model routing. Sonnet for mechanical work: copy changes, test updates, renames, docs.
 - Before starting a thread, say whether it runs in the CLOUD or on the STUDIO (rules below). A mixed ask becomes two threads: cloud writes first, the Studio thread checks it on the PR branch.
-- Stop and ask Tal in the conversation when the ask: changes the shape of stored Firestore data or touches existing user documents; changes sign-in; changes the paywall, pricing or onboarding answers; swaps an AI model or raises AI cost; deletes user data; or has two readings that would produce different builds. Otherwise run to a pull request without checking in.
+- Tal's word in this chat is the go. When he asks for something, carry it all the way to the end he asked for, without asking again and without sending him to GitHub. He never opens GitHub himself.
+- Ask first only when: the ask has two readings that would build different things, or a step would permanently delete user data he did not name. Anything else he asked for (sign-in, paywall, data shape, AI models), just do it and say plainly what changed.
 
 ## Where threads run
 
 CLOUD (default): `src/` logic, `api/`, `scripts/`, tests, docs, copy. The cloud has no Xcode, no simulator, no repo skills (`.claude/skills/`), and no access to Tal's Dropbox.
 
-STUDIO ("work locally", folder `~/Developer/Coffee-App` on the Mac Studio, Worktree on): anything that needs `npm run cap:sync`, Xcode, the iOS simulator, `/ios-qa`, App Store screenshots, a visual check of a screen, or the shared lessons in Tal's Hub. One Xcode build at a time on that machine. Never work in the main checkout itself; use the worktree.
+STUDIO ("work locally", folder `~/Developer/Coffee-App` on the Mac Studio, Worktree on): anything that needs `npm run cap:sync`, Xcode, the iOS simulator, `/ios-qa`, App Store screenshots, a visual check of a screen, or the shared lessons in Tal's Hub. One Xcode build at a time on that machine. Build and check work happens in a worktree, never the main checkout (ship threads are the one exception, below).
 
 UI changes (`src/tabs/`, `src/components/`, `src/App.jsx`, `src/styles/`): the cloud may write them, but only a Studio thread may say they look right, and only after it has looked at its own simulator screenshots.
+
+Shipping (Vercel and Capgo) runs only on the Studio; the cloud has no deploy logins.
 
 ## Every thread, before it changes code
 
@@ -34,17 +37,28 @@ UI changes (`src/tabs/`, `src/components/`, `src/App.jsx`, `src/styles/`): the c
 - Run `npm test` (10 steps, needs no keys; the Kalita check uses placeholder Firebase values) and `npm run lint`. Paste the final result lines in the PR body.
 - This repo has no CI. The thread's own test run is the only proof, so never skip it and never claim a pass you did not see.
 
+## Merging and shipping
+
+Merging to main deploys nothing on this repo. Users only get a change when someone ships it. So:
+
+- A change ask ends MERGED: tests and lint pass, the thread merges its own pull request into main, and reports. If tests fail, fix them; never merge red. If Tal says "PR only" or "don't merge", stop at the pull request.
+- UI changes: before merging, the coordinator starts a Studio thread on the PR branch to open the changed screens in the simulator and look at them. Merge after that check passes. Tal is not asked to look.
+- Shipping happens when Tal says so in the chat, for that change or batch:
+  - "ship web": a Studio thread deploys main to Vercel production (`npx vercel --prod`) and reports the URL.
+  - "ship app": a Studio thread runs `npm run ship:prod:ios` (Capgo production channel) and reports the bundle version.
+  - "ship" or "ship it": both.
+  - "dev build": a Studio thread runs `npm run ship:dev:ios`.
+- Ship threads run in the Studio's main checkout (`~/Developer/Coffee-App`): `git switch main`, `git pull --ff-only`, `npm ci` if the lockfile changed, then the command. If that checkout has local changes, stop and say so; never discard them.
+- "fix X and ship it" means all of it in one go: build, test, check, merge, ship, report.
+
 ## Safety (public repository)
 
-- Never commit or print keys, `.env` files, Firebase config values, Fellow credentials, user data, exports, or screenshots that show personal data. Never read env files. Tests use obvious placeholders only.
-- Deploys are not yours. Never run `vercel --prod`, `npm run ship:prod:ios`, `npm run ship:dev:ios`, a Capgo upload, or anything that reaches TestFlight or the App Store.
-- Never merge a pull request. Tal merges.
+- Never commit or print keys, env files, Firebase config values, Fellow credentials, user data, exports, or screenshots that show personal data. Never read env files. Tests use obvious placeholders only.
+- Never ship without Tal's word in the chat for that ship. A merge is never a ship.
 
 ## What done means
 
-- Cloud work that the tests fully prove: pull request open, test lines pasted, one-paragraph summary in the conversation with the PR link.
-- UI or iOS work done in the cloud: DRAFT pull request titled `needs Studio check:`, with what the Studio thread must open and what a passing screenshot shows. Say "written, not seen".
-- Studio work: pull request open with the screenshots it looked at, named by screen.
+- Merged (or shipped, if he said ship), with the test lines and, for UI, the screens the Studio thread looked at. One short summary in the conversation: what changed, version, what is live.
 - Every thread's final message names what it did not verify.
 
 ## Lessons
