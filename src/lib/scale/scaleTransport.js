@@ -17,13 +17,12 @@ import {
 } from './acaiaProtocol';
 import { createFakeTransport } from './fakeScale';
 
-// QA builds for the simulator (no Bluetooth there) set VITE_FAKE_SCALE=1.
-const FAKE = import.meta.env?.VITE_FAKE_SCALE === '1';
-
 // iPhone app only: iOS Safari has no Web Bluetooth, and a new JS bundle on an
 // older binary without the plugin simply hides the feature.
 export function scaleTransport() {
-  if (FAKE) return createFakeTransport();
+  // QA builds for the simulator (no Bluetooth there) set VITE_FAKE_SCALE=1;
+  // in every other build this branch and the fake scale are compiled out.
+  if (import.meta.env.VITE_FAKE_SCALE === '1') return createFakeTransport();
   if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('BluetoothLe')) return bleTransport;
   return null;
 }
