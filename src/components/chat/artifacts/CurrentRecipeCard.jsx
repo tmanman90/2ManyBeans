@@ -53,7 +53,7 @@ export function CurrentRecipeCard({ recipe = {}, title = 'Current recipe' }) {
   const rows = recipe.method === 'aiden' || recipe.device === 'aiden' ? aidenProfileRows(recipe) : isEspresso ? [
     ['Dose', recipe.doseGrams == null ? null : `${recipe.doseGrams} g`],
     ['Output', recipe.yieldGrams == null ? null : `${recipe.yieldGrams} g`],
-    ['Ratio', recipe.ratio],
+    ['Ratio', recipe.ratio == null ? null : `1:${recipe.ratio}`],
     ['Grind', espressoGrind],
     ['Temperature', espressoTemperature],
     ['Time guide', Array.isArray(recipe.timeRangeSeconds) ? `${recipe.timeRangeSeconds[0]}–${recipe.timeRangeSeconds[1]} s · button start to stop` : null],

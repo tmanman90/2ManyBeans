@@ -13,7 +13,7 @@ import { SwipeDownHandle } from './SwipeDownHandle';
 import { splitTastingNotes } from '../lib/tastingHero';
 import { FlavorRadar } from './FlavorRadar';
 import { resolveTastingLaunchMethod } from '../lib/ruphus/launch.js';
-import { formatBrewContext } from '../lib/brewContext.js';
+import { describeCupContext } from '../lib/brewContext.js';
 
 const IOS = 'cubic-bezier(0.32, 0.72, 0, 1)';
 // The organized flavor rows — one descriptor per line (no wall of text).
@@ -130,7 +130,7 @@ export function TastingDetailCard({ tasting, bean, onClose, onShare, onEdit, onD
             <div style={{ ...type.label, color: C.textLight }}>{bean?.roaster || 'Tasting'}</div>
             <div style={{ ...type.h1, color: C.text, marginTop: 3 }}>{bean?.name || 'Tasting'}</div>
             <div style={{ ...type.caption, color: C.textLight, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{formatDate(tasting.date)}</div>
-            {tasting.cupContext && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{formatBrewContext(tasting.cupContext)}</div>}
+            {tasting.cupContext && <div style={{ ...type.caption, color: C.textMuted, marginTop: 5 }}>{describeCupContext(tasting.cupContext).join(' · ')}</div>}
           </div>
           <div style={{ padding: '10px 16px 4px' }}>
             <FlavorRadar tasting={tasting} size={252} />

@@ -1,4 +1,4 @@
-import { espressoSetupIdentity } from './espressoRecipes.js';
+import { espressoSetupIdentity, espressoSetupSummary } from './espressoRecipes.js';
 
 // Shared, compact context for a brewed cup. This is deliberately a snapshot
 // seam, not a second brew log: callers may preserve it on a draft/tasting and
@@ -115,6 +115,20 @@ export function formatBrewContext(context = {}) {
   const source = recipe.provenance?.label || recipe.source === 'unsaved_target' ? (recipe.provenance?.label || 'unsaved target') : recipe.source === 'user_saved' ? 'saved recipe' : recipe.source === 'verified_roaster' ? 'verified roaster recipe' : recipe.source === 'app_baseline' ? 'app baseline' : '';
   const revision = context.recipeRevisionId ? `revision ${text(context.recipeRevisionId, 40)}` : '';
   return [`Cup context: ${label}${drink}`, equipmentParts.length ? `equipment ${equipmentParts.join(' · ')}` : '', targets ? `recipe snapshot ${targets}` : '', grinder, temperature, source, revision].filter(Boolean).join('; ');
+}
+
+const METHOD_NAMES = Object.freeze({ aiden: 'Aiden', v60_hot: 'Hot V60', v60_iced: 'Iced V60', kalita_hot: 'Hot Kalita', kalita_iced: 'Iced Kalita' });
+
+/** Cup context as lines a person reads. formatBrewContext stays the AI evidence format. */
+export function describeCupContext(context = {}) {
+  const method = normalizeTastingMethod(context.method);
+  if (!method) return ['Brew method not recorded'];
+  if (method !== 'espresso') return [METHOD_NAMES[method]];
+  const recipe = context.recipeSnapshot || {};
+  const targets = [recipe.doseGrams != null ? `${recipe.doseGrams} g in` : null, recipe.yieldGrams != null ? `${recipe.yieldGrams} g out` : null].filter(Boolean).join(', ');
+  // Canonical keys so a grinder-only snapshot is read as equipment, not preferences.
+  const setup = espressoSetupSummary({ machine: null, basket: null, ...(context.equipment || {}) });
+  return [isMilkDrink(context) ? 'Espresso with milk' : 'Straight espresso', setup, targets].filter(Boolean);
 }
 
 export function tastingSnapshotFromContext(context = {}) {
