@@ -11,8 +11,32 @@ assert.notEqual(r155.totalBrewTimeSeconds, r185.totalBrewTimeSeconds);
 assert.notEqual(r185.totalBrewTimeSeconds, r30.totalBrewTimeSeconds);
 assert.equal(r155.technique, 'low-agitation-center');
 assert.match(r155.techniqueInstruction, /center/i);
-assert.match(r155.steps[2].action, /do not spiral/i);
-assert.match(r155.steps[2].action, /do not spiral or swirl/i);
+// Pour path (circle/spiral) and brewer swirl are separate levers. The bloom
+// must wet the whole bed; no hot Wave technique bans the pour path outright.
+assert.match(r155.steps[0].action, /spiral from the center out/i);
+assert.match(r155.steps[0].action, /do not swirl/i);
+assert.match(r155.steps[2].action, /tight center circle/i);
+assert.match(r155.steps[2].action, /do not stir or swirl/i);
+const intents = [
+  { reasonCodes: [] },
+  { finesRisk: 'high', reasonCodes: [] },
+  { solubilityRisk: 'high', reasonCodes: [] },
+  { energyTendency: 'higher', reasonCodes: [] },
+  ...['low-agitation-center', 'bloom-led-pulse', 'center-to-spiral-pulse', 'low-agitation-no-swirl'].map((techniquePreference) => ({ techniquePreference, reasonCodes: [] })),
+];
+for (const intent of intents) {
+  for (const [size, dose] of [['155', 15], ['185', 20], ['185', 30]]) {
+    const recipe = generateKalitaRecipe(intent, { size, dose });
+    const copy = [recipe.techniqueInstruction, ...recipe.steps.map((step) => step.action)].join(' ');
+    assert.doesNotMatch(copy, /do not (?:use a wide )?spiral|avoid spiral|no spiral/i, `${recipe.technique} ${size} ${dose}g bans spiraling`);
+    assert.match(recipe.steps[0].action, /every ground is wet/i, `${recipe.technique} bloom must wet the whole bed`);
+    for (const step of recipe.steps.slice(1)) assert.match(step.action, /circle|spiral/i, `${recipe.technique} pour lacks a pour path: ${step.action}`);
+  }
+}
+const unknown = generateKalitaRecipe({ reasonCodes: [] }, { size: '185', dose: 20 });
+assert.equal(unknown.technique, 'low-agitation-no-swirl');
+assert.match(unknown.steps[1].action, /small circles from the center outward/i);
+assert.match(unknown.steps.at(-1).action, /no swirl needed/i);
 assert.deepEqual(r155.steps.map((step) => [step.timeSeconds, step.waterTotal]), [[0, 45], [40, 108], [75, 240]]);
 assert.equal(r155Extended.doseProfile, '155-extended');
 assert.equal(r155Extended.waterGrams, 320);

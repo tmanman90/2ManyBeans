@@ -2,7 +2,7 @@ import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, 
 import { kalitaDoseBounds, normalizeKalitaDose, normalizeKalitaSize } from '../data/kalitaConfiguration.js';
 
 export const KALITA_ENGINE_VERSION = 'kalita-engine-v2';
-export const KALITA_RULES_VERSION = 'kalita-rules-v4-published-timing';
+export const KALITA_RULES_VERSION = 'kalita-rules-v5-pour-geometry';
 export const KALITA_PHASE_CONTRACT_VERSION = 1;
 
 const GRINDER_RANGES = {
@@ -58,17 +58,33 @@ function techniqueFor(intent) {
   return { key: 'low-agitation-no-swirl', code: 'CONSERVATIVE_UNKNOWN_TECHNIQUE', finalSwirl: false };
 }
 
+// Pour geometry for the Wave. "Spiral" is a pour path; "swirl" is spinning
+// the brewer. They are different levers and the copy keeps them apart.
+// Published Wave recipes (src/data/manualSources/kalita.js and the Kalita
+// iced registry) pour the bloom across the whole bed so every ground is wet,
+// then pour the main water in circles or spirals over the flat bed while
+// staying off the paper walls (Vibrant, Onyx, Onyx EU, Drop, Ozone, Coava).
+// The low-agitation variants keep that path smaller and slower instead of
+// banning it; Kurasu's iced recipe is the one published Wave source that says
+// to avoid spirals and the iced adapter keeps that source's own words.
 function techniqueInstructionFor(key) {
   if (key === 'center-to-spiral-pulse') {
     return 'Start in the center, then use a controlled spiral outward. Keep the stream on the coffee bed, not the paper walls.';
   }
   if (key === 'bloom-led-pulse') {
-    return 'Let the bloom do the work, then use two restrained center pulses. Keep the stream on the coffee bed; do not use a wide spiral.';
+    return 'Let the bloom do the work, then use short, restrained pulses in small circles around the center. Keep the stream low and on the coffee bed.';
   }
-  if (key === 'low-agitation-no-swirl') {
-    return 'Use slow, centered pours with a low stream. Do not spiral or swirl.';
+  if (key === 'low-agitation-center') {
+    return 'Wet the whole bed for the bloom, then pour gently in a tight circle around the center with a low stream. Keep the circle small and away from the paper. No swirl.';
   }
-  return 'Pour slowly and directly into the center with a low stream. Do not spiral or swirl.';
+  return 'Wet the whole bed for the bloom, then pour in slow, small circles from the center outward, staying about 1 cm off the paper walls. Keep the stream low. No finishing swirl.';
+}
+
+function bloomAction(key, bloom) {
+  const wet = `Bloom with ${bloom}g in the first 10-15 seconds, pouring in a spiral from the center out to the edge of the bed so every ground is wet; keep the stream off the paper`;
+  if (key === 'low-agitation-center') return `${wet}. Do not swirl; let it rest.`;
+  if (key === 'low-agitation-no-swirl') return `${wet}. No swirl needed; let it rest.`;
+  return `${wet}, then give one gentle swirl to settle the bed and let it rest.`;
 }
 
 // Pour schedules per dose profile, timed from the first drop of bloom water
@@ -89,20 +105,23 @@ const KALITA_SCHEDULES = {
 
 function firstPourAction(key, target) {
   if (key === 'center-to-spiral-pulse') return `Start in the center, then pour in a controlled spiral outward to ${target}g total; keep the stream on the coffee bed, not the paper walls.`;
-  if (key === 'bloom-led-pulse') return `Pour from the center in a restrained pulse to ${target}g total; keep the stream on the coffee bed and away from the paper walls.`;
-  return `Pour slowly and directly into the center to ${target}g total; keep the stream low and do not spiral.`;
+  if (key === 'bloom-led-pulse') return `Pour a restrained pulse in small circles around the center to ${target}g total; keep the stream low and away from the paper walls.`;
+  if (key === 'low-agitation-center') return `Pour gently in a tight circle around the center to ${target}g total; keep the stream low and the circle small, away from the paper.`;
+  return `Pour in slow, small circles from the center outward to ${target}g total; keep the stream low and about 1 cm off the paper walls.`;
 }
 
 function middlePourAction(key, target) {
   if (key === 'center-to-spiral-pulse') return `Pour again with the same controlled spiral to ${target}g total; keep the stream on the coffee bed.`;
-  if (key === 'bloom-led-pulse') return `Pour another restrained center pulse to ${target}g total; do not use a wide spiral.`;
-  return `Pour slowly into the center again to ${target}g total; keep the stream low and do not spiral.`;
+  if (key === 'bloom-led-pulse') return `Pour another restrained pulse in the same small circles to ${target}g total.`;
+  if (key === 'low-agitation-center') return `Pour again in the same tight center circle to ${target}g total; keep the stream low.`;
+  return `Pour again in the same slow, small circles to ${target}g total; stay off the paper walls.`;
 }
 
 function finalPourAction(technique, target) {
   if (technique.key === 'center-to-spiral-pulse') return `Finish at ${target}g total with a gentle center-to-outward spiral; ${technique.finalSwirl ? 'swirl once only if the bed is uneven.' : 'do not swirl.'}`;
-  if (technique.key === 'bloom-led-pulse') return `Finish with a last restrained center pulse to ${target}g total; do not use a wide spiral or stir.`;
-  return `Finish at ${target}g total with another low, centered pour; do not spiral or swirl.`;
+  if (technique.key === 'bloom-led-pulse') return `Finish with a last restrained pulse in small center circles to ${target}g total; do not stir or swirl.`;
+  if (technique.key === 'low-agitation-center') return `Finish at ${target}g total with the same tight center circle; do not stir or swirl, and let it draw down.`;
+  return `Finish at ${target}g total with the same slow, small circles; no swirl needed, let it draw down.`;
 }
 
 export function validateKalitaCandidate(recipe) {
@@ -155,7 +174,7 @@ export function generateKalitaRecipe(intent = {}, configuration = {}) {
   ];
   const pourTargets = schedule.pours.map(([seconds, share]) => [seconds, Math.round(waterGrams * share)]);
   const steps = [
-    { time: '0:00', timeSeconds: 0, action: `Bloom with ${bloom}g water in the first 10-15 seconds; ${technique.key.includes('low-agitation') ? 'keep the stream centered and do not swirl.' : 'give one gentle settling swirl, then let the bloom rest.'}`, waterTotal: bloom, phase: 'brew' },
+    { time: '0:00', timeSeconds: 0, action: bloomAction(technique.key, bloom), waterTotal: bloom, phase: 'brew' },
     ...pourTargets.map(([seconds, target], index) => ({
       time: timeLabel(seconds),
       timeSeconds: seconds,
