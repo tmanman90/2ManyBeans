@@ -1,0 +1,25 @@
+{
+  "id": "dpl_drbTkvDGfxX1mnPtrwKFyHa7uMEf",
+  "url": "2manybeans-hbj5gwfyc-tmanman90s-projects.vercel.app",
+  "name": "2manybeans",
+  "target": "production",
+  "readyState": "READY",
+  "createdAt": 1790397150219,
+  "meta": {
+    "gitCommitAuthorName": "Tal Meltzer",
+    "gitCommitAuthorEmail": "talmeltzer@gmail.com",
+    "gitCommitMessage": "fix: keep recovered brew timer above recipe sheet",
+    "gitCommitRef": "codex/timer-production-release",
+    "gitCommitSha": "5ce7f2d3b53479e49259097b191e0b5d4eabd9c4",
+    "gitRootDirectory": "",
+    "actor": "codex",
+    "lambdaRuntimeStats": "{\"nodejs\":15}"
+  },
+  "gitSource": null,
+  "alias": [
+    "2manybeans.vercel.app",
+    "2manybeans.superxmusic.com",
+    "2manybeans-tmanman90s-projects.vercel.app"
+  ],
+  "projectId": "prj_YBlA850LISvVhK8ROr3XfHu5VuQc"
+}

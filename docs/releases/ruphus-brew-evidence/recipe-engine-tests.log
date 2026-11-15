@@ -1,0 +1,31 @@
+
+> coffee-hub@1.1.255 test:recipe-engine
+> node scripts/source-insights-regression.test.mjs && node scripts/recipe-evidence.test.mjs && node scripts/extraction-intent.test.mjs && node scripts/kalita-adapter.test.mjs && node scripts/kalita-runtime-contract.test.mjs && node scripts/kalita-iced-source-registry.test.mjs && node scripts/kalita-iced-adapter.test.mjs && node scripts/kalita-iced-recipe-contract.test.mjs && node scripts/kalita-iced-technique-copy.test.mjs && node scripts/latest-write-queue.test.mjs && node scripts/handbrew-cache-policy.test.mjs && node scripts/handbrew-kalita-iced-integration.test.mjs && node scripts/handbrew-kalita-iced-cutover-contract.test.mjs && node scripts/kalita-iced-evaluate-inventory.test.mjs && node scripts/verify-kalita-iced-ui.mjs && node scripts/v60-source-registry.test.mjs && node scripts/v60-adapter.test.mjs && node scripts/v60-recipe-contract.test.mjs && node scripts/v60-technique-copy.test.mjs && node scripts/v60-dose-scaling-provenance.test.mjs && node scripts/v60-cutover-boundaries.test.mjs && node scripts/v60-selector-counterexamples.test.mjs && node scripts/v60-iced-source-registry.test.mjs && node scripts/v60-iced-adapter.test.mjs && node scripts/v60-iced-recipe-contract.test.mjs && node scripts/v60-iced-technique-copy.test.mjs && node scripts/v60-switch-adapter.test.mjs && node scripts/v60-switch-recipe-contract.test.mjs && node scripts/handbrew-prep-contract.test.mjs && node scripts/v60-runtime-contract.test.mjs && node scripts/v60-switch-runtime-contract.test.mjs && node scripts/handbrew-v60-integration.test.mjs && node scripts/handbrew-v60-switch-integration.test.mjs && node scripts/handbrew-iced-prep-contract.test.mjs && node scripts/handbrew-v60-cutover-contract.test.mjs && node scripts/v60-evaluate-inventory.test.mjs && node scripts/v60-switch-recipe-compare.test.mjs
+
+source-insights regression passed
+recipe evidence passed
+extraction intent passed
+kalita adapter passed
+kalita runtime contract passed
+kalita iced source registry passed
+kalita iced adapter passed
+kalita iced recipe contract passed
+kalita iced technique copy passed
+latest write queue passed
+hand brew cache policy passed
+handbrew Kalita iced integration passed
+handbrew Kalita iced cutover contract passed
+read-only Kalita iced inventory evaluator passed
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByText('Iced pour over this coffee', { exact: true })[22m
+
+    at /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/scripts/verify-kalita-iced-ui.mjs:37:21 {
+  name: 'TimeoutError'
+}
+
+Node.js v22.22.1

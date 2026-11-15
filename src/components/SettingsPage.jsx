@@ -35,8 +35,8 @@ import { ruphusClientVersion } from '../lib/ruphus/census';
 const REDEEM_COPY = {
   invalid_input: "That code doesn't look right. Check it and try again.",
   invalid_code: "That code isn't valid. Double-check it and try again.",
-  already_redeemed: "You've already redeemed a code on this account.",
-  has_active_subscription: 'You already have Pro. Nothing to redeem.',
+  already_redeemed: "You've already redeemed this code.",
+  has_active_subscription: "This code can't replace your active subscription.",
   email_not_verified: 'Please verify your email address before redeeming.',
   rate_limited: 'Too many attempts. Please wait an hour and try again.',
 };
@@ -221,9 +221,9 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
     return () => { cancelled = true; };
   }, []);
 
-  // Redeem-code inline expand row (Subscription section, !hasPro only).
-  // Success state is derived from the Firestore listener flipping hasPro
-  // true; this local state is only for the form lifecycle and error copy.
+  // Redeem-code inline expand row (also available to web promo subscribers).
+  // Entitlements come from the Firestore listener; local state keeps the
+  // confirmation visible and allows the user to enter another unique code.
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemInput, setRedeemInput] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -553,9 +553,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
       const result = await redeemCode(code);
       haptic.light();
       setRedeemSuccess({ expiresAt: result.expiresAt });
-      // Firestore listener will flip hasPro true shortly; the row hides
-      // once it does. Keep the success panel visible until then so the
-      // user sees confirmation.
+      // The listener updates access and expiry. Keep the confirmation
+      // visible until the user closes it, including for promo extensions.
     } catch (err) {
       const copy = REDEEM_COPY[err?.code] || REDEEM_GENERIC_ERROR;
       setRedeemError(copy);
@@ -1117,7 +1116,8 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
               </>
             )}
 
-            {!hasPro && (
+            {(!hasPro || (!Capacitor.isNativePlatform()
+              && profile?.subscription?.lastEventType === 'REDEMPTION_CODE')) && (
               <>
                 <div style={separatorStyle} />
                 {Capacitor.isNativePlatform() ? (
@@ -1142,7 +1142,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                           marginBottom: 6,
                           fontWeight: 700,
                         }}>
-                          Pro unlocked
+                          Access activated
                         </div>
                         <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 14, fontFamily: fonts.body }}>
                           Active until {new Date(redeemSuccess.expiresAt).toLocaleDateString()}

@@ -1,0 +1,796 @@
+diff --git a/api/_lib/ruphusEvidence.js b/api/_lib/ruphusEvidence.js
+index 23c8a51..c7e03eb 100644
+--- a/api/_lib/ruphusEvidence.js
++++ b/api/_lib/ruphusEvidence.js
+@@ -1,3 +1,4 @@
++import { projectBrewEvidence } from './ruphusBrewEvidence.js';
+ import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
+ 
+ export const DEFAULT_HISTORY_DAYS = 14;
+@@ -234,7 +235,7 @@ export function summarizeEvidence(kind, records = [], { windowDays = DEFAULT_HIS
+     const date = daysAgo(record.date || record.createdAt || record.updatedAt, now);
+     const age = date == null ? '' : `${date} days ago`;
+     const numbers = [record.dose != null ? `${record.dose}g` : null, record.water != null ? `${record.water}g` : null, record.grind || null, record.temperature != null ? `${record.temperature}°` : null, record.drawdown || null, record.notes || record.note || null].filter(Boolean).join(', ');
+-    if (kind === 'brews') return ['BREW', method, age, numbers].filter(Boolean).join(' — ');
++    if (kind === 'brews') return ['BREW', record.snapshot ? (record.completed ? 'completed' : 'not completed') : null, method, age, numbers].filter(Boolean).join(' — ');
+     if (kind === 'tastings') return ['TASTING', age, 'not linked to a specific brew', numbers].filter(Boolean).join(' — ');
+     return [method, numbers, age].filter(Boolean).join(': ');
+   }).join(' | ');
+@@ -308,17 +309,27 @@ export async function readCoffeeEvidence({ uid, coffeeId, launchItem = null, rea
+     if (typeof reader !== 'function') return summarizeEvidence(kind, fallback, { windowDays, now, launchItem });
+     try {
+       const value = await withTimeout(reader({ uid, coffeeId, windowDays, launchItem, slotKey: launchItem?.method || launchItem?.slot || null }), timeoutMs);
+-      return summarizeEvidence(kind, scopeHistory(kind, value, windowDays, now, launchItem), { windowDays, now, launchItem });
++      const scoped = scopeHistory(kind, value, windowDays, now, launchItem);
++      if (kind === 'brews' || kind === 'tastings') return { ...summarizeEvidence(kind, scoped, { windowDays, now, launchItem }), rawRecords: Array.isArray(scoped) ? scoped : [] };
++      return summarizeEvidence(kind, scoped, { windowDays, now, launchItem });
+     } catch (error) {
+       return { kind, status: 'unavailable', summary: `I couldn't check ${kind} in the ${windowDays == null ? 'available history' : `last ${windowDays} days`} right now.`, windowDays, errorCode: error.code || 'read_failed' };
+     }
+   };
+-  const [coffee, recipe, brews, tastings] = await Promise.all([
++  let [coffee, recipe, brews, tastings] = await Promise.all([
+     typeof readers.readCoffee === 'function' ? withTimeout(readers.readCoffee({ uid, coffeeId }), timeoutMs).then((value) => ({ kind: 'coffee', status: value ? 'available' : 'empty', coffee: clone(value), summary: value?.name ? `${value.name} is in your rotation.` : 'No coffee matched that reference.' })).catch((error) => ({ kind: 'coffee', status: 'unavailable', summary: "I couldn't check that coffee right now.", errorCode: error.code || 'read_failed' })) : { kind: 'coffee', status: 'empty', summary: 'No coffee matched that reference.' },
+     read('recipe', readers.readRecipe),
+     read('brews', readers.readBrews || readers.readAttempts),
+     read('tastings', readers.readTastings),
+   ]);
++  if (brews.rawRecords) {
++    const projected = projectBrewEvidence(brews.rawRecords, coffee.coffee?.handBrewTimingMemory || [], tastings.rawRecords || []);
++    brews = summarizeEvidence('brews', projected, { windowDays, now, launchItem });
++    // Ephemeral server-only history lets the tool filter the resolved brewer
++    // and equipment before bounding to four; it never enters public evidence.
++    Object.defineProperty(brews, 'projectedRecords', { value: projected });
++  }
++  delete tastings.rawRecords;
+   return { coffee, recipe, brews, tastings, windowDays, readAt: new Date(now).toISOString(), launchItem: clone(launchItem), unavailable: [coffee, recipe, brews, tastings].filter((item) => item.status === 'unavailable').map((item) => item.kind) };
+ }
+ 
+diff --git a/api/_lib/ruphusOrchestrator.js b/api/_lib/ruphusOrchestrator.js
+index 2a21d0b..4bfb699 100644
+--- a/api/_lib/ruphusOrchestrator.js
++++ b/api/_lib/ruphusOrchestrator.js
+@@ -1,4 +1,5 @@
+-import { createLifecycleFrame, RUPHUS_CONTRACT_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
++import { hasUnsupportedSensoryInference, SENSORY_UNCERTAINTY_CORRECTION } from './ruphusSensoryConsistency.js';
++import { canonicalHash, createLifecycleFrame, RUPHUS_CONTRACT_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
+ import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
+ import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
+ import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
+@@ -10,13 +11,13 @@ const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe',
+ const SEVERE_SECOND_FAILURES = new Set([
+   'CF5_MACHINE_TOKEN', 'CF5_OPAQUE_REFERENCE', 'CF5_SECRET', 'CF5_DRAFT_LEAK',
+   'CF6_JSON_PROSE', 'CF6_PROPOSAL_PROSE', 'RT2_FALSE_AUTHORITY', 'CF4_FALSE_AUTHORITY',
+-  'RT6_METHOD_CONTRADICTION',
++  'RT6_METHOD_CONTRADICTION', 'RT8_UNSUPPORTED_SENSORY_INFERENCE',
+ ]);
+ // These are expected proposal-validation outcomes. They may be corrected once
+ // from the same exact evidence; owner, target, stale, timing, and transport
+ // failures remain terminal and must never earn a second proposal attempt.
+ const PROPOSAL_RECOVERABLE_FAILURES = new Set([
+-  'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal',
++  'duplicate_alternative', 'invalid_dose_preview', 'invalid_proposal', 'sensory_claim_uncertain',
+   'invalid_proposal_intent', 'invalid_ratio_preview',
+   'one_change_required', 'technique-conflict', 'unsupported-dose-profile', 'invalid_aiden_change', 'invalid_aiden_candidate',
+ ]);
+@@ -41,6 +42,7 @@ const safeFailureMessage = (error, fallback = 'I couldn’t complete that safely
+ const safeRecoveryText = (value, fallback = CARD_RECOVERY) => {
+   const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+   if (!text || text.length > 280 || /[{}[\]<>`]/.test(text)
++    || hasUnsupportedSensoryInference(text)
+     || runtimeTriggers({ reply: text, userTurn: '' }).length
+     || /\b(?:internal|debug|provider|tool|function|credential|secret|stack|trace|hash)\b/i.test(text)) return fallback;
+   return text;
+@@ -48,7 +50,7 @@ const safeRecoveryText = (value, fallback = CARD_RECOVERY) => {
+ const safeProposalExplanation = (value) => {
+   if (typeof value !== 'string') return null;
+   const text = value.trim().replace(/\s+/g, ' ');
+-  if (!text || text.length > 280 || /[<>`]/.test(text)) return null;
++  if (!text || text.length > 280 || /[<>`]/.test(text) || hasUnsupportedSensoryInference(text)) return null;
+   return text;
+ };
+ const techniqueRequest = (value, context = null, target = null) => isTechniqueExplorationRequest(value || '')
+@@ -138,7 +140,7 @@ function groundedClaimTriggers({ reply = '', context = null } = {}) {
+ }
+ 
+ function checkedTriggers({ reply, userTurn, trace, evidence, methodBinding, context }) {
+-  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding }), ...groundedClaimTriggers({ reply, context })];
++  return [...runtimeTriggers({ reply, userTurn, trace, evidence }), ...methodBindingTriggers({ reply, binding: methodBinding }), ...groundedClaimTriggers({ reply, context }), ...(hasUnsupportedSensoryInference(reply) ? [{ code: 'RT8_UNSUPPORTED_SENSORY_INFERENCE', severity: 'catastrophic' }] : [])];
+ }
+ 
+ function runtimeEvidence(toolEvidence = []) {
+@@ -397,6 +399,20 @@ function envelopeArtifactIssue(envelope, artifacts, context) {
+   return null;
+ }
+ 
++// Sensory recovery may repair prose only. Canonicalize nullable schema fields
++// and equivalent numeric representations, while binding every other argument.
++function sensoryRepairIdentity(args = {}) {
++  const identity = Object.fromEntries(Object.entries(args).filter(([key, value]) => key !== 'explanation' && value != null));
++  if (identity.slotKey && !identity.slot) identity.slot = identity.slotKey;
++  delete identity.slotKey;
++  if (identity.change) {
++    const raw = identity.change.value;
++    const numeric = typeof raw === 'string' && identity.change.control === 'ratio' ? raw.replace(/^1:/, '') : raw;
++    identity.change = { ...identity.change, value: numeric !== '' && Number.isFinite(Number(numeric)) ? Number(numeric) : raw };
++  }
++  return canonicalHash(identity);
++}
++
+ export async function runRuphusTurn({ turnId, context, userText, provider, tools, emit, signal, maxToolCalls = Number.POSITIVE_INFINITY, maxToolRounds = MAX_TOOL_ROUNDS } = {}) {
+   if (!turnId || !provider?.runTurn || !tools?.call) throw new Error('turn requires identity, provider, and tools');
+   const turnStartedAt = performance.now(); let firstFrameAt = null; let readRoundMs = 0;
+@@ -412,6 +428,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
+   let proposalClaimed = false;
+   let proposalRecoveryAttempted = false;
+   let proposalRetryAvailable = false;
++  let sensoryRepairBinding = null;
+   let preparationClaimRecoveryAttempted = false;
+   const trace = context?.trace || { focusChanges: [], reads: [], regenerations: [] };
+   if (!Array.isArray(trace.toolEvents)) trace.toolEvents = [];
+@@ -521,6 +538,15 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
+       responseEnvelope = response?.envelope || null;
+       if (response.text) text += String(response.text);
+       const calls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
++      // Check before any read, correction or persistence can run. A provider
++      // ignoring the proposal-only repair instruction must stop visibly.
++      if (sensoryRepairBinding && calls.some(request => request.name !== 'propose_recipe_change'
++        || sensoryRepairIdentity(request.args) !== sensoryRepairBinding)) {
++        throw Object.assign(new Error('sensory repair changed the experiment'), {
++          code: 'sensory_correction_changed_recipe',
++          responseText: 'I couldn’t correct the explanation while keeping the same recipe test. No new card was prepared.',
++        });
++      }
+       throwIfCancelled();
+       // An authenticated ordinal inspection reopens its original card. Do
+       // this before dispatching provider calls: a model-selected fresh
+@@ -846,11 +872,15 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
+         }
+         proposalRecoveryAttempted = true;
+         proposalRetryAvailable = true;
++        if (failedProposal.result.code === 'sensory_claim_uncertain') {
++          const original = calls.find(candidate => candidate.callId === failedProposal.callId);
++          sensoryRepairBinding = sensoryRepairIdentity(original.args);
++        }
+         response = await runProvider({
+           turnId, context, userText, conversation: context?.conversation || [],
+           tools: (tools.definitions || []).filter((definition) => definition?.name === 'propose_recipe_change'),
+           previous: response, toolResult: { results }, regeneration: true,
+-          correctiveInstruction: 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, return a typed blocked response, or clarification only when a specific missing user choice would allow completion.',
++          correctiveInstruction: (failedProposal.result.code === 'sensory_claim_uncertain' ? `${SENSORY_UNCERTAINTY_CORRECTION} Change only explanation; every other proposal argument must remain identical. ` : '') + 'The exact coffee and recipe evidence is already loaded. The proposed card failed a bounded recipe validation check. Make one corrected proposal using only that evidence, preserving the exact coffee, brewer, source, ratio or dose bounds, and physical grinder setting. Do not request another read, do not save or brew, and do not claim a card unless the proposal tool succeeds. If no safe correction exists, return a typed blocked response, or clarification only when a specific missing user choice would allow completion.',
+           signal,
+         });
+         throwIfCancelled();
+@@ -975,7 +1005,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
+       const groundedCorrection = triggers.some((trigger) => trigger.code === 'RT7_UNGROUNDED_GRINDER_STEP')
+         ? ' The user has a Fellow Ode Gen 2: use only its physical labels (whole number, .2, or .6). Replace any unsupported decimal with the nearest real click and explain the exact click change.'
+         : '';
+-      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}${groundedCorrection}`;
++      const correctiveInstruction = `The previous draft failed the response check. Keep the reply short and in plain coffee language; do not include markup, JSON, internal names, drafting notes, credential-shaped values, or claims of saved changes. If a source was unavailable, say you could not check it right now instead of claiming nothing exists. Return a fresh complete reply, and preserve useful conclusions from the tool evidence.${methodCorrection}${groundedCorrection}${triggers.some(trigger => trigger.code === 'RT8_UNSUPPORTED_SENSORY_INFERENCE') ? ` ${SENSORY_UNCERTAINTY_CORRECTION}` : ''}`;
+       response = await runProvider({ turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions, previous: response, correctiveInstruction, priorToolEvidence: toolEvidence, toolResult: { results: toolEvidence }, regeneration: true, signal });
+       throwIfCancelled();
+       text = '';
+diff --git a/api/_lib/ruphusPrompt.js b/api/_lib/ruphusPrompt.js
+index aaa6717..506c165 100644
+--- a/api/_lib/ruphusPrompt.js
++++ b/api/_lib/ruphusPrompt.js
+@@ -2,6 +2,8 @@ export const RUPHUS_SYSTEM_PROMPT = `You are Professor Ruphus, a warm and experi
+ 
+ Finish the user's task, not just a paragraph about it. When they ask for a recipe, something to brew, or a recommendation to try, deliver a usable named recipe card in this same turn with a short reason for choosing it when the trusted tools return a supported artifact. Use the exact recipe/evidence reader for a saved recipe; use read_technique_options only for a supported source-technique exploration, then propose_recipe_change. For an exact grounded diagnosis after reading the exact recipe, use propose_recipe_change with typed intent recipe_preview to prepare the separate review card; this does not save or brew. When a user requests a ratio or technique at a distinct serving size, put the positive numeric serving size in servingDoseGrams and keep the ratio or technique as the single change; the server validates the complete derived card. When a correction materially changes the method or technique, include one brief explanation of why the selected source-backed option fits; do not repeat card values, claim a save, or include markup. Interpret meaning across ordinary wording and follow-ups; the user need not say "technique", "prepare", or "yes". Do not substitute approximate recipe numbers from memory for a real card. For explanation or comparison only, use intent information and answer without creating a new card. A preview is not a save or a brew: only the native controls authorize those actions. If the source says no saved recipe exists, describe this as a first recipe, not as different from a fictional current one.
+ 
++For feedback about a brewed cup, freshly read read_coffee_evidence (even if an unsaved review is active). The completed brew snapshot is authoritative for executed dose, water, grind, temperature and pours; saved recipe and proposal metadata can differ after resizing. Select its recentBrews brewRef as the proposal baseline, preserving all other executed parameters for a one-control test. An untried review is not evidence of a tasted change. Link the current user feedback to a brew only when the conversation identifies it; otherwise ask which cup or recipe they used. Explicitly consider prior experiments and their reported outcome: a partly successful ratio change does not establish that another ratio reduction is best. Reassess strength versus extraction using available sensory feedback and measured elapsed time. After a failed or partly successful adjustment, do not merely repeat the earlier rationale: explain why repeating that control is preferable to the competing explanation, or ask one sensory question that separates them. Use the chosen baseline’s grinderGuidance.oneClickFiner or oneClickCoarser for a one-click test. A fast brew or thin cup alone does not prove under-extraction; source target time is a guide, not a duration to force. Say a brew finished in a duration only when timing.measuredElapsedSeconds is recorded; never describe plannedTargetSeconds or recipe totalBrewTime as its measured duration. A null measurement means the finish time is unknown. Sharpness alone does not establish extraction direction or rule out more extraction: distinguish sour acidity from bitterness or mouth-drying texture, and ask what sharp means if that distinction changes the advice. Judge an experiment by comparative sweetness, body, bitterness and drying sensation rather than a single ambiguous adjective. Explain the next experiment as a test with uncertainty and a useful taste criterion; never automatically equate thin with finer. For ordinary draft editing use baseline current_review; for saved-recipe editing use saved_recipe.
++
+ Carry the active conversational task across coffee and equipment changes. While choosing recipes, naming a new coffee or brewer continues that recipe request unless the user asks for an explanation instead; read its exact supported recipe or source route and deliver a card only when the tool returns one, rather than reverting to general coffee information. Never claim a technique source is missing or unavailable without actually calling read_technique_options for that target. A saved classic V60 and a requested Switch can share a storage slot but are different equipment: keep the requested Switch size and read its sources, not the saved classic recipe's instructions.
+ 
+ After you recommend a concrete recipe adjustment, "show recipe", "show me", or "open that recipe" means review that suggested version, not recite the unchanged saved recipe. Read the exact source and prepare the proposed adjustment as a native review card; nothing is saved. If there is no preceding adjustment, show the current recipe without inventing a change. A clear extraction report such as "Jar one Kalita sour" is enough to read that recipe and prepare one bounded next test; do not require a longer formal question.
+@@ -30,7 +32,7 @@ Keep brew attempts and tasting notes separate unless the evidence explicitly lin
+ 
+ After a topic switch or pronoun such as “that one,” stay with the most recently named coffee unless the words clearly point elsewhere. If the entire message only reaffirms the already focused coffee, acknowledge it in one short phrase and wait for the actual question; do not repeat its biography. Once a coffee is established, do not repeat its roaster, origin, process, or jar biography on consecutive turns; resume the unresolved question and add one useful detail or a small next step. After acknowledging a correction or new evidence, continue the user's goal rather than restarting its biography or asking the same question. If the user is only asking for information, clarity itself moves the conversation forward—do not force a recipe proposal. For a newly resolved or switched coffee, use only the profile and exact recipe or last-brew fields present in the trusted rotation snapshot or returned evidence; read that coffee's evidence before stating any brew, tasting, date, timing, dose, grind, or temperature not present there. Never infer a “last” or “latest” event. Before choosing among coffees, read the recent evidence for every plausible candidate; never claim there are no tasting notes or brew outcomes merely because you skipped those reads. Compare recent taste success, freshness and rest, and the user's likely goal rather than choosing from roast age alone. Use fresh, fresher, and freshest only for literal roast age; never describe an older coffee as fresher than a younger one.
+ 
+-For vague weakness such as watery, weak, flat, or hollow, ask one discriminating sensory question only when the answer changes the control: thin but sweet or clean points to strength, while sour or sharp may point toward extraction; muted is not by itself a diagnosis. When the user asks what to change but has not described the current cup, an older coffee-level tasting that is not linked to the current brew does not diagnose today's cup; ask the same one small sensory question before recommending a control. If you ask that question, ask only the question and wait for its answer; do not include a conditional control recommendation in the same reply. The one exception is after the user has just answered your brewer question: briefly acknowledge the brewer, then ask the sensory question so you never send two consecutive question-only replies. Once the answer is known, give one opinionated next test. When trusted coffee, exact recipe, and a resolved symptom support a bounded recommendation, give the advice and prepare its separate review card in the same turn without asking for another yes. For thin or watery but sweet/clean, lead with a concrete target ratio before example grams; for a confirmed sour or sharp cup, prefer one supported grind or temperature move; for muted without a clearer sensory distinction, ask one small clarification; never leave it at vague “more extraction”; tie the move to the user's reported cup and bound it as one test. Do not promise extraction stays unchanged. If the symptom or target is genuinely conditional, ask one discriminating question instead. Technique requests are a separate typed experiment: read the saved state, then offer eligible source-backed recipes for the user's requested hot V60, Kalita Wave, or ribbed Switch hardware and size, even when the supported source route explicitly permits it, and select one exact option before preparing its full source-native schedule; reference-only sources remain discussion-only. Inspection and comparison do not authorize a new card. Explicit reuse of a named historical option must use the freshly read current recipe and an authenticated current-session reference, never an old action or proposal id. A technique reference is not an executable option or a family and never creates a card. In particular, the researched Tetsu Kasuya God/Devil dual-temperature Switch method is a read-only reference: when the technique reader returns it, use only its source-supported facts (90°C first phase, 70°C second phase, percolation-first hybrid), do not say it is missing or ask the user to send its recipe, and do not call the current single-temperature Switch guide the original or an implicit approximation. The card is review-only; its native Start or Save control provides authority. The composite coffee-evidence result already includes the current recipe, recent brews, and tastings; use it for diagnosis and do not call the separate recipe reader until a proposal or technique choice needs the exact source. After a proposal succeeds, briefly state the exact before-and-after change and what stayed unchanged, and say it is ready to review—not applied.
++For vague weakness such as watery, weak, flat, or hollow, ask one discriminating sensory question only when the answer changes the control: thin but sweet or clean points to strength, while sour or sharp may point toward extraction; muted is not by itself a diagnosis. When the user asks what to change but has not described the current cup, an older coffee-level tasting that is not linked to the current brew does not diagnose today's cup; ask the same one small sensory question before recommending a control. If you ask that question, ask only the question and wait for its answer; do not include a conditional control recommendation in the same reply. The one exception is after the user has just answered your brewer question: briefly acknowledge the brewer, then ask the sensory question so you never send two consecutive question-only replies. Once the answer is known, give one opinionated next test. When trusted coffee, exact recipe, and a resolved symptom support a bounded recommendation, give the advice and prepare its separate review card in the same turn without asking for another yes. For thin or watery but sweet/clean, lead with a concrete target ratio before example grams; for a confirmed sour cup, consider one supported grind or temperature move; for ambiguous sharpness, clarify acidity versus bitterness or drying texture before assigning an extraction direction; for muted without a clearer sensory distinction, ask one small clarification; never leave it at vague “more extraction”; tie the move to the user's reported cup and bound it as one test. Do not promise extraction stays unchanged. If the symptom or target is genuinely conditional, ask one discriminating question instead. Technique requests are a separate typed experiment: read the saved state, then offer eligible source-backed recipes for the user's requested hot V60, Kalita Wave, or ribbed Switch hardware and size, even when the supported source route explicitly permits it, and select one exact option before preparing its full source-native schedule; reference-only sources remain discussion-only. Inspection and comparison do not authorize a new card. Explicit reuse of a named historical option must use the freshly read current recipe and an authenticated current-session reference, never an old action or proposal id. A technique reference is not an executable option or a family and never creates a card. In particular, the researched Tetsu Kasuya God/Devil dual-temperature Switch method is a read-only reference: when the technique reader returns it, use only its source-supported facts (90°C first phase, 70°C second phase, percolation-first hybrid), do not say it is missing or ask the user to send its recipe, and do not call the current single-temperature Switch guide the original or an implicit approximation. The card is review-only; its native Start or Save control provides authority. The composite coffee-evidence result already includes the current recipe, recent brews, and tastings; use it for diagnosis and do not call the separate recipe reader until a proposal or technique choice needs the exact source. After a proposal succeeds, briefly state the exact before-and-after change and what stayed unchanged, and say it is ready to review—not applied.
+ 
+ Treat a partial answer as partial: "thin" alone does not establish that the cup was sweet, clean, or not sour. Do not put unreported sensations into the user's mouth. If that answer is enough for a useful first strength test, recommend it as a test of thinness without claiming to have ruled out extraction; otherwise ask only the missing distinction, not the whole question again. When changing water or dose, do not promise that extraction will stay unchanged. Keep the reason tied to the user's reported symptom, distinguish the intended effect from a guaranteed result, and let the next cup's feedback settle it.
+ 
+@@ -49,7 +51,7 @@ export function buildDynamicEvidenceBlock(evidence = {}) {
+     && Array.isArray(evidence.proposalState?.techniqueReady?.optionIds)
+     && evidence.proposalState.techniqueReady.optionIds.length > 0;
+   const activeReview = currentReview
+-    ? `\n<CURRENT_RECIPE_REVIEW>\nAn authenticated, unsaved recipe review is active for the exact ${currentReview.mode || 'current'} ${currentReview.slot || 'recipe'}${currentReview.variant ? ` (${currentReview.variant})` : ''}${currentReview.size ? ` size ${currentReview.size}` : ''}. It is status ${currentReview.status}; it is review-only and has not been saved. For an ordinary bounded edit (including a serving-dose-only follow-up), call read_recipe for this exact target and then propose_recipe_change with intent recipe_preview. Do not call read_technique_options unless the user explicitly requests a different named technique or brewer. Information-only replies create no card. Reviews marked stale, kept, applied, or undone are not editable.\n</CURRENT_RECIPE_REVIEW>`
++    ? `\n<CURRENT_RECIPE_REVIEW>\nAn authenticated, unsaved recipe review is active for the exact ${currentReview.mode || 'current'} ${currentReview.slot || 'recipe'}${currentReview.variant ? ` (${currentReview.variant})` : ''}${currentReview.size ? ` size ${currentReview.size}` : ''}. It is status ${currentReview.status}; it is review-only and has not been saved. This review has not necessarily been brewed. For tasted-cup feedback read fresh brew evidence and use the identified completed brew baseline. For an ordinary bounded draft edit (including a serving-dose-only follow-up), call read_recipe for this exact target and then propose_recipe_change with intent recipe_preview. Do not call read_technique_options unless the user explicitly requests a different named technique or brewer. Information-only replies create no card. Reviews marked stale, kept, applied, or undone are not editable.\n</CURRENT_RECIPE_REVIEW>`
+     : '';
+   const proposalReadiness = reviews + activeReview + (proposalReady
+     ? '\n<RECIPE_REVIEW_REQUEST>\nTrusted coffee, exact recipe, and a resolved recommendation support a review card now. Prepare the bounded change or explicitly selected technique experiment without asking for another yes. If the target is genuinely unclear, ask one discriminating question; if preparation fails, explain that nothing was saved. The native card Start or Save control, not this request, authorizes a change.\n</RECIPE_REVIEW_REQUEST>'
+diff --git a/api/_lib/ruphusTools.js b/api/_lib/ruphusTools.js
+index ad27484..6fc68a2 100644
+--- a/api/_lib/ruphusTools.js
++++ b/api/_lib/ruphusTools.js
+@@ -1,3 +1,4 @@
++import { hasUnsupportedSensoryInference, SENSORY_UNCERTAINTY_CORRECTION } from './ruphusSensoryConsistency.js';
+ import { canonicalHash, clone, hasManualSourceProjection, RECIPE_TECHNIQUE_EXPERIMENT_PROTOCOL_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
+ import { makeArtifact } from '../../src/lib/ruphus/artifactRegistry.js';
+ import { canonicalRecipeSnapshot, validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResolver.js';
+@@ -34,7 +35,12 @@ import { normalizeRecipeEvidence } from '../../src/lib/recipeEvidence.js';
+ import { buildExtractionIntent } from '../../src/lib/extractionIntent.js';
+ 
+ function sourceGrinderGuidance(recipe, setup) {
+-  if (!hasManualSourceProjection(recipe)) return null;
++  if (!hasManualSourceProjection(recipe)) {
++    const setting = recipe?.grindSize?.setting ?? recipe?.grind;
++    if (setup?.grinder !== 'fellow-ode-gen2' || !isOdeStep(setting)) return null;
++    const index = ODE_GEN2_STEPS.indexOf(Number(setting));
++    return { grinderKey: setup.grinder, setting, controlUnit: 'physical_setting', oneClickFiner: ODE_GEN2_STEPS[index - 1] ?? null, oneClickCoarser: ODE_GEN2_STEPS[index + 1] ?? null };
++  }
+   const rawPersonalizedMicrons = recipe.sourceLineage?.grindAdaptation?.targetMicrons;
+   const personalizedMicrons = rawPersonalizedMicrons == null ? null : Number(rawPersonalizedMicrons);
+   const guidance = manualSourceGrindGuidance(Number.isFinite(personalizedMicrons)
+@@ -1081,6 +1087,27 @@ function techniqueReadinessMatches(context, { coffeeRef, slotKey, target = null,
+ export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true, proposalActions = [] } = {}) {
+   if (!uid || !context) throw new Error('tools require owner and context');
+   if (!(context.__ruphusResolvedTargets instanceof Map)) Object.defineProperty(context, '__ruphusResolvedTargets', { value: new Map(), enumerable: false, writable: true, configurable: true });
++  const brewBaselines = new Map();
++  const rememberBrews = (evidence, coffeeRef, slotKey) => {
++    const rows = (evidence.brews?.projectedRecords || evidence.brews?.records || [])
++      .filter(row => row.slotKey === slotKey
++        && (!row.snapshot || !context.methodBinding?.displayName || methodBindingMatchesRecipe(slotKey, context.methodBinding.displayName, row.snapshot)))
++      .slice(0, 4);
++    const completed = new Map();
++    const result = rows.map(row => {
++      const brewRef = `brew-${canonicalHash({ id: row.id, snapshot: row.snapshot }).slice(0, 12)}`;
++      const recipe = modelRecipe(row.snapshot);
++      if (row.completed && recipe && validateExecutableRecipe(recipe, slotKey).valid && (!context.methodBinding?.displayName || methodBindingMatchesRecipe(slotKey, context.methodBinding.displayName, recipe))) completed.set(brewRef, recipe);
++      const publicRecipe = clone(recipe);
++      // A planned timer duration is not a measurement of this completed cup.
++      // Keep the exact snapshot privately for proposal construction.
++      if (publicRecipe) for (const key of ['totalBrewTime', 'totalBrewTimeSeconds', 'guideTargetSeconds', 'drawdownTarget']) delete publicRecipe[key];
++      return { brewRef, status: row.completed ? 'completed' : row.snapshot ? 'not_completed' : 'unknown', completedAt: row.completedAt || null, recipe: publicRecipe, grinderGuidance: sourceGrinderGuidance(recipe, snapshot.setup), actualElapsedMs: row.actualElapsedMs ?? null,
++        timing: { measuredElapsedSeconds: row.actualElapsedMs == null ? null : Math.round(row.actualElapsedMs / 1000), plannedTargetSeconds: recipe?.guideTargetSeconds ?? recipe?.totalBrewTimeSeconds ?? null, measurementStatus: row.actualElapsedMs == null ? 'unknown' : 'recorded', guidance: 'Only measuredElapsedSeconds describes how long this brew took. Planned target is not observed finish time.' }, feedback: row.feedback || [] };
++    });
++    brewBaselines.set(`${coffeeRef}:${slotKey}`, completed);
++    return result;
++  };
+   const snapshot = context.__ruphusServerSnapshot || context.rotationSnapshot || { coffees: [], refs: {} };
+   const refs = context.__ruphusRefs ? { ...context.__ruphusRefs } : { ...(snapshot.refs || {}) };
+   const resolveId = (coffeeRef) => refs[coffeeRef] || null;
+@@ -1275,7 +1302,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+       // Keep only the resolved brewer's allowlisted recipe in this ephemeral tool
+       // result; raw records and source authority remain server-only, not in memory.
+       const sourceControls = editableReviewControlAvailability(exactTarget);
+-      return { ...publicEvidence(evidence), method, coffeeRef: args.coffeeRef, selectedRecipe: modelRecipe(exactTarget), ...(sourceControls ? { sourceControls } : currentReview?.sourceControls ? { sourceControls: currentReview.sourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(absentCreation ? { sourceState: 'absent' } : {}), ...(absentCreation && !compatibleDraft && !currentReview ? { creation: absentCreation } : {}), ...(compatibleDraft ? { draft: { sourceState: 'absent', recipe: modelRecipe(compatibleDraft.after) } } : {}) };
++      return { ...publicEvidence(evidence), recentBrews: rememberBrews(evidence, args.coffeeRef, method?.slot), method, coffeeRef: args.coffeeRef, selectedRecipe: modelRecipe(exactTarget), ...(sourceControls ? { sourceControls } : currentReview?.sourceControls ? { sourceControls: currentReview.sourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(absentCreation ? { sourceState: 'absent' } : {}), ...(absentCreation && !compatibleDraft && !currentReview ? { creation: absentCreation } : {}), ...(compatibleDraft ? { draft: { sourceState: 'absent', recipe: modelRecipe(compatibleDraft.after) } } : {}) };
+     }
+     const slotKey = args.slot || args.slotKey;
+     if (name === 'read_technique_options') {
+@@ -1493,6 +1520,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+           recipe: null,
+         };
+       }
++      const brewEvidence = await readCoffeeEvidence({ uid, coffeeId, readers: { ...readers, readRecipe: undefined }, now: args.now, windowDays: context.historyWidened || context.__ruphusHistoryWidened ? null : undefined });
++      const recentBrews = rememberBrews(brewEvidence, args.coffeeRef, slotKey);
+       const currentReview = activeReviewForTarget(context, { coffeeId, slotKey, sourceHash: recipeSourceHash(recipe, slotKey) });
+       if (currentReview) context.currentReview = publicCurrentReview(currentReview);
+       rememberTarget({ coffeeRef: args.coffeeRef, coffeeId, slotKey, before: modelRecipe(recipe), sourceHash: recipeSourceHash(recipe, slotKey) });
+@@ -1513,7 +1542,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+         return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, sourceState: 'present', recipe: modelRecipe(recipe), creation: firstRecipeCreation(slotKey), preparingNewConfiguration: true,
+           summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. If the user wants a recipe, the requested ${displayName} can be prepared here with propose_recipe_change, intent recipe_preview and servingDoseGrams. For an informational question, answer without proposing. The saved recipe remains unchanged until confirmation.` };
+       }
+-      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
++      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, recentBrews, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
+     }
+     const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
+     const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
+@@ -1536,7 +1565,14 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+     const compatibleDraft = draft && draftMatchesBoundMethod(context, draft, slotKey) ? draft : null;
+     const reviewDraft = activeReview && activeReview.sourceState === 'absent' && activeReview.before === null ? activeReview : null;
+     const compatibleReview = activeReview && draftMatchesBoundMethod(context, activeReview, slotKey) ? activeReview : null;
+-    const target = compatibleDraft
++    const completedBaselines = brewBaselines.get(`${args.coffeeRef}:${slotKey}`);
++    const completedRecipe = completedBaselines?.get(args.baseline);
++    if (args.baseline != null && !['saved_recipe', 'current_review'].includes(args.baseline) && !completedRecipe) return { ok: false, code: 'brew_baseline_unavailable', message: 'Read the completed brew evidence and choose a verified brewRef, or clarify which cup was tasted.' };
++    if (completedBaselines?.size && args.baseline == null && !techniqueExperiment) return { ok: false, code: 'brew_baseline_required', message: 'Choose baseline explicitly: a completed brewRef for a tasted-cup experiment, current_review for an untried draft edit, or saved_recipe. If the tasted cup is ambiguous, clarify first.' };
++    if (args.baseline === 'current_review' && !compatibleReview) return { ok: false, code: 'review_baseline_unavailable', message: 'There is no compatible active review.' };
++    const target = completedRecipe ? { ...resolvedTarget, before: clone(completedRecipe) }
++      : args.baseline === 'saved_recipe' ? resolvedTarget
++      : compatibleDraft
+       ? { ...resolvedTarget, draftRecipe: clone(compatibleDraft.after), draftProposalId: compatibleDraft.id }
+       : reviewDraft && compatibleReview
+         ? { ...resolvedTarget, draftRecipe: clone(compatibleReview.after), draftProposalId: compatibleReview.id }
+@@ -1549,6 +1585,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+     const reviewContinuation = Boolean(compatibleReview && args.intent !== 'information' && (args.change || args.servingDoseGrams != null));
+     const typedPreview = args.intent === 'recipe_preview' || reviewContinuation;
+     const servingDose = args.servingDoseGrams;
++    if (completedRecipe && args.change && servingDose != null) return { ok: false, code: 'one_change_required', message: 'Keep the completed brew dose fixed for a one-control experiment; resize separately.' };
+     if (servingDose != null && (!Number.isFinite(servingDose) || servingDose <= 0)) {
+       return { ok: false, code: 'invalid_serving_dose', message: 'The serving dose must be a positive number within this brewer’s supported range.' };
+     }
+@@ -1794,6 +1831,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+     const coffeeName = snapshot.coffees?.find((item) => item.refKey === args.coffeeRef)?.name
+       || (context.turnBinding?.coffeeRef === args.coffeeRef ? context.turnBinding.coffeeName : null);
+     const explanation = safeProposalExplanation(args.explanation);
++    if (hasUnsupportedSensoryInference(explanation)) return { ok: false, code: 'sensory_claim_uncertain', message: SENSORY_UNCERTAINTY_CORRECTION };
+     const artifact = makeArtifact('recipe_proposal', { id: args.proposalId || `proposal-${canonicalHash({ uid, coffeeId, slotKey, after, sessionId: context.sessionId || 'agent-session' }).slice(0, 16)}`, status: 'proposed', coffeeId, ...(coffeeName ? { coffeeName } : {}), slotKey, before: clone(before), after: clone(after), changedPaths: techniqueExperiment ? ['technique', ...paths] : paths, ...(experimentMetadata ? { techniqueExperiment: experimentMetadata } : {}), ...(explanation ? { explanation } : { explanation: null }), actions: [], recipeHash: canonicalHash(after), sourceHash: target.sourceHash });
+     const proposal = typeof proposalStore === 'function' ? await proposalStore({ uid, coffeeId, slotKey, sessionId: context.sessionId || context.launchContext?.sessionId || context.context?.sessionId || 'agent-session', after: validationRecipe, proposalId: artifact.id }) : artifact;
+     if (context.proposalState) {
+@@ -1819,7 +1857,7 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
+     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel. Set slot to the brewer the user means in this conversation, interpreting ordinary spelling and follow-ups. Null means genuinely unspecified. A selected recipe for another brewer does not establish whether the requested one exists.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }), slot: nullable({ type: 'string', enum: SLOT_KEYS }) }, required: ['coffeeRef', 'windowDays', 'slot'], additionalProperties: false } };
+     if (name === 'read_recipe') return { type: 'function', name, description: 'Read one exact recipe slot when its source data is needed. Reuse read_coffee_evidence.selectedRecipe only when it matches the requested brewer. If it is absent or for another brewer, read the requested slot before concluding its recipe is unavailable. A verified absent manual slot returns the available first-recipe configurations and controls; invalid or unavailable slots never authorize creation.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS } }, required: ['coffeeRef', 'slot'], additionalProperties: false } };
+     if (name === 'read_technique_options') return { type: 'function', name, description: 'Read source-backed hot V60, Kalita Wave, or ribbed Switch recipes for this coffee. Interpret the user’s conversational intent, not keywords: recipe_preview means they want something to brew, a recipe suggestion, an alternative, or a corrected-equipment recipe; information means explanation or comparison only. A preview does not save or start anything and needs no extra yes. For recipe_preview, select an exact executable option and call propose_recipe_change in this turn. Use the requested equipment; no matching saved recipe is required. Reference-only sources remain discussion-only.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot', 'kalita_hot'] }, intent: { type: 'string', enum: ['recipe_preview', 'information'] } }, required: ['coffeeRef', 'slot', 'intent'], additionalProperties: false } };
+-    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, one servingDoseGrams-only resize (or one serving size paired with one control/technique), one explicitly selected source-backed technique experiment, or a complete Aiden profile for a verified absent Aiden slot. The optional aidenProfile must be a complete profile when creating that first Aiden draft; never send a partial profile or manual pour-over fields. Allowed recipe controls are dose, water, grind, temperature, and ratio; a verified absent manual slot separately reports which first-recipe controls/configurations are available. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: { type: 'string', enum: ['recipe_preview', 'information'] }, change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), aidenProfile: nullable(AIDEN_DRAFT_SCHEMA), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'intent', 'change', 'servingDoseGrams', 'aidenProfile', 'experiment', 'explanation'], additionalProperties: false } };
++    return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, one servingDoseGrams-only resize (or one serving size paired with one control/technique), one explicitly selected source-backed technique experiment, or a complete Aiden profile for a verified absent Aiden slot. The optional aidenProfile must be a complete profile when creating that first Aiden draft; never send a partial profile or manual pour-over fields. Allowed recipe controls are dose, water, grind, temperature, and ratio; a verified absent manual slot separately reports which first-recipe controls/configurations are available. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: { type: 'string', enum: ['recipe_preview', 'information'] }, baseline: nullable({ type: 'string', description: 'A verified recentBrews brewRef for an experiment on a completed cup; current_review for editing an untried draft; saved_recipe for the saved recipe. Required when completed brews exist. Never treat an untried proposal as tasted.' }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), aidenProfile: nullable(AIDEN_DRAFT_SCHEMA), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string', maxLength: 280, description: 'Brief reason for this test, within 280 characters so it can be shown with the card. Distinguish measured time from planned time and acknowledge uncertainty.' }) }, required: ['coffeeRef', 'slot', 'intent', 'baseline', 'change', 'servingDoseGrams', 'aidenProfile', 'experiment', 'explanation'], additionalProperties: false } };
+   });
+   return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
+ }
+diff --git a/scripts/ruphus-source-completion.test.mjs b/scripts/ruphus-source-completion.test.mjs
+index 54c4105..127680c 100644
+--- a/scripts/ruphus-source-completion.test.mjs
++++ b/scripts/ruphus-source-completion.test.mjs
+@@ -198,3 +198,16 @@ test('source completion reaches the existing owned attempt lifecycle and legacy
+ });
+ 
+ console.log('Ruphus source completion contract passed');
++
++test('assistant brew evidence preserves source clock provenance and unknown planned finish', async () => {
++  const { projectBrewEvidence } = await import('../api/_lib/ruphusBrewEvidence.js');
++  const state = completedSourceState();
++  const attempt = { id: 'attempt-source-1', sessionId: 'attempt-source-1', coffeeId: 'coffee-1', slotKey: 'v60_hot', status: 'completed', snapshot: recipe };
++  const event = buildTimingEvent({ ...context, sessionId: attempt.sessionId, attemptId: attempt.id, actualElapsedMs: 182_000, completionKind: 'userFinished', sourceEvents: state.events, sourceCorrections: state.corrections });
++  assert.ok(event);
++  assert.equal(projectBrewEvidence([attempt], [event])[0].actualElapsedMs, 182_000);
++  assert.equal(event.targetMs, null);
++  for (const patch of [{ clockOrigin: 'timer-start' }, { sourceRevision: event.sourceRevision + 1 }, { sourceId: 'other-source' }, { sourceConfiguration: { ...event.sourceConfiguration, size: '02' } }]) {
++    assert.equal(projectBrewEvidence([attempt], [{ ...event, ...patch }])[0].actualElapsedMs, null, JSON.stringify(patch));
++  }
++});
+diff --git a/api/_lib/ruphusBrewEvidence.js b/api/_lib/ruphusBrewEvidence.js
+new file mode 100644
+index 0000000..15469d0
+--- /dev/null
++++ b/api/_lib/ruphusBrewEvidence.js
+@@ -0,0 +1,39 @@
++import { selectTimingMemory, timingContextFromRecipe } from '../../src/lib/brewTimingMemory.js';
++// Read-time projection only. Attempt.dose binds the saved source for optimistic
++// concurrency; snapshot is the recipe executed after a Brew once dose resize.
++const finite = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
++const date = row => Date.parse(row.completedAt || row.createdAt || row.date || '') || 0;
++export function projectBrewEvidence(attempts = [], timingMemory = [], tastings = []) {
++  timingMemory = Array.isArray(timingMemory) ? timingMemory : [];
++  tastings = Array.isArray(tastings) ? tastings : [];
++  return attempts.filter(attempt => attempt && typeof attempt === 'object').map(attempt => {
++    const recipe = attempt.snapshot && typeof attempt.snapshot === 'object' && !Array.isArray(attempt.snapshot) ? attempt.snapshot : null;
++    if (!recipe) return { ...attempt }; // Historical flat records remain descriptive, never executable.
++    const dose = recipe.coffeeGrams ?? recipe.userCoffeeGrams ?? recipe.dose;
++    const water = recipe.waterGrams ?? recipe.water;
++    const timingContext = timingContextFromRecipe({ beanId: attempt.coffeeId, recipe, mode: recipe.mode || (recipe.isIced ? 'iced' : 'hot') });
++    // Reuse the timer's source/configuration/clock contract, then require the
++    // exact attempt and session. Validate separately so duplicate sessions
++    // with conflicting elapsed times remain ambiguous rather than deduped.
++    const timing = timingMemory.filter(event =>
++      event && attempt.id && event.attemptId === attempt.id
++      && (!attempt.sessionId || event.sessionId === attempt.sessionId)
++      && (!attempt.revisionId || event.revisionId === attempt.revisionId)
++      && event.doseGrams === dose
++      && finite(event.actualElapsedMs)
++      && selectTimingMemory([event], timingContext));
++    // Conflicting measurements are ambiguous: do not pick one by array order.
++    const elapsed = timing.length && new Set(timing.map(event => event.actualElapsedMs)).size === 1 ? timing[0].actualElapsedMs : null;
++    const feedback = tastings.filter(item => item && attempt.id && item.attemptId === attempt.id)
++      .map(item => item.notes || item.note).filter(value => typeof value === 'string').slice(0, 3);
++    const completed = attempt.status === 'completed';
++    return { ...attempt, dose, water, grind: recipe.grindSize?.setting ?? recipe.grind,
++      temperature: recipe.waterTemp?.celsius ?? recipe.temperature,
++      ratio: recipe.ratio, completed,
++      actualElapsedMs: completed ? elapsed : null,
++      drawdown: completed && elapsed != null ? `measured ${Math.floor(Math.round(elapsed / 1000) / 60)}:${String(Math.round(elapsed / 1000) % 60).padStart(2, '0')}` : null,
++      notes: feedback.length ? feedback.join(' | ') : attempt.notes || attempt.note,
++      feedback,
++    };
++  }).sort((a, b) => date(b) - date(a));
++}
+diff --git a/api/_lib/ruphusSensoryConsistency.js b/api/_lib/ruphusSensoryConsistency.js
+new file mode 100644
+index 0000000..367ef1a
+--- /dev/null
++++ b/api/_lib/ruphusSensoryConsistency.js
+@@ -0,0 +1,27 @@
++// A narrow consistency check, not an extraction classifier. Match a direct
++// sensory-to-extraction claim, not unrelated words elsewhere in the sentence.
++// This deliberately does not attempt to grade every possible coffee inference.
++export function hasUnsupportedSensoryInference(value) {
++  if (typeof value !== 'string') return false;
++  const direction = String.raw`(?:over[ -]?extract\w*|under[ -]?extract\w*|too much extraction|more extraction|less extraction|(?:you\s+)?(?:must\s+)?grind(?:ing)? (?:finer|coarser))`;
++  const subject = String.raw`(?:sharpness|sourness|(?:sharp|sour) (?:cup|coffee))`;
++  const direct = new RegExp(String.raw`\b${subject}\s+(?:(?:alone|by itself)\s+)?(?:means?|proves?|confirms?)\s+(?:(?:that|it(?:'s| is)|the cup is|you have)\s+)*${direction}\b`, 'i');
++  const reversal = /\b(?:sharpness|sourness|sharp|sour)(?:\s+(?:cup|coffee|alone))?\s*,?\s*(?:(?:that|it)\s+)?points?\s+away\s+from\s+(?:more|higher|increasing)\s+extraction\b/i;
++  const conditionalDiagnosis = new RegExp(String.raw`\b(?:turns?|tastes?|is)\s+(?:sharp|sour)\s*,\s*(?:it|that|the cup)\s+(?:must be|is definitely|is certainly)\s+${direction}\b`, 'i');
++  const rejectedPrefix = /(?:\b(?:do not|don[’']t|never|avoid)\s+(?:assum(?:e|ing)|say(?:ing)?|claim(?:ing)?|conclud(?:e|ing))|\b(?:wrong|incorrect|misleading|unjustified)\s+to\s+(?:say|claim|assume|conclude)|\bnot\s+(?:true|established)\s+that)\s+(?:that\s+)?(?:[“"‘']\s*)?(?:(?:a|the)\s+)?$/i;
++  const rejectedSuffix = /^[”"’']?\s+(?:is|would be)\s+(?:wrong|incorrect|unsupported|unjustified|not supported)\b/i;
++  return value.split(/(?<=[.!?])\s+/u).some(sentence => {
++    if (sentence.trim().endsWith('?')) return false;
++    return [direct, reversal, conditionalDiagnosis].some(pattern => {
++      // Check rejection at each matched claim, so an unrelated negation or
++      // qualification cannot excuse a second categorical assertion.
++      for (const match of sentence.matchAll(new RegExp(pattern.source, 'gi'))) {
++        if (!rejectedPrefix.test(sentence.slice(0, match.index))
++          && !rejectedSuffix.test(sentence.slice(match.index + match[0].length))) return true;
++      }
++      return false;
++    });
++  });
++}
++
++export const SENSORY_UNCERTAINTY_CORRECTION = 'Sharpness alone does not establish extraction direction or rule out more extraction. Distinguish sour acidity from bitterness or a drying sensation; describe a bounded test or ask what sharp means. Do not invent a reported sensation or change the recipe merely to fix the explanation.';
+diff --git a/scripts/fixtures/ruphus-frukt-brew.mjs b/scripts/fixtures/ruphus-frukt-brew.mjs
+new file mode 100644
+index 0000000..494f7de
+--- /dev/null
++++ b/scripts/fixtures/ruphus-frukt-brew.mjs
+@@ -0,0 +1,14 @@
++// Sanitized reproduction of the FRUKT Kalita trial: synthetic owner/document IDs.
++import { timingContextFromRecipe } from '../../src/lib/brewTimingMemory.js';
++import { generateKalitaRecipe } from '../../src/lib/kalitaAdapter.js';
++import { createRecipePreview } from '../../src/lib/ruphus/recipePreview.js';
++export function fruktFixture() {
++  const coffee = { id: 'fixture-coffee', name: 'Casa Almeida Barreto', roaster: 'FRUKT', origin: 'Brazil', process: 'Natural' };
++  const saved = createRecipePreview({ recipe: generateKalitaRecipe(coffee, { dose: 24, grinder: 'fellow-ode-gen2', kalitaSize: '185' }), dose: 24, ratio: 16.5 });
++  Object.assign(saved, { slotKey: 'kalita_hot', coffeeGrams: 24, userCoffeeGrams: 24, waterGrams: 396, ratio: '1:16.5', waterTemp: { celsius: 93, fahrenheit: 199 }, grindSize: { ...saved.grindSize, setting: '6.2', microns: 747 } });
++  const executed = createRecipePreview({ recipe: saved, slotKey: 'kalita_hot', dose: 18, ratio: 15.5 });
++  const untried = createRecipePreview({ recipe: saved, slotKey: 'kalita_hot', dose: 24, ratio: 14.5 });
++  const attempt = { id: 'fixture-attempt', coffeeId: coffee.id, sessionId: 'fixture-attempt', slotKey: 'kalita_hot', status: 'completed', dose: 24, createdAt: '2026-10-11T23:34:26.711Z', completedAt: '2026-10-11T23:37:54.953Z', snapshot: executed };
++  coffee.handBrewTimingMemory = [{ ...timingContextFromRecipe({ beanId: coffee.id, recipe: executed }), attemptId: attempt.id, sessionId: attempt.sessionId, doseGrams: 18, actualElapsedMs: 203813, targetMs: 300000, completionKind: 'userFinished' }];
++  return { coffee, saved, executed, untried, attempt };
++}
+diff --git a/scripts/ruphus-brew-counterfactual.mjs b/scripts/ruphus-brew-counterfactual.mjs
+new file mode 100644
+index 0000000..02e7292
+--- /dev/null
++++ b/scripts/ruphus-brew-counterfactual.mjs
+@@ -0,0 +1,81 @@
++// Opt-in live replay. No Firebase/Vercel SDK, production endpoint or writable reader.
++// OPENAI_API_KEY must be supplied by the authorized caller, never written to disk.
++import { execFileSync } from 'node:child_process';
++import { writeFile, unlink, mkdir } from 'node:fs/promises';
++import OpenAI from 'openai';
++import { fruktFixture } from './fixtures/ruphus-frukt-brew.mjs';
++import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
++import { deriveProposalReadiness } from '../api/ruphus-agent.js';
++import { canonicalRecipeSnapshot } from '../src/lib/ruphus/legacyRecipeResolver.js';
++import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
++const baselineCommit = '5ce7f2d3b53479e49259097b191e0b5d4eabd9c4';
++const output = process.argv[2];
++const correctedOnly = process.argv.includes('--corrected-only');
++const ambiguityOnly = process.argv.includes('--ambiguity-only');
++const grindOnly = process.argv.includes('--grind-only');
++const callLimit = grindOnly ? 2 : ambiguityOnly ? 4 : correctedOnly ? 10 : 24;
++if (!output || !process.env.OPENAI_API_KEY) throw new Error('An output path and authorized existing OPENAI_API_KEY are required.');
++const temporary = [];
++const loadOriginal = async (path, replacements = []) => {
++  const dest = path.replace(/([^/]+)$/, '__counterfactual_$1');
++  let contents = execFileSync('git', ['show', `${baselineCommit}:${path}`], { encoding: 'utf8' });
++  for (const [before, after] of replacements) contents = contents.replaceAll(before, after);
++  await writeFile(dest, contents, { flag: 'wx' }); temporary.push(dest);
++  return import(new URL(`../${dest}`, import.meta.url));
++};
++let calls = 0; let estimatedCost = 0;
++const report = { baselineCommit, model: 'gpt-5.6-luna', reasoning: 'medium', maxOutputTokens: 900, evidenceByteCap: 4096, limits: { providerCalls: callLimit, maxRequestBytes: 200000, estimatedCostUSD: 0.50 }, cases: [], note: 'One replay per case per arm, not a statistical reliability estimate. Original production tools/prompt versus corrected tools/prompt; sanitized actual-case fixture, in-memory proposals only. Cost is estimated using the repository pricing registry.' };
++const sdk = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0, timeout: 45000 });
++const client = { responses: { create: async request => {
++  const bytes = Buffer.byteLength(JSON.stringify(request));
++  if (calls >= callLimit || bytes > 200000 || estimatedCost + bytes * .20 / 1000000 + .00108 > .50) throw new Error('Evaluation budget reached');
++  calls++;
++  const response = await sdk.responses.create(request);
++  estimatedCost += ((response.usage?.input_tokens || bytes) * .20 + (response.usage?.output_tokens || 900) * 1.20) / 1000000;
++  return response;
++} } };
++try {
++  await loadOriginal('api/_lib/ruphusEvidence.js');
++  const oldTools = await loadOriginal('api/_lib/ruphusTools.js', [["'./ruphusEvidence.js'", "'./__counterfactual_ruphusEvidence.js'"]]);
++  const oldOrchestrator = await loadOriginal('api/_lib/ruphusOrchestrator.js', [["'./ruphusTools.js'", "'./__counterfactual_ruphusTools.js'"], ["'./ruphusEvidence.js'", "'./__counterfactual_ruphusEvidence.js'"]]);
++  const oldPrompt = await loadOriginal('api/_lib/ruphusPrompt.js');
++  const oldProvider = await loadOriginal('api/_lib/ruphusProviders/openai.js', [["'../ruphusPrompt.js'", "'../__counterfactual_ruphusPrompt.js'"]]);
++  const newTools = await import('../api/_lib/ruphusTools.js');
++  const newPrompt = await import('../api/_lib/ruphusPrompt.js');
++  const newProvider = await import('../api/_lib/ruphusProviders/openai.js');
++  const intro = [{ role: 'user', content: 'Last time I did kalita 185 with jar 1 bean, it tasted too watered down. What do suggest I do differently' }, { role: 'assistant', content: 'Since you described the cup as watered down, this is a bounded strength test by tightening the brew ratio; it does not assume the cup was sour or under-extracted. Try a 1:15.5 ratio instead of 1:16.5. Open the recipe to choose your dose and review the pours; nothing is saved yet.' }, { role: 'assistant', content: 'Recipe action result: Brew once succeeded.' }];
++  for (const scenario of grindOnly ? ['grind_challenge'] : ambiguityOnly ? ['ambiguous_cup'] : ['partial_improvement', 'grind_challenge', 'ambiguous_cup']) {
++    for (const arm of correctedOnly ? ['corrected'] : ['original', 'corrected']) {
++      const f = fruktFixture();
++      Object.assign(f.coffee, { jarSlot: 1, status: 'ACTIVE', handBrewRecipes: { kalita: f.saved } });
++      const conversation = structuredClone(intro);
++      if (scenario === 'grind_challenge') conversation.push({ role: 'user', content: 'Better but still kind of thin' }, { role: 'assistant', content: 'Since the first tightening helped but the cup is still thin, I’d make one more strength-focused ratio step rather than changing grind or agitation. That targets body while keeping the same Kalita pulse profile. Try a 1:14.5 ratio instead of 1:15.5. Open the recipe to choose your dose and review the pours; nothing is saved yet.' });
++      const userText = scenario === 'partial_improvement' ? 'Better but still kind of thin' : scenario === 'grind_challenge' ? 'You don’t think it just need to be ground finer?' : 'One of my Kalita cups was still thin, but I’m not sure which recipe I used. What should I change?';
++      const attempts = [f.attempt];
++      if (scenario === 'ambiguous_cup') attempts.push({ ...structuredClone(f.attempt), id: 'fixture-other-attempt', sessionId: 'fixture-other-attempt', completedAt: '2026-10-11T23:50:00Z', snapshot: f.saved });
++      const readers = { listCoffees: async () => [f.coffee], readSetup: async () => ({ grinder: 'fellow-ode-gen2', defaultMethod: 'kalita_hot' }), readCoffee: async () => f.coffee, readRecipe: async () => f.saved, readAttempts: async () => attempts, readTastings: async () => [] };
++      const prior = scenario === 'grind_challenge' ? [{ type: 'recipe_proposal', id: 'fixture-untried', status: 'proposed', coffeeId: f.coffee.id, slotKey: 'kalita_hot', before: f.saved, after: f.untried, sourceHash: canonicalRecipeSnapshot(f.saved, 'kalita_hot').recipeHash }] : [];
++      const context = await buildRuphusContext({ uid: 'fixture-owner', contextRef: { surface: 'direct' }, userText, conversation, readers, evidenceByteCap: 4096, priorTechniqueProposals: prior });
++      Object.assign(context.proposalState, deriveProposalReadiness({ conversation, userText }));
++      Object.defineProperty(context, '__ruphusPriorProposals', { value: prior, enumerable: false });
++      const writes = []; const toolLog = [];
++      const impl = arm === 'original' ? oldTools : newTools;
++      const tools = impl.createRuphusTools({ uid: 'fixture-owner', context, readers, proposalStore: async input => { writes.push(input); return { ...input, status: 'proposed' }; } });
++      const wrapped = { ...tools, call: async (name, args) => { const result = await tools.call(name, { ...args, now: Date.parse('2026-10-12T00:00:00Z') }); toolLog.push({ name, args, result }); return result; } };
++      const provider = (arm === 'original' ? oldProvider : newProvider).createOpenAIProvider({ client, instructions: (arm === 'original' ? oldPrompt : newPrompt).RUPHUS_SYSTEM_PROMPT, maxOutputTokens: 900 });
++      const result = await (arm === 'original' ? oldOrchestrator.runRuphusTurn : runRuphusTurn)({ turnId: `${scenario}-${arm}`, context, userText, tools: wrapped, provider });
++      report.cases.push({ scenario, arm, userText, result, toolLog, inMemoryProposals: writes });
++      report.calls = calls; report.estimatedCostUSD = estimatedCost;
++      await mkdir(new URL('../docs/evaluations/', import.meta.url), { recursive: true });
++      await writeFile(output, JSON.stringify(report, null, 2));
++      console.log(JSON.stringify({ scenario, arm, ok: result.ok, code: result.code, text: result.text, calls }));
++      if (result.code?.startsWith('provider_')) throw new Error(`Production provider unavailable: ${result.code}`);
++    }
++  }
++} catch (error) {
++  report.blocker = String(error.message).replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
++  report.calls = calls; report.estimatedCostUSD = estimatedCost;
++  await writeFile(output, JSON.stringify(report, null, 2));
++  console.log(JSON.stringify({ blocker: report.blocker, calls }));
++  process.exitCode = 1;
++} finally { for (const path of temporary.reverse()) await unlink(path); }
+diff --git a/scripts/ruphus-brew-evidence.test.mjs b/scripts/ruphus-brew-evidence.test.mjs
+new file mode 100644
+index 0000000..5797816
+--- /dev/null
++++ b/scripts/ruphus-brew-evidence.test.mjs
+@@ -0,0 +1,117 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { fruktFixture } from './fixtures/ruphus-frukt-brew.mjs';
++import { projectBrewEvidence } from '../api/_lib/ruphusBrewEvidence.js';
++import { readCoffeeEvidence, publicEvidence } from '../api/_lib/ruphusEvidence.js';
++import { createRuphusTools } from '../api/_lib/ruphusTools.js';
++import { canonicalRecipeSnapshot } from '../src/lib/ruphus/legacyRecipeResolver.js';
++const now = Date.parse('2026-10-12T00:00:00Z');
++export function harness() {
++  const f = fruktFixture();
++  const context = { userText: 'You don’t think it just needs to be ground finer?', rotationSnapshot: { coffees: [{ refKey: 'c1', ...f.coffee, recipes: ['kalita_hot'] }], refs: { c1: f.coffee.id }, setup: { grinder: 'fellow-ode-gen2' } }, proposalState: { diagnosisReady: true, userAgreed: true }, __ruphusPriorProposals: [{ type: 'recipe_proposal', id: 'untried', status: 'proposed', coffeeId: f.coffee.id, slotKey: 'kalita_hot', sourceHash: canonicalRecipeSnapshot(f.saved, 'kalita_hot').recipeHash, before: f.saved, after: f.untried }] };
++  const readers = { readCoffee: async () => f.coffee, readRecipe: async () => f.saved, readAttempts: async () => [f.attempt], readTastings: async () => [] };
++  const writes = [];
++  const tools = createRuphusTools({ uid: 'fixture-owner', context, readers, proposalStore: async input => { writes.push(input); return { ...input, status: 'proposed' }; } });
++  return { ...f, context, readers, tools, writes };
++}
++test('snapshot wins over source dose; measured timing and explicit feedback join without rewriting history', async () => {
++  const h = harness();
++  const original = structuredClone(h.attempt);
++  const evidence = await readCoffeeEvidence({ uid: 'fixture-owner', coffeeId: h.coffee.id, readers: h.readers, now });
++  assert.match(evidence.brews.summary, /completed.*18g, 279g, 6.2, 93°.*measured 3:24/);
++  assert.deepEqual(h.attempt, original);
++  assert.doesNotMatch(JSON.stringify(publicEvidence(evidence)), /fixture-attempt|snapshot|owner/);
++  const projected = projectBrewEvidence([h.attempt], h.coffee.handBrewTimingMemory, [{ attemptId: h.attempt.id, notes: 'Better but still kind of thin' }, { notes: 'Unlinked bitter tasting' }]);
++  assert.deepEqual(projected[0].feedback, ['Better but still kind of thin']);
++});
++test('never infer a measurement from target, wall time, mismatched dose, skipped or unrelated timing', () => {
++  const { attempt, coffee } = fruktFixture();
++  for (const event of [{ ...coffee.handBrewTimingMemory[0], attemptId: 'other' }, { ...coffee.handBrewTimingMemory[0], doseGrams: 24 }, { ...coffee.handBrewTimingMemory[0], completionKind: 'skipped' }]) assert.equal(projectBrewEvidence([attempt], [event])[0].actualElapsedMs, null);
++  assert.equal(projectBrewEvidence([attempt], [coffee.handBrewTimingMemory[0], { ...coffee.handBrewTimingMemory[0], actualElapsedMs: 400000 }])[0].actualElapsedMs, null);
++  assert.equal(projectBrewEvidence([{ ...attempt, status: 'started' }], coffee.handBrewTimingMemory)[0].actualElapsedMs, null);
++});
++test('completed baseline preserves executed 18/279, temperature and pours during finer grind experiment', async () => {
++  const h = harness();
++  const evidence = await h.tools.call('read_coffee_evidence', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  assert.equal(evidence.recentBrews[0].recipe.coffeeGrams, 18);
++  assert.equal(evidence.recentBrews[0].actualElapsedMs, 203813);
++  assert.equal(evidence.recentBrews[0].timing.measuredElapsedSeconds, 204);
++  assert.equal(evidence.recentBrews[0].timing.plannedTargetSeconds, 300);
++  assert.equal(evidence.recentBrews[0].recipe.totalBrewTime, undefined);
++  assert.equal(evidence.recentBrews[0].grinderGuidance.oneClickFiner, 6);
++  assert.equal(evidence.currentReview.recipe.waterGrams, 348);
++  const args = { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'grind', value: 6 } };
++  assert.equal((await h.tools.call('propose_recipe_change', args)).code, 'brew_baseline_required');
++  assert.equal(h.writes.length, 0);
++  const result = await h.tools.call('propose_recipe_change', { ...args, baseline: evidence.recentBrews[0].brewRef });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  const { before, after } = result.artifact;
++  assert.equal(after.coffeeGrams, 18); assert.equal(after.waterGrams, 279); assert.equal(after.ratio, '1:15.5');
++  assert.equal(after.grindSize.setting, '6');
++  for (const key of Object.keys(before).filter(key => key !== 'grindSize')) assert.deepEqual(after[key], before[key], key);
++  assert.deepEqual(h.writes[0].after.steps, h.executed.steps);
++});
++test('draft editing remains explicit and separate from completed-brew diagnosis', async () => {
++  const h = harness();
++  await h.tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', baseline: 'current_review', change: { control: 'grind', value: 6 } });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.equal(result.artifact.after.waterGrams, 348);
++});
++test('unknown and uncompleted brew references cannot become experiment baselines', async () => {
++  const h = harness(); h.attempt.status = 'started';
++  await h.tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  for (const baseline of ['brew-1', 'foreign-brew']) assert.equal((await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', baseline, change: { control: 'grind', value: 6 } })).code, 'brew_baseline_unavailable');
++  assert.equal(h.writes.length, 0);
++});
++test('newest brews survive the four-record evidence limit regardless of database order', async () => {
++  const h = harness();
++  const older = Array.from({ length: 6 }, (_, index) => ({ ...h.attempt, id: `old-${index}`, completedAt: `2026-10-0${index + 1}T00:00:00Z` }));
++  h.readers.readAttempts = async () => [...older, h.attempt];
++  const evidence = await readCoffeeEvidence({ uid: 'fixture-owner', coffeeId: h.coffee.id, readers: h.readers, now });
++  assert.equal(evidence.brews.records[0].id, h.attempt.id);
++  assert.equal(evidence.brews.records.length, 4);
++});
++test('opaque brew references remain stable across reads and cannot cross equipment or coffee scope', async () => {
++  const h = harness();
++  const first = await h.tools.call('read_coffee_evidence', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  const second = await h.tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  assert.equal(first.recentBrews[0].brewRef, second.recentBrews[0].brewRef);
++  h.context.methodBinding = { status: 'locked', source: 'M1', slot: 'kalita_hot', displayName: 'hot Kalita 155' };
++  await h.tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', baseline: first.recentBrews[0].brewRef, change: { control: 'grind', value: 6 } });
++  assert.equal(result.code, 'brew_baseline_unavailable');
++  await assert.rejects(h.tools.call('propose_recipe_change', { coffeeRef: 'foreign', slot: 'kalita_hot', baseline: first.recentBrews[0].brewRef, change: { control: 'grind', value: 6 } }), { code: 'cross_owner_or_context' });
++});
++test('one-control trial cannot silently pair a serving resize with grind', async () => {
++  const h = harness();
++  const evidence = await h.tools.call('read_recipe', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', baseline: evidence.recentBrews[0].brewRef, intent: 'recipe_preview', servingDoseGrams: 24, change: { control: 'grind', value: 6 } });
++  assert.equal(result.code, 'one_change_required'); assert.equal(h.writes.length, 0);
++});
++test('timing must match coffee, brewer, equipment, lineage, session and revision', () => {
++  const { attempt, coffee } = fruktFixture(); const event = coffee.handBrewTimingMemory[0];
++  for (const patch of [
++    { beanId: 'other-coffee' }, { device: 'v60' }, { kalitaSize: '155' }, { mode: 'iced' },
++    { configurationKey: 'other-configuration' }, { sessionId: 'other-session' },
++    { doseGrams: null }, { lineage: null }, { lineage: { ...event.lineage, rulesVersion: 'other-rules' } },
++    { lineage: { ...event.lineage, sourceContextHash: 'other-source' } },
++  ]) assert.equal(projectBrewEvidence([attempt], [{ ...event, ...patch }])[0].actualElapsedMs, null, JSON.stringify(patch));
++  assert.equal(projectBrewEvidence([{ ...attempt, revisionId: 'expected-revision' }], [{ ...event, revisionId: 'wrong' }])[0].actualElapsedMs, null);
++});
++test('other brewers and equipment cannot crowd out the completed diagnostic baseline', async () => {
++  for (const readName of ['read_coffee_evidence', 'read_recipe']) {
++    const h = harness();
++    h.context.userText = 'Could grinding finer help my last Kalita 185 cup?';
++    h.context.methodBinding = { status: 'locked', source: 'M1', slot: 'kalita_hot', displayName: 'hot Kalita 185' };
++    const newer = Array.from({ length: 8 }, (_, index) => ({ ...h.attempt, id: `other-${index}`, slotKey: index < 4 ? 'aiden' : 'kalita_hot', snapshot: { ...h.executed, kalitaSize: '155' }, completedAt: '2026-10-11T23:59:00Z' }));
++    h.readers.readAttempts = async () => [...newer, h.attempt];
++    const evidence = await h.tools.call(readName, { coffeeRef: 'c1', slot: 'kalita_hot', now });
++    assert.equal(evidence.recentBrews.length, 1);
++    assert.equal(evidence.recentBrews[0].recipe.kalitaSize, '185');
++    assert.equal(evidence.recentBrews[0].recipe.waterGrams, 279);
++    assert.doesNotMatch(JSON.stringify(evidence), /projectedRecords|fixture-attempt|other-7/);
++    const result = await h.tools.call('propose_recipe_change', { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'grind', value: 6 } });
++    assert.equal(result.code, 'brew_baseline_required'); assert.equal(h.writes.length, 0);
++  }
++});
+diff --git a/scripts/ruphus-sensory-consistency.test.mjs b/scripts/ruphus-sensory-consistency.test.mjs
+new file mode 100644
+index 0000000..f5267f0
+--- /dev/null
++++ b/scripts/ruphus-sensory-consistency.test.mjs
+@@ -0,0 +1,139 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { hasUnsupportedSensoryInference } from '../api/_lib/ruphusSensoryConsistency.js';
++import { createRuphusTools } from '../api/_lib/ruphusTools.js';
++import { runRuphusTurn } from '../api/_lib/ruphusOrchestrator.js';
++import { fruktFixture } from './fixtures/ruphus-frukt-brew.mjs';
++const bad = 'Taste for more sweetness and body; if it turns sharp, that points away from more extraction.';
++const good = 'Treat this as a test; compare sweetness and body with the last cup, and note any bitterness or drying sensation. Sharpness alone does not determine extraction direction.';
++const now = Date.parse('2026-10-12T00:00:00Z');
++async function harness() {
++  const f = fruktFixture(); const writes = [];
++  const context = { userText: 'Could finer grinding help the last cup?', rotationSnapshot: { coffees: [{ refKey: 'c1', name: f.coffee.name, recipes: ['kalita_hot'] }], refs: { c1: f.coffee.id }, setup: { grinder: 'fellow-ode-gen2' } }, proposalState: { diagnosisReady: true, userAgreed: true } };
++  const tools = createRuphusTools({ uid: 'fixture-owner', context, readers: { readCoffee: async () => f.coffee, readRecipe: async () => f.saved, readAttempts: async () => [f.attempt], readTastings: async () => [] }, proposalStore: async input => { writes.push(input); return { ...input, status: 'proposed' }; } });
++  const evidence = await tools.call('read_coffee_evidence', { coffeeRef: 'c1', slot: 'kalita_hot', now });
++  const args = { coffeeRef: 'c1', slot: 'kalita_hot', baseline: evidence.recentBrews[0].brewRef, intent: 'recipe_preview', change: { control: 'grind', value: 6 }, explanation: bad };
++  return { ...f, tools, context, writes, args };
++}
++test('the observed sharp/extraction reversal and categorical paraphrases are caught', () => {
++  for (const text of [bad, 'Sharpness means over-extraction.', 'A sharp cup proves under-extraction.', 'Sharp coffee means you must grind coarser.', 'Sharpness confirms too much extraction.']) assert.equal(hasUnsupportedSensoryInference(text), true, text);
++});
++test('uncertainty, negated claims, comparative reports and clarifications remain allowed', () => {
++  for (const text of [good, 'Sharpness could mean acidity or a drying texture.', 'Sharpness doesn’t prove over-extraction.', 'Sharpness does not point away from more extraction.', 'What does sharp mean here: sour acidity or drying bitterness?', 'The finer test was harsher and drying; return to the previous setting and compare.', 'If the cup gains sweetness and body without drying, keep this test.']) assert.equal(hasUnsupportedSensoryInference(text), false, text);
++});
++test('bad explanation is rejected before publication or persistence; a corrected one preserves the experiment', async () => {
++  const h = await harness();
++  const rejected = await h.tools.call('propose_recipe_change', h.args);
++  assert.equal(rejected.code, 'sensory_claim_uncertain'); assert.equal(h.writes.length, 0); assert.equal(h.context.proposalState.proposalIssued, undefined);
++  const accepted = await h.tools.call('propose_recipe_change', { ...h.args, explanation: good });
++  assert.equal(accepted.ok, true); assert.equal(h.writes.length, 1);
++  assert.equal(accepted.artifact.after.coffeeGrams, 18); assert.equal(accepted.artifact.after.waterGrams, 279);
++  assert.equal(accepted.artifact.after.grindSize.setting, '6');
++  assert.deepEqual(accepted.artifact.after.steps, h.executed.steps);
++  assert.equal(accepted.artifact.explanation, good);
++});
++test('uncertainty guard does not prescribe a universal grind direction or control', async () => {
++  for (const change of [{ control: 'grind', value: 6 }, { control: 'grind', value: 6.6 }, { control: 'temperature', value: 94 }, { control: 'ratio', value: 15 }]) {
++    const h = await harness();
++    const result = await h.tools.call('propose_recipe_change', { ...h.args, change, explanation: good });
++    assert.equal(result.ok, true, JSON.stringify({ change, result }));
++    assert.equal(h.writes.length, 1);
++  }
++});
++test('real proposal recovery is bounded to one explanatory repair without publishing the rejected claim', async () => {
++  const h = await harness(); const frames = []; let calls = 0;
++  const result = await runRuphusTurn({ turnId: 'sensory-repair', context: h.context, userText: h.context.userText, tools: h.tools, emit: frame => frames.push(frame), provider: { runTurn: async input => {
++    calls++;
++    if (calls === 2) assert.match(input.correctiveInstruction, /Sharpness alone/);
++    assert.ok(calls <= 2);
++    return { toolCalls: [{ callId: `call-${calls}`, name: 'propose_recipe_change', args: { ...h.args, explanation: calls === 1 ? bad : good } }] };
++  } } });
++  assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(calls, 2); assert.equal(h.writes.length, 1);
++  const published = frames.filter(frame => ['artifact_ready', 'text_delta', 'turn_completed'].includes(frame.type));
++  assert.doesNotMatch(JSON.stringify(published), /points away from more extraction/);
++  assert.equal(published.filter(frame => frame.type === 'artifact_ready').length, 1);
++});
++test('repeated unsupported proposal rationale stops after one repair, without a stored or shown proposal', async () => {
++  const h = await harness(); let calls = 0;
++  const result = await runRuphusTurn({ turnId: 'sensory-stop', context: h.context, userText: h.context.userText, tools: h.tools, provider: { runTurn: async () => ({ toolCalls: [{ callId: `call-${++calls}`, name: 'propose_recipe_change', args: h.args }] }) } });
++  assert.equal(result.ok, false); assert.equal(calls, 2); assert.equal(h.writes.length, 0); assert.deepEqual(result.artifacts, []);
++});
++test('a prose-only extraction claim receives one uncertainty correction and no recipe is invented', async () => {
++  let calls = 0;
++  const result = await runRuphusTurn({ turnId: 'sensory-prose', context: {}, userText: 'What does sharp tell you?', tools: { names: [], definitions: [], call: async () => assert.fail('No recipe tool should run') }, provider: { runTurn: async input => {
++    calls++;
++    if (calls === 2) assert.match(input.correctiveInstruction, /Sharpness alone/);
++    return { text: calls === 1 ? bad : 'Do you mean sour acidity, bitterness, or a drying sensation?' };
++  } } });
++  assert.equal(result.ok, true); assert.equal(calls, 2); assert.equal(result.artifacts.length, 0); assert.match(result.text, /Do you mean/);
++});
++test('repeated unsupported prose is withheld, not delivered after the retry budget', async () => {
++  let calls = 0; const frames = [];
++  const result = await runRuphusTurn({ turnId: 'sensory-prose-stop', context: {}, userText: 'What does sharp tell you?', tools: { names: [], definitions: [], call: async () => assert.fail('No tools') }, emit: frame => frames.push(frame), provider: { runTurn: async () => { calls++; return { text: bad }; } } });
++  assert.equal(result.ok, false); assert.equal(calls, 2); assert.equal(frames.some(frame => frame.type === 'text_delta' && frame.text.includes('points away')), false);
++});
++test('a published valid card stays fixed when surrounding model prose makes the unsupported inference', async () => {
++  const h = await harness(); let calls = 0; const frames = [];
++  const result = await runRuphusTurn({ turnId: 'sensory-published-card', context: h.context, userText: h.context.userText, tools: h.tools, emit: frame => frames.push(frame), provider: { runTurn: async () => {
++    calls++;
++    return { text: bad, toolCalls: [{ callId: 'valid-card', name: 'propose_recipe_change', args: { ...h.args, explanation: good } }] };
++  } } });
++  assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(calls, 1); assert.equal(h.writes.length, 1);
++  assert.equal(result.artifacts.length, 1); assert.equal(result.artifacts[0].after.grindSize.setting, '6');
++  assert.doesNotMatch(result.text, /points away from more extraction/);
++  assert.equal(frames.filter(frame => frame.type === 'artifact_ready').length, 1);
++});
++test('ordinary negation and independent conditional advice do not spend a repair call', async () => {
++  for (const text of ['Sourness alone never proves under-extraction.', 'If you grind finer, that means more extraction; stop if the cup turns sharp or drying.', 'Sharpness is not proof of over-extraction.', 'If it tastes sour, try a finer setting and compare sweetness.', 'Sharpness might mean under-extraction.']) {
++    assert.equal(hasUnsupportedSensoryInference(text), false, text);
++    let calls = 0;
++    const result = await runRuphusTurn({ turnId: 'allowed-sensory', context: {}, userText: 'How should I compare the next cup?', tools: { names: [], definitions: [], call: async () => assert.fail('No tool expected') }, provider: { runTurn: async () => { calls++; return { text }; } } });
++    assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(calls, 1, text);
++  }
++  assert.equal(hasUnsupportedSensoryInference('Sharpness proves over-extraction, although the next test may help.'), true, 'unrelated qualification cannot excuse a categorical claim');
++});
++test('explanation repair cannot replace the baseline, control, dose, equipment or other recipe arguments', async () => {
++  for (const patch of [
++    { baseline: 'saved_recipe', change: { control: 'ratio', value: 14.5 } },
++    { change: { control: 'grind', value: 6.6 } },
++    { servingDoseGrams: 24 }, { slot: 'v60_hot' }, { coffeeRef: 'c2' },
++    { afterRecipe: { coffeeGrams: 24, waterGrams: 348 } },
++  ]) {
++    const h = await harness(); const frames = []; let calls = 0;
++    const result = await runRuphusTurn({ turnId: 'sensory-drift', context: h.context, userText: h.context.userText, tools: h.tools, emit: frame => frames.push(frame), provider: { runTurn: async () => ({ toolCalls: [{ callId: `call-${++calls}`, name: 'propose_recipe_change', args: calls === 1 ? h.args : { ...h.args, ...patch, explanation: good } }] }) } });
++    assert.equal(result.ok, false, JSON.stringify(patch)); assert.equal(result.code, 'sensory_correction_changed_recipe');
++    assert.equal(calls, 2); assert.equal(h.writes.length, 0); assert.equal(result.artifacts.length, 0);
++    assert.ok(frames.some(frame => frame.type === 'text_delta' && /No new card/.test(frame.text)));
++    assert.ok(frames.some(frame => frame.type === 'turn_interrupted'));
++  }
++});
++test('repair rejects an extra read but accepts equivalent numeric and nullable schema representations', async () => {
++  for (const extraRead of [false, true]) {
++    const h = await harness(); let calls = 0;
++    const result = await runRuphusTurn({ turnId: 'sensory-contract', context: h.context, userText: h.context.userText, tools: h.tools, provider: { runTurn: async () => {
++      calls++;
++      return { toolCalls: [calls === 2 && extraRead
++        ? { callId: 'extra-read', name: 'read_recipe', args: { coffeeRef: 'c1', slot: 'kalita_hot' } }
++        : { callId: `call-${calls}`, name: 'propose_recipe_change', args: calls === 1 ? h.args : { ...h.args, explanation: good, change: { control: 'grind', value: '6.0' }, servingDoseGrams: null, experiment: null } }] };
++    } } });
++    assert.equal(calls, 2); assert.equal(result.ok, !extraRead); assert.equal(h.writes.length, extraRead ? 0 : 1);
++    if (extraRead) assert.deepEqual(result.toolNames, ['propose_recipe_change']);
++  }
++});
++test('explicitly rejected diagnoses are allowed without exempting a separate asserted claim', () => {
++  for (const text of ['Do not assume sharpness means over-extraction.', 'It would be wrong to say sharpness proves under-extraction.', 'Avoid saying a sharp cup means too much extraction.', 'The claim “sharpness means over-extraction” is unsupported.']) {
++    assert.equal(hasUnsupportedSensoryInference(text), false, text);
++  }
++  assert.equal(hasUnsupportedSensoryInference('Do not assume sharpness means over-extraction; sourness proves under-extraction.'), true);
++});
++test('a blocked repair cannot echo the rejected claim through recovery text', async () => {
++  let calls = 0; const frames = [];
++  const result = await runRuphusTurn({ turnId: 'sensory-blocked-echo', context: {}, userText: 'What does sharp tell you?', tools: { names: [], definitions: [], call: async () => assert.fail('No tools') }, emit: frame => frames.push(frame), provider: { runTurn: async () => {
++    calls++;
++    return { text: 'Sharpness means over-extraction.', ...(calls === 2 ? { envelope: { state: 'blocked', intent: 'information', text: 'Sharpness means over-extraction.' } } : {}) };
++  } } });
++  assert.equal(result.ok, false); assert.equal(calls, 2);
++  assert.doesNotMatch(result.text, /means over-extraction/);
++  assert.doesNotMatch(JSON.stringify(frames.filter(frame => ['text_delta', 'turn_completed'].includes(frame.type))), /means over-extraction/);
++  assert.ok(frames.some(frame => frame.type === 'turn_interrupted'));
++});

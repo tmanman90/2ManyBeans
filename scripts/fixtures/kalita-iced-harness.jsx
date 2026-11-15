@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HandBrewModal } from '../../src/components/HandBrewModal.jsx';
 import { UserPreferencesProvider } from '../../src/hooks/useUserProfile.jsx';
+import { AuthContext } from '../../src/contexts/AuthContext.jsx';
 import { generateKalitaRecipe } from '../../src/lib/kalitaAdapter.js';
 import { generateKalitaIcedRecipe } from '../../src/lib/kalitaIcedAdapter.js';
 
@@ -36,8 +37,12 @@ function Harness() {
   );
 }
 
+// BrewTimer reads the signed-in user (brew timer recovery is per user), so the
+// harness supplies a signed-out auth context like a fresh install.
 createRoot(document.getElementById('root')).render(
-  <UserPreferencesProvider value={preferencesValue}>
-    <Harness />
-  </UserPreferencesProvider>,
+  <AuthContext.Provider value={{ user: null }}>
+    <UserPreferencesProvider value={preferencesValue}>
+      <Harness />
+    </UserPreferencesProvider>
+  </AuthContext.Provider>,
 );

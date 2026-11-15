@@ -6,7 +6,7 @@ import { ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { assertValidAidenProfile, toAidenProfile } from './aidenProfileValidation';
-import { AIDEN_SYSTEM_PROMPT, repairAidenProfile } from './aidenCore.js';
+import { AIDEN_SYSTEM_PROMPT, repairGeneratedAidenProfile } from './aidenCore.js';
 export { buildAidenTitle } from './aidenProfileValidation';
 
 const PROXY_URL = ruphusApiUrl('/api/openai');
@@ -39,38 +39,31 @@ export async function generateAidenRecipe(bean, research = null) {
     }
   }
 
-  const data = await fetchWithRetry({
-    url: PROXY_URL,
-    body: {
-      model: 'gpt-5.4-mini',
-      messages: [
-        { role: 'system', content: AIDEN_SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
-      ],
-      maxTokens: 1000,
-      feature: 'aidenRecipe',
-    },
-    retries: 2,
-    serviceName: 'OpenAI',
-  });
-  const text = data.text || '';
-  let parsed;
-  try {
-    const clean = text.replace(/```json|```/g, '').trim();
-    parsed = JSON.parse(clean);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        parsed = JSON.parse(match[0]);
-      } catch {
-        throw new Error('Recipe generation returned invalid data. Please try again.');
-      }
-    } else {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const data = await fetchWithRetry({
+      url: PROXY_URL,
+      body: {
+        model: 'gpt-5.4-mini',
+        messages: [
+          { role: 'system', content: AIDEN_SYSTEM_PROMPT },
+          { role: 'user', content: userContent },
+        ],
+        maxTokens: 2000,
+        responseFormat: { type: 'json_object' },
+        feature: 'aidenRecipe',
+      },
+      retries: 2,
+      serviceName: 'OpenAI',
+    });
+
+    try {
+      const parsed = JSON.parse(data.text || '');
+      return repairGeneratedAidenProfile(bean, parsed, research);
+    } catch {
+      if (attempt === 0) continue;
       throw new Error('Recipe generation returned invalid data. Please try again.');
     }
   }
-  return repairAidenProfile(bean, parsed, research);
 }
 
 export async function pushToAiden(recipe, bean = null, { isIced = false } = {}) {

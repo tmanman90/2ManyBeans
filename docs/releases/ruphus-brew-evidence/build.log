@@ -1,0 +1,65 @@
+
+> coffee-hub@1.1.255 build
+> vite build
+
+vite v7.3.3 building client environment for production...
+transforming...
+✓ 2430 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/firebase.js is dynamically imported by /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/fetchWithRetry.js, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/storage.js but also statically imported by /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/ScanSheet.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/SettingsPage.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/onboarding/OnboardingErrorBoundary.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/onboarding/OnboardingFlow.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/contexts/SubscriptionContext.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/hooks/useAppData.js, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/hooks/useAuth.js, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/hooks/useChatSession.js, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/hooks/useUserProfile.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/onboardingAnalytics.js, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/reauth.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/gemini.js is dynamically imported by /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/claude.js but also statically imported by /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/EditBeanModal.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/QuickRecipeFlow.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/ScanSheet.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/onboarding/screens/R10Demo.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/hooks/useProfessorRuphus.js, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/tabs/ChatTab.jsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/lib/storage.js is dynamically imported by /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/EditBeanModal.jsx but also statically imported by /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/EditBeanModal.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/components/ScanSheet.jsx, /Users/talmeltzer/Documents/VIBE CODING/Coffee-App-Build/.worktrees/ruphus-brew-evidence/src/hooks/useAppData.js, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/registerSW.js                       0.13 kB
+dist/manifest.webmanifest                0.38 kB
+dist/index.html                          1.68 kB │ gzip:   0.69 kB
+dist/assets/index-CGC0cH_z.css           6.70 kB │ gzip:   2.20 kB
+dist/assets/PaywallRoast-p2U6JutU.css   10.11 kB │ gzip:   2.70 kB
+dist/assets/index-CR-druBl.js            0.37 kB │ gzip:   0.27 kB
+dist/assets/web-DzYJctgH.js              0.43 kB │ gzip:   0.29 kB
+dist/assets/index-C5kXp3vB.js            0.44 kB │ gzip:   0.28 kB
+dist/assets/index-D-r1-pDG.js            0.65 kB │ gzip:   0.41 kB
+dist/assets/web-1Qyf_mKH.js              1.02 kB │ gzip:   0.52 kB
+dist/assets/index-DAJhBnKt.js            1.45 kB │ gzip:   0.75 kB
+dist/assets/web-BN5C3Ond.js              3.81 kB │ gzip:   1.03 kB
+dist/assets/index-D29vfYs0.js            4.43 kB │ gzip:   1.80 kB
+dist/assets/index-BBOEAy2f.js            4.53 kB │ gzip:   1.73 kB
+dist/assets/index-DHdBe6_i.js            5.13 kB │ gzip:   1.86 kB
+dist/assets/index-BN-z4buO.js            6.59 kB │ gzip:   2.50 kB
+dist/assets/web-CE7Pg5s8.js              8.78 kB │ gzip:   3.01 kB
+dist/assets/web-C3Uc7aYK.js             10.07 kB │ gzip:   2.08 kB
+dist/assets/PaywallSheet-B8qWOXwW.js    15.52 kB │ gzip:   5.21 kB
+dist/assets/PaywallRoast-BlWEkDU0.js    21.76 kB │ gzip:   7.57 kB
+dist/assets/ArchiveTab-COzy7i7M.js      21.86 kB │ gzip:   6.78 kB
+dist/assets/InventoryTab-B5T8jvFt.js    23.96 kB │ gzip:   8.10 kB
+dist/assets/index-iX0262Ti.js           26.09 kB │ gzip:  10.16 kB
+dist/assets/index.esm-Ck-ZnJ48.js       35.50 kB │ gzip:  11.50 kB
+dist/assets/web-CdrYUFuE.js             41.69 kB │ gzip:  10.66 kB
+dist/assets/TastingTab-wsvSpvT-.js      67.68 kB │ gzip:  20.54 kB
+dist/assets/ChatTab-DSkj9DyO.js         96.67 kB │ gzip:  30.83 kB
+dist/assets/react-CSWSLE_G.js          192.51 kB │ gzip:  60.36 kB
+dist/assets/onboarding-P35V_onT.js     356.04 kB │ gzip: 120.86 kB
+dist/assets/firebase-DEFXIrpu.js       424.34 kB │ gzip: 130.02 kB
+dist/assets/index-CON_gfrp.js          711.24 kB │ gzip: 201.34 kB
+
+(!) Some chunks are larger than 600 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.06s
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+PWA v1.2.0
+mode      generateSW
+precache  38 entries (2105.24 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-6c06881d.js

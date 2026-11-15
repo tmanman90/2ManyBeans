@@ -19,6 +19,8 @@ import { m, spring, popIn } from '../lib/motion';
 import { haptic } from './../lib/haptics';
 import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';
 import { useBrewTimer, formatMMSS } from '../hooks/useBrewTimer';
+import { useAuthContext } from '../contexts/AuthContext';
+import { clearBrewTimerSession, writeBrewTimerSession } from '../lib/brewTimerSession';
 import {
   initialManualBrewState,
   manualBrewView,
@@ -29,6 +31,7 @@ import { timingContextFromRecipe } from '../lib/brewTimingMemory';
 import {
   resolveGuideState,
   resolveStepTiming,
+  restorableSourceTimerState,
   resumeSourceTimerState,
   saveBrewTimingEvent,
   sourceTimerDisplayStages,
@@ -498,14 +501,16 @@ function useConfirmedSourceTimer(recipe, {
 
 const BrewTimerShell = ({
   open, recipe, bean, attemptId = null, revisionId = null, onClose, onStartTasting, onSaveTimingEvent,
-  sourceTimerState = null, sourceTimerBinding = null, timerOverride = null,
+  sourceTimerState = null, sourceTimerBinding = null, timerOverride = null, restoredSession = null,
 }) => {
-  const standardTimer = useBrewTimer(recipe, attemptId, { sourceTimerState, sourceTimerBinding });
+  const { user } = useAuthContext();
+  const timerOwner = user?.uid || 'demo';
+  const standardTimer = useBrewTimer(recipe, attemptId, { sourceTimerState, sourceTimerBinding, restoredSession });
   const timer = timerOverride || standardTimer;
   const {
     phase, stepIndex, timerSteps, currentStep, currentStepDurationMs,
     globalElapsedMs, stepElapsedMs, totalMs,
-    readGlobalMs, readStepMs,
+    readGlobalMs, readStepMs, getClockSnapshot,
     start, beginRunning, pause, resume, finish, skipForward, rewind, reset, completionKind, completionElapsedMs, completionAtMs,
     isReady,
   } = timer;
@@ -516,10 +521,12 @@ const BrewTimerShell = ({
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [saveState, setSaveState] = useState(null);
+  const [saveState, setSaveState] = useState(() => restoredSession?.phase === 'done'
+    ? ['saved', 'ephemeral'].includes(restoredSession.saveState) ? restoredSession.saveState : 'failed'
+    : null);
   const [chilled, setChilled] = useState(false);
-  const sessionRef = useRef(null);
-  const reportedRef = useRef(false);
+  const sessionRef = useRef(restoredSession?.timingContext || null);
+  const reportedRef = useRef(restoredSession?.phase === 'done');
   const isFinalStep = !!timerSteps && stepIndex + 1 >= timerSteps.length;
   const guideState = resolveGuideState(globalElapsedMs, totalMs);
   const guideRangeSeconds = Array.isArray(recipe?.guideRangeSeconds)
@@ -557,6 +564,28 @@ const BrewTimerShell = ({
       };
     }
   }, [open, recipe, bean?.id, attemptId, revisionId]);
+
+  // Store structural clock changes so a reclaimed WebView can reopen the
+  // same bean brew. Confirmed source timers use their own attempt state.
+  useEffect(() => {
+    if (!open || timerOverride || !['running', 'paused', 'done'].includes(phase)) return;
+    const save = () => writeBrewTimerSession(timerOwner, {
+      ...getClockSnapshot(),
+      recipe,
+      bean: bean ? {
+        id: bean.id,
+        name: bean.name,
+        roasterName: bean.roasterName,
+        productPhotoUrl: bean.productPhotoUrl,
+        photoUrl: bean.photoUrl,
+      } : null,
+      timingContext: sessionRef.current,
+      saveState,
+    });
+    save();
+    document.addEventListener('visibilitychange', save);
+    return () => document.removeEventListener('visibilitychange', save);
+  }, [open, timerOverride, phase, stepIndex, recipe, bean, saveState, getClockSnapshot, timerOwner]);
 
   const persistCompletion = useCallback(async () => {
     const session = sessionRef.current;
@@ -709,7 +738,7 @@ const BrewTimerShell = ({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 32,
-        zIndex: 1000,
+        zIndex: 1001,
       }}>
         <div style={{ fontSize: 16, color: C.text, textAlign: 'center', marginBottom: 16, fontFamily: fonts.body }}>
           This recipe is missing timer data.
@@ -737,12 +766,14 @@ const BrewTimerShell = ({
       setConfirmClose(true);
       return;
     }
+    clearBrewTimerSession(timerOwner);
     onClose?.();
   };
 
   const handleConfirmClose = () => {
     reset();
     setConfirmClose(false);
+    clearBrewTimerSession(timerOwner);
     onClose?.();
   };
 
@@ -788,6 +819,7 @@ const BrewTimerShell = ({
 
   return createPortal(
     <div
+      data-brew-timer-overlay
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
@@ -795,7 +827,7 @@ const BrewTimerShell = ({
         background: C.bg,
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 1000,
+        zIndex: 1001,
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         fontFamily: fonts.body,
@@ -1164,7 +1196,7 @@ const BrewTimerShell = ({
 
         {/* Completion screen overlay */}
         {phase === 'done' && recipe?.isIced && !chilled && (
-          <ChillServeScreen postBrewInstruction={recipe?.postBrewSteps?.[0]?.action} onCoffeeChilled={() => setChilled(true)} onDismiss={onClose} saveState={saveState} onRetrySave={persistCompletion} />
+          <ChillServeScreen postBrewInstruction={recipe?.postBrewSteps?.[0]?.action} onCoffeeChilled={() => setChilled(true)} onDismiss={() => { clearBrewTimerSession(timerOwner); onClose?.(); }} saveState={saveState} onRetrySave={persistCompletion} />
         )}
         {phase === 'done' && (!recipe?.isIced || chilled) && (
           <CompletionScreen
@@ -1172,8 +1204,8 @@ const BrewTimerShell = ({
             totalElapsedMs={globalElapsedMs}
             saveState={saveState}
             onRetrySave={persistCompletion}
-            onStartTasting={onStartTasting ? () => onStartTasting(bean?.id) : null}
-            onDone={onClose}
+            onStartTasting={onStartTasting ? () => { clearBrewTimerSession(timerOwner); onStartTasting(bean?.id); } : null}
+            onDone={() => { clearBrewTimerSession(timerOwner); onClose?.(); }}
           />
         )}
       </div>
@@ -1281,7 +1313,7 @@ function ConfirmedSourceBrewTimerSession({ onReplaceSourceTimerState, ...props }
 }
 
 function ConfirmedSourceBrewTimer({ onSourceTimerStateChange, ...props }) {
-  const [sessionState, setSessionState] = useState(props.sourceTimerState);
+  const [sessionState, setSessionState] = useState(() => restorableSourceTimerState(props.sourceTimerState));
   const [generation, setGeneration] = useState(0);
   const publishState = useCallback((next) => {
     setSessionState(next);

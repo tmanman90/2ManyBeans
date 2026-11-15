@@ -1,0 +1,131 @@
+Vercel CLI 63.1.0
+Deploying 2manybeans
+Uploading [--------------------] (0.0B/786.4KB)
+Uploading [=====---------------] (201.8KB/786.4KB)
+Uploading [==========----------] (393.8KB/786.4KB)
+Uploading [===============-----] (591.3KB/786.4KB)
+Uploading [====================] (786.4KB/786.4KB)
+  Inspect         https://vercel.com/tmanman90s-projects/2manybeans/CPK2owRM6ZN9zfSNvbVJoKmeyGrD
+  Production      https://2manybeans-d1h39q3gg-tmanman90s-projects.vercel.app
+Building…
+Building…
+Running build in Cleveland, USA (East) – cle1
+Build machine configuration: 4 cores, 8 GB
+Retrieving list of deployment files...
+Downloading 458 deployment files...
+Restored build cache from previous deployment (drbTkvDGfxX1mnPtrwKFyHa7uMEf)
+Running "vercel build"
+Vercel CLI 62.7.0
+Installing dependencies...
+up to date in 2s
+186 packages are looking for funding
+run `npm fund` for details
+npm warn install-scripts 5 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   sharp@0.32.6 (install: node-gyp rebuild)
+npm warn install-scripts   @firebase/util@1.13.0 (postinstall: node ./postinstall.js)
+npm warn install-scripts   esbuild@0.27.3 (postinstall: node install.js)
+npm warn install-scripts   protobufjs@7.5.6 (postinstall: node scripts/postinstall)
+npm warn install-scripts   sharp@0.34.5 (install: node install/check.js || npm run build)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+Running "npm run build"
+> coffee-hub@1.1.255 build
+> vite build
+vite v7.3.3 building client environment for production...
+transforming...
+✓ 2430 modules transformed.
+rendering chunks...
+[plugin vite:reporter]
+(!) /vercel/path0/src/firebase.js is dynamically imported by /vercel/path0/src/lib/fetchWithRetry.js, /vercel/path0/src/lib/storage.js but also statically imported by /vercel/path0/src/components/ScanSheet.jsx, /vercel/path0/src/components/SettingsPage.jsx, /vercel/path0/src/components/onboarding/OnboardingErrorBoundary.jsx, /vercel/path0/src/components/onboarding/OnboardingFlow.jsx, /vercel/path0/src/contexts/SubscriptionContext.jsx, /vercel/path0/src/hooks/useAppData.js, /vercel/path0/src/hooks/useAuth.js, /vercel/path0/src/hooks/useChatSession.js, /vercel/path0/src/hooks/useUserProfile.jsx, /vercel/path0/src/lib/onboardingAnalytics.js, /vercel/path0/src/lib/reauth.js, dynamic import will not move module into another chunk.
+[plugin vite:reporter]
+(!) /vercel/path0/src/lib/gemini.js is dynamically imported by /vercel/path0/src/lib/claude.js but also statically imported by /vercel/path0/src/components/EditBeanModal.jsx, /vercel/path0/src/components/QuickRecipeFlow.jsx, /vercel/path0/src/components/ScanSheet.jsx, /vercel/path0/src/components/onboarding/screens/R10Demo.jsx, /vercel/path0/src/hooks/useProfessorRuphus.js, /vercel/path0/src/tabs/ChatTab.jsx, dynamic import will not move module into another chunk.
+[plugin vite:reporter]
+(!) /vercel/path0/src/lib/storage.js is dynamically imported by /vercel/path0/src/components/EditBeanModal.jsx but also statically imported by /vercel/path0/src/components/EditBeanModal.jsx, /vercel/path0/src/components/ScanSheet.jsx, /vercel/path0/src/hooks/useAppData.js, dynamic import will not move module into another chunk.
+computing gzip size...
+dist/registerSW.js                       0.13 kB
+dist/manifest.webmanifest                0.38 kB
+dist/index.html                          1.68 kB │ gzip:   0.69 kB
+dist/assets/index-CGC0cH_z.css           6.70 kB │ gzip:   2.20 kB
+dist/assets/PaywallRoast-p2U6JutU.css   10.11 kB │ gzip:   2.70 kB
+dist/assets/index-CR-druBl.js            0.37 kB │ gzip:   0.27 kB
+dist/assets/web-DzYJctgH.js              0.43 kB │ gzip:   0.29 kB
+dist/assets/index-C5kXp3vB.js            0.44 kB │ gzip:   0.28 kB
+dist/assets/index-D-r1-pDG.js            0.65 kB │ gzip:   0.41 kB
+dist/assets/web-1Qyf_mKH.js              1.02 kB │ gzip:   0.52 kB
+dist/assets/index-DAJhBnKt.js            1.45 kB │ gzip:   0.75 kB
+dist/assets/web-BN5C3Ond.js              3.81 kB │ gzip:   1.03 kB
+dist/assets/index-D29vfYs0.js            4.43 kB │ gzip:   1.80 kB
+dist/assets/index-BBOEAy2f.js            4.53 kB │ gzip:   1.73 kB
+dist/assets/index-DHdBe6_i.js            5.13 kB │ gzip:   1.86 kB
+dist/assets/index-BN-z4buO.js            6.59 kB │ gzip:   2.50 kB
+dist/assets/web-CE7Pg5s8.js              8.78 kB │ gzip:   3.01 kB
+dist/assets/web-C3Uc7aYK.js             10.07 kB │ gzip:   2.08 kB
+dist/assets/PaywallSheet-B8qWOXwW.js    15.52 kB │ gzip:   5.21 kB
+dist/assets/PaywallRoast-B12XgHaR.js    21.76 kB │ gzip:   7.57 kB
+dist/assets/ArchiveTab-B52lTCPE.js      21.86 kB │ gzip:   6.78 kB
+dist/assets/InventoryTab-DVw7FMhn.js    23.96 kB │ gzip:   8.10 kB
+dist/assets/index-iX0262Ti.js           26.09 kB │ gzip:  10.16 kB
+dist/assets/index.esm-Ck-ZnJ48.js       35.50 kB │ gzip:  11.50 kB
+dist/assets/web-CdrYUFuE.js             41.69 kB │ gzip:  10.66 kB
+dist/assets/TastingTab-BQjbcp8I.js      67.68 kB │ gzip:  20.54 kB
+dist/assets/ChatTab-BWjTnLNw.js         96.67 kB │ gzip:  30.83 kB
+dist/assets/react-CSWSLE_G.js          192.51 kB │ gzip:  60.36 kB
+dist/assets/onboarding-P35V_onT.js     356.04 kB │ gzip: 120.86 kB
+dist/assets/firebase-DEFXIrpu.js       424.34 kB │ gzip: 130.02 kB
+dist/assets/index-BgtI9rOK.js          712.23 kB │ gzip: 201.74 kB
+✓ built in 5.88s
+(!) Some chunks are larger than 600 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+npx update-browserslist-db@latest
+Why you should do it regularly: https://github.com/browserslist/update-db#readme
+PWA v1.2.0
+mode      generateSW
+precache  38 entries (2106.21 KiB)
+files generated
+dist/sw.js
+dist/workbox-6c06881d.js
+Build Completed in /vercel/output [53s]
+Deploying outputs...
+[2K[1A[2K[G  Production      https://2manybeans-d1h39q3gg-tmanman90s-projects.vercel.app
+Completing…
+▲ Aliased         https://2manybeans.vercel.app
+{
+  "status": "ok",
+  "deployment": {
+    "id": "dpl_CPK2owRM6ZN9zfSNvbVJoKmeyGrD",
+    "url": "https://2manybeans-d1h39q3gg-tmanman90s-projects.vercel.app",
+    "productionUrl": "https://2manybeans.vercel.app",
+    "inspectorUrl": "https://vercel.com/tmanman90s-projects/2manybeans/CPK2owRM6ZN9zfSNvbVJoKmeyGrD",
+    "readyState": "READY",
+    "target": "production",
+    "deploymentApiUrl": "https://api.vercel.com/v13/deployments/dpl_CPK2owRM6ZN9zfSNvbVJoKmeyGrD",
+    "buildMachine": {
+      "cores": 4,
+      "memory": 8192,
+      "machine": "standard",
+      "selectionType": "elastic",
+      "selectionSource": "elastic-algorithm"
+    },
+    "deploymentProtection": [
+      "vercel_authentication"
+    ]
+  },
+  "message": "Deployment 2manybeans-d1h39q3gg-tmanman90s-projects.vercel.app ready. Production URL: https://2manybeans.vercel.app",
+  "next": [
+    {
+      "command": "vercel curl https://2manybeans.vercel.app",
+      "when": "Verify deployment, including when Deployment Protection is enabled"
+    },
+    {
+      "command": "vercel inspect 2manybeans-d1h39q3gg-tmanman90s-projects.vercel.app --cwd /var/folders/xx/hyp761n50hq2mw2ndtfrgs8c0000gn/T/ruphus-release-1.1.255-1vfpicq3",
+      "when": "Inspect deployment"
+    },
+    {
+      "command": "vercel deploy --prod --cwd /var/folders/xx/hyp761n50hq2mw2ndtfrgs8c0000gn/T/ruphus-release-1.1.255-1vfpicq3",
+      "when": "Promote to production"
+    }
+  ]
+}

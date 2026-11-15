@@ -2,6 +2,15 @@ import { manualSourceDisplay, validateManualSourceProjection } from './manualSou
 import { validateManualBrewState } from './ruphus/sourceTimerState.js';
 
 export const PHASE_CONTRACT_VERSION = 1;
+export const MAX_BREW_TIMER_AGE_MS = 6 * 60 * 60 * 1000;
+
+export function restorableSourceTimerState(state, now = Date.now()) {
+  const firstWater = state?.events?.['first-water'];
+  if (!Number.isFinite(firstWater) || Number.isFinite(state?.events?.['extraction:complete'])) return state;
+  return firstWater > 0 && firstWater <= now && now - firstWater < MAX_BREW_TIMER_AGE_MS
+    ? state
+    : null;
+}
 
 const WATER_ACTION = /\b(?:bloom|pour|pouring|water|hot water|pulse|finish)\b/i;
 const PREP_ACTION = /\b(?:rinse|preheat|load|add\s+\d+(?:\.\d+)?\s*g\s*coffee|level the bed|server ice|brew ice|discard rinse)\b/i;
@@ -49,7 +58,7 @@ export function resumeSourceTimerState(state, resumedAtMs) {
   return shifted;
 }
 
-export function sourceRestoreStartedAt(recipe, sourceTimerState, sourceTimerBinding = null) {
+export function sourceRestoreStartedAt(recipe, sourceTimerState, sourceTimerBinding = null, now = Date.now()) {
   const projection = recipe?.sourceProjection;
   const record = projection?.sourceExecution;
   if (sourceTimerMode(recipe) !== 'automatic' || !record || !sourceTimerState) return null;
@@ -64,7 +73,7 @@ export function sourceRestoreStartedAt(recipe, sourceTimerState, sourceTimerBind
   };
   const validation = validateManualBrewState(record, sourceTimerState, binding);
   const firstWater = sourceTimerState.events?.['first-water'];
-  if (!validation.valid || !Number.isFinite(firstWater)
+  if (!validation.valid || !restorableSourceTimerState(sourceTimerState, now) || !Number.isFinite(firstWater)
     || Number.isFinite(sourceTimerState.events?.['extraction:complete'])) return null;
   return firstWater;
 }

@@ -67,6 +67,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // One server-managed record per claimed code; cannot be reset by clients.
+    match /users/{userId}/redemptions/{code} {
+      allow read, write: if false;
+    }
+
     // Beans subcollection. Scoped rule -- size cap + required ownership,
     // no arbitrary garbage bags of data that could drive up Firestore bill.
     // 100KB per bean doc is generous but below the 1MB Firestore per-doc
