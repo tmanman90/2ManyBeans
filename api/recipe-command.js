@@ -7,6 +7,12 @@ import { isMutationAllowed, MUTATION_ROLLOUT_MODES, normalizeClientVersion, pers
 
 const allowedModes = new Set([...MUTATION_MODES, ...ORDINARY_MODES]);
 const mutationUids = () => new Set(String(process.env.RUPHUS_AGENT_V3_MUTATION_UIDS || '').split(',').map((value) => value.trim()).filter(Boolean));
+const isOrdinaryEspressoUndo = (command = {}) => command.mode === 'undo_revision'
+  && command.slotKey === 'espresso'
+  && command.clientIntent === 'espresso_direct_undo'
+  && typeof command.expectedRevisionId === 'string'
+  && !command.proposalId
+  && !command.attemptId;
 const requiredTierFor = (mode) => {
   if (mode === 'set_aiden_link' || mode === 'prepare_attempt') return 'ultra';
   if (mode === 'replace_active_recipe' || mode === 'set_aiden_grind' || MUTATION_MODES.includes(mode)) return 'pro';
@@ -20,7 +26,8 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   const shape = validateCommandRequest(command);
   if (!uid || !shape.valid || !allowedModes.has(command.mode)) return res.status(400).json({ error: 'invalid_command', details: shape.errors });
   if (Object.hasOwn(command, 'uid') || Object.hasOwn(command, 'ownerId') || Object.hasOwn(command, 'userId')) return res.status(400).json({ error: 'owner_identity_is_server_bound' });
-  if (MUTATION_ROLLOUT_MODES.has(command.mode) && !isMutationAllowed({ uid, mode: command.mode, rawUids: process.env.RUPHUS_AGENT_V3_MUTATION_UIDS, rawAccessUids: process.env.RUPHUS_AGENT_V3_UIDS })) return res.status(404).json({ error: 'mutation_unavailable' });
+  const ordinaryEspressoUndo = isOrdinaryEspressoUndo(command);
+  if (MUTATION_ROLLOUT_MODES.has(command.mode) && !ordinaryEspressoUndo && !isMutationAllowed({ uid, mode: command.mode, rawUids: process.env.RUPHUS_AGENT_V3_MUTATION_UIDS, rawAccessUids: process.env.RUPHUS_AGENT_V3_UIDS })) return res.status(404).json({ error: 'mutation_unavailable' });
   try {
     const requiredTier = requiredTierFor(command.mode);
     if (requiredTier) {
@@ -33,7 +40,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
     const { clientVersion: _clientVersion, commandCapabilities: _commandCapabilities, ...serverCommand } = command;
     const result = await executeRecipeCommand({ db, uid, clientVersion: normalizeClientVersion(command.clientVersion), ...serverCommand });
     const proposalMode = ['apply_proposal', 'brew_once', 'promote_attempt', 'undo_revision'].includes(command.mode);
-    await persistRuphusTrace({ db, uid, event: { feature: 'ruphus-agent-v3', endpoint: '/api/recipe-command', contextId: command.coffeeId, actionId: command.actionId, proposalId: command.proposalId, receiptId: result?.receipt?.id, approvalSource: MUTATION_MODES.includes(command.mode) ? 'native_card' : 'ordinary_app', proposalValid: proposalMode ? result?.receipt?.status !== 'validation_rejected' : undefined, failureCode: result?.error }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
+    await persistRuphusTrace({ db, uid, event: { feature: 'ruphus-agent-v3', endpoint: '/api/recipe-command', contextId: command.coffeeId, actionId: command.actionId, proposalId: command.proposalId, receiptId: result?.receipt?.id, approvalSource: MUTATION_MODES.includes(command.mode) && !ordinaryEspressoUndo ? 'native_card' : 'ordinary_app', proposalValid: proposalMode ? result?.receipt?.status !== 'validation_rejected' : undefined, failureCode: result?.error }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
     return res.status(200).json(result);
   } catch (error) {
     await persistRuphusTrace({ db, uid, event: { feature: 'ruphus-agent-v3', endpoint: '/api/recipe-command', contextId: command.coffeeId, actionId: command.actionId, proposalId: command.proposalId, failureCode: error.code || 'command_failed' }, retentionRaw: process.env.RUPHUS_AGENT_TRACE_RETENTION_DAYS }).catch(() => {});
@@ -42,4 +49,4 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   }
 });
 
-export { allowedModes, mutationUids, requiredTierFor };
+export { allowedModes, mutationUids, requiredTierFor, isOrdinaryEspressoUndo };

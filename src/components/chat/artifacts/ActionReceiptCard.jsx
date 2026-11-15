@@ -8,14 +8,17 @@ const receiptTitle = (artifact, fallback) => {
   return isIcedRecipe(artifact.recipe) && !/\biced\b/i.test(title) ? `${title} · Iced` : title;
 };
 
-export function ActionReceiptCard({ artifact = {}, onAction, actionPending = false }) {
+export function ActionReceiptCard({ artifact = {}, onAction, onEspressoAction, onPreview, actionPending = false }) {
   const status = artifact.status || 'succeeded';
-  const canUndo = status === 'succeeded' && artifact.undoAvailable === true;
+  const actionHandler = artifact.slotKey === 'espresso' ? (onEspressoAction || onAction) : onAction;
+  const canUndo = status === 'succeeded' && artifact.undoAvailable === true && Boolean(actionHandler);
   const canPromote = ['ready', 'succeeded', 'attempt_tasted'].includes(status) && artifact.promoteAvailable === true && Boolean(onAction);
   const canStart = status === 'succeeded' && artifact.mode === 'apply_proposal' && artifact.executionAvailable === true && Boolean(onAction);
+  const canViewEspresso = artifact.slotKey === 'espresso' && Boolean(artifact.recipe) && typeof onPreview === 'function';
   const completedCopy = status === 'undone' ? ['Recipe update undone', 'This update is no longer your saved recipe.'] : status === 'succeeded' ? {
     apply_proposal: ['Recipe updated', 'Your saved recipe is ready for your next brew.'],
     promote_attempt: ['Recipe updated', 'This trial is now your saved recipe.'],
+    replace_active_recipe: ['Espresso recipe saved', 'Your espresso recipe is saved for this bean.'],
     undo_revision: ['Change undone', artifact.restoredSourceState === 'absent' ? 'The new recipe was removed. No recipe is saved for this brewer.' : 'Your previous recipe is restored.'],
     keep_current: ['Recipe kept', 'Your saved recipe is unchanged.'],
     brew_once: ['Ready to try', artifact.sourceState === 'absent' ? 'Use this version for one brew. Nothing has been saved.' : 'Use this version for one brew. Your saved recipe is unchanged.'],
@@ -23,8 +26,15 @@ export function ActionReceiptCard({ artifact = {}, onAction, actionPending = fal
   return <div data-artifact="action_receipt" data-status={status} style={{ width: '100%', padding: 14, border: `1px solid ${C.hairline}`, borderRadius: radius.lg, boxShadow: shadows.e1, background: C.cream }}>
     <div style={typeScale.h3}>{status === 'undone' ? completedCopy[0] : receiptTitle(artifact, completedCopy?.[0] || 'Recipe change')}</div>
     <div style={{ color: C.textMuted, marginTop: 6 }}>{status === 'undone' ? completedCopy[1] : artifact.message || completedCopy?.[1] || 'Check the result before continuing.'}</div>
+    {artifact.slotKey === 'espresso' && artifact.recipe && <div aria-label="Saved espresso fields" style={{ color: C.textMuted, marginTop: 8, lineHeight: 1.45 }}>
+      {[artifact.recipe.doseGrams != null ? `Dose ${artifact.recipe.doseGrams} g` : null,
+        artifact.recipe.yieldGrams != null ? `Output ${artifact.recipe.yieldGrams} g` : null,
+        artifact.recipe.grinderSetting?.value != null ? `Grind ${artifact.recipe.grinderSetting.value}` : null,
+        artifact.recipe.temperature?.offsetF != null ? `Temperature ${artifact.recipe.temperature.offsetF >= 0 ? '+' : ''}${artifact.recipe.temperature.offsetF}°F from machine default` : null].filter(Boolean).join(' · ')}
+    </div>}
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-      {canUndo && <ArtifactAction action="undo_revision" label="Undo" status={status} onClick={() => onAction?.({ mode: 'undo_revision', artifact })} />}
+      {canViewEspresso && <ArtifactAction action="view_recipe" label="View recipe" status={status} onClick={() => onPreview?.(artifact)} />}
+      {canUndo && <ArtifactAction action="undo_revision" label="Undo" status={status} onClick={() => actionHandler?.({ mode: 'undo_revision', artifact })} />}
       {canStart && <ArtifactAction action="start_attempt" label={artifact.slotKey === 'aiden' ? 'Prepare in Fellow' : 'Start brew'} status={status} onClick={() => onAction?.({ mode: 'start_attempt', artifact })} />}
       {canPromote && <ArtifactAction action="promote_attempt" label="Make this my recipe" status={actionPending ? 'applying' : status} disabled={actionPending} onClick={() => onAction?.({ mode: 'promote_attempt', artifact })} />}
     </div>

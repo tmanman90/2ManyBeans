@@ -1,11 +1,12 @@
 import { hasUnsupportedSensoryInference, SENSORY_UNCERTAINTY_CORRECTION } from './ruphusSensoryConsistency.js';
 import { canonicalHash, createLifecycleFrame, RUPHUS_CONTRACT_VERSION, SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 import { gradeReply, isTechniqueExplorationRequest, runtimeTriggers } from '../../src/lib/ruphus/conversationContract.js';
-import { isContextualTechniqueFollowupRequest, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
+import { isContextualTechniqueFollowupRequest, isExplicitEspressoUndoRequest, isExplicitTechniqueReuseRequest, isHistoricalTechniqueInspectionRequest, RUPHUS_ESPRESSO_TOOL_NAMES, RUPHUS_FORBIDDEN_TOOL_NAMES } from './ruphusTools.js';
 import { aggregateProviderRetryCount, aggregateProviderUsage } from './ruphusRollout.js';
 import { MAX_READS_PER_TURN, MAX_TOOL_ROUNDS } from './ruphusEvidence.js';
 import { mentionedMethodSlots } from '../../src/lib/ruphus/methodResolver.js';
 import { isOdeStep } from '../../src/lib/brewMethods.js';
+import { espressoSetupKey } from '../../src/lib/espressoRecipes.js';
 
 const READS = new Set(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe']);
 const SEVERE_SECOND_FAILURES = new Set([
@@ -23,6 +24,7 @@ const PROPOSAL_RECOVERABLE_FAILURES = new Set([
 ]);
 const TECHNIQUE_RECOVERY = 'I can explain a different source-backed technique for this brewer, but I couldn’t prepare its review recipe safely. Your saved recipe is unchanged.';
 const CARD_RECOVERY = 'I haven’t prepared a recipe card yet. Your saved recipe is unchanged.';
+const ESPRESSO_STALE_UNDO = 'I couldn’t undo that espresso save because the recipe changed afterward. Undo is unavailable, and your newer saved recipe is unchanged.';
 const PREPARATION_CLAIM = /\b(?:prepared\s*:\s*|prepared\s+(?:the\s+)?(?:recipe|card|schedule)|prepared\s+for\s+review|ready\s+to\s+review|full\s+adapted\s+schedule\s+is\s+ready)\b/i;
 const SAFE_FAILURE_MESSAGES = Object.freeze({
   provider_schema: 'I couldn’t finish a reliable answer from the response. Your message is kept.',
@@ -276,6 +278,29 @@ function appendHandoff(current, handoff) {
   return [String(current || '').trim(), String(handoff || '').trim()].filter(Boolean).join(' ');
 }
 
+function espressoMutationHandoff(artifact) {
+  const recipe = artifact?.recipe || {};
+  const fields = [
+    recipe.doseGrams != null ? `${recipe.doseGrams} g in` : null,
+    recipe.yieldGrams != null ? `${recipe.yieldGrams} g out` : null,
+    recipe.grinderSetting?.value != null ? `grind ${recipe.grinderSetting.value}` : null,
+    recipe.temperature?.offsetF != null ? `temperature ${recipe.temperature.offsetF >= 0 ? '+' : ''}${recipe.temperature.offsetF}°F from the machine default` : null,
+  ].filter(Boolean).join(', ');
+  if (artifact?.mode === 'undo_revision') {
+    if (artifact?.restoredSourceState === 'absent' || artifact?.sourceState === 'absent') {
+      return fields
+        ? `I undid that espresso save. No espresso recipe is saved for this bean; the starting recipe is ${fields}.`
+        : 'I undid that espresso save. No espresso recipe is saved for this bean, and the starting recipe is restored.';
+    }
+    return fields
+      ? `I undid that espresso save. Your previous recipe is restored at ${fields}.`
+      : 'I undid that espresso save. Your previous espresso recipe is restored.';
+  }
+  return fields
+    ? `Saved the espresso recipe at ${fields}.`
+    : 'Saved the espresso recipe for this bean.';
+}
+
 /**
  * Proposal eligibility is a trusted, target-bound context input. The
  * conversation transcript is deliberately not consulted: an old diagnosis
@@ -427,6 +452,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
   const toolNames = []; const proposalIds = []; const artifacts = []; const toolEvidence = []; const usageSamples = []; const providerRetrySamples = [];
   let proposalClaimed = false;
   let proposalRecoveryAttempted = false;
+  let noChangeRecovery = null;
   let proposalRetryAvailable = false;
   let sensoryRepairBinding = null;
   let preparationClaimRecoveryAttempted = false;
@@ -650,7 +676,15 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         && !roundLimitRecovered && (!proposalClaimed || proposalRetryAvailable) && calls.length === 1
         && calls[0].name === 'propose_recipe_change'
         && proposalEligibleForTarget(context, calls[0].args || {});
-      if (toolRounds > maxToolRounds && !finalProposal) {
+      // An explicit espresso save/Undo may legitimately follow the resolver
+      // and exact recipe read. Keep this as a single final mutation exception
+      // rather than widening the general evidence-round budget; the command
+      // still enforces its own owner, setup, revision, and intent guards.
+      const finalEspressoMutation = toolRounds === maxToolRounds + 1
+        && readCalls > 0
+        && calls.length === 1
+        && RUPHUS_ESPRESSO_TOOL_NAMES.includes(calls[0].name);
+      if (toolRounds > maxToolRounds && !finalProposal && !finalEspressoMutation) {
         // Aiden can edit an existing device profile, but cannot generate one
         // through the manual source catalog. A verified missing profile is a
         // capability result, not a failed connection or an earned proposal.
@@ -749,7 +783,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       if (proposalRequests.length > 1 || (proposalClaimed && !proposalRetryAvailable && proposalRequests.length > 0)) throw Object.assign(new Error('at most one proposal is allowed per turn'), { code: 'proposal_timing' });
       for (const request of calls) {
         if (!tools.names?.includes(request.name) || RUPHUS_FORBIDDEN_TOOL_NAMES.includes(request.name)
-          || (!READS.has(request.name) && request.name !== 'propose_recipe_change')) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
+          || (!READS.has(request.name) && request.name !== 'propose_recipe_change' && !RUPHUS_ESPRESSO_TOOL_NAMES.includes(request.name))) throw Object.assign(new Error('model requested an unavailable action'), { code: 'forbidden_tool' });
         if (READS.has(request.name) && readCalls + 1 > MAX_READS_PER_TURN) throw Object.assign(new Error('maximum evidence reads exceeded'), { code: 'read_budget_exceeded' });
       }
       // If the only requested action is a typed recipe preview and its exact
@@ -799,6 +833,49 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       const results = [...(justInTimeRead ? [justInTimeRead] : []), ...settled.map((item) => item.value)];
       const ambiguous = results.find((item) => item.name === 'resolve_coffee' && item.result?.ok === false && item.result?.reason === 'ambiguous');
       if (ambiguous) { text += ambiguityClarification(ambiguous.result.candidates); break; }
+      // Once the authenticated espresso command has returned its receipt, the
+      // mutation is complete. Finish from that receipt before asking the model
+      // for another response; a follow-up preview, read-budget error, or
+      // provider interruption must not turn a committed save into “unchanged”.
+      const completedEspressoMutation = [...artifacts].reverse().find((artifact) =>
+        artifact?.slotKey === 'espresso'
+        && artifact?.status === 'succeeded'
+        && ['replace_active_recipe', 'undo_revision'].includes(artifact?.mode));
+      const completedEspressoCall = results.find((item) =>
+        RUPHUS_ESPRESSO_TOOL_NAMES.includes(item?.name)
+        && item?.result?.ok === true
+        && item?.result?.artifact?.slotKey === 'espresso');
+      if (completedEspressoMutation && completedEspressoCall) {
+        const receiptCoffeeRef = Object.entries(context?.__ruphusRefs || {})
+          .find(([, coffeeId]) => coffeeId === completedEspressoMutation.coffeeId)?.[0] || null;
+        text = espressoMutationHandoff(completedEspressoMutation);
+        responseEnvelope = {
+          ...(responseEnvelope || {}),
+          intent: 'information',
+          state: 'answered',
+          coffeeRef: completedEspressoMutation.coffeeRef || responseEnvelope?.coffeeRef || receiptCoffeeRef,
+          slot: 'espresso',
+        };
+        break;
+      }
+      const staleEspressoUndo = results.find((item) => item?.name === 'undo_espresso_recipe'
+        && item?.result?.ok === false
+        && item?.result?.code === 'recipe_stale');
+      if (staleEspressoUndo) {
+        // A guarded stale Undo is a completed, truthful refusal: the command
+        // checked the owner and live revision and deliberately wrote nothing.
+        // Do not ask the provider to turn that typed result into a recipe card
+        // failure or a generic “unchanged” interruption.
+        text = ESPRESSO_STALE_UNDO;
+        responseEnvelope = {
+          ...(responseEnvelope || {}),
+          intent: 'information',
+          state: 'answered',
+          coffeeRef: staleEspressoUndo.result.coffeeRef || responseEnvelope?.coffeeRef || null,
+          slot: 'espresso',
+        };
+        break;
+      }
       const historicalRead = results.find((item) => item.name === 'read_technique_options' && item.result?.historical === true);
       if (historicalRead) {
         text = historicalRead.result.message || 'I reopened the earlier technique as a read-only recipe. Your saved recipe is unchanged.';
@@ -888,6 +965,16 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       }
       if (results.some(item => item.name === 'propose_recipe_change' && ['duplicate_alternative', 'no_recipe_change'].includes(item.result?.code))) {
         const unchanged = results.some(item => item.result?.code === 'no_recipe_change');
+        const noChangeResult = unchanged
+          ? results.find(item => item.name === 'propose_recipe_change' && item.result?.code === 'no_recipe_change')
+          : null;
+        const noChangeRequest = noChangeResult
+          ? calls.find(request => request.callId === noChangeResult.callId)
+          : null;
+        const noChangeArgs = noChangeRequest?.args || {};
+        if (unchanged && proposalEligibleForTarget(context, noChangeArgs)) {
+          noChangeRecovery = { coffeeRef: noChangeArgs.coffeeRef, slot: noChangeArgs.slot || noChangeArgs.slotKey };
+        }
         const correctiveInstruction = unchanged
           ? 'The requested values already match the current recipe or existing suggestion. This is a successful no-change outcome, not a blocked response or validation failure. Return an information response explaining that it already matches; distinguish the existing preview from the saved recipe. Do not invent a different adjustment, call another tool, claim a new card or claim a save.'
           : 'Do not repeat the prior recipe as a new one or claim a card was prepared. Explain a genuinely different supported direction concisely, or honestly explain why you recommend keeping the prior suggestion.';
@@ -931,7 +1018,55 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
     // Failed proposals are already corrected above; missing preview artifacts
     // use the single envelope recovery below, with exact-read tools available.
     if (responseEnvelope?.state === 'blocked') {
-      throw Object.assign(new Error('provider marked the turn blocked'), { code: 'response_blocked', responseText: safeRecoveryText(text) });
+      // The provider can lose the server-only receipt marker on a resumed
+      // chat and classify a plainly authorized Undo as an unprepared card.
+      // Re-enter the existing guarded command once; the command itself still
+      // enforces owner, setup, receipt, and live revision. A stale result is a
+      // completed refusal, while a successful result gets the normal receipt
+      // handoff and never falls through to a generic interruption.
+      const boundEspressoRef = context?.turnBinding?.status === 'locked' && context.turnBinding.coffeeRef
+        ? context.turnBinding.coffeeRef
+        : null;
+      const boundEspressoId = boundEspressoRef ? context?.__ruphusRefs?.[boundEspressoRef] : null;
+      const boundEspressoSetupKey = context?.rotationSnapshot?.setup
+        ? espressoSetupKey(context.rotationSnapshot.setup)
+        : null;
+      const espressoReceipts = context?.__ruphusEspressoReceipts instanceof Map
+        ? [...context.__ruphusEspressoReceipts.values()].reverse()
+        : [];
+      const priorEspressoReceipt = boundEspressoId && context?.__ruphusEspressoReceipts instanceof Map
+        ? espressoReceipts.find((receipt) => receipt?.coffeeId === boundEspressoId
+          && receipt?.setupKey === boundEspressoSetupKey
+          && receipt?.revisionId && receipt?.undoAvailable === true)
+        : null;
+      // A response-loss replay can arrive after the first Undo already
+      // settled. Keep the same authenticated binding and let the command
+      // service perform its idempotent readback instead of treating the
+      // provider's blocked prose as an interrupted turn.
+      const replayedEspressoUndo = boundEspressoId && context?.__ruphusEspressoReceipts instanceof Map
+        ? espressoReceipts.find((receipt) => receipt?.coffeeId === boundEspressoId
+          && receipt?.setupKey === boundEspressoSetupKey
+          && receipt?.status === 'undone'
+          && (receipt?.undoReceipt?.revisionId || receipt?.undoRevisionId))
+        : null;
+      if (isExplicitEspressoUndoRequest(userText)
+        && (priorEspressoReceipt || replayedEspressoUndo)
+        && boundEspressoRef
+        && context?.methodBinding?.slot === 'espresso'
+        && context?.turnBinding?.status === 'locked') {
+        const guardedUndo = await runTool({ callId: 'runtime-espresso-undo-recovery', name: 'undo_espresso_recipe', args: { coffeeRef: boundEspressoRef, slot: 'espresso' } });
+        if (guardedUndo.result?.code === 'recipe_stale') {
+          text = ESPRESSO_STALE_UNDO;
+          responseEnvelope = { intent: 'information', state: 'answered', coffeeRef: boundEspressoRef, slot: 'espresso' };
+        } else if (guardedUndo.result?.ok === true && guardedUndo.result?.artifact) {
+          text = espressoMutationHandoff(guardedUndo.result.artifact);
+          responseEnvelope = { intent: 'information', state: 'answered', coffeeRef: boundEspressoRef, slot: 'espresso' };
+        } else {
+          throw Object.assign(new Error('provider marked the turn blocked'), { code: 'response_blocked', responseText: safeRecoveryText(text) });
+        }
+      } else {
+        throw Object.assign(new Error('provider marked the turn blocked'), { code: 'response_blocked', responseText: safeRecoveryText(text) });
+      }
     }
     const artifactIssue = envelopeArtifactIssue(responseEnvelope, artifacts, context);
     if (artifactIssue) {
@@ -940,7 +1075,7 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         response = await runProvider({
           turnId, context, userText, conversation: context?.conversation || [], tools: tools.definitions,
           previous: response, toolResult: { results: toolEvidence }, regeneration: true,
-          correctiveInstruction: 'The final response must use the exact current coffee and brewer. A recipe_preview answer is valid only when the proposal tool has returned a matching review card for this turn. If the card is missing or the target is wrong, call the exact proposal tool or answer with clarification/blocked state; do not claim a card is ready.',
+          correctiveInstruction: 'Re-evaluate the user’s actual request and use the exact current coffee and brewer. If this turn is only a bean or brewer focus switch with no request for a recipe, brew, technique, control, or card, answer with information acknowledging the exact identity without recipe numbers, an adjustment demand, or a new card. For an actual recipe or edit request, a recipe_preview answer is valid only when the proposal tool has returned a matching review card for this turn; if that card is missing or the target is wrong, call the exact proposal tool or answer with clarification/blocked state, and do not claim a card is ready.',
           signal,
         });
         throwIfCancelled();
@@ -951,7 +1086,12 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
       throw Object.assign(new Error('recipe response did not match a current review card'), { code: artifactIssue });
     }
     const hasCurrentCard = artifacts.some((artifact) => ['recipe_proposal', 'action_receipt'].includes(artifact?.type));
-    if (proposalRecoveryAttempted && !hasCurrentCard && responseEnvelope?.state !== 'clarification') {
+    const noChangeAnswered = noChangeRecovery
+      && responseEnvelope?.intent === 'information'
+      && responseEnvelope?.state === 'answered'
+      && responseEnvelope?.coffeeRef === noChangeRecovery.coffeeRef
+      && responseEnvelope?.slot === noChangeRecovery.slot;
+    if (proposalRecoveryAttempted && !hasCurrentCard && responseEnvelope?.state !== 'clarification' && !noChangeAnswered) {
       throw Object.assign(new Error('proposal recovery did not fulfill the recipe request'), { code: 'proposal_failed', responseText: safeRecoveryText(text) });
     }
     if (!hasCurrentCard && PREPARATION_CLAIM.test(text)) {
@@ -1025,6 +1165,21 @@ export async function runRuphusTurn({ turnId, context, userText, provider, tools
         send('tool_result', { name: pending.name, ...(pending.callId ? { callId: pending.callId } : {}), result: { ok: false, code: 'turn_cancelled', message: 'Turn cancelled.' } });
       }
       pendingTools.clear();
+    }
+    // A provider failure after a successful authenticated espresso command is
+    // a response failure, not a mutation failure. Return the canonical receipt
+    // so the user can see exactly what committed and use the existing action
+    // controls. The cancelled path remains terminal because the caller chose
+    // to stop the turn.
+    const completedEspressoMutation = !cancelled && [...artifacts].reverse().find((artifact) =>
+      artifact?.slotKey === 'espresso'
+      && artifact?.status === 'succeeded'
+      && ['replace_active_recipe', 'undo_revision'].includes(artifact?.mode));
+    if (completedEspressoMutation) {
+      const recoveredText = espressoMutationHandoff(completedEspressoMutation);
+      send('text_delta', { text: recoveredText });
+      send('turn_completed', { text: recoveredText, state: 'answered', timing: { firstFrameMs: firstFrameAt == null ? null : firstFrameAt - turnStartedAt, checkedReplyMs: performance.now() - turnStartedAt, readRoundMs: readRoundMs || null, regenerationCount: trace.regenerations.length } });
+      return { ok: true, turnId, text: recoveredText, state: 'answered', intent: 'information', artifacts, toolCalls, toolNames, proposalIds, trace, model: response?.model || null, ...accounting() };
     }
     const code = cancelled ? 'turn_cancelled' : error.code || 'turn_failed';
     const responseText = typeof error?.responseText === 'string' ? error.responseText.trim() : '';

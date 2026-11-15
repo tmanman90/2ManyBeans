@@ -7,6 +7,7 @@ import { sanitizeUserText } from '../../../lib/sanitizeUserText';
 import { scrollOnFocus } from '../../../lib/formHelpers';
 import { useNativeKeyboard } from '../../../hooks/useNativeKeyboard';
 import { readPendingProviderDisplayName } from '../../../hooks/useUserProfile';
+import { ESPRESSO_BASKETS, ESPRESSO_GRINDERS, ESPRESSO_MACHINES, changesEspressoEquipmentIdentity } from '../../../lib/brewMethods';
 import { MascotStage, NoteBubble, OnboardingTopBar, OnboardingCtaBar, onboardingBg } from './OnboardingPrimitives';
 
 const GRINDERS = [
@@ -26,6 +27,7 @@ const BREW_OPTIONS = [
   { key: 'chemex', label: 'Chemex' },
   { key: 'aeropress', label: 'Aeropress' },
   { key: 'french-press', label: 'French Press' },
+  { key: 'espresso', label: 'Espresso' },
 ];
 
 const inputStyle = {
@@ -63,6 +65,12 @@ export default function R07Preferences() {
   const [grinder, setGrinder] = useState(answers?.preferences?.grinder || 'fellow-ode-gen2');
   const [grinderCustom, setGrinderCustom] = useState(answers?.preferences?.grinderCustomName || '');
   const [brewMethod, setBrewMethod] = useState(answers?.preferences?.brewMethod || 'aiden');
+  const [espressoMachine, setEspressoMachine] = useState(answers?.preferences?.espressoMachine || 'unknown');
+  const [espressoBasket, setEspressoBasket] = useState(answers?.preferences?.espressoBasket || 'unknown');
+  const [espressoGrinder, setEspressoGrinder] = useState(answers?.preferences?.espressoGrinder || 'integrated');
+  const [espressoGrinderModel, setEspressoGrinderModel] = useState(answers?.preferences?.espressoGrinderModel || '');
+  const [espressoGrinderCustomName, setEspressoGrinderCustomName] = useState(answers?.preferences?.espressoGrinderCustomName || '');
+  const [espressoSetupConfirmed, setEspressoSetupConfirmed] = useState(answers?.preferences?.espressoSetupConfirmed === true);
   const [displayName, setDisplayName] = useState(
     answers?.preferences?.displayName || user?.displayName || readPendingProviderDisplayName() || ''
   );
@@ -75,6 +83,12 @@ export default function R07Preferences() {
       grinder,
       grinderCustomName: grinder === 'other' ? sanitizeUserText(grinderCustom) : null,
       brewMethod,
+      espressoMachine: espressoMachine === 'unknown' ? null : espressoMachine,
+      espressoBasket: espressoBasket === 'unknown' ? null : espressoBasket,
+      espressoGrinder,
+      espressoGrinderModel: espressoGrinder === 'external' ? sanitizeUserText(espressoGrinderModel) || null : null,
+      espressoGrinderCustomName: espressoGrinder === 'custom' ? sanitizeUserText(espressoGrinderCustomName) || null : null,
+      espressoSetupConfirmed: espressoSetupConfirmed && espressoMachine === 'breville-barista-express' && espressoBasket === 'stock-double-single-wall',
     };
     prefs.displayName = sanitizeUserText(displayName);
     dispatch({
@@ -82,6 +96,31 @@ export default function R07Preferences() {
       next: 'r8',
       answersPatch: { preferences: { ...(answers?.preferences || {}), ...prefs } },
     });
+  };
+
+  const handleEspressoMachineChange = (event) => {
+    setEspressoMachine(event.target.value);
+    if (changesEspressoEquipmentIdentity('espressoMachine')) setEspressoSetupConfirmed(false);
+  };
+
+  const handleEspressoBasketChange = (event) => {
+    setEspressoBasket(event.target.value);
+    if (changesEspressoEquipmentIdentity('espressoBasket')) setEspressoSetupConfirmed(false);
+  };
+
+  const handleEspressoGrinderChange = (event) => {
+    setEspressoGrinder(event.target.value);
+    setEspressoSetupConfirmed(false);
+  };
+
+  const handleEspressoGrinderModelChange = (event) => {
+    setEspressoGrinderModel(event.target.value);
+    setEspressoSetupConfirmed(false);
+  };
+
+  const handleEspressoCustomGrinderChange = (event) => {
+    setEspressoGrinderCustomName(event.target.value);
+    setEspressoSetupConfirmed(false);
   };
 
   return (
@@ -182,7 +221,10 @@ export default function R07Preferences() {
               return (
                 <m.button
                   key={method.key}
-                  onClick={() => setBrewMethod(method.key)}
+                  onClick={() => {
+                    setBrewMethod(method.key);
+                    if (method.key === 'espresso') setEspressoSetupConfirmed(false);
+                  }}
                   whileTap={{ scale: 0.96 }}
                   transition={spring.snappy}
                   style={{
@@ -212,6 +254,61 @@ export default function R07Preferences() {
             })}
           </div>
         </m.div>
+
+        {brewMethod === 'espresso' && (
+          <m.div variants={listItem} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FieldLabel style={{ marginTop: 2 }}>Espresso setup</FieldLabel>
+            <select aria-label="Espresso machine" value={espressoMachine} onChange={handleEspressoMachineChange} style={selectStyle}>
+              {ESPRESSO_MACHINES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+            </select>
+            <select aria-label="Espresso basket" value={espressoBasket} onChange={handleEspressoBasketChange} style={selectStyle}>
+              {ESPRESSO_BASKETS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+            </select>
+              <select aria-label="Espresso grinder" value={espressoGrinder} onChange={handleEspressoGrinderChange} style={selectStyle}>
+              {ESPRESSO_GRINDERS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+            </select>
+            {espressoGrinder === 'external' && (
+              <input
+                type="text"
+                aria-label="External espresso grinder model"
+                value={espressoGrinderModel}
+                onChange={handleEspressoGrinderModelChange}
+                onFocus={scrollOnFocus}
+                placeholder="External grinder model (optional)"
+                maxLength={80}
+                style={inputStyle}
+              />
+            )}
+            {espressoGrinder === 'custom' && (
+              <input
+                type="text"
+                aria-label="Custom espresso grinder name"
+                value={espressoGrinderCustomName}
+                onChange={handleEspressoCustomGrinderChange}
+                onFocus={scrollOnFocus}
+                placeholder="Your grinder name"
+                maxLength={80}
+                style={inputStyle}
+              />
+            )}
+            {espressoBasket === 'different' && (
+              <div style={{ ...t.body, color: C.textMuted, lineHeight: 1.45 }}>
+                This basket stays available for chat and tasting. The Barista Express starting recipe is only offered for the verified stock double single-wall basket.
+              </div>
+            )}
+            {espressoMachine === 'breville-barista-express' && espressoBasket === 'stock-double-single-wall' && (
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, color: C.textMuted, fontSize: 13, lineHeight: 1.45 }}>
+                <input
+                  type="checkbox"
+                  checked={espressoSetupConfirmed}
+                  onChange={(e) => setEspressoSetupConfirmed(e.target.checked)}
+                  style={{ width: 20, height: 20, flex: '0 0 auto', marginTop: 1 }}
+                />
+                I confirm this is my Barista Express and stock double single-wall basket.
+              </label>
+            )}
+          </m.div>
+        )}
       </m.div>
       </div>
 

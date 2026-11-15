@@ -17,11 +17,12 @@ import { API_BASE } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { stripMarkdown } from './textFormat';
 import { buildPalateSummary } from './palateSummary.js';
+import { formatBrewContext, isMilkDrink } from './brewContext.js';
 
 // Preference enum whitelists. Firestore does not enforce types, so a tampered
 // doc could put any string in preferences.brewMethod / preferences.grinder.
 // These hard-validate before interpolation.
-const VALID_BREW_METHODS = new Set(['aiden', 'v60', 'kalita', 'chemex', 'aeropress', 'french-press', 'handbrew']);
+const VALID_BREW_METHODS = new Set(['aiden', 'espresso', 'v60', 'kalita', 'chemex', 'aeropress', 'french-press', 'handbrew']);
 const VALID_GRINDER_KEYS = new Set([
   'fellow-ode-gen2',
   'fellow-opus',
@@ -453,6 +454,23 @@ function formatHandBrewRecipeLine(bean) {
   return reasoning ? `${line} Reasoning: ${reasoning}` : line;
 }
 
+function formatEspressoRecipeLine(bean) {
+  const recipe = bean?.espressoRecipe;
+  if (!recipe || typeof recipe !== 'object') return null;
+  const dose = numOrNull(recipe.doseGrams);
+  const output = numOrNull(recipe.yieldGrams);
+  const ratio = numOrNull(recipe.ratio);
+  const range = Array.isArray(recipe.timeRangeSeconds) && recipe.timeRangeSeconds.length === 2
+    ? `${recipe.timeRangeSeconds[0]}–${recipe.timeRangeSeconds[1]}s ${recipe.timeBasis === 'machine_start_to_stop' ? 'machine start to stop' : ''}`.trim()
+    : '';
+  const temperature = recipe.temperature && typeof recipe.temperature === 'object' && Number.isInteger(recipe.temperature.offsetF)
+    ? `machine default ${recipe.temperature.offsetF >= 0 ? '+' : ''}${recipe.temperature.offsetF}°F`
+    : '';
+  const parts = [dose !== null ? `${dose}g in` : null, output !== null ? `${output}g out` : null, ratio !== null ? `1:${ratio}` : null, range || null, temperature || null].filter(Boolean);
+  if (!parts.length) return null;
+  return `    Espresso recipe: ${parts.join(', ')}.`;
+}
+
 export function buildChatContext(beans, tastings, preferences, firstName) {
   // Null-safe preference resolution with enum validation. Firestore is
   // free-form, so validate before any interpolation.
@@ -465,8 +483,8 @@ export function buildChatContext(beans, tastings, preferences, firstName) {
       ? sanitize(prefs.grinderCustomName, 50) || 'Custom grinder'
       : GRINDER_LABELS[grinderKey] || 'Fellow Ode Gen 2';
   const DEVICE_LABELS = { v60: 'V60 pour-over', kalita: 'Kalita Wave pour-over', chemex: 'Chemex pour-over', aeropress: 'Aeropress', 'french-press': 'French Press', handbrew: 'Hand-brew (manual pour-over)' };
-  const brewerLabel = brewMethod === 'aiden' ? 'Fellow Aiden' : (DEVICE_LABELS[brewMethod] || 'Manual brew');
-  const brewerRef = brewMethod === 'aiden' ? 'FELLOW AIDEN' : 'HAND-BREW';
+  const brewerLabel = brewMethod === 'aiden' ? 'Fellow Aiden' : brewMethod === 'espresso' ? 'Espresso' : (DEVICE_LABELS[brewMethod] || 'Manual brew');
+  const brewerRef = brewMethod === 'aiden' ? 'FELLOW AIDEN' : brewMethod === 'espresso' ? 'ESPRESSO' : 'HAND-BREW';
 
   const active = beans
     .filter(b => b.status === 'ACTIVE')
@@ -474,8 +492,9 @@ export function buildChatContext(beans, tastings, preferences, firstName) {
       const ps = getPeakStatus(b);
       const sourceSummary = summarizeSourceInsights(b, { maxChars: 160 });
       const summary = `  Jar #${b.jarSlot}: ${sanitize(b.roaster)} -- ${sanitize(b.name)} (${sanitize(b.origin)}) | ${sanitize(b.variety)} ${sanitize(b.process)} | ${ps.days}d post-roast (${ps.label}) | Opened: ${sanitize(b.openDate, 20)} (${daysOpen(b.openDate)}d ago) | Notes: ${sanitize(b.bagNotes, 200)}${sourceSummary ? ` | Source: ${sanitize(sourceSummary, 160)}` : ''}`;
-      const recipeLine =
-        brewMethod !== 'aiden' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
+      const recipeLine = brewMethod === 'espresso'
+        ? formatEspressoRecipeLine(b)
+        : brewMethod !== 'aiden' ? formatHandBrewRecipeLine(b) : formatAidenRecipeLine(b);
       return recipeLine ? `${summary}\n${recipeLine}` : summary;
     })
     .join('\n');
@@ -513,7 +532,9 @@ export function buildChatContext(beans, tastings, preferences, firstName) {
     // data could set it negative or infinite and trigger a RangeError.
     const ratingN = numOrNull(t.rating);
     const stars = ratingN !== null ? '\u2605'.repeat(Math.max(0, Math.min(5, Math.floor(ratingN)))) : '';
-    return `  ${sanitize(t.date, 20)}: ${sanitize(bean?.name) || '?'} -- ${sanitize(t.oneWord, 50)} ${stars} -- ${sanitize(t.notes, 200)}`;
+    const context = t.cupContext ? formatBrewContext(t.cupContext) : '';
+    const milkContext = t.cupContext && isMilkDrink(t.cupContext) ? ' (milk drink; sensory notes are for the finished drink)' : '';
+    return `  ${sanitize(t.date, 20)}: ${sanitize(bean?.name) || '?'}${context ? ` -- ${sanitize(context, 180)}` : ''}${milkContext} -- ${sanitize(t.oneWord, 50)} ${stars} -- ${sanitize(t.notes, 200)}`;
   }).join('\n');
 
   // Static block: persona + shared knowledge + brewer/grinder references +
@@ -676,13 +697,15 @@ export async function sendChatMessage(systemPrompt, history) {
 // wizard. The wizard's deterministic coaching always renders; if this resolves, it swaps in a
 // warmer, bean-specific line. Pro-gated at the call site (free users get the full deterministic
 // flow). Returns a short plain-text reaction, or '' on any failure (caller ignores empties).
-export async function reactToTastingStep({ bean, step, userText, expected }) {
+export async function reactToTastingStep({ bean, step, userText, expected, brewContext = null }) {
   if (!userText || !step) return '';
   const beanName = sanitize(bean?.name || bean?.roaster || 'this coffee', 80);
   const origin = sanitize(bean?.origin || '', 60);
-  const expectedLine = expected?.cues?.[step.key] ? sanitize(String(expected.cues[step.key]).replace(/-{3,}/g, '--'), 180) : '';
+  const espresso = brewContext?.method === 'espresso';
+  const drink = brewContext?.drinkType === 'with_milk' ? ' with milk' : '';
+  const expectedLine = !espresso && expected?.cues?.[step.key] ? sanitize(String(expected.cues[step.key]).replace(/-{3,}/g, '--'), 180) : '';
   const system = `You are Professor Ruphus, a warm, witty master coffee taster mentoring a NOVICE through tasting one specific cup, one attribute at a time.
-You are reacting to their observation on the "${sanitize(step.title, 30)}" step for ${beanName}${origin ? ` (${origin})` : ''}.
+You are reacting to their observation on the "${sanitize(step.title, 30)}" step for ${beanName}${origin ? ` (${origin})` : ''}${espresso ? `, an espresso${drink}` : ''}.
 ${expectedLine ? `For context, you expected: ${expectedLine}` : ''}
 Reply in ONE or TWO short sentences. Affirm what they noticed, gently sharpen it, and if useful nudge toward what to feel next. Encouraging, specific, never a lecture. No markdown, no lists, no emoji.`;
   try {

@@ -3,6 +3,7 @@ import test from 'node:test';
 import { bindRuphusTurn } from '../api/_lib/ruphusTurnBinder.js';
 import { resolveCoffeeReference } from '../src/lib/ruphus/referenceResolver.js';
 import { generateManualSourceTechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
+import { explicitMethodFromText, resolveMethod } from '../src/lib/ruphus/methodResolver.js';
 
 const coffees = [
   { id: 'a', refKey: 'c-a', name: 'El Vergel', roaster: 'Good Medicine', origin: 'Colombia', process: 'washed', jarSlot: 1 },
@@ -86,6 +87,32 @@ test('trusted turn binding admits exact discourse references but leaves fuzzy an
   assert.equal(bindRuphusTurn({ userText: 'jar one', coffees, refs }).coffeeRef, 'c-a');
 });
 
+test('retry save pronouns follow the established coffee', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const focused = bindRuphusTurn({ userText: 'Tell me about El Vergel.', coffees, refs });
+  for (const userText of ['Retry that save.', 'Retry this save']) {
+    const result = bindRuphusTurn({ userText, coffees, refs, ledger: focused.ledger, launchContext: { coffeeRef: focused.coffeeRef, launchItem: { kind: 'recipe', method: 'espresso' } } });
+    assert.deepEqual({ status: result.status, coffeeRef: result.coffeeRef }, { status: 'locked', coffeeRef: 'c-a' });
+  }
+});
+
+test('current Undo pronouns follow the established coffee while alternatives stay ambiguous', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const focused = bindRuphusTurn({ userText: 'Tell me about El Vergel.', coffees, refs });
+  for (const userText of ['nah put it back how it was', 'Could you undo that?', 'Would you put it back, please?']) {
+    const result = bindRuphusTurn({ userText, coffees, refs, ledger: focused.ledger, launchContext: { coffeeRef: focused.coffeeRef, launchItem: { kind: 'recipe', method: 'espresso' } } });
+    assert.deepEqual({ status: result.status, coffeeRef: result.coffeeRef }, { status: 'locked', coffeeRef: 'c-a' });
+  }
+  assert.notEqual(bindRuphusTurn({ userText: "Don't put it back.", coffees, refs, ledger: focused.ledger }).status, 'locked');
+  assert.notEqual(bindRuphusTurn({ userText: 'Would undo help?', coffees, refs, ledger: focused.ledger }).status, 'locked');
+  const alternatives = bindRuphusTurn({ userText: 'Undo jar one or jar two?', coffees, refs, ledger: focused.ledger });
+  assert.equal(alternatives.status, 'ambiguous');
+  assert.deepEqual(alternatives.candidates.map(({ coffeeRef, coffeeName }) => ({ coffeeRef, coffeeName })), [
+    { coffeeRef: 'c-a', coffeeName: 'El Vergel' },
+    { coffeeRef: 'c-b', coffeeName: 'Colombia La Esperanza' },
+  ]);
+});
+
 test('qualified references keep hedged identity conditional while imperatives stay authoritative', () => {
   const refs = { 'c-a': 'a', 'c-b': 'b' };
   const hedged = bindRuphusTurn({ userText: 'It might have been jar 2.', coffees, refs });
@@ -117,6 +144,38 @@ test('qualified references keep hedged identity conditional while imperatives st
   const namedHedgeAction = bindRuphusTurn({ userText: 'Maybe use Colombia La Esperanza.', coffees, refs });
   assert.equal(namedHedgeAction.status, 'ambiguous');
   assert.equal(namedHedgeAction.certainty, 'conditional');
+});
+
+test('protective bean clauses do not override positive bean or method focus', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const userText = "Use jar 2 for V60. Don't change jar 1's espresso recipe.";
+  const binding = bindRuphusTurn({ userText, coffees, refs });
+  assert.deepEqual({ status: binding.status, coffeeRef: binding.coffeeRef }, { status: 'locked', coffeeRef: 'c-b' });
+  assert.equal(explicitMethodFromText(userText), 'v60_hot');
+  assert.equal(resolveMethod({ userText, coffeeRef: 'c-b', methodFocus: { displayName: 'espresso' }, methodFocusCoffeeRef: 'c-b', recipeSlots: ['v60_hot', 'espresso'] }).slot, 'v60_hot');
+
+  const reversed = bindRuphusTurn({ userText: "Don't change jar 1's espresso recipe; use jar 2 for V60 now.", coffees, refs });
+  assert.deepEqual({ status: reversed.status, coffeeRef: reversed.coffeeRef }, { status: 'locked', coffeeRef: 'c-b' });
+  assert.equal(explicitMethodFromText("Don't change jar 1's espresso recipe; use jar 2 for V60 now."), 'v60_hot');
+
+  const conjunction = "Don't change jar 1's espresso recipe but use jar 2 for V60 now.";
+  const conjunctionBinding = bindRuphusTurn({ userText: conjunction, coffees, refs });
+  assert.deepEqual({ status: conjunctionBinding.status, coffeeRef: conjunctionBinding.coffeeRef }, { status: 'locked', coffeeRef: 'c-b' });
+  assert.equal(explicitMethodFromText(conjunction), 'v60_hot');
+
+  const sensory = bindRuphusTurn({ userText: 'Jar 1 is not sour with hot Kalita.', coffees, refs });
+  assert.deepEqual({ status: sensory.status, coffeeRef: sensory.coffeeRef }, { status: 'locked', coffeeRef: 'c-a' });
+  assert.equal(explicitMethodFromText('Jar 1 is not sour with hot Kalita.'), 'kalita_hot');
+});
+
+test('a protected ordinal leaves the established coffee for the next current-recipe turn', () => {
+  const refs = { 'c-a': 'a', 'c-b': 'b' };
+  const focused = bindRuphusTurn({ userText: 'Use jar 2 for V60.', coffees, refs });
+  assert.equal(focused.coffeeRef, 'c-b');
+  const protectedTurn = bindRuphusTurn({ userText: "Don't change jar 1's espresso recipe. Use V60 now.", coffees, refs, ledger: focused.ledger });
+  assert.notEqual(protectedTurn.status, 'locked');
+  const followup = bindRuphusTurn({ userText: 'Show the current recipe.', coffees, refs, ledger: protectedTurn.ledger });
+  assert.equal(followup.coffeeRef, 'c-b');
 });
 
 test('trusted binding exposes genuine bounded ambiguity without guessing', () => {

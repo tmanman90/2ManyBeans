@@ -15,9 +15,13 @@ const ORDINAL_GLOBAL = /\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/gi;
 // an earlier hedged mention in the same turn.
 const EXPLICIT_REFERENCE_ACTION = /\b(?:use|make|brew|try|pick|choose|switch\s+to|tell\s+me\s+about|update|change|save|apply|open|show)\b/gi;
 const IDENTITY_HEDGE = /\b(?:maybe|perhaps|possibly|might|may|probably|likely|think|guess|unsure|unclear)\b/i;
+const REFERENCE_NEGATOR = /\b(?:don['’]t|do not|never|no|without|can['’]t|cannot|shouldn['’]t|wouldn['’]t|didn['’]t|did not)\b/i;
 const OTHER = /\bother\b/i;
 const DESCRIPTOR = /^(?:now\s+)?the\s+[a-z0-9][a-z0-9' -]{0,64}\s+one[.!?]?$/i;
 const CONTEXTUAL_TECHNIQUE_FOLLOWUP = /^(?:show|give)\s+me\s+(?:another|a\s+different)\s+(?:one|option)[.!?]?$/i;
+const CURRENT_UNDO_REFERENCE = /^(?:(?:nah|no|okay|ok|please)\s+)*(?:(?:can|could|would)\s+you\s+)?(?:(?:put\s+(?:it|that)\s+back(?:\s+how\s+it\s+was)?)|(?:(?:undo|revert|reverse)\s+(?:that|it))|back\s+how\s+it\s+was)(?:\s*,?\s*please)?$/i;
+const CURRENT_RETRY_REFERENCE = /^(?:(?:(?:it|that|this)\s+)?didn['’]?t\s+work[?!.,;\s]*(?:please|pls)?[?!.,;\s]*)?(?:(?:please|pls)\s+)?(?:try|retry)\s+(?:(?:save|saving|apply|applying|update|updating)\s+)?(?:(?:(?:it|that|this)\s+)?(?:again|once\s+more)|(?:it|that|this)|(?:that|this|the)\s+save)(?:\s+(?:please|pls))?[.!?]*$/i;
+const UNDO_REFERENCE_WORD = /\b(?:undo|revert|reverse|put\s+(?:it|that)\s+back)\b/i;
 const TECHNIQUE_COMPARISON_REFERENCE = /^(?:(?:compare|contrast)\s+(?:(?:those|these|the)\s+)?(?:two|both)(?:\s+(?:source\s+)?(?:techniques?|methods?|options?|cards?))?|(?:what(?:'s|\s+is)\s+the\s+difference\s+between)\s+(?:those|these|the\s+two)(?:\s+(?:source\s+)?(?:techniques?|methods?|options?|cards?))?)[.!?]?$/i;
 const TECHNIQUE_HISTORY_REFERENCE = /^(?:(?:show|give|tell|describe|inspect|review|open|use|try|brew|prepare|make|pick|choose|revisit|repeat)\s+(?:me\s+)?)*(?:the\s+)?(?:first|1st|second|2nd|third|3rd|last|previous|earlier)\s+(?:one|option|technique|method|card|recipe)(?:\s+(?:again|back|repeat))?[.!?]?$/i;
 // A short noun-phrase answer can select one of the source choices named in a
@@ -63,6 +67,27 @@ function exactNameReference(userText, coffees = []) {
   return longest.length === 1 ? longest[0].name : null;
 }
 
+function referenceActionPrefix(value, actionIndex) {
+  return String(value || '').slice(0, actionIndex)
+    .split(/[,.!?;]|\b(?:but|however|instead|rather than)\b/i)
+    .at(-1) || '';
+}
+
+function negatedReferenceAction(value, action) {
+  return REFERENCE_NEGATOR.test(referenceActionPrefix(value, action.index));
+}
+
+function protectedOrdinalReference(value, match) {
+  const source = String(value || '');
+  const qualifyingActions = [...source.matchAll(EXPLICIT_REFERENCE_ACTION)].filter((action) => {
+    if (action.index > match.index) return false;
+    const between = source.slice(action.index + action[0].length, match.index);
+    return !/\b(?:jar|shelf|bean)\s*#?\s*(?:\d+|one|two|three)\b/i.test(between)
+      && !IDENTITY_HEDGE.test(between);
+  });
+  return qualifyingActions.length > 0 && qualifyingActions.every((action) => negatedReferenceAction(source, action));
+}
+
 function explicitOrdinalReference(value) {
   const actions = [...String(value || '').matchAll(EXPLICIT_REFERENCE_ACTION)];
   const matches = [...String(value || '').matchAll(ORDINAL_GLOBAL)];
@@ -78,7 +103,7 @@ function explicitOrdinalReference(value) {
     // make jar 3") is still conditional. A new clause after a correction
     // ("..., but use jar 1") gets its own explicit reading.
     const clause = String(value || '').slice(Math.max(0, action.index - 48), action.index).split(/[,.!?;]/).at(-1) || '';
-    return !IDENTITY_HEDGE.test(clause);
+    return !IDENTITY_HEDGE.test(clause) && !negatedReferenceAction(value, action);
   })).at(-1);
   return target?.[0] || null;
 }
@@ -226,17 +251,44 @@ function contextualTechniqueReference(userText, coffees, ledger, launchContext, 
   return { reference: coffeeName, current: coffeeName, techniqueSlot: selected.proposal.slotKey, techniqueKind: selected.proposal.techniqueExperiment.kind };
 }
 
+function alternativeUndoCandidates(value, coffees, refs) {
+  if (!UNDO_REFERENCE_WORD.test(value) || !/\b(?:or|either)\b/i.test(value)) return [];
+  const labels = [...String(value || '').matchAll(ORDINAL_GLOBAL)].map((match) => match[0]);
+  if (labels.length < 2) return [];
+  const seen = new Set();
+  return labels.map((label) => resolveCoffeeReference({ reference: label, coffees }))
+    .filter((result) => result?.ok && result.coffee)
+    .map((result) => {
+      const coffeeRef = refForCoffee(result.coffee, refs);
+      const coffeeName = text(result.coffee?.name || result.coffee?.coffeeName);
+      return coffeeRef && coffeeName ? { coffeeRef, coffeeName, coffee: result.coffee } : null;
+    })
+    .filter((item) => item && !seen.has(item.coffeeRef) && seen.add(item.coffeeRef));
+}
+
 function isSupportedReference(userText, coffees, ledger, launchContext, refs, priorTechniqueProposals = []) {
   const value = text(userText).replace(/[.!?]+$/, '').trim();
   const namedReference = exactNameReference(value, coffees);
   if (namedReference) return { reference: namedReference, certainty: referenceCertainty(value, namedReference) };
+  const alternativeCandidates = alternativeUndoCandidates(value, coffees, refs);
+  if (alternativeCandidates.length > 1) return { reference: value, certainty: 'ambiguous', alternativeCandidates };
   const explicitOrdinal = explicitOrdinalReference(value);
   if (explicitOrdinal) return { reference: explicitOrdinal, certainty: 'explicit' };
   if (ORDINAL.test(value)) {
+    const ordinalMatch = value.match(ORDINAL);
+    if (ordinalMatch && protectedOrdinalReference(value, ordinalMatch)) return null;
     const ordinal = value.match(ORDINAL)[0];
     return { reference: ordinal, certainty: referenceCertainty(value, ordinal) };
   }
   if (CURRENT_RECIPE_ACTION.test(value)) {
+    const current = currentName({ coffees, ledger, launchContext, refs });
+    return current ? { reference: 'current coffee', current } : null;
+  }
+  if (CURRENT_UNDO_REFERENCE.test(value)) {
+    const current = currentName({ coffees, ledger, launchContext, refs });
+    return current ? { reference: 'current coffee', current } : null;
+  }
+  if (CURRENT_RETRY_REFERENCE.test(value)) {
     const current = currentName({ coffees, ledger, launchContext, refs });
     return current ? { reference: 'current coffee', current } : null;
   }
@@ -286,6 +338,9 @@ export function bindRuphusTurn({ userText = '', coffees = [], ledger = {}, launc
   const inventory = Array.isArray(coffees) ? coffees : [];
   const supported = isSupportedReference(userText, inventory, ledger, launchContext, refs, priorTechniqueProposals);
   if (!supported) return { status: 'none', ledger, refs: {}, launchHintConsumed: false };
+  if (supported.certainty === 'ambiguous' && Array.isArray(supported.alternativeCandidates)) {
+    return { status: 'ambiguous', candidates: supported.alternativeCandidates, ledger, refs: {}, launchHintConsumed: false };
+  }
   // A launch coffee is an established current reference even before the
   // first evidence read has populated namedCoffees. Seed only the resolver's
   // local input; the authoritative ledger is updated only after a lock.

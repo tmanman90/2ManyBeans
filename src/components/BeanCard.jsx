@@ -5,7 +5,7 @@ import { C, fonts, type, shadows, radius, cardBase, motion as motionTokens } fro
 import { m, cardPress } from '../lib/motion';
 import { getPeakStatus, daysOpen, today, daysBetween, formatDate, lifePct } from '../lib/peakStatus';
 import { EditBeanModal } from './EditBeanModal';
-import { getBrewMethod } from '../lib/brewMethods';
+import { getBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { summarizeSourceInsights } from '../lib/sourceInsights';
 
@@ -50,7 +50,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
     : null;
   const sourceSummary = summarizeSourceInsights(bean, { maxChars: compact ? 120 : 180 });
 
-  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || sourceSummary || grindText || (bean.handBrewRecipe && preferences.brewMethod !== 'aiden');
+  const hasDetails = bean.altitude || bean.region || bean.farm || bean.roastLevel || bean.cupScore || bean.brewingRec || bean.sourcedBy || bean.roastedIn || bean.variety || ps.days !== undefined || dOpen !== null || bean.frozenAt || bean.bagNotes || sourceSummary || grindText || (bean.handBrewRecipe && isManualBrewMethod(preferences.brewMethod));
 
   const photoHeight = compact ? 180 : 240;
 
@@ -378,7 +378,7 @@ export const BeanCard = ({ bean, actions, compact = false, updateBean, deleteBea
                 {sourceSummary && <span><strong style={{ color: C.text }}>Source Insight:</strong> {sourceSummary}</span>}
                 {bean.bagNotes && bean.bagNotes !== '(not logged)' && <span><strong style={{ color: C.text }}>Full Notes:</strong> {bean.bagNotes}</span>}
                 {grindText && <span><strong style={{ color: C.text }}>Grind:</strong> {grindText}</span>}
-                {bean.handBrewRecipe && preferences.brewMethod !== 'aiden' && (
+                {bean.handBrewRecipe && isManualBrewMethod(preferences.brewMethod) && (
                   <span><strong style={{ color: C.text }}>Last Brew:</strong> {bean.handBrewRecipe.method || 'Pour-over'}, {bean.handBrewRecipe.coffeeGrams}g / {bean.handBrewRecipe.waterGrams}g</span>
                 )}
               </div>

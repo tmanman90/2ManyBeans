@@ -96,19 +96,23 @@ test('locked method binding is injected after general setup and rejects another 
   assert.deepEqual(methodBindingTriggers({ reply: 'Use the Aiden recipe instead.', binding: { status: 'locked', slot: 'kalita_hot' } }).map((item) => item.code), ['RT6_METHOD_CONTRADICTION']);
   assert.deepEqual(methodBindingTriggers({ reply: 'For the Kalita, was it thin but clean or sour?', binding: { status: 'locked', slot: 'kalita_hot' } }), []);
 });
-test('tools expose reads, trial review, and proposal but no mutation', async () => {
+test('tools expose reads, trial review, proposal, and narrow espresso mutation', async () => {
   const calls = [];
   const tools = createRuphusTools({ uid: 'u1', context: base, readers: { listCoffees: async () => [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1 }, { id: 'coffee-2', name: 'Rwanda', jarSlot: null }], readCoffee: async ({ coffeeId }) => ({ id: coffeeId, name: coffeeId === 'coffee-2' ? 'Rwanda' : 'El Vergel' }), readRecipe: async ({ slotKey }) => ({ method: 'v60', device: 'v60', mode: 'hot', dose: 15, water: 250, waterTemp: { celsius: 94 }, grindSize: { setting: 4.2 }, slotKey }), readBrews: async () => [], readTastings: async () => [] } });
-  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
+  assert.deepEqual(tools.names, ['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change', 'save_espresso_recipe', 'undo_espresso_recipe']);
   const proposalSchema = tools.definitions.find((definition) => definition.name === 'propose_recipe_change').parameters;
   const changeSchema = proposalSchema.properties.change.anyOf.find((schema) => schema.type === 'object');
   assert.deepEqual(changeSchema.properties.control.enum, ['dose', 'water', 'grind', 'temperature', 'ratio']);
   assert.deepEqual(proposalSchema.properties.servingDoseGrams.anyOf, [{ type: 'number' }, { type: 'null' }]);
   assert.ok(proposalSchema.required.includes('servingDoseGrams'));
   assert.equal(Object.hasOwn(proposalSchema.properties, 'afterRecipe'), false);
-  assert.deepEqual(proposalSchema.properties.explanation.anyOf, [{ type: 'string' }, { type: 'null' }]);
+  const explanationSchema = proposalSchema.properties.explanation;
+  assert.equal(explanationSchema.anyOf.length, 2);
+  assert.equal(explanationSchema.anyOf[0].type, 'string');
+  assert.equal(explanationSchema.anyOf[0].maxLength, 280);
+  assert.equal(explanationSchema.anyOf[1].type, 'null');
   assert.ok(proposalSchema.required.includes('explanation'));
-  assert.deepEqual(tools.definitions.find((definition) => definition.name === 'read_recipe').parameters.properties.slot.enum, ['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
+  assert.deepEqual(tools.definitions.find((definition) => definition.name === 'read_recipe').parameters.properties.slot.enum, ['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced', 'espresso']);
   const assertStrictSchema = (schema) => {
     if (schema?.type === 'array') {
       assert.ok(schema.items, 'every provider array schema must declare items');
@@ -748,6 +752,59 @@ test('already matching recipe values produce information without a corrective pr
   });
   assert.equal(result.ok, true);
   assert.equal(calls, 2);
+  assert.deepEqual(result.artifacts, []);
+});
+
+test('a trusted no-change result can complete after one bounded proposal repair', async () => {
+  const context = { ...structuredClone(base), conversation: [],
+    __ruphusResolvedTargets: new Map([['c1:kalita_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0; let proposalCalls = 0;
+  const proposalArgs = { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'temperature', value: 96.1 } };
+  const result = await runRuphusTurn({ turnId: 'no-change-after-repair', context, userText: 'Use 205 F', emit: () => {},
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async (name, args) => {
+      assert.equal(name, 'propose_recipe_change');
+      assert.deepEqual({ coffeeRef: args.coffeeRef, slot: args.slot }, { coffeeRef: 'c1', slot: 'kalita_hot' });
+      proposalCalls += 1;
+      return proposalCalls === 1
+        ? { ok: false, code: 'invalid_proposal', message: 'The first proposal needs one bounded repair.' }
+        : { ok: false, code: 'no_recipe_change', message: 'That is already the current recipe.' };
+    } },
+    provider: { async runTurn(input) {
+      providerCalls += 1;
+      if (providerCalls <= 2) return { toolCalls: [{ callId: `same-temperature-${providerCalls}`, name: 'propose_recipe_change', args: proposalArgs }] };
+      assert.deepEqual(input.tools, []);
+      return { text: 'The requested temperature already matches the current recipe. Your saved recipe is unchanged.', envelope: { intent: 'information', state: 'answered', text: 'The requested temperature already matches the current recipe. Your saved recipe is unchanged.', coffeeRef: 'c1', slot: 'kalita_hot' } };
+    } },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(providerCalls, 3);
+  assert.equal(proposalCalls, 2);
+  assert.deepEqual(result.artifacts, []);
+});
+
+test('no-change recovery does not accept an unrelated final envelope', async () => {
+  const context = { ...structuredClone(base), conversation: [],
+    __ruphusResolvedTargets: new Map([['c1:kalita_hot', { coffeeRef: 'c1', coffeeId: 'coffee-1', sourceHash: 'hash' }]]),
+    proposalState: { target: { coffeeRef: 'c1', slot: 'kalita_hot' }, previewReady: true, proposalIssued: false },
+  };
+  let providerCalls = 0; let proposalCalls = 0;
+  const proposalArgs = { coffeeRef: 'c1', slot: 'kalita_hot', intent: 'recipe_preview', change: { control: 'temperature', value: 96.1 } };
+  const result = await runRuphusTurn({ turnId: 'no-change-unrelated-envelope', context, userText: 'Use 205 F', emit: () => {},
+    tools: { names: ['propose_recipe_change'], definitions: [{ name: 'propose_recipe_change' }], call: async () => {
+      proposalCalls += 1;
+      return proposalCalls === 1 ? { ok: false, code: 'invalid_proposal' } : { ok: false, code: 'no_recipe_change' };
+    } },
+    provider: { async runTurn() {
+      providerCalls += 1;
+      if (providerCalls <= 2) return { toolCalls: [{ callId: `proposal-${providerCalls}`, name: 'propose_recipe_change', args: proposalArgs }] };
+      return { text: 'The requested value already matches another recipe.', envelope: { intent: 'information', state: 'answered', text: 'The requested value already matches another recipe.', coffeeRef: 'c2', slot: 'kalita_hot' } };
+    } },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'proposal_failed');
+  assert.equal(providerCalls, 3);
   assert.deepEqual(result.artifacts, []);
 });
 

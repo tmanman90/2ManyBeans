@@ -10,6 +10,8 @@ import { haptic } from '../lib/haptics';
 import { Toast } from './Toast';
 import { usePreferences } from '../hooks/useUserProfile';
 import { BREW_DEVICES } from '../lib/brewMethods';
+import { espressoSetupDescription } from '../lib/espressoRecipes';
+import { EspressoEquipmentEditor } from './EspressoEquipmentEditor';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { usePaywall } from '../hooks/usePaywall.jsx';
@@ -167,6 +169,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
   const { openPaywall } = usePaywall();
 
   const [toast, setToast] = useState(null);
+  const [editingEspressoEquipment, setEditingEspressoEquipment] = useState(false);
   const [editingDisplayName, setEditingDisplayName] = useState(false);
   const [displayNameValue, setDisplayNameValue] = useState('');
   const [editingUsername, setEditingUsername] = useState(false);
@@ -888,7 +891,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
             <div style={separatorStyle} />
             {/* Brew Method */}
             <div style={rowStyle}>
-              <span style={rowLabelStyle}>Brew Method</span>
+              <span style={rowLabelStyle}>Default brew method</span>
               <div style={rowValueStyle}>
                 <select
                   value={preferences.brewMethod}
@@ -896,6 +899,7 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                   style={selectStyle}
                 >
                   <option value="aiden">Aiden Brew</option>
+                  <option value="espresso">Espresso</option>
                   {BREW_DEVICES.map(d => (
                     <option key={d.key} value={d.key}>{d.label}</option>
                   ))}
@@ -903,6 +907,26 @@ export const SettingsPage = ({ open, onClose, profile, updateProfile, uid, beans
                 <ChevronRight size={16} color={C.textLight} />
               </div>
             </div>
+            <div style={separatorStyle} />
+            <div style={{ ...sectionHeaderStyle, padding: '12px 16px 6px' }}>Espresso equipment</div>
+            {editingEspressoEquipment ? (
+              <div style={{ padding: '12px 16px 18px' }}>
+                <EspressoEquipmentEditor
+                  onCancel={() => setEditingEspressoEquipment(false)}
+                  onSaved={() => { setEditingEspressoEquipment(false); setToast('Espresso equipment saved'); }}
+                />
+              </div>
+            ) : (
+              <button type="button" aria-label="Edit espresso equipment" onClick={() => setEditingEspressoEquipment(true)} style={{ ...rowStyle, width: '100%', border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left', minHeight: 64 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={rowLabelStyle}>{preferences.espressoMachine ? 'Your espresso setup' : 'Add your machine'}</div>
+                  <div style={{ ...typeScale.caption, color: C.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                    {preferences.espressoMachine ? espressoSetupDescription(preferences) : 'Optional · tailor your espresso recipes'}
+                  </div>
+                </div>
+                <ChevronRight size={18} color={C.accent} style={{ flexShrink: 0 }} />
+              </button>
+            )}
             <div style={separatorStyle} />
             {/* Grind Size Display */}
             <div style={rowStyle}>

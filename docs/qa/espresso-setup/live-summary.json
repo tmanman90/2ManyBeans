@@ -1,0 +1,70 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "caseId": "G01",
+      "receipt": "live-G01-1791917751337-receipt.json",
+      "status": "passed",
+      "turns": 1,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917746301-manifest.json"
+    },
+    {
+      "caseId": "G02",
+      "receipt": "live-G02-1791917798671-receipt.json",
+      "status": "passed",
+      "turns": 3,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917792141-manifest.json"
+    },
+    {
+      "caseId": "G03",
+      "receipt": "live-G03-1791917828316-receipt.json",
+      "status": "passed",
+      "turns": 1,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917821584-manifest.json"
+    },
+    {
+      "caseId": "G04",
+      "receipt": "live-G04-1791917841701-receipt.json",
+      "status": "passed",
+      "turns": 2,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917836138-manifest.json"
+    },
+    {
+      "caseId": "G05",
+      "receipt": "live-G05-1791917873676-receipt.json",
+      "status": "passed",
+      "turns": 1,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917868631-manifest.json"
+    },
+    {
+      "caseId": "G06",
+      "receipt": "live-G06-1791917887324-receipt.json",
+      "status": "passed",
+      "turns": 1,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917881398-manifest.json"
+    },
+    {
+      "caseId": "G07",
+      "receipt": "live-G07-1791917900094-receipt.json",
+      "status": "passed",
+      "turns": 2,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917895244-manifest.json"
+    },
+    {
+      "caseId": "G08",
+      "receipt": "live-G08-1791917915201-receipt.json",
+      "status": "passed",
+      "turns": 1,
+      "semanticCheck": "Main-agent review of all returned texts against fixed pre-run oracle; correct method, mass, grinder, read-only advice, Save and Undo; no invented controls",
+      "sourceManifest": "live-generic-1791917910293-manifest.json"
+    }
+  ],
+  "scope": "Actual configured provider and authenticated emulator endpoint, not hosted/device inference"
+}

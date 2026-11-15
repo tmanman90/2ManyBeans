@@ -1,6 +1,7 @@
 // Brew method registry — strategy pattern per Architecture Strategist recommendation
 // Each tab renders method.label based on the user's preference.
 // Adding a new brew method requires one entry here, not editing three tabs.
+import { isSupportedEspressoSetup as isSupportedEspressoRecipeSetup } from './espressoRecipes.js';
 
 // App notation for the Ode's 31 physical positions: whole, first tick (.2),
 // second tick (.6). These labels are not decimal fractions of a dial interval.
@@ -45,6 +46,43 @@ export const GRINDER_LABELS = {
   'comandante-c40': 'Comandante C40',
   '1zpresso-jx-pro': 'JX-Pro',
   'baratza-virtuoso-plus': 'Virtuoso+',
+};
+
+// Espresso equipment is kept separate from the pour-over/immersion grinder
+// preference.  The Barista Express is the first verified preset; the
+// independent fields let a user keep their existing V60 grinder while using
+// either the machine's integrated grinder or a separately named grinder for
+// espresso.
+export const ESPRESSO_MACHINES = [
+  { key: 'unknown', label: 'Not sure' },
+  { key: 'breville-barista-express', label: 'Breville Barista Express' },
+  { key: 'other', label: 'Other espresso machine' },
+];
+
+export const ESPRESSO_BASKETS = [
+  { key: 'unknown', label: 'Not sure', supported: false },
+  { key: 'stock-double-single-wall', label: 'Stock double · single-wall', supported: true },
+  { key: 'dual-wall', label: 'Dual-wall basket', supported: false },
+  { key: 'different', label: "I'm using a different basket", supported: false },
+];
+
+export const ESPRESSO_GRINDERS = [
+  { key: 'unknown', label: 'Not sure' },
+  { key: 'integrated', label: 'Built-in grinder' },
+  { key: 'preground', label: 'Preground coffee' },
+  { key: 'external', label: 'External grinder' },
+  { key: 'custom', label: 'Custom grinder' },
+];
+
+export const DEFAULT_ESPRESSO_SETUP = {
+  espressoMachine: null,
+  espressoBasket: null,
+  espressoGrinder: null,
+  espressoMachineName: null,
+  espressoBasketDoseGrams: null,
+  espressoGrinderModel: null,
+  espressoGrinderCustomName: null,
+  espressoSetupConfirmed: false,
 };
 
 // Grinder micron scales — THE single source of truth for setting↔micron math.
@@ -231,6 +269,16 @@ export const BREW_METHODS = {
     category: 'immersion',
     grindLabel: handBrewGrindLabel,
   },
+  espresso: {
+    label: 'Espresso Recipe',
+    // Entry points use the shared Coffee/Droplets icon strategy; no
+    // espresso-specific raster asset exists in this release.
+    icon: null,
+    category: 'espresso',
+    // Espresso targets use their own schema and must never render a
+    // pour-over/Aiden grind value in this shared bean-card helper.
+    grindLabel: () => null,
+  },
 };
 
 // Deprecated alias — existing users with 'handbrew' preference get V60 behavior
@@ -238,14 +286,31 @@ BREW_METHODS.handbrew = BREW_METHODS.v60;
 
 // Derive BREW_DEVICES from BREW_METHODS (all non-aiden entries)
 export const BREW_DEVICES = Object.entries(BREW_METHODS)
-  .filter(([key]) => key !== 'aiden' && key !== 'handbrew')
+  .filter(([key, val]) => key !== 'aiden' && key !== 'handbrew' && val.category !== 'espresso')
   .map(([key, val]) => ({ key, label: val.label.replace(' Recipe', '') }));
 
 // Helper: get the active brew method config
 export const getBrewMethod = (brewMethodKey) => BREW_METHODS[brewMethodKey] || BREW_METHODS.aiden;
 
 // Helper: check if a brew method key is a manual (non-aiden) method
-export const isManualBrewMethod = (key) => key !== 'aiden' && BREW_METHODS[key];
+export const isManualBrewMethod = (key) => (
+  key !== 'aiden' && key !== 'espresso' && Boolean(BREW_METHODS[key])
+);
+
+export const isEspressoBrewMethod = (key) => key === 'espresso';
+
+export const isSupportedEspressoSetup = isSupportedEspressoRecipeSetup;
+
+export const changesEspressoEquipmentIdentity = (key) => (
+  ['espressoMachine', 'espressoMachineName', 'espressoBasketDoseGrams', 'espressoBasket', 'espressoGrinder', 'espressoGrinderModel', 'espressoGrinderCustomName'].includes(key)
+);
+
+// Archived bean cards show the recipe that was actually saved with the bean.
+// This is independent of the user's current brew preference, which may have
+// changed since the recipe was created.
+export const hasSavedBrewProfile = ({ showBrewProfile, aidenRecipe, handBrewRecipe, espressoRecipe } = {}) => (
+  showBrewProfile === true && Boolean(aidenRecipe || handBrewRecipe || espressoRecipe)
+);
 
 // Normalize recipe step times for the BrewTimer contract: parse each step's
 // time into strictly ascending timeSeconds. Models often emit two steps at

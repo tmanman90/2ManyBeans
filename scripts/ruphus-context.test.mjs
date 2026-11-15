@@ -30,6 +30,27 @@ test('context accepts direct and typed launch clues without preloading record-sh
   const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'What should I brew?', evidenceByteCap: 10000, readers: { listCoffees: async ({ uid }) => { owners.push(uid); return [{ id: 'coffee-1', name: 'El Vergel', jarSlot: 1, status: 'ACTIVE', recipes: ['v60_hot'] }]; }, readSetup: async () => ({ defaultMethod: 'v60_hot', grinder: 'Ode 4.2', units: 'metric' }) } });
   assert.deepEqual(owners, ['u1']); assert.equal(context.launchContext.surface, 'direct'); assert.equal(context.launchCoffeeId, null); assert.match(context.rotationSnapshot.text, /El Vergel/); assert.equal(context.recipe, undefined);
 });
+test('failed espresso retry wording inherits the authenticated current coffee and method', async () => {
+  const context = await buildRuphusContext({
+    uid: 'u1',
+    contextRef: { surface: 'direct', coffeeRef: 'coffee-1' },
+    userText: "didn't work? try again pls",
+    ledger: {
+      entries: [
+        { kind: 'coffee_focus', status: 'available', namedCoffees: ['Cocoa Garden'] },
+        { kind: 'method_focus', status: 'available', namedCoffees: ['Cocoa Garden'], methodFocus: { displayName: 'espresso' } },
+      ],
+    },
+    evidenceByteCap: 10000,
+    readers: {
+      listCoffees: async () => [{ id: 'coffee-1', name: 'Cocoa Garden', jarSlot: 1, status: 'ACTIVE' }],
+      readSetup: async () => ({ defaultMethod: 'espresso', espressoMachine: 'breville-barista-express', espressoBasket: 'stock-double-single-wall', espressoGrinder: 'integrated', espressoSetupConfirmed: true }),
+    },
+  });
+  assert.equal(context.turnBinding.status, 'locked');
+  assert.equal(context.turnBinding.coffeeName, 'Cocoa Garden');
+  assert.equal(context.methodBinding.slot, 'espresso');
+});
 test('history compaction reserves the latest exchange ahead of older UTF-8 memory', async () => {
   const conversation = [{ role: 'user', content: 'I used the Kalita.' }, { role: 'assistant', content: 'Reduce water by 10 g.' }];
   const ledger = { entries: Array.from({ length: 4 }, () => ({ kind: 'tastings', status: 'available', summary: '☕'.repeat(220) })) };

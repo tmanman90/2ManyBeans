@@ -1,7 +1,7 @@
-const RECORDED_SLOTS = new Set(['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced']);
+const RECORDED_SLOTS = new Set(['aiden', 'v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced', 'espresso']);
 
 export function resolveTastingLaunchMethod(tasting = {}) {
-  const recordedSlot = [tasting.agentProvenance?.slotKey, tasting.provenance?.slotKey, tasting.brewAttempt?.slotKey, tasting.slotKey]
+  const recordedSlot = [tasting.cupContext?.method, tasting.agentProvenance?.slotKey, tasting.provenance?.slotKey, tasting.brewAttempt?.slotKey, tasting.slotKey]
     .map(value => String(value || '').trim().toLowerCase())
     .find(value => RECORDED_SLOTS.has(value));
   if (recordedSlot) return recordedSlot;

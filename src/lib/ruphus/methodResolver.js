@@ -1,6 +1,6 @@
 import { SLOT_KEYS } from './contracts.js';
 
-const DISPLAY = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' });
+const DISPLAY = Object.freeze({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita', espresso: 'espresso' });
 const slot = (value) => {
   const valueText = String(value || '').toLowerCase().replace(/\s+/g, '_');
   if (SLOT_KEYS.includes(valueText)) return valueText;
@@ -19,13 +19,13 @@ const recent = (record, now, days) => {
   return !Number.isFinite(now) || now - date <= days * 86400000;
 };
 const explicitMode = (text) => /\biced\b|\bcold\b/i.test(String(text || '')) ? 'iced' : /\bhot\b/i.test(String(text || '')) ? 'hot' : null;
-const applyMode = (value, mode) => value === 'aiden' || !mode || !value ? value : `${value.split('_')[0]}_${mode}`;
+const applyMode = (value, mode) => value === 'aiden' || value === 'espresso' || !mode || !value ? value : `${value.split('_')[0]}_${mode}`;
 const recordTime = (record) => {
   const value = Date.parse(record?.date || record?.createdAt || record?.updatedAt || record?.lastBrewDate || '');
   return Number.isFinite(value) ? value : -Infinity;
 };
 
-const METHOD_MENTION = /\b(?:(hot|iced)\s+)?(aiden|v\s*60|kalita)(?:\s+(?:155|185))?\b/gi;
+const METHOD_MENTION = /\b(?:(hot|iced)\s+)?(aiden|espresso|v\s*60|kalita)(?:\s+(?:155|185))?\b/gi;
 // Switch is a V60 variant, not a standalone recipe slot. Require equipment
 // grammar so the verb in “switch to Jar 2” cannot bind the current coffee to
 // a Switch recipe. The exact variant is enforced later against the saved
@@ -34,13 +34,19 @@ const SWITCH_EQUIPMENT_MENTION = /\b(?:switch(?:\s+0?[23])?\s+(?:the\s+)?(?:tech
 // Only treat a method mention as negated when the short bridge after the
 // negator is method-grammar. Sensory clauses such as “not sour with the hot
 // Kalita” must leave Kalita as the explicit method.
-const NEGATED_METHOD_PREFIX = /\b(?:not|never|no|didn't|did\s+not|wasn't|was\s+not|isn't|is\s+not|don't|do\s+not|without)\b(?:\s+(?:the|a|an|my|your|this|that|it|use|used|brew|brewed|make|made|choose|pick|on|with|instead|rather|than|for|to|did|do)){0,5}\s*$/i;
+const NEGATED_METHOD_PREFIX = /\b(?:not|never|no|didn['’]t|did\s+not|wasn['’]t|was\s+not|isn['’]t|is\s+not|don['’]t|do\s+not|without)\b(?:\s+(?:the|a|an|my|your|this|that|it|use|used|brew|brewed|make|made|choose|pick|on|with|instead|rather|than|for|to|did|do)){0,5}\s*$/i;
+const NEGATED_RECIPE_METHOD_PREFIX = /\b(?:don['’]t|do\s+not|never|cannot|can['’]t|shouldn['’]t|wouldn['’]t|didn['’]t|did\s+not)\b[^.!?,;]*(?:change|changing|save|apply|update|keep|leave|touch)\b[^.!?,;]*$/i;
+
+const negatedMethodPrefix = (prefix) => {
+  const clause = String(prefix || '').split(/[.!?,;]|\b(?:but|however|instead|rather than)\b/i).at(-1) || '';
+  return NEGATED_METHOD_PREFIX.test(clause) || NEGATED_RECIPE_METHOD_PREFIX.test(clause);
+};
 
 function positiveSwitchMentions(value) {
   const source = String(value || '');
   return [...source.matchAll(SWITCH_EQUIPMENT_MENTION)].filter((match) => {
     const prefix = source.slice(Math.max(0, match.index - 64), match.index);
-    return !NEGATED_METHOD_PREFIX.test(prefix);
+    return !negatedMethodPrefix(prefix);
   });
 }
 
@@ -79,7 +85,7 @@ export function explicitMethodFromText(value) {
   const positive = [];
   for (const match of source.matchAll(METHOD_MENTION)) {
     const prefix = source.slice(Math.max(0, match.index - 64), match.index);
-    if (NEGATED_METHOD_PREFIX.test(prefix)) continue;
+    if (negatedMethodPrefix(prefix)) continue;
     const resolved = slot(`${match[1] ? `${match[1]} ` : ''}${match[2]}`);
     if (resolved && !positive.includes(resolved)) positive.push(resolved);
   }

@@ -9,7 +9,7 @@ export const RUPHUS_RESPONSE_SCHEMA = Object.freeze({
   type: 'object',
   additionalProperties: false,
   properties: {
-    intent: { type: 'string', enum: ['information', 'recipe_preview'], description: 'Classify the user’s current task in conversation: recipe_preview for a recipe to use or an edit to the active recipe, including dose/equipment follow-ups; information for explanation/comparison alone. A failed recipe request remains recipe_preview with blocked or clarification state, never information just because no card was produced.' },
+    intent: { type: 'string', enum: ['information', 'recipe_preview'], description: 'Classify the user’s current task in conversation: recipe_preview for an explicit recipe to use or an edit to the active recipe, including concrete dose/equipment follow-ups; information for explanation/comparison and a bare bean or brewer focus switch that requests no recipe, card, brew, technique, or control change. A failed explicit recipe request remains recipe_preview with blocked or clarification state, never information just because no card was produced.' },
     state: { type: 'string', enum: ['answered', 'clarification', 'blocked'] },
     text: { type: 'string' },
     coffeeRef: { anyOf: [{ type: 'string' }, { type: 'null' }] },

@@ -30,6 +30,7 @@ import { usePaywall } from './usePaywall.jsx';
 import { createKeyedLatestWriteQueue } from '../lib/latestWriteQueue';
 import { canUseCachedHotRecipe, kalitaDefaultDose, v60SwitchDefaultDose, resolveIcedRetryConfiguration } from '../lib/handBrewCachePolicy';
 import { hydrateSavedSourceDose, previewSavedSourceDose, savedSourceDosePersistence } from '../lib/savedSourceDose';
+import { isManualBrewMethod } from '../lib/brewMethods';
 
 export function useHandBrew(updateBean, saveHandBrewTiming) {
   const mountedRef = useRef(true);
@@ -204,6 +205,10 @@ export function useHandBrew(updateBean, saveHandBrewTiming) {
     }
     requestedFingerprintRef.current = null;
     const device = deviceOverride || getBrewDevice();
+    // Espresso has its own recipe contract. Never let an explicit espresso
+    // selection enter the hand-brew legacy fallback (which would otherwise
+    // produce a V60-shaped request or recipe).
+    if (!isManualBrewMethod(device)) return;
     const requestResearch = cachedResearch || bean.beanResearch || null;
     // Replace, rather than retain, per-bean research before any cache path can
     // return. A later dose change must never regenerate Bean B with Bean A's

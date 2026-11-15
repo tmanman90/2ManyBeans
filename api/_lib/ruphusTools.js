@@ -33,6 +33,16 @@ import { KALITA_ICED_RULES } from '../../src/data/kalitaIcedSourceRegistry.js';
 import { manualSourceGrindGuidance } from '../../src/lib/manualSourceProjection.js';
 import { normalizeRecipeEvidence } from '../../src/lib/recipeEvidence.js';
 import { buildExtractionIntent } from '../../src/lib/extractionIntent.js';
+import { espressoRecipeFingerprint, editEspressoRecipe, resolveEspressoRecipe, validateEspressoRecipe, espressoSetupKey } from '../../src/lib/espressoRecipes.js';
+
+// Keep the command service out of the eager tools import graph. The command
+// service imports rollout gates, which import the tool-name registry; loading
+// it lazily preserves that existing boundary while still using the real
+// authenticated transaction path for espresso mutations.
+const executeRecipeCommand = async (input) => {
+  const module = await import('./ruphusCommandService.js');
+  return module.executeRecipeCommand(input);
+};
 
 function sourceGrinderGuidance(recipe, setup) {
   if (!hasManualSourceProjection(recipe)) {
@@ -70,7 +80,34 @@ function sourceGrindControl(recipe, value, setup) {
 }
 
 export const RUPHUS_READ_TOOL_NAMES = Object.freeze(['resolve_coffee', 'read_coffee_evidence', 'read_recipe', 'read_technique_options', 'review_trial_recipe', 'propose_recipe_change']);
+export const RUPHUS_ESPRESSO_TOOL_NAMES = Object.freeze(['save_espresso_recipe', 'undo_espresso_recipe']);
 export const RUPHUS_FORBIDDEN_TOOL_NAMES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'complete_attempt', 'prepare_attempt', 'undo_revision', 'promote_attempt', 'create_receipt', 'fellow_prepare', 'claim_physical_success']);
+const ESPRESSO_RETRY_TTL_MS = 10 * 60 * 1000;
+const RETRYABLE_ESPRESSO_FAILURES = new Set(['injected_persistence_failure', 'aborted', 'unavailable', 'deadline-exceeded', 'internal']);
+export function isExplicitEspressoRetryRequest(value = '') {
+  const text = String(value || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  const suffix = '(?:please|pls)?[.!?]*';
+  const action = '(?:(?:save|saving|apply|applying|update|updating)\\s+)?';
+  const target = '(?:(?:(?:it|that|this)\\s+)?(?:again|once more)|(?:it|that|this))';
+  return new RegExp(`^(?:(?:(?:it|that|this)\\s+)?didn['’]?t\\s+work[?!.,;\\s]*(?:please|pls)?[?!.,;\\s]*)?(?:try|retry)\\s+${action}${target}\\s*${suffix}$`, 'i').test(text)
+    || new RegExp(`^(?:please|pls)\\s+(?:try|retry)\\s+${action}${target}\\s*${suffix}$`, 'i').test(text)
+    || /^(?:(?:please|pls)\s+)?retry\s+(?:that|this|the)\s+save\s*[.!?]*$/i.test(text);
+}
+
+export function isExplicitEspressoUndoRequest(value = '') {
+  const text = String(value || '').replace(/[‘’]/g, "'").trim();
+  if (!text) return false;
+  const undoPhrase = '(?:undo|revert|reverse|put\\s+(?:it|that)\\s+back|back\\s+how\\s+it\\s+was|take\\s+(?:it|that)\\s+back)';
+  if (new RegExp(`\\b(?:don't|do\\s+not|never|without|no|not)\\b[\\s\\S]{0,40}\\b${undoPhrase}\\b`, 'i').test(text)) return false;
+  if (/\b(?:if|whether|unless|or)\b/i.test(text)) return false;
+  const directPatterns = [
+    new RegExp(`^\\s*(?:(?:nah|please)\\s+)*${undoPhrase}\\b`, 'i'),
+    new RegExp(`^\\s*(?:can|could|would)\\s+you\\s+(?:please\\s+)?${undoPhrase}\\b`, 'i'),
+    new RegExp(`\\bplease\\s+${undoPhrase}\\b`, 'i'),
+  ];
+  return directPatterns.some((pattern) => pattern.test(text));
+}
 const nullable = (schema) => ({ anyOf: [schema, { type: 'null' }] });
 const strictObject = (properties) => ({ type: 'object', properties: Object.fromEntries(Object.entries(properties).map(([key, schema]) => [key, nullable(schema)])), required: Object.keys(properties), additionalProperties: false });
 const RECIPE_STEP = strictObject({ time: { type: 'string' }, timeSeconds: { type: 'number' }, action: { type: 'string' }, waterTotal: { type: 'number' }, name: { type: 'string' }, phase: { type: 'string' }, untimed: { type: 'boolean' } });
@@ -109,7 +146,7 @@ const cleanInventory = (coffee) => Object.fromEntries(['refKey', ...AIDEN_BEAN_C
   .filter((key) => Object.hasOwn(coffee || {}, key))
   .map((key) => [key, key === 'jarSlot' ? coffee[key] : clone(coffee[key])]));
 const isCurrentCoffeeReference = (value) => /^(?:this|current)(?:\s+(?:coffee|bean|one))?$/i.test(String(value || '').trim());
-const displaySlot = (slot) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita' }[slot] || slot);
+const displaySlot = (slot) => ({ aiden: 'Aiden', v60_hot: 'hot V60', v60_iced: 'iced V60', kalita_hot: 'hot Kalita', kalita_iced: 'iced Kalita', espresso: 'espresso' }[slot] || slot);
 const detailedMethodDisplay = (value) => /^(?:hot|iced) Switch (?:02|03)$/.test(String(value || '').trim())
   || /^(?:hot|iced) Kalita (?:155|185)$/.test(String(value || '').trim());
 const methodBindingCarriesIdentity = (value) => detailedMethodDisplay(value)
@@ -655,6 +692,11 @@ function modelRecipe(recipe) {
   if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
   const result = {};
   for (const key of Object.keys(RECIPE_PROPERTIES)) if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
+  if (recipe.slotKey === 'espresso' || recipe.method === 'espresso') {
+    for (const key of ['schemaVersion', 'engine', 'slotKey', 'coffeeId', 'setup', 'setupKey', 'setupDescription', 'recipeKind', 'doseBasis', 'doseGrams', 'yieldGrams', 'ratio', 'timeRangeSeconds', 'timeBasis', 'grindGuidance', 'grinderSetting', 'temperature', 'preparation', 'roastLevel', 'source', 'provenance', 'originalProvenance', 'userAdjustedFields', 'fingerprint']) {
+      if (Object.hasOwn(recipe, key)) result[key] = clone(recipe[key]);
+    }
+  }
   if (recipe.method === 'aiden' || recipe.device === 'aiden' || recipe.slotKey === 'aiden') Object.assign(result, clone(toAidenProfile(recipe)));
   return result;
 }
@@ -1084,9 +1126,17 @@ function techniqueReadinessMatches(context, { coffeeRef, slotKey, target = null,
     && (!target?.sourceHash || !ready.sourceHash || ready.sourceHash === target.sourceHash));
 }
 
-export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true, proposalActions = [] } = {}) {
+export function createRuphusTools({ uid, context, readers = {}, proposalStore, canPropose = true, proposalActions = [], db = null } = {}) {
   if (!uid || !context) throw new Error('tools require owner and context');
   if (!(context.__ruphusResolvedTargets instanceof Map)) Object.defineProperty(context, '__ruphusResolvedTargets', { value: new Map(), enumerable: false, writable: true, configurable: true });
+  if (!(context.__ruphusEspressoOperations instanceof Map)) Object.defineProperty(context, '__ruphusEspressoOperations', { value: new Map(), enumerable: false, writable: true, configurable: true });
+  if (!(context.__ruphusEspressoReceipts instanceof Map)) Object.defineProperty(context, '__ruphusEspressoReceipts', { value: new Map(), enumerable: false, writable: true, configurable: true });
+  for (const receipt of Array.isArray(context.__ruphusPriorEspressoReceipts) ? context.__ruphusPriorEspressoReceipts : []) {
+    const setupKey = receipt?.setupKey || receipt?.recipe?.setupKey || null;
+    if (receipt?.coffeeId && receipt?.revisionId && setupKey) {
+      context.__ruphusEspressoReceipts.set(`${receipt.coffeeId}:${setupKey}`, { ...receipt, setupKey });
+    }
+  }
   const brewBaselines = new Map();
   const rememberBrews = (evidence, coffeeRef, slotKey) => {
     const rows = (evidence.brews?.projectedRecords || evidence.brews?.records || [])
@@ -1128,10 +1178,10 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const coffees = typeof readers.listCoffees === 'function' ? await readers.listCoffees({ uid }) : snapshot.coffees || [];
     return Array.isArray(coffees) ? coffees : [];
   };
-  const readRecipe = async (coffeeId, slotKey, coffeeRef) => {
+  const readRecipe = async (coffeeId, slotKey, coffeeRef, { historical = slotKey !== 'espresso' } = {}) => {
     if (!SLOT_KEYS.includes(slotKey)) return null;
     const item = context.__ruphusLaunchContext?.launchItem;
-    const launchItem = context.launchCoffeeId === coffeeRef
+    const launchItem = historical && context.launchCoffeeId === coffeeRef
       && item?.kind === 'recipe'
       && item.method === slotKey
       ? item
@@ -1142,6 +1192,11 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       // an absent slot. Convert the reader's private validity annotation into
       // a safe tool marker so it cannot become a proposal target.
       if (recipe?.validationStatus === 'invalid') return { code: 'recipe_invalid', slotKey, sourceState: 'present' };
+      if (slotKey === 'espresso' && recipe?.code === 'recipe_missing' && typeof readers.readCoffee === 'function') {
+        const bean = await readers.readCoffee({ uid, coffeeId });
+        const resolved = bean ? resolveEspressoRecipe({ bean, setup: snapshot.setup || {} }) : null;
+        if (resolved?.ok) return { ...resolved.recipe, ...(resolved.setupMismatch ? { setupMismatch: true, previousRecipe: resolved.previousRecipe } : {}) };
+      }
       return recipe;
     }
     return null;
@@ -1155,8 +1210,178 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     const evidence = normalizeRecipeEvidence(bean, bean.beanResearch || null);
     return { evidence, intent: buildExtractionIntent(evidence) };
   };
+  const espressoRecipeForCommand = (recipe) => {
+    const next = clone(recipe || {});
+    // Reader provenance paths are authority metadata, not editable recipe
+    // fields. The command service validates the resulting canonical snapshot.
+    delete next.selectedPath;
+    delete next.selectedHash;
+    delete next.validationStatus;
+    delete next.setupMismatch;
+    delete next.previousRecipe;
+    return next;
+  };
+  // This is model-facing status only; the undo command still rechecks owner,
+  // setup, and active revision inside the command transaction.  Expose the
+  // status only when the live recipe is the exact recipe in an authenticated
+  // current-session receipt, so a stale launch recipe can never advertise an
+  // undo path.
+  const currentEspressoUndoReceipt = async (coffeeId, recipe) => {
+    if (!recipe || recipe.code || recipe.slotKey !== 'espresso') return null;
+    const setupKey = recipe.setupKey || espressoSetupKey(recipe.setup || {});
+    if (!setupKey || !(context.__ruphusEspressoReceipts instanceof Map)) return null;
+    const coffee = typeof readers.readCoffee === 'function'
+      ? await readers.readCoffee({ uid, coffeeId })
+      : snapshot.coffees?.find((item) => item.id === coffeeId) || null;
+    const activeRevisionId = coffee?.activeRevisionIds?.espresso || null;
+    if (!activeRevisionId) return null;
+    const current = espressoRecipeForCommand(recipe);
+    return [...context.__ruphusEspressoReceipts.values()].reverse().find((receipt) =>
+      receipt?.status === 'succeeded'
+      && receipt?.undoAvailable !== false
+      && receipt?.coffeeId === coffeeId
+      && receipt?.setupKey === setupKey
+      && receipt?.revisionId === activeRevisionId
+      && receipt?.recipe
+      && espressoRecipeFingerprint(espressoRecipeForCommand(receipt.recipe)) === espressoRecipeFingerprint(current)) || null;
+  };
+  // The authenticated turn ID gives one deterministic operation namespace per
+  // request. Cross-turn response loss is recovered from the persisted receipt;
+  // the command service still rejects a same-turn input mismatch.
+  const espressoActionId = (mode, coffeeId, payload = {}) => `ruphus_espresso_${canonicalHash({
+    uid,
+    sessionId: context.sessionId || 'agent-session',
+    mode,
+    coffeeId,
+    payload: payload?.recipe
+      ? { ...payload, recipe: undefined, recipeFingerprint: espressoRecipeFingerprint(payload.recipe) }
+      : payload,
+  })}`;
+  const existingEspressoOperation = ({ mode, coffeeId, setupKey, recipe = null, expectedRevisionId = null, expectedRevisionHash = null, receiptId = null } = {}) => [...context.__ruphusEspressoOperations.values()].reverse().find((operation) =>
+    operation?.mode === mode
+    && operation?.coffeeId === coffeeId
+    && operation?.slotKey === 'espresso'
+    && (!setupKey || operation?.recipe?.setupKey === setupKey || operation?.setupKey === setupKey)
+    && (recipe == null || espressoRecipeFingerprint(espressoRecipeForCommand(operation.recipe)) === espressoRecipeFingerprint(espressoRecipeForCommand(recipe)))
+    && (expectedRevisionId == null ? operation?.expectedRevisionId == null : operation?.expectedRevisionId === expectedRevisionId)
+    && (expectedRevisionHash == null ? operation?.expectedRevisionHash == null : operation?.expectedRevisionHash === expectedRevisionHash)
+    && (!receiptId || operation?.receiptId === receiptId));
+  const readPersistedEspressoAction = async (actionId) => {
+    if (!db?.runTransaction || !db?.collection || !actionId) return null;
+    try {
+      return await db.runTransaction(async (tx) => {
+        const actionRef = db.collection('users').doc(uid).collection('actions').doc(actionId);
+        const snapshot = await tx.get(actionRef);
+        return snapshot?.exists ? snapshot.data() : null;
+      });
+    } catch {
+      return null;
+    }
+  };
+  const retryRef = () => db?.collection?.('users')?.doc(uid)?.collection?.('chatSessions')?.doc('espresso-retry') || null;
+  const readPersistedEspressoRetry = async () => {
+    const ref = retryRef();
+    if (!db?.runTransaction || !ref) return null;
+    try {
+      const record = await db.runTransaction(async (tx) => {
+        const snapshot = await tx.get(ref);
+        return snapshot?.exists ? snapshot.data() : null;
+      });
+      if (record?.ownerId !== uid || record.status !== 'retryable' || record.slotKey !== 'espresso') return null;
+      if (!Number.isFinite(Number(record.expiresAt)) || Number(record.expiresAt) <= Date.now()) return null;
+      return record;
+    } catch {
+      return null;
+    }
+  };
+  const writePersistedEspressoRetry = async (record) => {
+    const ref = retryRef();
+    if (!db?.runTransaction || !ref || !record) return false;
+    try {
+      await db.runTransaction(async (tx) => {
+        const snapshot = await tx.get(ref);
+        const current = snapshot?.exists ? snapshot.data() : null;
+        // One retry candidate is authoritative. The operation start is frozen
+        // before command execution, so a delayed failure from an older action
+        // cannot replace a newer candidate. A closed record for the same
+        // operation must never be reopened, while a newer authorized operation
+        // may replace an older closed tombstone.
+        if (current?.ownerId !== uid && current) return;
+        if (current?.actionId === record.actionId && current.status !== 'retryable') return;
+        const currentStart = Number(current?.operationStartedAt ?? current?.createdAt);
+        const incomingStart = Number(record.operationStartedAt ?? record.createdAt);
+        if (current && Number.isFinite(currentStart) && Number.isFinite(incomingStart)
+          && (incomingStart < currentStart || (incomingStart === currentStart && current.actionId !== record.actionId))) return;
+        tx.set(ref, { ...clone(record), ownerId: uid, updatedAt: Date.now() }, { merge: true });
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const invalidatePersistedEspressoRetry = async (record = null, reason = 'invalidated') => {
+    const ref = retryRef();
+    if (!db?.runTransaction || !ref) return false;
+    try {
+      await db.runTransaction(async (tx) => {
+        const snapshot = await tx.get(ref);
+        const current = snapshot?.exists ? snapshot.data() : null;
+        if (!current || current.ownerId !== uid || current.status !== 'retryable' || (record?.actionId && current.actionId !== record.actionId)) return;
+        tx.set(ref, { ownerId: uid, status: reason, invalidatedAt: Date.now(), updatedAt: Date.now() }, { merge: true });
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const explicitEspressoRequest = (kind, args = {}, { retryRecord = null } = {}) => {
+    const text = String(context.userText || '').trim();
+    if (!text) return false;
+    const negated = /\b(?:don't|do not|never|not|without)\b[\s\S]{0,28}\b(?:save|apply|set|change|update|make|undo|revert|reverse)\b/i.test(text);
+    if (negated) return false;
+    if (kind === 'undo') return isExplicitEspressoUndoRequest(text);
+    // A model-provided field is not a substitute for an unresolved user
+    // choice. Require clarification for alternatives such as “finer grind or
+    // more output—save that”, even when the provider guesses one field.
+    const unresolvedAlternative = /\b(?:either|one\s+of)\b[\s\S]{0,80}\bor\b/i.test(text)
+      || /\b(?:finer|coarser|more|less|higher|lower|increase|decrease)\s+(?:grind|output|dose|temperature|water)\b[\s\S]{0,64}\bor\b/i.test(text);
+    if (unresolvedAlternative) return false;
+    const concrete = ['doseGrams', 'yieldGrams', 'grinderValue', 'temperatureOffsetF'].some((key) => args[key] != null);
+    const assent = /^(?:yes|do it|go ahead|make that change|make the change)$/i.test(text)
+      && /\b(?:save|apply|set|change|dose|output|grind|temperature|ratio|recipe)\b/i.test(String(context.conversation?.at(-1)?.content || context.conversation?.at(-1)?.text || ''));
+    const retry = /\b(?:try|retry|attempt)\b[\s\S]{0,24}\b(?:save|saving|apply|update)\b[\s\S]{0,24}\b(?:again|once\s+more)\b/i.test(text)
+      || /\b(?:again|once\s+more)\b[\s\S]{0,24}\b(?:save|saving|apply|update)\b/i.test(text);
+    const hypothetical = /\b(?:would|could|should|what if|if|wondering|hypothetical)\b[\s\S]{0,36}\b(?:help|work|be|taste|better|worse)\b/i.test(text);
+    if (hypothetical) return false;
+    return Boolean(retryRecord && isExplicitEspressoRetryRequest(text))
+      || retry || assent || (concrete && /\b(?:save|saving|apply|set|change|update|make)\b/i.test(text));
+  };
+  const espressoReceiptArtifact = (result, { mode, coffeeId, slotKey = 'espresso', recipe = null, coffeeName = null } = {}) => {
+    const receipt = result?.receipt || {};
+    return makeArtifact(mode === 'undo_revision' ? 'undo_receipt' : 'action_receipt', {
+      id: receipt.id,
+      // Chat receipt cards and session recovery use the command-service
+      // status vocabulary. `applied` is a proposal/artifact state, while a
+      // successful command receipt is `succeeded` and therefore exposes Undo.
+      status: receipt.status === 'succeeded' ? 'succeeded' : 'failed',
+      mode: receipt.mode || mode,
+      actionId: receipt.actionId,
+      coffeeId,
+      slotKey,
+      revisionId: receipt.revisionId || null,
+      parentRevisionId: receipt.parentRevisionId || null,
+      undoneRevisionId: receipt.undoneRevisionId || null,
+      restoredRevisionId: receipt.restoredRevisionId || null,
+      restoredSourceState: receipt.restoredSourceState || null,
+      undoAvailable: receipt.undoAvailable === true,
+      sourceState: receipt.sourceState || null,
+      ...(coffeeName ? { coffeeName } : {}),
+      ...(recipe ? { recipe: modelRecipe(recipe) } : {}),
+      message: mode === 'undo_revision' ? 'The espresso recipe was undone and the prior saved setup was restored.' : 'The espresso recipe was saved to this bean.',
+    });
+  };
   const call = async (name, args = {}) => {
-    if (!RUPHUS_READ_TOOL_NAMES.includes(name)) throw Object.assign(new Error(`tool unavailable: ${name}`), { code: 'tool_unavailable' });
+    if (!RUPHUS_READ_TOOL_NAMES.includes(name) && !RUPHUS_ESPRESSO_TOOL_NAMES.includes(name)) throw Object.assign(new Error(`tool unavailable: ${name}`), { code: 'tool_unavailable' });
     forbidOwner(args);
     if (name === 'resolve_coffee') {
       if (typeof args.reference !== 'string' || !args.reference.trim()) throw Object.assign(new Error('reference is required'), { code: 'invalid_tool_input' });
@@ -1304,7 +1529,330 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const sourceControls = editableReviewControlAvailability(exactTarget);
       return { ...publicEvidence(evidence), recentBrews: rememberBrews(evidence, args.coffeeRef, method?.slot), method, coffeeRef: args.coffeeRef, selectedRecipe: modelRecipe(exactTarget), ...(sourceControls ? { sourceControls } : currentReview?.sourceControls ? { sourceControls: currentReview.sourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(absentCreation ? { sourceState: 'absent' } : {}), ...(absentCreation && !compatibleDraft && !currentReview ? { creation: absentCreation } : {}), ...(compatibleDraft ? { draft: { sourceState: 'absent', recipe: modelRecipe(compatibleDraft.after) } } : {}) };
     }
+    if (name === 'save_espresso_recipe') {
+      if (!db?.runTransaction) return { ok: false, code: 'espresso_mutation_unavailable', message: 'Espresso saving is unavailable in this session. Your saved recipe is unchanged.' };
+      if (args.slot !== 'espresso') return { ok: false, code: 'slot_required', message: 'This save is only available for espresso.' };
+      const retryRecord = await readPersistedEspressoRetry();
+      const retryRequested = isExplicitEspressoRetryRequest(context.userText);
+      if (retryRecord && /\b(?:don't|do not|never|not)\b[\s\S]{0,32}\b(?:try|retry)\b/i.test(String(context.userText || ''))) {
+        await invalidatePersistedEspressoRetry(retryRecord, 'negated');
+      }
+      if (!explicitEspressoRequest('save', args, { retryRecord })) return { ok: false, code: 'espresso_save_requires_explicit_request', message: 'I can explain or suggest an espresso change, but I only save it after a direct request.' };
+      const setup = context.rotationSnapshot?.setup || {};
+      const bean = typeof readers.readCoffee === 'function' ? await readers.readCoffee({ uid, coffeeId }) : null;
+      const activeRevisionId = bean?.activeRevisionIds?.espresso || null;
+      const setupKey = espressoSetupKey(setup);
+      // A receipt created by this authenticated session is the only authority
+      // that may advance a recipe opened from a historical launch card. If an
+      // external edit has moved the live revision, fall back to the historical
+      // read so the launch stale guard still rejects the overwrite.
+      const trustedReceipt = activeRevisionId
+        ? [...context.__ruphusEspressoReceipts.values()].reverse().find((receipt) => receipt?.coffeeId === coffeeId && receipt?.setupKey === setupKey && receipt?.revisionId === activeRevisionId && receipt?.recipe)
+        : null;
+      // Save validation may inspect the launch revision to reject a stale
+      // modal baseline; ordinary espresso reads deliberately use the live
+      // owner revision so a prior chat save is visible on the next turn.
+      const currentRead = await readRecipe(coffeeId, 'espresso', args.coffeeRef, { historical: !trustedReceipt });
+      const selectedRevisionId = trustedReceipt
+        ? activeRevisionId
+        : String(currentRead?.selectedPath || '').match(/recipeRevisions\/([^/]+)/)?.[1]
+        || (context.launchCoffeeId === args.coffeeRef && context.__ruphusLaunchContext?.launchItem?.method === 'espresso'
+          ? context.__ruphusLaunchContext.launchItem.ref
+          : null);
+      // A launch item is a historical baseline, not permission to overwrite
+      // whatever is live now. Compare present and absent states explicitly;
+      // after Undo removes the first saved recipe there is no active revision
+      // to compare against, but the old launch revision must still be stale.
+      const revisionMismatch = Boolean(selectedRevisionId && selectedRevisionId !== (bean?.activeRevisionIds?.espresso || null));
+      let current = currentRead && !currentRead.code && currentRead.validationStatus !== 'invalid' ? espressoRecipeForCommand(currentRead) : null;
+      if (!current && currentRead?.code === 'recipe_missing' && bean) {
+        const baseline = resolveEspressoRecipe({ bean, setup });
+        if (baseline.ok) current = espressoRecipeForCommand(baseline.recipe);
+      }
+      if (!current) return { ok: false, code: currentRead?.code || 'recipe_unavailable', message: 'I could not verify the current espresso recipe. Nothing was changed.' };
+      if (current.doseGrams == null && args.doseGrams == null) return { ok: false, code: 'espresso_dose_required', message: 'What coffee dose does your basket use? I need that before saving an output target; your recipe is unchanged.' };
+      let next = current;
+      if (args.doseGrams != null || args.yieldGrams != null) {
+        const edited = editEspressoRecipe(current, { ...(args.doseGrams == null ? {} : { doseGrams: args.doseGrams }), ...((args.yieldGrams ?? current.yieldGrams) == null ? {} : { yieldGrams: args.yieldGrams ?? current.yieldGrams }) });
+        if (!edited.ok) {
+          if (retryRequested && retryRecord) await invalidatePersistedEspressoRetry(retryRecord, 'stale');
+          return { ok: false, code: edited.code || 'invalid_recipe', message: 'Those espresso targets need a positive basket-appropriate dose and matching output ratio; nothing was saved.' };
+        }
+        next = edited.recipe;
+      } else next = { ...current, source: 'user_saved', originalProvenance: current.originalProvenance || current.provenance || null, provenance: { kind: 'user_saved', label: 'Saved recipe' }, userAdjustedFields: [...new Set(current.userAdjustedFields || [])] };
+      if (args.grinderValue != null) {
+        next.grinderSetting = { ...next.grinderSetting, value: args.grinderValue, source: 'user_saved' };
+        next.userAdjustedFields = [...new Set([...(next.userAdjustedFields || []), 'grinderSetting'])];
+      }
+      if (args.temperatureOffsetF != null) {
+        next.temperature = { ...next.temperature, offsetF: args.temperatureOffsetF };
+        next.userAdjustedFields = [...new Set([...(next.userAdjustedFields || []), 'temperature'])];
+      }
+      next.source = 'user_saved';
+      next.originalProvenance = next.originalProvenance || next.provenance || null;
+      next.provenance = { kind: 'user_saved', label: 'Saved recipe' };
+      next.fingerprint = espressoRecipeFingerprint(next);
+      const validation = validateEspressoRecipe(next, { setup, coffeeId });
+      if (!validation.valid) {
+        if (retryRequested && retryRecord) await invalidatePersistedEspressoRetry(retryRecord, 'stale');
+        return { ok: false, code: 'invalid_recipe', errors: validation.errors, message: 'That espresso change did not pass setup validation. Nothing was saved.' };
+      }
+      const currentBinding = context.__ruphusTurnBinding || context.turnBinding;
+      const currentMethodBinding = context.__ruphusMethodBinding || context.methodBinding;
+      const liveRevisionId = bean?.activeRevisionIds?.espresso || null;
+      const retryRevisionMatches = retryRecord
+        && (retryRecord.expectedRevisionId || null) === liveRevisionId
+        && (liveRevisionId || retryRecord.expectedRevisionHash === absentRecipeSourceHash('espresso'));
+      const retryTargetMatches = Boolean(retryRequested
+        && retryRecord
+        && retryRecord.actionId
+        && retryRecord.coffeeId === coffeeId
+        && retryRecord.setupKey === setupKey
+        && retryRecord.slotKey === 'espresso'
+        && retryRecord.boundaryIndex === Number(context.sessionState?.boundaryIndex || 0)
+        && currentBinding?.status === 'locked'
+        && currentBinding.coffeeRef === args.coffeeRef
+        && currentMethodBinding?.slot === 'espresso'
+        && retryRevisionMatches
+        && retryRecord.recipeFingerprint === espressoRecipeFingerprint(next)
+        && retryRecord.recipe
+        && espressoRecipeFingerprint(espressoRecipeForCommand(retryRecord.recipe)) === espressoRecipeFingerprint(next));
+      const generatedActionId = espressoActionId('save', coffeeId, { recipe: next });
+      const actionId = retryRecord?.actionId && retryRequested ? retryRecord.actionId : generatedActionId;
+      const retryPersistedAction = retryRequested && retryRecord?.actionId
+        ? await readPersistedEspressoAction(retryRecord.actionId)
+        : null;
+      const retryPersistedResult = retryPersistedAction?.status === 'succeeded' ? retryPersistedAction.result : null;
+      const retryPersistedReceipt = retryPersistedResult?.receipt;
+      const retryPersistedRecipe = retryPersistedResult?.revision?.snapshot || retryPersistedResult?.bean?.espressoRecipe || null;
+      const retryCommitted = Boolean(
+        retryRequested
+        && retryRecord?.actionId
+        && retryPersistedAction?.actionId === retryRecord.actionId
+        && retryPersistedReceipt?.status === 'succeeded'
+        && retryPersistedReceipt?.mode === 'replace_active_recipe'
+        && retryPersistedReceipt?.coffeeId === coffeeId
+        && retryPersistedReceipt?.slotKey === 'espresso'
+        && retryPersistedRecipe?.coffeeId === coffeeId
+        && retryPersistedRecipe?.setupKey === next.setupKey
+        && bean?.activeRevisionIds?.espresso === retryPersistedReceipt.revisionId
+        && bean?.espressoRecipe
+        && espressoRecipeFingerprint(espressoRecipeForCommand(retryPersistedRecipe)) === espressoRecipeFingerprint(next)
+        && espressoRecipeFingerprint(espressoRecipeForCommand(bean.espressoRecipe)) === espressoRecipeFingerprint(retryPersistedRecipe));
+      if (retryRequested && retryRecord && !retryTargetMatches && !retryCommitted) {
+        await invalidatePersistedEspressoRetry(retryRecord, 'stale');
+        return { ok: false, code: 'espresso_retry_stale', message: 'That failed espresso save is no longer bound to this coffee, setup, or current recipe. Make a fresh explicit save request.' };
+      }
+      // A response-loss replay is identified by the exact authenticated
+      // receipt still being the live revision with the same canonical recipe,
+      // not by retry wording. If another operation created a new revision,
+      // the revision mismatch deliberately earns a new action instead.
+      const priorReceipt = [...context.__ruphusEspressoReceipts.values()].reverse().find((receipt) =>
+        receipt?.status === 'succeeded'
+        && receipt?.coffeeId === coffeeId
+        && receipt?.setupKey === next.setupKey
+        && receipt?.revisionId === bean?.activeRevisionIds?.espresso
+        && receipt?.recipe
+        && espressoRecipeFingerprint(espressoRecipeForCommand(receipt.recipe)) === espressoRecipeFingerprint(next));
+      if (priorReceipt) {
+        // The prior turn may have committed before its response was lost. A
+        // matching live revision and immutable receipt is a replay of that
+        // result, not a new save operation.
+        const replayReceipt = {
+          ...clone(priorReceipt),
+          status: 'succeeded',
+          mode: 'replace_active_recipe',
+          undoAvailable: priorReceipt.undoAvailable !== false,
+        };
+        const artifact = espressoReceiptArtifact({ receipt: replayReceipt }, { mode: 'replace_active_recipe', coffeeId, recipe: next, coffeeName: bean?.name || null });
+        return { ok: true, coffeeRef: args.coffeeRef, slot: 'espresso', recipe: modelRecipe(next), receipt: replayReceipt, artifact, replayed: true };
+      }
+      // A response can be lost after the transaction commits but before the
+      // active chat session stores its receipt. Recover the original result
+      // from the owner-scoped action journal before constructing a new write.
+      // The action path alone is not authority: every canonical bean/setup /
+      // live-revision and recipe fingerprint check below must match.
+      const persistedAction = await readPersistedEspressoAction(actionId);
+      const persistedResult = persistedAction?.status === 'succeeded' ? persistedAction.result : null;
+      const persistedReceipt = persistedResult?.receipt;
+      const persistedRecipe = persistedResult?.revision?.snapshot || persistedResult?.bean?.espressoRecipe || null;
+      const persistedMatches = Boolean(
+        persistedAction?.actionId === actionId
+        && persistedReceipt?.status === 'succeeded'
+        && persistedReceipt?.mode === 'replace_active_recipe'
+        && persistedReceipt?.coffeeId === coffeeId
+        && persistedReceipt?.slotKey === 'espresso'
+        && persistedReceipt?.revisionId === bean?.activeRevisionIds?.espresso
+        && persistedRecipe?.coffeeId === coffeeId
+        && persistedRecipe?.setupKey === next.setupKey
+        && bean?.espressoRecipe
+        && espressoRecipeFingerprint(espressoRecipeForCommand(persistedRecipe)) === espressoRecipeFingerprint(next)
+        && espressoRecipeFingerprint(espressoRecipeForCommand(bean.espressoRecipe)) === espressoRecipeFingerprint(espressoRecipeForCommand(persistedRecipe))
+      );
+      if (persistedMatches) {
+        if (retryRecord) await invalidatePersistedEspressoRetry(retryRecord, 'succeeded');
+        const replayReceipt = clone(persistedReceipt);
+        const artifact = espressoReceiptArtifact({ receipt: replayReceipt }, { mode: 'replace_active_recipe', coffeeId, recipe: next, coffeeName: bean?.name || null });
+        context.__ruphusEspressoReceipts.set(`${coffeeId}:${next.setupKey}`, { ...clone(replayReceipt), coffeeId, setupKey: next.setupKey, recipe: clone(next) });
+        return { ok: true, coffeeRef: args.coffeeRef, slot: 'espresso', recipe: modelRecipe(next), receipt: replayReceipt, artifact, replayed: true };
+      }
+      if (revisionMismatch && !retryTargetMatches && !retryCommitted) {
+        return { ok: false, code: 'recipe_stale', message: 'The opened espresso recipe is stale; refresh before saving so your newer saved change is preserved.' };
+      }
+      const expectedRevisionId = bean?.activeRevisionIds?.espresso || null;
+      const expectedRevisionHash = expectedRevisionId ? null : absentRecipeSourceHash('espresso');
+      const reusedRetry = retryRequested && retryRecord?.actionId === actionId ? retryRecord : null;
+      const operationStartedAt = Number(reusedRetry?.operationStartedAt);
+      const frozenOperationStartedAt = Number.isFinite(operationStartedAt) ? operationStartedAt : Date.now();
+      const priorOperation = existingEspressoOperation({
+        mode: 'replace_active_recipe',
+        coffeeId,
+        setupKey: next.setupKey,
+        recipe: next,
+        expectedRevisionId,
+        expectedRevisionHash,
+      });
+      const operation = priorOperation || {
+        actionId,
+        mode: 'replace_active_recipe',
+        coffeeId,
+        slotKey: 'espresso',
+        setupKey: next.setupKey,
+        recipe: clone(next),
+        patch: { espressoRecipe: clone(next) },
+        expectedRevisionId: expectedRevisionId || undefined,
+        expectedRevisionHash: expectedRevisionHash || undefined,
+        operationStartedAt: frozenOperationStartedAt,
+      };
+      context.__ruphusEspressoOperations.set(operation.actionId, operation);
+      try {
+        const result = await executeRecipeCommand({ db, uid, ...operation });
+        if (retryRecord) await invalidatePersistedEspressoRetry(retryRecord, 'succeeded');
+        const artifact = espressoReceiptArtifact(result, { mode: 'replace_active_recipe', coffeeId, recipe: next, coffeeName: bean?.name || null });
+        const receipt = result?.receipt;
+        if (receipt?.revisionId) context.__ruphusEspressoReceipts.set(`${coffeeId}:${next.setupKey}`, { ...clone(receipt), coffeeId, setupKey: next.setupKey, recipe: clone(next) });
+        return { ok: true, coffeeRef: args.coffeeRef, slot: 'espresso', recipe: modelRecipe(result.revision?.snapshot || next), receipt: result.receipt, artifact };
+      } catch (error) {
+        if (RETRYABLE_ESPRESSO_FAILURES.has(String(error?.code || ''))) {
+          await writePersistedEspressoRetry({
+            ownerId: uid,
+            kind: 'espresso_save_retry',
+            status: 'retryable',
+            slotKey: 'espresso',
+            actionId,
+            originalTurnId: reusedRetry?.originalTurnId || context.sessionId || null,
+            boundaryIndex: Number(context.sessionState?.boundaryIndex || 0),
+            coffeeId,
+            setupKey: next.setupKey,
+            expectedRevisionId: expectedRevisionId || null,
+            expectedRevisionHash: expectedRevisionHash || null,
+            recipe: clone(next),
+            recipeFingerprint: espressoRecipeFingerprint(next),
+            operationStartedAt: operation.operationStartedAt || frozenOperationStartedAt,
+            createdAt: reusedRetry?.createdAt || operation.operationStartedAt || frozenOperationStartedAt,
+            attempts: Number(reusedRetry?.attempts || 0) + 1,
+            expiresAt: Date.now() + ESPRESSO_RETRY_TTL_MS,
+          });
+        }
+        return { ok: false, code: error.code || 'espresso_save_failed', message: error.message || 'The espresso save failed. Your saved recipe is unchanged.' };
+      }
+    }
+    if (name === 'undo_espresso_recipe') {
+      if (!db?.runTransaction) return { ok: false, code: 'espresso_mutation_unavailable', message: 'Espresso Undo is unavailable in this session. Your saved recipe is unchanged.' };
+      if (args.slot !== 'espresso') return { ok: false, code: 'slot_required', message: 'This Undo is only available for espresso.' };
+      if (!explicitEspressoRequest('undo')) return { ok: false, code: 'espresso_undo_requires_explicit_request', message: 'I can only Undo an espresso save after a direct Undo request.' };
+      const setup = context.rotationSnapshot?.setup || {};
+      const setupKey = espressoSetupKey(setup);
+      const retryRecord = await readPersistedEspressoRetry();
+      const savedReceipt = context.__ruphusEspressoReceipts.get(`${coffeeId}:${setupKey}`)
+        || [...context.__ruphusEspressoReceipts.values()].reverse().find((item) => item?.coffeeId === coffeeId && item?.setupKey === setupKey);
+      if (!savedReceipt?.revisionId) return { ok: false, code: 'nothing_to_undo', message: 'There is no saved espresso change to undo.' };
+      const bean = typeof readers.readCoffee === 'function' ? await readers.readCoffee({ uid, coffeeId }) : null;
+      const persistedUndoRevisionId = savedReceipt.undoReceipt?.revisionId || savedReceipt.undoRevisionId || null;
+      const undoArtifact = savedReceipt.undoArtifact || savedReceipt.undoReceipt || null;
+      const undoSucceeded = undoArtifact?.status === 'succeeded' && undoArtifact?.mode === 'undo_revision';
+      const restoredSourceState = savedReceipt.restoredSourceState
+        || undoArtifact?.restoredSourceState
+        || (savedReceipt.restoredRecipe || undoArtifact?.recipe ? 'present' : null);
+      const restoredRecipe = savedReceipt.restoredRecipe || undoArtifact?.recipe || null;
+      const liveRecipe = bean?.espressoRecipe ? espressoRecipeForCommand(bean.espressoRecipe) : null;
+      const presentReplay = Boolean(persistedUndoRevisionId
+        && bean?.activeRevisionIds?.espresso === persistedUndoRevisionId
+        && restoredRecipe
+        && liveRecipe
+        && espressoRecipeFingerprint(liveRecipe) === espressoRecipeFingerprint(espressoRecipeForCommand(restoredRecipe)));
+      const absentReplay = Boolean(restoredSourceState === 'absent'
+        && !bean?.activeRevisionIds?.espresso
+        && !bean?.espressoRecipe);
+      if (savedReceipt.status === 'undone' && undoSucceeded && (presentReplay || absentReplay)) {
+        const replayReceipt = savedReceipt.undoResultReceipt
+          ? clone(savedReceipt.undoResultReceipt)
+          : savedReceipt.undoReceipt?.type === 'undo_receipt'
+            ? clone(savedReceipt.undoReceipt)
+            : {
+              id: `${savedReceipt.id || savedReceipt.actionId}-undo`,
+              actionId: `${savedReceipt.actionId || savedReceipt.id}-undo`,
+              mode: 'undo_revision',
+              status: 'succeeded',
+              coffeeId,
+              slotKey: 'espresso',
+              revisionId: persistedUndoRevisionId,
+              undoneRevisionId: savedReceipt.revisionId,
+              restoredRevisionId: savedReceipt.restoredRevisionId || null,
+              restoredSourceState: savedReceipt.restoredSourceState || (savedReceipt.restoredRecipe ? 'present' : 'absent'),
+              undoAvailable: false,
+            };
+        const replayArtifact = savedReceipt.undoArtifact
+          ? clone(savedReceipt.undoArtifact)
+          : savedReceipt.undoReceipt?.type === 'undo_receipt'
+            ? clone(savedReceipt.undoReceipt)
+            : espressoReceiptArtifact({ receipt: replayReceipt }, { mode: 'undo_revision', coffeeId, recipe: savedReceipt.restoredRecipe, coffeeName: bean?.name || null });
+        return { ok: true, coffeeRef: args.coffeeRef, slot: 'espresso', recipe: restoredRecipe ? modelRecipe(restoredRecipe) : null, receipt: replayReceipt, artifact: replayArtifact, replayed: true, sourceState: restoredSourceState };
+      }
+      const expectedRevisionId = savedReceipt.revisionId;
+      if (bean?.activeRevisionIds?.espresso !== expectedRevisionId) return { ok: false, code: 'recipe_stale', message: 'That espresso save is no longer the current recipe, so Undo is unavailable.' };
+      const receiptId = savedReceipt.id || savedReceipt.actionId;
+      const priorOperation = existingEspressoOperation({ mode: 'undo_revision', coffeeId, setupKey, expectedRevisionId, receiptId });
+      const operation = priorOperation || {
+        actionId: espressoActionId('undo', coffeeId, { receiptId, revisionId: expectedRevisionId }),
+        mode: 'undo_revision',
+        clientIntent: 'espresso_direct_undo',
+        coffeeId,
+        slotKey: 'espresso',
+        setupKey,
+        expectedRevisionId,
+        receiptId,
+      };
+      context.__ruphusEspressoOperations.set(operation.actionId, operation);
+      try {
+        const result = await executeRecipeCommand({ db, uid, ...operation });
+        if (retryRecord) await invalidatePersistedEspressoRetry(retryRecord, 'undone');
+        const restored = result.revision?.snapshot ? espressoRecipeForCommand(result.revision.snapshot) : null;
+        const artifact = espressoReceiptArtifact(result, { mode: 'undo_revision', coffeeId, recipe: restored, coffeeName: bean?.name || null });
+        for (const [key, candidate] of context.__ruphusEspressoOperations.entries()) {
+          if (candidate?.mode === 'replace_active_recipe' && candidate?.coffeeId === coffeeId && candidate?.setupKey === setupKey) context.__ruphusEspressoOperations.delete(key);
+        }
+        context.__ruphusEspressoReceipts.set(`${coffeeId}:${setupKey}`, {
+          ...clone(savedReceipt),
+          status: 'undone',
+          undoAvailable: false,
+          undoRevisionId: result.receipt?.revisionId || null,
+          restoredRevisionId: result.receipt?.restoredRevisionId || null,
+          restoredSourceState: result.receipt?.restoredSourceState || (restored ? 'present' : 'absent'),
+          restoredRecipe: restored ? clone(restored) : null,
+          undoResultReceipt: clone(result.receipt),
+          undoArtifact: clone(artifact),
+          undoReceipt: clone(artifact),
+        });
+        return { ok: true, coffeeRef: args.coffeeRef, slot: 'espresso', recipe: restored ? modelRecipe(restored) : null, receipt: result.receipt, artifact };
+      } catch (error) {
+        return { ok: false, code: error.code || 'espresso_undo_failed', message: error.message || 'The espresso Undo failed. Your saved recipe is unchanged.' };
+      }
+    }
     const slotKey = args.slot || args.slotKey;
+    if (name === 'propose_recipe_change' && slotKey === 'espresso') {
+      return { ok: false, code: 'espresso_save_requires_explicit_tool', message: 'Espresso advice is read-only until the user explicitly asks to save a concrete change; use save_espresso_recipe for that request.' };
+    }
     if (name === 'read_technique_options') {
       if (args.intent != null && !['recipe_preview', 'information'].includes(args.intent)) return { ok: false, actionable: false, code: 'invalid_recipe_intent', message: 'I could not determine whether to explain this technique or prepare a recipe.' };
       if (context.currentReview?.editable === true
@@ -1538,11 +2086,17 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       const availableSourceControls = editableReviewControlAvailability(recipe);
       const displayName = methodDisplayForContext(context, slotKey, recipe);
       const grinderGuidance = sourceGrinderGuidance(currentReview?.after || recipe, snapshot.setup);
+      const reversibleReceipt = slotKey === 'espresso'
+        ? await currentEspressoUndoReceipt(coffeeId, recipe)
+        : null;
+      const recipeSummary = slotKey === 'espresso'
+        ? recipe.doseGrams == null ? `general espresso starting point at 1:${recipe.ratio}; coffee dose and output mass are not selected. Ask for the basket’s recommended or usual dose before choosing an absolute mass; equipment can remain unknown` : `${recipe.doseGrams}g in to ${recipe.yieldGrams}g out`
+        : `${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water`;
       if (!currentReview && needsConfigurationDraft(context, recipe, slotKey)) {
         return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, sourceState: 'present', recipe: modelRecipe(recipe), creation: firstRecipeCreation(slotKey), preparingNewConfiguration: true,
           summary: `The saved recipe is for ${methodDisplayForRecipe(slotKey, recipe)}. If the user wants a recipe, the requested ${displayName} can be prepared here with propose_recipe_change, intent recipe_preview and servingDoseGrams. For an informational question, answer without proposing. The saved recipe remains unchanged until confirmation.` };
       }
-      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, recentBrews, ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipe.dose ?? recipe.coffeeGrams ?? '?'}g coffee to ${recipeWaterSummary(recipe)} water.`, recipe: modelRecipe(recipe) };
+      return { ok: true, coffeeRef: args.coffeeRef, slot: slotKey, displayName, recentBrews, ...(recipe.setupMismatch ? { setupMismatch: true, previousRecipe: modelRecipe(recipe.previousRecipe), equipmentMessage: 'The prior saved recipe belongs to different equipment and remains unchanged. This is a new starting point for the current equipment.' } : {}), ...(grinderGuidance ? { grinderGuidance } : {}), ...(availableSourceControls ? { sourceControls: availableSourceControls } : {}), ...(currentReview ? { currentReview: publicCurrentReview(currentReview) } : {}), ...(reversibleReceipt ? { undoAvailable: true, reversibleAction: { action: 'undo_espresso_recipe', message: 'An authenticated current espresso save receipt is available. If the user explicitly asks to undo or put this save back, call undo_espresso_recipe for this coffee and setup.' } } : {}), summary: slotKey === 'aiden' ? `Aiden profile at 1:${recipe.ratio}; serving size is chosen on Aiden. The complete bloom and pulse settings are included.` : `${displayName} recipe: ${recipeSummary}.${reversibleReceipt ? ' An authenticated current espresso save receipt is available; an explicit undo request can use undo_espresso_recipe.' : ''}`, recipe: modelRecipe(recipe) };
     }
     const experiment = args.experiment && typeof args.experiment === 'object' && !Array.isArray(args.experiment) ? args.experiment : null;
     const experimentHasSelection = Boolean(experiment?.techniqueId || experiment?.familyId || experiment?.sourceId);
@@ -1851,7 +2405,8 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       : [];
     return { ok: true, proposal: clone(proposal), artifact: clone({ ...artifact, actions, sourceState: proposal?.sourceState || (before ? 'present' : 'absent'), ...(proposal?.sourceHash ? { sourceHash: proposal.sourceHash } : {}), ...(proposal?.sourceRevisionId ? { sourceRevisionId: proposal.sourceRevisionId } : {}), ...(proposal?.sessionId ? { sessionId: proposal.sessionId } : {}) }) };
   };
-  const definitions = RUPHUS_READ_TOOL_NAMES.filter((name) => name !== 'resolve_coffee' || context.turnBinding?.status !== 'locked').map((name) => {
+  const definitions = RUPHUS_READ_TOOL_NAMES.filter((name) => (name !== 'resolve_coffee' || context.turnBinding?.status !== 'locked')
+    && (context.methodBinding?.slot !== 'espresso' || !['propose_recipe_change', 'read_technique_options'].includes(name))).map((name) => {
     if (name === 'review_trial_recipe') return { type: 'function', name, description: 'Recover an existing Brew once trial when the user asks to keep it, make it permanent, or save that trial. This reads the actual trial and displays its save control; it never saves or requires tasting. Use instead of generating a new recipe from conversation prose. Use null trialRef initially; if several trials are returned, clarify using their dates or adjustments, then pass the chosen trialRef.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, trialRef: nullable({ type: 'string' }) }, required: ['coffeeRef', 'slot', 'trialRef'], additionalProperties: false } };
     if (name === 'resolve_coffee') return { type: 'function', name, description: 'Resolve a coffee reference such as a jar, name, roaster, origin, or pronoun. Call once for a reference, then keep the returned coffeeRef for later tools in this turn.', strict: true, parameters: { type: 'object', properties: { reference: { type: 'string' } }, required: ['reference'], additionalProperties: false } };
     if (name === 'read_coffee_evidence') return { type: 'function', name, description: 'Read recipe, recent brews, and tastings for one resolved coffee in parallel. Set slot to the brewer the user means in this conversation, interpreting ordinary spelling and follow-ups. Null means genuinely unspecified. A selected recipe for another brewer does not establish whether the requested one exists.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, windowDays: nullable({ type: 'number' }), slot: nullable({ type: 'string', enum: SLOT_KEYS }) }, required: ['coffeeRef', 'windowDays', 'slot'], additionalProperties: false } };
@@ -1859,5 +2414,9 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
     if (name === 'read_technique_options') return { type: 'function', name, description: 'Read source-backed hot V60, Kalita Wave, or ribbed Switch recipes for this coffee. Interpret the user’s conversational intent, not keywords: recipe_preview means they want something to brew, a recipe suggestion, an alternative, or a corrected-equipment recipe; information means explanation or comparison only. A preview does not save or start anything and needs no extra yes. For recipe_preview, select an exact executable option and call propose_recipe_change in this turn. Use the requested equipment; no matching saved recipe is required. Reference-only sources remain discussion-only.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['v60_hot', 'kalita_hot'] }, intent: { type: 'string', enum: ['recipe_preview', 'information'] } }, required: ['coffeeRef', 'slot', 'intent'], additionalProperties: false } };
     return { type: 'function', name, description: 'Prepare one review card: either one bounded recipe-control change, one servingDoseGrams-only resize (or one serving size paired with one control/technique), one explicitly selected source-backed technique experiment, or a complete Aiden profile for a verified absent Aiden slot. The optional aidenProfile must be a complete profile when creating that first Aiden draft; never send a partial profile or manual pour-over fields. Allowed recipe controls are dose, water, grind, temperature, and ratio; a verified absent manual slot separately reports which first-recipe controls/configurations are available. For an exact grounded diagnosis, set intent to recipe_preview after reading the exact recipe; this prepares a review card only and never saves or brews. If the user names a serving size together with a ratio or technique, put that positive numeric dose in servingDoseGrams rather than inventing a second change; the server validates the brewer bounds. Include a brief explanation only when it helps answer why a corrected method or technique fits; do not repeat card values. Use information for explanation or comparison, which must not create a card. These are proposals only; never claim a save or brew.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: SLOT_KEYS }, intent: { type: 'string', enum: ['recipe_preview', 'information'] }, baseline: nullable({ type: 'string', description: 'A verified recentBrews brewRef for an experiment on a completed cup; current_review for editing an untried draft; saved_recipe for the saved recipe. Required when completed brews exist. Never treat an untried proposal as tasted.' }), change: nullable({ type: 'object', properties: { control: { type: 'string', enum: PROPOSAL_CONTROLS }, value: { anyOf: [{ type: 'number' }, { type: 'string' }] } }, required: ['control', 'value'], additionalProperties: false }), servingDoseGrams: nullable({ type: 'number' }), aidenProfile: nullable(AIDEN_DRAFT_SCHEMA), experiment: nullable(strictObject({ kind: { type: 'string', enum: ['v60_technique', 'manual_source_technique'] }, techniqueId: { type: 'string' }, familyId: { type: 'string' }, sourceId: { type: 'string' } })), explanation: nullable({ type: 'string', maxLength: 280, description: 'Brief reason for this test, within 280 characters so it can be shown with the card. Distinguish measured time from planned time and acknowledge uncertainty.' }) }, required: ['coffeeRef', 'slot', 'intent', 'baseline', 'change', 'servingDoseGrams', 'aidenProfile', 'experiment', 'explanation'], additionalProperties: false } };
   });
-  return Object.freeze({ names: RUPHUS_READ_TOOL_NAMES, definitions, call });
+  definitions.push(
+    { type: 'function', name: 'save_espresso_recipe', description: 'Save one explicit espresso recipe adjustment after reading the exact current espresso recipe or general framework. Missing equipment is valid; a concrete positive basket-appropriate dose is required. A dose on an incomplete general framework derives output from its ratio. Generic recipes do not use Breville temperature offsets, and unknown/preground grinders never receive invented settings. This is the only conversational save tool: use it only when the user explicitly asks to save, apply, or make the change. Preserve every field not requested. Provide exact saved fields in the response; do not save observations or a shot log. Use null for untouched fields.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['espresso'] }, doseGrams: nullable({ type: 'number' }), yieldGrams: nullable({ type: 'number' }), grinderValue: nullable({ anyOf: [{ type: 'number' }, { type: 'string' }] }), temperatureOffsetF: nullable({ type: 'integer', enum: [-4, -2, 0, 2, 4] }) }, required: ['coffeeRef', 'slot', 'doseGrams', 'yieldGrams', 'grinderValue', 'temperatureOffsetF'], additionalProperties: false } },
+    { type: 'function', name: 'undo_espresso_recipe', description: 'Undo the latest explicit espresso save for the exact coffee and setup when the user explicitly asks to undo it. Use only after a saved espresso action receipt; never undo another brewer or a stale revision.', strict: true, parameters: { type: 'object', properties: { coffeeRef: { type: 'string' }, slot: { type: 'string', enum: ['espresso'] } }, required: ['coffeeRef', 'slot'], additionalProperties: false } },
+  );
+  return Object.freeze({ names: Object.freeze([...RUPHUS_READ_TOOL_NAMES, ...RUPHUS_ESPRESSO_TOOL_NAMES]), definitions, call });
 }

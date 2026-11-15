@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { calculateCost, normalizeUsage } from './modelPricing.js';
-import { RUPHUS_READ_TOOL_NAMES } from './ruphusTools.js';
+import { RUPHUS_ESPRESSO_TOOL_NAMES, RUPHUS_READ_TOOL_NAMES } from './ruphusTools.js';
 import { SLOT_KEYS } from '../../src/lib/ruphus/contracts.js';
 
 // These are rollout controls, not client feature flags. A missing or malformed
@@ -24,7 +24,7 @@ export const MUTATION_ROLLOUT_MODES = new Set([
   'prepare_attempt',
   'promote_attempt',
 ]);
-const TRACE_TOOL_NAMES = new Set([...RUPHUS_READ_TOOL_NAMES, 'propose_recipe_change']);
+const TRACE_TOOL_NAMES = new Set([...RUPHUS_READ_TOOL_NAMES, ...RUPHUS_ESPRESSO_TOOL_NAMES]);
 const TRACE_OUTCOMES = new Set(['started', 'succeeded', 'failed']);
 // Telemetry carries diagnostic categories only. Keep this closed so a
 // provider/tool supplied identifier (or credential-shaped string) can never
@@ -38,6 +38,7 @@ const TRACE_CODES = new Set([
   'invalid_dose_preview', 'invalid_ratio_preview', 'invalid_aiden_change', 'invalid_recipe', 'one_change_required', 'no_recipe_change',
   'duplicate_alternative', 'physical_grind_required', 'technique_option_required', 'source_recipe_control_unsupported',
   'source-ratio-adaptation-unsupported', 'read_budget_complete', 'read_budget_exceeded', 'tool_round_limit',
+  'espresso_save_requires_explicit_request', 'espresso_undo_requires_explicit_request', 'espresso_setup_unconfirmed', 'espresso_mutation_unavailable', 'espresso_save_failed', 'espresso_undo_failed',
 ]);
 const traceCode = (item) => {
   if (typeof item?.code === 'string' && TRACE_CODES.has(item.code)) return item.code;
@@ -206,7 +207,7 @@ export function redactRuphusTelemetry(input = {}) {
   if (proposalHash) output.proposalHash = String(proposalHash);
   if (Array.isArray(input.proposalIds)) output.proposalHashes = input.proposalIds.map(hashTelemetryId).filter(Boolean);
   if (Array.isArray(input.toolNames)) {
-    output.toolNames = input.toolNames.filter((name) => typeof name === 'string' && RUPHUS_READ_TOOL_NAMES.includes(name.trim())).map((name) => name.trim());
+    output.toolNames = input.toolNames.filter((name) => typeof name === 'string' && TRACE_TOOL_NAMES.has(name.trim())).map((name) => name.trim());
   }
   if (input.trace && typeof input.trace === 'object') {
     const trace = {};

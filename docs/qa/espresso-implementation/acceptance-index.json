@@ -1,0 +1,65 @@
+{
+  "status": "local_complete_with_baseline_exceptions",
+  "sourceCommit": "a1da52c3fd2ef767f057c0afd80b43337e221008",
+  "verification": {
+    "conversations": {
+      "accepted": 36,
+      "required": 36,
+      "index": "conversation-index.json"
+    },
+    "mutationPerturbations": {
+      "accepted": 10,
+      "required": 10
+    },
+    "strengthenedStandardWrites": {
+      "accepted": 9,
+      "required": 9
+    },
+    "focused": {
+      "commandsPassed": 13,
+      "receipt": "final-focused.json"
+    },
+    "priorChat": {
+      "commandsPassed": 14,
+      "receipt": "prior-chat-1791868156-receipt.json"
+    },
+    "regression": {
+      "commands": 44,
+      "passed": 41,
+      "baselineFailures": 3,
+      "receipt": "final-regression.json"
+    },
+    "lint": {
+      "changedFiles": 48,
+      "changedFilesPassed": true,
+      "wholeRepositoryErrors": 4,
+      "wholeRepositoryWarnings": 2,
+      "attribution": "preexisting-lint-source.json",
+      "receipt": "lint-1791868192-receipt.json"
+    },
+    "browser": {
+      "groupsPassed": 12,
+      "widths": [
+        320,
+        390,
+        1280
+      ],
+      "receipt": "app-browser-1791868247111-receipt.json",
+      "manifest": "emulator-app-browser-11-manifest.json",
+      "visualInspection": [
+        "390px",
+        "1280px"
+      ]
+    }
+  },
+  "independentReview": "review-final-acceptance.md",
+  "limits": [
+    "Three broad regression failures reproduced on untouched58d1643; no all-green repository claim",
+    "Four whole-lint errors and two warnings in unchanged files",
+    "No native iOS, production release or human cup-quality proof",
+    "Actual conversations use explicit evaluation caps and source-specific accepted versions",
+    "Scan/enrichment and held tasting-save callback are identified fixtures"
+  ],
+  "failedRunsRetained": true,
+  "cleanup": "cleanup.json"
+}

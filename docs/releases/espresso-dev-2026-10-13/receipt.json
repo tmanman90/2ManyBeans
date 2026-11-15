@@ -1,0 +1,83 @@
+{
+  "status": "dev_published_phone_installed_and_launched",
+  "sourceCommit": "8e8da05b56385a094202c5ee40b958b57b073866",
+  "webPreview": "https://2manybeans-erl86upph-tmanman90s-projects.vercel.app",
+  "previewSmoke": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/api/ruphus-agent",
+      "status": 401
+    },
+    {
+      "path": "/api/recipe-command",
+      "status": 401
+    }
+  ],
+  "otaAppId": "com.talmeltzer.coffeehub.dev",
+  "otaChannel": "dev",
+  "otaBundle": "1.1.256-devapp.d20261013.t152026",
+  "otaGuardExitCode": 0,
+  "otaPointerVerified": true,
+  "native": {
+    "bundleId": "com.talmeltzer.coffeehub.dev",
+    "displayName": "2manybeans Dev",
+    "sdk": "iphoneos27.0",
+    "webIndexSha256": "cb09afac4e7984710e1694f970d5fab657f664c480ca6adf0e6343a9d986f12f",
+    "uploadedAssetsMatch": true,
+    "rawXcodeBuildSucceeded": true,
+    "finalHelperExitCode": 0,
+    "finalCodeSignatureValid": true,
+    "existingDevGoogleLoginResourceApplied": true,
+    "earlierHelperFalseNegative": "Source snippets in warnings contained error: and were misclassified; no raw compiler failure"
+  },
+  "phone": {
+    "name": "Tal Meltzer",
+    "os": "27.0.1",
+    "coreDeviceId": "9A6C66CF-3E3E-5AF7-93C1-C45D77663506",
+    "hardwareUdid": "00008160-0014609634400036",
+    "installed": true,
+    "launched": true,
+    "launchProcessId": 22998,
+    "installExitCode": 0,
+    "launchExitCode": 0,
+    "profileIncludesHardwareUdid": true,
+    "signingTeam": "WC5UF2NSAP",
+    "profileExpires": "2027-10-13T15:55:00Z",
+    "signingAccess": "Existing user-owned App Store Connect API key; verified Dev bundle access before registration/signing"
+  },
+  "nativeCompatibility": {
+    "package": "purchases-ios-spm",
+    "pinnedVersion": "5.67.1",
+    "beforeSha256": "7d5eb572233ad587841d61be7294b32583d35724be6aa39006982d298774c511",
+    "afterSha256": "7ac4b717493a4267a6dcb6f8ed239ea63c4cb228a65fb5bd7559b4080554e016",
+    "change": "Move unchanged private designated initializer from extension into struct, as upstream5.78 fix; public API unchanged",
+    "upstream": "https://raw.githubusercontent.com/RevenueCat/purchases-ios/5.78.0/Sources/Paywalls/PaywallColor.swift",
+    "scope": "Task-owned native dependency copy only"
+  },
+  "packageVersionUnchanged": "1.1.255",
+  "production": "Existing production deployment and production Capgo app/channel untouched",
+  "temporaryCredentials": "Temporary server credential copies removed; API private key reused from its existing location without copying or printing it; private client build config retained outside Git for reproducibility",
+  "resume": {
+    "projectPath": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/ios/App/App.xcodeproj",
+    "scheme": "App",
+    "derivedDataPath": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/.runtime/iOSDerivedData",
+    "appPath": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/.runtime/iOSDerivedData/Build/Products/Debug-iphoneos/App.app",
+    "clientBuildEnvironment": "/Users/talmeltzer/.codex/worktrees/espresso-recipes/Coffee-App-Build/docs/qa/espresso-implementation/.runtime/ios-dev-env.json",
+    "next": "User testing in 2manybeans Dev; signed installer and native compatibility evidence retained for reproducing any device issues."
+  },
+  "vercelDeploymentId": "dpl_CpaN3QaYYQ19FKpFw49G5TE7CpNN",
+  "vercelState": "READY",
+  "proofLimits": [
+    "Installation and launch verified on the physical phone; authenticated sign-in, hosted chat and native tasting have not yet been exercised on-device.",
+    "Dev uses the existing Firebase project/account data; this is not an isolated test database."
+  ],
+  "evidence": {
+    "apiSigningBuild": "docs/qa/espresso-implementation/.runtime/phone-api-signing-build.log",
+    "install": "docs/qa/espresso-implementation/.runtime/phone-install.log",
+    "launch": "docs/qa/espresso-implementation/.runtime/phone-launch.log",
+    "finalArtifact": "docs/qa/espresso-implementation/.runtime/native-final-verification.json"
+  }
+}

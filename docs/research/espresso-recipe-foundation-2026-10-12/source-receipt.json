@@ -1,0 +1,42 @@
+{
+  "review_date": "2026-10-12",
+  "method": "Original YouTube English auto-captions and manufacturer PDF; relevant PDF diagrams visually checked. Raw files are ignored local evidence.",
+  "files": [
+    {
+      "file": "BES870_USCM_IB_X26_LR.pdf",
+      "sha256": "e5765d205258e6dcecf2f839c8a5111125d55aa691c4db381d472e2e67dbd18f",
+      "bytes": 4123670,
+      "url": "https://assets.breville.com/BES870/BES870_USCM_IB_X26_LR.pdf"
+    },
+    {
+      "file": "F4wrUP4c5P4.en.json3",
+      "sha256": "90a8d9ff5efcdca439292b1155bfafa1900a8c38c56bac8b1b1013325403bcdc",
+      "bytes": 179036,
+      "url": "https://www.youtube.com/watch?v=F4wrUP4c5P4"
+    },
+    {
+      "file": "QAzE-_ocf1U.en.json3",
+      "sha256": "42842d8224712fee4e4e4c868cb1ac02587c767318279773b249ef90a2a2b7d1",
+      "bytes": 305050,
+      "url": "https://www.youtube.com/watch?v=QAzE-_ocf1U"
+    },
+    {
+      "file": "aTFsBqhpLes.en.json3",
+      "sha256": "024e4c7ba44cc017f7a3bfa5398e044ec003e56490062f9e91d5fff943e4ad73",
+      "bytes": 265437,
+      "url": "https://www.youtube.com/watch?v=aTFsBqhpLes"
+    },
+    {
+      "file": "er2voEn8ZDU.en.json3",
+      "sha256": "b566e47a587b1f531304ea6547efb38bb625cfdfb8b955ad6739218e095de8e6",
+      "bytes": 257505,
+      "url": "https://www.youtube.com/watch?v=er2voEn8ZDU"
+    },
+    {
+      "file": "hQaV3w_XNiw.en.json3",
+      "sha256": "24991d7844073d550a8bd33d3f52941215fbb1d744b2f350f67e3d5c01481211",
+      "bytes": 223823,
+      "url": "https://www.youtube.com/watch?v=hQaV3w_XNiw"
+    }
+  ]
+}

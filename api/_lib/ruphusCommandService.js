@@ -3,13 +3,14 @@ import { validateExecutableRecipe } from '../../src/lib/ruphus/legacyRecipeResol
 import { absentRecipeSourceHash, resolveRecipeSource } from '../../src/lib/ruphus/recipeSourceState.js';
 import { normalizeClientVersion } from './ruphusRollout.js';
 import { aidenProfileHash } from '../../src/lib/ruphus/aidenProfilePreview.js';
+import { espressoSetupKey, validateEspressoRecipe } from '../../src/lib/espressoRecipes.js';
 
 export const MUTATION_MODES = Object.freeze(['apply_proposal', 'brew_once', 'keep_current', 'start_attempt', 'timer_started', 'complete_attempt', 'prepare_attempt', 'promote_attempt', 'undo_revision']);
 export const ORDINARY_MODES = Object.freeze(['replace_active_recipe', 'set_dose', 'set_aiden_grind', 'set_aiden_link']);
 
 const id = (prefix, actionId) => `${prefix}_${String(actionId || Date.now().toString(36)).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 48)}`;
 const fail = (code, message, details = {}) => { throw Object.assign(new Error(message), { code, details }); };
-const slotMethod = (slotKey) => slotKey === 'aiden' ? 'aiden' : slotKey?.startsWith('kalita') ? 'kalita' : 'v60';
+const slotMethod = (slotKey) => slotKey === 'aiden' ? 'aiden' : slotKey === 'espresso' ? 'espresso' : slotKey?.startsWith('kalita') ? 'kalita' : 'v60';
 const slotMode = (slotKey) => slotKey?.endsWith('iced') ? 'iced' : 'hot';
 const projection = (bean, slotKey, recipe) => {
   const next = { ...bean };
@@ -20,14 +21,23 @@ const projection = (bean, slotKey, recipe) => {
       if (bean[key] && !bean[`${key}ProfileHash`] && bean.aidenRecipe) next[`${key}ProfileHash`] = aidenProfileHash(bean.aidenRecipe);
     }
     next.aidenRecipe = clone(recipe);
-  }
-  else {
+  } else if (slotKey === 'espresso') {
+    next.espressoRecipe = clone(recipe);
+    next.espressoRecipesBySetup = { ...(next.espressoRecipesBySetup || {}), [recipe.setupKey]: clone(recipe) };
+  } else {
     const mapKey = slotMethod(slotKey) === 'kalita' ? 'kalita' : 'v60';
     const mapName = slotMode(slotKey) === 'iced' ? 'handBrewIcedRecipes' : 'handBrewRecipes';
     next[mapName] = { ...(next[mapName] || {}), [mapKey]: clone(recipe) };
     if (mapName === 'handBrewRecipes' && next.handBrewRecipe?.device === recipe.device) next.handBrewRecipe = clone(recipe);
   }
   next.activeRevisionIds = { ...(next.activeRevisionIds || {}) };
+  return next;
+};
+const removeEspressoSetupProjection = (bean, setupKey) => {
+  if (!setupKey || !bean.espressoRecipesBySetup?.[setupKey]) return bean;
+  const next = { ...bean, espressoRecipesBySetup: { ...bean.espressoRecipesBySetup } };
+  delete next.espressoRecipesBySetup[setupKey];
+  if (!Object.keys(next.espressoRecipesBySetup).length) delete next.espressoRecipesBySetup;
   return next;
 };
 const stableProjectionHash = (recipe, slotKey) => {
@@ -141,6 +151,10 @@ const assertRecipePatch = (patch, slotKey, recipe = null) => {
   if (!patch) return;
   const allowed = new Set(['aidenGrind', 'aidenLink', 'aidenUsedRelay', 'aidenIcedLink', 'aidenIcedUsedRelay']);
   const method = slotMethod(slotKey); const iced = slotMode(slotKey) === 'iced';
+  if (slotKey === 'espresso') {
+    if (Object.keys(patch).length !== 1 || !Object.hasOwn(patch, 'espressoRecipe') || canonicalHash(patch.espressoRecipe) !== canonicalHash(recipe)) fail('invalid_action', 'The espresso projection must be the fully validated recipe snapshot.');
+    return;
+  }
   const recipeRoot = `${iced ? 'handBrewIcedRecipes' : 'handBrewRecipes'}.${method}`;
   for (const key of Object.keys(patch)) {
     if (allowed.has(key) && (slotKey === 'aiden' || key !== 'aidenGrind')) continue;
@@ -156,11 +170,24 @@ const assertRecipePatch = (patch, slotKey, recipe = null) => {
     fail('invalid_action', 'Only the selected slot projection may be updated by this command.');
   }
 };
+const assertEspressoCommand = (bean, command, ownerPreferences = null) => {
+  const validation = validateEspressoRecipe(command.recipe, { coffeeId: command.coffeeId });
+  if (!validation.valid) fail('invalid_recipe', validation.errors.join('; '), { errors: validation.errors });
+  if (command.recipe.coffeeId !== command.coffeeId) fail('invalid_recipe', 'The espresso recipe belongs to a different bean.');
+  if (command.recipe.setupKey !== espressoSetupKey(command.recipe.setup)) fail('invalid_recipe', 'The espresso setup fingerprint is inconsistent.');
+  const boundPreferences = ownerPreferences || null;
+  if (!boundPreferences) fail('invalid_recipe', 'The owner espresso setup is unavailable; refresh equipment preferences before saving.');
+  if (espressoSetupKey(boundPreferences) !== command.recipe.setupKey) fail('invalid_recipe', 'The espresso recipe does not match the current owner equipment.');
+};
+const assertOrdinaryEspressoUndo = (state, current, command) => {
+  if (command.mode !== 'undo_revision' || command.slotKey !== 'espresso' || command.clientIntent !== 'espresso_direct_undo') return;
+  if (!current || current.ownerId !== state.uid || current.sourceState !== 'present' || current.source !== 'replace' || current.slotKey !== 'espresso') fail('not_found', 'This espresso save is unavailable for direct Undo.');
+};
 const valueMatchesSelected = (mirror, recipe, slotKey) => Boolean(mirror && recipe && (!mirror.device || mirror.device === slotMethod(slotKey)) && (!mirror.method || mirror.method === recipe.method || mirror.device === slotMethod(slotKey)) && stableProjectionHash(mirror, slotKey) === stableProjectionHash(recipe, slotKey));
 const receipt = ({ actionId, mode, status = 'succeeded', ...fields }) => ({ id: id('receipt', actionId), actionId, mode, status, ...fields, createdAt: new Date().toISOString() });
 
-export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.now() } = {}) {
-  const state = { uid, now: clock, beans: new Map(), revisions: new Map(), proposals: new Map(), attempts: new Map(), actions: new Map(), receipts: new Map() };
+export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.now(), preferences = null } = {}) {
+  const state = { uid, now: clock, preferences, beans: new Map(), revisions: new Map(), proposals: new Map(), attempts: new Map(), actions: new Map(), receipts: new Map() };
   const execute = (command = {}) => {
     if (!command.actionId) fail('invalid_action', 'actionId is required');
     if (!command.coffeeId) fail('invalid_action', 'coffeeId is required');
@@ -175,8 +202,13 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
     const slotKey = command.slotKey || (command.mode === 'set_aiden_grind' ? 'aiden' : command.mode === 'set_dose' ? 'v60_hot' : null);
     if (!slotKey) fail('invalid_action', 'slotKey is required');
     state.commandMode = command.mode;
+    if (slotKey === 'espresso' && command.mode === 'replace_active_recipe') {
+      assertEspressoCommand(bean, command, state.preferences || null);
+      assertRecipePatch(command.patch, slotKey, command.recipe);
+    }
     const current = revisionFor(state, bean, command.coffeeId, slotKey, command.recipe, command);
     checkCommandExpected(state, current, command);
+    assertOrdinaryEspressoUndo(state, current, command);
     const mode = command.mode;
     if (!MUTATION_MODES.includes(mode) && !ORDINARY_MODES.includes(mode)) fail('unsupported_mode', 'Unsupported recipe command.');
     let result;
@@ -269,6 +301,7 @@ export function createMemoryCommandStore({ uid = 'user-1', clock = () => Date.no
   };
   return {
     seedBean(coffeeId, bean) { state.beans.set(coffeeId, clone({ ...bean, id: coffeeId, ownerId: bean.ownerId || state.uid })); },
+    setPreferences(next) { state.preferences = clone(next); },
     seedProposal(proposal) { state.proposals.set(proposal.id, clone(proposal)); },
     seedAttempt(attempt) { state.attempts.set(attempt.id, clone(attempt)); },
     execute,
@@ -290,15 +323,32 @@ function createAttempt(state, command, revision, proposalId) {
 function commitRevision(state, bean, current, command, recipe, source, proposal = null, undoneRevisionId = null) {
   const validation = validateExecutableRecipe(recipe, command.slotKey);
   if (!validation.valid) fail('invalid_recipe', validation.errors.join('; '), { errors: validation.errors });
-  const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.sourceState === 'absent' ? null : current.id, parentSourceState: current.sourceState || 'present', snapshot: clone(recipe), snapshotHash: stableProjectionHash(recipe, command.slotKey), sourceState: 'present', ...(command.slotKey === 'aiden' ? { aidenGrind: clone(command.patch?.aidenGrind ?? bean.aidenGrind ?? null) } : {}), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
+  const previousSetupTarget = command.slotKey === 'espresso' && source === 'replace'
+    ? bean.espressoRecipesBySetup?.[recipe.setupKey]
+    : null;
+  const revision = { id: id('revision', command.actionId), ownerId: state.uid, coffeeId: command.coffeeId, slotKey: command.slotKey, parentId: current.sourceState === 'absent' ? null : current.id, parentSourceState: current.sourceState || 'present', snapshot: clone(recipe), snapshotHash: stableProjectionHash(recipe, command.slotKey), sourceState: 'present', ...(command.slotKey === 'aiden' ? { aidenGrind: clone(command.patch?.aidenGrind ?? bean.aidenGrind ?? null) } : {}), ...(previousSetupTarget ? { previousSetupTarget: clone(previousSetupTarget) } : {}), source, proposalId: proposal?.id || null, undoneRevisionId, status: 'active', createdAt: new Date(state.now()).toISOString() };
   state.revisions.set(revision.id, revision);
-  const next = projection(bean, command.slotKey, recipe); next.activeRevisionIds[command.slotKey] = revision.id;
+  // A normal setup replacement keeps the prior setup target available for a
+  // later switch. Undo removes only the setup target being undone, then
+  // restores the exact parent snapshot; unrelated setup targets remain.
+  const setupToRemove = command.slotKey === 'espresso' && source === 'undo' ? current.snapshot?.setupKey : null;
+  let projectionBase = removeEspressoSetupProjection(bean, setupToRemove);
+  if (source === 'undo' && current.previousSetupTarget?.setupKey) {
+    projectionBase = {
+      ...projectionBase,
+      espressoRecipesBySetup: {
+        ...(projectionBase.espressoRecipesBySetup || {}),
+        [current.previousSetupTarget.setupKey]: clone(current.previousSetupTarget),
+      },
+    };
+  }
+  const next = projection(projectionBase, command.slotKey, recipe); next.activeRevisionIds[command.slotKey] = revision.id;
   const recipeProvenance = { ...(next.recipeProvenance || {}) };
   if (source === 'apply' || source === 'promote') recipeProvenance[command.slotKey] = { source, revisionId: revision.id, slotKey: command.slotKey };
   if (source === 'replace' || source === 'undo') delete recipeProvenance[command.slotKey];
   next.recipeProvenance = recipeProvenance;
   state.beans.set(command.coffeeId, next);
-  return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.sourceState === 'absent' ? null : current.id, parentSourceState: current.sourceState || 'present', sourceState: 'present', createdFirstSavedRecipe: current.sourceState === 'absent', proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' }) };
+  return { ok: true, revision: clone(revision), bean: clone(next), receipt: receipt({ actionId: command.actionId, mode: command.mode, coffeeId: command.coffeeId, slotKey: command.slotKey, revisionId: revision.id, parentRevisionId: current.sourceState === 'absent' ? null : current.id, parentSourceState: current.sourceState || 'present', sourceState: 'present', createdFirstSavedRecipe: current.sourceState === 'absent', proposalId: proposal?.id || null, physicalBrewConfirmed: false, undoAvailable: source === 'apply' || source === 'promote' || (command.slotKey === 'espresso' && (current.sourceState === 'absent' || source === 'replace')) }) };
 }
 
 function liveAbsentSource(slotKey) {
@@ -308,6 +358,15 @@ function liveAbsentSource(slotKey) {
 function absenceProjection(bean, slotKey) {
   const next = { ...bean };
   if (slotKey === 'aiden') delete next.aidenRecipe;
+  else if (slotKey === 'espresso') {
+    const setupKey = next.espressoRecipe?.setupKey;
+    delete next.espressoRecipe;
+    if (setupKey && next.espressoRecipesBySetup?.[setupKey]) {
+      next.espressoRecipesBySetup = { ...next.espressoRecipesBySetup };
+      delete next.espressoRecipesBySetup[setupKey];
+      if (!Object.keys(next.espressoRecipesBySetup).length) delete next.espressoRecipesBySetup;
+    }
+  }
   else {
     const mapKey = slotMethod(slotKey) === 'kalita' ? 'kalita' : 'v60';
     const mapName = slotMode(slotKey) === 'iced' ? 'handBrewIcedRecipes' : 'handBrewRecipes';
@@ -369,6 +428,7 @@ export async function executeRecipeCommand({ db, uid, clientVersion = null, ...c
   if (!uid) fail('owner_required', 'Authenticated owner is required.');
   return db.runTransaction(async (tx) => {
     const beanRef = db.collection('users').doc(uid).collection('beans').doc(command.coffeeId);
+    const profileRef = db.collection('users').doc(uid);
     const actionRef = db.collection('users').doc(uid).collection('actions').doc(command.actionId);
     const actionSnap = await tx.get(actionRef);
     if (actionSnap.exists) {
@@ -379,6 +439,8 @@ export async function executeRecipeCommand({ db, uid, clientVersion = null, ...c
     const beanSnap = await tx.get(beanRef);
     if (!beanSnap.exists) fail('not_found', 'Coffee is not available.');
     const bean = { id: command.coffeeId, ...beanSnap.data() };
+    const profileSnap = await tx.get(profileRef);
+    const ownerPreferences = profileSnap.exists ? profileSnap.data()?.preferences || null : null;
     const slotKey = command.slotKey || (command.mode === 'set_aiden_grind' ? 'aiden' : command.mode === 'set_dose' ? 'v60_hot' : null);
     if (!slotKey) fail('invalid_action', 'slotKey is required');
     const currentId = bean.activeRevisionIds?.[slotKey];
@@ -387,7 +449,7 @@ export async function executeRecipeCommand({ db, uid, clientVersion = null, ...c
     if (command.proposalId) refs.push({ kind: 'proposal', ref: db.collection('users').doc(uid).collection('proposals').doc(command.proposalId) });
     if (command.attemptId) refs.push({ kind: 'attempt', ref: db.collection('users').doc(uid).collection('brewAttempts').doc(command.attemptId) });
     const snapshots = await Promise.all(refs.map(({ ref }) => tx.get(ref)));
-    const state = { uid, now: () => Date.now(), commandMode: command.mode, beans: new Map([[command.coffeeId, bean]]), revisions: new Map(), proposals: new Map(), attempts: new Map(), actions: new Map(), receipts: new Map() };
+    const state = { uid, now: () => Date.now(), preferences: ownerPreferences, commandMode: command.mode, beans: new Map([[command.coffeeId, bean]]), revisions: new Map(), proposals: new Map(), attempts: new Map(), actions: new Map(), receipts: new Map() };
     refs.forEach(({ kind }, index) => {
       const snap = snapshots[index];
       if (!snap.exists) return;
@@ -446,8 +508,13 @@ function executeOnState(state, command) {
   const bean = state.beans.get(command.coffeeId);
   if (!bean) fail('not_found', 'Coffee is not available.');
   state.commandMode = command.mode;
+  if (command.slotKey === 'espresso' && command.mode === 'replace_active_recipe') {
+    assertEspressoCommand(bean, command, state.preferences || null);
+    assertRecipePatch(command.patch, command.slotKey, command.recipe);
+  }
   const current = revisionFor(state, bean, command.coffeeId, command.slotKey, command.recipe, command);
   checkCommandExpected(state, current, command);
+  assertOrdinaryEspressoUndo(state, current, command);
   const mode = command.mode;
   if (['apply_proposal', 'brew_once', 'keep_current'].includes(mode) && command.proposalId) {
     const boundProposal = state.proposals.get(command.proposalId);

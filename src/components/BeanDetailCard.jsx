@@ -17,7 +17,7 @@ import { haptic } from '../lib/haptics';
 import { fonts } from '../styles/theme';
 import { getPeakStatus, daysSinceRoast, formatDate } from '../lib/peakStatus';
 import { summarizeSourceInsights } from '../lib/sourceInsights';
-import { getBrewMethod } from '../lib/brewMethods';
+import { getBrewMethod, hasSavedBrewProfile } from '../lib/brewMethods';
 import { usePreferences } from '../hooks/useUserProfile';
 import { tastingIcon, tastingIconImage } from '../lib/tastingIcons';
 import { useStrippedBag, bagPhotoFor } from '../lib/stripBg';
@@ -723,7 +723,7 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                   </Panel>
 
                   {/* Saved brew profile (archive only) — read-only recap of stored recipes */}
-                  {showBrewProfile && (bean.aidenRecipe || bean.handBrewRecipe) && (
+                  {hasSavedBrewProfile({ showBrewProfile, aidenRecipe: bean.aidenRecipe, handBrewRecipe: bean.handBrewRecipe, espressoRecipe: bean.espressoRecipe }) && (
                     <Panel>
                       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                         <Coffee size={26} color={INK} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -745,6 +745,13 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
                               <div style={{ fontFamily: G, fontSize: 13, color: GRAY, lineHeight: 1.5 }}>
                                 {[bean.handBrewRecipe.method, bean.handBrewRecipe.coffeeGrams && bean.handBrewRecipe.waterGrams && `${bean.handBrewRecipe.coffeeGrams}g / ${bean.handBrewRecipe.waterGrams}g`, bean.handBrewRecipe.ratio, bean.handBrewRecipe.grindSize?.description && `Grind ${bean.handBrewRecipe.grindSize.description}`].filter(Boolean).join(' · ')}
                               </div>
+                            </div>
+                          )}
+                          {bean.espressoRecipe && (
+                            <div style={{ marginTop: bean.aidenRecipe || bean.handBrewRecipe ? 10 : 0 }}>
+                              <RecipeProvenanceStrip provenance={bean.recipeProvenance?.espresso} onUndo={onUndoRecipe && bean.recipeProvenance?.espresso ? () => onUndoRecipe(bean.recipeProvenance.espresso) : undefined} />
+                              <div style={{ fontFamily: G, fontSize: 12.5, fontWeight: 700, color: '#3A3632', marginBottom: 2 }}>Espresso</div>
+                              <div style={{ fontFamily: G, fontSize: 11.5, color: GRAY }}>{[bean.espressoRecipe.doseGrams && `${bean.espressoRecipe.doseGrams}g`, bean.espressoRecipe.yieldGrams && `${bean.espressoRecipe.yieldGrams}g out`, bean.espressoRecipe.ratio && `1:${bean.espressoRecipe.ratio}`, bean.espressoRecipe.provenance?.label].filter(Boolean).join(' · ')}</div>
                             </div>
                           )}
                         </div>

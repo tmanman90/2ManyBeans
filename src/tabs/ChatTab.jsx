@@ -14,13 +14,15 @@ import { streamWithAuth, resolveTerminal, holdBackScan } from '../lib/streamChat
 import { chatErrorMessage } from '../lib/fetchWithRetry';
 import { AidenModal } from '../components/AidenModal';
 import { HandBrewModal } from '../components/HandBrewModal';
+import { EspressoModal } from '../components/EspressoModal';
 import { Toast } from '../components/Toast';
 import { Btn } from '../components/Btn';
 import { useAidenBrew } from '../hooks/useAidenBrew';
 import { useHandBrew } from '../hooks/useHandBrew';
+import { useEspressoBrew } from '../hooks/useEspressoBrew';
 import { useNativeKeyboard } from '../hooks/useNativeKeyboard';
 import { useChatSession } from '../hooks/useChatSession';
-import { getBrewMethod } from '../lib/brewMethods';
+import { getBrewMethod, isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
 import { buildNewBeanData } from '../lib/beanBuilder';
 import { getPeakStatus, daysOpen } from '../lib/peakStatus';
 import { usePreferences } from '../hooks/useUserProfile';
@@ -32,6 +34,7 @@ import { StreamingBubble } from '../components/chat/StreamingBubble';
 import { recipeSummary } from '../components/chat/RecipeCard';
 import { parseBeanScan, parseRecipeCard, trimApiMessages } from '../lib/chatParse';
 import { isRuphusAgentV3Enabled, isRuphusMutationEnabled } from '../lib/ruphus/featureFlags';
+import { espressoTastingContext } from '../lib/brewContext';
 import { streamAgentWithAuth } from '../lib/ruphus/streamAgent';
 import { useRuphusAction } from '../hooks/useRuphusAction';
 import { prepareRecipePreview } from '../lib/recipeCommands';
@@ -554,7 +557,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const [historicalProposal, setHistoricalProposal] = useState(null);
   const historicalOriginRef = useRef(null);
   const handleRuphusAction = useCallback(async (request) => {
-    if (!mutationEnabled) return null;
+    const espressoReceipt = request?.artifact?.slotKey === 'espresso'
+      && ['action_receipt', 'undo_receipt'].includes(request?.artifact?.type);
+    if (!mutationEnabled && !espressoReceipt) return null;
     try { return await runRuphusAction(request); } catch (error) {
       if (isStaleRecipeError(error) && request?.artifact?.id) {
         const currentPreview = recipePreviewRef.current;
@@ -704,11 +709,23 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     if (!beanId) return;
     await updateBean(beanId, updates);
   };
-  const isHandBrew = preferences.brewMethod !== 'aiden';
+  const isHandBrew = isManualBrewMethod(preferences.brewMethod);
+  const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
   const aiden = useAidenBrew(ephemeralUpdateBean);
   const handBrew = useHandBrew(ephemeralUpdateBean, saveHandBrewTiming);
+  const espresso = useEspressoBrew();
+  const { handleBrewEspresso } = espresso;
 
   const openRecipePreview = useCallback((artifact) => {
+    if (artifact?.slotKey === 'espresso') {
+      const bean = beans.find((item) => item.id === artifact.coffeeId);
+      if (!bean) {
+        setToast('That coffee is no longer in your rotation.');
+        return;
+      }
+      handleBrewEspresso(bean, true);
+      return;
+    }
     if (!artifact || !['v60_hot', 'v60_iced', 'kalita_hot', 'kalita_iced'].includes(artifact.slotKey)) return;
     const bean = beans.find((item) => item.id === artifact.coffeeId);
     if (!bean) {
@@ -734,7 +751,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
     } catch (error) {
       setToast(error.message || 'This recipe preview is unavailable.');
     }
-  }, [beans, uid, preferences?.grinder]);
+  }, [beans, uid, preferences?.grinder, handleBrewEspresso]);
 
   // Historical cards have no action authority. Inspection keeps the exact
   // delivered artifact (including a source projection) and never enters the
@@ -1018,7 +1035,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
 
   const handleBrewRecipe = (bean) => {
     if (!bean) return;
-    if (isHandBrew) {
+    if (isEspresso) {
+      handleBrewEspresso(bean);
+    } else if (isHandBrew) {
       handBrew.handleBrewHandBrew(bean);
     } else {
       aiden.handleBrewWithAiden(bean);
@@ -1533,7 +1552,9 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
   const handleBrewScanned = () => {
     if (!scannedBean) return;
     const ephemeralBean = { ...scannedBean, status: 'SEALED' };
-    if (isHandBrew) {
+    if (isEspresso) {
+      handleBrewEspresso(ephemeralBean);
+    } else if (isHandBrew) {
       handBrew.handleBrewHandBrew(ephemeralBean);
     } else {
       aiden.handleBrewWithAiden(ephemeralBean);
@@ -1672,7 +1693,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
             if (i === 0 && msg.role === 'assistant' && !msg.content?.trim() && !msg.artifacts?.length && !msg.photos?.length) return null;
             return (
               <m.div key={msg.id} {...(reduceMotion ? {} : fadeUp)} transition={{ duration: motionTokens.dur.base, ease: motionTokens.ease.out, delay: 0 }}>
-                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} onInspect={handleHistoricalProposalInspect} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
+                {agentEnabled && msg.role === 'assistant' && msg.turnId ? <RuphusMessage text={msg.content}><div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{(msg.artifacts || []).map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onEspressoAction={handleRuphusAction} onPreview={openRecipePreview} onInspect={handleHistoricalProposalInspect} actionPending={Boolean(ruphusActionPending)} />)}</div></RuphusMessage> : <ChatMessage
                   msg={msg}
                   onRetryErrored={handleRetryErrored}
                   recipeActions={{
@@ -1681,7 +1702,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
                     onBrew: handleBrewRecipe,
                     onSave: handleSaveRecipe,
                     savingKey: savingRecipeKey,
-                    brewing: isHandBrew
+                    brewing: isEspresso ? (espresso.espressoModal || espresso.espressoLoading) : isHandBrew
                       ? (handBrew.handBrewModal || handBrew.handBrewLoading)
                       : (aiden.aidenModal || aiden.aidenLoading),
                   }}
@@ -1700,7 +1721,7 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
           />
         )}
         {agentEnabled && loading && agentText && <RuphusMessage text={agentText} />}
-        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onPreview={openRecipePreview} onInspect={handleHistoricalProposalInspect} actionPending={Boolean(ruphusActionPending)} />)}</div>}
+        {agentEnabled && !loading && agentArtifacts.length > 0 && <div style={{ display: 'grid', gap: 8 }}>{agentArtifacts.map(artifact => <ArtifactRenderer key={artifact.id} artifact={artifact} onAction={mutationEnabled ? handleRuphusAction : undefined} onEspressoAction={handleRuphusAction} onPreview={openRecipePreview} onInspect={handleHistoricalProposalInspect} actionPending={Boolean(ruphusActionPending)} />)}</div>}
         {historicalProposal && <HistoricalRecipeInspector proposal={historicalProposal} onClose={closeHistoricalProposal} />}
       </div>
 
@@ -1832,6 +1853,25 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
         onPersistDose={handBrew.persistDose}
         onSaveTimingEvent={handBrew.saveTimingEvent}
         onTimerStart={handBrew.startAttemptTimer}
+      />
+      <EspressoModal
+        open={espresso.espressoModal}
+        onClose={espresso.closeEspressoModal}
+        bean={espresso.espressoBean}
+        recipe={espresso.espressoRecipe}
+        loading={espresso.espressoLoading}
+        error={espresso.espressoError}
+        phase={espresso.espressoPhase}
+        notice={espresso.espressoNotice}
+        setupMismatch={espresso.espressoSetupMismatch}
+        onStartCurrentSetup={espresso.startEspressoForCurrentSetup}
+        onRetry={espresso.onRetry}
+        onRegenerate={espresso.onRegenerate}
+        onSave={espresso.saveEspressoRecipe}
+        onUndo={espresso.undoEspressoRecipe}
+        onDoseChange={espresso.editEspressoDose}
+        onYieldChange={espresso.editEspressoYield}
+        onStartTasting={() => onStartTastingSession?.(espresso.espressoBean?.id, null, espresso.espressoRecipe ? espressoTastingContext({ recipe: espresso.espressoRecipe, savedRecipe: espresso.espressoBean?.espressoRecipe, setup: espresso.espressoRecipe.setup, revisionId: espresso.espressoBean?.activeRevisionIds?.espresso }) : null)}
       />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
     </div>
