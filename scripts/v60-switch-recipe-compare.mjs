@@ -19,6 +19,7 @@ import {
   generateV60SwitchRecipe, validateV60SwitchCandidate, V60_SWITCH_ENGINE_VERSION, V60_SWITCH_RULES_VERSION,
 } from '../src/lib/v60SwitchAdapter.js';
 import { V60_SWITCH_CLASSIC_BASELINE_MICRONS, V60_SWITCH_PROCESS_OVERRIDE } from '../src/data/v60SwitchConfiguration.js';
+import { isMain } from './is-main.mjs';
 
 const EVALUATION_BEANS_PATH = new URL('../docs/data/v60-switch-recipe-evaluation-beans.json', import.meta.url);
 
@@ -396,7 +397,7 @@ export function renderMarkdown(report) {
   return lines.join('\n');
 }
 
-if (fileURLToPath(import.meta.url) === resolve(process.argv[1] || '')) {
+if (isMain(import.meta.url)) {
   const report = buildReport();
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(report, null, 2));

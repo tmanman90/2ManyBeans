@@ -2,6 +2,7 @@ import { runPreflight } from './capability-preflight.mjs';
 import { createAgentRunner, sealCalibrationManifest } from './agent-runner.mjs';
 import { MODEL_ARMS } from './models.mjs';
 import { parseCandidateResponse } from './tournament.mjs';
+import { isMain } from '../is-main.mjs';
 
 /**
  * Entry point for the paid evaluation. Configuration is deliberately injected
@@ -79,7 +80,7 @@ export async function runFrozenEvaluation({
   return { ok: finalist.ok, classification: finalist.ok ? 'pending-blind-review' : finalist.classification, stage: 'finalist-blind-review', dispatched: finalist.dispatched, calibration, sealedManifest, canary, qualification, blindReview, finalist, finalistBlindReview, preflight: checkedPreflight };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const outcome = await runEvaluation();
   if (!outcome.ok) process.exitCode = 2;
 }
