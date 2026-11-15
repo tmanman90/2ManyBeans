@@ -73,7 +73,7 @@ test('existing entry points do not classify espresso as hand brew or Aiden', () 
     'src/tabs/RotationTab.jsx',
     'src/tabs/InventoryTab.jsx',
     'src/tabs/ChatTab.jsx',
-    'src/components/QuickRecipeFlow.jsx',
+    'src/lib/quickRecipe.js', // Quick Recipe's brewer classification lives here
   ]) {
     const source = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /preferences\.brewMethod\s*!==\s*['"]aiden['"]/);
