@@ -47,7 +47,7 @@
            background: linear-gradient(160deg, #3A4A55 0%, #26313A 60%, #1C232A 100%); }
   .strip.tall { height: 196px; }
   .sb { position: absolute; top: 19px; font: 600 16px/1 -apple-system, system-ui; color: #fff; }
-  .sb.l { left: 34px; } .sb.r { right: 30px; display: flex; gap: 6px; align-items: center; }
+  .sb.l { left: 34px; } .sb.r { right: 24px; display: flex; gap: 6px; align-items: center; }
   .bars { display: flex; gap: 2px; align-items: flex-end; height: 11px; }
   .bars i { width: 3px; background: #fff; border-radius: 1px; display: block; }
   .batt { width: 25px; height: 12px; border: 1.5px solid rgba(255,255,255,.55); border-radius: 4px; padding: 1.5px; }
@@ -129,7 +129,7 @@
   <symbol id="cup" viewBox="0 0 24 24"><path d="M4 8.5h12.5v5.5a5.5 5.5 0 0 1-5.5 5.5H9.5A5.5 5.5 0 0 1 4 14V8.5Zm12.5 1.5h1.2a2.8 2.8 0 0 1 0 5.6h-1.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 2.8c-.6.9.6 1.6 0 2.6M11.5 2.8c-.6.9.6 1.6 0 2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
 </svg>
 
-<template id="statusbar"><div class="sb l num">9:41</div><div class="sb r"><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span class="batt"><i></i></span></div></template>
+<template id="statusbar"><div class="sb l num">9:41</div><div class="sb r"><span class="batt"><i></i></span></div></template>
 
 <!-- ============ 01 COMPACT ============ -->
 <div class="board" id="compact">
@@ -138,14 +138,11 @@
 
   <div class="strip" data-sb>
     <div class="island compact">
-      <div class="lead" style="color:var(--caramel)">
-        <svg width="12" height="12"><use href="#drop"/></svg>
-        <span class="cmp-num num">190g</span>
-      </div>
+      <div class="lead" style="color:var(--caramel)"><span class="cmp-num num">190g</span></div>
       <div class="trail"><span class="cmp-num num" style="color:var(--ink)">0:21</span></div>
     </div>
   </div>
-  <div class="cap"><b>Pouring.</b> Target scale weight left, step countdown right.</div>
+  <div class="cap"><b>Pouring.</b> Target scale weight left (caramel), step countdown right. Each side fits 52 pt.</div>
 
   <div class="strip" data-sb style="margin-top:14px">
     <div class="island compact">
@@ -166,10 +163,10 @@
   <div class="strip" data-sb style="margin-top:14px">
     <div class="island compact">
       <div class="lead" style="color:var(--amber)"><svg width="14" height="14"><use href="#tap"/></svg></div>
-      <div class="trail"><span class="cmp-num" style="color:var(--amber);font-size:14px">Your turn</span></div>
+      <div class="trail"><span class="cmp-num num" style="color:var(--amber)">0:08</span></div>
     </div>
   </div>
-  <div class="cap"><b>Confirm-to-advance step</b> (source recipes that wait for you). No countdown to show.</div>
+  <div class="cap"><b>Your turn.</b> Source recipes that wait for you to confirm a step. Counts up from when the step became due.</div>
 </div>
 
 <!-- ============ 02 MINIMAL ============ -->
@@ -196,8 +193,8 @@
 
   <div class="row" style="margin-top:16px;gap:28px">
     <div>
-      <div class="strip" data-sb style="width:190px;border-radius:22px 22px 0 0">
-        <div class="island rest" style="left:40%"></div>
+      <div class="strip" style="width:190px">
+        <div class="island rest" style="left:14px;transform:none"></div>
         <div class="minimal" style="left:146px">
           <svg width="30" height="30" viewBox="0 0 30 30">
             <circle cx="15" cy="15" r="12.5" fill="none" stroke="rgba(226,162,102,0.25)" stroke-width="3"/>
@@ -209,8 +206,8 @@
       <div class="cap"><b>Drawdown</b></div>
     </div>
     <div>
-      <div class="strip" data-sb style="width:190px">
-        <div class="island rest" style="left:40%"></div>
+      <div class="strip" style="width:190px">
+        <div class="island rest" style="left:14px;transform:none"></div>
         <div class="minimal" style="left:146px"><svg width="14" height="14" style="color:var(--ink-2)"><use href="#pause"/></svg></div>
       </div>
       <div class="cap"><b>Paused</b></div>
@@ -218,15 +215,15 @@
   </div>
   <div class="row" style="margin-top:12px;gap:28px">
     <div>
-      <div class="strip" data-sb style="width:190px">
-        <div class="island rest" style="left:40%"></div>
+      <div class="strip" style="width:190px">
+        <div class="island rest" style="left:14px;transform:none"></div>
         <div class="minimal" style="left:146px"><svg width="16" height="16" style="color:var(--sage)"><use href="#check"/></svg></div>
       </div>
       <div class="cap"><b>Done</b></div>
     </div>
     <div>
-      <div class="strip" data-sb style="width:190px">
-        <div class="island rest" style="left:40%"></div>
+      <div class="strip" style="width:190px">
+        <div class="island rest" style="left:14px;transform:none"></div>
         <div class="minimal" style="left:146px"><svg width="15" height="15" style="color:var(--amber)"><use href="#tap"/></svg></div>
       </div>
       <div class="cap"><b>Your turn</b></div>
@@ -238,7 +235,7 @@
 <div class="board" id="expanded">
   <h2>03 · Expanded</h2>
   <h3>Long-press the island</h3>
-  <div class="strip tall" data-sb style="height:200px">
+  <div class="strip tall" data-sb style="height:178px">
     <div class="expanded">
       <div class="ex-top">
         <div class="lead">
@@ -387,11 +384,11 @@
       <div class="la-head"><span class="t"><svg width="13" height="13" style="color:var(--frost)"><use href="#snow"/></svg>Ethiopia Guji · Iced V60</span><span class="num">Brew 3:05</span></div>
       <div class="la-main">
         <div><div class="sub" style="color:var(--frost)">Chill and serve</div><div class="what">Swirl over ice</div></div>
-        <svg width="40" height="40" viewBox="0 0 40 40" style="color:var(--frost)"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(169,195,208,.25)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#A9C3D0" stroke-width="4" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="40" transform="rotate(-90 20 20)"/><use href="#snow" x="12" y="12" width="16" height="16"/></svg>
+        <div style="text-align:right"><div class="hint" style="justify-content:flex-end">chilling</div><div class="num" style="font:600 26px/1 -apple-system,system-ui;color:var(--frost);margin-top:4px">0:42</div></div>
       </div>
     </div>
   </div>
-  <div class="cap"><b>Iced.</b> After drawdown, the frost tint takes over for the chill step, matching the in-app iced mode.</div>
+  <div class="cap"><b>Iced.</b> After drawdown, the frost tint takes over for the chill step (the in-app "Coffee chilled" step). Counts up, ends when you tap Coffee chilled.</div>
 </div>
 
 <script>
