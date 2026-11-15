@@ -62,6 +62,8 @@
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Coffee Hub connects to your coffee scale to track your pours.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take photos of coffee bags to scan bean details</string>
 	<key>NSPhotoLibraryUsageDescription</key>
