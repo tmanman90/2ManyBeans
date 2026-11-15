@@ -183,8 +183,11 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
     ? { ...newBeanEntry, ...(liveNewBean || {}), _scanPhotos: newBeanEntry._scanPhotos }
     : null;
 
+  // Quick Recipe has already kept this bean in the Archive (recordedBeanId).
+  // Saving writes the full inventory bean over that same record, so the
+  // Archive entry and any rating on it become this one inventory bean.
   const handleSaveToInventory = async (data) => {
-    const { aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, handBrewIcedRecipes, espressoRecipe, photo, ...fields } = data;
+    const { recordedBeanId, aidenRecipe, aidenLink, aidenGrind, handBrewRecipe, handBrewRecipes, handBrewIcedRecipes, espressoRecipe, photo, ...fields } = data;
     const aidenData = aidenRecipe ? { aidenRecipe, aidenLink, aidenGrind } : undefined;
     const beanData = buildNewBeanData(fields, { aidenData });
     if (handBrewRecipe) beanData.handBrewRecipe = handBrewRecipe;
@@ -194,7 +197,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
       // A scan has no canonical bean id yet. Never persist its espresso
       // snapshot with coffeeId:null; create the inventory record first, then
       // attach the exact edited snapshot through the authenticated command.
-      const beanId = await addBean(beanData);
+      const beanId = await addBean(beanData, recordedBeanId);
       let savedBean = { id: beanId, ...beanData };
       if (espressoRecipe) {
         const reboundBase = { ...espressoRecipe, coffeeId: beanId };
@@ -746,7 +749,6 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onSaveToInventory={handleSaveToInventory}
         addBean={addBean}
         addTasting={addTasting}
-        uid={uid}
         onStartTastingSession={onStartTastingSession}
       />
       {newBeanEntry && (
@@ -756,7 +758,8 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
           bean={newBeanForModal}
           updateBean={updateBean}
           deleteBean={deleteBean}
-          isNewBean
+          // Not isNewBean: Cancel must not delete the bean, which is also its
+          // Archive record from Quick Recipe.
           uid={uid}
         />
       )}
