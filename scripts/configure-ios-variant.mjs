@@ -184,8 +184,9 @@ const patchProject = () => {
   const source = readFileSync(projectPath, 'utf8');
   const updated = replaceRequired(
     source,
-    /PRODUCT_BUNDLE_IDENTIFIER = com\.talmeltzer\.coffeehub(?:\.dev)?;/g,
-    `PRODUCT_BUNDLE_IDENTIFIER = ${variant.appId};`,
+    // The brew Live Activity extension's ID is the app's plus ".BrewActivity".
+    /PRODUCT_BUNDLE_IDENTIFIER = com\.talmeltzer\.coffeehub(?:\.dev)?(\.BrewActivity)?;/g,
+    `PRODUCT_BUNDLE_IDENTIFIER = ${variant.appId}$1;`,
     'PRODUCT_BUNDLE_IDENTIFIER in Xcode project',
   );
 

@@ -6,6 +6,11 @@ import Capacitor
 /// StatusBar plugin's resizeWebView() can introduce on certain iPhone models.
 class MyViewController: CAPBridgeViewController {
 
+    override func capacitorDidLoad() {
+        // Local plugins in the app target are not auto-registered.
+        bridge?.registerPluginInstance(BrewActivityPlugin())
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         // The StatusBar plugin runs its resizeWebView() on capacitorViewDidAppear

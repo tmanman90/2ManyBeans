@@ -26,6 +26,7 @@ import { usePreferences } from './hooks/useUserProfile';
 import { Modal } from './components/Modal';
 import { BrewTimer } from './components/BrewTimer';
 import { clearBrewTimerSession, readBrewTimerSession } from './lib/brewTimerSession';
+import { endBrewActivity } from './lib/brewLiveActivity';
 import { useRuphusAttemptOutbox } from './hooks/useRuphusAttemptOutbox';
 import { validateLaunchContext } from './lib/ruphus/conversationContract.js';
 
@@ -49,7 +50,12 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
   const { preferences } = usePreferences();
   const [tab, setTab] = useState('rotation');
   const [recoveringTimer, setRecoveringTimer] = useState(() => readBrewTimerSession(uid));
-  useEffect(() => { setRecoveringTimer(readBrewTimerSession(uid)); }, [uid]);
+  useEffect(() => {
+    const session = readBrewTimerSession(uid);
+    setRecoveringTimer(session);
+    // A Live Activity left from a brew this launch cannot reopen.
+    if (!session) endBrewActivity();
+  }, [uid]);
   // Onboarding palate seam (null for every pre-onboarding-100x profile).
   const onboardingPalate = useMemo(() => getOnboardingPalate(profile), [profile]);
   const [openModal, setOpenModal] = useState(false);
