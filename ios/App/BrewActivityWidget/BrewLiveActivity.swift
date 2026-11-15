@@ -116,14 +116,15 @@ private struct BrewFace {
         }
     }
 
-    /// "POUR 3 OF 4", "PAUSED · POUR 3 OF 4", "YOUR TURN · STEP 3 OF 5"
-    func header(stepCount: Int) -> String {
+    /// "POUR 3 OF 4", "PAUSED · POUR 3 OF 4", "YOUR TURN · STEP 3 OF 5".
+    /// `short` drops the step for the narrow expanded island corner.
+    func header(stepCount: Int, short: Bool = false) -> String {
         let title = step?.title ?? ""
         switch kind {
         case .pour, .wait: return title.uppercased()
-        case .paused: return "PAUSED · \(title.uppercased())"
-        case .yourTurn: return "YOUR TURN · STEP \(index + 1) OF \(stepCount)"
-        case .chill: return "CHILL AND SERVE"
+        case .paused: return short ? "PAUSED" : "PAUSED · \(title.uppercased())"
+        case .yourTurn: return short ? "YOUR TURN" : "YOUR TURN · STEP \(index + 1) OF \(stepCount)"
+        case .chill: return short ? "CHILL" : "CHILL AND SERVE"
         case .done: return "BREW DONE"
         }
     }
@@ -148,8 +149,8 @@ private struct ClockText: View {
     var body: some View {
         switch clock {
         case let .countdown(start, end):
-            // pauseTime stops it at 0:00 instead of counting past the end.
-            Text(timerInterval: min(start, end) ... end, pauseTime: end, countsDown: true)
+            // A timer interval stops at 0:00 at its end instead of counting past.
+            Text(timerInterval: min(start, end) ... end, countsDown: true)
         case let .countUp(from):
             Text(timerInterval: from ... from.addingTimeInterval(8 * 3600), countsDown: false)
         case let .fixed(text):
@@ -169,6 +170,11 @@ private struct BrewElapsedText: View {
             Text(brewClock(state.elapsedSeconds))
         }
     }
+}
+
+/// Timer text takes the width of its longest value; size it to the brew.
+private func elapsedWidth(_ state: BrewState) -> CGFloat {
+    (state.totalSeconds ?? 0) >= 600 ? 42 : 33
 }
 
 // MARK: - Brew bar
@@ -209,8 +215,10 @@ private struct BrewBar: View {
                 .progressViewStyle(BarStyle(fill: fill))
         } else if face.kind != .paused, let start = starts[index],
                   let end = state.endOfStep(index, startingAt: start), end > start {
+            // Timer-driven progress only moves with the system style.
             ProgressView(timerInterval: start ... end, countsDown: false, label: { EmptyView() }, currentValueLabel: { EmptyView() })
-                .progressViewStyle(BarStyle(fill: fill))
+                .progressViewStyle(.linear)
+                .tint(fill)
         } else {
             Capsule().fill(Color.track)
         }
@@ -240,18 +248,21 @@ private struct HeadlineText: View {
 
     var body: some View {
         switch face.kind {
-        case .done:
-            Text("Ready to taste")
         case .chill:
-            Text(state.note ?? "Chill and serve")
+            longText(state.note ?? "Chill and serve")
         case .wait, .yourTurn:
-            Text(face.step?.detail ?? "")
-                .font(.system(size: size * 0.72, weight: .semibold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+            longText(face.step?.detail ?? "")
         default:
             targetText
         }
+    }
+
+    /// Step text can run long; two smaller lines instead of a cut-off one.
+    private func longText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: size * 0.72, weight: .semibold))
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
     }
 
     /// "Pour to 190 g" with the unit muted.
@@ -375,10 +386,10 @@ private struct LockScreenView: View {
         case .chill:
             Text("Brew \(brewClock(state.elapsedSeconds))")
         case .yourTurn:
-            HStack(spacing: 4) { BrewElapsedText(state: state).frame(width: 44, alignment: .trailing); Text("elapsed") }
+            HStack(spacing: 4) { BrewElapsedText(state: state).frame(width: elapsedWidth(state), alignment: .trailing); Text("elapsed") }
         default:
             if let total = state.totalSeconds, total > 0 {
-                HStack(spacing: 4) { BrewElapsedText(state: state).frame(width: 44, alignment: .trailing); Text("of \(brewClock(total))") }
+                HStack(spacing: 4) { BrewElapsedText(state: state).frame(width: elapsedWidth(state), alignment: .trailing); Text("of \(brewClock(total))") }
             } else {
                 BrewElapsedText(state: state)
             }
@@ -519,7 +530,7 @@ private struct ExpandedLeading: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Label(face.header(stepCount: context.state.steps.count), systemImage: face.glyph)
+            Label(face.header(stepCount: context.state.steps.count, short: true), systemImage: face.glyph)
                 .font(.system(size: 13, weight: .bold))
                 .tracking(0.8)
                 .foregroundStyle(face.tint)
@@ -529,6 +540,7 @@ private struct ExpandedLeading: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color.muted)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
         .padding(.leading, 6)
         .padding(.top, 4)
@@ -544,7 +556,7 @@ private struct ExpandedTrailing: View {
             .monospacedDigit()
             .foregroundStyle(face.kind == .done ? Color.cream : face.kind == .wait ? Color.caramel : face.tint)
             .multilineTextAlignment(.trailing)
-            .frame(width: 104, alignment: .trailing)
+            .frame(width: 88, alignment: .trailing)
             .padding(.trailing, 6)
     }
 }
@@ -554,44 +566,36 @@ private struct ExpandedBottom: View {
     let state: BrewState
 
     var body: some View {
+        // Done never reaches the island: an ended activity shows on the Lock
+        // Screen only.
         VStack(alignment: .leading, spacing: 8) {
-            if face.kind == .done {
-                HStack {
-                    Text("Ready to taste")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.cream)
-                    Spacer()
-                    RateCupLink()
-                }
-                BrewBar(state: state, face: face)
-            } else {
-                HeadlineText(face: face, state: state, size: 24)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(face.kind == .paused ? Color.muted : Color.cream)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                if face.kind == .yourTurn {
-                    Text("Open the app to confirm")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.muted)
-                } else if face.kind != .chill {
-                    BrewBar(state: state, face: face)
-                    HStack(spacing: 4) {
-                        BrewElapsedText(state: state).frame(width: 40, alignment: .leading)
-                        if let total = state.totalSeconds, total > 0 { Text("of \(brewClock(total))") }
-                        Spacer()
-                        if let next = face.next {
-                            (Text("Next ").foregroundColor(.muted) + Text(next.short).foregroundColor(.cream))
-                                .lineLimit(1)
-                            if let at = face.nextAt { Text(at) }
-                        }
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .monospacedDigit()
+            HeadlineText(face: face, state: state, size: 24)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(face.kind == .paused ? Color.muted : Color.cream)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if face.kind == .yourTurn {
+                Text("Open the app to confirm")
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.muted)
+            } else if face.kind != .chill {
+                BrewBar(state: state, face: face)
+                HStack(spacing: 4) {
+                    BrewElapsedText(state: state).frame(width: elapsedWidth(state), alignment: .leading)
+                    if let total = state.totalSeconds, total > 0 { Text("of \(brewClock(total))") }
+                    Spacer()
+                    if let next = face.next {
+                        (Text("Next ").foregroundColor(.muted) + Text(next.short).foregroundColor(.cream))
+                            .lineLimit(1)
+                        if let at = face.nextAt { Text(at) }
+                    }
                 }
+                .font(.system(size: 14, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.muted)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 6)
         .padding(.bottom, 4)
     }

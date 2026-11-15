@@ -49,6 +49,7 @@ src/
   lib/openai.js         # OpenAI API helpers — client-side retry + friendly errors
   lib/professorRuphus.js # Professor Ruphus story generation (GPT-5.4) + tasting score conversion (GPT-5.4 Mini)
   lib/aiden.js          # Aiden brew profile (GPT-5.4): researchBean() + generateAidenRecipe() + pushToAiden()
+  lib/brewLiveActivity.js # Brew timer Live Activity + step notifications (native: ios/App/App/BrewActivityPlugin.swift, ios/App/BrewActivityWidget/)
   styles/theme.js       # Color palette
 ```
 
@@ -103,3 +104,4 @@ FELLOW_EMAIL, FELLOW_PASSWORD
 - Full reference: `.claude/skills/ios-design.md`
 - Auth: `signInWithPopup` on web, `@codetrix-studio/capacitor-google-auth` + `signInWithCredential` on native
 - Firestore: `persistentMultipleTabManager` on web, `persistentSingleTabManager` on native
+- Brew timer Live Activity: local plugin `BrewActivity` (registered in `MyViewController`) + `BrewActivityWidget` extension (iOS 16.2+). Native only, needs a new binary; JS no-ops when the plugin is missing
