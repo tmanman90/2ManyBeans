@@ -1,4 +1,5 @@
-// Quick Recipe Flow — scan a coffee bag and generate a recipe without adding to inventory
+// Quick Recipe Flow — scan a coffee bag, pick any brewer, and get a recipe.
+// The bean is kept in the Archive once a recipe loads; Save to Inventory moves it to inventory.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CameraIcon, X, Search, RotateCcw, Save, Coffee, Star, BookOpen } from 'lucide-react';
@@ -23,7 +24,7 @@ import { QuickRateForm } from './QuickRateForm';
 import { Modal } from './Modal';
 import { Btn } from './Btn';
 import { Toast } from './Toast';
-import { isEspressoBrewMethod, isManualBrewMethod } from '../lib/brewMethods';
+import { QUICK_RECIPE_BREWERS, quickRecipeStartBrewer, quickRecipeMethod, buildQuickRecipeRecord } from '../lib/quickRecipe';
 import { executeRecipeCommand } from '../lib/recipeCommands';
 import { editEspressoRecipe, espressoRecipeFingerprint, validateEspressoRecipe } from '../lib/espressoRecipes';
 import { espressoTastingContext } from '../lib/brewContext';
@@ -38,17 +39,17 @@ const toEphemeralBean = (data) => {
   return bean;
 };
 
-export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, uid, onStartTastingSession }) => {
+export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, addTasting, onStartTastingSession }) => {
   const { preferences } = usePreferences();
-  const isHandBrew = isManualBrewMethod(preferences.brewMethod);
-  const isEspresso = isEspressoBrewMethod(preferences.brewMethod);
+  const startBrewer = quickRecipeStartBrewer(preferences.brewMethod);
 
   const [step, setStep] = useState('photo'); // photo | scanning | enriching | bagSize | brewing
   const [photos, setPhotos] = useState([]); // up to 3 { base64, mediaType, previewUrl }
   const [scanData, setScanData] = useState(null);
   const [scanError, setScanError] = useState(null);
   const [bagSizeInput, setBagSizeInput] = useState('');
-  const [activeMethod, setActiveMethod] = useState(isEspresso ? 'espresso' : (isHandBrew ? 'handbrew' : 'aiden'));
+  const [brewer, setBrewer] = useState(startBrewer); // aiden | a hand brew device key | espresso
+  const activeMethod = quickRecipeMethod(brewer);
   const [savedBeanId, setSavedBeanId] = useState(null);
   const [quickRateOpen, setQuickRateOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -82,13 +83,13 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       setScanData(null);
       setScanError(null);
       setBagSizeInput('');
-      setActiveMethod(isEspresso ? 'espresso' : (isHandBrew ? 'handbrew' : 'aiden'));
+      setBrewer(startBrewer);
       setSavedBeanId(null);
       savingRef.current = null;
       setQuickRateOpen(false);
       setToast(null);
     }
-  }, [clearPhotos, isEspresso, isHandBrew, open]);
+  }, [clearPhotos, startBrewer, open]);
 
   const takeNativePhoto = async () => {
     try {
@@ -229,36 +230,28 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     startBrew(updated);
   };
 
-  const startBrew = (data) => {
-    setStep('brewing');
+  // One dispatch for every brewer. Research already fetched for this bean is
+  // reused so switching brewers does not search the web again.
+  const brewWith = (nextBrewer, data) => {
     const ephemeralBean = toEphemeralBean(data);
-    // Start with user's preferred brew method
-    if (isEspresso) {
-      setActiveMethod('espresso');
-      espresso.handleBrewEspresso(ephemeralBean);
-    } else if (isHandBrew) {
-      setActiveMethod('handbrew');
-      handBrew.handleBrewHandBrew(ephemeralBean);
-    } else {
-      setActiveMethod('aiden');
-      aiden.handleBrewWithAiden(ephemeralBean);
-    }
+    const research = handBrew.handBrewResearch || aiden.aidenResearch || null;
+    setBrewer(nextBrewer);
+    const method = quickRecipeMethod(nextBrewer);
+    if (method === 'aiden') aiden.handleBrewWithAiden(ephemeralBean, research);
+    else if (method === 'espresso') espresso.handleBrewEspresso(ephemeralBean);
+    else handBrew.handleBrewHandBrew(ephemeralBean, research, false, nextBrewer);
   };
 
-  const handleToggleMethod = () => {
-    if (!scanData) return;
-    const ephemeralBean = toEphemeralBean(scanData);
-    if (activeMethod === 'aiden') {
-      // Switch to hand brew, pass Aiden's research as cache
-      setActiveMethod('handbrew');
-      handBrew.handleBrewHandBrew(ephemeralBean, aiden.aidenResearch);
-    } else if (activeMethod === 'handbrew') {
-      // Switch to Aiden, pass hand brew's research as cache
-      setActiveMethod('aiden');
-      aiden.handleBrewWithAiden(ephemeralBean, handBrew.handBrewResearch);
-    } else if (activeMethod === 'espresso') {
-      espresso.handleBrewEspresso(ephemeralBean, true);
-    }
+  // Start with the brewer picked in Settings
+  const startBrew = (data) => {
+    setStep('brewing');
+    brewWith(startBrewer, data);
+  };
+
+  const handlePickBrewer = (nextBrewer) => {
+    if (!scanData || nextBrewer === brewer) return;
+    haptic.light();
+    brewWith(nextBrewer, scanData);
   };
 
   const handleRetryPhoto = () => {
@@ -269,7 +262,9 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     setStep('photo');
   };
 
-  const handleSave = (espressoPatch = {}) => {
+  // Save to Inventory turns the Archive record into the inventory bean,
+  // carrying every recipe made in this session (any brewer, hot or iced).
+  const handleSave = async (espressoPatch = {}) => {
     if (!scanData || !onSaveToInventory) return;
     let espressoForSave = null;
     if (activeMethod === 'espresso' && espresso.espressoRecipe) {
@@ -280,6 +275,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         return;
       }
     }
+    const recordedBeanId = await handleAutoSave();
+    if (!recordedBeanId) return;
     const handBrewForSave = handBrew.handBrewRecipe
       ? {
           ...handBrew.handBrewRecipe,
@@ -293,6 +290,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       : null;
     const saveData = {
       ...scanData,
+      recordedBeanId,
       aidenRecipe: aiden.aidenRecipe,
       aidenLink: aiden.aidenResult?.link || null,
       aidenGrind: aiden.aidenRecipe?.grindRecommendation || null,
@@ -307,7 +305,8 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     onSaveToInventory(saveData);
   };
 
-  // Auto-save bean to inventory as SEALED (for tasting actions)
+  // Record the bean in the Archive once (recipe loaded, or any action that
+  // needs a real bean id). Every later action reuses the same record.
   const handleAutoSave = async () => {
     if (savedBeanId) return savedBeanId;
     // Ref guard: if a save is already in flight, await it instead of starting a second
@@ -315,11 +314,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     if (!addBean || !scanData) return null;
     const savePromise = (async () => {
       try {
-        const beanData = {
-          ...toEphemeralBean(scanData),
-          status: 'SEALED',
-          uid,
-        };
+        const beanData = buildQuickRecipeRecord(scanData);
         // Attach any generated recipes
         if (aiden.aidenRecipe) {
           beanData.aidenRecipe = { ...aiden.aidenRecipe, generatedAt: new Date().toISOString() };
@@ -364,7 +359,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
         handBrew.attachHandBrewBeanId(newId);
         setToast(espressoAttachFailed
           ? 'Bean saved, but its espresso recipe could not be attached. Open the bean and save again.'
-          : `${scanData.name || 'Bean'} saved to inventory`);
+          : `${scanData.name || 'Bean'} saved to your Archive`);
         return newId;
       } catch (err) {
         console.error('Auto-save failed:', err);
@@ -389,13 +384,6 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
     await addTasting({ beanId, rating, notes });
     haptic.success();
     setToast('Rating saved');
-  };
-
-  const handleRuphusTasting = async () => {
-    const beanId = await handleAutoSave();
-    if (beanId) {
-      setToast(`${scanData?.name || 'Bean'} saved. Start a tasting from the Tasting tab.`);
-    }
   };
 
   // Called from BrewTimer completion screen. The "bean" at this point is the
@@ -444,13 +432,24 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
   };
 
   // Build the action buttons shown in the recipe footer
-  const recipeHasLoaded = activeMethod === 'aiden'
+  const recipeHasLoaded = Boolean(activeMethod === 'aiden'
     ? aiden.aidenRecipe && !aiden.aidenLoading
     : activeMethod === 'handbrew'
       ? handBrew.handBrewRecipe && !handBrew.handBrewLoading
-      : espresso.espressoRecipe && !espresso.espressoLoading;
+      : espresso.espressoRecipe && !espresso.espressoLoading);
 
-  const actionButtons = recipeHasLoaded ? (
+  // Keep the bean in the Archive as soon as a recipe has loaded, so the app
+  // remembers it was brewed even if nothing else is tapped.
+  useEffect(() => {
+    if (open && step === 'brewing' && recipeHasLoaded) handleAutoSave();
+  }, [open, step, recipeHasLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The brewer picker stays whenever a scanned bean is brewing, including
+  // while a recipe failed or for Espresso, so the user can always switch.
+  // The other actions need a loaded recipe. Espresso's own sheet already has
+  // a Taste button, so Tasting with Ruphus is not repeated there.
+  const isEspressoSheet = activeMethod === 'espresso';
+  const actionButtons = step === 'brewing' && scanData ? (
     <m.div
       {...fadeUp}
       style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}
@@ -458,21 +457,50 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       {/* Divider */}
       <div style={{ borderTop: `1px solid ${C.hairline}`, marginBottom: 4 }} />
 
-      {/* Brew method toggle */}
-      <Btn variant="secondary" onClick={handleToggleMethod} style={{ width: '100%', justifyContent: 'center' }}>
-        <Coffee size={14} />
-        {activeMethod === 'aiden' ? 'Get Hand Brew Recipe' : activeMethod === 'handbrew' ? 'Get Aiden Recipe' : 'Refresh Espresso Recipe'}
-      </Btn>
+      {/* Brewer picker: every brewer the app has a recipe for */}
+      <div style={{ ...type.caption, color: C.textMuted, textAlign: 'center' }}>Brew with</div>
+      <div role="radiogroup" aria-label="Brew with" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 4 }}>
+        {QUICK_RECIPE_BREWERS.map(({ key, label }) => {
+          const selected = key === brewer;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => handlePickBrewer(key)}
+              style={{
+                minHeight: 44,
+                padding: '0 14px',
+                borderRadius: radius.pill,
+                border: `1px solid ${selected ? C.accent : C.border}`,
+                background: selected ? C.accentSoft : C.card,
+                color: selected ? C.accent : C.text,
+                fontFamily: fonts.body,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: selected ? 'default' : 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
+      {recipeHasLoaded && <>
       {/* Quick Rate */}
       <Btn variant="ghost" onClick={handleQuickRate} style={{ width: '100%', justifyContent: 'center' }}>
         <Star size={14} /> Quick Rate
       </Btn>
 
       {/* Ruphus Tasting */}
-      <Btn variant="ghost" onClick={handleRuphusTasting} style={{ width: '100%', justifyContent: 'center' }}>
-        <Coffee size={14} /> Tasting with Ruphus
-      </Btn>
+      {!isEspressoSheet && (
+        <Btn variant="ghost" onClick={handleBrewTimerStartTasting} style={{ width: '100%', justifyContent: 'center' }}>
+          <Coffee size={14} /> Tasting with Ruphus
+        </Btn>
+      )}
 
       {/* Learn */}
       <Btn variant="ghost" onClick={handleLearnPress} style={{ width: '100%', justifyContent: 'center' }}>
@@ -480,11 +508,12 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
       </Btn>
 
       {/* Save to Inventory */}
-      {onSaveToInventory && !savedBeanId && (
-        <Btn variant="ghost" onClick={handleSave} style={{ width: '100%', justifyContent: 'center' }}>
+      {onSaveToInventory && (
+        <Btn variant="ghost" onClick={() => handleSave()} style={{ width: '100%', justifyContent: 'center' }}>
           <Save size={14} /> Save to Inventory
         </Btn>
       )}
+      </>}
     </m.div>
   ) : null;
 
@@ -559,6 +588,7 @@ export const QuickRecipeFlow = ({ open, onClose, onSaveToInventory, addBean, add
             onDoseChange={espresso.editEspressoDose}
             onYieldChange={espresso.editEspressoYield}
             onStartTasting={handleBrewTimerStartTasting}
+            extraFooter={actionButtons}
           />
         )}
         <ProfessorRuphusSlideUp {...ruphusProps} />

@@ -469,6 +469,8 @@ export const AidenModal = ({ open, onClose, bean, recipe, result, loading, error
           )}
         </m.div>
       )}
+      {/* Quick Recipe's brewer picker, so a failed recipe is not a dead end */}
+      {error && !recipe && extraFooter}
 
       {/* Recipe success */}
       {recipe && !icedMode && (
