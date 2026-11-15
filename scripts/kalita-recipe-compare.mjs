@@ -1,4 +1,5 @@
 import { validateKalitaRecipe } from './kalita-recipe-contract.test.mjs';
+import { isMain } from './is-main.mjs';
 
 export function normalizeRecipe(recipe) {
   const validation = validateKalitaRecipe(recipe);
@@ -29,7 +30,7 @@ export function compareRecipes(current, candidate, { legacyVariance = {} } = {})
   return { outcome: 'compared', current: left, candidate: right, deltas, reviewFlags };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const report = compareRecipes(JSON.parse(process.argv[2] || 'null'), JSON.parse(process.argv[3] || 'null'));
   console.log(JSON.stringify(report, null, 2));
 }

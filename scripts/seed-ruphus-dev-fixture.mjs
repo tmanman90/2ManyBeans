@@ -6,6 +6,7 @@ import { canonicalHash } from '../src/lib/ruphus/contracts.js';
 import { generateKalitaRecipe } from '../src/lib/kalitaAdapter.js';
 import { generateV60Recipe } from '../src/lib/v60Adapter.js';
 import { SLOT_DEFINITIONS } from '../src/lib/ruphus/legacyRecipeResolver.js';
+import { isMain } from './is-main.mjs';
 
 export function assertDevTarget({ projectId, fixtureUid, authorized = false } = {}) {
   if (!authorized) throw new Error('fixture seeding requires explicit Dev authorization');
@@ -183,7 +184,7 @@ async function seedFirestore({ projectId, fixtureUid, root }) {
   return seedFixture({ projectId, fixtureUid, authorized: true, root, write: (path, data) => db.doc(path).set(data, { merge: true }) });
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+if (isMain(import.meta.url)) {
   try {
     const projectId = process.env.RUPHUS_DEV_PROJECT_ID;
     const fixtureUid = process.env.RUPHUS_DEV_FIXTURE_UID;

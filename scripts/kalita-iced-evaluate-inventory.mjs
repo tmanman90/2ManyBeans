@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { evaluateAndRedactKalitaIcedInventory } from '../src/lib/kalitaIcedInventoryEvaluation.js';
+import { isMain } from './is-main.mjs';
 
 export function parseArgs(argv = []) {
   const options = {};
@@ -60,4 +61,4 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (fileURLToPath(import.meta.url) === resolve(process.argv[1] || '')) main();
+if (isMain(import.meta.url)) main();

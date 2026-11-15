@@ -12,6 +12,7 @@ import {
   gradeReply, fixtureManifestShape, validateLaunchContext, CONTRACT_VERSION,
 } from '../src/lib/ruphus/conversationContract.js';
 import { assessCalibration, createAnthropicJudgeAdapter, createBlindJudgePacket, createBlindPairwisePacket, createCalibrationPackets, judgeTranscript, pairwisePass, validateJudgeResult, validatePairwiseResult } from './ruphus-conversation-judge.mjs';
+import { isMain } from './is-main.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const FIXTURE_ROOT = join(HERE, 'fixtures', 'ruphus-conversation');
@@ -829,6 +830,6 @@ async function runCli() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   void runCli();
 }
