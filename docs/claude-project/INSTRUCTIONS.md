@@ -19,7 +19,9 @@ This project is 2ManyBeans (the app is called Coffee Hub in the code): Tal Meltz
 
 CLOUD (default): `src/` logic, `api/`, `scripts/`, tests, docs, copy. The cloud has no Xcode, no simulator, no repo skills (`.claude/skills/`), and no access to Tal's Dropbox.
 
-STUDIO ("work locally", folder `~/Developer/Coffee-App` on the Mac Studio, Worktree on): anything that needs `npm run cap:sync`, Xcode, the iOS simulator, `/ios-qa`, App Store screenshots, a visual check of a screen, or the shared lessons in Tal's Hub. One Xcode build at a time on that machine. Build and check work happens in a worktree, never the main checkout (ship threads are the one exception, below).
+STUDIO ("work locally", folder `~/Developer/Coffee-App` on the Mac Studio, Worktree on): anything that needs `npm run cap:sync`, Xcode, the iOS simulator, `/ios-qa`, App Store screenshots, a visual check of a screen, or the shared lessons in Tal's Hub. One Xcode build at a time on that machine.
+
+LAPTOP (folder `~/Documents/VIBE CODING/Coffee-App-Build`, Worktree on): fallback only. Use it when the Studio is unreachable or Tal says "on the laptop". It stops when the lid closes, so never start a long job there. Same rules as the Studio. Leave its `laptop-wip-2026-09` branch alone. Build and check work happens in a worktree, never the main checkout (ship threads are the one exception, below).
 
 UI changes (`src/tabs/`, `src/components/`, `src/App.jsx`, `src/styles/`): the cloud may write them, but only a Studio thread may say they look right, and only after it has looked at its own simulator screenshots.
 
