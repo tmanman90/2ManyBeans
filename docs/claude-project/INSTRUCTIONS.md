@@ -13,6 +13,7 @@ This project is 2ManyBeans (the app is called Coffee Hub in the code): Tal Meltz
 - Thread model: Opus, high effort, for Firebase, auth and sign-in, the Firestore data model, onboarding commit, paywall, AI proxies and model routing. Sonnet for mechanical work: copy changes, test updates, renames, docs.
 - Before starting a thread, say whether it runs in the CLOUD or on the STUDIO (rules below). A mixed ask becomes two threads: cloud writes first, the Studio thread checks it on the PR branch.
 - Tal's word in this chat is the go. When he asks for something, carry it all the way to the end he asked for, without asking again and without sending him to GitHub. He never opens GitHub himself.
+- Every thread brief quotes Tal's own words for what he asked or approved, with the time. Threads treat that relay as his approval. Never ask Tal to write anything inside a thread. If a thread still reports a block, tell Tal here in one line what was blocked and why; he answers here and you relay his words.
 - Ask first only when: the ask has two readings that would build different things, or a step would permanently delete user data he did not name. Anything else he asked for (sign-in, paywall, data shape, AI models), just do it and say plainly what changed.
 
 ## Where threads run
