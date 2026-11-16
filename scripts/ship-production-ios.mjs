@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { compatibilityUploadFlag } from './capgo-compat.mjs';
 
 const PROD_APP_ID = 'com.talmeltzer.coffeehub';
 const PROD_CHANNEL = 'production';
@@ -108,6 +109,17 @@ console.log(`New bundle: ${bundleVersion}`);
 // so normalize Package.swift back to the published package before Capgo compares
 // this JS-only OTA with the existing production native baseline.
 restorePublishedSocialLoginManifest();
+
+// Native plugins added since the production baseline stop the upload unless
+// the JS guards them at runtime (see scripts/capgo-compat.mjs). Guarded ones
+// upload with --accept-incompatible; everything else keeps --fail-on-incompatible.
+const compatibility = compatibilityUploadFlag(
+  capgo(['bundle', 'compatibility', PROD_APP_ID, '--channel', PROD_CHANNEL, '--text'], { capture: true }),
+);
+if (compatibility.accepted.length > 0) {
+  console.log(`Accepting runtime-guarded native plugins missing from older binaries: ${compatibility.accepted.join(', ')}`);
+}
+
 run(npmCommand, ['run', 'build:ios']);
 
 capgo([
@@ -115,7 +127,7 @@ capgo([
   '--path', './dist',
   '--channel', PROD_CHANNEL,
   '--bundle', bundleVersion,
-  '--fail-on-incompatible',
+  compatibility.flag,
   // Delta only: devices fetch just the files that changed. Every native build
   // has shipped @capgo/capacitor-updater 8.45.0 (delta needs 7.0.35+ on 7.x),
   // so no installed app needs the full zip.
