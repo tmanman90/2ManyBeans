@@ -18,6 +18,7 @@ const PROD_APP_ID = 'com.talmeltzer.coffeehub';
 const PROD_CHANNEL = 'production';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const SOCIAL_LOGIN_PACKAGE = '@capgo/capacitor-social-login';
+const SOCIAL_LOGIN_RESTORED_FILES = ['CapgoCapacitorSocialLogin.podspec'];
 const REQUIRED_BUILD_ENV = [
   'VITE_FIREBASE_API_KEY',
   'VITE_FIREBASE_AUTH_DOMAIN',
@@ -69,7 +70,13 @@ function restorePublishedSocialLoginManifest() {
     }
 
     writeFileSync(`${packageRoot}/Package.swift`, manifest, 'utf8');
-    console.log(`Restored published ${SOCIAL_LOGIN_PACKAGE}@${installed.version} native manifest for the production baseline.`);
+    // The plugin's own capacitor:sync:before hook comments the Facebook pods out
+    // of the podspec on every cap sync (e.g. a TestFlight build), and Capgo
+    // checksums the podspec too, so restore it as well.
+    for (const file of SOCIAL_LOGIN_RESTORED_FILES) {
+      writeFileSync(`${packageRoot}/${file}`, run('tar', ['-xOf', join(staging, archive), `package/${file}`], { capture: true }), 'utf8');
+    }
+    console.log(`Restored published ${SOCIAL_LOGIN_PACKAGE}@${installed.version} native manifest and podspec for the production baseline.`);
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }

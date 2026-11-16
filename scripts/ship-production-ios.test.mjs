@@ -24,6 +24,7 @@ assert.match(source, /installed production[\s\S]*baseline/);
 assert.match(source, /restorePublishedSocialLoginManifest\(\);/);
 assert.match(source, /npmCommand, \['pack', `\$\{SOCIAL_LOGIN_PACKAGE\}@\$\{installed\.version\}`/);
 assert.match(source, /manifest\.includes\('facebook-ios-sdk'\)/);
+assert.match(source, /SOCIAL_LOGIN_RESTORED_FILES = \['CapgoCapacitorSocialLogin\.podspec'\]/);
 assert.ok(
   source.indexOf('restorePublishedSocialLoginManifest();') < source.indexOf("run(npmCommand, ['run', 'build:ios'])"),
   'production must restore the published native manifest before building and uploading',
