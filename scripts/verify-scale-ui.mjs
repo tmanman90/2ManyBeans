@@ -88,6 +88,17 @@ try {
   // Opting out falls back to the ordinary timer.
   await page.getByRole('button', { name: 'Start without the scale' }).click();
   await page.getByText('Brewing', { exact: false }).first().waitFor({ timeout: 6000 });
+
+  // A fresh install that missed the 3-2-1: the pill still works mid-brew. It
+  // asks before restarting the clock, then opens pairing with no countdown.
+  const late = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await late.goto(url);
+  await late.waitForTimeout(3500);
+  await late.getByRole('button', { name: 'Connect a scale' }).click({ timeout: 2000 });
+  await late.getByText('Brew with your scale?').waitFor();
+  await late.getByRole('button', { name: 'Restart', exact: true }).click();
+  await late.getByRole('dialog', { name: 'Connect your scale' }).waitFor();
+  await late.getByText('Acaia Lunar').waitFor();
   console.log('Scale UI flow passed');
 } catch (error) {
   console.error(error);

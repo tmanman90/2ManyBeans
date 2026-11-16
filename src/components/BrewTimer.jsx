@@ -15,7 +15,7 @@ import { assetUrl } from "../lib/assetUrl";
 import { createPortal } from 'react-dom';
 import { X, Pause, Play, SkipForward, SkipBack, Check } from 'lucide-react';
 import { C, fonts, shadows, radius, glass, type as typeScale } from '../styles/theme';
-import { m, spring, popIn } from '../lib/motion';
+import { m, spring } from '../lib/motion';
 import { haptic } from './../lib/haptics';
 import { useBrewTimerAlerts } from '../hooks/useBrewTimerAlerts';
 import { useBrewLiveActivity } from '../hooks/useBrewLiveActivity';
@@ -537,7 +537,8 @@ const BrewTimerShell = ({
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);
-  const [confirmClose, setConfirmClose] = useState(false);
+  // null, 'close' (stop the brew), or 'scale' (restart the brew with a scale).
+  const [confirmClose, setConfirmClose] = useState(null);
   const [saveState, setSaveState] = useState(() => restoredSession?.phase === 'done'
     ? ['saved', 'ephemeral'].includes(restoredSession.saveState) ? restoredSession.saveState : 'failed'
     : null);
@@ -799,7 +800,7 @@ const BrewTimerShell = ({
 
   const handleCloseRequest = () => {
     if (phase === 'countdown' || phase === 'running' || phase === 'paused') {
-      setConfirmClose(true);
+      setConfirmClose('close');
       return;
     }
     clearBrewTimerSession(timerOwner);
@@ -808,8 +809,12 @@ const BrewTimerShell = ({
 
   const handleConfirmClose = () => {
     reset();
-    setConfirmClose(false);
+    setConfirmClose(null);
     clearBrewTimerSession(timerOwner);
+    if (confirmClose === 'scale') {
+      scaleBrew.openPair();
+      return;
+    }
     onClose?.();
   };
 
@@ -847,12 +852,23 @@ const BrewTimerShell = ({
   };
 
   const prebrew = phase === 'idle' || phase === 'countdown';
+  // The 3-2-1 countdown is short, so most taps on the pill land after the clock
+  // started. A brew the scale can still own restarts (after a confirm) and pairs.
+  const canPairNow = prebrew && canHoldForScale;
+  const canRestartForScale = canHoldForScale && !isConfirmedSource && !scaleLive
+    && (phase === 'running' || phase === 'paused');
+  const scalePillActive = canPairNow || canRestartForScale || (scaleLive && ['lost', 'silent'].includes(scale.status));
+  const showScalePill = scale.available && (canPairNow || canRestartForScale || scaleLive);
   const handleScalePill = () => {
     if (scaleLive && ['lost', 'silent'].includes(scale.status)) {
       scale.reconnect();
       return;
     }
-    if (!prebrew || ['connected', 'connecting'].includes(scale.status)) return;
+    if (canRestartForScale) {
+      setConfirmClose('scale');
+      return;
+    }
+    if (!canPairNow || ['connected', 'connecting'].includes(scale.status)) return;
     if (phase === 'countdown') (timer.cancelCountdown || reset)();
     scaleBrew.openPair();
   };
@@ -958,9 +974,9 @@ const BrewTimerShell = ({
             )}
           </div>
         </div>
-        {scale.available && (
+        {showScalePill && (
           <div style={{ flexShrink: 0, marginLeft: 8 }}>
-            <ScaleStatusPill scale={scale} onPress={handleScalePill} disabled={!prebrew && !(scaleLive && ['lost', 'silent'].includes(scale.status))} />
+            <ScaleStatusPill scale={scale} onPress={handleScalePill} disabled={!scalePillActive} />
           </div>
         )}
         <m.button
@@ -1356,8 +1372,12 @@ const BrewTimerShell = ({
           padding: 24,
           zIndex: 3,
         }}>
-          <m.div
-            {...popIn}
+          {/* Plain DOM + CSS keyframes: framer's animate can stay at opacity 0
+              inside a portal in WKWebView (lessons.md), hiding the buttons. */}
+          <div
+            className="wiz-pop"
+            role="alertdialog"
+            aria-label={confirmClose === 'scale' ? 'Brew with your scale?' : 'Stop the brew?'}
             style={{
               background: glass.sheet,
               borderRadius: radius.xl,
@@ -1379,14 +1399,16 @@ const BrewTimerShell = ({
               marginBottom: 8,
               letterSpacing: '-0.01em',
             }}>
-              Stop the brew?
+              {confirmClose === 'scale' ? 'Brew with your scale?' : 'Stop the brew?'}
             </div>
             <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 24, lineHeight: 1.5, fontFamily: fonts.body }}>
-              You'll lose the current timer progress.
+              {confirmClose === 'scale'
+                ? 'The timer restarts, then starts on your first pour.'
+                : "You'll lose the current timer progress."}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <m.button
-                onClick={() => setConfirmClose(false)}
+                onClick={() => setConfirmClose(null)}
                 whileTap={{ scale: 0.97 }}
                 transition={spring.snappy}
                 style={{
@@ -1413,7 +1435,7 @@ const BrewTimerShell = ({
                   flex: 1,
                   padding: '13px',
                   borderRadius: radius.md,
-                  background: C.red,
+                  background: confirmClose === 'scale' ? C.accent : C.red,
                   color: '#fff',
                   border: 'none',
                   fontSize: 14,
@@ -1423,10 +1445,10 @@ const BrewTimerShell = ({
                   willChange: 'transform',
                 }}
               >
-                Stop
+                {confirmClose === 'scale' ? 'Restart' : 'Stop'}
               </m.button>
             </div>
-          </m.div>
+          </div>
         </div>
       )}
     </div>,
