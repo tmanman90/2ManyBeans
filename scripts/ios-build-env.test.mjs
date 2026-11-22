@@ -79,11 +79,14 @@ for (const [label, value] of [
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 assert.match(
   packageJson.scripts['build:ios:dev'],
-  /^node scripts\/assert-ios-build-env\.mjs && .*TMB_APP_VARIANT=dev.*TMB_DISABLE_CAPGO_UPDATES=1.*vite build$/,
+  /^node scripts\/assert-ios-build-env\.mjs && .*TMB_APP_VARIANT=dev.*vite build$/,
   'the normal Dev native build must fail closed before Vite runs',
 );
-assert.match(packageJson.scripts['cap:copy:dev'], /configure-ios-variant\.mjs dev && TMB_APP_VARIANT=dev TMB_DISABLE_CAPGO_UPDATES=1 .*npx cap copy ios/);
-assert.match(packageJson.scripts['cap:sync:dev'], /configure-ios-variant\.mjs dev && TMB_APP_VARIANT=dev TMB_DISABLE_CAPGO_UPDATES=1 .*npx cap sync/);
+assert.match(packageJson.scripts['cap:copy:dev'], /configure-ios-variant\.mjs dev && TMB_APP_VARIANT=dev .*npx cap copy ios/);
+assert.match(packageJson.scripts['cap:sync:dev'], /configure-ios-variant\.mjs dev && TMB_APP_VARIANT=dev .*npx cap sync/);
+for (const script of ['build:ios:dev', 'cap:copy:dev', 'cap:sync:dev']) {
+  assert.doesNotMatch(packageJson.scripts[script], /TMB_DISABLE_CAPGO_UPDATES/, `${script} must keep Dev Capgo updates on`);
+}
 assert.equal(packageJson.scripts.build, 'vite build', 'web builds must not inherit the native preflight');
 assert.equal(packageJson.scripts['build:ios'], 'CAPACITOR_BUILD=true vite build', 'production native build must remain unchanged');
 

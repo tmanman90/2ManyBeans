@@ -1,5 +1,5 @@
 // Reads `capgo bundle compatibility --text` output and decides how the
-// production upload treats native-package differences.
+// Capgo upload treats native-package differences.
 //
 // Capgo flags a JS bundle as incompatible when it ships with a native plugin
 // the channel's current baseline lacks. Installed binaries without that plugin
@@ -32,13 +32,13 @@ export function parseCompatibility(text) {
 export function compatibilityUploadFlag(text, guarded = RUNTIME_GUARDED_PLUGINS) {
   const rows = parseCompatibility(text);
   if (rows.length === 0) {
-    throw new Error('Could not read the Capgo compatibility table. Refusing production upload.');
+    throw new Error('Could not read the Capgo compatibility table. Refusing upload.');
   }
   const failing = rows.filter((row) => !row.ok);
   const unguarded = failing.filter((row) => !Object.hasOwn(guarded, row.name));
   if (unguarded.length > 0) {
     const list = unguarded.map((row) => `${row.name} (${row.details})`).join(', ');
-    throw new Error(`Capgo says this bundle needs native code the production app lacks: ${list}. Ship a new App Store build first, or guard the plugin at runtime and list it in RUNTIME_GUARDED_PLUGINS.`);
+    throw new Error(`Capgo says this bundle needs native code the installed app lacks: ${list}. Ship a new native build first, or guard the plugin at runtime and list it in RUNTIME_GUARDED_PLUGINS.`);
   }
   return {
     flag: failing.length > 0 ? '--accept-incompatible' : '--fail-on-incompatible',
