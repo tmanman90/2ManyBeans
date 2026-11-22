@@ -540,8 +540,9 @@ const BrewTimerShell = ({
   const scaleLive = scaleBrew.stage === 'live' && (phase === 'running' || phase === 'paused');
   useLayoutEffect(() => {
     holdStepRef.current = scaleLive
-      ? (index, overdueMs) => holdForPour({
-        timerSteps, stepIndex: index, target: scaleBrew.target, reachedAtMs: scaleBrew.reached, overdueMs, connected: scale.status === 'connected',
+      ? (index) => holdForPour({
+        timerSteps, stepIndex: index, target: scaleBrew.target, reachedAtMs: scaleBrew.reached,
+        grams: scale.grams, idleMs: scaleBrew.pourIdleMs(), connected: scale.status === 'connected',
       })
       : null;
   });

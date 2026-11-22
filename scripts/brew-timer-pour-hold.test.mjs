@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 import { buildBrewActivity } from '../src/lib/brewLiveActivity.js';
 import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
-import { holdForPour, POUR_HOLD_MAX_MS, pourTargets } from '../src/lib/scale/scaleSession.js';
+import { holdForPour, POUR_STALL, pourTargets } from '../src/lib/scale/scaleSession.js';
 import { generateV60SwitchRecipe } from '../src/lib/v60SwitchAdapter.js';
 
 const recipe = generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' });
@@ -19,11 +19,14 @@ const pour2 = targets[1];
 assert.equal(pour2.stepIndex, 1);
 
 // --- When to hold ---------------------------------------------------------
-const base = { timerSteps, stepIndex: 1, target: pour2, reachedAtMs: {}, overdueMs: 1000, connected: true };
+const base = { timerSteps, stepIndex: 1, target: pour2, reachedAtMs: {}, grams: 220, idleMs: 0, connected: true };
 assert.equal(holdForPour(base), true, 'pour 2 short of 300 g holds the steep');
 assert.equal(holdForPour({ ...base, reachedAtMs: { 1: 1 } }), false, 'a reached pour lets the steep start');
 assert.equal(holdForPour({ ...base, connected: false }), false, 'no hold without a connected scale');
-assert.equal(holdForPour({ ...base, overdueMs: POUR_HOLD_MAX_MS }), false, 'the hold gives up after a minute');
+assert.equal(holdForPour({ ...base, idleMs: 10 * 60 * 1000 }), true, 'a slow pour 2 is never cut off by the clock, however long it takes');
+assert.equal(holdForPour({ ...base, grams: 129, idleMs: 60000 }), true, 'pour 2 not started yet: keep waiting');
+assert.equal(holdForPour({ ...base, grams: 290, idleMs: POUR_STALL.idleMs }), false, 'stopped just short of 300 g: the steep starts');
+assert.equal(holdForPour({ ...base, grams: 290, idleMs: POUR_STALL.idleMs - 1 }), true, 'a brief pause near the end still holds');
 assert.equal(holdForPour({ ...base, stepIndex: 0, target: targets[0] }), false, 'pour 1 is not followed by a steep');
 assert.equal(holdForPour({ ...base, stepIndex: 2 }), false, 'only the pour step itself is held');
 

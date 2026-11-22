@@ -19,6 +19,7 @@ import {
   activePour,
   buildScaleSummary,
   detectFirstPour,
+  FLOW_BAND,
   flowRate,
   pourTargets,
   TARGET_REACHED_G,
@@ -43,6 +44,7 @@ export function useScaleBrew({ open, phase, stepIndex, timerSteps, doseGrams, be
   const startAtRef = useRef(null);
   const reachedRef = useRef({});
   const summaryRef = useRef(null);
+  const lastFlowAtRef = useRef(null);
 
   useEffect(() => {
     if (open) return;
@@ -58,6 +60,7 @@ export function useScaleBrew({ open, phase, stepIndex, timerSteps, doseGrams, be
     startAtRef.current = null;
     reachedRef.current = {};
     summaryRef.current = null;
+    lastFlowAtRef.current = null;
   }, [open]);
 
   const prebrew = phase === 'idle' || phase === 'countdown';
@@ -101,7 +104,9 @@ export function useScaleBrew({ open, phase, stepIndex, timerSteps, doseGrams, be
   const target = activePour(targets, stepIndex);
   useEffect(() => {
     if (stage !== 'live' || scale.grams == null) return;
-    setFlow(flowRate(scale.samplesRef.current));
+    const gps = flowRate(scale.samplesRef.current);
+    setFlow(gps);
+    if (gps >= FLOW_BAND.idle) lastFlowAtRef.current = Date.now();
     if (phase !== 'running' || !target || reachedRef.current[target.stepIndex]) return;
     if (scale.grams < target.targetG - TARGET_REACHED_G) return;
     reachedRef.current = { ...reachedRef.current, [target.stepIndex]: Date.now() };
@@ -139,6 +144,9 @@ export function useScaleBrew({ open, phase, stepIndex, timerSteps, doseGrams, be
     setSummary(built);
     return built;
   }, [live, scale.samplesRef, scale.device, scale.protocol, targets, doseGrams]);
+
+  // How long the water has been still, for the steep's pour hold.
+  const pourIdleMs = useCallback(() => (lastFlowAtRef.current == null ? Infinity : Date.now() - lastFlowAtRef.current), []);
 
   const openPair = useCallback(() => {
     setOptedOut(false);
@@ -181,6 +189,7 @@ export function useScaleBrew({ open, phase, stepIndex, timerSteps, doseGrams, be
     reached,
     poured,
     flow,
+    pourIdleMs,
     startedToast,
     summary,
     finishSummary,

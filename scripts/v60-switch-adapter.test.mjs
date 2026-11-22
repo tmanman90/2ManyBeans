@@ -114,12 +114,23 @@ assert.deepEqual(noConfidence.reasonCodes, ['SWITCH_VALVE_TIMING_BASELINE_LOW_CO
 
 const clarityIntent = { confidence: 'high', cupDirection: { clarity: 'high', body: 'balanced', sweetness: 'high' } };
 const clarityMod = modulateSwitchValveTiming(mediumPreset, clarityIntent);
-assert.ok(clarityMod.valveCloseTimeSeconds > mediumPreset.valveCloseTimeSeconds, 'clarity-leaning bean must close the valve later');
-assert.ok(clarityMod.steepDurationSeconds < mediumPreset.steepDurationSeconds, 'clarity-leaning bean must steep for less time');
-assert.ok(clarityMod.reasonCodes.includes('SWITCH_LATE_CLOSE_CLARITY'));
-assert.ok(clarityMod.reasonCodes.includes('SWITCH_STEEP_SHORTENED_CLARITY'));
-assert.ok(clarityMod.valveCloseTimeSeconds - mediumPreset.valveCloseTimeSeconds <= 15, 'close-time delay must stay within the ~10-15s bound');
-assert.ok(mediumPreset.steepDurationSeconds - clarityMod.steepDurationSeconds <= 30, 'steep shortening must stay within the ~20-30s bound');
+// Clarity beans follow Coffee Chronicler's published timing (close 0:45, open
+// 2:00). The old rule (close 12 s later, steep 25 s shorter) left Tal ~15 s of
+// real steep after pour 2 and a light cup (2026-11-22).
+assert.equal(clarityMod.valveCloseTimeSeconds, 45, 'clarity-leaning medium bean closes at Chronicler\'s 0:45');
+assert.equal(clarityMod.steepDurationSeconds, 75, 'clarity-leaning bean keeps Chronicler\'s full 75 s closed window');
+assert.deepEqual(clarityMod.reasonCodes, ['SWITCH_CHRONICLER_TIMING_CLARITY']);
+for (const roast of ['light', 'medium', 'dark']) {
+  const preset = V60_SWITCH_ROAST_PRESETS[roast];
+  const mod = modulateSwitchValveTiming(preset, clarityIntent);
+  assert.ok(mod.valveCloseTimeSeconds >= preset.valveCloseTimeSeconds && mod.steepDurationSeconds >= preset.steepDurationSeconds, `${roast}: clarity never shortens the steep`);
+  const recipe = generateV60SwitchRecipe(clarityIntent, { dose: 20, roast });
+  const steep = recipe.steps.find((s) => s.waitForPour);
+  const drain = recipe.steps.at(-1);
+  assert.ok(drain.timeSeconds - steep.timeSeconds >= 40, `${roast}: clarity bean gets only ${drain.timeSeconds - steep.timeSeconds}s of steep after pour 2`);
+}
+const tal = generateV60SwitchRecipe(clarityIntent, { dose: 20, roast: 'medium' });
+assert.deepEqual(tal.steps.map((s) => s.time), ['0:00', '0:45', '1:20', '2:00'], 'Tal\'s 20 g / 300 g clarity brew: Chronicler timing with a 40 s steep');
 
 const sweetnessIntent = { confidence: 'high', cupDirection: { clarity: 'balanced', body: 'supported', sweetness: 'high' }, finesRisk: 'high' };
 const sweetnessMod = modulateSwitchValveTiming(mediumPreset, sweetnessIntent);
