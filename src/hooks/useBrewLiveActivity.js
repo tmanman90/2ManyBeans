@@ -15,11 +15,12 @@ const methodLabel = (context) => {
 };
 
 // Mirrors the open brew timer on the Dynamic Island and Lock Screen.
-// Publishes on transitions only (phase, step, source readiness, chill).
+// Publishes on transitions only (phase, step, source readiness, scale hold, chill).
 export function useBrewLiveActivity({ open, timer, recipe, bean, sessionRef, attemptId, chilled, onRateCup }) {
   const { phase, stepIndex, timerSteps } = timer;
   const sourceStatus = timer.sourceReadiness?.status || null;
   const sourceActive = Boolean(timer.sourceActive);
+  const holding = Boolean(timer.holding);
   // Same rule as the in-app chill screen.
   const iced = Boolean(recipe?.isIced);
   const latest = useRef(null);
@@ -46,6 +47,7 @@ export function useBrewLiveActivity({ open, timer, recipe, bean, sessionRef, att
       currentStepDurationMs: t.currentStepDurationMs,
       totalMs: t.totalMs,
       confirmedSource: t.sourceMode === 'confirmed',
+      holding,
       sourceReadiness: t.sourceReadiness,
       sourceActive,
       completionElapsedMs: t.completionElapsedMs,
@@ -68,7 +70,7 @@ export function useBrewLiveActivity({ open, timer, recipe, bean, sessionRef, att
       iced: isIced,
     }), activity);
     publishedRef.current = true;
-  }, [open, phase, stepIndex, timerSteps, sourceStatus, sourceActive, chilled]);
+  }, [open, phase, stepIndex, timerSteps, sourceStatus, sourceActive, holding, chilled]);
 
   useEffect(() => () => {
     if (publishedRef.current) endBrewActivity();

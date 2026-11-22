@@ -119,6 +119,13 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     ? Math.max(0, (restoredSession.pauseStartedAt ?? Date.now()) - restoredSession.stepStartedAt - restoredSession.stepPausedAccumMs)
     : 0);
   const [completion, setCompletion] = useState(restoredSession?.completion ?? null);
+  // A step the caller holds past its planned end (the scale is still waiting
+  // for a pour) keeps running; later steps keep their own lengths, so the
+  // guide total grows by the time held.
+  const holdStepRef = options.holdStepRef || null;
+  const holdingRef = useRef(false);
+  const [holding, setHolding] = useState(false);
+  const [heldMs, setHeldMs] = useState(0);
 
   const getClockSnapshot = useCallback(() => ({
     phase: state.phase,
@@ -135,7 +142,7 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
   const totalMs = sourceTotalSeconds != null
     ? sourceTotalSeconds * 1000
     : effectiveRecipe?.totalBrewTimeSeconds != null
-      ? effectiveRecipe.totalBrewTimeSeconds * 1000
+      ? effectiveRecipe.totalBrewTimeSeconds * 1000 + heldMs
       : 0;
 
   const currentStep = timerSteps && state.stepIndex < timerSteps.length
@@ -144,6 +151,14 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
   const currentStepDurationMs = currentStep && Number.isFinite(currentStep.durationSeconds)
     ? currentStep.durationSeconds * 1000
     : 0;
+
+  // Leaving a held step: the time past its planned end moves the guide total.
+  const releaseHold = useCallback((stepMs) => {
+    if (!holdingRef.current) return;
+    holdingRef.current = false;
+    setHolding(false);
+    setHeldMs((total) => total + Math.max(0, stepMs - currentStepDurationMs));
+  }, [currentStepDurationMs]);
 
   // Pure readers — compute elapsed live from refs and Date.now(). These
   // are the source of truth; setState values are just cached snapshots
@@ -218,14 +233,28 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
       if (currentStep) {
         const isFinalStep = state.stepIndex + 1 >= (timerSteps?.length || 0);
         if (!isFinalStep && step >= currentStepDurationMs) {
-          // Roll step clock forward by the exact duration so residual overshoot
-          // carries into the next step (e.g. tick arrived 150ms after the
-          // boundary — next step starts with 150ms already elapsed).
-          stepStartedAtRef.current = advanceStepClock(
-            stepStartedAtRef.current,
-            currentStepDurationMs,
-            stepPausedAccumMsRef.current,
-          );
+          if (holdStepRef?.current?.(state.stepIndex, step - currentStepDurationMs)) {
+            if (!holdingRef.current) {
+              holdingRef.current = true;
+              setHolding(true);
+            }
+            return;
+          }
+          if (holdingRef.current) {
+            // A held step ends now, so the next step starts now with its
+            // full length.
+            releaseHold(step);
+            stepStartedAtRef.current = Date.now();
+          } else {
+            // Roll step clock forward by the exact duration so residual overshoot
+            // carries into the next step (e.g. tick arrived 150ms after the
+            // boundary — next step starts with 150ms already elapsed).
+            stepStartedAtRef.current = advanceStepClock(
+              stepStartedAtRef.current,
+              currentStepDurationMs,
+              stepPausedAccumMsRef.current,
+            );
+          }
           stepPausedAccumMsRef.current = 0;
           // Reset the display state BEFORE dispatching so the next render sees
           // 0 against the new step duration instead of the overshoot value
@@ -241,7 +270,7 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
       alive = false;
       clearInterval(id);
     };
-  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, readGlobalMs, readStepMs]);
+  }, [state.phase, state.stepIndex, currentStep, currentStepDurationMs, timerSteps, readGlobalMs, readStepMs, holdStepRef, releaseHold]);
 
   // Recompute on visibility change so foreground resume doesn't wait up to
   // 100ms for the next interval fire. Matches Capacitor's JS suspension model.
@@ -308,6 +337,9 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     stepPausedAccumMsRef.current = 0;
     completionRef.current = null;
     setCompletion(null);
+    holdingRef.current = false;
+    setHolding(false);
+    setHeldMs(0);
     setGlobalElapsedMs(Math.max(0, Date.now() - atMs));
     setStepElapsedMs(Math.max(0, Date.now() - atMs));
     dispatch({ type: 'COUNTDOWN_DONE' });
@@ -343,20 +375,22 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     if (state.stepIndex + 1 >= timerSteps.length) {
       return;
     }
+    releaseHold(readStepMs());
     stepStartedAtRef.current = stepNavAnchor();
     stepPausedAccumMsRef.current = 0;
     setStepElapsedMs(0);
     dispatch({ type: 'NEXT_STEP' });
-  }, [timerSteps, state.stepIndex]);
+  }, [timerSteps, state.stepIndex, releaseHold, readStepMs]);
 
   const rewind = useCallback(() => {
     if (!timerSteps || state.stepIndex <= 0) return;
+    releaseHold(readStepMs());
     // Global elapsed clock keeps ticking. Only the step clock resets.
     stepStartedAtRef.current = stepNavAnchor();
     stepPausedAccumMsRef.current = 0;
     setStepElapsedMs(0);
     dispatch({ type: 'SET_STEP', stepIndex: state.stepIndex - 1 });
-  }, [timerSteps, state.stepIndex]);
+  }, [timerSteps, state.stepIndex, releaseHold, readStepMs]);
 
   const reset = useCallback(() => {
     clearCheckpoint(checkpointRef.current?.id);
@@ -368,6 +402,9 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     stepPausedAccumMsRef.current = 0;
     completionRef.current = null;
     setCompletion(null);
+    holdingRef.current = false;
+    setHolding(false);
+    setHeldMs(0);
     setGlobalElapsedMs(0);
     setStepElapsedMs(0);
     dispatch({ type: 'RESET' });
@@ -382,6 +419,7 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
     globalElapsedMs,
     stepElapsedMs,
     totalMs,
+    holding,
     // Live readers for rAF loops — read Date.now() against internal refs
     // every frame so animations stay 60fps without React state churn.
     readGlobalMs,

@@ -23,7 +23,7 @@
     "test:trial-offer": "node scripts/trial-offer.test.mjs",
     "test:espresso": "node --test scripts/espresso-command.test.mjs scripts/espresso-equipment-routing.test.mjs scripts/espresso-recipe.test.mjs scripts/espresso-ui.test.mjs scripts/recipe-command-entitlement.test.mjs scripts/ruphus-context.test.mjs scripts/ruphus-espresso-tools.test.mjs scripts/ruphus-reference-resolution.test.mjs scripts/ruphus-rollout-gates.test.mjs scripts/ruphus-u2-runtime.test.mjs scripts/ruphus-u4-tasting-context.test.mjs",
     "test:recipe-scaling": "node scripts/recipe-scaling.test.mjs",
-    "test:scale": "node --test scripts/acaia-protocol.test.mjs scripts/scale-session.test.mjs && node scripts/verify-scale-ui.mjs",
+    "test:scale": "node --test scripts/acaia-protocol.test.mjs scripts/scale-session.test.mjs && node scripts/brew-timer-pour-hold.test.mjs && node scripts/verify-scale-ui.mjs",
     "test:quick-recipe": "node --test scripts/quick-recipe-flow.test.mjs",
     "test:bean-card-swipe": "node --test scripts/bean-card-swipe.test.mjs",
     "test:brew-timing-memory": "node scripts/brew-timing-memory.test.mjs && node scripts/brew-timing-persistence.test.mjs && node scripts/brew-timer-lifecycle.test.mjs && node scripts/brew-timer-session.test.mjs && node scripts/brew-live-activity.test.mjs && node scripts/handbrew-timing-memory-integration.test.mjs",

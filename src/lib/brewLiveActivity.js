@@ -83,6 +83,7 @@ export function buildBrewActivity({
   currentStepDurationMs,
   totalMs,
   confirmedSource = false,
+  holding = false,
   sourceReadiness = null,
   sourceActive = false,
   completionElapsedMs = null,
@@ -101,6 +102,8 @@ export function buildBrewActivity({
   if (confirmedSource) {
     steps[index] = { ...steps[index], seconds: currentStepDurationMs > 0 ? currentStepDurationMs / 1000 : null };
   }
+  // A step the app holds for the scale has no end yet, so nothing auto-advances.
+  if (holding) steps[index] = { ...steps[index], seconds: null };
   const totalSeconds = totalMs > 0 ? totalMs / 1000 : null;
   const base = {
     steps,
