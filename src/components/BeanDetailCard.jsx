@@ -8,12 +8,13 @@
 // the bespoke icon set is the next phase. Bag background stripping is also
 // pending (real photos render as-is on the white card for now).
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { X, ArrowRight, RotateCcw, Pencil, Snowflake, Undo2, BookOpen, Flame, Leaf, Container, Coffee, Mountain, Check, Trash2, ChevronRight, Settings2, MessageCircle } from 'lucide-react';
 import { splitTastingNotes } from '../lib/tastingHero';
-import { AnimatePresence, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, useDragControls, useMotionValue, useTransform, useMotionTemplate, animate as fmAnimate, useReducedMotion } from 'framer-motion';
 import { m, spring } from '../lib/motion';
 import { haptic } from '../lib/haptics';
+import { lockSwipeAxis, resolveCardSwipe } from '../lib/cardSwipe';
 import { fonts } from '../styles/theme';
 import { getPeakStatus, daysSinceRoast, formatDate } from '../lib/peakStatus';
 import { summarizeSourceInsights } from '../lib/sourceInsights';
@@ -400,6 +401,10 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
   const swipeToken = useRef(0);
   const swipeAnim = useRef(null);
   useEffect(() => () => { swipeToken.current++; swipeAnim.current?.stop(); }, []);
+  const dragControls = useDragControls();
+  const [swipeAxis, setSwipeAxis] = useState('y');
+  const pendingSwipe = useRef(null); // touch down, axis not chosen yet
+  const swipeOrigin = useRef(null);  // first touch of the current drag
 
   // Bean swap is parent-driven (no remount, per contract — a remount would kill the
   // slide transition and replay the mount-scoped entrance haptic / hero-morph guard
@@ -421,19 +426,27 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
   // top, so normal scrolling is never hijacked. Rubber-bands the sheet, dismisses on a
   // sufficient pull. (Front uses framer drag on the whole card.)
   const backPull = {
-    onTouchStart: (e) => { pullStart.current = (backScrollRef.current?.scrollTop || 0) <= 0 ? e.touches[0].clientY : null; },
+    onTouchStart: (e) => {
+      const touch = e.touches[0];
+      pullStart.current = (backScrollRef.current?.scrollTop || 0) <= 0 ? { x: touch.clientX, y: touch.clientY, axis: null } : null;
+    },
     onTouchMove: (e) => {
-      if (pullStart.current == null) return;
-      const dy = e.touches[0].clientY - pullStart.current;
-      if (dy > 0 && backScrollRef.current) backScrollRef.current.style.transform = `translateY(${dy * 0.35}px)`;
+      const start = pullStart.current;
+      if (!start) return;
+      const touch = e.touches[0];
+      start.axis ??= lockSwipeAxis({ x: touch.clientX - start.x, y: touch.clientY - start.y });
+      if (start.axis === 'x') { pullStart.current = null; return; } // sideways belongs to the notes rail
+      const dy = touch.clientY - start.y;
+      if (start.axis === 'y' && dy > 0 && backScrollRef.current) backScrollRef.current.style.transform = `translateY(${dy * 0.35}px)`;
     },
     onTouchEnd: (e) => {
-      if (pullStart.current == null) return;
-      const dy = e.changedTouches[0].clientY - pullStart.current;
+      const start = pullStart.current;
+      if (!start) return;
+      const dy = e.changedTouches[0].clientY - start.y;
       const el = backScrollRef.current;
       if (el) { el.style.transition = 'transform 0.26s cubic-bezier(0.22,1,0.36,1)'; el.style.transform = 'translateY(0)'; setTimeout(() => { if (el) el.style.transition = ''; }, 280); }
       pullStart.current = null;
-      if (dy > 95) { haptic.light(); onClose(); }
+      if (start.axis === 'y' && dy > 95) { haptic.light(); onClose(); }
     },
   };
 
@@ -466,18 +479,40 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
     });
   };
 
-  // Dominant-axis branch: y keeps today's dismiss thresholds unchanged; x commits a
-  // navigate only past the threshold AND only if a neighbor exists in that direction
-  // (no neighbor => the elastic already rubber-banded it, nothing to commit).
+  // Choose the axis ourselves, then start framer's drag on that one axis. framer's
+  // dragDirectionLock favors y as soon as y passes 10px, even on a mostly sideways swipe.
+  const onCardPointerDown = (e) => {
+    if (!swipeEnabled || flipped || !e.isPrimary) return;
+    pendingSwipe.current = { pointerId: e.pointerId, x: e.pageX, y: e.pageY };
+  };
+  const onCardPointerMove = (e) => {
+    const start = pendingSwipe.current;
+    if (!start || e.pointerId !== start.pointerId) return;
+    if (!e.buttons) { pendingSwipe.current = null; return; } // released before locking
+    const axis = lockSwipeAxis({ x: e.pageX - start.x, y: e.pageY - start.y });
+    if (!axis) return;
+    pendingSwipe.current = null;
+    swipeOrigin.current = start;
+    flushSync(() => setSwipeAxis(axis)); // framer reads the drag prop when the drag starts
+    dragControls.start(e);
+  };
+
+  // The release obeys the locked axis. Distances count from the first touch.
   const onFrontDragEnd = (e, info) => {
     if (swipeBusy.current) return; // a commit is mid-flight — ignore until it lands
-    if (swipeEnabled && Math.abs(info.offset.x) > Math.abs(info.offset.y)) {
-      const goingNext = info.offset.x < 0;
-      const target = goingNext ? nextBean : prevBean;
-      if (target && (Math.abs(info.offset.x) > 90 || Math.abs(info.velocity.x) > 500)) commitSwipe(target, goingNext);
-      return;
-    }
-    if (info.offset.y > 110 || info.velocity.y > 650) onClose();
+    const offset = swipeEnabled
+      ? { x: info.point.x - swipeOrigin.current.x, y: info.point.y - swipeOrigin.current.y }
+      : info.offset;
+    const action = resolveCardSwipe({
+      axis: swipeEnabled ? swipeAxis : 'y',
+      offset,
+      velocity: info.velocity,
+      hasPrev: !!prevBean,
+      hasNext: !!nextBean,
+    });
+    if (action === 'next') commitSwipe(nextBean, true);
+    else if (action === 'prev') commitSwipe(prevBean, false);
+    else if (action === 'dismiss') onClose();
   };
 
   const notes = parseNotes(bean.bagNotes);
@@ -556,12 +591,15 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
           exit={reduce ? { opacity: 0, scale: 0.93, y: 12 } : { opacity: 0 }}
           transition={spring.soft}
           onClick={(e) => e.stopPropagation()}
-          drag={flipped ? false : (swipeEnabled ? true : 'y')}
-          dragDirectionLock
+          onPointerDown={onCardPointerDown}
+          onPointerMove={onCardPointerMove}
+          drag={flipped ? false : (swipeEnabled ? swipeAxis : 'y')}
+          dragListener={!swipeEnabled}
+          dragControls={dragControls}
           dragConstraints={swipeEnabled ? { top: 0, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0 }}
           dragElastic={swipeEnabled ? { top: 0, bottom: 0.6, left: nextBean ? 0.5 : 0.12, right: prevBean ? 0.5 : 0.12 } : { top: 0, bottom: 0.6 }}
           onDragEnd={onFrontDragEnd}
-          style={{ width: '100%', maxWidth: 384, height: 'min(90vh, 720px)', perspective: 2200, touchAction: flipped ? 'pan-y' : 'none', x, rotateZ }}
+          style={{ width: '100%', maxWidth: 384, height: 'min(90vh, 720px)', perspective: 2200, touchAction: flipped ? 'pan-y' : 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', x, rotateZ }}
         >
           <m.div
             animate={{ rotateY: flipped ? 180 : 0 }}
