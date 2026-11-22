@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  closedPourSeconds, generateV60SwitchRecipe, generateV60SwitchFallback, validateV60SwitchCandidate, modulateSwitchValveTiming,
+  closedPourSeconds, MIN_STEEP_AFTER_POUR_SECONDS, generateV60SwitchRecipe, generateV60SwitchFallback, validateV60SwitchCandidate, modulateSwitchValveTiming,
 } from '../src/lib/v60SwitchAdapter.js';
 import { V60_SWITCH_ROAST_PRESETS } from '../src/data/v60SwitchConfiguration.js';
 import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
@@ -88,7 +88,7 @@ for (const roast of ['light', 'medium', 'dark']) {
     assert.ok(steep?.waitForPour === true && steep.phase === 'immersion' && /valve closed/i.test(steep.action), `${label}: no steep step after the close+pour step`);
     assert.equal(steep.waterTotal, recipe.waterGrams, `${label}: the steep adds no water`);
     assert.ok(/open the valve/i.test(drain?.action), `${label}: drain must follow the steep`);
-    assert.ok(drain.timeSeconds - steep.timeSeconds >= 15, `${label}: steep after the pour is only ${drain.timeSeconds - steep.timeSeconds}s`);
+    assert.ok(drain.timeSeconds - steep.timeSeconds >= MIN_STEEP_AFTER_POUR_SECONDS, `${label}: steep after the pour is only ${drain.timeSeconds - steep.timeSeconds}s`);
     assert.ok(steep.timeSeconds - recipe.steps[closeIndex].timeSeconds >= 15, `${label}: pour window too short`);
     const modulation = modulateSwitchValveTiming(V60_SWITCH_ROAST_PRESETS[roast], intent);
     assert.equal(drain.timeSeconds - recipe.steps[closeIndex].timeSeconds, recipe.reasonCodes.includes('SWITCH_HOT_STEEP_CAPPED') ? 100 : modulation.steepDurationSeconds, `${label}: close->open window changed`);
@@ -96,8 +96,8 @@ for (const roast of ['light', 'medium', 'dark']) {
   }
 }
 assert.equal(closedPourSeconds(171, 75), 35, '171 g at 5 g/s, rounded up to 5 s');
-assert.equal(closedPourSeconds(171, 50), 35, 'a 50 s closed window still keeps 15 s of steep');
-assert.equal(closedPourSeconds(171, 40), 25, 'pour window shrinks to keep 15 s of steep');
+assert.equal(closedPourSeconds(171, 70), 30, 'pour window shrinks to keep 40 s of steep');
+assert.equal(closedPourSeconds(171, 50), 15, 'pour window never drops under 15 s');
 assert.equal(closedPourSeconds(20, 75), 15, 'a tiny pour still gets 15 s');
 
 // --- Bean-driven valve-timing modulation (Revision 2026-08-16) ------------

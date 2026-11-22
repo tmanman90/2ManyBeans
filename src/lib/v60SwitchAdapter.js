@@ -31,13 +31,17 @@ const GRINDER_RANGES = {
 
 // The closed-valve window (close -> open) includes pour 2. The steep step
 // starts once that pour should be done: the remaining water at about 5 g/s,
-// rounded up to 5 s, always leaving at least 15 s of untouched steep.
+// rounded up to 5 s (never under 15 s). The window leaves at least 40 s of
+// untouched steep where it can: published light-roast hybrids keep the valve
+// closed 75 s including a ~160 g pour (Coffee Chronicler, Jean Galea), and
+// Sample Coffee waits ~1 min after its closed pour (2026-11-22 survey).
 const CLOSED_POUR_GRAMS_PER_SECOND = 5;
-const MIN_STEEP_AFTER_POUR_SECONDS = 15;
+const MIN_POUR_WINDOW_SECONDS = 15;
+export const MIN_STEEP_AFTER_POUR_SECONDS = 40;
 
 export function closedPourSeconds(pourGrams, steepDurationSeconds) {
   const seconds = Math.ceil(pourGrams / CLOSED_POUR_GRAMS_PER_SECOND / 5) * 5;
-  return Math.max(MIN_STEEP_AFTER_POUR_SECONDS, Math.min(seconds, steepDurationSeconds - MIN_STEEP_AFTER_POUR_SECONDS));
+  return Math.max(MIN_POUR_WINDOW_SECONDS, Math.min(seconds, steepDurationSeconds - MIN_STEEP_AFTER_POUR_SECONDS));
 }
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
