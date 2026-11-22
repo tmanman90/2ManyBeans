@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activePour, buildScaleSummary, detectFirstPour, flowLabel, flowRate, lastScaleCurve,
-  normalizeScaleSummary, pourProgress, pourTargets, targetState, thinCurve,
+  normalizeScaleSummary, pourProgress, pourTargets, stepAfterLastPour, targetState, thinCurve,
 } from '../src/lib/scale/scaleSession.js';
 import { fakePourWeight, createFakeTransport } from '../src/lib/scale/fakeScale.js';
 import { buildTimingEvent, mergeTimingEvent, timingContextFromRecipe } from '../src/lib/brewTimingMemory.js';
@@ -93,6 +93,20 @@ test('summary: per pour, ratio, bloom, flow and a 1 Hz curve', () => {
   assert.ok(summary.curve[0] <= 1, "starts at the first drop");
   assert.equal(summary.curve[180], 320);
   assert.equal(buildScaleSummary({ samples, firstWaterAtMs: start, finishAtMs: start - 1, targets }), null);
+});
+
+test('V60 Switch: Steep and Drain take over once the last pour is behind the brewer', () => {
+  const timerSteps = [
+    { index: 0, startSeconds: 0, step: { name: 'Open pour', waterTotal: 129 } },
+    { index: 1, startSeconds: 40, step: { name: 'Close and pour', waterTotal: 300 } },
+    { index: 2, startSeconds: 75, step: { name: 'Steep', waterTotal: 300 } },
+    { index: 3, startSeconds: 115, step: { name: 'Drain', waterTotal: 300 } },
+  ];
+  const targets = pourTargets(timerSteps);
+  assert.equal(stepAfterLastPour(timerSteps, targets, 0), null);
+  assert.equal(stepAfterLastPour(timerSteps, targets, 1), null, 'pour 2 is still the pour');
+  assert.equal(stepAfterLastPour(timerSteps, targets, 2), 'Steep');
+  assert.equal(stepAfterLastPour(timerSteps, targets, 3), 'Drain');
 });
 
 test('thin curve carries the last reading forward', () => {

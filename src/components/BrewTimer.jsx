@@ -30,7 +30,7 @@ import {
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { useScaleBrew } from '../hooks/useScaleBrew';
-import { holdForPour, lastScaleCurve, pourProgress, targetState } from '../lib/scale/scaleSession';
+import { holdForPour, lastScaleCurve, pourProgress, stepAfterLastPour, targetState } from '../lib/scale/scaleSession';
 import { ScalePairSheet } from './scale/ScalePairSheet';
 import { ScalePrebrew } from './scale/ScalePrebrew';
 import { ScaleSummary } from './scale/ScaleSummary';
@@ -508,6 +508,8 @@ function useConfirmedSourceTimer(recipe, {
   };
 }
 
+const scaleBannerStyle = { width: '100%', boxSizing: 'border-box', borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'center', fontWeight: 800, fontSize: 16, color: '#fff' };
+
 const BrewTimerShell = ({
   open, recipe, bean, attemptId = null, revisionId = null, onClose, onStartTasting, onSaveTimingEvent,
   sourceTimerState = null, sourceTimerBinding = null, timerOverride = null, restoredSession = null,
@@ -886,6 +888,14 @@ const BrewTimerShell = ({
   const scaleState = scaleLive ? targetState(scaleGrams, scaleTarget?.targetG) : null;
   const isLastPour = scaleTarget && scaleTarget === scaleBrew.targets[scaleBrew.targets.length - 1];
   const nextPour = scaleTarget ? scaleBrew.targets[scaleBrew.targets.indexOf(scaleTarget) + 1] : null;
+  const stepAfterPours = scaleLive ? stepAfterLastPour(timerSteps, scaleBrew.targets, stepIndex) : null;
+  const currentStepRemainingMs = resolveStepTiming({
+    isFinalStep,
+    nominalDurationMs: currentStepDurationMs,
+    totalMs,
+    globalElapsedMs,
+    stepElapsedMs,
+  }).remainingMs;
   const scaleRingColor = phase === 'paused' ? C.accentLight : scaleState === 'reached' ? C.green : scaleState === 'over' ? C.amber : C.accent;
 
   const beanName = bean?.name || bean?.roasterName || '';
@@ -1230,8 +1240,13 @@ const BrewTimerShell = ({
 
         {scaleLive && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {scaleState === 'reached' || scaleState === 'over' ? (
-              <div role="status" style={{ width: '100%', boxSizing: 'border-box', borderRadius: 16, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'center', fontWeight: 800, fontSize: 16, background: scaleState === 'over' ? C.amber : C.green, color: '#fff' }}>
+            {stepAfterPours ? (
+              <div style={{ ...scaleBannerStyle, background: C.accent }}>
+                <span role="status">{stepAfterPours}</span>
+                {currentStepRemainingMs > 0 && <span style={{ marginLeft: 'auto', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatMMSS(currentStepRemainingMs)} left</span>}
+              </div>
+            ) : scaleState === 'reached' || scaleState === 'over' ? (
+              <div role="status" style={{ ...scaleBannerStyle, background: scaleState === 'over' ? C.amber : C.green }}>
                 <span>{scaleState === 'over' ? `Over by ${Math.round(scaleGrams - scaleTarget.targetG)} g` : isLastPour ? 'Last pour done' : 'Stop pouring'}</span>
                 {nextPour && <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 13, opacity: 0.9 }}>Next pour at {formatMMSS(nextPour.startSeconds * 1000)}</span>}
               </div>
@@ -1257,13 +1272,6 @@ const BrewTimerShell = ({
         >
           {(timerSteps || []).map((ts, i) => {
             const status = i < stepIndex ? 'done' : i === stepIndex ? 'current' : 'upcoming';
-            const remainingMs = resolveStepTiming({
-              isFinalStep,
-              nominalDurationMs: currentStepDurationMs,
-              totalMs,
-              globalElapsedMs,
-              stepElapsedMs,
-            }).remainingMs;
             const timeLabel = isConfirmedSource && status !== 'current'
               ? status === 'done' ? 'confirmed' : sourceTriggerLabel(ts.step)
               : isConfirmedSource && status === 'current'
@@ -1281,7 +1289,7 @@ const BrewTimerShell = ({
                       : `${formatMMSS(guideWindowMs[0] - globalElapsedMs)} to window`
                   : isFinalStep && guideState.reached
                     ? `+${formatMMSS(guideState.overtimeMs)} over`
-                    : `${formatMMSS(remainingMs)} left`)
+                    : `${formatMMSS(currentStepRemainingMs)} left`)
               : status === 'done'
                 ? `@${formatMMSS(ts.startSeconds * 1000)}`
                 : `@${formatMMSS(ts.startSeconds * 1000)}`;
