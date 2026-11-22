@@ -7,11 +7,15 @@
  * - the production and development app IDs are different;
  * - the dev native wrapper uses the `-devapp` version lineage;
  * - the social-login Package.swift patch must run before Capgo metadata checks;
- * - Capgo must reject native incompatibility instead of advancing the channel.
+ * - Capgo must reject native incompatibility instead of advancing the channel,
+ *   except plugins the JS guards at runtime (scripts/capgo-compat.mjs).
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { compatibilityUploadFlag } from './capgo-compat.mjs';
 import { semverSafeDevTimestamp } from './ship-dev-version.mjs';
 
 const DEV_APP_ID = 'com.talmeltzer.coffeehub.dev';
@@ -65,6 +69,24 @@ function nextDevBundle(packageVersion, currentBundle) {
   return `${next.join('.')}-devapp.${timestamp}`;
 }
 
+// social-login's own cap sync hook rewrites its podspec, and Capgo checksums
+// that file. Upload from the published copy so a recent cap sync (any Dev
+// TestFlight build) does not read as a native change.
+function restorePublishedSocialLoginPodspec() {
+  const packageRoot = 'node_modules/@capgo/capacitor-social-login';
+  const { version } = JSON.parse(readFileSync(`${packageRoot}/package.json`, 'utf8'));
+  const staging = mkdtempSync(join(tmpdir(), 'coffee-hub-social-login-'));
+  try {
+    run(npmCommand, ['pack', `@capgo/capacitor-social-login@${version}`, '--pack-destination', staging], { capture: true });
+    const archive = readdirSync(staging).find((name) => name.endsWith('.tgz'));
+    if (!archive) throw new Error(`Could not fetch the published social-login ${version} podspec.`);
+    const podspec = run('tar', ['-xOf', join(staging, archive), 'package/CapgoCapacitorSocialLogin.podspec'], { capture: true });
+    writeFileSync(`${packageRoot}/CapgoCapacitorSocialLogin.podspec`, podspec, 'utf8');
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+}
+
 const capacitorConfig = readFileSync('capacitor.config.ts', 'utf8');
 if (!capacitorConfig.includes(DEV_APP_ID) || !capacitorConfig.includes("defaultChannel: 'dev'")) {
   throw new Error('Dev Capacitor config no longer points at the expected app ID/channel. Refusing upload.');
@@ -89,7 +111,16 @@ console.log(`New bundle: ${devBundle}`);
 
 // Keep native metadata aligned with the already-installed Dev wrapper before
 // Capgo performs its compatibility check.
+restorePublishedSocialLoginPodspec();
 run('node', ['scripts/patch-social-login.mjs']);
+
+const compatibility = compatibilityUploadFlag(
+  capgo(['bundle', 'compatibility', DEV_APP_ID, '--channel', DEV_CHANNEL, '--text'], { capture: true }),
+);
+if (compatibility.accepted.length > 0) {
+  console.log(`Accepting runtime-guarded native plugins missing from older binaries: ${compatibility.accepted.join(', ')}`);
+}
+
 run(npmCommand, ['run', 'build:ios:dev']);
 
 capgo([
@@ -97,7 +128,7 @@ capgo([
   '--path', './dist',
   '--channel', DEV_CHANNEL,
   '--bundle', devBundle,
-  '--fail-on-incompatible',
+  compatibility.flag,
   // Delta only: devices fetch just the files that changed. Every native build
   // has shipped @capgo/capacitor-updater 8.45.0 (delta needs 7.0.35+ on 7.x),
   // so no installed app needs the full zip.
