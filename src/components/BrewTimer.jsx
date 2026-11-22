@@ -30,7 +30,7 @@ import {
 import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { timingContextFromRecipe } from '../lib/brewTimingMemory';
 import { useScaleBrew } from '../hooks/useScaleBrew';
-import { lastScaleCurve, pourProgress, targetState } from '../lib/scale/scaleSession';
+import { holdForPour, lastScaleCurve, pourProgress, targetState } from '../lib/scale/scaleSession';
 import { ScalePairSheet } from './scale/ScalePairSheet';
 import { ScalePrebrew } from './scale/ScalePrebrew';
 import { ScaleSummary } from './scale/ScaleSummary';
@@ -514,7 +514,9 @@ const BrewTimerShell = ({
 }) => {
   const { user } = useAuthContext();
   const timerOwner = user?.uid || 'demo';
-  const standardTimer = useBrewTimer(recipe, attemptId, { sourceTimerState, sourceTimerBinding, restoredSession });
+  // Filled below once the scale exists; the timer asks it before each step ends.
+  const holdStepRef = useRef(null);
+  const standardTimer = useBrewTimer(recipe, attemptId, { sourceTimerState, sourceTimerBinding, restoredSession, holdStepRef });
   const timer = timerOverride || standardTimer;
   const {
     phase, stepIndex, timerSteps, currentStep, currentStepDurationMs,
@@ -534,6 +536,13 @@ const BrewTimerShell = ({
   });
   const scale = scaleBrew.scale;
   const scaleLive = scaleBrew.stage === 'live' && (phase === 'running' || phase === 'paused');
+  useLayoutEffect(() => {
+    holdStepRef.current = scaleLive
+      ? (index, overdueMs) => holdForPour({
+        timerSteps, stepIndex: index, target: scaleBrew.target, reachedAtMs: scaleBrew.reached, overdueMs, connected: scale.status === 'connected',
+      })
+      : null;
+  });
 
   const ringRef = useRef(null);
   const pillsScrollRef = useRef(null);

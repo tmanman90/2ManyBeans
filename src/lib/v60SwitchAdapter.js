@@ -19,13 +19,26 @@ export const V60_SWITCH_ENGINE_VERSION = 'v60-switch-engine-v1';
 // "Revision 2026-08-16") — invalidates every cached dual-temp candidate
 // (which carried a non-null waterTemp2) so it regenerates under the new
 // single-temp + bean-driven-valve-timing rules on next read (R8).
-export const V60_SWITCH_RULES_VERSION = 'v60-switch-rules-v2-single-temp';
+// v3 (2026-11-22) adds the timed closed-valve steep step after pour 2, so
+// cached v2 recipes (no steep step) regenerate on next read.
+export const V60_SWITCH_RULES_VERSION = 'v60-switch-rules-v3-timed-steep';
 export const V60_SWITCH_PHASE_CONTRACT_VERSION = 1;
 
 const GRINDER_RANGES = {
   'fellow-ode-gen2': [4, 8], 'fellow-opus': [3, 8.5], 'baratza-encore-esp': [10, 32],
   'comandante-c40': [18, 38], '1zpresso-jx-pro': [90, 180], 'baratza-virtuoso-plus': [10, 32],
 };
+
+// The closed-valve window (close -> open) includes pour 2. The steep step
+// starts once that pour should be done: the remaining water at about 5 g/s,
+// rounded up to 5 s, always leaving at least 15 s of untouched steep.
+const CLOSED_POUR_GRAMS_PER_SECOND = 5;
+const MIN_STEEP_AFTER_POUR_SECONDS = 15;
+
+export function closedPourSeconds(pourGrams, steepDurationSeconds) {
+  const seconds = Math.ceil(pourGrams / CLOSED_POUR_GRAMS_PER_SECOND / 5) * 5;
+  return Math.max(MIN_STEEP_AFTER_POUR_SECONDS, Math.min(seconds, steepDurationSeconds - MIN_STEEP_AFTER_POUR_SECONDS));
+}
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const timeLabel = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -243,23 +256,32 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
   const valveOpenAt = valveCloseAt + steepDuration;
   const totalBrewTimeSeconds = valveOpenAt + preset.drawdownBudgetSeconds;
 
+  const steepStartsAt = valveCloseAt + closedPourSeconds(waterGrams - phase1WaterGrams, steepDuration);
+
   const steps = [];
   if (closedBloomSeconds > 0) {
-    steps.push({ time: '0:00', timeSeconds: 0, action: `Close the valve and bloom with ${bloomGrams}g water.`, waterTotal: bloomGrams, phase: 'immersion' });
+    steps.push({ time: '0:00', timeSeconds: 0, name: 'Closed bloom', action: `Close the valve and bloom with ${bloomGrams}g water.`, waterTotal: bloomGrams, phase: 'immersion' });
     steps.push({
-      time: timeLabel(timeOffset), timeSeconds: timeOffset,
+      time: timeLabel(timeOffset), timeSeconds: timeOffset, name: 'Open pour',
       action: `Open the valve. Pour to ${phase1WaterGrams}g in a steady center pour.`, waterTotal: phase1WaterGrams, phase: 'percolation',
     });
   } else {
-    steps.push({ time: '0:00', timeSeconds: 0, action: `Pour to ${phase1WaterGrams}g with the valve open.`, waterTotal: phase1WaterGrams, phase: 'percolation' });
+    steps.push({ time: '0:00', timeSeconds: 0, name: 'Open pour', action: `Pour to ${phase1WaterGrams}g with the valve open.`, waterTotal: phase1WaterGrams, phase: 'percolation' });
   }
   steps.push({
-    time: timeLabel(valveCloseAt), timeSeconds: valveCloseAt,
+    time: timeLabel(valveCloseAt), timeSeconds: valveCloseAt, name: 'Close and pour',
     action: `Close the valve. Pour to ${waterGrams}g.`,
     waterTotal: waterGrams, phase: 'immersion',
   });
+  // waitForPour: with a scale, this step starts only once pour 2 reaches its
+  // target, so a slow pour never eats the steep (BrewTimer holds the pour).
   steps.push({
-    time: timeLabel(valveOpenAt), timeSeconds: valveOpenAt,
+    time: timeLabel(steepStartsAt), timeSeconds: steepStartsAt, name: 'Steep',
+    action: 'Keep the valve closed and let it steep.',
+    waterTotal: waterGrams, phase: 'immersion', waitForPour: true,
+  });
+  steps.push({
+    time: timeLabel(valveOpenAt), timeSeconds: valveOpenAt, name: 'Drain',
     action: 'Open the valve and let it fully drain.', waterTotal: waterGrams, phase: 'drawdown',
   });
 

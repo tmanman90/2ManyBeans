@@ -25,7 +25,7 @@ assert.equal(sourceRestoreStartedAt(sourceRecipe, sourceState, binding, now), no
 sourceState.events['first-water'] = now - MAX_BREW_TIMER_AGE_MS;
 assert.equal(sourceRestoreStartedAt(sourceRecipe, sourceState, binding, now), null, 'stale Onyx source timer starts fresh');
 
-assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId, \{ sourceTimerState, sourceTimerBinding, restoredSession \}\)/);
+assert.match(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8'), /useBrewTimer\(recipe, attemptId, \{ sourceTimerState, sourceTimerBinding, restoredSession, holdStepRef \}\)/);
 assert.ok(/const handleConfirmClose = \(\) => \{\s*reset\(\);/.test(readFileSync(new URL('../src/components/BrewTimer.jsx', import.meta.url), 'utf8')), 'Stop clears the checkpoint before the attempt modal unmounts');
 assert.match(readFileSync(new URL('../src/components/HandBrewModal.jsx', import.meta.url), 'utf8'), /key=\{attemptId \|\| \(sourceProjection \? `\$\{sourceProjection\.sourceId\}:\$\{sourceProjection\.sourceRevision\}` : 'standard-brew'\)\}/);
 

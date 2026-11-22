@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  generateV60SwitchRecipe, generateV60SwitchFallback, validateV60SwitchCandidate, modulateSwitchValveTiming,
+  closedPourSeconds, generateV60SwitchRecipe, generateV60SwitchFallback, validateV60SwitchCandidate, modulateSwitchValveTiming,
 } from '../src/lib/v60SwitchAdapter.js';
 import { V60_SWITCH_ROAST_PRESETS } from '../src/data/v60SwitchConfiguration.js';
 import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
@@ -71,7 +71,34 @@ assert.equal(validateV60SwitchCandidate(clampedBloom).valid, true);
 // No closed-bloom override -> no reason code, default structure (2 or 3 steps, no bloom sub-step)
 const noBloom = generateV60SwitchRecipe({}, { dose: 20, roast: 'medium' });
 assert.ok(!noBloom.reasonCodes.includes('SWITCH_CLOSED_BLOOM_CAPPED'));
-assert.equal(noBloom.steps.length, 3, 'default template has 3 timed steps: percolation, close+steep, open+drain');
+assert.equal(noBloom.steps.length, 4, 'default template has 4 timed steps: percolation, close+pour, closed steep, open+drain');
+
+// --- Closed-valve steep is its own timed step (2026-11-22) ----------------
+// Tal's V60 Switch brew said "open the valve" right as pour 2 finished: the
+// close+pour step ran straight into the drain step, so a slow pour 2 ate the
+// whole steep. The steep is now its own step, after a pour window, before the
+// drain, and the close->open window is unchanged.
+for (const roast of ['light', 'medium', 'dark']) {
+  for (const intent of [{}, { confidence: 'high', cupDirection: { clarity: 'high' } }, { confidence: 'high', cupDirection: { sweetness: 'high' }, finesRisk: 'high' }]) {
+    const recipe = generateV60SwitchRecipe(intent, { dose: 20, roast });
+    const label = `${roast}/${JSON.stringify(intent)}`;
+    const closeIndex = recipe.steps.findIndex((s) => /close the valve/i.test(s.action));
+    const steep = recipe.steps[closeIndex + 1];
+    const drain = recipe.steps[closeIndex + 2];
+    assert.ok(steep?.waitForPour === true && steep.phase === 'immersion' && /valve closed/i.test(steep.action), `${label}: no steep step after the close+pour step`);
+    assert.equal(steep.waterTotal, recipe.waterGrams, `${label}: the steep adds no water`);
+    assert.ok(/open the valve/i.test(drain?.action), `${label}: drain must follow the steep`);
+    assert.ok(drain.timeSeconds - steep.timeSeconds >= 15, `${label}: steep after the pour is only ${drain.timeSeconds - steep.timeSeconds}s`);
+    assert.ok(steep.timeSeconds - recipe.steps[closeIndex].timeSeconds >= 15, `${label}: pour window too short`);
+    const modulation = modulateSwitchValveTiming(V60_SWITCH_ROAST_PRESETS[roast], intent);
+    assert.equal(drain.timeSeconds - recipe.steps[closeIndex].timeSeconds, recipe.reasonCodes.includes('SWITCH_HOT_STEEP_CAPPED') ? 100 : modulation.steepDurationSeconds, `${label}: close->open window changed`);
+    assert.equal(validateV60SwitchCandidate(recipe).valid, true, label);
+  }
+}
+assert.equal(closedPourSeconds(171, 75), 35, '171 g at 5 g/s, rounded up to 5 s');
+assert.equal(closedPourSeconds(171, 50), 35, 'a 50 s closed window still keeps 15 s of steep');
+assert.equal(closedPourSeconds(171, 40), 25, 'pour window shrinks to keep 15 s of steep');
+assert.equal(closedPourSeconds(20, 75), 15, 'a tiny pour still gets 15 s');
 
 // --- Bean-driven valve-timing modulation (Revision 2026-08-16) ------------
 // modulateSwitchValveTiming() directly: bounds respected, reason codes emitted.

@@ -93,6 +93,18 @@ export function activePour(targets, stepIndex) {
   return active || targets[0] || null;
 }
 
+// A step marked waitForPour (the V60 Switch steep) starts only once the pour
+// before it reaches its target, so a slow pour never eats the steep. The
+// timer holds that pour past its planned end while the scale is connected
+// and the pour is short, for at most POUR_HOLD_MAX_MS.
+export const POUR_HOLD_MAX_MS = 60000;
+
+export function holdForPour({ timerSteps, stepIndex, target, reachedAtMs = {}, overdueMs = 0, connected }) {
+  if (!connected || !timerSteps?.[stepIndex + 1]?.step?.waitForPour) return false;
+  if (!target || target.stepIndex !== stepIndex || reachedAtMs[stepIndex]) return false;
+  return overdueMs < POUR_HOLD_MAX_MS;
+}
+
 export function targetState(grams, targetG) {
   if (!Number.isFinite(targetG)) return 'pouring';
   if (grams > targetG + TARGET_OVER_G) return 'over';
