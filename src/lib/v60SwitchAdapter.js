@@ -31,13 +31,17 @@ const GRINDER_RANGES = {
 
 // The closed-valve window (close -> open) includes pour 2. The steep step
 // starts once that pour should be done: the remaining water at about 5 g/s,
-// rounded up to 5 s, always leaving at least 15 s of untouched steep.
+// rounded up to 5 s (never under 15 s). The window leaves at least 40 s of
+// untouched steep where it can: published light-roast hybrids keep the valve
+// closed 75 s including a ~160 g pour (Coffee Chronicler, Jean Galea), and
+// Sample Coffee waits ~1 min after its closed pour (2026-11-22 survey).
 const CLOSED_POUR_GRAMS_PER_SECOND = 5;
-const MIN_STEEP_AFTER_POUR_SECONDS = 15;
+const MIN_POUR_WINDOW_SECONDS = 15;
+export const MIN_STEEP_AFTER_POUR_SECONDS = 40;
 
 export function closedPourSeconds(pourGrams, steepDurationSeconds) {
   const seconds = Math.ceil(pourGrams / CLOSED_POUR_GRAMS_PER_SECOND / 5) * 5;
-  return Math.max(MIN_STEEP_AFTER_POUR_SECONDS, Math.min(seconds, steepDurationSeconds - MIN_STEEP_AFTER_POUR_SECONDS));
+  return Math.max(MIN_POUR_WINDOW_SECONDS, Math.min(seconds, steepDurationSeconds - MIN_STEEP_AFTER_POUR_SECONDS));
 }
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -81,8 +85,8 @@ function isAnaerobicProcess(config, intent) {
 // are the extraction dial (Chronicler's sweet-version close-time shift,
 // Quan's steep-time dial), not a mid-brew temperature drop.
 function reasonForPreset(preset, isAnaerobic, valveTimingReasonCodes = []) {
-  const timingNote = valveTimingReasonCodes.includes('SWITCH_STEEP_SHORTENED_CLARITY')
-    ? ' This bean\'s clarity leans forward, so the valve stays open a touch longer and the closed steep runs shorter for a brighter, more percolation-driven cup.'
+  const timingNote = valveTimingReasonCodes.includes('SWITCH_CHRONICLER_TIMING_CLARITY')
+    ? ' This bean\'s clarity leans forward, so it follows Coffee Chronicler\'s published timing: the valve stays open until 0:45 for a brighter, more percolation-driven start, then a full 75 s closed before it opens.'
     : valveTimingReasonCodes.includes('SWITCH_EARLY_CLOSE_SWEETNESS')
       ? ' This bean leans toward body and sweetness, so the valve closes a little earlier for a fuller, rounder immersion phase.'
       : '';
@@ -122,8 +126,8 @@ export function modulateSwitchValveTiming(preset, intent = {}) {
 
   const cupDirection = intent?.cupDirection || {};
   const highRisk = intent?.finesRisk === 'high' || intent?.solubilityRisk === 'high';
-  // Clarity-leaning / high-acidity-desired: later close (more percolation),
-  // shorter steep (Quan's dial — [quan-secondary]).
+  // Clarity-leaning / high-acidity-desired: no earlier close or shorter
+  // steep than Chronicler's published 0:45 / 75 s ([chronicler-primary]).
   const clarityLeaning = cupDirection.clarity === 'high';
   // Body/sweetness-leaning, or high fines/solubility risk without a clarity
   // lean: earlier close (Chronicler's sweet-variant logic —
@@ -137,9 +141,9 @@ export function modulateSwitchValveTiming(preset, intent = {}) {
   const reasonCodes = [];
 
   if (clarityLeaning) {
-    closeDelta += bounds.clarityCloseDelaySeconds;
-    steepDelta -= bounds.claritySteepShortenSeconds;
-    reasonCodes.push('SWITCH_LATE_CLOSE_CLARITY', 'SWITCH_STEEP_SHORTENED_CLARITY');
+    closeDelta = Math.max(0, bounds.clarityMinCloseSeconds - baselineClose);
+    steepDelta = Math.max(0, bounds.clarityMinSteepSeconds - baselineSteep);
+    if (closeDelta || steepDelta) reasonCodes.push('SWITCH_CHRONICLER_TIMING_CLARITY');
   } else if (bodySweetnessLeaning) {
     closeDelta -= bounds.sweetnessCloseEarlySeconds;
     reasonCodes.push('SWITCH_EARLY_CLOSE_SWEETNESS');

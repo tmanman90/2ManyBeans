@@ -116,10 +116,13 @@ export const V60_SWITCH_GUARDRAILS = Object.freeze({
 // so two beans at the same roast preset can diverge meaningfully without
 // ever producing a physically implausible schedule.
 export const V60_SWITCH_VALVE_MODULATION_BOUNDS = Object.freeze({
-  // Clarity-leaning intent: later close (more percolation) + shorter steep
-  // (Quan's dial — [quan-secondary]).
-  clarityCloseDelaySeconds: 12, // bounded ~10-15s later close
-  claritySteepShortenSeconds: 25, // bounded ~20-30s shorter steep
+  // Clarity-leaning intent: Coffee Chronicler's published timing, valve
+  // closed at 0:45 and opened at 2:00 [chronicler-primary], as a floor. The
+  // 2026-08-16 rule (close 12 s later, steep 25 s shorter, [derived]) left
+  // about 15 s of real steep after pour 2 and Tal's cup tasted light
+  // (2026-11-22). A preset already at or past these keeps its own timing.
+  clarityMinCloseSeconds: 45,
+  clarityMinSteepSeconds: 75,
   // Body/sweetness-leaning or high fines/solubility risk: earlier close
   // (Chronicler's sweet-variant logic — [chronicler-primary]) + longer steep
   // when fines/solubility risk is specifically high.

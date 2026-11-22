@@ -94,15 +94,18 @@ export function activePour(targets, stepIndex) {
 }
 
 // A step marked waitForPour (the V60 Switch steep) starts only once the pour
-// before it reaches its target, so a slow pour never eats the steep. The
-// timer holds that pour past its planned end while the scale is connected
-// and the pour is short, for at most POUR_HOLD_MAX_MS.
-export const POUR_HOLD_MAX_MS = 60000;
+// before it is done, so a slow pour never eats the steep: the timer holds that
+// pour past its planned end while the scale is connected. The pour is done
+// when it reaches its target, or when the water stopped within
+// POUR_STALL.gapG of it for POUR_STALL.idleMs (the brewer stopped just short).
+// A pour that never started keeps waiting; Skip still moves on.
+export const POUR_STALL = { gapG: 15, idleMs: 5000 };
 
-export function holdForPour({ timerSteps, stepIndex, target, reachedAtMs = {}, overdueMs = 0, connected }) {
+export function holdForPour({ timerSteps, stepIndex, target, reachedAtMs = {}, grams, idleMs = 0, connected }) {
   if (!connected || !timerSteps?.[stepIndex + 1]?.step?.waitForPour) return false;
   if (!target || target.stepIndex !== stepIndex || reachedAtMs[stepIndex]) return false;
-  return overdueMs < POUR_HOLD_MAX_MS;
+  const stoppedShort = Number.isFinite(grams) && grams >= target.targetG - POUR_STALL.gapG && idleMs >= POUR_STALL.idleMs;
+  return !stoppedShort;
 }
 
 // The named step the brewer is on once the last pour is behind them (the V60

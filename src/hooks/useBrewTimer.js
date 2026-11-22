@@ -233,7 +233,7 @@ export function useBrewTimer(recipe, sessionId = null, options = {}) {
       if (currentStep) {
         const isFinalStep = state.stepIndex + 1 >= (timerSteps?.length || 0);
         if (!isFinalStep && step >= currentStepDurationMs) {
-          if (holdStepRef?.current?.(state.stepIndex, step - currentStepDurationMs)) {
+          if (holdStepRef?.current?.(state.stepIndex)) {
             if (!holdingRef.current) {
               holdingRef.current = true;
               setHolding(true);
