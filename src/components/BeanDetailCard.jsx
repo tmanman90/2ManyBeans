@@ -426,19 +426,27 @@ export function BeanDetailCard({ bean, tastings = [], originRect, onOpen, onClos
   // top, so normal scrolling is never hijacked. Rubber-bands the sheet, dismisses on a
   // sufficient pull. (Front uses framer drag on the whole card.)
   const backPull = {
-    onTouchStart: (e) => { pullStart.current = (backScrollRef.current?.scrollTop || 0) <= 0 ? e.touches[0].clientY : null; },
+    onTouchStart: (e) => {
+      const touch = e.touches[0];
+      pullStart.current = (backScrollRef.current?.scrollTop || 0) <= 0 ? { x: touch.clientX, y: touch.clientY, axis: null } : null;
+    },
     onTouchMove: (e) => {
-      if (pullStart.current == null) return;
-      const dy = e.touches[0].clientY - pullStart.current;
-      if (dy > 0 && backScrollRef.current) backScrollRef.current.style.transform = `translateY(${dy * 0.35}px)`;
+      const start = pullStart.current;
+      if (!start) return;
+      const touch = e.touches[0];
+      start.axis ??= lockSwipeAxis({ x: touch.clientX - start.x, y: touch.clientY - start.y });
+      if (start.axis === 'x') { pullStart.current = null; return; } // sideways belongs to the notes rail
+      const dy = touch.clientY - start.y;
+      if (start.axis === 'y' && dy > 0 && backScrollRef.current) backScrollRef.current.style.transform = `translateY(${dy * 0.35}px)`;
     },
     onTouchEnd: (e) => {
-      if (pullStart.current == null) return;
-      const dy = e.changedTouches[0].clientY - pullStart.current;
+      const start = pullStart.current;
+      if (!start) return;
+      const dy = e.changedTouches[0].clientY - start.y;
       const el = backScrollRef.current;
       if (el) { el.style.transition = 'transform 0.26s cubic-bezier(0.22,1,0.36,1)'; el.style.transform = 'translateY(0)'; setTimeout(() => { if (el) el.style.transition = ''; }, 280); }
       pullStart.current = null;
-      if (dy > 95) { haptic.light(); onClose(); }
+      if (start.axis === 'y' && dy > 95) { haptic.light(); onClose(); }
     },
   };
 
