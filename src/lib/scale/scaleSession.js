@@ -105,6 +105,14 @@ export function holdForPour({ timerSteps, stepIndex, target, reachedAtMs = {}, o
   return overdueMs < POUR_HOLD_MAX_MS;
 }
 
+// The named step the brewer is on once the last pour is behind them (the V60
+// Switch Steep and Drain), or null while a pour is still ahead or under way.
+export function stepAfterLastPour(timerSteps, targets, stepIndex) {
+  const lastPour = targets?.[targets.length - 1];
+  if (!lastPour || stepIndex <= lastPour.stepIndex) return null;
+  return timerSteps?.[stepIndex]?.step?.name || null;
+}
+
 export function targetState(grams, targetG) {
   if (!Number.isFinite(targetG)) return 'pouring';
   if (grams > targetG + TARGET_OVER_G) return 'over';
