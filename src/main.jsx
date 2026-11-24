@@ -265,7 +265,7 @@ const Root = () => {
     beans, tastings,
     addBean, updateBean, saveHandBrewTiming, deleteBean,
     addTasting, updateTasting, deleteTasting,
-    openBean, finishBean, returnBean, getBeanById, seedTalData, refetch,
+    openBean, finishBean, returnBean, getBeanById, refetch,
     loaded: dataLoaded,
   } = useAppData(user?.uid);
 

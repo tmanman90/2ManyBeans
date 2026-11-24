@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, writeBatch,
-  serverTimestamp, query, where, getDoc, getDocs, limit, deleteField, runTransaction
+  serverTimestamp, query, where, getDoc, getDocs, deleteField, runTransaction
 } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../firebase';
 import { today } from '../lib/peakStatus';
 import { deleteBeanPhoto } from '../lib/storage';
-import { INITIAL_BEANS, INITIAL_TASTINGS } from '../lib/seedData';
 import { cacheRead, cacheWrite } from '../lib/offlineCache';
 import { buildTimingEvent, mergeTimingEvent } from '../lib/brewTimingMemory';
 import { commandForBeanUpdate, executeRecipeCommand, isProtectedRecipeUpdate, protectedRecipeUpdates, splitProtectedRecipeUpdates } from '../lib/recipeCommands';
@@ -409,49 +408,6 @@ export const useAppData = (uid) => {
     }
   }, [uid]);
 
-  // Seed Tal's initial data into Firestore
-  const seedTalData = useCallback(async () => {
-    if (!uid) return;
-
-    // Idempotency guard: don't seed if beans already exist
-    const beansRef = collection(db, 'users', uid, 'beans');
-    const existing = await getDocs(query(beansRef, limit(1)));
-    if (!existing.empty) return;
-
-    const batch = writeBatch(db);
-
-    // Map seedId -> new Firestore doc ID so tastings can reference the right bean
-    const seedIdMap = {};
-
-    for (const bean of INITIAL_BEANS) {
-      const beanRef = doc(collection(db, 'users', uid, 'beans'));
-      if (bean.seedId) seedIdMap[bean.seedId] = beanRef.id;
-
-      const { seedId: _seedId, ...beanData } = bean;
-      batch.set(beanRef, {
-        ...beanData,
-        clientVersion: ruphusClientVersion(),
-        clientVersionUpdatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    for (const tasting of INITIAL_TASTINGS) {
-      const tastingRef = doc(collection(db, 'users', uid, 'tastings'));
-      const { seedBeanId, ...tastingData } = tasting;
-
-      batch.set(tastingRef, {
-        ...tastingData,
-        beanId: seedIdMap[seedBeanId] || seedBeanId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    await batch.commit();
-  }, [uid]);
-
   return {
     beans,
     tastings,
@@ -466,7 +422,6 @@ export const useAppData = (uid) => {
     finishBean,
     returnBean,
     getBeanById,
-    seedTalData,
     loaded,
     refetch,
   };

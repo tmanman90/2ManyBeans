@@ -57,7 +57,6 @@ export function useDemoAppData(onWriteAttempt) {
     finishBean: gatedWrite,
     returnBean: gatedWrite,
     getBeanById,
-    seedTalData: () => {},
     refetch: () => {},
   }), [beans, tastings, gatedWrite, getBeanById]);
 }
