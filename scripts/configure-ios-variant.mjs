@@ -224,7 +224,7 @@ const patchInfoPlist = () => {
     updated = replaceRequired(
       updated,
       /(\t<key>NSCameraUsageDescription<\/key>)/,
-      '\t<key>NSBluetoothAlwaysUsageDescription</key>\n\t<string>Coffee Hub connects to your coffee scale to track your pours.</string>\n$1',
+      '\t<key>NSBluetoothAlwaysUsageDescription</key>\n\t<string>2manybeans uses Bluetooth to connect to your coffee scale and show the live weight of each pour in the brew timer.</string>\n$1',
       'Bluetooth usage string insertion point in Info.plist',
     );
   }
