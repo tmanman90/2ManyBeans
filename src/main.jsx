@@ -61,6 +61,19 @@ if (Capacitor.isNativePlatform()) {
   });
 }
 
+// End the native launch splash as soon as Root shows a real first screen.
+// The native auto-hide (launchShowDuration in capacitor.config.ts) stays on as
+// the cap, so a failed or missing hide can never leave the splash up. Safe on
+// every binary: hide() only ends the splash earlier than its own timer.
+let launchSplashHidden = false;
+function hideLaunchSplash() {
+  if (launchSplashHidden || !Capacitor.isNativePlatform()) return;
+  launchSplashHidden = true;
+  import('@capacitor/splash-screen')
+    .then(({ SplashScreen }) => SplashScreen.hide())
+    .catch(() => { /* the native auto-hide ends it */ });
+}
+
 const DEMO_PROFILE = {
   displayName: 'Coffee Explorer',
   onboardingComplete: true,
@@ -309,6 +322,12 @@ const Root = () => {
   }, [user?.uid]);
 
   const authValue = useMemo(() => ({ user, logOut: handleLogOut }), [user, handleLogOut]);
+
+  // Past the loading gates: the sign-in screen, or a signed-in user's profile.
+  const firstScreenReady = !authLoading && (!user || profileLoaded);
+  useEffect(() => {
+    if (firstScreenReady) hideLaunchSplash();
+  }, [firstScreenReady]);
 
   // Gate 1: Auth loading
   if (authLoading) return <LoadingScreen />;

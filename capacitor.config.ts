@@ -28,7 +28,9 @@ const config: CapacitorConfig = {
       style: 'LIGHT',
     },
     SplashScreen: {
-      launchShowDuration: 2000,
+      // A cap, not the normal length: src/main.jsx hides the splash as soon as
+      // the first screen is ready. If that never happens, this ends it.
+      launchShowDuration: 4000,
       launchAutoHide: true,
       backgroundColor: '#FAF6F1',
       showSpinner: false,
