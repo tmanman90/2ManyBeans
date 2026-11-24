@@ -19,6 +19,7 @@ import { ProfessorRuphusSlideUp } from '../components/ProfessorRuphusSlideUp';
 import { Badge } from '../components/Badge';
 import { Btn } from '../components/Btn';
 import { Modal } from '../components/Modal';
+import { CelebrationSheet } from '../components/CelebrationSheet';
 import { FinishBagPrompt } from '../components/FinishBagPrompt';
 import { Toast } from '../components/Toast';
 import { QuickRecipeFlow } from '../components/QuickRecipeFlow';
@@ -722,28 +723,15 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         onUpdateTasting={updateTasting}
         beans={beans}
       />
-      <Modal open={!!celebratingBean} onClose={() => setCelebratingBean(null)} title="" centered>
-        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
-          <video
-            src={assetUrl("/images/ruphus-animations/ruphus-fist-pump.mp4")}
-            poster={assetUrl("/images/ruphus-animations/ruphus-fist-pump-poster.jpg")}
-            autoPlay muted playsInline
-            onPlay={() => setTimeout(() => { setCelebratingBean(null); setToast('Bag finished!'); }, 2200)}
-            style={{
-              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 12px',
-              display: 'block',
-              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
-              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
-            }}
-          />
-          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 4 }}>
-            Bag finished!
-          </div>
-          <div style={{ fontSize: 14, color: C.textMuted }}>
-            On to the next one, brewer.
-          </div>
-        </div>
-      </Modal>
+      <CelebrationSheet
+        open={!!celebratingBean}
+        clip="ruphus-fist-pump"
+        title="Bag finished!"
+        subtitle="On to the next one, brewer."
+        afterPlayMs={2200}
+        onDone={() => { setCelebratingBean(null); setToast('Bag finished!'); }}
+        onClose={() => setCelebratingBean(null)}
+      />
       <Toast message={toast} open={!!toast} onClose={() => setToast(null)} />
       <QuickRecipeFlow
         open={quickRecipeOpen}
