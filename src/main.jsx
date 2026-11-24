@@ -20,11 +20,9 @@ import { C, fonts } from './styles/theme';
 import { MotionConfig } from 'framer-motion';
 import GrainOverlay from './components/visual/GrainOverlay';
 
-// Module-scope lazy load (must NOT be inside component body). The new
-// onboarding flow replaces the single-page wizard — see docs/plans/
-// 2026-04-12-009-feat-onboarding-13-screen-rebuild-plan.md. Keeping the
-// `OnboardingWizard` chunk reference would prevent tree-shaking; the old
-// file is deleted in Phase 5 once the new flow is verified on TestFlight.
+// Module-scope lazy loads (must NOT be inside component body). Onboarding
+// only loads for a user who has not finished it (Gate 5);
+// scripts/native-bundle.test.mjs guards that no launch preloads it.
 const OnboardingFlow = React.lazy(() => import('./components/onboarding/OnboardingFlow'));
 const PaywallSheet = React.lazy(() => import('./components/PaywallSheet').then((m) => ({ default: m.PaywallSheet })));
 const PaywallRoast = React.lazy(() => import('./components/paywall/PaywallRoast'));
