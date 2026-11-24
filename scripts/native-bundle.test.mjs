@@ -34,6 +34,16 @@ test('every static /images path in src exists in public', () => {
   assert.deepEqual(missing, []);
 });
 
+test('fonts are self-hosted, so first paint never waits on the network', () => {
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  assert.doesNotMatch(html, /<link[^>]+href="https?:\/\//, 'index.html must not load an external stylesheet or preconnect');
+  const css = readFileSync(join(root, 'src/styles/fonts.css'), 'utf8');
+  const files = [...css.matchAll(/url\((\/fonts\/[\w.-]+\.woff2)\)/g)].map((match) => match[1]);
+  assert.ok(files.length > 0, 'fonts.css declares no font files');
+  assert.deepEqual(files.filter((path) => !existsSync(join(root, 'public', path))), []);
+  assert.match(readFileSync(join(root, 'src/styles/global.css'), 'utf8'), /^@import '\.\/fonts\.css';/);
+});
+
 test('every tasting-note illustration resolves to a bundled WebP', () => {
   const source = readFileSync(join(root, 'src/lib/tastingIcons.jsx'), 'utf8');
   const block = source.slice(source.indexOf('const IMAGE_ICONS = {'), source.indexOf('export function tastingIconImage'));
