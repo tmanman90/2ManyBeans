@@ -6,8 +6,11 @@ const source = readFileSync(new URL('./ship-production-ios.mjs', import.meta.url
 
 assert.match(source, /const PROD_APP_ID = 'com\.talmeltzer\.coffeehub';/);
 assert.match(source, /const PROD_CHANNEL = 'production';/);
-assert.match(source, /REQUIRED_BUILD_ENV/);
-assert.match(source, /VITE_FIREBASE_API_KEY/);
+assert.match(source, /run\(process\.execPath, \['scripts\/assert-ios-build-env\.mjs', 'release'\]\)/);
+assert.ok(
+  source.indexOf("'assert-ios-build-env.mjs', 'release'") < source.indexOf('capgo(['),
+  'the release preflight must run before any Capgo call',
+);
 assert.match(source, /build:ios/);
 assert.match(source, /compatibilityUploadFlag\(/);
 assert.match(source, /'bundle', 'compatibility', PROD_APP_ID, '--channel', PROD_CHANNEL, '--text'/);
