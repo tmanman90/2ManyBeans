@@ -219,7 +219,7 @@ export function withCorsAuthPro(handler, { rateLimit } = {}) {
 }
 
 // Gate: require an active Ultra entitlement.
-// Use for features exclusive to the Ultra tier (Fellow Aiden push, multi-brewer).
+// Use for features exclusive to the Ultra tier (Fellow Aiden push; nothing else is Ultra-only).
 export function withCorsAuthUltra(handler, { rateLimit } = {}) {
   return withCorsAuth(async (req, res, decodedToken) => {
     if (decodedToken?.uid) {

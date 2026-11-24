@@ -10,7 +10,7 @@
 //   - Restore Purchases link always visible.
 //
 // Promotion logic: if the paywall was triggered by an Ultra-only feature
-// (Fellow Aiden push, multi-brewer), the Ultra card is pre-selected and
+// (Fellow Aiden push, the only Ultra feature), the Ultra card is pre-selected and
 // the copy emphasizes Fellow integration. Otherwise Pro Annual is the
 // default to maximize LTV.
 
@@ -44,7 +44,7 @@ const CONTEXT_COPY = {
   },
   aiden: {
     headline: 'Send recipes straight to your Aiden',
-    subtext: 'Ultra unlocks direct Fellow Aiden push and multi-brewer support.',
+    subtext: 'Ultra is everything in Pro, plus sending recipes straight to your Fellow Aiden.',
   },
   generic: {
     headline: 'Unlock AI-powered brewing',
@@ -61,14 +61,12 @@ const FEATURES_PRO = [
   'AI tasting coach with guided scoring',
   'Unlimited bean scanning',
   'Personalized hand brew recipes',
-  'Coffee chat with expert knowledge',
+  'Coffee chat and Ruphus stories',
 ];
 
 const FEATURES_ULTRA = [
   'Everything in Pro, unlimited',
   'Push recipes directly to Fellow Aiden',
-  'Multi-brewer support (V60, Chemex, AeroPress)',
-  'Priority model routing',
 ];
 
 // Feature row icons (SVG inline, no external deps)
