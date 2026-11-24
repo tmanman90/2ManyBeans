@@ -69,6 +69,51 @@ test('the App Store sync and copy run the release preflight first', () => {
   assert.match(scripts['build:ios:dev'], /^node scripts\/assert-ios-build-env\.mjs && /);
 });
 
+// Runs the real ship script with stand-in npx and npm first on PATH. They only
+// record that they were called and exit 1, so nothing can reach Capgo even if
+// the preflight line is removed. A refused shell must stop before either is called.
+function shipProduction(overrides = {}) {
+  const bin = mkdtempSync(join(tmpdir(), 'ship-prod-bin-'));
+  const calls = join(bin, 'calls.log');
+  for (const tool of ['npx', 'npm']) {
+    writeFileSync(join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> "${calls}"\nexit 1\n`, { mode: 0o755 });
+  }
+  const env = { PATH: `${bin}:/usr/bin:/bin` };
+  for (const name of FIREBASE) env[name] = SENTINEL;
+  for (const [name, value] of Object.entries(overrides)) {
+    if (value === undefined) delete env[name];
+    else env[name] = value;
+  }
+  try {
+    const result = spawnSync(process.execPath, ['scripts/ship-production-ios.mjs'], { cwd: REPO, env, encoding: 'utf8' });
+    let called = '';
+    try { called = readFileSync(calls, 'utf8'); } catch { /* nothing was called */ }
+    return { ...result, called };
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+}
+
+test('ship:prod:ios refuses dev switches and missing Firebase before any Capgo or npm call', () => {
+  for (const [name, value] of [
+    ['VITE_FAKE_SCALE', '1'],
+    ['TMB_APP_VARIANT', 'dev'],
+    ['TMB_DISABLE_CAPGO_UPDATES', '1'],
+    ['VITE_FIREBASE_APP_ID', undefined],
+  ]) {
+    const result = shipProduction({ [name]: value });
+    assert.notEqual(result.status, 0, `${name}=${value} must stop the production ship`);
+    assert.match(result.stderr, new RegExp(name));
+    assert.equal(result.called, '', `${name}=${value} reached: ${result.called}`);
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SENTINEL));
+  }
+});
+
+test('ship:prod:ios lets a clean shell through to Capgo', () => {
+  const result = shipProduction();
+  assert.match(result.called, /^npx @capgo\/cli@latest channel currentBundle production com\.talmeltzer\.coffeehub/);
+});
+
 test('the Bluetooth permission text names 2manybeans in the plist and the variant script', () => {
   const plist = read('ios/App/App/Info.plist').match(/<key>NSBluetoothAlwaysUsageDescription<\/key>\s*<string>([^<]+)<\/string>/)?.[1];
   const script = read('scripts/configure-ios-variant.mjs').match(/<key>NSBluetoothAlwaysUsageDescription<\/key>\\n\\t<string>([^<]+)<\/string>/)?.[1];

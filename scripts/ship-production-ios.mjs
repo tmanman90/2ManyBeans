@@ -4,8 +4,8 @@
  * Upload the web bundle to the production iOS app only.
  *
  * Production uses the package version as the Capgo bundle version. This guard
- * refuses duplicate/non-advancing versions and refuses builds without the
- * Firebase client configuration that the native app needs at startup.
+ * refuses duplicate/non-advancing versions, and runs the release preflight
+ * (scripts/assert-ios-build-env.mjs release) before anything touches Capgo.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -19,14 +19,6 @@ const PROD_CHANNEL = 'production';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const SOCIAL_LOGIN_PACKAGE = '@capgo/capacitor-social-login';
 const SOCIAL_LOGIN_RESTORED_FILES = ['CapgoCapacitorSocialLogin.podspec'];
-const REQUIRED_BUILD_ENV = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_STORAGE_BUCKET',
-  'VITE_FIREBASE_MESSAGING_SENDER_ID',
-  'VITE_FIREBASE_APP_ID',
-];
 
 function run(command, args, options = {}) {
   const { capture = false, ...execOptions } = options;
@@ -87,11 +79,13 @@ if (!capacitorConfig.includes(`appId: isDevApp ? '${PROD_APP_ID}.dev' : '${PROD_
   throw new Error('Production Capacitor app ID is not the expected Coffee Hub app. Refusing upload.');
 }
 
-const missingBuildEnv = REQUIRED_BUILD_ENV.filter((name) => !process.env[name]);
-if (missingBuildEnv.length > 0) {
-  throw new Error(
-    `Missing ${missingBuildEnv.join(', ')}. Refusing production OTA upload because the bundle would not have a valid Firebase config. Pull the Vercel production environment into the shell before shipping.`,
-  );
+// The same release preflight as cap:sync, before any Capgo or npm call: all six
+// Firebase values present, and no VITE_FAKE_SCALE, TMB_APP_VARIANT=dev or
+// TMB_DISABLE_CAPGO_UPDATES=1 (any of those would ship a dev build to every user).
+try {
+  run(process.execPath, ['scripts/assert-ios-build-env.mjs', 'release']);
+} catch {
+  throw new Error('Refusing production OTA upload: the release preflight failed (reason above).');
 }
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));

@@ -2,7 +2,7 @@
 
 // Native iOS build preflight. Runs before Vite, so a wrong shell never reaches a binary.
 //   node scripts/assert-ios-build-env.mjs           Dev app (build:ios:dev)
-//   node scripts/assert-ios-build-env.mjs release   App Store app (cap:sync, cap:copy)
+//   node scripts/assert-ios-build-env.mjs release   App Store app (cap:sync, cap:copy, ship:prod:ios)
 // Prints variable names only, never values.
 
 const requiredFirebase = [
