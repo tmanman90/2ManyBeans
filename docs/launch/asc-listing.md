@@ -59,10 +59,10 @@ FREE TIER
 Add beans, track your rotation, and log manual tastings for free. A few trial bean scans and one AI tasting coach session are included so you can try the good stuff before subscribing.
 
 PRO ($4.99 / month or $49.99 / year)
-Unlimited bean scans, unlimited AI tasting coach, unlimited personalized hand brew recipes, and unlimited coffee chat.
+Every AI feature, unlimited: bean scans, the AI tasting coach, personalized hand brew recipes, coffee chat, and Professor Ruphus stories.
 
 ULTRA ($9.99 / month or $99.99 / year)
-Everything in Pro, plus direct push to Fellow Aiden, multi-brewer support (V60, Chemex, AeroPress, Kalita), priority model routing, and early access to new features.
+Everything in Pro, plus direct push of your recipes to a Fellow Aiden brewer.
 
 Both tiers start with a 3-day free trial. Cancel anytime from the App Store subscription settings.
 

@@ -50,7 +50,7 @@ export default function PaywallRoast({ open, context, onClose, initialStep = 'va
     if (open && !wasOpenRef.current) {
       setNav({ step: initialStep, dir: 'forward', seq: 0 });
       // Pre-select Ultra when the paywall was opened by an Ultra-only
-      // feature (Aiden push, multi-brewer); Pro Annual otherwise.
+      // feature (Aiden push, the only one); Pro Annual otherwise.
       setTier(context?.promote === 'ultra' ? 'ultra' : 'pro');
       setCycle('annual');
       setDevNotice(null);

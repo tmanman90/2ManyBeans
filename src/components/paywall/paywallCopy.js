@@ -138,7 +138,7 @@ export const PAYWALL_COPY = {
   aiden: {
     head: 'Send recipes straight',
     tail: 'to your Aiden',
-    subtext: 'Ultra unlocks direct Fellow Aiden push and multi-brewer support.',
+    subtext: 'Ultra is everything in Pro, plus sending recipes straight to your Fellow Aiden.',
     rows: [ROW_AIDEN, { ...ROW_RECIPES, sub: 'dialed to your beans and roast' }, ROW_ADJUST],
   },
 
@@ -183,9 +183,8 @@ export const COMPARE_ROWS = [
   { feature: 'Unlimited bean scanning', pro: true, ultra: true },
   { feature: 'Personalized hand brew recipes', pro: true, ultra: true },
   { feature: 'Coffee chat', detail: 'expert knowledge on tap', pro: true, ultra: true },
+  { feature: 'Professor Ruphus stories', pro: true, ultra: true },
   { feature: 'Push recipes to Fellow Aiden', pro: false, ultra: true },
-  { feature: 'Multi-brewer support', detail: 'V60, Chemex, AeroPress', pro: false, ultra: true },
-  { feature: 'Priority model routing', pro: false, ultra: true },
 ];
 
 // "Everything in the free plan stays free" block on step 3. The metered

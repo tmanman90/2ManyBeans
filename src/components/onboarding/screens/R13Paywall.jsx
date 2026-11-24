@@ -28,15 +28,15 @@ const PLANS = [
   {
     key: 'pro',
     label: 'Pro',
-    tagline: 'Everything you need to track your beans.',
-    perks: ['Unlimited bean inventory', 'Tasting log', 'Freshness tracking'],
+    tagline: 'Every AI feature, unlimited.',
+    perks: ['AI tasting coach', 'Unlimited bean scans', 'Personalized brew recipes', 'Chat and Professor Ruphus stories'],
     recommended: false,
   },
   {
     key: 'ultra',
     label: 'Ultra',
-    tagline: 'The full experience, nothing held back.',
-    perks: ['Everything in Pro', 'AI Aiden brew recipes', 'Professor Ruphus stories', 'Priority support'],
+    tagline: 'Everything in Pro, plus your Fellow Aiden.',
+    perks: ['Everything in Pro', 'Push recipes directly to Fellow Aiden'],
     recommended: true,
   },
 ];
