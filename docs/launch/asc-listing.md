@@ -243,10 +243,11 @@ The app supports Sign in with Apple and Google Sign-In. No demo account is neede
 
 #### 1.1 (paste this)
 
-Before pasting, three checks:
+Before pasting, four checks:
 - Section 2: confirm the button names on build 43.
-- Section 6: keep it only if `VITE_RUPHUS_AGENT_V3_UIDS` is set in the production build values (check whether the key is present; never print it). If it is empty, delete section 6.
+- Section 6: check whether `VITE_RUPHUS_AGENT_V3_UIDS` and `VITE_RUPHUS_AGENT_V3_MUTATION_UIDS` are set in the production build values (whether each key is present; never print them). If `VITE_RUPHUS_AGENT_V3_UIDS` is empty, delete section 6. If only `VITE_RUPHUS_AGENT_V3_MUTATION_UIDS` is empty, delete the section's last sentence (recipe changes).
 - Section 4: the sentence marked `[PENDING TAL]` is a release policy Tal has not adopted (plan decision M2). Delete it unless he adopts it. Remove the marker either way before pasting.
+- Section 5: marked `[PENDING TAL: tier copy]`. Tal has not ruled on what Pro and Ultra say. Match it to his ruling and remove the marker before pasting.
 
 ```
 This is an update to approved version 1.0. Here is everything that changed.
@@ -261,7 +262,7 @@ Bluetooth LE. Optional connection to an Acaia coffee scale so the timer shows li
 
 2. HOW TO REACH THEM
 
-Sign in with Apple or Google. You can also tap "Explore demo" on the sign-in screen to browse sample data.
+Sign in with Apple or Google. You can also tap "Explore without an account" on the sign-in screen to browse sample data.
 Add a bean, open it, choose a hand brew recipe (for example V60), and start the timer. Hand brew recipes are part of Pro. The free trial is available in the sandbox.
 With the timer running, lock the phone to see the Live Activity.
 The Scale button is at the top of the timer before the brew starts. With no scale nearby the sheet shows "Searching nearby".
@@ -276,15 +277,15 @@ The app is built with Capacitor. The interface is JavaScript, HTML and CSS runni
 
 5. SUBSCRIPTIONS
 
-Same four products as 1.0. Pro unlocks the AI features. Ultra adds direct push of recipes to a Fellow Aiden brewer, which needs that brewer and a Fellow account. It is optional and not needed to test anything else. The iOS app has no invite code entry. Settings links to Apple's offer code redemption.
+[PENDING TAL: tier copy] Same four products as 1.0. Pro unlocks the AI features. Ultra adds direct push of recipes to a Fellow Aiden brewer, which needs that brewer and a Fellow account. It is optional and not needed to test anything else. The iOS app has no invite code entry. Settings links to Apple's offer code redemption.
 
 6. LIMITED TEST
 
-A newer version of the chat assistant is enabled only for the developer's own accounts. The account list is fixed inside the app bundle. It is the same chat feature with a newer model pipeline. It is off for all other users.
+A newer version of the chat assistant is enabled only for the developer's own accounts. The account list is fixed inside the app bundle. It is the same chat feature with a newer model pipeline. It is off for all other users. For accounts on a second fixed list inside the bundle, the assistant can also apply recipe changes.
 
 7. NOTHING ELSE IS HIDDEN
 
-There are no other feature flags, remote switches or dormant features. Development tools (a simulated scale and a debug panel) are compiled out of this build.
+There are no other remote switches or dormant features. Development tools (a simulated scale and a debug panel) are compiled out of this build.
 
 AI data sharing, account deletion (Settings, Delete Account) and sign-in are unchanged from 1.0.
 ```
