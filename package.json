@@ -23,7 +23,7 @@
     "test:is-main": "node --test scripts/is-main.test.mjs",
     "test:paywall-tiers": "node --test scripts/paywall-tier-claims.test.mjs",
     "test:launch-splash": "node scripts/verify-launch-splash.mjs",
-    "test:celebration-timing": "node --test scripts/celebration-timing.test.mjs",
+    "test:celebration-timing": "node --test scripts/celebration-timing.test.mjs && node scripts/verify-celebration-sheets.mjs",
     "test:trial-offer": "node scripts/trial-offer.test.mjs",
     "test:espresso": "node --test scripts/espresso-command.test.mjs scripts/espresso-equipment-routing.test.mjs scripts/espresso-recipe.test.mjs scripts/espresso-ui.test.mjs scripts/recipe-command-entitlement.test.mjs scripts/ruphus-context.test.mjs scripts/ruphus-espresso-tools.test.mjs scripts/ruphus-reference-resolution.test.mjs scripts/ruphus-rollout-gates.test.mjs scripts/ruphus-u2-runtime.test.mjs scripts/ruphus-u4-tasting-context.test.mjs",
     "test:recipe-scaling": "node scripts/recipe-scaling.test.mjs",

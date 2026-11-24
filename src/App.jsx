@@ -1,6 +1,5 @@
 // App shell — warm Ghibli-inspired coffee journal
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { assetUrl } from "./lib/assetUrl";
 import { getOnboardingPalate } from './lib/palateProfile';
 import { buildNewBeanData } from './lib/beanBuilder';
 import { Settings as SettingsIcon } from 'lucide-react';
@@ -23,7 +22,7 @@ import { SettingsPage } from './components/SettingsPage';
 import { TourOverlay } from './components/TourOverlay';
 import { Wordmark } from './components/Wordmark';
 import { usePreferences } from './hooks/useUserProfile';
-import { Modal } from './components/Modal';
+import { CelebrationSheet } from './components/CelebrationSheet';
 import { BrewTimer } from './components/BrewTimer';
 import { clearBrewTimerSession, readBrewTimerSession } from './lib/brewTimerSession';
 import { endBrewActivity } from './lib/brewLiveActivity';
@@ -540,28 +539,15 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
       )}
 
       {/* First bean celebration */}
-      <Modal open={firstBeanCelebrating} onClose={() => setFirstBeanCelebrating(false)} title="" centered>
-        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
-          <video
-            src={assetUrl("/images/ruphus-animations/ruphus-first-bean.mp4")}
-            poster={assetUrl("/images/ruphus-animations/ruphus-first-bean-poster.jpg")}
-            autoPlay muted playsInline
-            onPlay={() => setTimeout(() => setFirstBeanCelebrating(false), 4000)}
-            style={{
-              width: 200, height: 200, objectFit: 'contain', margin: '0 auto 12px',
-              display: 'block',
-              WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
-              maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)',
-            }}
-          />
-          <div style={{ fontFamily: fonts.heading, fontSize: 20, color: C.text, marginBottom: 4 }}>
-            Your first bean!
-          </div>
-          <div style={{ fontSize: 14, color: C.textMuted }}>
-            Welcome to the journey, brewer.
-          </div>
-        </div>
-      </Modal>
+      <CelebrationSheet
+        open={firstBeanCelebrating}
+        clip="ruphus-first-bean"
+        title="Your first bean!"
+        subtitle="Welcome to the journey, brewer."
+        afterPlayMs={4000}
+        onDone={() => setFirstBeanCelebrating(false)}
+        onClose={() => setFirstBeanCelebrating(false)}
+      />
 
       {recoveringTimer && (
         <BrewTimer

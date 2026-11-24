@@ -2,7 +2,7 @@
 // Single modal with view swapping: 'prompt' (quick rate) | 'fullReview'
 import { useState, useEffect } from 'react';
 import { assetUrl } from "../lib/assetUrl";
-import { celebrationCloseAt } from '../lib/celebrationTiming';
+import { useCelebrationClose } from '../hooks/useCelebrationClose';
 import { ArrowLeft } from 'lucide-react';
 import { C, fonts, type, radius } from '../styles/theme';
 import { haptic } from '../lib/haptics';
@@ -13,9 +13,6 @@ import { StarRating } from './StarRating';
 import { TastingForm } from './TastingForm';
 import { Btn } from './Btn';
 
-// The fist-pump clip stays on screen this long once it starts playing; the
-// sheet never stays past the cap, even if the clip is slow or never plays.
-const CELEBRATION = { afterPlayMs: 2200, maxMs: 4000 };
 
 export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, onUpdateTasting }) => {
   const [view, setView] = useState('prompt');
@@ -23,33 +20,28 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
   const [oneWord, setOneWord] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  // null, or { shownAt, playedAt } while the celebration is on screen.
-  const [celebration, setCelebration] = useState(null);
-  const celebrating = celebration !== null;
+  const [celebrating, setCelebrating] = useState(false);
 
-  // Reset state when modal opens
+  // Reset state when the modal opens, and end any celebration when it closes,
+  // so the next bag never starts on the last one's celebration.
   useEffect(() => {
-    if (open) {
-      setView('prompt');
-      setRating(0);
-      setOneWord('');
-      setSaving(false);
-      setError(null);
-      setCelebration(null);
-    }
+    setCelebrating(false);
+    if (!open) return;
+    setView('prompt');
+    setRating(0);
+    setOneWord('');
+    setSaving(false);
+    setError(null);
   }, [open]);
 
-  useEffect(() => {
-    if (!celebration || !open) return undefined;
-    const delay = Math.max(0, celebrationCloseAt(celebration, CELEBRATION) - Date.now());
-    const timer = setTimeout(() => onClose('Saved & finished!'), delay);
-    return () => clearTimeout(timer);
-  }, [celebration, open, onClose]);
-
-  const startCelebration = () => setCelebration({ shownAt: Date.now(), playedAt: null });
-  const handleClipPlay = () => setCelebration((current) => (
-    current && current.playedAt === null ? { ...current, playedAt: Date.now() } : current
-  ));
+  // The fist pump stays 2.2 s once it plays, and never past 4 s from when the
+  // celebration opened (a slow or failed clip cannot keep the sheet up).
+  const handleClipPlay = useCelebrationClose({
+    active: open && celebrating,
+    afterPlayMs: 2200,
+    maxMs: 4000,
+    onDone: () => onClose('Saved & finished!'),
+  });
 
   if (!bean) return null;
 
@@ -67,7 +59,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       });
       await onFinish(bean.id);
       haptic.success();
-      startCelebration();
+      setCelebrating(true);
     } catch (err) {
       console.error('Quick save failed:', err);
       setError('Failed to save rating. Try again.');
@@ -96,7 +88,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
 
       await onFinish(bean.id);
       haptic.success();
-      startCelebration();
+      setCelebrating(true);
       setView('prompt');
     } catch (err) {
       console.error('Full review save failed:', err);
