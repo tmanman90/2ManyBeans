@@ -108,7 +108,7 @@ Added since 1.0
 • A new look across the whole app.
 • A guided tasting wizard with a flavor card for every cup.
 • Professor Ruphus chat: streaming answers, saved conversations, recipe cards you can brew or save, and web answers with sources.
-• Bean-specific recipes for Kalita Wave, V60 and V60 Switch, hot and iced.
+• Bean-specific recipes for Kalita Wave and V60, hot and iced, plus V60 Switch.
 • The timer remembers your timing for each bean.
 • A new onboarding with a palate profile.
 • A new subscription screen that spells out what Pro and Ultra include. Plans and prices are unchanged.
@@ -218,7 +218,7 @@ If the live form asks about AI chat or assistants, answer truthfully: yes, a cof
 
 ### Privacy Manifest (PrivacyInfo.xcprivacy)
 - Required by Apple as of 2026. Auto-rejection without it.
-- Verify each SDK ships its own: Capacitor, Firebase, RevenueCat, Fellow Aiden HTTP wrapper.
+- Verify each SDK ships its own: Capacitor and its plugins, Firebase, RevenueCat. Fellow Aiden has no SDK in the app; it is called from our server (`api/aiden.js`).
 - After `npm run cap:sync`, check:
   ```bash
   find ios/App/Pods -name "PrivacyInfo.xcprivacy" -type f
@@ -265,7 +265,7 @@ The Scale button is at the top of the timer before the brew starts. With no scal
 
 3. FEATURES ADDED SINCE 1.0
 
-New visual design. Guided tasting wizard and flavor card. Rebuilt chat with saved conversations, recipe cards and sourced web answers. Bean-specific recipes for Kalita Wave, V60 and V60 Switch, hot and iced. Brew timing memory. Espresso recipes. Quick Recipe for any brewer. Rebuilt onboarding. New subscription screen with the same four products and prices.
+New visual design. Guided tasting wizard and flavor card. Rebuilt chat with saved conversations, recipe cards and sourced web answers. Bean-specific recipes for Kalita Wave and V60, hot and iced, plus V60 Switch. Brew timing memory. Espresso recipes. Quick Recipe for any brewer. Rebuilt onboarding. New subscription screen with the same four products and prices.
 
 4. OVER-THE-AIR UPDATES
 
@@ -277,11 +277,15 @@ Same four products and prices as 1.0. Pro unlocks every feature, including all A
 
 6. LIMITED TEST
 
-A newer version of the chat assistant is enabled only for the developer's own accounts. The account list is fixed inside the app bundle. It is the same chat feature with a newer model pipeline. It is off for all other users. For accounts on a second fixed list inside the bundle, the assistant can also apply recipe changes.
+A newer version of the chat assistant is enabled only for the developer's own accounts. The account list is fixed inside the app bundle. It is the same chat feature with a newer model pipeline. It is off for all other users. For accounts on a second fixed list inside the bundle, the assistant can also apply recipe changes. Pilot accounts also see "Ask Ruphus" buttons on bean and tasting cards, which open this chat with that bean or tasting as context.
 
 7. NOTHING ELSE IS HIDDEN
 
-There are no other remote switches or dormant features. Development tools (a simulated scale and a debug panel) are compiled out of this build.
+One server setting names a single developer account that may push Aiden recipes through the developer's own Fellow account, for testing. It unlocks nothing for any other user: every other Ultra subscriber connects their own Fellow account. There are no other remote switches or dormant features. Development tools (a simulated scale and a debug panel) are compiled out of this build.
+
+8. THIRD-PARTY SDKS IN THE APP
+
+Firebase (Auth, Firestore, Storage). RevenueCat (subscriptions). @capgo/capacitor-social-login (Sign in with Apple and Google). @capgo/capacitor-updater (web bundle updates, see section 4). @capacitor-community/bluetooth-le (the optional scale, see section 1). Anthropic Claude, OpenAI GPT, Google Gemini and Fellow Aiden are called through our own server, not from SDKs in the app.
 
 AI data sharing, account deletion (Settings, Delete Account) and sign-in are unchanged from 1.0.
 ```
@@ -324,7 +328,7 @@ THIRD-PARTY SDKs
 - Firebase (Auth + Firestore)
 - RevenueCat (subscription management)
 - Anthropic Claude, OpenAI GPT, Google Gemini (all via our own server proxy, not direct SDK)
-- @capgo/capacitor-social-login (Google and Apple sign-in on iOS)
+- @codetrix-studio/capacitor-google-auth (Google Sign-In on iOS)
 ```
 
 ### Contact Info (App Review Contact)
