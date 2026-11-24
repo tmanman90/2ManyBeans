@@ -96,6 +96,26 @@ test('no paywall surface claims an Ultra feature that does not exist', () => {
   assert.deepEqual(hits, []);
 });
 
+// Every screen that sells Pro or Ultra. Ultra only adds the Fellow Aiden push,
+// so no card there may carry a badge that recommends it over Pro.
+const PAYWALL_SURFACES = [
+  ...sourceFiles('src/components/paywall'),
+  'src/components/PaywallSheet.jsx',
+  'src/components/onboarding/screens/R13Paywall.jsx',
+  'src/components/onboarding/screens/R13bNudge.jsx',
+];
+// Rendered badge text (a string, or JSX text after `>`) or a badge prop.
+// A plain `recommended:` field name is not a badge and does not match.
+const RECOMMENDING_BADGE = /(['"`>]\s*(best value|recommended|most popular|best deal|top pick)\b)|\bbestValue\b/i;
+
+test('no paywall card carries a recommending badge', () => {
+  const hits = PAYWALL_SURFACES
+    .map((path) => [path, code(path).match(RECOMMENDING_BADGE)])
+    .filter(([, match]) => match)
+    .map(([path, match]) => `${path}: ${match[0].trim()}`);
+  assert.deepEqual(hits, []);
+});
+
 test('the compare table gives Ultra exactly one extra row, the Aiden push', () => {
   const copy = read('src/components/paywall/paywallCopy.js');
   const rows = [...copy.matchAll(/\{ feature: '([^']+)'[^}]*pro: (true|false), ultra: (true|false) \}/g)]

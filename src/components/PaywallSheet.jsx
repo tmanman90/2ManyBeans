@@ -390,7 +390,6 @@ export function PaywallSheet({ open, context, onClose }) {
                   />
                   <TierCard
                     label="Ultra"
-                    badge="Best Value"
                     selected={tier === 'ultra'}
                     onSelect={() => setTier('ultra')}
                     features={FEATURES_ULTRA}
@@ -450,7 +449,7 @@ export function PaywallSheet({ open, context, onClose }) {
   );
 }
 
-function TierCard({ label, badge, selected, onSelect, features, monthly, annual, cycle, onCycleChange }) {
+function TierCard({ label, selected, onSelect, features, monthly, annual, cycle, onCycleChange }) {
   const monthlyPrice = monthly?.product?.priceString ?? '—';
   const annualPrice = annual?.product?.priceString ?? '—';
 
@@ -482,12 +481,6 @@ function TierCard({ label, badge, selected, onSelect, features, monthly, annual,
       transition={spring.soft}
       animate={{ y: selected ? -3 : 0 }}
     >
-      {badge && (
-        <div style={styles.badge}>
-          <span style={styles.badgeText}>{badge}</span>
-        </div>
-      )}
-
       {/* Tier label */}
       <div style={styles.cardLabelRow}>
         <span style={{
@@ -678,23 +671,6 @@ const styles = {
     flexDirection: 'column',
     gap: 0,
     WebkitTapHighlightColor: 'transparent',
-  },
-  badge: {
-    position: 'absolute',
-    top: -11,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    background: C.accent,
-    borderRadius: radius.pill,
-    padding: '3px 10px',
-    whiteSpace: 'nowrap',
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    color: '#FFF',
   },
   cardLabelRow: {
     display: 'flex',

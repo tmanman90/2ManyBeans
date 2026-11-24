@@ -573,20 +573,6 @@ export default function R13Paywall() {
                       boxShadow: plan.recommended ? shadows.e3 : shadows.e1,
                       textAlign: 'left',
                     }}>
-                      {plan.recommended && (
-                        <div style={{
-                          position: 'absolute',
-                          top: -1,
-                          right: 14,
-                          background: C.accent,
-                          color: '#fff',
-                          ...t.label,
-                          padding: '3px 10px',
-                          borderRadius: `0 0 ${radius.xs}px ${radius.xs}px`,
-                        }}>
-                          Recommended
-                        </div>
-                      )}
                       <div style={{
                         ...t.h2,
                         color: plan.recommended ? C.accent : C.text,

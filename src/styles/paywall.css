@@ -368,11 +368,11 @@
 .pw-plan-card.is-selected { border-color: var(--pw-gold); }
 
 /* FIXED HEIGHT, not min-height — price-alignment fix Tal caught and a
-   known regression target. Pro's head is one line + no badge row while
-   Ultra's wraps with the Best value badge; with auto/min heights the two
-   cards' annual prices land at different y and the grid reads broken.
-   Same reason .pw-badge-slot below reserves the badge line even when a
-   row has no badge. Do not "simplify" either back to auto height. */
+   known regression target. With auto/min heights the two cards' annual
+   prices land at different y whenever their heads differ, and the grid
+   reads broken. .pw-badge-slot below reserves the old badge line (no card
+   carries a badge now) so spacing is unchanged. Do not "simplify" either
+   back to auto height. */
 .pw-plan-head {
   /* name (23) + gap (4) + badge slot (20) + gap (4) + two desc lines (33) */
   height: 88px;
@@ -399,7 +399,7 @@
   margin: 0;
 }
 
-/* Badges (Save 17% / Best value) — gold fill + dark ink, sanctioned. */
+/* Badges (Save 17%) — gold fill + dark ink, sanctioned. */
 .pw-badge {
   display: inline-flex;
   align-items: center;

@@ -4,7 +4,7 @@
 // warm surface ladder (s0-s4), a three-step text ramp, and ONE gold accent
 // sampled from the MFP reference. Gold is budgeted to exactly five surfaces:
 // CTA gradient fill, value-row icon glyphs, the headline tail phrase,
-// text badges (Save 17% / Best value), and the selected plan border + check.
+// text badges (Save 17%), and the selected plan border + check.
 //
 // This file is intentionally separate from src/styles/theme.js — that palette
 // is consumed by ~60 files and stays untouched. Nothing here overlaps its keys.
