@@ -22,8 +22,6 @@ Backup options if Apple rejects the primary:
 
 ### Description (4000 char max)
 
-_The Ultra paragraph below waits on Tal's ruling on the Ultra tier claims (1.1 plan item M1). It is unchanged here._
-
 ```
 2manybeans is the specialty coffee journal that actually coaches you.
 
@@ -113,7 +111,7 @@ Added since 1.0
 • Bean-specific recipes for Kalita Wave, V60 and V60 Switch, hot and iced.
 • The timer remembers your timing for each bean.
 • A new onboarding with a palate profile.
-• A new subscription screen. Plans and prices are unchanged.
+• A new subscription screen that spells out what Pro and Ultra include. Plans and prices are unchanged.
 
 Plus speed improvements and fixes.
 ```
@@ -243,11 +241,9 @@ The app supports Sign in with Apple and Google Sign-In. No demo account is neede
 
 #### 1.1 (paste this)
 
-Before pasting, four checks:
+Before pasting, two checks:
 - Section 2: confirm the button names on build 43.
 - Section 6: check whether `VITE_RUPHUS_AGENT_V3_UIDS` and `VITE_RUPHUS_AGENT_V3_MUTATION_UIDS` are set in the production build values (whether each key is present; never print them). If `VITE_RUPHUS_AGENT_V3_UIDS` is empty, delete section 6. If only `VITE_RUPHUS_AGENT_V3_MUTATION_UIDS` is empty, delete the section's last sentence (recipe changes).
-- Section 4: the sentence marked `[PENDING TAL]` is a release policy Tal has not adopted (plan decision M2). Delete it unless he adopts it. Remove the marker either way before pasting.
-- Section 5: marked `[PENDING TAL: tier copy]`. Tal has not ruled on what Pro and Ultra say. Match it to his ruling and remove the marker before pasting.
 
 ```
 This is an update to approved version 1.0. Here is everything that changed.
@@ -273,11 +269,11 @@ New visual design. Guided tasting wizard and flavor card. Rebuilt chat with save
 
 4. OVER-THE-AIR UPDATES
 
-The app is built with Capacitor. The interface is JavaScript, HTML and CSS running in WKWebView. We use Capgo to update that web bundle between App Store releases. Several items in section 3 reached 1.0 users this way. All of them are in this binary for your review. The web bundle cannot change native code or permissions. The bundle in this binary matches the bundle on our update channel at submission. [PENDING TAL] From this version on, new features ship through App Review and the update channel is used for fixes and content tuning.
+The app is built with Capacitor. The interface is JavaScript, HTML and CSS running in WKWebView. We use Capgo to update that web bundle between App Store releases. Several items in section 3 reached 1.0 users this way. All of them are in this binary for your review. The web bundle cannot change native code or permissions. The bundle in this binary matches the bundle on our update channel at submission. From this version on, new features ship through App Review and the update channel is used for fixes and content tuning.
 
 5. SUBSCRIPTIONS
 
-[PENDING TAL: tier copy] Same four products as 1.0. Pro unlocks the AI features. Ultra adds direct push of recipes to a Fellow Aiden brewer, which needs that brewer and a Fellow account. It is optional and not needed to test anything else. The iOS app has no invite code entry. Settings links to Apple's offer code redemption.
+Same four products and prices as 1.0. Pro unlocks every feature, including all AI features: the tasting coach, unlimited bean scans, recipes, chat and Professor Ruphus stories. Ultra is everything in Pro, plus direct push of recipes to a Fellow Aiden brewer, which needs that brewer and a Fellow account. It is optional and not needed to test anything else. The iOS app has no invite code entry. Settings links to Apple's offer code redemption.
 
 6. LIMITED TEST
 
