@@ -317,27 +317,6 @@ ${beanSection}${originSection}${pastSection}`;
   ];
 }
 
-// Send a tasting coach message. Pass `firstMessage: true` for the first
-// message in a new session to charge the free-tier credit; subsequent
-// turns in the same session pass `firstMessage: false` and don't charge.
-export async function sendTastingMessage(systemPrompt, history, { firstMessage = false } = {}) {
-  // Anthropic rejects extra fields on message objects. Our in-app messages
-  // carry a `stepKey` for the spine UI -- strip it here at the API boundary.
-  const cleanHistory = history.slice(-8).map(({ role, content }) => ({ role, content }));
-  const data = await callClaude({
-    metered: firstMessage,
-    system: systemPrompt,
-    messages: cleanHistory,
-    maxTokens: 1000,
-    feature: 'tastingCoach',
-  });
-  const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
-  // Strip markdown at the API boundary so every caller gets clean plain text.
-  // Must preserve the ---EXTRACT---...---END--- marker, which doesn't contain
-  // markdown anyway, and stripMarkdown leaves those lines untouched.
-  return stripMarkdown(raw);
-}
-
 // Sanitize a string before interpolating it into a Claude system prompt.
 // - Strips anything outside the whitelist (blocks control chars, newlines,
 //   angle brackets, curly braces, backticks, most punctuation).
