@@ -1,13 +1,15 @@
 // Guards the iOS web bundle that Capgo ships over the air. Capgo asks for
 // bundles under 20 MB; 1.1.255 went out at 120 MB because the Ruphus videos
 // (served from the CDN on native anyway) and full-size PNGs rode along.
+// It also proves a production native build carries none of the dev-only tools
+// (App Review guideline 2.5.19: no hidden or dormant features).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 import { CDN_PREFIXES } from '../src/lib/cdnAssets.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -43,21 +45,44 @@ test('every tasting-note illustration resolves to a bundled WebP', () => {
   assert.deepEqual(missing, []);
 });
 
+// One production native build for the tests below. The shell's dev switches
+// never leak into it.
+let outDir;
+before(() => {
+  outDir = mkdtempSync(join(tmpdir(), 'coffee-hub-native-bundle-'));
+  const env = { ...process.env, CAPACITOR_BUILD: 'true' };
+  delete env.TMB_APP_VARIANT;
+  delete env.VITE_FAKE_SCALE;
+  execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], {
+    cwd: root,
+    env,
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+});
+after(() => rmSync(outDir, { recursive: true, force: true }));
+
 test('the native build drops CDN-served media and stays under 20 MB', () => {
-  const outDir = mkdtempSync(join(tmpdir(), 'coffee-hub-native-bundle-'));
-  try {
-    execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], {
-      cwd: root,
-      env: { ...process.env, CAPACITOR_BUILD: 'true' },
-      stdio: ['ignore', 'ignore', 'inherit'],
-    });
-    for (const prefix of CDN_PREFIXES) {
-      assert.equal(existsSync(join(outDir, prefix)), false, `${prefix} must not be bundled on native`);
-    }
-    const total = filesUnder(outDir).reduce((sum, file) => sum + statSync(file).size, 0);
-    console.log(`Native bundle: ${(total / 1024 / 1024).toFixed(2)} MB`);
-    assert.ok(total < MAX_BUNDLE_BYTES, `native bundle is ${(total / 1024 / 1024).toFixed(1)} MB, budget is 20 MB`);
-  } finally {
-    rmSync(outDir, { recursive: true, force: true });
+  for (const prefix of CDN_PREFIXES) {
+    assert.equal(existsSync(join(outDir, prefix)), false, `${prefix} must not be bundled on native`);
   }
+  const total = filesUnder(outDir).reduce((sum, file) => sum + statSync(file).size, 0);
+  console.log(`Native bundle: ${(total / 1024 / 1024).toFixed(2)} MB`);
+  assert.ok(total < MAX_BUNDLE_BYTES, `native bundle is ${(total / 1024 / 1024).toFixed(1)} MB, budget is 20 MB`);
+});
+
+// Markers of the simulated scale (fakeScale.js), the dev paywall price stub
+// (devOfferings.js), the dev Settings panel, and the old app name in the
+// Bluetooth help text.
+const DEV_ONLY_MARKERS = ['fake-pearl-s', 'PEARLS-0F2A', 'Replay onboarding', 'dev_stub', 'allow Coffee Hub'];
+
+test('the production native build carries no dev-only tools', () => {
+  const hits = [];
+  for (const file of filesUnder(outDir)) {
+    if (!/\.(js|html|css|json)$/.test(file)) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const marker of DEV_ONLY_MARKERS) {
+      if (text.includes(marker)) hits.push(`${marker} in ${file.slice(outDir.length + 1)}`);
+    }
+  }
+  assert.deepEqual(hits, []);
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 import { Coffee, Clock, Heart, X } from 'lucide-react';
 import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
 import { m, fadeUp, spring } from '../../../lib/motion';
@@ -644,7 +645,9 @@ export default function R13Paywall() {
                   {trial ? `Start my ${trial.label}` : 'See my plans'}
                 </GlassButton>
 
-                <RedemptionInline onRedeemed={handleRedeemed} />
+                {/* Guideline 3.1.1: the iOS app never unlocks Pro with its own code entry
+                    (Apple rejection 2026-05-13, fixed in 343725f). Web keeps the input. */}
+                {!Capacitor.isNativePlatform() && <RedemptionInline onRedeemed={handleRedeemed} />}
               </>
             )}
           </m.div>

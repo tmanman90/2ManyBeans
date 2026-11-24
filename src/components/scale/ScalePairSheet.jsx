@@ -29,7 +29,7 @@ export function ScalePairSheet({ found, scanError, onChoose, onClose }) {
         <p style={{ color: C.textMuted, fontSize: 15, lineHeight: 1.5, margin: '6px 0 0' }}>Weigh each pour live. Wake the scale by pressing its button.</p>
         {scanError ? (
           <div role="alert" style={{ margin: '20px 0 10px', padding: '12px 14px', borderRadius: 14, background: C.redBg, color: C.red, fontSize: 14, fontWeight: 700, lineHeight: 1.45 }}>
-            Bluetooth is off or not allowed. Turn it on, and allow Coffee Hub under Settings, Privacy, Bluetooth.
+            Bluetooth is off or not allowed. Turn it on, and allow 2manybeans under Settings, Privacy, Bluetooth.
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.accent, margin: '20px 0 10px' }}>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { C, fonts, type as t, radius, shadows, cardBase } from '../../../styles/theme';
 import { m, fadeUp, listContainer, listItem } from '../../../lib/motion';
 import { useOnboarding } from '../OnboardingContext';
@@ -255,9 +256,12 @@ export default function R13bNudge() {
               </m.div>
             )}
 
-            <m.div variants={listItem} style={{ marginTop: 'auto' }}>
-              <RedemptionInline onRedeemed={handleRedeemed} />
-            </m.div>
+            {/* Guideline 3.1.1: no in-app code entry on iOS (see R13Paywall). Web keeps it. */}
+            {!Capacitor.isNativePlatform() && (
+              <m.div variants={listItem} style={{ marginTop: 'auto' }}>
+                <RedemptionInline onRedeemed={handleRedeemed} />
+              </m.div>
+            )}
           </>
         )}
       </m.div>

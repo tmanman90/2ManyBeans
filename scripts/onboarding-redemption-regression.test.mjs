@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { checkRateLimit } from '../api/redeem-code.js';
 
@@ -56,5 +56,34 @@ assert.match(userProfile, /await setDoc\(profileRef, profileData, \{ merge: true
 assert.match(onboardingFlow, /const hasCompleteProfile = Boolean\(/);
 assert.match(onboardingFlow, /else if \(!hasCompleteProfile\) \{/);
 assert.doesNotMatch(onboardingFlow, /else if \(!profile\) \{/);
+
+// Guideline 3.1.1: Apple rejected the iOS app on 2026-05-13 for an in-app code
+// entry that unlocks Pro (fixed in 343725f). The onboarding invite box came back
+// on native on 2026-07-09 through a new, ungated call site. Every place that
+// renders <RedemptionInline> must sit behind !Capacitor.isNativePlatform().
+const sourceFiles = (dir) => readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true })
+  .flatMap((entry) => {
+    const path = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return sourceFiles(path);
+    return /\.(jsx?|tsx?)$/.test(entry.name) ? [path] : [];
+  });
+
+const callSites = [];
+for (const path of sourceFiles('src')) {
+  const source = read(path);
+  for (const match of source.matchAll(/<RedemptionInline\b/g)) {
+    callSites.push(path);
+    const before = source.slice(Math.max(0, match.index - 200), match.index);
+    assert.match(
+      before,
+      /!Capacitor\.isNativePlatform\(\) && (?:\(\s*<m\.div[^>]*>\s*)?$/,
+      `${path} renders <RedemptionInline> without the native gate (Guideline 3.1.1)`,
+    );
+  }
+}
+assert.deepEqual(callSites.sort(), [
+  'src/components/onboarding/screens/R13Paywall.jsx',
+  'src/components/onboarding/screens/R13bNudge.jsx',
+]);
 
 console.log('Onboarding redemption regression passed.');
