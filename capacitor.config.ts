@@ -7,6 +7,10 @@ const config: CapacitorConfig = {
   appId: isDevApp ? 'com.talmeltzer.coffeehub.dev' : 'com.talmeltzer.coffeehub',
   appName: isDevApp ? '2manybeans Dev' : '2manybeans',
   webDir: 'dist',
+  // The WebView's own colour, shown until the page first paints. Without it iOS
+  // uses systemBackground (white, or black in dark mode), which shows whenever
+  // the page is slower than the splash cap. Same as `body` in global.css.
+  backgroundColor: '#F3EDE4',
   plugins: {
     CapacitorHttp: {
       enabled: true,
