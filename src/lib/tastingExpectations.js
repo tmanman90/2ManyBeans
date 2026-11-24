@@ -88,7 +88,7 @@ function altitudeMeters(bean) {
   return Number.isFinite(n) ? n : null;
 }
 
-// --- Axis labels (novice vocabulary, from tastingGlossary) ---
+// --- Axis labels (novice vocabulary) ---
 const LABELS = {
   acidity:   [[2, 'gentle'], [4, 'soft & mellow'], [6, 'crisp, like apple'], [8, 'bright, like lemon'], [10, 'vibrant & punchy']],
   sweetness: [[2, 'subtle'], [4, 'present'], [6, 'sweet, like honey'], [8, 'rich, like caramel'], [10, 'lush & syrupy']],
