@@ -654,24 +654,6 @@ export async function prepareChatMessagesForClaude(history, { onImageDescribeSta
   return { messages: recentMessages, hasImages };
 }
 
-export async function sendChatMessage(systemPrompt, history) {
-  const { messages: recentMessages, hasImages } = await prepareChatMessagesForClaude(history);
-
-  const data = await callClaude({
-    system: systemPrompt,
-    messages: recentMessages,
-    // Sized for BEAN_SCAN + sourceInsights under the Sonnet 5 tokenizer;
-    // re-baseline via count_tokens fixture during Phase B.
-    maxTokens: hasImages ? 2600 : 800,
-    model: 'claude-sonnet-5',
-    feature: 'chat',
-  });
-  const raw = data.content?.map(c => c.text || '').join('') || 'Sorry, something went wrong.';
-  // Preserve the ---BEAN_SCAN---...---END_SCAN--- marker (it's plain JSON, no
-  // markdown) and strip any stray bold/italic from the conversational text.
-  return { text: stripMarkdown(raw), stopReason: data.stop_reason };
-}
-
 // reactToTastingStep — additive, NON-GATING Ruphus reaction for one beat of the guided tasting
 // wizard. The wizard's deterministic coaching always renders; if this resolves, it swaps in a
 // warmer, bean-specific line. Pro-gated at the call site (free users get the full deterministic
