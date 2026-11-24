@@ -22,13 +22,13 @@
 // PRICES marker whenever these values are in use, so they can never be mistaken
 // for the real thing.
 
-/** True only in the dev-variant build. */
+/**
+ * True only in the dev-variant build. Keep this a bare expression: a try/catch
+ * here stops the minifier folding it to `false`, and the stub then ships in the
+ * production bundle (scripts/native-bundle.test.mjs checks).
+ */
 export function devOfferingsEnabled() {
-  try {
-    return typeof __APP_VARIANT__ !== 'undefined' && __APP_VARIANT__ === 'dev';
-  } catch {
-    return false;
-  }
+  return typeof __APP_VARIANT__ !== 'undefined' && __APP_VARIANT__ === 'dev';
 }
 
 // Mirrors ASC: 3-day free introductory offer on all four products.
