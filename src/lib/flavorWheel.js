@@ -50,7 +50,7 @@ export function chipsForLevel(level) {
   return out;
 }
 
-// --- Axis slider configs (0–10) with novice notch labels (tastingGlossary vocabulary) ---
+// --- Axis slider configs (0–10) with novice notch labels ---
 // `scoreKey` = the 6-axis fingerprint score this slider feeds (or null); `field` = the tasting
 // record field it writes (the notch word). acidity/sweetness/body feed the radar directly →
 // the fingerprint is real. Finish is a tasting field, not a radar axis (fragranceAroma, flavor,

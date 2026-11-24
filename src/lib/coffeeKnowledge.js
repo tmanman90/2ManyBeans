@@ -306,8 +306,7 @@ Grinder settings are STARTING POINTS: burr calibration varies unit to unit
 `;
 
 // --- BREW TROUBLESHOOTING RULES ---
-// Shared by chat + tasting coach. Replaces the inline rules previously
-// hardcoded in buildTastingSystemPrompt.
+// Used by the chat system prompt (buildChatContext in claude.js).
 export const BREW_TROUBLESHOOTING_RULES = `
 Brew troubleshooting (apply per brewer):
 - Sour / bright / sharp: grind finer; or on Aiden, raise bloom temperature or
