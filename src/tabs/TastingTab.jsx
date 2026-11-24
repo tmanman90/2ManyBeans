@@ -580,6 +580,7 @@ export const TastingTab = ({ uid, beans, tastings, preferences = null, pendingTa
         <div style={{ textAlign: 'center', padding: '24px 20px' }}>
           <video
             src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")}
+            poster={assetUrl("/images/ruphus-animations/ruphus-empty-cup-poster.jpg")}
             autoPlay muted loop playsInline
             style={{
               width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px',

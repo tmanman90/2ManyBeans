@@ -544,6 +544,7 @@ export const App = ({ uid, beans, tastings, addBean, updateBean, saveHandBrewTim
         <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
           <video
             src={assetUrl("/images/ruphus-animations/ruphus-first-bean.mp4")}
+            poster={assetUrl("/images/ruphus-animations/ruphus-first-bean-poster.jpg")}
             autoPlay muted playsInline
             onPlay={() => setTimeout(() => setFirstBeanCelebrating(false), 4000)}
             style={{

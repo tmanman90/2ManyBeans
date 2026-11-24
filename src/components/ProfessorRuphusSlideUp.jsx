@@ -188,6 +188,7 @@ export const ProfessorRuphusSlideUp = ({ open, onClose, bean, story, loading, re
             <div style={{ textAlign: 'center', paddingTop: 40 }}>
               <video
                 src={assetUrl("/images/ruphus-animations/ruphus-examining-v3.mp4")}
+                poster={assetUrl("/images/ruphus-animations/ruphus-examining-v3-poster.jpg")}
                 autoPlay muted loop playsInline preload="auto"
                 style={{ width: 240, height: 'auto', marginBottom: 16, background: 'transparent' }}
               />

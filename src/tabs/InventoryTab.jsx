@@ -399,6 +399,7 @@ export const InventoryTab = ({ uid, beans, tastings, onOpenBean, onAddBean, upda
           >
             <video
               src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")}
+              poster={assetUrl("/images/ruphus-animations/ruphus-empty-cup-poster.jpg")}
               autoPlay muted loop playsInline
               style={{
                 width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',

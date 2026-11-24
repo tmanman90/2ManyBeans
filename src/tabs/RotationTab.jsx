@@ -390,6 +390,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         >
           <video
             src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")}
+            poster={assetUrl("/images/ruphus-animations/ruphus-empty-cup-poster.jpg")}
             autoPlay muted loop playsInline
             style={{
               width: 200, height: 200, objectFit: 'contain', marginBottom: 8,
@@ -725,6 +726,7 @@ export const RotationTab = ({ uid, beans, tastings, onFinishBean, onReturnBean, 
         <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
           <video
             src={assetUrl("/images/ruphus-animations/ruphus-fist-pump.mp4")}
+            poster={assetUrl("/images/ruphus-animations/ruphus-fist-pump-poster.jpg")}
             autoPlay muted playsInline
             onPlay={() => setTimeout(() => { setCelebratingBean(null); setToast('Bag finished!'); }, 2200)}
             style={{
