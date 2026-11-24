@@ -86,4 +86,18 @@ assert.deepEqual(callSites.sort(), [
   'src/components/onboarding/screens/R13bNudge.jsx',
 ]);
 
+// Settings keeps the gate the May fix added: on iOS the redeem row opens
+// Apple's offer-code page, and the custom code input exists only in the web
+// branch of that same ternary.
+const settings = read('src/components/SettingsPage.jsx');
+const settingsGate = settings.match(
+  /\{Capacitor\.isNativePlatform\(\) \? \(\s*<button[\s\S]{0,300}?apps\.apple\.com\/redeem\?ctx=offercodes[\s\S]{0,400}?Redeem Offer Code[\s\S]{0,200}?\) : \(/,
+);
+assert.ok(settingsGate, 'SettingsPage.jsx must send iOS to Apple offer-code redemption (Guideline 3.1.1)');
+const webBranchStart = settingsGate.index + settingsGate[0].length;
+for (const marker of ['value={redeemInput}', 'handleRedeemSubmit()', 'onClick={handleRedeemSubmit}']) {
+  const at = settings.indexOf(marker);
+  assert.ok(at > webBranchStart, `SettingsPage.jsx: ${marker} must sit in the web branch of the native gate`);
+}
+
 console.log('Onboarding redemption regression passed.');
