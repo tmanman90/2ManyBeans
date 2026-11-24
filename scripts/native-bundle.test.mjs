@@ -63,7 +63,7 @@ before(() => {
   const env = { ...process.env, CAPACITOR_BUILD: 'true' };
   delete env.TMB_APP_VARIANT;
   delete env.VITE_FAKE_SCALE;
-  execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], {
+  execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir', '--manifest', '--logLevel', 'error'], {
     cwd: root,
     env,
     stdio: ['ignore', 'ignore', 'inherit'],
@@ -95,4 +95,23 @@ test('the production native build carries no dev-only tools', () => {
     }
   }
   assert.deepEqual(hits, []);
+});
+
+// Onboarding is lazy (main.jsx). A forced manualChunks rule once made the entry
+// import and preload the onboarding chunk on every launch.
+test('the native build never imports or preloads onboarding at launch', () => {
+  const manifest = JSON.parse(readFileSync(join(outDir, '.vite/manifest.json'), 'utf8'));
+  const startup = new Set();
+  const walk = (key) => {
+    if (startup.has(key)) return;
+    startup.add(key);
+    for (const next of manifest[key].imports || []) walk(next);
+  };
+  walk('index.html');
+  const isOnboarding = (key) => /onboarding/i.test(`${key} ${manifest[key].name || ''} ${manifest[key].src || ''}`);
+  const loadedAtLaunch = [...startup].filter(isOnboarding).map((key) => manifest[key].file);
+  assert.deepEqual(loadedAtLaunch, [], 'the entry statically imports (and index.html preloads) onboarding code');
+  const flow = manifest['src/components/onboarding/OnboardingFlow.jsx'];
+  assert.ok(flow?.isDynamicEntry, 'OnboardingFlow must be its own lazy chunk');
+  assert.ok(!readFileSync(join(outDir, 'index.html'), 'utf8').includes(flow.file), `index.html preloads ${flow.file}`);
 });

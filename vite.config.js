@@ -58,11 +58,15 @@ export default defineConfig({
         // lazy chunks that only load on demand. Forcing them into a static
         // group here would defeat those splits.
         manualChunks(id) {
-          // Force all 14 onboarding screen files + shared state/shell/hook
-          // into a single `onboarding` chunk. Keeps the lazy-loaded entry
-          // honest: one fetch on Gate 5 → entire flow is ready. Budget
-          // (<120KB gzip) is verified in Phase 5.
-          if (id.includes('/src/components/onboarding/')) return 'onboarding';
+          // Onboarding has no rule here on purpose: forcing it into a named
+          // chunk made Rollup park shared code there and the entry preload
+          // it on every launch. It stays a real lazy chunk (main.jsx).
+          // The animation library gets its own stable vendor chunk instead.
+          if (
+            id.includes('/node_modules/framer-motion/') ||
+            id.includes('/node_modules/motion-dom/') ||
+            id.includes('/node_modules/motion-utils/')
+          ) return 'motion';
           if (
             id.includes('/node_modules/firebase/app') ||
             id.includes('/node_modules/firebase/auth') ||
