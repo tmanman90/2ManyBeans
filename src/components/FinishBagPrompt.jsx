@@ -2,6 +2,7 @@
 // Single modal with view swapping: 'prompt' (quick rate) | 'fullReview'
 import { useState, useEffect } from 'react';
 import { assetUrl } from "../lib/assetUrl";
+import { celebrationCloseAt } from '../lib/celebrationTiming';
 import { ArrowLeft } from 'lucide-react';
 import { C, fonts, type, radius } from '../styles/theme';
 import { haptic } from '../lib/haptics';
@@ -12,13 +13,19 @@ import { StarRating } from './StarRating';
 import { TastingForm } from './TastingForm';
 import { Btn } from './Btn';
 
+// The fist-pump clip stays on screen this long once it starts playing; the
+// sheet never stays past the cap, even if the clip is slow or never plays.
+const CELEBRATION = { afterPlayMs: 2200, maxMs: 4000 };
+
 export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, onUpdateTasting }) => {
   const [view, setView] = useState('prompt');
   const [rating, setRating] = useState(0);
   const [oneWord, setOneWord] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [celebrating, setCelebrating] = useState(false);
+  // null, or { shownAt, playedAt } while the celebration is on screen.
+  const [celebration, setCelebration] = useState(null);
+  const celebrating = celebration !== null;
 
   // Reset state when modal opens
   useEffect(() => {
@@ -28,9 +35,21 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       setOneWord('');
       setSaving(false);
       setError(null);
-      setCelebrating(false);
+      setCelebration(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!celebration || !open) return undefined;
+    const delay = Math.max(0, celebrationCloseAt(celebration, CELEBRATION) - Date.now());
+    const timer = setTimeout(() => onClose('Saved & finished!'), delay);
+    return () => clearTimeout(timer);
+  }, [celebration, open, onClose]);
+
+  const startCelebration = () => setCelebration({ shownAt: Date.now(), playedAt: null });
+  const handleClipPlay = () => setCelebration((current) => (
+    current && current.playedAt === null ? { ...current, playedAt: Date.now() } : current
+  ));
 
   if (!bean) return null;
 
@@ -48,8 +67,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
       });
       await onFinish(bean.id);
       haptic.success();
-      setCelebrating(true);
-      setTimeout(() => onClose('Saved & finished!'), 2200);
+      startCelebration();
     } catch (err) {
       console.error('Quick save failed:', err);
       setError('Failed to save rating. Try again.');
@@ -78,9 +96,8 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
 
       await onFinish(bean.id);
       haptic.success();
-      setCelebrating(true);
+      startCelebration();
       setView('prompt');
-      setTimeout(() => onClose('Saved & finished!'), 2200);
     } catch (err) {
       console.error('Full review save failed:', err);
       setError('Failed to save review. Try again.');
@@ -168,6 +185,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
             src={assetUrl("/images/ruphus-animations/ruphus-fist-pump.mp4")}
             poster={assetUrl("/images/ruphus-animations/ruphus-fist-pump-poster.jpg")}
             autoPlay muted playsInline
+            onPlay={handleClipPlay}
             style={{
               width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',
               display: 'block',
