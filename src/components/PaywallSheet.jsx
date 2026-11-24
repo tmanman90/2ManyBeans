@@ -32,7 +32,7 @@ import { introOfferFromPackage } from '../lib/trialOffer';
 const CONTEXT_COPY = {
   scan_cap: {
     headline: "You've used your free scans",
-    subtext: 'Unlock unlimited bean scanning and tasting coach with Coffee Hub Pro.',
+    subtext: 'Unlock unlimited bean scanning and tasting coach with 2manybeans Pro.',
   },
   taste_cap: {
     headline: 'Ready to level up your tasting?',
@@ -341,7 +341,7 @@ export function PaywallSheet({ open, context, onClose }) {
             {/* Header */}
             {showMarketing ? (
               <m.div style={styles.header} {...fadeUp}>
-                <div style={styles.eyebrow}>Coffee Hub</div>
+                <div style={styles.eyebrow}>2manybeans</div>
                 <h2 style={styles.headline}>{copy.headline}</h2>
                 <p style={styles.sub}>{copy.subtext}</p>
               </m.div>
@@ -351,7 +351,7 @@ export function PaywallSheet({ open, context, onClose }) {
               </div>
             ) : (
               <div style={styles.header}>
-                <div style={styles.eyebrow}>Coffee Hub</div>
+                <div style={styles.eyebrow}>2manybeans</div>
                 <h2 style={styles.headline}>{copy.headline}</h2>
                 <p style={styles.sub}>{copy.subtext}</p>
               </div>
