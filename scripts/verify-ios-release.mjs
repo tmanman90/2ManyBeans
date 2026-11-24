@@ -45,10 +45,12 @@ export function expectedRelease(repo = REPO) {
   if (builds.size !== 1 || versions.size !== 1) {
     throw new Error(`project.pbxproj targets disagree: builds ${[...builds]}, versions ${[...versions]}`);
   }
+  const webViewBackground = readFileSync(join(repo, 'capacitor.config.ts'), 'utf8').match(/^ {2}backgroundColor: '([^']+)'/m)?.[1];
   return {
     version: [...versions][0],
     build: [...builds][0],
     bluetooth: readPlist(join(repo, 'ios/App/App/Info.plist')).NSBluetoothAlwaysUsageDescription,
+    webViewBackground,
   };
 }
 
@@ -103,6 +105,8 @@ export function verifyIosRelease(appPath, expected = expectedRelease()) {
     check(capacitor.appName === DISPLAY_NAME, `capacitor.config.json appName is "${capacitor.appName}", expected "${DISPLAY_NAME}"`);
     check(updater.autoUpdate === true, 'Capgo autoUpdate is not true');
     check(updater.defaultChannel === undefined, `Capgo defaultChannel is "${updater.defaultChannel}"; the App Store app uses the default channel`);
+    check(capacitor.backgroundColor === expected.webViewBackground, `capacitor.config.json backgroundColor is ${capacitor.backgroundColor}, expected ${expected.webViewBackground} (else the WebView shows white or black while the page loads)`);
+    check(capacitor.ios?.backgroundColor === undefined, `capacitor.config.json ios.backgroundColor ${capacitor.ios?.backgroundColor} overrides the app background`);
     check(capacitor.server?.url === undefined, `capacitor.config.json points the app at ${capacitor.server?.url} (simulator setting left in)`);
   } else {
     misses.push('capacitor.config.json is missing');

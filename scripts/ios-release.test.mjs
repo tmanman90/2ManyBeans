@@ -158,6 +158,7 @@ function buildFixture(expected, { info = {}, widget = {}, capacitor = {}, entitl
   writeFileSync(join(app, 'capacitor.config.json'), JSON.stringify({
     appId: 'com.talmeltzer.coffeehub',
     appName: '2manybeans',
+    backgroundColor: expected.webViewBackground,
     plugins: { CapacitorUpdater: { autoUpdate: true } },
     ...capacitor,
   }));
@@ -179,6 +180,17 @@ test('the archive check reads the expected build from the repo', macOnly, async 
   assert.equal(expected.version, '1.1');
   assert.equal(expected.build, '43');
   assert.match(expected.bluetooth, /^2manybeans /);
+  assert.equal(expected.webViewBackground, '#F3EDE4');
+});
+
+test('the WebView background is the colour the page paints first', () => {
+  // body in global.css is the first surface the app draws; the WebView colour
+  // shows until then, so the two must match or a slow start flashes.
+  const body = read('src/styles/global.css').match(/^body \{[^}]*?\n {2}background: (#[0-9A-Fa-f]{6});/m)?.[1];
+  const config = read('capacitor.config.ts');
+  assert.ok(body, 'global.css body background not found');
+  assert.equal(config.match(/^ {2}backgroundColor: '([^']+)'/m)?.[1], body);
+  assert.doesNotMatch(config, /ios: \{[^}]*backgroundColor/, 'an ios.backgroundColor would override it');
 });
 
 test('the archive check passes a correct App Store app', macOnly, async () => {
@@ -208,6 +220,8 @@ test('the archive check reports every miss', macOnly, async () => {
     [{ withWidget: false }, /BrewActivityWidget\.appex is missing/],
     [{ capacitor: { appId: 'com.talmeltzer.coffeehub.dev' } }, /appId/],
     [{ capacitor: { plugins: { CapacitorUpdater: { autoUpdate: false } } } }, /autoUpdate/],
+    [{ capacitor: { backgroundColor: undefined } }, /backgroundColor is undefined/],
+    [{ capacitor: { ios: { backgroundColor: '#FFFFFF' } } }, /ios\.backgroundColor/],
     [{ capacitor: { plugins: { CapacitorUpdater: { autoUpdate: true, defaultChannel: 'dev' } } } }, /defaultChannel/],
     [{ capacitor: { server: { url: 'http://localhost:5173' } } }, /simulator setting/],
     [{ publicText: 'onFound({deviceId:"fake-pearl-s"})' }, /fake-pearl-s/],
