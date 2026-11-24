@@ -166,6 +166,7 @@ export const FinishBagPrompt = ({ open, onClose, bean, onFinish, onAddTasting, o
         <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
           <video
             src={assetUrl("/images/ruphus-animations/ruphus-fist-pump.mp4")}
+            poster={assetUrl("/images/ruphus-animations/ruphus-fist-pump-poster.jpg")}
             autoPlay muted playsInline
             style={{
               width: 200, height: 200, objectFit: 'contain', margin: '0 auto 16px',

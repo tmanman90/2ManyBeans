@@ -109,7 +109,7 @@ function EmptyState({ hasFilters, onClear }) {
   return (
     <div style={{ padding: '40px 24px', textAlign: 'center', background: C.cream, border: `1px solid ${C.borderLight}`, borderRadius: radius.lg, margin: '12px 0' }}>
       {!hasFilters && (
-        <video src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")} autoPlay muted loop playsInline
+        <video src={assetUrl("/images/ruphus-animations/ruphus-empty-cup.mp4")} poster={assetUrl("/images/ruphus-animations/ruphus-empty-cup-poster.jpg")} autoPlay muted loop playsInline
           style={{ width: 200, height: 200, objectFit: 'contain', margin: '0 auto 8px', display: 'block', WebkitMaskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)', maskImage: 'radial-gradient(ellipse 75% 55% at center 48%, black 60%, transparent 100%)' }} />
       )}
       <div style={{ ...type.h2, color: C.text, marginBottom: 6 }}>{hasFilters ? 'No matches' : 'Nothing archived yet'}</div>
