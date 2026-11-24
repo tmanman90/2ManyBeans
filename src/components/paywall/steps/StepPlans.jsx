@@ -85,7 +85,7 @@ export default function StepPlans({
           <div className="pw-plan-grid pw-in" style={{ '--pw-d': '140ms' }}>
             <TierCard
               name="Pro"
-              desc="The daily essentials, unlimited."
+              desc="Every AI feature, unlimited."
               annualPkg={packages.proAnnual}
               monthlyPkg={packages.proMonthly}
               selected={tier === 'pro'}
