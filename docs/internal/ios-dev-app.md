@@ -19,10 +19,10 @@ This builds the web app with the dev Capacitor config, copies it into iOS, and p
 It also swaps in the dev `GoogleService-Info.plist` and Google URL scheme so native Apple/Google auth tokens are accepted for the `.dev` bundle id.
 
 ```sh
-npm run cap:copy
+node scripts/configure-ios-variant.mjs prod
 ```
 
-This restores the native wrapper to production settings after dev testing.
+This restores the native wrapper to production settings after dev testing (bundle ids, display name, Firebase plist, Google URL scheme, Capgo config). It does not rebuild the web bundle, so `ios/App/App/public` stays the dev build until the next `npm run cap:sync`. `npm run cap:copy` and `npm run cap:sync` now run the App Store release preflight first and need the six `VITE_FIREBASE_*` values, so they are not a restore step.
 
 For a full plugin sync, use `npm run cap:sync:dev` or `npm run cap:sync` instead.
 
@@ -66,7 +66,7 @@ xcodebuild -allowProvisioningUpdates \
 After testing, restore the generated native files to production:
 
 ```sh
-npm run cap:copy
+node scripts/configure-ios-variant.mjs prod
 ```
 
 ## App Store Connect and Firebase
