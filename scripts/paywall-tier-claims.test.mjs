@@ -116,6 +116,11 @@ test('no paywall card carries a recommending badge', () => {
   assert.deepEqual(hits, []);
 });
 
+// Tal 2026-11-24: neither onboarding plan card is styled as the pick.
+test('onboarding plan cards give neither plan a highlight', () => {
+  assert.doesNotMatch(code('src/components/onboarding/screens/R13Paywall.jsx'), /\brecommended\b/);
+});
+
 test('the compare table gives Ultra exactly one extra row, the Aiden push', () => {
   const copy = read('src/components/paywall/paywallCopy.js');
   const rows = [...copy.matchAll(/\{ feature: '([^']+)'[^}]*pro: (true|false), ultra: (true|false) \}/g)]
