@@ -38,6 +38,11 @@ function filesUnder(dir) {
   });
 }
 
+function googleSchemeOf(info) {
+  return (info.CFBundleURLTypes || []).flatMap((type) => type.CFBundleURLSchemes || [])
+    .find((scheme) => scheme.startsWith('com.googleusercontent.apps.'));
+}
+
 export function expectedRelease(repo = REPO) {
   const project = readFileSync(join(repo, 'ios/App/App.xcodeproj/project.pbxproj'), 'utf8');
   const builds = new Set([...project.matchAll(/CURRENT_PROJECT_VERSION = ([^;]+);/g)].map((m) => m[1]));
@@ -45,12 +50,20 @@ export function expectedRelease(repo = REPO) {
   if (builds.size !== 1 || versions.size !== 1) {
     throw new Error(`project.pbxproj targets disagree: builds ${[...builds]}, versions ${[...versions]}`);
   }
+  // Google sign-in returns to the app through its reversed client ID URL scheme.
+  // configure-ios-variant.mjs prod copies it from the prod Firebase file into
+  // Info.plist; that file is not committed, so fall back to the tracked plist.
+  const prodFirebase = join(repo, 'config/firebase/GoogleService-Info.prod.plist');
+  const googleScheme = existsSync(prodFirebase)
+    ? readPlist(prodFirebase).REVERSED_CLIENT_ID
+    : googleSchemeOf(readPlist(join(repo, 'ios/App/App/Info.plist')));
   const webViewBackground = readFileSync(join(repo, 'capacitor.config.ts'), 'utf8').match(/^ {2}backgroundColor: '([^']+)'/m)?.[1];
   return {
     version: [...versions][0],
     build: [...builds][0],
     bluetooth: readPlist(join(repo, 'ios/App/App/Info.plist')).NSBluetoothAlwaysUsageDescription,
     webViewBackground,
+    googleScheme,
   };
 }
 
@@ -112,13 +125,11 @@ export function verifyIosRelease(appPath, expected = expectedRelease()) {
     misses.push('capacitor.config.json is missing');
   }
 
-  const firebasePath = join(appPath, 'GoogleService-Info.plist');
-  if (existsSync(firebasePath)) {
-    const firebase = readPlist(firebasePath);
-    check(firebase.BUNDLE_ID === PROD_APP_ID, `GoogleService-Info.plist BUNDLE_ID is ${firebase.BUNDLE_ID}, expected ${PROD_APP_ID}`);
-  } else {
-    misses.push('GoogleService-Info.plist is missing');
-  }
+  // Firebase runs as the web SDK from the JS bundle; no native code reads
+  // GoogleService-Info.plist and it has never been in the app. What the binary
+  // does carry is the Google sign-in URL scheme, and a dev one breaks sign-in.
+  const googleScheme = googleSchemeOf(info);
+  check(googleScheme === expected.googleScheme, `Google sign-in URL scheme is ${googleScheme}, expected ${expected.googleScheme}`);
 
   const publicDir = join(appPath, 'public');
   if (existsSync(publicDir)) {
