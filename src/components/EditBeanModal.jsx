@@ -25,6 +25,7 @@ import { usePreferences } from '../hooks/useUserProfile';
 import { GRINDER_LABELS } from '../lib/brewMethods';
 import { ROAST_STYLE_CATEGORIES } from '../lib/roasterProfiles';
 import { FREE_LIMITS } from '../lib/subscriptionConfig';
+import { useStrippedBag } from '../lib/stripBg';
 
 const SprigDivider = ({ color = C.accentLight, size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 14 14" style={{ flexShrink: 0, opacity: 0.7 }}>
@@ -131,6 +132,9 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
   const [photoError, setPhotoError] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState(null);
   const [displayPhotoUrl, setDisplayPhotoUrl] = useState('');
+  // Product shots carry a baked paper backdrop; strip it like the cards do so
+  // the bag floats on this frame instead of sitting in a white box.
+  const framedPhotoSrc = useStrippedBag(displayPhotoUrl || null);
   const [aiFilling, setAiFilling] = useState(false);
   const fileRef = useRef(null);
   const photoInFlight = useRef(false);
@@ -576,7 +580,7 @@ export const EditBeanModal = ({ open, onClose, bean, updateBean, deleteBean, uid
             border: `1px solid ${C.hairline}`,
           }}>
             <img
-              src={displayPhotoUrl}
+              src={framedPhotoSrc || displayPhotoUrl}
               alt={`${bean.name} bag`}
               style={{ width: '100%', height: 200, objectFit: 'contain', objectPosition: 'center' }}
             />
