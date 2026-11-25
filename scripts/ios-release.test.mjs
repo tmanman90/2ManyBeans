@@ -15,6 +15,10 @@ import test from 'node:test';
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const read = (path) => readFileSync(join(REPO, path), 'utf8');
 const macOnly = { skip: process.platform !== 'darwin' && 'needs plutil and codesign' };
+// The preflight also reads env files the way Vite does. Point it at an empty
+// folder so this checkout's own files never decide a test.
+const NO_ENV_FILES = mkdtempSync(join(tmpdir(), 'preflight-no-env-'));
+process.on('exit', () => rmSync(NO_ENV_FILES, { recursive: true, force: true }));
 
 const FIREBASE = [
   'VITE_FIREBASE_API_KEY',
@@ -27,7 +31,7 @@ const FIREBASE = [
 const SENTINEL = 'release-secret-must-never-appear-in-output';
 
 function releaseGuard(overrides = {}) {
-  const env = { PATH: process.env.PATH };
+  const env = { PATH: process.env.PATH, TMB_ENV_DIR: NO_ENV_FILES };
   for (const name of FIREBASE) env[name] = SENTINEL;
   for (const [name, value] of Object.entries(overrides)) {
     if (value === undefined) delete env[name];
@@ -60,6 +64,46 @@ test('release preflight refuses dev switches', () => {
   }
 });
 
+// Vite embeds VITE_* values from env files, so the preflight must see them there
+// too (the 1.1.256 ship had its keys in .env.local, not the shell).
+function guardWithEnvFile(fileName, lines, shell = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'preflight-env-file-'));
+  try {
+    writeFileSync(join(dir, fileName), `${lines.join('\n')}\n`);
+    const env = { PATH: process.env.PATH, TMB_ENV_DIR: dir, ...shell };
+    return spawnSync(process.execPath, ['scripts/assert-ios-build-env.mjs', 'release'], { cwd: REPO, env, encoding: 'utf8' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('release preflight accepts Firebase values that live only in an env file Vite reads', () => {
+  for (const fileName of ['.env', '.env.local', '.env.production', '.env.production.local']) {
+    const result = guardWithEnvFile(fileName, FIREBASE.map((name) => `${name}=${SENTINEL}`));
+    assert.equal(result.status, 0, `${fileName}: ${result.stderr}`);
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SENTINEL));
+  }
+});
+
+test('release preflight ignores env files Vite does not read in a production build', () => {
+  const result = guardWithEnvFile('.env.development', FIREBASE.map((name) => `${name}=${SENTINEL}`));
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /VITE_FIREBASE_API_KEY/);
+});
+
+test('release preflight refuses the simulated scale set in an env file', () => {
+  const result = guardWithEnvFile('.env.local', [...FIREBASE.map((name) => `${name}=${SENTINEL}`), 'VITE_FAKE_SCALE=1']);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /VITE_FAKE_SCALE/);
+});
+
+test('a blank shell value wins over an env file, as it does in Vite', () => {
+  const result = guardWithEnvFile('.env.local', FIREBASE.map((name) => `${name}=${SENTINEL}`), { VITE_FIREBASE_APP_ID: '   ' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /VITE_FIREBASE_APP_ID/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(SENTINEL));
+});
+
 test('the App Store sync and copy run the release preflight first', () => {
   const { scripts } = JSON.parse(read('package.json'));
   for (const name of ['cap:sync', 'cap:copy']) {
@@ -78,7 +122,7 @@ function shipProduction(overrides = {}) {
   for (const tool of ['npx', 'npm']) {
     writeFileSync(join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> "${calls}"\nexit 1\n`, { mode: 0o755 });
   }
-  const env = { PATH: `${bin}:/usr/bin:/bin` };
+  const env = { PATH: `${bin}:/usr/bin:/bin`, TMB_ENV_DIR: NO_ENV_FILES };
   for (const name of FIREBASE) env[name] = SENTINEL;
   for (const [name, value] of Object.entries(overrides)) {
     if (value === undefined) delete env[name];

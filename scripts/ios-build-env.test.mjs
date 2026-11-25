@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// The preflight also reads env files the way Vite does. Point every run below at
+// an empty folder so this checkout's own files never decide a check.
+process.env.TMB_ENV_DIR = mkdtempSync(join(tmpdir(), 'preflight-no-env-'));
+process.on('exit', () => rmSync(process.env.TMB_ENV_DIR, { recursive: true, force: true }));
 
 const required = [
   'VITE_FIREBASE_API_KEY',
@@ -49,6 +56,7 @@ assert.notEqual(whitespaceResult.status, 0, 'whitespace-only Firebase values mus
 assert.match(whitespaceResult.stderr, /VITE_FIREBASE_API_KEY/);
 
 const configuredEnv = Object.fromEntries(required.map((name) => [name, name === 'VITE_RUPHUS_API_BASE' ? 'https://ruphus-preview.vercel.app/' : 'configured-for-test']));
+configuredEnv.TMB_ENV_DIR = process.env.TMB_ENV_DIR;
 const configured = spawnSync(process.execPath, ['scripts/assert-ios-build-env.mjs'], {
   cwd: process.cwd(),
   env: configuredEnv,
