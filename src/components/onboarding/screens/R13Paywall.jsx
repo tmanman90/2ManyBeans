@@ -30,14 +30,12 @@ const PLANS = [
     label: 'Pro',
     tagline: 'Every AI feature, unlimited.',
     perks: ['AI tasting coach', 'Unlimited bean scans', 'Personalized brew recipes', 'Chat and Professor Ruphus stories'],
-    recommended: false,
   },
   {
     key: 'ultra',
     label: 'Ultra',
     tagline: 'Everything in Pro, plus your Fellow Aiden.',
     perks: ['Everything in Pro', 'Push recipes directly to Fellow Aiden'],
-    recommended: true,
   },
 ];
 
@@ -566,30 +564,14 @@ export default function R13Paywall() {
                       position: 'relative',
                       padding: '16px 16px',
                       borderRadius: radius.lg,
-                      border: plan.recommended
-                        ? `2px solid ${C.accent}`
-                        : `1.5px solid ${C.border}`,
-                      background: plan.recommended ? C.accentSoft : C.cream,
-                      boxShadow: plan.recommended ? shadows.e3 : shadows.e1,
+                      border: `1.5px solid ${C.border}`,
+                      background: C.cream,
+                      boxShadow: shadows.e1,
                       textAlign: 'left',
                     }}>
-                      {plan.recommended && (
-                        <div style={{
-                          position: 'absolute',
-                          top: -1,
-                          right: 14,
-                          background: C.accent,
-                          color: '#fff',
-                          ...t.label,
-                          padding: '3px 10px',
-                          borderRadius: `0 0 ${radius.xs}px ${radius.xs}px`,
-                        }}>
-                          Recommended
-                        </div>
-                      )}
                       <div style={{
                         ...t.h2,
-                        color: plan.recommended ? C.accent : C.text,
+                        color: C.text,
                         marginBottom: 4,
                       }}>
                         {plan.label}
@@ -611,15 +593,15 @@ export default function R13Paywall() {
                             <div style={{
                               width: 16, height: 16,
                               borderRadius: '50%',
-                              background: plan.recommended ? C.accent : C.accentSoft,
-                              border: plan.recommended ? 'none' : `1.5px solid ${C.accent}`,
+                              background: C.accentSoft,
+                              border: `1.5px solid ${C.accent}`,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               flexShrink: 0,
                             }}>
                               <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                                <path d="M1 3l2 2 4-4" stroke={plan.recommended ? '#fff' : C.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M1 3l2 2 4-4" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                             </div>
                             <span style={{ ...t.body, color: C.text }}>{perk}</span>

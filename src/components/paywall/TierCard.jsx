@@ -82,7 +82,6 @@ function SkuRow({ selected, onPress, children }) {
 export default function TierCard({
   name,
   desc,
-  bestValue = false,
   annualPkg,
   monthlyPkg,
   selected = false,
@@ -96,17 +95,12 @@ export default function TierCard({
   return (
     <div className={`pw-plan-card${selected ? ' is-selected' : ''}`}>
       {/*
-        The badge gets its OWN row, reserved in both cards even when empty.
-        Nesting it in the name row let it wrap to a second line on Ultra only,
-        so the two heads held different content heights and the fixed-height
-        head clipped Ultra's description. Reserving the slot makes the heads
-        structurally equal rather than equal by luck.
+        The empty badge row is kept so both cards keep the head height and
+        spacing they had with Ultra's old Best value badge (see .pw-plan-head).
       */}
       <div className="pw-plan-head">
         <h3 className="pw-plan-name">{name}</h3>
-        <div className="pw-badge-slot">
-          {bestValue ? <span className="pw-badge">Best value</span> : null}
-        </div>
+        <div className="pw-badge-slot" />
         <p className="pw-plan-desc">{desc}</p>
       </div>
 

@@ -1,7 +1,7 @@
 // Step 2 — Plans. Pro and Ultra side by side, each card showing its annual
 // and monthly price simultaneously (Apple mass-rejected billing-cycle
 // toggles in Jan 2026 — all four prices stay visible). Annual is the hero
-// row with the live-computed Save badge; Ultra carries Best value.
+// row with the live-computed Save badge.
 //
 // The two tier cards animate TOGETHER (one .pw-in wrapper, one delay):
 // side-by-side peers arriving at different times read as a bug.
@@ -96,7 +96,6 @@ export default function StepPlans({
             <TierCard
               name="Ultra"
               desc="Everything, plus your Aiden."
-              bestValue
               annualPkg={packages.ultraAnnual}
               monthlyPkg={packages.ultraMonthly}
               selected={tier === 'ultra'}
