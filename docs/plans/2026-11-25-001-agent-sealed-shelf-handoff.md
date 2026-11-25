@@ -73,4 +73,61 @@ Commit on the branch (one commit per logical step is fine), push the branch, the
 
 ## Results
 
-(filled in by the Studio session)
+Filled in by the Studio session on 2026-11-25.
+
+**Done: the agent now sees the sealed shelf on the dev backend.** Production is untouched.
+
+What changed:
+- The snapshot carries a `sealedShelf` next to the 3-jar rotation, with its own 1,000-character budget. Rotation output is byte-identical to before.
+- Each bag has a ref key, name, roaster, origin, process, roast date, days off roast and peak state with days.
+- Peak state comes from the app's `getPeakStatus`. It now also returns a `phase` field, so nothing parses labels. No second formula.
+- Order is who needs opening soonest: past peak, then fewest peak days left, then closest to peak. Frozen and undated bags go last. Cap is 8, plus a "+N more" line.
+- Every sealed line says "not opened yet". The prompt bans dial-in or brew fixes for sealed bags, and says how to pick one bag to open.
+- The evidence read for a sealed bag now says "sealed on your shelf and not opened yet", not "in your rotation".
+
+What the agent receives for a two-jar, two-sealed shelf:
+
+```
+Sealed shelf (not opened yet), soonest to open first:
+1. Kafiex Colombia, Kafiex, Colombia, Natural; 12 days off roast, in peak, 18 days left.
+2. Fritz Ethiopia, Fritz, Ethiopia, Anaerobic; 5 days off roast, resting, peak in 5 days.
+```
+
+Saves:
+- New guard on `save_espresso_recipe`: it refuses a ref that differs from the coffee the message named (`save_target_mismatch`).
+- It also refuses a sealed bag the message does not name (`sealed_save_requires_named_bag`).
+- Tests prove a save lands on the exact bag named, sealed or in a jar, and that a wrong ref saves nothing.
+
+Tests:
+- `npm test` exit 0. `npm run test:ruphus-u3` 66 of 66. `npx vite build` exit 0.
+- New tests cover: shelf with refs, FINISHED excluded, rotation unchanged, cap and "+N more", budget, "not opened yet" marker, urgency order, shelf life override, frozen and undated bags, field sanitizing, binding to a sealed ref, and the save guards.
+- `scripts/ruphus-evidence.test.mjs` was not in `npm test` before. It is now.
+
+**Blocked: no real agent conversation was run. Spend was $0.**
+- The harness's live mode needs a model key, a dev sign-in token and Firebase admin access in the shell. None are set on the Studio.
+- The only existing key path reads an env file, which this brief forbids. So I did not run it.
+- The fixture account also has no sealed bags, so a fixture run would not test this anyway.
+- To check it yourself: on the Dev app, ask the agent "what bean should I open?".
+
+Cross-model review (gpt-6.1-sol, high effort, two read-only passes). Fixed:
+- A wrong ref could save to another sealed bag. Fixed with the save guards above.
+- Up Next ranking (bag size, variety) could push the most urgent bag past the cap and ignored the shelf life override. Replaced with urgency order.
+- The prompt claimed sealed bags have no brews. Resealed bags keep their history, so that claim is gone.
+- Bag names reached the prompt unsanitized. Now stripped of control and markup characters.
+- Peak state was read from display labels. Now read from the new `phase` field.
+- Two tests repeated a date helper. Now shared in `scripts/test-dates.mjs`.
+
+Skipped, with reasons:
+- Server timezone. Days off roast count on the server's UTC calendar. In the PT evening that can read one day more than the app shows. The request carries no timezone, and the existing rotation ages already work this way. A fix needs the app to send its timezone, which is a client change.
+- Rotation jar names are still unsanitized. That predates this change and is outside this brief.
+
+Ship:
+- New dev deployment: `twomanybeans-swaps-yqmuexnr7-tmanman90s-projects.vercel.app` (Preview, project `twomanybeans-swaps-dev`).
+- Probe before the alias move: 401 "Invalid or expired token". Same after.
+- `twomanybeans-swaps-api.vercel.app` now points at it.
+- Rollback: `npx vercel alias set twomanybeans-swaps-lrw9yo0ir-tmanman90s-projects.vercel.app twomanybeans-swaps-api.vercel.app --scope tmanman90s-projects`.
+- Nothing went to production. No settings or env vars were touched. The model is unchanged.
+
+Notes:
+- The main checkout on the Studio is `~/Developer/Coffee-App`, not the path in this brief. The worktree came from there, and its files were left alone.
+- Lesson added to `lessons.md`: `src/lib` modules the API imports need explicit `.js` paths.
