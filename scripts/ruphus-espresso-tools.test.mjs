@@ -751,5 +751,16 @@ assert.doesNotMatch(partialGeneric.recipe.grindGuidance, /Barista Express grinde
   assert.equal(sealedDb.read(beanRef('sealed-bean')).espressoRecipe.doseGrams, 18);
   assert.equal(sealedDb.read(beanRef('sealed-other')).espressoRecipe, undefined);
   assert.notEqual(sealedSave.coffeeRef, jarSave.coffeeRef);
+  // The user names Kafiex, but the tool call carries Fritz's ref: refused.
+  const wrongRef = await saveFor('Please save 20 grams for the Kafiex Colombia espresso recipe.', (context) => context.rotationSnapshot.sealedShelf.find((bag) => bag.name === 'Fritz Ethiopia')?.refKey, 'turn-sealed-wrong-ref', 20);
+  assert.equal(wrongRef.result.ok, false);
+  assert.equal(wrongRef.result.code, 'save_target_mismatch');
+  assert.equal(sealedDb.read(beanRef('sealed-other')).espressoRecipe, undefined);
+  assert.equal(sealedDb.read(beanRef('sealed-bean')).espressoRecipe.doseGrams, 18);
+  // A sealed bag the message never names is not a save target.
+  const unnamedSealed = await saveFor('Please save 21 grams for this espresso recipe.', (context) => context.rotationSnapshot.sealedShelf.find((bag) => bag.name === 'Fritz Ethiopia')?.refKey, 'turn-sealed-unnamed', 21);
+  assert.equal(unnamedSealed.result.ok, false);
+  assert.equal(unnamedSealed.result.code, 'sealed_save_requires_named_bag');
+  assert.equal(sealedDb.read(beanRef('sealed-other')).espressoRecipe, undefined);
 }
 console.log('ruphus espresso tools tests: existing save/idempotency/Undo plus generic equipment contracts passed');

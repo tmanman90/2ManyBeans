@@ -1540,6 +1540,13 @@ export function createRuphusTools({ uid, context, readers = {}, proposalStore, c
       if (!explicitEspressoRequest('save', args, { retryRecord })) return { ok: false, code: 'espresso_save_requires_explicit_request', message: 'I can explain or suggest an espresso change, but I only save it after a direct request.' };
       const setup = context.rotationSnapshot?.setup || {};
       const bean = typeof readers.readCoffee === 'function' ? await readers.readCoffee({ uid, coffeeId }) : null;
+      // Sealed shelf refs widen the set of valid targets, so a save must land
+      // on the coffee this message resolved to, and a sealed bag only when
+      // this message names it.
+      const saveBinding = context.__ruphusTurnBinding || context.turnBinding;
+      const boundCoffeeId = saveBinding?.status === 'locked' ? resolveId(saveBinding.coffeeRef) : null;
+      if (boundCoffeeId && boundCoffeeId !== coffeeId) return { ok: false, code: 'save_target_mismatch', message: 'That save pointed at a different coffee than the one you named. Nothing was saved.' };
+      if (bean?.status === 'SEALED' && boundCoffeeId !== coffeeId) return { ok: false, code: 'sealed_save_requires_named_bag', message: 'Name the sealed bag you want this saved to. Nothing was saved.' };
       const activeRevisionId = bean?.activeRevisionIds?.espresso || null;
       const setupKey = espressoSetupKey(setup);
       // A receipt created by this authenticated session is the only authority

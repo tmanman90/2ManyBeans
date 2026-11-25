@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
+import { localDaysAgo } from './test-dates.mjs';
 import { sanitizeEvidence } from '../src/lib/ruphus/sanitizeEvidence.js';
 import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
 import { generateV60IcedRecipe } from '../src/lib/v60IcedAdapter.js';
@@ -155,11 +156,10 @@ test('context exposes only the exact editable review as typed current recipe con
 });
 
 test('context and provider block carry the sealed shelf as unopened bags without raw IDs', async () => {
-  const day = (days) => { const date = new Date(Date.now() - days * 86400000); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
   const coffees = [
     { id: 'firestore-jar-1', name: 'El Vergel', origin: 'Colombia', process: 'Washed', jarSlot: 1, status: 'ACTIVE' },
-    { id: 'firestore-sealed-1', name: 'Kafiex Colombia', roaster: 'Kafiex', origin: 'Colombia', process: 'Natural', status: 'SEALED', roastDate: day(12), degasMin: 3, peakStart: 10, peakEnd: 30 },
-    { id: 'firestore-sealed-2', name: 'Fritz Ethiopia', roaster: 'Fritz', origin: 'Ethiopia', process: 'Washed', status: 'SEALED', roastDate: day(5), degasMin: 3, peakStart: 10, peakEnd: 30 },
+    { id: 'firestore-sealed-1', name: 'Kafiex Colombia', roaster: 'Kafiex', origin: 'Colombia', process: 'Natural', status: 'SEALED', roastDate: localDaysAgo(12), degasMin: 3, peakStart: 10, peakEnd: 30 },
+    { id: 'firestore-sealed-2', name: 'Fritz Ethiopia', roaster: 'Fritz', origin: 'Ethiopia', process: 'Washed', status: 'SEALED', roastDate: localDaysAgo(5), degasMin: 3, peakStart: 10, peakEnd: 30 },
     { id: 'firestore-finished', name: 'Finished Panama', status: 'FINISHED' },
   ];
   const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'What bean should I open next?', evidenceByteCap: 10000, readers: { listCoffees: async () => coffees } });

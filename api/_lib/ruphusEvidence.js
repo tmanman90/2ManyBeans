@@ -2,7 +2,7 @@ import { projectBrewEvidence } from './ruphusBrewEvidence.js';
 import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
 import { formatBrewContext, isMilkDrink, snapshotBrewContext } from '../../src/lib/brewContext.js';
 import { daysSinceRoast, effectivePeakEnd, getPeakStatus } from '../../src/lib/peakStatus.js';
-import { getRecommendations } from '../../src/lib/recommendations.js';
+import { sanitizeUserText } from '../../src/lib/sanitizeUserText.js';
 
 export const DEFAULT_HISTORY_DAYS = 14;
 export const MAX_SNAPSHOT_LINES = 12;
@@ -185,23 +185,45 @@ function safeCoffee(coffee, refKey) {
   };
 }
 
-const clip = (value, max = 48) => { const value_ = text(value); return value_.length <= max ? value_ : `${value_.slice(0, max - 1).trimEnd()}…`; };
+// Bag fields are user-controlled and land in the developer prompt
+// (lessons.md: system prompt injection), so strip control and markup
+// characters before clipping.
+const promptField = (value, max = 48) => {
+  const clean = sanitizeUserText(String(value ?? '')).replace(/[`<>{}]/g, '').trim();
+  return clean.length <= max ? clean : `${clean.slice(0, max - 1).trimEnd()}…`;
+};
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 
-// Peak state comes from the app's own getPeakStatus label, so the agent and
+// Peak state comes from the app's own getPeakStatus phase, so the agent and
 // the Inventory tab never disagree about where a bag is in its window.
 function sealedPeak(coffee) {
   if (!text(coffee?.roastDate)) return { state: 'unknown', label: 'roast date unknown' };
   const peakStart = coffee?.peakStart;
   const peakEnd = effectivePeakEnd(coffee || {});
   if (!finite(peakStart) || !finite(peakEnd)) return { state: 'unknown', label: 'peak window unknown' };
-  const status = getPeakStatus(coffee);
+  const { phase } = getPeakStatus(coffee);
   const days = daysSinceRoast(coffee.roastDate, coffee);
-  if (status.frozen) return { state: 'frozen', label: 'frozen' };
-  if (!finite(days)) return { state: 'unknown', label: 'peak window unknown' };
-  if (/^(?:Degassing|Resting)/.test(status.label)) return { state: 'before', daysUntilPeak: peakStart - days, label: `${status.label.toLowerCase()}, peak in ${peakStart - days} days` };
-  if (/^In Peak/.test(status.label)) return { state: 'in', daysLeftInPeak: peakEnd - days, label: `in peak, ${peakEnd - days} days left` };
+  if (phase === 'frozen') return { state: 'frozen', label: 'frozen' };
+  if (!finite(days) || phase === 'unknown') return { state: 'unknown', label: 'peak window unknown' };
+  if (phase === 'degassing' || phase === 'resting') return { state: 'before', daysUntilPeak: peakStart - days, label: `${phase}, peak in ${peakStart - days} days` };
+  if (phase === 'peak') return { state: 'in', daysLeftInPeak: peakEnd - days, label: `in peak, ${peakEnd - days} days left` };
   return { state: 'past', daysPastPeak: days - peakEnd, label: `past peak by ${days - peakEnd} days` };
+}
+
+// "Who needs opening soonest": past peak (longest past first), then in peak
+// (fewest days left first), then resting (closest to peak first); frozen and
+// undated bags last. Variety against the jars is the agent's call, not ours.
+const PEAK_URGENCY = Object.freeze({ past: 0, in: 1, before: 2, frozen: 3, unknown: 4 });
+function urgencyKey(peak) {
+  if (peak.state === 'past') return -peak.daysPastPeak;
+  if (peak.state === 'in') return peak.daysLeftInPeak;
+  if (peak.state === 'before') return peak.daysUntilPeak;
+  return 0;
+}
+function bySoonestToOpen(a, b) {
+  return PEAK_URGENCY[a.peak.state] - PEAK_URGENCY[b.peak.state]
+    || urgencyKey(a.peak) - urgencyKey(b.peak)
+    || a.name.localeCompare(b.name);
 }
 
 function sealedLine(bag, rank) {
@@ -210,46 +232,42 @@ function sealedLine(bag, rank) {
   return `${rank}. ${identity}; ${age}${bag.peak.label}.`;
 }
 
-/**
- * Unopened bags, ordered the way the app's Up Next ranks them
- * (getRecommendations), with their own ref keys and character budget.
- */
+/** Unopened bags, soonest to open first, with their own ref keys and character budget. */
 export function buildSealedShelf(coffees = [], refs = {}) {
-  const all = Array.isArray(coffees) ? coffees : [];
-  const sealedTotal = all.filter((coffee) => coffee?.status === 'SEALED').length;
-  if (!sealedTotal) return { sealedShelf: [], sealedLines: [], sealedText: '', sealedMore: 0 };
-  const ordered = getRecommendations(all, sealedTotal).map((item) => item.bean);
-  const header = 'Sealed shelf (not opened yet; no brews or dial-in exist for these), best to open first:';
+  const ordered = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.status === 'SEALED').map((coffee) => ({
+    id: coffee?.id || null,
+    bag: {
+      refKey: `c${canonicalHash({ id: coffee?.id || coffee?.name, shelf: 'sealed' }).slice(0, 8)}`,
+      opened: false,
+      status: 'SEALED',
+      name: promptField(coffee?.name || coffee?.coffeeName),
+      roaster: promptField(coffee?.roaster),
+      origin: promptField(coffee?.origin),
+      process: promptField(coffee?.process),
+      roastDate: text(coffee?.roastDate) || null,
+      daysOffRoast: text(coffee?.roastDate) ? daysSinceRoast(coffee.roastDate, coffee) : null,
+      peak: sealedPeak(coffee),
+    },
+  })).sort((a, b) => bySoonestToOpen(a.bag, b.bag));
+  if (!ordered.length) return { sealedShelf: [], sealedLines: [], sealedText: '', sealedMore: 0 };
+  const header = 'Sealed shelf (not opened yet), soonest to open first:';
   const moreLine = (count) => `+${count} more sealed ${count === 1 ? 'bag' : 'bags'} (not opened yet).`;
   const sealedShelf = [];
   const sealedLines = [header];
   let chars = header.length;
-  for (const coffee of ordered.slice(0, MAX_SEALED_SHELF_BAGS)) {
-    const refKey = `c${canonicalHash({ id: coffee?.id || coffee?.name, shelf: 'sealed' }).slice(0, 8)}`;
-    const bag = {
-      refKey,
-      opened: false,
-      status: 'SEALED',
-      name: clip(coffee?.name || coffee?.coffeeName),
-      roaster: clip(coffee?.roaster),
-      origin: clip(coffee?.origin),
-      process: clip(coffee?.process),
-      roastDate: text(coffee?.roastDate) || null,
-      daysOffRoast: text(coffee?.roastDate) ? daysSinceRoast(coffee.roastDate, coffee) : null,
-      peak: sealedPeak(coffee),
-    };
+  for (const { id, bag } of ordered.slice(0, MAX_SEALED_SHELF_BAGS)) {
+    // Never let a sealed key shadow a rotation key for a different bag.
+    if (refs[bag.refKey] && refs[bag.refKey] !== id) continue;
     const line = sealedLine(bag, sealedShelf.length + 1);
-    const remainingAfter = sealedTotal - sealedShelf.length - 1;
+    const remainingAfter = ordered.length - sealedShelf.length - 1;
     const reserve = remainingAfter > 0 ? 1 + moreLine(remainingAfter).length : 0;
     if (chars + 1 + line.length + reserve > MAX_SEALED_SHELF_CHARS) break;
-    // Never let a sealed key shadow a rotation key for a different bag.
-    if (refs[refKey] && refs[refKey] !== (coffee?.id || null)) continue;
-    refs[refKey] = coffee?.id || null;
+    refs[bag.refKey] = id;
     sealedShelf.push(bag);
     sealedLines.push(line);
     chars += 1 + line.length;
   }
-  const sealedMore = sealedTotal - sealedShelf.length;
+  const sealedMore = ordered.length - sealedShelf.length;
   if (sealedMore > 0) sealedLines.push(moreLine(sealedMore));
   return { sealedShelf, sealedLines, sealedText: sealedLines.join('\n'), sealedMore };
 }

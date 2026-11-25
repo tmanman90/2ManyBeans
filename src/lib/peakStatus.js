@@ -60,18 +60,18 @@ export const getPeakStatus = (bean) => {
   const days = daysSinceRoast(bean.roastDate, bean);
   const peak = effectivePeakEnd(bean);
   const frozen = !!bean.frozenAt;
-  if (days === null) return { label: "Unknown", color: C.textMuted, bg: C.borderLight };
+  if (days === null) return { label: "Unknown", phase: "unknown", color: C.textMuted, bg: C.borderLight };
   if (frozen) {
-    return { label: `Frozen (${days}d)`, color: C.blue, bg: C.blueBg, days, frozen: true };
+    return { label: `Frozen (${days}d)`, phase: "frozen", color: C.blue, bg: C.blueBg, days, frozen: true };
   }
-  if (days < bean.degasMin) return { label: "Degassing", color: C.purple, bg: C.purpleBg, days };
-  if (days < bean.peakStart) return { label: "Resting", color: C.amber, bg: C.amberBg, days };
+  if (days < bean.degasMin) return { label: "Degassing", phase: "degassing", color: C.purple, bg: C.purpleBg, days };
+  if (days < bean.peakStart) return { label: "Resting", phase: "resting", color: C.amber, bg: C.amberBg, days };
   if (days <= peak) {
     const pct = Math.round(((days - bean.peakStart) / (peak - bean.peakStart)) * 100);
-    return { label: `In Peak (${pct}%)`, color: C.green, bg: C.greenBg, days };
+    return { label: `In Peak (${pct}%)`, phase: "peak", color: C.green, bg: C.greenBg, days };
   }
   const over = days - peak;
-  if (over <= 14) return { label: `Fading (+${over}d)`, color: C.amber, bg: C.amberBg, days };
-  if (over <= 30) return { label: `Past Peak (+${over}d)`, color: C.red, bg: C.redBg, days };
-  return { label: `Stale (+${over}d)`, color: C.red, bg: C.redBg, days };
+  if (over <= 14) return { label: `Fading (+${over}d)`, phase: "fading", color: C.amber, bg: C.amberBg, days };
+  if (over <= 30) return { label: `Past Peak (+${over}d)`, phase: "past", color: C.red, bg: C.redBg, days };
+  return { label: `Stale (+${over}d)`, phase: "stale", color: C.red, bg: C.redBg, days };
 };
