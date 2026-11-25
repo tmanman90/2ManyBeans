@@ -188,6 +188,7 @@ function buildFixture(expected, { info = {}, widget = {}, capacitor = {}, entitl
     CFBundleVersion: expected.build,
     NSSupportsLiveActivities: true,
     NSBluetoothAlwaysUsageDescription: expected.bluetooth,
+    CFBundleURLTypes: [{ CFBundleURLSchemes: [expected.googleScheme] }, { CFBundleURLSchemes: ['com.talmeltzer.coffeehub'] }],
     ...info,
   });
   if (withWidget) {
@@ -206,7 +207,6 @@ function buildFixture(expected, { info = {}, widget = {}, capacitor = {}, entitl
     plugins: { CapacitorUpdater: { autoUpdate: true } },
     ...capacitor,
   }));
-  writePlist(join(app, 'GoogleService-Info.plist'), { BUNDLE_ID: 'com.talmeltzer.coffeehub' });
   writeFileSync(join(app, 'public/assets/index.js'), publicText);
   const entitlementsPath = join(root, 'entitlements.plist');
   writePlist(entitlementsPath, { 'com.apple.developer.applesignin': ['Default'], 'get-task-allow': false, ...entitlements });
@@ -225,6 +225,7 @@ test('the archive check reads the expected build from the repo', macOnly, async 
   assert.equal(expected.build, '43');
   assert.match(expected.bluetooth, /^2manybeans /);
   assert.equal(expected.webViewBackground, '#F3EDE4');
+  assert.match(expected.googleScheme, /^com\.googleusercontent\.apps\./);
 });
 
 test('the WebView background is the colour the page paints first', () => {
@@ -259,6 +260,8 @@ test('the archive check reports every miss', macOnly, async () => {
     [{ info: { NSSupportsLiveActivities: false } }, /NSSupportsLiveActivities/],
     [{ info: { NSBluetoothAlwaysUsageDescription: 'Coffee Hub connects to your coffee scale to track your pours.' } }, /Bluetooth text/],
     [{ info: { UIBackgroundModes: ['bluetooth-central'] } }, /UIBackgroundModes/],
+    [{ info: { CFBundleURLTypes: [{ CFBundleURLSchemes: ['com.googleusercontent.apps.dev-client'] }] } }, /Google sign-in URL scheme/],
+    [{ info: { CFBundleURLTypes: [] } }, /Google sign-in URL scheme is undefined/],
     [{ widget: { CFBundleVersion: '42' } }, /Widget build/],
     [{ widget: { CFBundleIdentifier: 'com.talmeltzer.coffeehub.dev.BrewActivity' } }, /Widget bundle ID/],
     [{ withWidget: false }, /BrewActivityWidget\.appex is missing/],
